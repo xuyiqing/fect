@@ -1,0 +1,96 @@
+##########
+## Print
+##########
+## a fect object
+print.fect <- function(x,
+                       switch.on = TRUE,
+                       switch.off = FALSE,
+                       time.on.lim = NULL,
+                       time.off.lim = NULL,  
+                       ...) {
+    
+    cat("Call:\n")
+    print(x$call, digits = 4)
+
+    if (switch.on == TRUE) {
+        if (!is.null(time.on.lim)) {
+
+            if (is.numeric(time.on.lim)==FALSE) {
+                stop("Some element in \"time.on.lim\" is not numeric.")
+            } else {
+                if (length(time.on.lim)!=2) {
+                    stop("time.on.lim must be of length 2.")
+                }
+            }
+
+            seq.on.min <- min(which(x$time.on >= time.on.lim[1]))
+            seq.on.max <- max(which(x$time.on <= time.on.lim[2]))
+            seq.on <- seq.on.min:seq.on.max
+        } else {
+            seq.on <- 1:length(x$time.on)
+        }
+
+
+    }
+
+    if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
+        if (!is.null(time.off.lim)) {
+
+            if (is.numeric(time.off.lim)==FALSE) {
+                stop("Some element in \"time.off.lim\" is not numeric.")
+            } else {
+                if (length(time.off.lim)!=2) {
+                    stop("time.off.lim must be of length 2.")
+                }
+            }
+
+            seq.off.min <- min(which(x$time.off >= time.off.lim[1]))
+            seq.off.max <- max(which(x$time.off <= time.off.lim[2]))
+            seq.off <- seq.off.min:seq.off.max
+        } else {
+            seq.off <- 1:length(x$time.off)
+        }    
+    }
+    
+    if (is.null(x$est.avg) == TRUE) { # no uncertainties
+        cat("\nAverage Treatment Effect:\n")
+        print(x$att.avg, digits = 4)
+        if (switch.on == TRUE) {
+            cat("\n   ~ Switch-on by Period:\n")
+            print(x$att.on[seq.on], digits = 4)
+        }
+        if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
+            cat("\n   ~ Switch-on by Period:\n")
+            print(x$att.off[seq.off], digits = 4)    
+        }
+        if (is.null(x$X) == FALSE) {
+            cat("\nCoefficients for the Covariates:\n")
+            print(x$beta, digits = 4)
+        }
+        cat("\nUncertainty estimates not available.\n")
+    } else {
+        cat("\nAverage Treatment Effect:\n")
+        print(x$est.avg, digits = 4)
+        if (switch.on == TRUE) {
+            cat("\n   ~ Switch-on by Period:\n")
+            print(x$est.att.on[seq.on,], digits = 4)
+        }
+        if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
+            cat("\n   ~ Switch-on by Period:\n")
+            print(x$est.att.off[seq.off,], digits = 4)    
+        }
+        if (is.null(x$X) == FALSE) {
+            cat("\nCoefficients for the Covariates:\n")
+            print(x$est.beta, digits = 4)
+        }
+        ## cat("\n   ~ Chi-squared test for switch-on treatment effect of pre-treatment periods:\n")
+        ## cat("P =",x$T0.on.p)
+        ## cat("\n   ~ Chi-squared test for switch-off treatment effect of pre-treatment periods:\n")
+        ## cat("P =",x$T0.off.p)
+    }
+
+    if (!is.null(x$est.placebo)) {
+        cat("\nPlacebo effect for pre-treatment periods:\n")
+        print(x$est.placebo, digits = 4)
+    }
+}

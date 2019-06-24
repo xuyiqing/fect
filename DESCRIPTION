@@ -1,0 +1,17 @@
+Package: fect
+Type: Package
+Title: Fixed Effects Counterfactuals
+Version: 1.4.2
+Date: 2019-06-19
+Author: Licheng Liu, Ye Wang, Yiqing Xu
+Maintainer: Yiqing Xu <yiqingxu@ucsd.edu>
+Description: Provides causal inference with counterfactual estimators. 
+NeedsCompilation: yes
+License: GPL-2
+Imports: Rcpp (>= 0.12.3), ggplot2 (>= 2.1.0), GGally (>= 1.0.1),
+         doParallel (>= 1.0.10), foreach (>= 1.4.3), abind (>= 1.4-0), 
+         gridExtra, grid, fastplm
+SystemRequirements: A C++11 compiler.
+Depends: R (>= 2.10)
+LinkingTo: Rcpp, RcppArmadillo
+RoxygenNote: 6.0.1
