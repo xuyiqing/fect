@@ -8,30 +8,33 @@
 plot.fect <- function(x,  
                       type = "raw",
                       gap.type = "on",
-                      bound = "both",
+                      bound = NULL,
                       vis = "connected",
                       count = TRUE,
-                      proportion = NULL,
+                      proportion = 0.3,
                       equiv.bound = NULL,
                       equiv.bound.size = 1,
                       effect.bound.ratio = FALSE,
+                      p.value = TRUE,
+                      main = NULL,
                       xlim = NULL, 
                       ylim = NULL,
                       xlab = NULL, 
                       ylab = NULL,
-                      label.size = 5,
-                      label.pos = NULL,
-                      legend.pos = NULL,
-                      theme.bw = FALSE,
                       legendOff = FALSE,
+                      legend.pos = NULL,
+                      legend.nrow = NULL,
+                      legend.labs = NULL,
+                      text.pos = NULL,
+                      theme.bw = FALSE,
                       gridOff = FALSE,
-                      main = NULL,
                       id = NULL,
-                      cex.main = 15,
-                      cex.main.sub = 12,
-                      cex.axis = 8,
-                      cex.lab = 12, 
-                      cex.legend = 12,
+                      cex.main = NULL,
+                      cex.main.sub = NULL,
+                      cex.axis = NULL,
+                      cex.lab = NULL, 
+                      cex.legend = NULL,
+                      cex.text = NULL,
                       axis.adjust = FALSE,
                       axis.lab = "both",
                       axis.lab.gap = c(0, 0),
@@ -50,19 +53,24 @@ plot.fect <- function(x,
     placeboTest <- x$placeboTest
     placebo.period <- x$placebo.period
     binary <- x$binary
+    wald <- !is.null(x$wald$p)
+
 
     if (class(x) != "fect") {
         stop("Not a \"fect\" object.")
     }
-    if (!type %in% c("missing", "raw", "gap")) {
+    if (!type %in% c("missing", "raw", "gap","equiv")) {
         stop("\"type\" option misspecified.")
     }
     if (type == "gap" && gap.type == "off" && is.null(x$att.off)) {
         stop("No switch-off treatment effect to be plotted.")
     }
-    if (!bound %in% c("none", "min", "equiv", "both")) {
-        stop("\"bound\" option misspecified.")
-    } 
+    if (is.null(bound) == FALSE) {
+        if (!bound %in% c("none", "min", "equiv", "both")) {
+            stop("\"bound\" option misspecified.")
+        } 
+    }    
+    
     if (is.null(xlim)==FALSE) {
         if (is.numeric(xlim)==FALSE) {
             stop("Some element in \"xlim\" is not numeric.")
@@ -81,6 +89,29 @@ plot.fect <- function(x,
             }
         }
     }
+
+    ## gap or equiv
+    if (type == "gap") {
+        if (is.null(bound) == TRUE) {
+            bound <- "none"
+        }
+        maintext <- "Estimated Average Treatment Effect"
+    } else if (type == "equiv") {
+        if (is.null(bound) == TRUE) {
+            bound <- "both"
+        }
+        if (length(xlim)==0) {
+            xlim <- c(-1e5, 0.5)
+        } else {
+            if (xlim[2]>0) {
+                xlim[2]<-0.5
+            }
+        }
+        maintext <- "Equivalence Test" 
+        type <- "gap"
+    }       
+
+
     if (is.null(xlab)==FALSE) {
         if (is.character(xlab) == FALSE) {
             stop("\"xlab\" is not a string.")
@@ -123,12 +154,69 @@ plot.fect <- function(x,
         }
     }
 
-    #if (!is.null(label.pos)) {
-    #    if (length(label.pos) != 2) {
-    #        stop(" \"label.pos\" must be of length 2. ")
 
-    #    }
-    #}
+    #### font size
+    ## title
+    if (is.null(cex.main)==FALSE) {
+        if (is.numeric(cex.main)==FALSE) {
+            stop("\"cex.main\" is not numeric.")
+        }
+        cex.main <- 18 * cex.main
+    } else {
+        cex.main <- 18
+    }
+    ## subtitle
+    if (is.null(cex.main.sub)==FALSE) {
+        if (is.numeric(cex.main.sub)==FALSE) {
+            stop("\"cex.main.sub\" is not numeric.")
+        }
+        cex.main.sub <- 16 * cex.main.sub
+    } else {
+        cex.main.sub <- 16
+    }
+    ## axis label
+    if (is.null(cex.lab)==FALSE) {
+        if (is.numeric(cex.lab)==FALSE) {
+            stop("\"cex.lab\" is not numeric.")
+        }
+        cex.lab <- 15 * cex.lab
+    } else {
+        cex.lab <- 15
+    }
+    ## axis number
+    if (is.null(cex.axis)==FALSE) {
+        if (is.numeric(cex.axis)==FALSE) {
+            stop("\"cex.axis\" is not numeric.")
+        }
+        cex.axis <- 15 * cex.axis
+    }  else {
+        cex.axis <- 15
+    }
+    ## legend
+    if (is.null(cex.legend)==FALSE) {
+        if (is.numeric(cex.legend)==FALSE) {
+            stop("\"cex.legend\" is not numeric.")
+        }
+        cex.legend <- 15 * cex.legend
+    }  else {
+        cex.legend <- 15
+    }
+    ## text
+    if (is.null(cex.text)==FALSE) {
+        if (is.numeric(cex.text)==FALSE) {
+            stop("\"cex.text\" is not numeric.")
+        }
+        cex.text <- 6 * cex.text
+    }  else {
+        cex.text <- 6
+    }
+
+    ## text label position
+    if (!is.null(text.pos)) {
+       if (length(text.pos) != 2) {
+           stop(" \"text.pos\" must be of length 2. ")
+       }
+    }
 
     ##-------------------------------##
     ## Plotting
@@ -146,7 +234,7 @@ plot.fect <- function(x,
 
     TT <- dim(Y)[1]
     N <- dim(Y)[2]
-
+    
     if (type == "missing") {
         if (is.null(id) == TRUE) {
             ## if (is.null(show.id) == TRUE) {
@@ -238,6 +326,7 @@ plot.fect <- function(x,
 
     ############  START  ############### 
     if (type == "gap") {
+
         ## axes labels
         if (is.null(xlab) == TRUE) {
             xlab <- paste("Time relative to Treatment")
@@ -251,13 +340,14 @@ plot.fect <- function(x,
             ylab <- NULL
         }
 
+        ## 0 lines
         lcolor <- "white"
+        lwidth <- 2
         if (theme.bw == TRUE) {
             lcolor <- "#AAAAAA70"
-        }
-            
-        ## title
-        maintext <- "Estimated Average Treatment Effect"
+            lwidth <- 1.5
+        }           
+        
 
         if (gap.type == "on") {
 
@@ -307,10 +397,14 @@ plot.fect <- function(x,
 
                 ## add legend for 95\% CI
                 set.limits <- "ci"
-                set.labels <- "ATT (w/ 95% CI)"
+                if (is.null(legend.labs)==TRUE) {
+                    set.labels <- "ATT (w/ 95% CI)"                    
+                } else {
+                    set.labels <- legend.labs
+                }
                 set.colors <- "#000000FF"
                 set.linetypes <- "solid"
-                set.size <- 0.7
+                set.size <- 1
 
                 ## create a dataset for bound
                 if (bound == "equiv") {
@@ -321,33 +415,43 @@ plot.fect <- function(x,
                     data2$id <- rep(1:2, each = length(bound.time))
 
                     set.limits <- c(set.limits, "equiv")
-                    set.labels <- c(set.labels, "Equiv. Bound")
+                    if (is.null(legend.labs)==TRUE) {
+                        set.labels <- c(set.labels, "equiv. Bound")
+                    } else {
+                        set.labels <- legend.labs
+                    }
                     set.colors <- c(set.colors, "red")
                     set.linetypes <- c(set.linetypes, "dashed")
                     set.size <- c(set.size, 0.7)
-                }
+                } 
                 else if (bound == "min") {
                     data2 <- cbind.data.frame(c(rep(minbound, each = length(bound.time))))
                     names(data2) <- "bound"
                     data2$time <- rep(bound.time, 2)
                     data2$type <- rep(c("min"), 2 * length(bound.time))
                     data2$id <- rep(1:2, each = length(bound.time))
-
                     set.limits <- c(set.limits, "min")
-                    set.labels <- c(set.labels, "Min. Bound")
+                    if (is.null(legend.labs)==TRUE) {
+                        set.labels <- c(set.labels, "Min. Bound")
+                    } else {
+                        set.labels <- legend.labs
+                    }
                     set.colors <- c(set.colors, "gray50")
                     set.linetypes <- c(set.linetypes, "dashed")
                     set.size <- c(set.size, 0.7)
                 }
-                else {
+                else if (bound == "both") {
                     data2 <- cbind.data.frame(c(rep(minbound, each = length(bound.time)), rep(equiv.bound, each = length(bound.time))))
                     names(data2) <- "bound"
                     data2$time <- rep(bound.time, 4)
                     data2$type <- rep(c("min", "equiv"), each = 2 * length(bound.time))
                     data2$id <- rep(1:4, each = length(bound.time))
-
                     set.limits <- c(set.limits, "min", "equiv")
-                    set.labels <- c(set.labels, "Min. Bound", "Equiv. Bound")
+                    if (is.null(legend.labs)==TRUE) {
+                        set.labels <- c(set.labels, "Min. Bound", "Equiv. Bound")
+                    } else {
+                        set.labels <- legend.labs
+                    }
                     set.colors <- c(set.colors, "gray50", "red")
                     set.linetypes <- c(set.linetypes, "dashed", "dashed")
                     set.size <- c(set.size, 0.7, 0.7)
@@ -410,8 +514,10 @@ plot.fect <- function(x,
                                        size = type,
                                        group = id)) 
                 ## legend
-                legend.row <- ifelse(length(set.limits) <= 3, 1, 2)
-
+                if (is.null(legend.nrow) == TRUE) {
+                    legend.nrow <- ifelse(length(set.limits) <= 3, 1, 2)    
+                } 
+                
                 p <- p + scale_colour_manual(limits = set.limits,
                                              labels = set.labels,
                                              values =set.colors) +
@@ -421,17 +527,18 @@ plot.fect <- function(x,
                          scale_linetype_manual(limits = set.limits,
                                                labels = set.labels,
                                                values = set.linetypes) +
-                         guides(linetype = guide_legend(title=NULL, nrow=legend.row),
-                                colour = guide_legend(title=NULL, nrow=legend.row),
-                                size = guide_legend(title=NULL, nrow=legend.row)) 
+                         guides(linetype = guide_legend(title=NULL, nrow=legend.nrow),
+                                colour = guide_legend(title=NULL, nrow=legend.nrow),
+                                size = guide_legend(title=NULL, nrow=legend.nrow)) 
                 
                 if (effect.bound.ratio == TRUE) {
-                    if (is.null(label.pos)) {
-                        label.pos[1] <- min(data[,"time"], na.rm = 1) + 0.8
-                        label.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[1] + 0.85*(ylim[2] - ylim[1]))
+                    if (is.null(text.pos)) {
+                        text.pos[1] <- min(data[,"time"], na.rm = 1)
+                        text.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[1])
                     }
                     p.label <- paste("ATT / Min. Bound = ", sprintf("%.3f",x$att.avg / minBound), sep="")
-                    p <- p + annotate("text", x = label.pos[1], y = label.pos[2], label = p.label, size = label.size)
+                    p <- p + annotate("text", x = text.pos[1], y = text.pos[2], 
+                        label = p.label, size = cex.text, hjust = 0)
                 
                 }
                 
@@ -441,79 +548,77 @@ plot.fect <- function(x,
                     scale_x_continuous(labels=scaleFUN) 
             }
 
-
-
-            #if (!(theme.bw == TRUE && gridOff == TRUE)) {
-                p <- p + geom_vline(xintercept = 0, colour=lcolor,size = 2) +
-                         geom_hline(yintercept = 0, colour=lcolor,size = 2)
-            #}
-
+            ## theme
             if (theme.bw == TRUE) {
-                p <- p + theme_bw() + 
-                theme(legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
-                      legend.position = legend.pos,
-                      axis.title = element_text(size=cex.lab),
-                      axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
-                      axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)),
-                      axis.text = element_text(color="black", size=cex.axis),
-                      axis.text.x = element_text(size = cex.axis, angle = angle, hjust=x.h, vjust=x.v),
-                      axis.text.y = element_text(size = cex.axis),
-                      plot.title = element_text(size = cex.main,
-                                                hjust = 0.5,
-                                                face="bold",
-                                                margin = margin(10, 0, 10, 0)))
-                if (gridOff == TRUE) {
-                    p <- p + theme(panel.grid.major = element_blank(),
-                                   panel.grid.minor = element_blank())
+                p <- p + theme_bw() 
+            }
+
+            # horizontal 0 line
+            p <- p + geom_hline(yintercept = 0, colour=lcolor,size = lwidth)
+            # vertical 0 line
+            if (length(xlim)!=0) {
+                if (xlim[2]>=1) {
+                    p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)
                 }
             } else {
-                p <- p + theme(legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
-                               legend.position = legend.pos,
-                               axis.title=element_text(size=cex.lab),
-                               axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
-                               axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)),
-                               axis.text = element_text(color="black", size=cex.axis),
-                               axis.text.x = element_text(size = cex.axis, angle = angle, hjust=x.h, vjust=x.v),
-                               axis.text.y = element_text(size = cex.axis),
-                               plot.title = element_text(size = cex.main,
-                                                         hjust = 0.5,
-                                                         face="bold",
-                                                         margin = margin(10, 0, 10, 0)))
+                p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)
+            }
 
-            } 
+            ## legend and axes
+            p <- p + theme(legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
+               legend.position = legend.pos,
+               legend.background = element_rect(fill="transparent",colour=NA),
+               axis.title=element_text(size=cex.lab),
+               axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
+               axis.title.y = element_text(margin = margin(t = 0, r = 0, b = 0, l = 0)),
+               axis.text = element_text(color="black", size=cex.axis),
+               axis.text.x = element_text(size = cex.axis, angle = angle, hjust=x.h, vjust=x.v),
+               axis.text.y = element_text(size = cex.axis),
+               plot.title = element_text(size = cex.main, hjust = 0.5, face="bold", margin = margin(10, 0, 10, 0)))
+
+            ## grid
+            if (gridOff == TRUE) {
+                p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+            }
+
+
            
-            ## point estimates
             if (placeboTest == FALSE) {
+                ## point estimates
                 p <- p + geom_line(data = data, aes(time, ATT.ON), size = 1.2)
+                ## CIs
+                p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)
+                ## wald
+                if (wald == TRUE) {
+                    p.label <- paste0("Wald p value: ", sprintf("%.3f",x$wald$p))
+                    wald <- TRUE
+                } 
             } else {
+                ## point estimates
                 p <- p + geom_line(data = data, aes(time, ATT.ON3), size = 0.7)
                 p <- p + geom_line(data = data, aes(time, ATT.ON4), size = 0.7, colour = "#4671D5")
-
                 if (vis == "connected") {
                     p <- p + geom_point(data = data, aes(time, ATT.ON), size = 1.2)
                     p <- p + geom_point(data = data, aes(time, ATT.ON2), size = 1.2, colour = "#4671D5")
                 }
-            }
-             
-            ## confidence intervals
-            if (is.null(x$est.att.on)==FALSE) {
-                if (placeboTest == FALSE) {
-                    p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)
-                } else {
-
-                    if (is.null(label.pos)) {
-                        label.pos[1] <- min(data[,"time"], na.rm = 1) + 0.8
-                        label.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[1] + 0.85*(ylim[2] - ylim[1]))
-                    }
-
-                    p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2)
-                    p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF")
-                    p.label <- paste("p value: ", sprintf("%.3f",x$est.placebo[5]), sep="")
-                    p <- p + annotate("text", x = label.pos[1], y = label.pos[2], label = p.label, size = label.size)
-
+                ## CIs
+                p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2)
+                p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF")
+                ## p value
+                p.label <- paste0("p value: ", sprintf("%.3f",x$est.placebo[5]))
+            }       
+                        
+            
+            ## mark p value
+            if ((wald == TRUE | placeboTest == TRUE) & p.value == TRUE) {
+                if (is.null(text.pos)) {
+                    text.pos[1] <- min(data[,"time"], na.rm = 1)
+                    text.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[2])
                 }
+                p <- p + annotate("text", x = text.pos[1], y = text.pos[2], 
+                    label = p.label, size = cex.text, hjust = 0)        
             }
-
+            
             if (count == TRUE) {
                 data[,"xmin"] <- data[,"time"] - 0.2
                 data[,"xmax"] <- data[,"time"] + 0.2
@@ -521,6 +626,7 @@ plot.fect <- function(x,
                 data[,"ymax"] <- rect.min + (data[,"count"]/max.count) * 0.8 * rect.length
                 p <- p + geom_rect(data = data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "grey70", colour = "grey69", alpha = 0.4, size = 0.2)
             }
+
         } else {
             ## switch-off effects
             if (is.null(x$est.att.off) == TRUE) { 
@@ -536,8 +642,7 @@ plot.fect <- function(x,
                     rect.min <- min(data[,"ATT.OFF"]) - rect.length
                 }  
 
-            } else {
-                
+            } else {                
                 tb <- x$est.att.off
                 data <- cbind.data.frame(time, tb, count = x$count.off)[show,]
                 ## rect.length <- (max(data[,"CI.upper"]) - min(data[,"CI.lower"]))/2
@@ -561,36 +666,24 @@ plot.fect <- function(x,
                     scale_x_continuous(labels=scaleFUN) 
 
             if (theme.bw == TRUE) {
-                p <- p + theme_bw() + 
-                theme(legend.position = legend.pos, 
-                      axis.title=element_text(size=cex.lab),
-                      axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
-                      axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)),
-                      axis.text = element_text(color="black", size=cex.axis),
-                      axis.text.x = element_text(size = cex.axis, angle = angle, hjust=x.h, vjust=x.v),
-                      axis.text.y = element_text(size = cex.axis),
-                      plot.title = element_text(size = cex.main,
-                                                hjust = 0.5,
-                                                face="bold",
-                                                margin = margin(10, 0, 10, 0)))
-                if (gridOff == TRUE) {
-                    p <- p + theme(panel.grid.major = element_blank(),
-                                   panel.grid.minor = element_blank())
-                }
-            } else {
-                p <- p + theme(legend.position = legend.pos,
-                               axis.title=element_text(size=cex.lab),
-                               axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
-                               axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)),
-                               axis.text = element_text(color="black", size=cex.axis),
-                               axis.text.x = element_text(size = cex.axis, angle = angle, hjust=x.h, vjust=x.v),
-                               axis.text.y = element_text(size = cex.axis),
-                               plot.title = element_text(size = cex.main,
-                                                         hjust = 0.5,
-                                                         face="bold",
-                                                         margin = margin(10, 0, 10, 0)))
+                p <- p + theme_bw() 
+            } 
 
-            }
+            if (gridOff == TRUE) {
+                p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+            }   
+
+            p <- p + theme(legend.position = legend.pos,
+             axis.title=element_text(size=cex.lab),
+             axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
+             axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)),
+             axis.text = element_text(color="black", size=cex.axis),
+             axis.text.x = element_text(size = cex.axis, angle = angle, hjust=x.h, vjust=x.v),
+             axis.text.y = element_text(size = cex.axis),
+             plot.title = element_text(size = cex.main,
+               hjust = 0.5,
+               face="bold",
+               margin = margin(10, 0, 10, 0)))
                     
            
             ## point estimates

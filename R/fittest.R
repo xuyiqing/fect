@@ -1,24 +1,26 @@
 #####################################
 ## goodness of fit test: wild
 #####################################
-fect.test <- function(Y,
-                      X,
-                      D, ## input
-                      I,
-                      II,
-                      T.on,
-                      T.off = NULL,
-                      method = "fe",
-                      r = 0,
-                      lambda = Inf,
-                      force,
-                      hasRevs = 0,
-                      tol,
-                      norm.para,
-                      pre.period = NULL,
-                      nboots,
-                      parallel = TRUE,
-                      cores = NULL) {
+fect.test <- function(
+    out, # from fect
+    Y,
+    X,
+    D, ## input
+    I,
+    II,
+    T.on,
+    T.off = NULL,
+    method = "ife",
+    r = 0,
+    lambda = Inf,
+    force,
+    hasRevs = 0,
+    tol,
+    norm.para,
+    pre.period = NULL,
+    nboots,
+    parallel = TRUE,
+    cores = NULL) {
     
     
     x <- y <- na.pos <- NULL
@@ -30,23 +32,6 @@ fect.test <- function(Y,
         p <- 0
     }
     
-    ## estimation
-    if (method == "fe") {
-        out <- fect.fe(Y = Y, X = X, D = D, I = I, II = II, 
-                       T.on = T.on, T.off = NULL,
-                       r.cv = r, force = force, hasRevs = 0, 
-                       tol = tol, boot = 1,
-                       norm.para = norm.para, 
-                       placebo.period = NULL, placeboTest = 0)
-    } else {
-        out <- fect.mc(Y = Y, X = X, D = D, I = I, II = II,
-                       T.on = T.on, T.off = NULL, 
-                       lambda.cv = lambda, force = force, hasRevs = 0, 
-                       tol = tol, boot = 1,
-                       norm.para = norm.para,
-                       placebo.period = NULL, placeboTest = 0)
-    }
-
     ## output
     eff <- out$eff
     eff[which(is.na(eff))] <- 0
@@ -71,13 +56,12 @@ fect.test <- function(Y,
     #res <- lm.fit$residuals
     #f <- ((sum(eff.pre[,"eff"]^2) - sum(res^2))/length(unique(eff.pre[,"period"])))/(sum(res^2)/(dim(eff.pre)[1] - length(unique(eff.pre[,"period"]))))
     f <- summary(lm.fit)$f[1]
+    names(f) <- NULL
 
     ## bootstrapped F under H0
     f.boot <- rep(NA, nboots)
 
-    cat("\rBootstrapping ...\n")
- 
-    if (method == "fe") {
+    if (method == "ife") {
         one.nonpara <- function() {
                 
             res.p <- matrix(sample(c(-1, 1), N*TT, replace = TRUE), TT, N)
@@ -172,45 +156,44 @@ fect.test <- function(Y,
         }  
     } 
     ## end of bootstrapping
-    cat("\r")
 
-    
+    cat(length(f.boot), " runs\n", sep = "")    
     f.q <- quantile(f.boot, probs = c(0.025, 0.975))
     f.p <- sum(f.boot > f)/nboots
 
-    title <- "Empirical distribution of F under H0"
-    ## plot
-    f.data <- cbind.data.frame(f.boot = f.boot)
-    p <- ggplot(f.data, aes(f.boot)) + geom_density() + geom_vline(xintercept = f, colour="red",size = 0.5)
+    # title <- "Empirical distribution of F under H0"    
+    # ## plot
+    # f.data <- cbind.data.frame(f.boot = f.boot)
+    # p <- ggplot(f.data, aes(f.boot)) + geom_density() + geom_vline(xintercept = f, colour="red",size = 0.5)
 
-    d <- ggplot_build(p)$data[[1]]
+    # d <- ggplot_build(p)$data[[1]]
 
-    if (f < max(d[,"x"])) {
-        p <- p + geom_area(data = subset(d, x > f), aes(x=x, y=y), fill="red", alpha = 0.2)
-    }
+    # if (f < max(d[,"x"])) {
+    #     p <- p + geom_area(data = subset(d, x > f), aes(x=x, y=y), fill="red", alpha = 0.2)
+    # }
 
-    p <- p + annotate("text", x = 0.9*max(d[,"x"]), y = 0.9*max(d[,"y"]), label = paste("P value: ", f.p, sep=""))
+    # p <- p + annotate("text", x = 0.9*max(d[,"x"]), y = 0.9*max(d[,"y"]), label = paste("P value: ", f.p, sep=""))
 
-    p <- p + ggtitle(title) +  theme(plot.title = element_text(size=20,
-                                                               hjust = 0.5,
-                                                               margin = margin(10, 0, 10, 0)))
+    # p <- p + ggtitle(title) +  theme(plot.title = element_text(size=20,
+    #                                                            hjust = 0.5,
+    #                                                            margin = margin(10, 0, 10, 0)))
 
     ## suppressWarnings(print(p))
   
     ## store results
-    Ftest <- matrix(NA, 1, 4)
-    Ftest[1, ] <- c(f, f.q, f.p)
-
-    colnames(Ftest) <- c("Test_statistics", "Boot_quantile_Lower", "Boot_quantile_Upper", "P_value")
-    rownames(Ftest) <- "F_statistic"
-
-    return(list(Ftest = Ftest, f.boot = f.boot, p = p))
+    return(list(
+        stat = f, 
+        p = f.p,
+        quantile_lower = f.q[1], 
+        quantile_upper = f.q[2],
+        boot = f.boot))
     
 } ## end of test
 
 #####################################
 ## goodness of fit test: non para 
 #####################################
+
 fect.test2 <- function(Y,
                        X,
                        D, ## input
@@ -218,7 +201,7 @@ fect.test2 <- function(Y,
                        II,
                        T.on,
                        T.off = NULL,
-                       method = "fe",
+                       method = "ife",
                        r = 0,
                        lambda = Inf,
                        force,
@@ -264,7 +247,7 @@ fect.test2 <- function(Y,
     }
     
     ## estimation
-    if (method == "fe") {
+    if (method == "ife") {
         out <- fect.fe(Y = Y, X = X, D = D, I = I, II = II, 
                        T.on = T.on, T.off = NULL,
                        r.cv = r, force = force, hasRevs = 0, 
@@ -312,7 +295,7 @@ fect.test2 <- function(Y,
 
     cat("\rBootstrapping ...\n")
 
-    if (method == "fe") {
+    if (method == "ife") {
         one.nonpara <- function() {
 
             if (hasRevs == 0) {
@@ -565,9 +548,8 @@ fect.test2 <- function(Y,
     Ftest <- matrix(NA, 1, 4)
     Ftest[1, ] <- c(f, f.q, f.p)
 
-    colnames(Ftest) <- c("Test_statistics", "Boot_quantile_Lower", "Boot_quantile_Upper", "P_value")
-    rownames(Ftest) <- "F_statistic"
-
-    return(list(Ftest = Ftest, f.boot = f.boot, p = p))
+    colnames(Ftest) <- c("stat", "quantile_lower", "quantile_upper", "p_value")
+    
+    return(list(stat = Ftest, boot = f.boot, graph = p))
     
 } ## end of test

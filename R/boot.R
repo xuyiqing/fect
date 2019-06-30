@@ -9,7 +9,7 @@ fect.boot <- function(Y,
                       II, 
                       T.on, 
                       T.off = NULL, 
-                      method = "fe",
+                      method = "ife",
                       criterion = "mspe",
                       CV,
                       k = 5,
@@ -65,7 +65,7 @@ fect.boot <- function(Y,
     
     ## estimation
     if (CV == 0) { 
-        if (method == "fe") {
+        if (method == "ife") {
             out <- fect.fe(Y = Y, X = X, D = D, I = I, II = II, 
                            T.on = T.on, T.off = T.off,
                            r.cv = r, binary = binary, QR = QR,
@@ -102,7 +102,7 @@ fect.boot <- function(Y,
                                   k = k, r = r, r.end = r.end, 
                                   QR = QR, force = force, 
                                   hasRevs = hasRevs, tol = tol)
-            method <- "fe"
+            method <- "ife"
         }
         
     }
@@ -150,9 +150,9 @@ fect.boot <- function(Y,
         att.placebo.boot <- matrix(0, nboots, 1)
     } 
 
-    cat("\rBootstrapping ...\n")
+    cat("Bootstrapping for uncertainties ... ")
  
-    if (method == "fe") {
+    if (method == "ife") {
         one.nonpara <- function() {
 
             if (is.null(cl)) {
@@ -431,8 +431,7 @@ fect.boot <- function(Y,
         }  
     } 
     ## end of bootstrapping
-    cat("\r")
-
+    
     ## remove failure bootstrap
     ## alternative condition? max(apply(is.na(att.on.boot),2,sum)) == dim(att.on.boot)[1]
     if (sum(is.na(c(att.avg.boot))) > 0) {
@@ -455,7 +454,7 @@ fect.boot <- function(Y,
         }
 
     }
-    cat("Actual bootstrap times: ", dim(att.on.boot)[2], "\n", sep = "")
+    cat(dim(att.on.boot)[2], " runs\n", sep = "")
      
     ####################################
     ## Variance and CIs

@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactuals
-Version: 1.4.2
-Date: 2019-06-19
+Version: 1.4.4
+Date: 2019-06-30
 Author: Licheng Liu, Ye Wang, Yiqing Xu
 Maintainer: Yiqing Xu <yiqingxu@ucsd.edu>
 Description: Provides causal inference with counterfactual estimators. 

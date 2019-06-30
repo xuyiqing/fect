@@ -8,7 +8,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     II, 
                     T.on, 
                     T.off = NULL, 
-                    method = "fe",
+                    method = "ife",
                     criterion = "mspe",  
                     k = 5, # CV time
                     r = 0, # initial number of factors considered if CV==1
@@ -69,13 +69,13 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
     if (r.end >= T0.min) {
-        if (method %in% c("both", "fe")) {
+        if (method %in% c("both", "ife")) {
             cat("Facotr number should not be greater than ", T0.min-1, "\n", sep = "")
         }
         r.end <- T0.min-1
     } else {
         if (obs.con) {
-            if (method %in% c("both", "fe")) {
+            if (method %in% c("both", "ife")) {
                 cat("Facotr number should not be greater than ", r.end, "\n", sep = "")
             }
         }
@@ -95,7 +95,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     r.max <- min(TT, r.end)
     r.cv <- 0 ## initial value
 
-    if (method %in% c("fe", "both") && r.max == 0) {
+    if (method %in% c("ife", "both") && r.max == 0) {
         
         r.cv <- 0
         cat("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
@@ -162,7 +162,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 ##  ---------------- cross validation for ife model ------------------  ##
         ##  --------------------------------------------- ##
         
-        if (method %in% c("fe", "both")) {
+        if (method %in% c("ife", "both")) {
             
             cat("Interactive fixed effects model...\n")
             
@@ -384,7 +384,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }    ## End of Cross-Validation 
 
 
-    if (method == "fe") {
+    if (method == "ife") {
         est.best <- est.best.ife
         validF <- ifelse(r.cv > 0, 1, 0)
     } 
@@ -396,7 +396,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if (MSPE.best.ife <= MSPE.best.mc) {
             est.best <- est.best.ife
             validF <- ifelse(r.cv > 0, 1, 0) 
-            method <- "fe"
+            method <- "ife"
         } else {
             est.best <- est.best.mc
             validF <- est.best$validF
@@ -412,7 +412,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         ##------------------------------## 
 
     ## 00. run a fect to obtain residuals
-    #if (method == "fe") {
+    #if (method == "ife") {
     #    if (r.cv == 0) {
     #        est.equiv <- est.best
     #    } else {
@@ -430,7 +430,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     ## we first adjustment for normalization 
     if (!is.null(norm.para)) {
         
-        if (method == "fe") {
+        if (method == "ife") {
             ## variance of the error term 
             sigma2 <- est.best$sigma2 * (norm.para[1]^2)
             IC <- est.best$IC - log(est.best$sigma2) + log(sigma2)
@@ -442,7 +442,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
         ## output of estimates
         est.best$mu <- est.best$mu * norm.para[1] 
-        if (method == "fe" && r.cv > 0) {
+        if (method == "ife" && r.cv > 0) {
             est.best$lambda <- est.best$lambda * norm.para[1]
             est.best$VNT <- est.best$VNT * norm.para[1]
         }
@@ -462,7 +462,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
     ## 0. revelant parameters
     sigma2 <- IC <- PC <- NULL
-    if (method == "fe") {
+    if (method == "ife") {
         sigma2 <- est.best$sigma2   
         IC <- est.best$IC
         PC <- est.best$PC
@@ -593,7 +593,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         out<-c(out,list(alpha = est.best$alpha, xi = est.best$xi))
     }
 
-    if (method == "fe") {
+    if (method == "ife") {
         out <- c(out, list(r.cv = r.cv, IC = IC, PC = PC, sigma2 = sigma2))
         if (r.cv > 0) {
             out <- c(out, list(factor = as.matrix(est.best$factor),

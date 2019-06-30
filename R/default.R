@@ -1,7 +1,7 @@
 ## Causal inference using counterfactual estimators 
 ## (fect: fixed effects counterfactuals)
-## Version 1.2.0
-## Author: Licheng Liu(Tsinghua), Ye Wang(NYU), Yiqing Xu(UCSD)
+## Version 1.4.4
+## Author: Licheng Liu (Tsinghua), Ye Wang(NYU), Yiqing Xu(Stanford)
 ## Date: 2019.01.02
 
 ## MAIN FUNCTION
@@ -43,7 +43,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  k = 5, # times of CV
                  binary = FALSE, # probit model
                  QR = FALSE, # QR or SVD for binary probit 
-                 method = "fe", # method: fe for interactive fe; mc for matrix completion
+                 method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
                  criterion = "mspe", # for ife model: mspe, pc or both
                  se = FALSE, # report uncertainties
                  nboots = 200, # number of bootstraps
@@ -54,7 +54,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  min.T0 = 5, # minimum T0
                  max.missing = NULL, # maximum missing
                  pre.period = NULL, # fit test period 
-                 fitTest = FALSE, # fit test
+                 wald = FALSE, # fit test
                  placebo.period = NULL, # placebo test period
                  placeboTest = FALSE, # placebo test
                  normalize = FALSE # accelerate option
@@ -79,7 +79,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          k = 5, # times of CV
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
-                         method = "fe", # method: fe for interactive fe; mc for matrix completion
+                         method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
                          criterion = "mspe", # for ife model: mspe, pc or both
                          se = FALSE, # report uncertainties
                          nboots = 200, # number of bootstraps
@@ -90,7 +90,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.period = NULL,
-                         fitTest = FALSE,
+                         wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
                          normalize = FALSE
@@ -130,7 +130,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         na.rm, index, force, cl, r, lambda, nlambda, 
                         CV, k, binary, QR, method, criterion, se, 
                         nboots, parallel, cores, tol, seed, min.T0,
-                        max.missing, pre.period, fitTest,
+                        max.missing, pre.period, wald,
                         placebo.period, placeboTest, normalize)
     
     out$call <- match.call()
@@ -158,7 +158,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          k = 5, # times of CV
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
-                         method = "fe", # method: fe for interactive fe; mc for matrix completion
+                         method = "fe", # method: ife for interactive fe; mc for matrix completion
                          criterion = "mspe", 
                          se = FALSE, # report uncertainties
                          nboots = 200, # number of bootstraps
@@ -169,7 +169,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.period = NULL,
-                         fitTest = FALSE,
+                         wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
                          normalize = FALSE
@@ -210,13 +210,18 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     ## binary
     if (binary == 1) {
-        method <- "fe"
+        method <- "ife"
         normalize <- FALSE
     }
 
     ## method
-    if (!method %in% c("fe", "mc", "both")) {
-        stop("\"method\" option misspecified; choose from c(\"fe\", \"mc\", \"both\").")
+    if (!method %in% c("fe", "ife", "mc", "both")) {
+        stop("\"method\" option misspecified; choose from c(\"fe\", \"ife\", \"mc\", \"both\").")
+    }
+    if (method == "fe") {
+        r <- 0
+        CV <- FALSE
+        method <- "ife"
     }
 
     if (!criterion %in% c("mspe", "pc", "both")) {
@@ -224,11 +229,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     if (method == "both" && criterion == "pc") {
-        stop("\"fe\" and \"mc\" method cannot be campared; try using \"mspe\" as criteria.")
+        stop("\"ife\" and \"mc\" method cannot be compared; try using \"mspe\" as criteria.")
     }
 
     ## r
-    if ( method %in% c("fe", "both") & r[1] < 0) {
+    if ( method %in% c("ife", "both") & r[1] < 0) {
         stop("\"r\" option misspecified. The number of factors must be non-negative.")
     }
 
@@ -241,7 +246,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
         if (CV == FALSE & is.null(lambda)) {
             cat("No lambda is supplied. FEct is applied.")
-            method <- "fe"
+            method <- "ife"
             r <- 0
         }
     } 
@@ -251,14 +256,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         CV <- TRUE
     }
     if (CV == TRUE) {
-        if (fitTest == TRUE) {
-            stop("Fitness test cannot be performed while doing cross-validation.")
-        }
+        
         if (placeboTest == TRUE) {
             stop("Placebo test cannot be performed while doing cross-validation.")
         }
 
-        if (method %in% c("fe", "both")) {
+        if (method %in% c("ife", "both")) {
             if (length(r) == 2 & r[1] > r[2]) {
                 stop("\"r\" option misspecified.")
             }
@@ -269,9 +272,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             }
         }
     } else {
-        if (! method %in% c("fe", "mc")) {
-            stop("\"method\" option misspecified; please choose from c(\"fe\", \"mc\").")
+        if (! method %in% c("ife", "mc")) {
+            stop("\"method\" option misspecified; please choose from c(\"ife\", \"mc\").")
         }
+    }
+
+    if (placeboTest == TRUE) {
+        wald <- FALSE
     }
 
     if (length(r) == 1) {
@@ -286,12 +293,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     ## uncertainty estimates
     if (is.logical(se) == FALSE & !se%in%c(0, 1)) {
-        stop("se is not a logical flag.")
+        stop("\"se\" is not a logical flag.")
     } 
 
     ## normalize
     if (is.logical(normalize) == FALSE & !normalize%in%c(0, 1)) {
-        stop("normalize is not a logical flag.")
+        stop("\"normalize\" is not a logical flag.")
     } 
 
     ## nboots
@@ -316,13 +323,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## seed
     if (is.null(seed) == FALSE) {
         if (is.numeric(seed) == FALSE) {
-            stop("seed should be a number.")
+            stop("\"seed\" should be a number.")
         }
     }
 
     ## remove missing values
     if (is.logical(na.rm) == FALSE & !na.rm%in%c(0, 1)) {
-        stop("na.rm is not a logical flag.")
+        stop("\"na.rm\" is not a logical flag.")
     } 
 
     ## select variable that are to be used 
@@ -379,7 +386,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## check index and treatment indicator
     if (! class(data[, Dname]) %in% c("numeric", "integer")) {
         ## data[, Dname] <- as.numeric(as.character(data[, Dname]))
-        stop("Treatment indicator should be a numberic value.")
+        stop("Treatment indicator should be a numeric value.")
     } 
 
     if (class(data[, index[1]]) == "factor") {
@@ -577,7 +584,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## rm.tr.id: relative location of treated units (within all treated units) 
     ## that will be removed 
     if (T0.min < min.T0) {
-        cat("Some treated units has too few pre-treatment periods. \nThey will be automatically removed.\n")
+        cat("Some treated units has too few pre-treatment periods; they are removed automatically.\n")
     }
 
     rm.id <- sort(unique(c(which((TT - apply(I, 2, sum)) > max.missing), which(T0 < min.T0))))
@@ -748,7 +755,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## Register clusters
     ##-------------------------------##
     
-    if ((se == TRUE | fitTest == TRUE) & parallel==TRUE) {
+    if ((se == TRUE | wald == TRUE) & parallel==TRUE) {
+
+        ## set seed
+        if (is.null(seed) == FALSE) {
+            set.seed(seed)
+        }
    
         if (is.null(cores) == TRUE) {
             cores <- detectCores()
@@ -762,7 +774,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## run main program
     ##-------------------------------## 
 
-    if ( se == FALSE & fitTest == FALSE) {
+    if (se == FALSE) {
 
         if (CV == TRUE) { 
             if (binary == FALSE) {
@@ -783,8 +795,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                       hasRevs = hasRevs, tol = tol)
             }
             
-        } else {
-            if (method == "fe") {
+        } else { ## non-binary case
+            if (method == "ife") {
                 out <- fect.fe(Y = Y, D = D, X = X, I = I, II = II,
                                T.on = T.on, T.off = T.off, r.cv = r,
                                binary = binary, QR = QR,
@@ -806,24 +818,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         }
 
-    } else { 
-
-        if (is.null(seed) == FALSE) {
-            set.seed(seed)
-        }
-
-        if (fitTest == TRUE) {
-            out <- fect.test(Y = Y, D = D, X = X, I = I, II = II,
-                             T.on = T.on, T.off = NULL,
-                             method = method, r = r, lambda = lambda,
-                             force = force, hasRevs = 0,
-                             tol = tol, norm.para = norm.para,
-                             pre.period = pre.period, nboots = nboots,
-                             parallel = parallel, cores = cores)
-
-        } else {
-
-            out <- fect.boot(Y = Y, D = D, X = X, I = I, II = II,
+    } else { # SE == TRUE
+        
+        out <- fect.boot(Y = Y, D = D, X = X, I = I, II = II,
                              T.on = T.on, T.off = T.off, cl = cl,
                              method = method, criterion = criterion,
                              CV = CV, k = k, r = r, r.end = r.end, 
@@ -836,22 +833,34 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                              nboots = nboots, parallel = parallel,
                              cores = cores)
 
-        }
-
     }
 
-    if ((se == TRUE | fitTest == TRUE) & parallel == TRUE) {
+    if ((out$validX == 0) & (p!=0) ) {
+        warning("Multi-colinearity among covariates. Try removing some of them.\r")
+    }     
+
+    # Wald test
+    if (wald == TRUE) {
+
+        cat("Bootstrapping for Wald test ... ")
+
+        out.wald <- fect.test(out = out, 
+            Y = Y, D = D, X = X, I = I, II = II,
+            T.on = T.on, T.off = NULL,
+            method = method, r = out$r.cv, lambda = out$lambda.cv,
+            force = force, hasRevs = 0,
+            tol = tol, norm.para = norm.para,
+            pre.period = pre.period, nboots = nboots,
+            parallel = parallel, cores = cores)
+    } 
+
+    
+    if ((se == TRUE | wald == TRUE) & parallel == TRUE) {
         stopCluster(para.clusters)
         ##closeAllConnections()
     }
 
-    if (fitTest == TRUE) {
-        return(out)
-    }
-
-    if ( (out$validX == 0) & (p!=0) ) {
-        warning("Multi-colinearity among covariates. Try removing some of them.\r")
-    }    
+       
     
     ##-------------------------------##
     ## storage
@@ -925,6 +934,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         output <- c(output,list(remove.id = remove.id))
         ## cat("list of removed units:",remove.id)
         ## cat("\n\n")
+    }
+    if (wald == TRUE) {
+        output <- c(output,list(wald = out.wald))
     }
     output <- c(output, list(call = match.call()))
     class(output) <- "fect"

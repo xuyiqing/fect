@@ -1,9 +1,9 @@
 # fect
 
-## Fixed Effects counterfactuals
+## Fixed Effects Counterfactual Estimators
 ---
 
-**Authors:** Yiqing Xu [<yiqingxu@ucsd.edu>]; Licheng Liu [<liulch.16@sem.tsinghua.edu.cn>] 
+**Authors:** Licheng Liu [<liulch.16@sem.tsinghua.edu.cn>]; Yiqing Xu [<yiqingxu@stanford.edu>]
 
 **How to Uses:** [Examples](http://yiqingxu.org/software/gsynth/gsynth_examples.html)
 
