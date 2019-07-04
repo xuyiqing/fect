@@ -35,7 +35,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  na.rm = FALSE, # remove missing values
                  index, # c(unit, time) indicators
                  force = "unit", # fixed effects demeaning
-                 cl = NULL, 
+                 cl = "unit", 
                  r = 0, # nubmer of factors
                  lambda = NULL, # mc method: regularization parameter
                  nlambda = 10, ## mc method: regularization parameter
@@ -71,7 +71,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          na.rm = FALSE, # remove missing values
                          index, # c(unit, time) indicators
                          force = "unit", # fixed effects demeaning
-                         cl = NULL, 
+                         cl = "unit", 
                          r = 0, # nubmer of factors
                          lambda = NULL, # mc method: regularization parameter
                          nlambda = 10, ## mc method: regularization parameter
@@ -150,7 +150,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          na.rm = FALSE, # remove missing values
                          index, # c(unit, time) indicators
                          force = "unit", # fixed effects demeaning
-                         cl = NULL, 
+                         cl = "unit", 
                          r = 0, # nubmer of factors
                          lambda = NULL, ## mc method: regularization parameter
                          nlambda = 0, ## mc method: regularization parameter
@@ -333,15 +333,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     } 
 
     ## select variable that are to be used 
-    if (!is.null(cl)) {
-        if (cl %in% index) {
-            data <- data[,c(index, Y, D, X)]
-        } else {
-            data <- data[,c(index, Y, D, X, cl)]
-        }
-    } else {
+    #if (!is.null(cl)) {
+    #    if (cl %in% index) {
+    #        data <- data[,c(index, Y, D, X)]
+    #    } else {
+    #        data <- data[,c(index, Y, D, X, cl)]
+    #    }
+    #} else {
         data <- data[,c(index, Y, D, X)] ## some variables may not be used
-    }
+    #}
     
     if (na.rm == TRUE) {
         data <- na.omit(data)
@@ -369,11 +369,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     Xname <- X
     clname <- cl
 
-    if (!is.null(clname)) {
-        if (!clname %in% index) {
-            data[, clname] <- as.numeric(as.factor(data[, clname]))
-        }
-    }
+    #if (!is.null(clname)) {
+    #    if (!clname %in% index) {
+    #        data[, clname] <- as.numeric(as.factor(data[, clname]))
+    #    }
+    #}
 
     ## normalize
     norm.para <- NULL
@@ -542,24 +542,24 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             ## } 
         } 
     }
-    if (!is.null(clname)) {
-        if (clname %in% index) {
-            cl <- 1:N
-        } else {
-            cl <- matrix(data[, clname], TT, N)
-            v.cl <- c()
-            for (i in 1:N) {
-                if (sum(is.na(cl[,i])) > 0) {
-                    v.cl <- c(v.cl, na.omit(cl[,i])[1])
-                } else {
-                    v.cl <- c(v.cl, cl[1, i])
-                }
-            }
-            cl <- v.cl
-        }
-    } else {
-        cl <- NULL
-    }
+    #if (!is.null(clname)) {
+    #    if (clname %in% index) {
+    #        cl <- 1:N
+    #    } else {
+    #        cl <- matrix(data[, clname], TT, N)
+    #        v.cl <- c()
+    #        for (i in 1:N) {
+    #            if (sum(is.na(cl[,i])) > 0) {
+    #                v.cl <- c(v.cl, na.omit(cl[,i])[1])
+    #            } else {
+    #                v.cl <- c(v.cl, cl[1, i])
+    #            }
+    #        }
+    #        cl <- v.cl
+    #    }
+    #} else {
+    #    cl <- NULL
+    #}
 
     ## ----------------------------------------------------------- ##
     II <- I
@@ -613,9 +613,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         D <- as.matrix(D[,-rm.id])
         I <- as.matrix(I[,-rm.id]) ## after removing
         II <- as.matrix(II[,-rm.id])
-        if (!is.null(cl)) {
-            cl <- cl[-rm.id]
-        }
+        #if (!is.null(cl)) {
+        #    cl <- cl[-rm.id]
+        #}
     }  
 
     ## 2. check if some periods when all units are missing
@@ -694,9 +694,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             I <- as.matrix(I[,-rm.id.2.pos]) ## after removing
             II <- as.matrix(II[,-rm.id.2.pos])
             T.on <- as.matrix(T.on[,-rm.id.2.pos])
-            if (!is.null(cl)) {
-                cl <- cl[-rm.id.2.pos]
-            }
+            #if (!is.null(cl)) {
+            #    cl <- cl[-rm.id.2.pos]
+            #}
         }  
     }
 
@@ -821,7 +821,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     } else { # SE == TRUE
         
         out <- fect.boot(Y = Y, D = D, X = X, I = I, II = II,
-                             T.on = T.on, T.off = T.off, cl = cl,
+                             T.on = T.on, T.off = T.off, cl = NULL,
                              method = method, criterion = criterion,
                              CV = CV, k = k, r = r, r.end = r.end, 
                              nlambda = nlambda, lambda = lambda,
@@ -847,7 +847,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         out.wald <- fect.test(out = out, 
             Y = Y, D = D, X = X, I = I, II = II,
             T.on = T.on, T.off = NULL,
-            method = method, r = out$r.cv, lambda = out$lambda.cv,
+            method = method, cl = cl, r = out$r.cv, 
+            lambda = out$lambda.cv,
             force = force, hasRevs = 0,
             tol = tol, norm.para = norm.para,
             pre.period = pre.period, nboots = nboots,

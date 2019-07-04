@@ -11,6 +11,7 @@ fect.test <- function(
     T.on,
     T.off = NULL,
     method = "ife",
+    cl = NULL,
     r = 0,
     lambda = Inf,
     force,
@@ -64,8 +65,11 @@ fect.test <- function(
     if (method == "ife") {
         one.nonpara <- function() {
                 
-            res.p <- matrix(sample(c(-1, 1), N*TT, replace = TRUE), TT, N)
-            ## res.p <- matrix(rep(sample(c(-1, 1), N, replace = TRUE), each = TT), TT, N)
+            if (is.null(cl)) {
+                res.p <- matrix(sample(c(-1, 1), N*TT, replace = TRUE), TT, N)
+            } else {
+                res.p <- matrix(rep(sample(c(-1, 1), N, replace = TRUE), each = TT), TT, N)
+            }
             Y.boot <- Y.f + res.p * eff
             Y.boot[which(I == 0)] <- 0
             boot <- try(fect.fe(Y = Y.boot, X = X, D = D, I = I, II = II, 
@@ -99,8 +103,11 @@ fect.test <- function(
     } else { ## mc
         one.nonpara <- function() {
             
-            res.p <- matrix(sample(c(-1, 1), N*TT, replace = TRUE), TT, N)
-            ## res.p <- matrix(rep(sample(c(-1, 1), N, replace = TRUE), each = TT), TT, N)
+            if (is.null(cl)) {
+                res.p <- matrix(sample(c(-1, 1), N*TT, replace = TRUE), TT, N)
+            } else {
+                res.p <- matrix(rep(sample(c(-1, 1), N, replace = TRUE), each = TT), TT, N)
+            }
             Y.boot <- Y.f + res.p * eff
             Y.boot[which(I == 0)] <- 0
             boot <- try(fect.mc(Y = Y.boot, X = X, D = D, 

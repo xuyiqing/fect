@@ -4,7 +4,7 @@
 \description{Implements the matrix completion method based
 on interactive fixed effect models.}
 \usage{fect(formula = NULL, data, Y, D, X = NULL, na.rm = FALSE, 
-       index, force = "unit", cl = NULL, r = 0, lambda = NULL, nlambda = 10,
+       index, force = "unit", cl = "unit", r = 0, lambda = NULL, nlambda = 10,
        CV = TRUE, k = 5, binary = FALSE, QR = FALSE,
        method = "fe", criterion = "mspe",
        se = FALSE, nboots = 200, 
