@@ -424,6 +424,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         stop(paste("Error values in variable \"", Dname,"\".", sep = ""))
     }
 
+
     ## check variation in x
     if (p > 0) {
         for (i in 1:p) {
@@ -472,15 +473,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             ob.indicator[sub.start:sub.end] <- ob.indicator[sub.start:sub.end] + i * TT
         }
 
-        if (!is.null(clname)) {
-            if (!clname %in% index) {
-                variable <- c(Yname, Dname, Xname, clname)
-            } else {
-                variable <- c(Yname, Dname, Xname)
-            }
-        } else {
+        #if (!is.null(clname)) {
+        #    if (!clname %in% index) {
+        #        variable <- c(Yname, Dname, Xname, clname)
+        #    } else {
+        #        variable <- c(Yname, Dname, Xname)
+        #    }
+        #} else {
             variable <- c(Yname, Dname, Xname)
-        }
+        #}
 
         data_I <- matrix(0, N * TT, 1)
         data_I[ob.indicator, 1] <- 1
