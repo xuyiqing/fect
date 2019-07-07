@@ -41,6 +41,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  nlambda = 10, ## mc method: regularization parameter
                  CV = TRUE, # cross-validation
                  k = 5, # times of CV
+                 cv.prop = 0.1, ## proportion of CV counts
                  binary = FALSE, # probit model
                  QR = FALSE, # QR or SVD for binary probit 
                  method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
@@ -77,6 +78,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          nlambda = 10, ## mc method: regularization parameter
                          CV = TRUE, # cross-validation
                          k = 5, # times of CV
+                         cv.prop = 0.1, ## proportion of CV counts
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
@@ -128,7 +130,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
     out <- fect.default(formula = NULL, data = data, Y = Yname,
                         D = Dname, X = Xname,
                         na.rm, index, force, cl, r, lambda, nlambda, 
-                        CV, k, binary, QR, method, criterion, se, 
+                        CV, k, cv.prop, binary, QR, method, criterion, se, 
                         nboots, parallel, cores, tol, seed, min.T0,
                         max.missing, pre.period, wald,
                         placebo.period, placeboTest, normalize)
@@ -156,6 +158,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          nlambda = 0, ## mc method: regularization parameter
                          CV = TRUE, # cross-validation
                          k = 5, # times of CV
+                         cv.prop = 0.1,
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: ife for interactive fe; mc for matrix completion
@@ -783,7 +786,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                T.on = T.on, T.off = T.off, 
                                method = method,
                                criterion = criterion,
-                               k = k, r = r, r.end = r.end, 
+                               k = k, cv.prop = cv.prop,
+                               r = r, r.end = r.end, 
                                nlambda = nlambda, lambda = lambda,
                                force = force, hasRevs = hasRevs, 
                                tol = tol, norm.para = norm.para)
@@ -791,7 +795,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 out <- fect.binary.cv(Y = Y, D = D, X = X,
                                       I = I, II = II, 
                                       T.on = T.on, T.off = T.off, 
-                                      k = k, r = r, r.end = r.end, 
+                                      k = k, cv.prop = cv.prop,
+                                      r = r, r.end = r.end, 
                                       QR = QR, force = force, 
                                       hasRevs = hasRevs, tol = tol)
             }

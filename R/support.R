@@ -318,7 +318,7 @@ cv.sample <- function(I, count) {
         ## remove boundary observation 
         oci2 <- setdiff(oci, c((1:N)*TT, (TT*(0:(N-1))+1)))
         ## randomly select 1/3
-        subcount <- as.integer(count/3)
+        subcount <- floor(count/3)
         rm.id <- sample(oci2, subcount, replace = FALSE)
         rm.id.upper <- rm.id - 1
         rm.id.lower <- rm.id + 1

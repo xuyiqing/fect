@@ -11,6 +11,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     method = "ife",
                     criterion = "mspe",  
                     k = 5, # CV time
+                    cv.prop = 0.1,
                     r = 0, # initial number of factors considered if CV==1
                     r.end,
                     nlambda = 10, 
@@ -114,10 +115,12 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         t.on.cv <- t.on[cv.pos]
         count.on.cv <- as.numeric(table(t.on.cv))
         ## tot.id <- which(c(II)==1) ## observed control data
-        cv.count <- ceiling((sum(II)*sum(II))/sum(I))
+        ## cv.count <- ceiling((sum(II)*sum(II))/sum(I))
+        rm.count <- floor(sum(II)*cv.prop)
+        cv.count <- sum(II) - rm.count
 
         ociCV <- matrix(NA, cv.count, k) ## store indicator
-        rmCV <- matrix(NA, (length(oci) - cv.count), k) ## removed indicator
+        rmCV <- matrix(NA, rm.count, k) ## removed indicator
         Y0CV <- array(NA, dim = c(TT, N, k)) ## store initial Y0
         if (p > 0) {
            beta0CV <- array(NA, dim = c(p, 1, k)) 
@@ -130,7 +133,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             repeat{
                 cv.n <- cv.n + 1
                 ## cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
-                cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
+                cv.id <- cv.sample(II, sum(II)*cv.prop)
+                ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
                 II.cv <- II
                 II.cv[cv.id] <- 0
                 con1 <- sum(apply(II.cv, 1, sum) >= 1) == TT
