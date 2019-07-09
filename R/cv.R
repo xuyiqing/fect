@@ -12,8 +12,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     criterion = "mspe",  
                     k = 5, # CV time
                     cv.prop = 0.1,
-                    cv.treat = FALSE, 
-                    cv.continue = 1,
+                    cv.treat = TRUE, 
+                    cv.nobs = 3,
                     r = 0, # initial number of factors considered if CV==1
                     r.end,
                     nlambda = 10, 
@@ -136,7 +136,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             repeat{
                 cv.n <- cv.n + 1
                 ## cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
-                cv.id <- cv.sample(II, D, rm.count, cv.continue, cv.treat)
+                cv.id <- cv.sample(II, D, rm.count, cv.nobs, cv.treat)
                 ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
                 II.cv <- II
                 II.cv[cv.id] <- 0
@@ -172,7 +172,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         
         if (method %in% c("ife", "both")) {
             
-            cat("Interactive fixed effects model...\n")
+            # cat("Interactive fixed effects model...\n")
             
             r.pc <- est.pc.best <- MSPE.best <- MSPE.pc.best <- NULL
             if (criterion == "PC") {

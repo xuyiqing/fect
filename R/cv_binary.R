@@ -10,8 +10,8 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
                            T.off = NULL, 
                            k = 5, # CV time
                            cv.prop = 0.1,
-                           cv.treat = FALSE, 
-                           cv.continue = 1,
+                           cv.treat = TRUE, 
+                           cv.nobs = 3,
                            r = 0, # initial number of factors considered if CV==1
                            r.end,
                            QR = FALSE, 
@@ -135,7 +135,7 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
             cv.n <- 0
             repeat{
                 cv.n <- cv.n + 1
-                cv.id <- cv.sample(II, D, rm.count, cv.continue, cv.treat)
+                cv.id <- cv.sample(II, D, rm.count, cv.nobs, cv.treat)
                 ## cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
                 ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
                 II.cv <- II

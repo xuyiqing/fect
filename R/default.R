@@ -36,14 +36,14 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  index, # c(unit, time) indicators
                  force = "unit", # fixed effects demeaning
                  cl = "unit", 
-                 r = 0, # nubmer of factors
+                 r = 0, # number of factors
                  lambda = NULL, # mc method: regularization parameter
                  nlambda = 10, ## mc method: regularization parameter
                  CV = TRUE, # cross-validation
                  k = 10, # times of CV
                  cv.prop = 0.1, ## proportion of CV counts
-                 cv.treat = TRUE, 
-                 cv.continue = 3,
+                 cv.treat = TRUE, ## cv targeting treated units
+                 cv.nobs = 3,  ## cv taking consecutive units
                  binary = FALSE, # probit model
                  QR = FALSE, # QR or SVD for binary probit 
                  method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
@@ -82,7 +82,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          k = 10, # times of CV
                          cv.prop = 0.1, ## proportion of CV counts
                          cv.treat = TRUE, 
-                         cv.continue = 3,
+                         cv.nobs = 3,
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
@@ -134,7 +134,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
     out <- fect.default(formula = NULL, data = data, Y = Yname,
                         D = Dname, X = Xname,
                         na.rm, index, force, cl, r, lambda, nlambda, 
-                        CV, k, cv.prop, cv.treat, cv.continue,
+                        CV, k, cv.prop, cv.treat, cv.nobs,
                         binary, QR, method, criterion, se, 
                         nboots, parallel, cores, tol, seed, min.T0,
                         max.missing, pre.period, wald,
@@ -165,7 +165,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          k = 10, # times of CV
                          cv.prop = 0.1,
                          cv.treat = TRUE, 
-                         cv.continue = 3,
+                         cv.nobs = 3,
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: ife for interactive fe; mc for matrix completion
@@ -795,7 +795,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                criterion = criterion,
                                k = k, cv.prop = cv.prop,
                                cv.treat = cv.treat,
-                               cv.continue = cv.continue, 
+                               cv.nobs = cv.nobs, 
                                r = r, r.end = r.end, 
                                nlambda = nlambda, lambda = lambda,
                                force = force, hasRevs = hasRevs, 
@@ -806,7 +806,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                       T.on = T.on, T.off = T.off, 
                                       k = k, cv.prop = cv.prop,
                                       cv.treat = cv.treat, 
-                                      cv.continue = cv.continue,
+                                      cv.nobs = cv.nobs,
                                       r = r, r.end = r.end, 
                                       QR = QR, force = force, 
                                       hasRevs = hasRevs, tol = tol)

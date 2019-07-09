@@ -228,14 +228,14 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     eff.pre <- cbind(eff.v.use1[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
     colnames(eff.pre) <- c("eff", "period", "unit")
 
-    pre.sd <- eff.pre.equiv <- NULL
+    sigma2.pre <- eff.pre.equiv <- NULL
     if (binary == FALSE && boot == FALSE) {
         eff.pre.equiv <- cbind(eff.equiv.v[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
         colnames(eff.pre.equiv) <- c("eff.equiv", "period", "unit")
 
-        pre.sd <- tapply(eff.pre.equiv[,1], eff.pre.equiv[,2], sd)
-        pre.sd <- cbind(pre.sd, sort(unique(eff.pre.equiv[, 2])), table(eff.pre.equiv[, 2]))
-        colnames(pre.sd) <- c("sd", "period", "count")
+        sigma2.pre <- tapply(eff.pre.equiv[,1], eff.pre.equiv[,2], var)
+        sigma2.pre <- cbind(sigma2.pre, sort(unique(eff.pre.equiv[, 2])), table(eff.pre.equiv[, 2]))
+        colnames(sigma2.pre) <- c("sigma2", "period", "count")
     }
 
     time.on <- sort(unique(t.on.use))
@@ -317,7 +317,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         count.on = count.on,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
-        pre.sd = pre.sd)
+        sigma2.pre = sigma2.pre)
 
     if (binary == 0) {
         out <- c(out, list(PC = PC,

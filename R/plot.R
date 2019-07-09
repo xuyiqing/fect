@@ -6,39 +6,40 @@
 # main: whether to show the title;
 # id: plot a part of units
 plot.fect <- function(x,  
-                      type = "raw",
-                      gap.type = "on",
-                      bound = NULL,
-                      vis = "connected",
-                      count = TRUE,
-                      proportion = 0.3,
-                      equiv.bound = NULL,
-                      equiv.bound.size = 1,
-                      effect.bound.ratio = FALSE,
-                      p.value = TRUE,
-                      main = NULL,
-                      xlim = NULL, 
-                      ylim = NULL,
-                      xlab = NULL, 
-                      ylab = NULL,
-                      legendOff = FALSE,
-                      legend.pos = NULL,
-                      legend.nrow = NULL,
-                      legend.labs = NULL,
-                      text.pos = NULL,
-                      theme.bw = FALSE,
-                      gridOff = FALSE,
-                      id = NULL,
-                      cex.main = NULL,
-                      cex.main.sub = NULL,
-                      cex.axis = NULL,
-                      cex.lab = NULL, 
-                      cex.legend = NULL,
-                      cex.text = NULL,
-                      axis.adjust = FALSE,
-                      axis.lab = "both",
-                      axis.lab.gap = c(0, 0),
-                      ...){
+  type = "gap",
+  gap.type = "on",
+  bound = NULL,
+  vis = "connected",
+  count = TRUE,
+  proportion = 0.3,
+  equiv.bound = NULL,
+  equiv.bound.size = 1,
+  effect.bound.ratio = FALSE,
+  p.value = TRUE,
+  main = NULL,
+  xlim = NULL, 
+  ylim = NULL,
+  xlab = NULL, 
+  ylab = NULL,
+  legendOff = FALSE,
+  legend.pos = NULL,
+  legend.nrow = NULL,
+  legend.labs = NULL,
+  text.pos = NULL,
+  theme.bw = FALSE,
+  gridOff = FALSE,
+  id = NULL,
+  cex.main = NULL,
+  cex.main.sub = NULL,
+  cex.axis = NULL,
+  cex.lab = NULL, 
+  cex.legend = NULL,
+  cex.text = NULL,
+  axis.adjust = FALSE,
+  axis.lab = "both",
+  axis.lab.gap = c(0, 0),
+  ...){
+
     ##-------------------------------##
     ## Checking Parameters
     ##-------------------------------## 
@@ -295,7 +296,7 @@ plot.fect <- function(x,
     ## count 
     show.count <- 1:time.end
     count.on <- x$count.on
-    max.count <- max(count.on[which(time >= 0)])
+    max.count <- max(count.on)
 
     if (!is.null(proportion)) {
         ## max.count <- max(count.on[which(time > 0)])
@@ -580,8 +581,6 @@ plot.fect <- function(x,
             if (gridOff == TRUE) {
                 p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
             }
-
-
            
             if (placeboTest == FALSE) {
                 ## point estimates
@@ -617,15 +616,8 @@ plot.fect <- function(x,
                 }
                 p <- p + annotate("text", x = text.pos[1], y = text.pos[2], 
                     label = p.label, size = cex.text, hjust = 0)        
-            }
+            }            
             
-            if (count == TRUE) {
-                data[,"xmin"] <- data[,"time"] - 0.2
-                data[,"xmax"] <- data[,"time"] + 0.2
-                data[,"ymin"] <- rep(rect.min, dim(data)[1])
-                data[,"ymax"] <- rect.min + (data[,"count"]/max.count) * 0.8 * rect.length
-                p <- p + geom_rect(data = data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "grey70", colour = "grey69", alpha = 0.4, size = 0.2)
-            }
 
         } else {
             ## switch-off effects
@@ -692,17 +684,24 @@ plot.fect <- function(x,
             ## confidence intervals
             if (is.null(x$est.att.off)==FALSE) {
                 p <- p + geom_ribbon(aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)
-            }
-
-            if (count == TRUE) {
-                data[,"xmin"] <- data[,"time"] - 0.2
-                data[,"xmax"] <- data[,"time"] + 0.2
-                data[,"ymin"] <- rep(rect.min, dim(data)[1])
-                data[,"ymax"] <- rect.min + (data[,"count"]/max.count) * 0.8 * rect.length
-                p <- p + geom_rect(data = data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "grey70", colour = "grey69", alpha = 0.4, size = 0.2)
-            }
+            }            
 
         }
+
+        ## histogram
+        if (count == TRUE) {
+            data[,"xmin"] <- data[,"time"] - 0.2
+            data[,"xmax"] <- data[,"time"] + 0.2
+            data[,"ymin"] <- rep(rect.min, dim(data)[1])
+            data[,"ymax"] <- rect.min + (data[,"count"]/max.count) * 0.8 * rect.length
+            xx <- range(data$time)
+            p <- p + geom_rect(data = data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+                fill = "grey70", colour = "grey69", alpha = 0.4, size = 0.2)
+            p <- p + annotate("text", x = - 0.02 * (xx[2]-xx[1]), 
+                y = max(data$ymax) + 0.2 * rect.length, 
+                label = max.count, size = cex.text * 0.8, hjust = 0.5)
+        }
+
             
         ## title
         if (is.null(main) == TRUE) {
