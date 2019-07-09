@@ -65,10 +65,10 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     est.best <- inter_fe_mc(YY, Y0, X, II, beta0, hasF, lambda.cv, force, tol) 
     validX <- est.best$validX
     validF <- est.best$validF
-    #est.equiv <- NULL
-    #if (boot == FALSE) {
-    #    est.equiv <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
-    #}
+    est.equiv <- NULL
+    if (boot == FALSE) {
+        est.equiv <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+    }
     
         ##------------------------------##
     ## ----------- Summarize -------------- ##
@@ -94,9 +94,9 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         }
         est.best$residuals <- est.best$residuals * norm.para[1] 
         est.best$fit <- est.best$fit * norm.para[1] 
-        #if (boot == FALSE) {
-        #    est.equiv$fit <- est.equiv$fit * norm.para[1]
-        #}
+        if (boot == FALSE) {
+            est.equiv$fit <- est.equiv$fit * norm.para[1]
+        }
     }
 
     ## 0. revelant parameters
@@ -114,11 +114,11 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     eff <- Y - est.best$fit  
     att.avg <- sum(eff * D)/(sum(D))
     
-    #equiv.att.avg <- eff.equiv <- NULL
-    #if (boot == FALSE) {
-    #    eff.equiv <- Y - est.equiv$fit
-    #    equiv.att.avg <- sum(eff.equiv * D)/(sum(D))
-    #}
+    equiv.att.avg <- eff.equiv <- NULL
+    if (boot == FALSE) {
+        eff.equiv <- Y - est.equiv$fit
+        equiv.att.avg <- sum(eff.equiv * D)/(sum(D))
+    }
 
     ## 2. rmse for treated units' observations under control
     tr <- which(apply(D, 2, sum) > 0)
@@ -143,29 +143,33 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     t.on.use <- t.on
     n.on.use <- rep(1:N, each = TT)
 
-    #eff.equiv.v <- NULL
-    #if (boot == FALSE) {
-    #    eff.equiv.v <- c(eff.equiv)
-    #}
+    eff.equiv.v <- NULL
+    if (boot == FALSE) {
+        eff.equiv.v <- c(eff.equiv)
+    }
 
     if (NA %in% eff.v | NA %in% t.on) {
         eff.v.use1 <- eff.v[-c(rm.pos1, rm.pos2)]
         t.on.use <- t.on[-c(rm.pos1, rm.pos2)]
         n.on.use <- n.on.use[-c(rm.pos1, rm.pos2)]
-        #if (boot == FALSE) {
-        #    eff.equiv.v <- eff.equiv.v[-c(rm.pos1, rm.pos2)]
-        #}
+        if (boot == FALSE) {
+            eff.equiv.v <- eff.equiv.v[-c(rm.pos1, rm.pos2)]
+        }
     }
 
     pre.pos <- which(t.on.use <= 0)
     eff.pre <- cbind(eff.v.use1[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
     colnames(eff.pre) <- c("eff", "period", "unit")
 
-    #eff.pre.equiv <- NULL
-    #if (boot == FALSE) {
-    #    eff.pre.equiv <- cbind(eff.equiv.v[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
-    #    colnames(eff.pre.equiv) <- c("eff.equiv", "period", "unit")
-    #}
+    pre.sd <- eff.pre.equiv <- NULL
+    if (boot == FALSE) {
+        eff.pre.equiv <- cbind(eff.equiv.v[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
+        colnames(eff.pre.equiv) <- c("eff.equiv", "period", "unit")
+
+        pre.sd <- tapply(eff.pre.equiv[,1], eff.pre.equiv[,2], sd)
+        pre.sd <- cbind(pre.sd, sort(unique(eff.pre.equiv[, 2])), table(eff.pre.equiv[, 2]))
+        colnames(pre.sd) <- c("sd", "period", "count")
+    }
 
 
     time.on <- sort(unique(t.on.use))
@@ -243,6 +247,8 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         att.on = att.on,
         count.on = count.on,
         eff.pre = eff.pre,
+        eff.pre.equiv = eff.pre.equiv,
+        pre.sd = pre.sd,
         rmse = rmse,
         res = est.best$residuals
     )

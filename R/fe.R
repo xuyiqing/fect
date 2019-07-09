@@ -81,13 +81,13 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     est.equiv <- NULL
     if (binary == FALSE) {
         est.best <- inter_fe_ub(YY, Y0, X, II, beta0, r.cv, force = force, tol) 
-        #if (boot == FALSE) {
-        #    if (r.cv == 0) {
-        #        est.equiv <- est.best
-        #    } else {
-        #        est.equiv <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
-        #    }
-        #}
+        if (boot == FALSE) {
+            if (r.cv == 0) {
+                est.equiv <- est.best
+            } else {
+                est.equiv <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+            }
+        }
     } else {
         if (QR == FALSE) {
             est.best <- inter_fe_d_ub(YY, Y0, FE0, X, II, r.cv, force, tol = tol)
@@ -136,9 +136,9 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         est.best$residuals <- est.best$residuals * norm.para[1] 
         est.best$fit <- est.best$fit * norm.para[1]
         ini.res <- ini.res * norm.para[1] 
-        #if (boot == FALSE) {
-        #    est.equiv$fit <- est.equiv$fit * norm.para[1]
-        #}
+        if (boot == FALSE) {
+            est.equiv$fit <- est.equiv$fit * norm.para[1]
+        }
     }
 
     ## 0. relevant parameters
@@ -164,20 +164,20 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     Y.ct.equiv <- Y.ct <- NULL
     if (binary == FALSE) {
         Y.ct <- est.best$fit
-        #if (boot == FALSE) {
-        #    Y.ct.equiv <- est.equiv$fit
-        #}
+        if (boot == FALSE) {
+            Y.ct.equiv <- est.equiv$fit
+        }
     } else {
         Y.ct <- pnorm(est.best$fit)
     }
     eff <- Y - Y.ct    
     att.avg <- sum(eff * D)/(sum(D))
     
-    #equiv.att.avg <- eff.equiv <- NULL
-    #if (binary == FALSE && boot == FALSE) {
-    #    eff.equiv <- Y - Y.ct.equiv
-    #    equiv.att.avg <- sum(eff.equiv * D)/(sum(D))
-    #}
+    equiv.att.avg <- eff.equiv <- NULL
+    if (binary == FALSE && boot == FALSE) {
+        eff.equiv <- Y - Y.ct.equiv
+        equiv.att.avg <- sum(eff.equiv * D)/(sum(D))
+    }
 
     ## 2. rmse for treated units' observations under control
     if (binary == 0) {
@@ -203,10 +203,10 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     t.on <- c(T.on)
     eff.v <- c(eff) ## a vector
     
-    #eff.equiv.v <- NULL
-    #if (binary == FALSE && boot == FALSE) {
-    #    eff.equiv.v <- c(eff.equiv)
-    #}
+    eff.equiv.v <- NULL
+    if (binary == FALSE && boot == FALSE) {
+        eff.equiv.v <- c(eff.equiv)
+    }
 
     rm.pos1 <- which(is.na(eff.v))
     rm.pos2 <- which(is.na(t.on)) 
@@ -219,20 +219,24 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         eff.v.use1 <- eff.v[-c(rm.pos1, rm.pos2)]
         t.on.use <- t.on[-c(rm.pos1, rm.pos2)]
         n.on.use <- n.on.use[-c(rm.pos1, rm.pos2)]
-        #if (binary == FALSE && boot == FALSE) {
-        #    eff.equiv.v <- eff.equiv.v[-c(rm.pos1, rm.pos2)]
-        #}
+        if (binary == FALSE && boot == FALSE) {
+            eff.equiv.v <- eff.equiv.v[-c(rm.pos1, rm.pos2)]
+        }
     }
 
     pre.pos <- which(t.on.use <= 0)
     eff.pre <- cbind(eff.v.use1[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
     colnames(eff.pre) <- c("eff", "period", "unit")
 
-    #eff.pre.equiv <- NULL
-    #if (binary == FALSE && boot == FALSE) {
-    #    eff.pre.equiv <- cbind(eff.equiv.v[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
-    #    colnames(eff.pre.equiv) <- c("eff.equiv", "period", "unit")
-    #}
+    pre.sd <- eff.pre.equiv <- NULL
+    if (binary == FALSE && boot == FALSE) {
+        eff.pre.equiv <- cbind(eff.equiv.v[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
+        colnames(eff.pre.equiv) <- c("eff.equiv", "period", "unit")
+
+        pre.sd <- tapply(eff.pre.equiv[,1], eff.pre.equiv[,2], sd)
+        pre.sd <- cbind(pre.sd, sort(unique(eff.pre.equiv[, 2])), table(eff.pre.equiv[, 2]))
+        colnames(pre.sd) <- c("sd", "period", "count")
+    }
 
     time.on <- sort(unique(t.on.use))
     att.on <- as.numeric(tapply(eff.v.use1, t.on.use, mean)) ## NA already removed
@@ -311,7 +315,9 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         time.on = time.on,
         att.on = att.on,
         count.on = count.on,
-        eff.pre = eff.pre)
+        eff.pre = eff.pre,
+        eff.pre.equiv = eff.pre.equiv,
+        pre.sd = pre.sd)
 
     if (binary == 0) {
         out <- c(out, list(PC = PC,
