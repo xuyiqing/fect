@@ -42,6 +42,8 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  CV = TRUE, # cross-validation
                  k = 5, # times of CV
                  cv.prop = 0.1, ## proportion of CV counts
+                 cv.treat = FALSE, 
+                 cv.continue = 1,
                  binary = FALSE, # probit model
                  QR = FALSE, # QR or SVD for binary probit 
                  method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
@@ -79,6 +81,8 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          CV = TRUE, # cross-validation
                          k = 5, # times of CV
                          cv.prop = 0.1, ## proportion of CV counts
+                         cv.treat = FALSE, 
+                         cv.continue = 1,
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
@@ -130,7 +134,8 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
     out <- fect.default(formula = NULL, data = data, Y = Yname,
                         D = Dname, X = Xname,
                         na.rm, index, force, cl, r, lambda, nlambda, 
-                        CV, k, cv.prop, binary, QR, method, criterion, se, 
+                        CV, k, cv.prop, cv.treat, cv.continue,
+                        binary, QR, method, criterion, se, 
                         nboots, parallel, cores, tol, seed, min.T0,
                         max.missing, pre.period, wald,
                         placebo.period, placeboTest, normalize)
@@ -159,6 +164,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          CV = TRUE, # cross-validation
                          k = 5, # times of CV
                          cv.prop = 0.1,
+                         cv.treat = FALSE, 
+                         cv.continue = 1,
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: ife for interactive fe; mc for matrix completion
@@ -787,6 +794,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                method = method,
                                criterion = criterion,
                                k = k, cv.prop = cv.prop,
+                               cv.treat = cv.treat,
+                               cv.continue = cv.continue, 
                                r = r, r.end = r.end, 
                                nlambda = nlambda, lambda = lambda,
                                force = force, hasRevs = hasRevs, 
@@ -796,6 +805,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                       I = I, II = II, 
                                       T.on = T.on, T.off = T.off, 
                                       k = k, cv.prop = cv.prop,
+                                      cv.treat = cv.treat, 
+                                      cv.continue = cv.continue,
                                       r = r, r.end = r.end, 
                                       QR = QR, force = force, 
                                       hasRevs = hasRevs, tol = tol)
@@ -827,17 +838,17 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     } else { # SE == TRUE
         
         out <- fect.boot(Y = Y, D = D, X = X, I = I, II = II,
-                             T.on = T.on, T.off = T.off, cl = NULL,
-                             method = method, criterion = criterion,
-                             CV = CV, k = k, r = r, r.end = r.end, 
-                             nlambda = nlambda, lambda = lambda,
-                             binary = binary, QR = QR,
-                             force = force, hasRevs = hasRevs,
-                             tol = tol, norm.para = norm.para,
-                             placeboTest = placeboTest, 
-                             placebo.period = placebo.period,
-                             nboots = nboots, parallel = parallel,
-                             cores = cores)
+                         T.on = T.on, T.off = T.off, cl = NULL,
+                         method = method, criterion = criterion,
+                         CV = CV, k = k, r = r, r.end = r.end, 
+                         nlambda = nlambda, lambda = lambda,
+                         binary = binary, QR = QR,
+                         force = force, hasRevs = hasRevs,
+                         tol = tol, norm.para = norm.para,
+                         placeboTest = placeboTest, 
+                         placebo.period = placebo.period,
+                         nboots = nboots, parallel = parallel,
+                         cores = cores)
 
     }
 

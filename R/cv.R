@@ -12,6 +12,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     criterion = "mspe",  
                     k = 5, # CV time
                     cv.prop = 0.1,
+                    cv.treat = FALSE, 
+                    cv.continue = 1,
                     r = 0, # initial number of factors considered if CV==1
                     r.end,
                     nlambda = 10, 
@@ -128,12 +130,13 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             beta0CV <- array(0, dim = c(1, 0, k)) ## store initial beta0
         }
         
+        ## cv.id.all <- c()
         for (i in 1:k) {
             cv.n <- 0
             repeat{
                 cv.n <- cv.n + 1
                 ## cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
-                cv.id <- cv.sample(II, sum(II)*cv.prop)
+                cv.id <- cv.sample(II, D, rm.count, cv.continue, cv.treat)
                 ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
                 II.cv <- II
                 II.cv[cv.id] <- 0
@@ -145,6 +148,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 if (cv.n > 100) {
                     stop("Some units have too few pre-treatment observations. Try to remove them.")
                 }
+                ## cv.id.all <- c(cv.id.all, list(cv.id))
             }
             rmCV[,i] <- cv.id
             ocicv <- setdiff(oci, cv.id)
