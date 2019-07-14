@@ -308,6 +308,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         ##  ------------------------------------- ##
         if (method %in% c("mc", "both")) {
             cat("Matrix completion method...\n")
+            eigen.all <- NULL
             if (is.null(lambda) || length(lambda) == 1) {
                 ## create the hyper-parameter sequence
                 ## biggest candidate lambda 
@@ -320,13 +321,18 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 Y.lambda <- YY - Y0
                 ## Y.lambda[which(II == 0)] <- Y0[which(II == 0)]
                 Y.lambda[which(II == 0)] <- 0
-                lambda.max <- log10(max(svd( Y.lambda / (TT * N) )$d))
+                eigen.all <- svd( Y.lambda / (TT * N) )$d
+                lambda.max <- log10(max(eigen.all))
                 lambda <- rep(NA, nlambda)
                 lambda.by <- 3/(nlambda - 2)
                 for (i in 1:(nlambda - 1)) {
                     lambda[i] <- 10^(lambda.max - (i - 1) * lambda.by)
                 }
                 lambda[nlambda] <- 0
+            } else {
+                Y.lambda <- YY - Y0
+                Y.lambda[which(II == 0)] <- 0
+                eigen.all <- svd( Y.lambda / (TT * N) )$d
             }
 
             ## store all MSPE
@@ -614,7 +620,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     if (method == "mc") {
-        out <- c(out, list(lambda.cv = lambda.cv, lambda.seq = lambda))
+        out <- c(out, list(lambda.cv = lambda.cv, lambda.seq = lambda,
+                           lambda.norm = lambda.cv / max(eigen.all), 
+                           eigen.all = eigen.all))
     }
 
     ## CV results

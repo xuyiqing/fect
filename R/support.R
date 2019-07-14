@@ -50,11 +50,11 @@ get_term <- function(d,
         } else if (dd[1] == 1) {
             for (i in 1:(change.length)) {
                 if (i == 1) {
-                    if (type == "on") {
-                        part.term <- 1:(change.pos[i] - 1)
-                    } else if (type == "off") {
+                    #if (type == "on") {
+                    #    part.term <- 1:(change.pos[i] - 1)
+                    #} else if (type == "off") {
                         part.term <- rep(NA, change.pos[i] - 1)
-                    }
+                    #}
                 } else {
                     if (i %% 2 == 0) {
                         part.term <- (change.pos[i-1] - change.pos[i] + 1):0

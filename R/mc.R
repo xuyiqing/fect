@@ -60,6 +60,15 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     ## ----------- Main Algorithm ----------- ##
         ##-------------------------------##
 
+    lambda.norm <- eigen.all <- NULL
+    if (boot == FALSE) {
+        Y.lambda <- YY - Y0
+        Y.lambda[which(II == 0)] <- 0
+        eigen.all <- svd( Y.lambda / (TT * N) )$d
+        lambda.norm <- lambda.cv / max(eigen.all)
+    }
+    
+
     validX <- 1 ## no multi-colinearity
     ## matrix completion
     est.best <- inter_fe_mc(YY, Y0, X, II, beta0, hasF, lambda.cv, force, tol) 
@@ -237,6 +246,8 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         N = N,
         p = p,
         lambda.cv = lambda.cv, 
+        lambda.norm = lambda.norm,
+        eigen.all = eigen.all,
         beta = beta,
         est = est.best,
         mu = est.best$mu,
