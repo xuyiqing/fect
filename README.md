@@ -3,11 +3,13 @@
 ## Fixed Effects Counterfactual Estimators
 ---
 
-**Authors:** Licheng Liu [<liulch.16@sem.tsinghua.edu.cn>]; Yiqing Xu [<yiqingxu@stanford.edu>]
+**Authors:** Licheng Liu [<liulch.16@sem.tsinghua.edu.cn>]; Ye Wang[<yw1576@nyu.edu>], Yiqing Xu [<yiqingxu@stanford.edu>]
 
-**How to Uses:** [Examples](http://yiqingxu.org/software/gsynth/gsynth_examples.html)
+**Maintainer:** Licheng Liu
 
-**Reference:**  Yiqing Xu. 2017. "Generalized Synthetic Control Method: Causal Inference  with Interactive Fixed Effects Models." Political Analysis, Vol. 25, Iss. 1, January 2017, pp. 57-76. Available at: <http://dx.doi.org/10.1017/pan.2016.2>
+**How to Uses:** [Examples](http://yiqingxu.org/software/fect/fect_examples.html)
+
+**Reference:**  Licheng Liu, Ye Wang, Yiqing Xu (2019). "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data." Working Paper, Stanford University.
 
 **Note:**
 
