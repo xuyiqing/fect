@@ -57,6 +57,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  min.T0 = 5, # minimum T0
                  max.missing = NULL, # maximum missing
                  pre.period = NULL, # fit test period 
+                 off.period = NULL, # fit test period: switch-off 
                  wald = FALSE, # fit test
                  placebo.period = NULL, # placebo test period
                  placeboTest = FALSE, # placebo test
@@ -96,6 +97,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.period = NULL,
+                         off.period = NULL, # fit test period: switch-off 
                          wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
@@ -137,7 +139,8 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         CV, k, cv.prop, cv.treat, cv.nobs,
                         binary, QR, method, criterion, se, 
                         nboots, parallel, cores, tol, seed, min.T0,
-                        max.missing, pre.period, wald,
+                        max.missing, pre.period, 
+                        off.period, wald,
                         placebo.period, placeboTest, normalize)
     
     out$call <- match.call()
@@ -179,6 +182,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.period = NULL,
+                         off.period = NULL, # fit test period: switch-off 
                          wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
@@ -866,9 +870,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             T.on = T.on, T.off = NULL,
             method = method, cl = cl, r = out$r.cv, 
             lambda = out$lambda.cv,
-            force = force, hasRevs = 0,
+            force = force, hasRevs = hasRevs,
             tol = tol, norm.para = norm.para,
-            pre.period = pre.period, nboots = nboots,
+            pre.period = pre.period, 
+            off.period = pff.period,
+            nboots = nboots,
             parallel = parallel, cores = cores)
     } 
 
@@ -938,6 +944,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                      Y = Yname,
                      D = Dname,
                      X = Xname,
+                     hasRevs = hasRevs,
                      index = index,
                      id = iname,
                      time = tname,

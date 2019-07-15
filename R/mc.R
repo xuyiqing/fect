@@ -205,6 +205,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
+    eff.off.equiv <- off.sd <- eff.off <- NULL
 
     ## 6. switch-off effects
     if (hasRevs == 1) {    
@@ -216,6 +217,19 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         if (NA %in% eff.v | NA %in% t.off) {
             eff.v.use2 <- eff.v[-c(rm.pos1, rm.pos3)]
             t.off.use <- t.off[-c(rm.pos1, rm.pos3)]
+        }
+
+        off.pos <- which(t.off.use > 0)
+        eff.off <- cbind(eff.v.use2[off.pos], t.off.use[off.pos], n.on.use[off.pos])
+        colnames(eff.off) <- c("eff", "period", "unit")
+
+        if (boot == FALSE) {
+            eff.off.equiv <- cbind(eff.equiv.v[off.pos], t.off.use[off.pos], n.on.use[off.pos])
+            colnames(eff.off.equiv) <- c("off.equiv", "period", "unit")
+
+            off.sd <- tapply(eff.off.equiv[,1], eff.off.equiv[,2], sd)
+            off.sd <- cbind(off.sd, sort(unique(eff.off.equiv[, 2])), table(eff.off.equiv[, 2]))
+            colnames(off.sd) <- c("sd", "period", "count")
         }
 
         time.off <- sort(unique(t.off.use))
@@ -267,7 +281,10 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     if (hasRevs == 1) {
         out <- c(out, list(time.off = time.off, 
                            att.off = att.off,
-                           count.off = count.off))
+                           count.off = count.off,
+                           eff.off = eff.off,
+                           eff.off.equiv = eff.off.equiv,
+                           off.sd = off.sd))
     }
 
     #if (boot == FALSE) {

@@ -19,6 +19,7 @@ fect.test <- function(
     tol,
     norm.para,
     pre.period = NULL,
+    off.period = NULL,
     nboots,
     parallel = TRUE,
     cores = NULL) {
@@ -59,8 +60,23 @@ fect.test <- function(
     f <- summary(lm.fit)$f[1]
     names(f) <- NULL
 
+    f2 <- NULL
+    if (hasRevs) {
+        ## switch-off 
+        eff.off <- as.data.frame(out$eff.off)
+        eff.off <- eff.off[which(eff.off[,"period"] >= off.period[1] & eff.off[,"period"] <= off.period[2]),]
+        lm.fit2 <- lm(eff ~ factor(period), data = eff.off)
+
+        f2 <- summary(lm.fit2)$f[1]
+        names(f2) <- NULL
+    }
+
     ## bootstrapped F under H0
     f.boot <- rep(NA, nboots)
+    f2.boot <- NULL
+    if (hasRevs) {
+        f2.boot <- rep(NA, nboots)
+    }
 
     if (method == "ife") {
         one.nonpara <- function() {
@@ -80,8 +96,8 @@ fect.test <- function(
                                 placebo.period = NULL, placeboTest = 0), silent = TRUE)
             
             if ('try-error' %in% class(boot)) {
-                cat("NA")
-                return(NA)
+                ## cat("NA")
+                return(list(f.boot = NA, f.boot.2 = NA))
             } else {
                 ## cat(boot$niter)
                 ## cat("\n")
@@ -92,11 +108,26 @@ fect.test <- function(
                 #f.boot <- ((sum(data[,"eff"]^2) - sum((lm.fit.boot$residuals)^2))/length(unique(data[,"period"])))/(sum((lm.fit.boot$residuals)^2)/(dim(data[1]-unique(data[,"period"]))))
                 f.boot <- summary(lm.fit.boot)$f[1]
                 ## if (r.cv == 0) {
-                return(list(f.boot = f.boot))
+
+                f.boot.2 <- NULL
+                if (hasRevs) {
+                    ## switch-off 
+                    data2 <- as.data.frame(out$eff.off)
+                    data2 <- data2[which(data2[,"period"] >= off.period[1] & data2[,"period"] <= off.period[2]),]
+                    lm.fit.boot2 <- lm(eff ~ factor(period), data = data2)
+
+                    f.boot.2 <- summary(lm.fit.boot2)$f[1]
+                }
+                if (hasRevs) {
+                    return(list(f.boot = f.boot, f.boot.2 = f.boot.2))
+                } else {
+                    return(list(f.boot = f.boot))
+                }
+                
                 ## } else {
                 ##     return(list(f.boot = f.boot, factor.boot = boot$factor))
                 ## } 
-            }  
+            }    
             
         } 
             
@@ -119,8 +150,8 @@ fect.test <- function(
                                 placebo.period = NULL, placeboTest = 0), silent = TRUE)
 
             if ('try-error' %in% class(boot)) {
-                cat("NA")
-                return(NA)
+                ## cat("NA")
+                return(list(f.boot = NA, f.boot.2 = NA))
             } else {
                 ## cat(boot$niter)
                 ## cat("\n")
@@ -131,11 +162,26 @@ fect.test <- function(
                 #f.boot <- ((sum(data[,"eff"]^2) - sum((lm.fit.boot$residuals)^2))/length(unique(data[,"period"])))/(sum((lm.fit.boot$residuals)^2)/(dim(data[1]-unique(data[,"period"]))))
                 f.boot <- summary(lm.fit.boot)$f[1]
                 ## if (r.cv == 0) {
-                return(list(f.boot = f.boot))
+                
+                f.boot.2 <- NULL
+                if (hasRevs) {
+                    ## switch-off 
+                    data2 <- as.data.frame(out$eff.off)
+                    data2 <- data2[which(data2[,"period"] >= off.period[1] & data2[,"period"] <= off.period[2]),]
+                    lm.fit.boot2 <- lm(eff ~ factor(period), data = data2)
+
+                    f.boot.2 <- summary(lm.fit.boot2)$f[1]
+                }
+                if (hasRevs) {
+                    return(list(f.boot = f.boot, f.boot.2 = f.boot.2))
+                } else {
+                    return(list(f.boot = f.boot))
+                }
+
                 ## } else {
                 ##     return(list(f.boot = f.boot, factor.boot = boot$factor))
                 ## } 
-            }    
+            }
         } 
     }
     
@@ -162,38 +208,41 @@ fect.test <- function(
             }  
         }  
     } 
+
     ## end of bootstrapping
-
-    cat(length(f.boot), " runs\n", sep = "")    
+    if (sum(is.na(f.boot)) > 0) {
+        f.boot <- f.boot[-which(is.na(f.boot))]
+    }
+    cat(length(f.boot), " runs\n", sep = "")
+    
     f.q <- quantile(f.boot, probs = c(0.025, 0.975))
-    f.p <- sum(f.boot > f)/nboots
+    f.p <- sum(f.boot > f)/length(f.boot)
+    wald.on <- list(stat = f, 
+                    p = f.p,
+                    quantile_lower = f.q[1], 
+                    quantile_upper = f.q[2],
+                    boot = f.boot)
 
-    # title <- "Empirical distribution of F under H0"    
-    # ## plot
-    # f.data <- cbind.data.frame(f.boot = f.boot)
-    # p <- ggplot(f.data, aes(f.boot)) + geom_density() + geom_vline(xintercept = f, colour="red",size = 0.5)
 
-    # d <- ggplot_build(p)$data[[1]]
+    wald.off <- NULL
+    if (hasRevs) {
+        if (sum(is.na(f2.boot)) > 0) {
+            f2.boot <- f2.boot[-which(is.na(f2.boot))]
+        }
+        f.q2 <- quantile(f2.boot, probs = c(0.025, 0.975))
+        f.p2 <- sum(f2.boot > f2)/length(f2.boot)
+        wald.off <- list(stat = f2, 
+                         p = f.p2,
+                         quantile_lower = f.q2[1], 
+                         quantile_upper = f.q2[2],
+                         boot = f2.boot)
+    }
 
-    # if (f < max(d[,"x"])) {
-    #     p <- p + geom_area(data = subset(d, x > f), aes(x=x, y=y), fill="red", alpha = 0.2)
-    # }
-
-    # p <- p + annotate("text", x = 0.9*max(d[,"x"]), y = 0.9*max(d[,"y"]), label = paste("P value: ", f.p, sep=""))
-
-    # p <- p + ggtitle(title) +  theme(plot.title = element_text(size=20,
-    #                                                            hjust = 0.5,
-    #                                                            margin = margin(10, 0, 10, 0)))
-
-    ## suppressWarnings(print(p))
-  
-    ## store results
-    return(list(
-        stat = f, 
-        p = f.p,
-        quantile_lower = f.q[1], 
-        quantile_upper = f.q[2],
-        boot = f.boot))
+    if (hasRevs) {
+        return(list(wald.on = wald.on, wald.off = wald.off))
+    } else {
+        return(list(wald.on = wald.on))
+    }
     
 } ## end of test
 

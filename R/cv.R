@@ -547,6 +547,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     att.on <- as.numeric(tapply(eff.v.use1, t.on.use, mean)) ## NA already removed
     count.on <- as.numeric(table(t.on.use))
 
+    eff.off <- eff.equiv <- off.sd <- NULL
     ## 6. switch-off effects
     if (hasRevs == 1) {    
         t.off <- c(T.off)
@@ -559,10 +560,20 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             t.off.use <- t.off[-c(rm.pos1, rm.pos3)]
         }
 
+        off.pos <- which(t.off.use > 0)
+        eff.off <- cbind(eff.v.use2[off.pos], t.off.use[off.pos], n.on.use[off.pos])
+        colnames(eff.off) <- c("eff", "period", "unit")
+
+        eff.off.equiv <- cbind(eff.equiv.v[off.pos], t.off.use[off.pos], n.on.use[off.pos])
+        colnames(eff.off.equiv) <- c("off.equiv", "period", "unit")
+
+        off.sd <- tapply(eff.off.equiv[,1], eff.off.equiv[,2], sd)
+        off.sd <- cbind(off.sd, sort(unique(eff.off.equiv[, 2])), table(eff.off.equiv[, 2]))
+        colnames(off.sd) <- c("sd", "period", "count")
+
         time.off <- sort(unique(t.off.use))
         att.off <- as.numeric(tapply(eff.v.use2, t.off.use, mean)) ## NA already removed
         count.off <- as.numeric(table(t.off.use))
-
     }
 
     ##-------------------------------##
@@ -600,7 +611,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     if (hasRevs == 1) {
         out <- c(out, list(time.off = time.off, 
                            att.off = att.off,
-                           count.off = count.off))
+                           count.off = count.off,
+                           eff.off = eff.off,
+                           eff.off.equiv = eff.off.equiv,
+                           off.sd = off.sd))
     }
 
     if (force == 1) {

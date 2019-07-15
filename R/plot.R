@@ -314,14 +314,18 @@ plot.fect <- function(x,
     if (length(xlim) != 0) {
         show.time <- which(time >= xlim[1] & time <= xlim[2])
     }
-    if (is.null(proportion) == TRUE) {
-        show.count <- 1:time.end
-    } else {    
-        show.count <- which(count.num >= max.count * proportion)
+    if (type == "gap") {
+        if (is.null(proportion) == TRUE) {
+            show.count <- 1:time.end
+        } else {    
+            show.count <- which(count.num >= max.count * proportion)
+        }
+        # which periods to be shown
+        show <- intersect(show.count, show.time) 
+    } else {
+        show <- show.time
     }
-
-    # which periods to be shown
-    show <- intersect(show.count, show.time) 
+    
     
     # maximum number of cases to be shown
     max.count <- max(count.num[show])
