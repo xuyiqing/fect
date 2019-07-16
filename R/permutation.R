@@ -40,21 +40,21 @@ fect.permu <- function(Y,
         one.rank <- sample(1:tt.length, tt.length, replace = FALSE)
 
         for (i in 1:tt.length) {
-            sub.pos <- c(sub.pos, l.tt[[one.rank[i]]])
+            sub.pos <- c(sub.pos, unlist(l.tt[[one.rank[i]]]))
         }
 
         Y.permu <- as.matrix(Y[sub.pos, ])
         I.permu <- as.matrix(I[sub.pos, ])
-        D.permu <- as.matrix(D[sub.pos, ])
+        #D.permu <- as.matrix(D[sub.pos, ])
 
         if (!is.null(X)) {
             X.permu <- X[sub.pos,,,drop = FALSE]
         }
 
-        result <- try(one.permu(Y, 
-                                X, 
+        result <- try(one.permu(Y.permu, 
+                                X.permu, 
                                 D,  
-                                I, 
+                                I.permu, 
                                 r.cv, 
                                 lambda.cv, 
                                 method,
