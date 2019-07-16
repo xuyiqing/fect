@@ -61,6 +61,8 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  wald = FALSE, # fit test
                  placebo.period = NULL, # placebo test period
                  placeboTest = FALSE, # placebo test
+                 permute = FALSE, ## permutation test
+                 m = 2, ## block length
                  normalize = FALSE # accelerate option
                 ) {
     UseMethod("fect")
@@ -101,6 +103,8 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
+                         permute = FALSE, ## permutation test
+                         m = 2, ## block length
                          normalize = FALSE
                         ) {
     ## parsing
@@ -141,7 +145,8 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         nboots, parallel, cores, tol, seed, min.T0,
                         max.missing, pre.period, 
                         off.period, wald,
-                        placebo.period, placeboTest, normalize)
+                        placebo.period, placeboTest, 
+                        permute, m, normalize)
     
     out$call <- match.call()
     out$formula <- formula
@@ -186,6 +191,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
+                         permute = FALSE, ## permutation test
+                         m = 2, ## block length
                          normalize = FALSE
                         ) {  
     
@@ -770,7 +777,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## Register clusters
     ##-------------------------------##
     
-    if ((se == TRUE | wald == TRUE) & parallel==TRUE) {
+    if ((se == TRUE | wald == TRUE | permute == TRUE) & parallel==TRUE) {
 
         ## set seed
         if (is.null(seed) == FALSE) {
@@ -878,8 +885,25 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             parallel = parallel, cores = cores)
     } 
 
+    ## permutation test 
+    if (permute == TRUE) {
+        cat("Permuting under sharp null hypothesis ... ")
+
+        out.permute <- fect.permu(Y = Y, X = X, D = D, I = I, r.cv = out$r.cv,
+                                  lambda.cv = out$lambda.cv, m = m, 
+                                  method = out$method, force = force,                      
+                                  tol = tol, norm.para = norm.para,
+                                  nboots = nboots,
+                                  parallel = parallel, cores = cores)
+
+        permute.p <- sum(out.permute > abs(out$att.avg)) / length(out.permute)
+
+        permute.result <- list(permute.att.avg = out.permute, p = permute.p)
+
+    }
+
     
-    if ((se == TRUE | wald == TRUE) & parallel == TRUE) {
+    if ((se == TRUE | wald == TRUE | permute) & parallel == TRUE) {
         stopCluster(para.clusters)
         ##closeAllConnections()
     }
@@ -962,6 +986,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
     if (wald == TRUE) {
         output <- c(output,list(wald = out.wald))
+    }
+    if (permute == TRUE) {
+        output <- c(output,list(permute = permute.result))
     }
     output <- c(output, list(call = match.call()))
     class(output) <- "fect"

@@ -250,6 +250,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     ##-------------------------------##  
     out<-list(
         ## main results
+        method = "mc",
         T.on = T.on,
         Y.ct = est.best$fit,
         eff = eff,

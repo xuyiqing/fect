@@ -303,12 +303,15 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
+    method <- ifelse(r.cv > 0, "ife", "fe")
+
   
     ##-------------------------------##
     ##            Storage            ##
     ##-------------------------------##  
     out<-list(
         ## main results 
+        method = method,
         T.on = T.on,
         Y.ct = Y.ct,
         eff = eff,

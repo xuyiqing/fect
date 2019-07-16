@@ -1,7 +1,7 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactuals
-Version: 0.0.6
+Version: 0.0.7
 Date: 2019-07-15
 Author: Licheng Liu, Ye Wang, Yiqing Xu
 Maintainer: Yiqing Xu <yiqingxu@ucsd.edu>

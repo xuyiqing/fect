@@ -338,8 +338,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             ## store all MSPE
             MSPE.best <- NULL 
             CV.out.mc <- matrix(NA, length(lambda), 4)
-            colnames(CV.out.mc) <- c("lambda", "MSPE", "MSPTATT", "MSE")
-            CV.out.mc[,"lambda"] <- c(lambda)
+            colnames(CV.out.mc) <- c("lambda.norm", "MSPE", "MSPTATT", "MSE")
+            CV.out.mc[,"lambda.norm"] <- c(lambda/max(eigen.all))
             CV.out.mc[,"MSPE"] <- 1e20
 
             for (i in 1:length(lambda)) {    
@@ -383,8 +383,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 ## CV.out[i, "sigma2"] <- sigma2 
                 CV.out.mc[i, 2:4] <- c(MSPE, MSPTATT, MSE)
 
-                cat("\n lambda = ",
-                sprintf("%.5f",lambda[i]),"; MSPE = ",
+                cat("\n lambda.norm = ",
+                sprintf("%.5f",lambda[i]/max(eigen.all)),"; MSPE = ",
                 sprintf("%.5f",MSPE), "; MSPTATT = ",
                 sprintf("%.5f",MSPTATT), "; MSE = ", 
                 sprintf("%.5f",MSE), sep="")
@@ -392,7 +392,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             }
             est.best.mc <- est.best 
             MSPE.best.mc <- MSPE.best
-            cat("\n\n lambda* = ",lambda.cv, sep="")
+            cat("\n\n lambda.norm* = ",lambda.cv/max(eigen.all), sep="")
             cat("\n\n")
         }
     }    ## End of Cross-Validation 
