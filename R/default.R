@@ -880,7 +880,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             force = force, hasRevs = hasRevs,
             tol = tol, norm.para = norm.para,
             pre.period = pre.period, 
-            off.period = pff.period,
+            off.period = off.period,
             nboots = nboots,
             parallel = parallel, cores = cores)
     } 
