@@ -315,6 +315,7 @@ plot.fect <- function(x,
         show.time <- which(time >= xlim[1] & time <= xlim[2])
     }
     if (type == "gap") {
+        
         if (is.null(proportion) == TRUE) {
             show.count <- 1:time.end
         } else {    
@@ -322,25 +323,29 @@ plot.fect <- function(x,
         }
         # which periods to be shown
         show <- intersect(show.count, show.time) 
+
+        # maximum number of cases to be shown
+        max.count <- max(count.num[show])
+        
+        # where on x-axis to show the number
+        max.count.pos <- time[intersect(show,which(count.num == max.count))]
+        
+        if (length(max.count.pos)>1) {
+            if (best.pos %in% max.count.pos) {
+                max.count.pos <- best.pos
+            } else if ((1-best.pos) %in% max.count.pos) {
+                max.count.pos <- 1-best.pos
+            } else {
+                max.count.pos <- max.count.pos[1]
+            }
+        }
+
     } else {
         show <- show.time
     }
     
     
-    # maximum number of cases to be shown
-    max.count <- max(count.num[show])
-    
-    # where on x-axis to show the number
-    max.count.pos <- time[intersect(show,which(count.num == max.count))]
-    if (length(max.count.pos)>1) {
-        if (best.pos %in% max.count.pos) {
-            max.count.pos <- best.pos
-        } else if ((1-best.pos) %in% max.count.pos) {
-            max.count.pos <- 1-best.pos
-        } else {
-            max.count.pos <- max.count.pos[1]
-        }
-    }
+
     
     if (length(show) <= 2) {
         stop("Cannot plot.\n")
