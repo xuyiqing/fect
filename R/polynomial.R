@@ -1,87 +1,91 @@
 ###################################################################
-## Matrix Completion Function
+## IFE Model Function
 ###################################################################
-fect.mc <- function(Y, # Outcome variable, (T*N) matrix
-                    X, # Explanatory variables:  (T*N*p) array
-                    D, 
-                    I,
-                    II, 
-                    T.on, 
-                    T.off = NULL, 
-                    lambda.cv = 1e10,
-                    force,
-                    hasF = 1,
-                    hasRevs = 1, 
-                    tol, # tolerance level
-                    boot = FALSE, # bootstrapped sample
-                    norm.para = NULL,
-                    placeboTest = 0,
-                    placebo.period = NULL,
-                    time.on.seq = NULL,
-                    time.off.seq = NULL) {  
-    
+fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
+                            X, # Explanatory variables:  (T*N*p) array
+                            D, #  Indicator for treated unit (tr==1) 
+                            I,
+                            II, 
+                            T.on, 
+                            T.off = NULL, 
+                            power = 1,
+                            force, 
+                            hasRevs = 1,
+                            tol, # tolerance level
+                            boot = FALSE, # bootstrapped sample
+                            placeboTest = 0,
+                            placebo.period = NULL,
+                            norm.para = NULL,
+                            time.on.seq = NULL,
+                            time.off.seq = NULL) {  
     
     ##-------------------------------##
     ## Parsing data
     ##-------------------------------##  
-    placebo.pos <-  na.pos <- NULL
-   
+    placebo.pos <- na.pos <- NULL
+    res.sd1 <- res.sd2 <- NULL
+
     ## unit id and time
     TT <- dim(Y)[1]
     N <- dim(Y)[2]
-    if (is.null(X) == FALSE) {p <- dim(X)[3]} else {p <- 0}
+    if (is.null(X) == FALSE) {
+        p <- dim(X)[3]
+    } else {
+        p <- 0
+        X <- array(0, dim = c(1, 1, 0))
+    }
 
     ## replicate data
     YY <- Y
     YY[which(II == 0)] <- 0 ## reset to 0 
-    t.on <- c(T.on)
 
-    ## initial fit using fastplm
-    data.ini <- matrix(NA, (TT*N), (2 + 1 + p))
-    data.ini[, 2] <- rep(1:N, each = TT)         ## unit fe
-    data.ini[, 3] <- rep(1:TT, N)                ## time fe
-    data.ini[, 1] <- c(Y)                       ## outcome
-    if (p > 0) {                                ## covar
+    oci <- which(c(II) == 1)
+
+    ## reshape 
+    vy <- as.matrix(c(YY))
+    vx.fit <- vx <- NULL
+    if (p > 0) {
         for (i in 1:p) {
-            data.ini[, (3 + i)] <- c(X[, , i])
+            vx[, i] <- c(X[,, i])
+        }
+        vx.fit <- as.matrix(vx[oci,])
+    }
+    vindex <- cbind(rep(1:N, each = TT), rep(1:TT, N))  ## id time
+    if (power > 1) {
+        for (i in 2:power) {
+            vindex <- cbind(vindex, rep((1:TT)^i, N))
         }
     }
 
-    ## observed Y0 indicator:
-    oci <- which(c(II) == 1)
-    initialOut <- initialFit(data = data.ini, force = force, oci = oci)
-    Y0 <- initialOut$Y0
-    beta0 <- initialOut$beta0
-    if (p > 0 && sum(is.na(beta0)) > 0) {
-        beta0[which(is.na(beta0))] <- 0
+    if (force == 1) {
+        sf <- 1
+    } else if (force == 2) {
+        sf <- 2
+    } else {
+        sf <- c(1,2)
     }
-    
-        ##-------------------------------##
-    ## ----------- Main Algorithm ----------- ##
-        ##-------------------------------##
 
-    lambda.norm <- eigen.all <- NULL
-    if (boot == FALSE) {
-        Y.lambda <- YY - Y0
-        Y.lambda[which(II == 0)] <- 0
-        eigen.all <- svd( Y.lambda / (TT * N) )$d
-        lambda.norm <- lambda.cv / max(eigen.all)
-    }
-    
+    cf <- list(c(1,2))
 
-    validX <- 1 ## no multi-colinearity
-    ## matrix completion
-    est.best <- inter_fe_mc(YY, Y0, X, II, beta0, hasF, lambda.cv, force, tol) 
-    validX <- est.best$validX
-    validF <- est.best$validF
-    est.equiv <- NULL
-    if (boot == FALSE) {
-        est.equiv <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+    if (power > 1) {
+        for (i in 2:power) {
+            cf <- c(cf, list(c(1, i + 1)))
+        }
     }
+
+    est.best <- fastplm(y = as.matrix(vy[oci]), 
+                        x = vx.fit, 
+                        ind = as.matrix(vindex[oci,]),
+                        sfe = sf, cfe = cf, PCA = TRUE,
+                        se = FALSE)
+
+    yfit <- predict(est.best, x = vx, ind = vindex)
+
+    Y.ct <- matrix(yfit, TT, N)
+
+    beta <- est.best$coefficients
     
-        ##------------------------------##
-    ## ----------- Summarize -------------- ##
-        ##------------------------------##    
+    validX <- ifelse(p > 0, 1, 0) 
 
     ##-------------------------------##
     ##   ATT and Counterfactuals     ##
@@ -90,46 +94,29 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     ## we first adjustment for normalization 
     if (!is.null(norm.para)) {
 
-        Y <- Y * norm.para[1] 
+        Y <- Y * norm.para[1]
+        
+        ## variance of the error term 
+        sigma2 <- est.best$sigma2 * (norm.para[1]^2)    
+        est.best$sigma2 <- sigma2
 
         ## output of estimates
         est.best$mu <- est.best$mu * norm.para[1] 
-        if (force%in%c(1, 3)) {
-            est.best$alpha <- est.best$alpha * norm.para[1] 
-        }
-        if (force%in%c(2,3)) {
-            est.best$xi <- est.best$xi * norm.para[1] 
-        }
-        #if (p>0) {
-        #    est.best$beta <- est.best$beta * norm.para[1]
-        #}
-        est.best$residuals <- est.best$residuals * norm.para[1] 
-        est.best$fit <- est.best$fit * norm.para[1] 
-        if (boot == FALSE) {
-            est.equiv$fit <- est.equiv$fit * norm.para[1]
-        }
+
+        est.best$residuals <- est.best$residuals * norm.para[1]
+
+        Y.ct <- Y.ct * norm.para[1]
+
     }
 
-    ## 0. revelant parameters
-    if (p>0) {
-        na.pos <- is.nan(est.best$beta)
-        beta <- est.best$beta
-        if( sum(na.pos) > 0 ) {
-            beta[na.pos] <- NA
-        }
-    } else {
+    ## 0. relevant parameters
+    if (is.null(beta)) {
         beta <- NA
     }
    
     ## 1. estimated att and counterfactuals
-    eff <- Y - est.best$fit  
+    eff <- Y - Y.ct    
     att.avg <- sum(eff * D)/(sum(D))
-    
-    equiv.att.avg <- eff.equiv <- NULL
-    if (boot == FALSE) {
-        eff.equiv <- Y - est.equiv$fit
-        equiv.att.avg <- sum(eff.equiv * D)/(sum(D))
-    }
 
     ## 2. rmse for treated units' observations under control
     tr <- which(apply(D, 2, sum) > 0)
@@ -137,51 +124,43 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     eff.tr <- as.matrix(eff[,tr])
     v.eff.tr <- eff.tr[tr.co]
     rmse <- sqrt(mean(v.eff.tr^2))
+    
 
     ## 3. unbalanced output
-    if (0%in%I) {
+    if (0 %in% I) {
         eff[which(I == 0)] <- NA
-        est.best$fit[which(I == 0)] <- NA
+        Y.ct[which(I == 0)] <- NA
     }
-    est.best$residuals[which(II == 0)] <- NA    
-
+      
     ## 4. dynamic effects
     t.on <- c(T.on)
     eff.v <- c(eff) ## a vector
+
     rm.pos1 <- which(is.na(eff.v))
-    rm.pos2 <- which(is.na(t.on))
+    rm.pos2 <- which(is.na(t.on)) 
+
     eff.v.use1 <- eff.v
     t.on.use <- t.on
     n.on.use <- rep(1:N, each = TT)
-
-    eff.equiv.v <- NULL
-    if (boot == FALSE) {
-        eff.equiv.v <- c(eff.equiv)
-    }
 
     if (NA %in% eff.v | NA %in% t.on) {
         eff.v.use1 <- eff.v[-c(rm.pos1, rm.pos2)]
         t.on.use <- t.on[-c(rm.pos1, rm.pos2)]
         n.on.use <- n.on.use[-c(rm.pos1, rm.pos2)]
-        if (boot == FALSE) {
-            eff.equiv.v <- eff.equiv.v[-c(rm.pos1, rm.pos2)]
-        }
     }
 
     pre.pos <- which(t.on.use <= 0)
     eff.pre <- cbind(eff.v.use1[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
     colnames(eff.pre) <- c("eff", "period", "unit")
 
-    pre.sd <- eff.pre.equiv <- NULL
+    sigma2.pre <- eff.pre.equiv <- NULL
     if (boot == FALSE) {
-        eff.pre.equiv <- cbind(eff.equiv.v[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
-        colnames(eff.pre.equiv) <- c("eff.equiv", "period", "unit")
+        eff.pre.equiv <- eff.pre
 
-        pre.sd <- tapply(eff.pre.equiv[,1], eff.pre.equiv[,2], sd)
-        pre.sd <- cbind(pre.sd, sort(unique(eff.pre.equiv[, 2])), table(eff.pre.equiv[, 2]))
-        colnames(pre.sd) <- c("sd", "period", "count")
+        sigma2.pre <- tapply(eff.pre.equiv[,1], eff.pre.equiv[,2], var)
+        sigma2.pre <- cbind(sigma2.pre, sort(unique(eff.pre.equiv[, 2])), table(eff.pre.equiv[, 2]))
+        colnames(sigma2.pre) <- c("sigma2", "period", "count")
     }
-
 
     time.on <- sort(unique(t.on.use))
     att.on <- as.numeric(tapply(eff.v.use1, t.on.use, mean)) ## NA already removed
@@ -226,8 +205,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         colnames(eff.off) <- c("eff", "period", "unit")
 
         if (boot == FALSE) {
-            eff.off.equiv <- cbind(eff.equiv.v[off.pos], t.off.use[off.pos], n.on.use[off.pos])
-            colnames(eff.off.equiv) <- c("off.equiv", "period", "unit")
+            eff.off.equiv <- eff.off
 
             off.sd <- tapply(eff.off.equiv[,1], eff.off.equiv[,2], sd)
             off.sd <- cbind(off.sd, sort(unique(eff.off.equiv[, 2])), table(eff.off.equiv[, 2]))
@@ -246,15 +224,15 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
             count.off <- count.off.med
             time.off <- time.off.seq
         }
-    }  
+    }
+  
     ##-------------------------------##
-    ## Storage 
+    ##            Storage            ##
     ##-------------------------------##  
     out<-list(
-        ## main results
-        method = "mc",
+        ## main results 
         T.on = T.on,
-        Y.ct = est.best$fit,
+        Y.ct = Y.ct,
         eff = eff,
         att.avg = att.avg,
         ## supporting
@@ -262,25 +240,16 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         T = TT,
         N = N,
         p = p,
-        lambda.cv = lambda.cv, 
-        lambda.norm = lambda.norm,
-        eigen.all = eigen.all,
         beta = beta,
         est = est.best,
-        mu = est.best$mu,
         validX = validX,
-        validF = validF,
-        niter = est.best$niter,
         time.on = time.on,
         att.on = att.on,
         count.on = count.on,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
-        pre.sd = pre.sd,
-        rmse = rmse,
-        res = est.best$residuals
-    )
-
+        sigma2.pre = sigma2.pre)
+    
     if (hasRevs == 1) {
         out <- c(out, list(time.off = time.off, 
                            att.off = att.off,
@@ -290,21 +259,13 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                            off.sd = off.sd))
     }
 
-    #if (boot == FALSE) {
-    #    out <- c(out, list(equiv.att.avg = equiv.att.avg))
-    #}
-
-    if (force == 1) {
-        out<-c(out, list(alpha = est.best$alpha))
-    } else if (force == 2) {
-        out<-c(out,list(xi = est.best$xi))
-    } else if (force == 3) {
-        out<-c(out,list(alpha = est.best$alpha, xi = est.best$xi))
-    }
-
     if (!is.null(placebo.period) && placeboTest == 1) {
         out <- c(out, list(att.placebo = att.placebo))
     }
 
     return(out)
-} ## mc functions ends
+} 
+
+
+
+

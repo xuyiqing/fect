@@ -17,6 +17,7 @@ fect.boot <- function(Y,
                       r.end,
                       lambda = NULL,
                       nlambda = 10,
+                      alpha = 0.05,
                       binary,
                       QR,
                       force,                      
@@ -25,6 +26,7 @@ fect.boot <- function(Y,
                       norm.para,
                       placebo.period = NULL,
                       placeboTest = FALSE,
+                      vartype = "bootstrap",
                       nboots,
                       parallel = TRUE,
                       cores = NULL) {
@@ -133,6 +135,10 @@ fect.boot <- function(Y,
     } else {
         cl.unique <- unique(cl)
     }
+
+    if (vartype == "jackknife") {
+        nboots <- min(N, nboots)
+    }
  
     ## bootstrapped estimates
     eff.boot <- array(0,dim = c(TT, Ntr, nboots))  ## to store results
@@ -153,78 +159,85 @@ fect.boot <- function(Y,
     cat("Bootstrapping for uncertainties ... ")
  
     if (method == "ife") {
-        one.nonpara <- function() {
+        one.nonpara <- function(num = NULL) {
 
-            if (is.null(cl)) {
-                if (hasRevs == 0) {
-                    if (Nco > 0) {
-                        repeat{
-                            fake.co <- sample(co, Nco, replace=TRUE)
-                            fake.tr <- sample(tr, Ntr, replace=TRUE)
-                            boot.id <- c(fake.tr, fake.co)
-                            if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                break
+            if (is.null(num)) {
+                if (is.null(cl)) {
+                    if (hasRevs == 0) {
+                        if (Nco > 0) {
+                            repeat{
+                                fake.co <- sample(co, Nco, replace=TRUE)
+                                fake.tr <- sample(tr, Ntr, replace=TRUE)
+                                boot.id <- c(fake.tr, fake.co)
+                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                    break
+                                }
+                            }
+                        } else {
+                            repeat{
+                                boot.id <- sample(tr, Ntr, replace=TRUE)
+                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                    break
+                                }
                             }
                         }
                     } else {
-                        repeat{
-                            boot.id <- sample(tr, Ntr, replace=TRUE)
-                            if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                break
+                        if (Ntr > 0) {
+                            if (Nco > 0) {
+                                repeat{
+                                    fake.co <- sample(co, Nco, replace=TRUE)
+                                    fake.tr <- sample(tr, Ntr, replace=TRUE)
+                                    fake.rev <- sample(rev, Nrev, replace=TRUE)
+                                    boot.id <- c(fake.rev, fake.tr, fake.co)
+                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                        break
+                                    }
+                                }
+                            } else {
+                                repeat{
+                                    fake.tr <- sample(tr, Ntr, replace=TRUE)
+                                    fake.rev <- sample(rev, Nrev, replace=TRUE)
+                                    boot.id <- c(fake.rev, fake.tr)
+                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                        break
+                                    }
+                                }
+                            }
+                        } else {
+                            if (Nco > 0) {
+                                repeat{
+                                    fake.co <- sample(co, Nco, replace=TRUE)
+                                    fake.rev <- sample(rev, Nrev, replace=TRUE)
+                                    boot.id <- c(fake.rev, fake.co)
+                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                        break
+                                    }
+                                }
+                            } else {
+                                repeat{
+                                    boot.id <- sample(rev, Nrev, replace=TRUE)
+                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                        break
+                                    }
+                                }
                             }
                         }
                     }
                 } else {
-                    if (Ntr > 0) {
-                        if (Nco > 0) {
-                            repeat{
-                                fake.co <- sample(co, Nco, replace=TRUE)
-                                fake.tr <- sample(tr, Ntr, replace=TRUE)
-                                fake.rev <- sample(rev, Nrev, replace=TRUE)
-                                boot.id <- c(fake.rev, fake.tr, fake.co)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        } else {
-                            repeat{
-                                fake.tr <- sample(tr, Ntr, replace=TRUE)
-                                fake.rev <- sample(rev, Nrev, replace=TRUE)
-                                boot.id <- c(fake.rev, fake.tr)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        }
-                    } else {
-                        if (Nco > 0) {
-                            repeat{
-                                fake.co <- sample(co, Nco, replace=TRUE)
-                                fake.rev <- sample(rev, Nrev, replace=TRUE)
-                                boot.id <- c(fake.rev, fake.co)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        } else {
-                            repeat{
-                                boot.id <- sample(rev, Nrev, replace=TRUE)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        }
+                    cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
+                    cl.boot.uni <- unique(cl.boot)
+                    cl.boot.count <- as.numeric(table(cl.boot))
+                    boot.id <- c()
+                    for (kk in 1:length(cl.boot.uni)) {
+                        boot.id <- c(boot.id, rep(which(cl == cl.boot.uni[kk]), cl.boot.count[kk]))
                     }
                 }
-            } else {
-                cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
-                cl.boot.uni <- unique(cl.boot)
-                cl.boot.count <- as.numeric(table(cl.boot))
-                boot.id <- c()
-                for (kk in 1:length(cl.boot.uni)) {
-                    boot.id <- c(boot.id, rep(which(cl == cl.boot.uni[kk]), cl.boot.count[kk]))
-                }
+
+            } else { ## jackknife
+                boot.id <- 1:N
+                boot.id <- boot.id[-num]
             }
+            
             X.boot <- X[,boot.id,,drop = FALSE]
             D.boot <- D[, boot.id]
             I.boot <- I[, boot.id]
@@ -269,76 +282,83 @@ fect.boot <- function(Y,
     } else { ## mc
         one.nonpara <- function() {
 
-            if (is.null(cl)) {
-                if (hasRevs == 0) {
-                    if (Nco > 0) {
-                        repeat{
-                            fake.co <- sample(co, Nco, replace=TRUE)
-                            fake.tr <- sample(tr, Ntr, replace=TRUE)
-                            boot.id <- c(fake.tr, fake.co)
-                            if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                break
+            if (is.null(num)) {
+                if (is.null(cl)) {
+                    if (hasRevs == 0) {
+                        if (Nco > 0) {
+                            repeat{
+                                fake.co <- sample(co, Nco, replace=TRUE)
+                                fake.tr <- sample(tr, Ntr, replace=TRUE)
+                                boot.id <- c(fake.tr, fake.co)
+                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                    break
+                                }
+                            }
+                        } else {
+                            repeat{
+                                boot.id <- sample(tr, Ntr, replace=TRUE)
+                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                    break
+                                }
                             }
                         }
                     } else {
-                        repeat{
-                            boot.id <- sample(tr, Ntr, replace=TRUE)
-                            if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                break
+                        if (Ntr > 0) {
+                            if (Nco > 0) {
+                                repeat{
+                                    fake.co <- sample(co, Nco, replace=TRUE)
+                                    fake.tr <- sample(tr, Ntr, replace=TRUE)
+                                    fake.rev <- sample(rev, Nrev, replace=TRUE)
+                                    boot.id <- c(fake.rev, fake.tr, fake.co)
+                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                        break
+                                    }
+                                }
+                            } else {
+                                repeat{
+                                    fake.tr <- sample(tr, Ntr, replace=TRUE)
+                                    fake.rev <- sample(rev, Nrev, replace=TRUE)
+                                    boot.id <- c(fake.rev, fake.tr)
+                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                        break
+                                    }
+                                }
+                            }
+                        } else {
+                            if (Nco > 0) {
+                                repeat{
+                                    fake.co <- sample(co, Nco, replace=TRUE)
+                                    fake.rev <- sample(rev, Nrev, replace=TRUE)
+                                    boot.id <- c(fake.rev, fake.co)
+                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                        break
+                                    }
+                                }
+                            } else {
+                                repeat{
+                                    boot.id <- sample(rev, Nrev, replace=TRUE)
+                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+                                        break
+                                    }
+                                }
                             }
                         }
                     }
                 } else {
-                    if (Ntr > 0) {
-                        if (Nco > 0) {
-                            repeat{
-                                fake.co <- sample(co, Nco, replace=TRUE)
-                                fake.tr <- sample(tr, Ntr, replace=TRUE)
-                                fake.rev <- sample(rev, Nrev, replace=TRUE)
-                                boot.id <- c(fake.rev, fake.tr, fake.co)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        } else {
-                            repeat{
-                                fake.tr <- sample(tr, Ntr, replace=TRUE)
-                                fake.rev <- sample(rev, Nrev, replace=TRUE)
-                                boot.id <- c(fake.rev, fake.tr)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        }
-                    } else {
-                        if (Nco > 0) {
-                            repeat{
-                                fake.co <- sample(co, Nco, replace=TRUE)
-                                fake.rev <- sample(rev, Nrev, replace=TRUE)
-                                boot.id <- c(fake.rev, fake.co)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        } else {
-                            repeat{
-                                boot.id <- sample(rev, Nrev, replace=TRUE)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        }
+                    cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
+                    cl.boot.uni <- unique(cl.boot)
+                    cl.boot.count <- as.numeric(table(cl.boot))
+                    boot.id <- c()
+                    for (kk in 1:length(cl.boot.uni)) {
+                        boot.id <- c(boot.id, rep(which(cl == cl.boot.uni[kk]), cl.boot.count[kk]))
                     }
                 }
+
             } else {
-                cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
-                cl.boot.uni <- unique(cl.boot)
-                cl.boot.count <- as.numeric(table(cl.boot))
-                boot.id <- c()
-                for (kk in 1:length(cl.boot.uni)) {
-                    boot.id <- c(boot.id, rep(which(cl == cl.boot.uni[kk]), cl.boot.count[kk]))
-                }
+                boot.id <- 1:N
+                boot.id <- boot.id[-num]
             }
+            
             
                 
             X.boot <- X[,boot.id,,drop = FALSE]
@@ -382,6 +402,13 @@ fect.boot <- function(Y,
             }                        
         } 
     }
+
+    jack.seq <- sample(1:N, N, replace = FALSE)
+    boot.seq <- NULL
+    if (vartype == "jackknife") {
+        ## nboots <- min(N, nboots)
+        boot.seq <- jack.seq[1:nboots]
+    }
     
     ## computing
     if (parallel == TRUE) { 
@@ -390,7 +417,7 @@ fect.boot <- function(Y,
                             .export = c("fect.fe", "fect.mc", "get_term"),
                             .packages = c("fect")
                             ) %dopar% {
-                                return(one.nonpara())
+                                return(one.nonpara(boot.seq[j]))
                             }
 
         for (j in 1:nboots) { 
@@ -410,7 +437,7 @@ fect.boot <- function(Y,
         } 
     } else {
         for (j in 1:nboots) { 
-            boot <- one.nonpara() 
+            boot <- one.nonpara(boot.seq[j]) 
             att.avg.boot[j,] <- boot$att.avg
             att.on.boot[,j] <- boot$att.on
             att.on.count.boot[,j] <- boot$count.on 
@@ -477,7 +504,7 @@ fect.boot <- function(Y,
     }
 
     ## ATT estimates
-    CI.att.on <- t(apply(att.on.boot, 1, function(vec) quantile(vec,c(0.025,0.975), na.rm=TRUE)))
+    CI.att.on <- t(apply(att.on.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
     se.att.on <- apply(att.on.boot, 1, function(vec) sd(vec, na.rm=TRUE))
     pvalue.att.on <- apply(att.on.boot, 1, get.pvalue)
 
@@ -489,8 +516,13 @@ fect.boot <- function(Y,
     norm.att.on.sq <- (att.on/se.att.on)^2
     T0.on.p <- 1 - pchisq(sum(norm.att.on.sq[1:T0.on.l]), df = T0.on.l)
 
+    att.bound <- t(apply(att.on.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+    colnames(att.bound) <- c("CI.lower", "CI.upper")
+    rownames(att.bound) <- out$time.on
+    
+
     if (hasRevs == 1) {
-        CI.att.off <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(0.025,0.975), na.rm=TRUE)))
+        CI.att.off <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
         se.att.off <- apply(att.off.boot, 1, function(vec) sd(vec, na.rm=TRUE))
         pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
 
@@ -501,10 +533,14 @@ fect.boot <- function(Y,
         T0.off.l <- sum(out$time.off > 0)
         norm.att.off.sq <- (att.off/se.att.off)^2
         T0.off.p <- 1 - pchisq(sum(norm.att.off.sq[(length(out$time.off) - T0.off.l + 1):length(out$time.off)]), df = T0.off.l)
+
+        att.off.bound <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+        colnames(att.off.bound) <- c("CI.lower", "CI.upper")
+        rownames(att.off.bound) <- out$time.off
     }
 
     ## average (over time) ATT
-    CI.avg <- quantile(att.avg.boot, c(0.025,0.975), na.rm=TRUE)
+    CI.avg <- quantile(att.avg.boot, c(alpha, 1 - alpha/2), na.rm=TRUE)
     se.avg <- sd(att.avg.boot, na.rm=TRUE)
     pvalue.avg <- get.pvalue(att.avg.boot)
     est.avg <- t(as.matrix(c(att.avg, se.avg, CI.avg, pvalue.avg)))
@@ -514,7 +550,7 @@ fect.boot <- function(Y,
     ## regression coefficents
     if (p > 0) {
         CI.beta<-t(apply(beta.boot, 1, function(vec)
-            quantile(vec,c(0.025, 0.975), na.rm=TRUE)))
+            quantile(vec,c(alpha, 1 - alpha/2), na.rm=TRUE)))
         se.beta<-apply(beta.boot, 1, function(vec)sd(vec,na.rm=TRUE))
         pvalue.beta <- apply(beta.boot, 1, get.pvalue)
         beta[na.pos] <- NA
@@ -525,7 +561,7 @@ fect.boot <- function(Y,
     ## placebo test
     if (!is.null(placebo.period) & placeboTest == TRUE) {
         att.placebo <- out$att.placebo        
-        CI.placebo <- quantile(att.placebo.boot, c(0.025,0.975), na.rm=TRUE)
+        CI.placebo <- quantile(att.placebo.boot, c(alpha, 1- alpha/2), na.rm=TRUE)
         se.placebo <- sd(att.placebo.boot, na.rm=TRUE)
         pvalue.placebo <- get.pvalue(att.placebo.boot)
         est.placebo <- t(as.matrix(c(att.placebo, se.placebo, CI.placebo, pvalue.placebo)))
@@ -536,6 +572,7 @@ fect.boot <- function(Y,
     result<-list(est.avg = est.avg,
                  att.avg.boot = att.avg.boot,
                  est.att.on = est.att.on,
+                 att.bound = att.bound,
                  att.on.boot = att.on.boot,
                  att.on.count.boot = att.on.count.boot,
                  T0.on.p = T0.on.p)
@@ -544,7 +581,11 @@ fect.boot <- function(Y,
         result <- c(result,list(est.beta = est.beta))
     }
     if (hasRevs == 1) {
-        result<-c(result,list(est.att.off = est.att.off, att.off.boot = att.off.boot, att.off.count.boot = att.off.count.boot, T0.off.p = T0.off.p))
+        result<-c(result,list(est.att.off = est.att.off, 
+                              att.off.boot = att.off.boot, 
+                              att.off.bound = att.off.bound,
+                              att.off.count.boot = att.off.count.boot, 
+                              T0.off.p = T0.off.p))
     } 
 
     if (!is.null(placebo.period) & placeboTest == TRUE) {

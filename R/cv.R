@@ -443,6 +443,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
     ## we first adjustment for normalization 
     if (!is.null(norm.para)) {
+
+        Y <- Y * norm.para[1]
         
         if (method == "ife") {
             ## variance of the error term 
@@ -466,9 +468,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if (force%in%c(2,3)) {
             est.best$xi <- est.best$xi * norm.para[1] 
         }
-        if (p>0) {
-            est.best$beta <- est.best$beta * norm.para[1]
-        }
+        #if (p>0) {
+        #    est.best$beta <- est.best$beta * norm.para[1]
+        #}
         est.best$residuals <- est.best$residuals * norm.para[1] 
         est.best$fit <- est.best$fit * norm.para[1] 
         est.equiv$fit <- est.equiv$fit * norm.para[1]

@@ -48,7 +48,9 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  QR = FALSE, # QR or SVD for binary probit 
                  method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
                  criterion = "mspe", # for ife model: mspe, pc or both
+                 alpha = 0.05, # significance level
                  se = FALSE, # report uncertainties
+                 vartype = "bootstrap", # bootstrap or jackknife
                  nboots = 200, # number of bootstraps
                  parallel = FALSE, # parallel computing
                  cores = NULL, # number of cores
@@ -90,7 +92,9 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
                          criterion = "mspe", # for ife model: mspe, pc or both
+                         alpha = 0.05, # significance level
                          se = FALSE, # report uncertainties
+                         vartype = "bootstrap", # bootstrap or jackknife
                          nboots = 200, # number of bootstraps
                          parallel = FALSE, # parallel computing
                          cores = NULL, # number of cores
@@ -141,7 +145,8 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         D = Dname, X = Xname,
                         na.rm, index, force, cl, r, lambda, nlambda, 
                         CV, k, cv.prop, cv.treat, cv.nobs,
-                        binary, QR, method, criterion, se, 
+                        binary, QR, method, criterion, alpha, se, 
+                        vartype,
                         nboots, parallel, cores, tol, seed, min.T0,
                         max.missing, pre.period, 
                         off.period, wald,
@@ -178,7 +183,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: ife for interactive fe; mc for matrix completion
                          criterion = "mspe", 
+                         alpha = 0.05, # significance level
                          se = FALSE, # report uncertainties
+                         vartype = "bootstrap", # bootstrap or jackknife
                          nboots = 200, # number of bootstraps
                          parallel = FALSE, # parallel computing
                          cores = NULL, # number of cores
@@ -207,6 +214,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## index
     if (length(index) != 2 | sum(index %in% colnames(data)) != 2) {
         stop("\"index\" option misspecified. Try, for example, index = c(\"unit.id\", \"time\").")
+    }
+
+    if (se == 1) {
+        if (! vartype %in% c("bootstrap", "jackknife")) {
+            stop("\"vartype\" option misspecified.")
+        }
     }
     
     ## check duplicated observations
@@ -853,11 +866,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          method = method, criterion = criterion,
                          CV = CV, k = k, r = r, r.end = r.end, 
                          nlambda = nlambda, lambda = lambda,
-                         binary = binary, QR = QR,
+                         alpha = alpha, binary = binary, QR = QR,
                          force = force, hasRevs = hasRevs,
                          tol = tol, norm.para = norm.para,
                          placeboTest = placeboTest, 
                          placebo.period = placebo.period,
+                         vartype = vartype,
                          nboots = nboots, parallel = parallel,
                          cores = cores)
 

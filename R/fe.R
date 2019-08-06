@@ -109,7 +109,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
 
     ## we first adjustment for normalization 
     if (!is.null(norm.para) && binary == FALSE) {
-        
+        Y <- Y * norm.para[1]
         ## variance of the error term 
         sigma2 <- est.best$sigma2 * (norm.para[1]^2)
         IC <- est.best$IC - log(est.best$sigma2) + log(sigma2)
@@ -130,12 +130,12 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         if (force%in%c(2,3)) {
             est.best$xi <- est.best$xi * norm.para[1] 
         }
-        if (p>0) {
-            est.best$beta <- est.best$beta * norm.para[1]
-        }
+        #if (p>0) {
+        #    est.best$beta <- est.best$beta * norm.para[1]
+        #}
         est.best$residuals <- est.best$residuals * norm.para[1] 
         est.best$fit <- est.best$fit * norm.para[1]
-        ini.res <- ini.res * norm.para[1] 
+        ## ini.res <- ini.res * norm.para[1] 
         if (boot == FALSE) {
             est.equiv$fit <- est.equiv$fit * norm.para[1]
         }
@@ -228,14 +228,14 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     eff.pre <- cbind(eff.v.use1[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
     colnames(eff.pre) <- c("eff", "period", "unit")
 
-    sigma2.pre <- eff.pre.equiv <- NULL
+    pre.sd <- eff.pre.equiv <- NULL
     if (binary == FALSE && boot == FALSE) {
         eff.pre.equiv <- cbind(eff.equiv.v[pre.pos], t.on.use[pre.pos], n.on.use[pre.pos])
         colnames(eff.pre.equiv) <- c("eff.equiv", "period", "unit")
 
-        sigma2.pre <- tapply(eff.pre.equiv[,1], eff.pre.equiv[,2], var)
-        sigma2.pre <- cbind(sigma2.pre, sort(unique(eff.pre.equiv[, 2])), table(eff.pre.equiv[, 2]))
-        colnames(sigma2.pre) <- c("sigma2", "period", "count")
+        pre.sd <- tapply(eff.pre.equiv[,1], eff.pre.equiv[,2], sd)
+        pre.sd <- cbind(pre.sd, sort(unique(eff.pre.equiv[, 2])), table(eff.pre.equiv[, 2]))
+        colnames(pre.sd) <- c("sd", "period", "count")
     }
 
     time.on <- sort(unique(t.on.use))
@@ -334,7 +334,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         count.on = count.on,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
-        sigma2.pre = sigma2.pre)
+        pre.sd = pre.sd)
 
     if (binary == 0) {
         out <- c(out, list(PC = PC,

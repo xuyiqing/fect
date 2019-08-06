@@ -418,7 +418,7 @@ plot.fect <- function(x,
                 } else {
                     time0 <- which(time[show] <= 0)
                 }
-                att.sub <- as.matrix(x$est.att.on[show, ])
+                att.sub <- as.matrix(x$att.bound[show, ])
 
             } else {
                 if (sum(time[show] > 0) == 0) {
@@ -427,7 +427,7 @@ plot.fect <- function(x,
                 } else {
                     time0 <- which(time[show] >= 1)
                 }
-                att.sub <- as.matrix(x$est.att.off[show, ])
+                att.sub <- as.matrix(x$att.off.bound[show, ])
             }
 
             minBound <- max(abs(att.sub[time0, c("CI.lower", "CI.upper")]))
