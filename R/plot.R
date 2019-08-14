@@ -293,8 +293,8 @@ plot.fect <- function(x,
     ## type of plots
     if (type == "gap") {
         if (switch.on == TRUE) {
-            time <- x$time.on
-            count.num <- x$count.on
+            time <- x$time
+            count.num <- x$count
             best.pos <- 1
         } else if (switch.on == FALSE) {
             time <- x$time.off
@@ -398,7 +398,7 @@ plot.fect <- function(x,
         ## bound
         data2 <- NULL
         if (bound != "none") {
-            if (is.null(x$est.att.on)) {
+            if (is.null(x$est.att)) {
                 cat("No uncertainty estimates.\n")
                 bound <- "none"
             }
@@ -518,7 +518,7 @@ plot.fect <- function(x,
 
         CI <- NULL
         if (switch.on == TRUE) {
-            if (is.null(x$est.att.on)==TRUE) {
+            if (is.null(x$est.att)==TRUE) {
                 CI <- FALSE
             } else {
                 CI <- TRUE
@@ -538,11 +538,11 @@ plot.fect <- function(x,
             ## switch-on effect
             if (CI==FALSE) {               
 
-                data <- cbind.data.frame(time, ATT = x$att.on, count = count.num)[show,]                
+                data <- cbind.data.frame(time, ATT = x$att, count = count.num)[show,]                
 
             } else {
 
-                tb <- x$est.att.on
+                tb <- x$est.att
                 data <- cbind.data.frame(time, tb, count = count.num)[show,]
                 colnames(data)[2] <- "ATT"
 
