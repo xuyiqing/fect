@@ -10,7 +10,7 @@ att.cumu <- function(x, ## a fect object
                     ) {
 
     if (is.null(period)) {
-        period <- c(1, max(x$time.on))
+        period <- c(1, max(x$time))
     }
 
     if (length(period) != 2) {
@@ -19,9 +19,9 @@ att.cumu <- function(x, ## a fect object
 
     ## start point
     se <- 0
-    time <- x$time.on
-    att <- x$att.on
-    est.att <- x$est.att.on
+    time <- x$time
+    att <- x$att
+    est.att <- x$est.att
 
     if (!is.null(est.att)) {
         se <- 1
@@ -104,14 +104,14 @@ att.cumu.sub <- function(x, ## a fect object
     se <- 0
 
     if (type == "on") {
-        time <- x$time.on
-        att <- x$att.on
-        count <- x$count.on
+        time <- x$time
+        att <- x$att
+        count <- x$count
 
-        if (!is.null(x$est.att.on)) {
+        if (!is.null(x$est.att)) {
             se <- 1
-            att.boot <- x$att.on.boot
-            count.boot <- x$att.on.count.boot
+            att.boot <- x$att.boot
+            count.boot <- x$att.count.boot
         }
     } else {
         time <- x$time.off

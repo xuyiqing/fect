@@ -342,9 +342,9 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
         validX = validX,
         validF = validF,
         niter = est.best$niter, 
-        time.on = time.on,
-        att.on = att.on,
-        count.on = count.on,
+        time = time.on,
+        att = att.on,
+        count = count.on,
         eff.pre = eff.pre,
         CV.out = CV.out
     )

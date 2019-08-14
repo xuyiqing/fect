@@ -115,8 +115,8 @@ fect.boot <- function(Y,
     eff <- out$eff
     att.avg <- out$att.avg
 
-    att.on <- out$att.on
-    time.on <- out$time.on
+    att.on <- out$att
+    time.on <- out$time
 
     time.off <- NULL
     if (hasRevs == 1) {
@@ -137,12 +137,12 @@ fect.boot <- function(Y,
     }
 
     if (vartype == "jackknife") {
-        nboots <- min(N, nboots)
+        nboots <- N
     }
  
     ## bootstrapped estimates
-    eff.boot <- array(0,dim = c(TT, Ntr, nboots))  ## to store results
-    att.avg.boot <- matrix(0, nboots, 1)
+    ## eff.boot <- array(0,dim = c(TT, Ntr, nboots))  ## to store results
+    att.avg.boot <- matrix(0, 1, nboots)
     att.on.boot <- matrix(0, length(time.on), nboots)
     att.on.count.boot <- matrix(0, length(time.on), nboots)
     if (hasRevs == 1) {
@@ -153,10 +153,15 @@ fect.boot <- function(Y,
         beta.boot <- matrix(0, p, nboots)
     }
     if (!is.null(placebo.period) & placeboTest == TRUE) {
-        att.placebo.boot <- matrix(0, nboots, 1)
+        att.placebo.boot <- matrix(0, 1, nboots)
     } 
 
-    cat("Bootstrapping for uncertainties ... ")
+    if (vartype == "jackknife") {
+        cat("Jackknife estimates ... ")
+    } else {
+        cat("Bootstrapping for uncertainties ... ")
+    }
+    
  
     if (method == "ife") {
         one.nonpara <- function(num = NULL) {
@@ -243,7 +248,7 @@ fect.boot <- function(Y,
             I.boot <- I[, boot.id]
 
             if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
-                boot0 <- list(att.avg = NA, att.on = NA, count.on = NA, 
+                boot0 <- list(att.avg = NA, att = NA, count = NA, 
                               beta = NA, att.off = NA, count.off = NA, 
                               att.placebo = NA)
                 return(boot0)
@@ -269,7 +274,7 @@ fect.boot <- function(Y,
                                     placeboTest = placeboTest), silent = TRUE)
 
                 if ('try-error' %in% class(boot)) {
-                    boot0 <- list(att.avg = NA, att.on = NA, count.on = NA, 
+                    boot0 <- list(att.avg = NA, att = NA, count = NA, 
                                   beta = NA, att.off = NA, count.off = NA, 
                                   att.placebo = NA)
                     return(boot0)
@@ -366,7 +371,7 @@ fect.boot <- function(Y,
             I.boot <- I[, boot.id]
 
             if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
-                boot0 <- list(att.avg = NA, att.on = NA, count.on = NA, 
+                boot0 <- list(att.avg = NA, att = NA, count = NA, 
                               beta = NA, att.off = NA, count.off = NA, 
                               att.placebo = NA)
                 return(boot0)
@@ -392,7 +397,7 @@ fect.boot <- function(Y,
                                     placeboTest = placeboTest), silent = TRUE)
                 
                 if ('try-error' %in% class(boot)) {
-                    boot0 <- list(att.avg = NA, att.on = NA, count.on = NA, 
+                    boot0 <- list(att.avg = NA, att = NA, count = NA, 
                                   beta = NA, att.off = NA, count.off = NA, 
                                   att.placebo = NA)
                     return(boot0)
@@ -403,11 +408,12 @@ fect.boot <- function(Y,
         } 
     }
 
-    jack.seq <- sample(1:N, N, replace = FALSE)
+    ## jack.seq <- sample(1:N, N, replace = FALSE)
     boot.seq <- NULL
     if (vartype == "jackknife") {
         ## nboots <- min(N, nboots)
-        boot.seq <- jack.seq[1:nboots]
+        ## boot.seq <- jack.seq[1:nboots]
+        boot.seq <- 1:N 
     }
     
     ## computing
@@ -421,9 +427,9 @@ fect.boot <- function(Y,
                             }
 
         for (j in 1:nboots) { 
-            att.avg.boot[j,] <- boot.out[[j]]$att.avg
-            att.on.boot[,j] <- boot.out[[j]]$att.on 
-            att.on.count.boot[,j] <- boot.out[[j]]$count.on 
+            att.avg.boot[,j] <- boot.out[[j]]$att.avg
+            att.on.boot[,j] <- boot.out[[j]]$att
+            att.on.count.boot[,j] <- boot.out[[j]]$count
             if (p > 0) {
                 beta.boot[,j] <- boot.out[[j]]$beta
             }
@@ -432,15 +438,15 @@ fect.boot <- function(Y,
                 att.off.count.boot[,j] <- boot.out[[j]]$count.off 
             }
             if (!is.null(placebo.period) & placeboTest == TRUE) {
-                att.placebo.boot[j,] <- boot.out[[j]]$att.placebo
+                att.placebo.boot[,j] <- boot.out[[j]]$att.placebo
             }
         } 
     } else {
         for (j in 1:nboots) { 
             boot <- one.nonpara(boot.seq[j]) 
-            att.avg.boot[j,] <- boot$att.avg
-            att.on.boot[,j] <- boot$att.on
-            att.on.count.boot[,j] <- boot$count.on 
+            att.avg.boot[,j] <- boot$att.avg
+            att.on.boot[,j] <- boot$att
+            att.on.count.boot[,j] <- boot$count
             if (p > 0) {
                 beta.boot[,j] <- boot$beta
             }
@@ -449,7 +455,7 @@ fect.boot <- function(Y,
                 att.off.count.boot[,j] <- boot$count.off 
             }
             if (!is.null(placebo.period) & placeboTest == TRUE) {
-                att.placebo.boot[j,] <- boot$att.placebo
+                att.placebo.boot[,j] <- boot$att.placebo
             }
             ## report progress
             if (j%%100 == 0)  {
@@ -463,7 +469,7 @@ fect.boot <- function(Y,
     ## alternative condition? max(apply(is.na(att.on.boot),2,sum)) == dim(att.on.boot)[1]
     if (sum(is.na(c(att.avg.boot))) > 0) {
         boot.rm <- which(is.na(c(att.avg.boot)))
-        att.avg.boot <- as.matrix(att.avg.boot[-boot.rm,])
+        att.avg.boot <- t(as.matrix(att.avg.boot[,-boot.rm]))
         att.on.boot <- as.matrix(att.on.boot[,-boot.rm])
         att.on.count.boot <- as.matrix(att.on.count.boot[,-boot.rm])
         if (p > 0) {
@@ -477,7 +483,7 @@ fect.boot <- function(Y,
             att.off.count.boot <- as.matrix(att.off.count.boot[,-boot.rm])
         }
         if (!is.null(placebo.period) & placeboTest == TRUE) {
-            att.placebo.boot <- as.matrix(att.placebo.boot[-boot.rm,])
+            att.placebo.boot <- t(as.matrix(att.placebo.boot[,-boot.rm]))
         }
 
     }
@@ -504,78 +510,125 @@ fect.boot <- function(Y,
     }
 
     ## ATT estimates
-    CI.att.on <- t(apply(att.on.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
-    se.att.on <- apply(att.on.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-    pvalue.att.on <- apply(att.on.boot, 1, get.pvalue)
+    if (vartype == "jackknife") {
+        att.on.j <- jackknifed(att.on, att.on.boot, alpha)
+        est.att.on <- cbind(att.on, att.on.j$se, att.on.j$CI.l, att.on.j$CI.u, att.on.j$P, out$count)
+        colnames(est.att.on) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                  "p.value", "count.on")
+        rownames(est.att.on) <- out$time
 
-    est.att.on <- cbind(att.on, se.att.on, CI.att.on, pvalue.att.on, out$count.on)
-    colnames(est.att.on) <- c("ATT.ON", "S.E.", "CI.lower", "CI.upper",
-                              "p.value", "count.on")
-    rownames(est.att.on) <- out$time.on
-    T0.on.l <- sum(out$time.on <= 0)
-    norm.att.on.sq <- (att.on/se.att.on)^2
-    T0.on.p <- 1 - pchisq(sum(norm.att.on.sq[1:T0.on.l]), df = T0.on.l)
+        att.bound <- cbind(att.on + qnorm(alpha)*att.on.j$se, att.on + qnorm(1 - alpha)*att.on.j$se)
+        colnames(att.bound) <- c("CI.lower", "CI.upper")
+        rownames(att.bound) <- out$time
 
-    att.bound <- t(apply(att.on.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
-    colnames(att.bound) <- c("CI.lower", "CI.upper")
-    rownames(att.bound) <- out$time.on
-    
+        if (hasRevs == 1) {
+            att.off.j <- jackknifed(att.off, att.off.boot, alpha)
+            est.att.off <- cbind(att.off, att.off.j$se, att.off.j$CI.l, att.off.j$CI.u, att.off.j$P, out$count.on)
+            colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
+                                      "p.value", "count.off")
+            rownames(est.att.off) <- out$time.off
 
-    if (hasRevs == 1) {
-        CI.att.off <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
-        se.att.off <- apply(att.off.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-        pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
+            att.off.bound <- cbind(att.off + qnorm(alpha)*att.off.j$se, att.off + qnorm(1 - alpha)*att.off.j$se)
+            colnames(att.off.bound) <- c("CI.lower", "CI.upper")
+            rownames(att.off.bound) <- out$time.off
+        }
 
-        est.att.off <- cbind(att.off, se.att.off, CI.att.off, pvalue.att.off, out$count.off)
-        colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
-                                   "p.value", "count.off")
-        rownames(est.att.off) <- out$time.off
-        T0.off.l <- sum(out$time.off > 0)
-        norm.att.off.sq <- (att.off/se.att.off)^2
-        T0.off.p <- 1 - pchisq(sum(norm.att.off.sq[(length(out$time.off) - T0.off.l + 1):length(out$time.off)]), df = T0.off.l)
+        ## average (over time) ATT
+        att.avg.j <- jackknifed(att.avg, att.avg.boot, alpha)
+        est.avg <- t(as.matrix(c(att.avg, att.avg.j$se, att.avg.j$CI.l, att.avg.j$CI.u, att.avg.j$P)))
+        colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
 
-        att.off.bound <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
-        colnames(att.off.bound) <- c("CI.lower", "CI.upper")
-        rownames(att.off.bound) <- out$time.off
-    }
+        ## regression coefficents
+        if (p > 0) {
+            beta.j <- jackknifed(beta, beta.boot, alpha)
+            est.beta <- cbind(beta, beta.j$se, beta.j$CI.l, beta.j$CI.u, beta.j$P)
+            colnames(est.beta)<-c("beta", "S.E.", "CI.lower", "CI.upper", "p.value")
+        }
 
-    ## average (over time) ATT
-    CI.avg <- quantile(att.avg.boot, c(alpha, 1 - alpha/2), na.rm=TRUE)
-    se.avg <- sd(att.avg.boot, na.rm=TRUE)
-    pvalue.avg <- get.pvalue(att.avg.boot)
-    est.avg <- t(as.matrix(c(att.avg, se.avg, CI.avg, pvalue.avg)))
-    colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
+        ## placebo test
+        if (!is.null(placebo.period) & placeboTest == TRUE) {
+            att.placebo <- out$att.placebo
+            att.placebo.j <- jackknifed(att.placebo, att.placebo.boot, alpha)
+            est.placebo <- t(as.matrix(c(att.placebo, att.placebo.j$se, att.placebo.j$CI.l, att.placebo.j$CI.u, att.placebo.j$P)))
+            colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
+        }
 
-    
-    ## regression coefficents
-    if (p > 0) {
-        CI.beta<-t(apply(beta.boot, 1, function(vec)
-            quantile(vec,c(alpha, 1 - alpha/2), na.rm=TRUE)))
-        se.beta<-apply(beta.boot, 1, function(vec)sd(vec,na.rm=TRUE))
-        pvalue.beta <- apply(beta.boot, 1, get.pvalue)
-        beta[na.pos] <- NA
-        est.beta<-cbind(beta, se.beta, CI.beta, pvalue.beta)
-        colnames(est.beta)<-c("beta", "S.E.", "CI.lower", "CI.upper", "p.value")
-    }
+    } else {
 
-    ## placebo test
-    if (!is.null(placebo.period) & placeboTest == TRUE) {
-        att.placebo <- out$att.placebo        
-        CI.placebo <- quantile(att.placebo.boot, c(alpha, 1- alpha/2), na.rm=TRUE)
-        se.placebo <- sd(att.placebo.boot, na.rm=TRUE)
-        pvalue.placebo <- get.pvalue(att.placebo.boot)
-        est.placebo <- t(as.matrix(c(att.placebo, se.placebo, CI.placebo, pvalue.placebo)))
-        colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
+        CI.att.on <- t(apply(att.on.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+        se.att.on <- apply(att.on.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+        pvalue.att.on <- apply(att.on.boot, 1, get.pvalue)
+
+        est.att.on <- cbind(att.on, se.att.on, CI.att.on, pvalue.att.on, out$count)
+        colnames(est.att.on) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                  "p.value", "count.on")
+        rownames(est.att.on) <- out$time
+        #T0.on.l <- sum(out$time.on <= 0)
+        #norm.att.on.sq <- (att.on/se.att.on)^2
+        #T0.on.p <- 1 - pchisq(sum(norm.att.on.sq[1:T0.on.l]), df = T0.on.l)
+
+        att.bound <- t(apply(att.on.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+        colnames(att.bound) <- c("CI.lower", "CI.upper")
+        rownames(att.bound) <- out$time
+        
+
+        if (hasRevs == 1) {
+            CI.att.off <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+            se.att.off <- apply(att.off.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+            pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
+
+            est.att.off <- cbind(att.off, se.att.off, CI.att.off, pvalue.att.off, out$count.off)
+            colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
+                                       "p.value", "count.off")
+            rownames(est.att.off) <- out$time.off
+            #T0.off.l <- sum(out$time.off > 0)
+            #norm.att.off.sq <- (att.off/se.att.off)^2
+            #T0.off.p <- 1 - pchisq(sum(norm.att.off.sq[(length(out$time.off) - T0.off.l + 1):length(out$time.off)]), df = T0.off.l)
+
+            att.off.bound <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+            colnames(att.off.bound) <- c("CI.lower", "CI.upper")
+            rownames(att.off.bound) <- out$time.off
+        }
+
+        ## average (over time) ATT
+        CI.avg <- quantile(att.avg.boot, c(alpha, 1 - alpha/2), na.rm=TRUE)
+        se.avg <- sd(att.avg.boot, na.rm=TRUE)
+        pvalue.avg <- get.pvalue(att.avg.boot)
+        est.avg <- t(as.matrix(c(att.avg, se.avg, CI.avg, pvalue.avg)))
+        colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
+
+        
+        ## regression coefficents
+        if (p > 0) {
+            CI.beta<-t(apply(beta.boot, 1, function(vec)
+                quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+            se.beta<-apply(beta.boot, 1, function(vec)sd(vec,na.rm=TRUE))
+            pvalue.beta <- apply(beta.boot, 1, get.pvalue)
+            beta[na.pos] <- NA
+            est.beta<-cbind(beta, se.beta, CI.beta, pvalue.beta)
+            colnames(est.beta)<-c("beta", "S.E.", "CI.lower", "CI.upper", "p.value")
+        }
+
+        ## placebo test
+        if (!is.null(placebo.period) & placeboTest == TRUE) {
+            att.placebo <- out$att.placebo        
+            CI.placebo <- quantile(att.placebo.boot, c(alpha/2, 1- alpha/2), na.rm=TRUE)
+            se.placebo <- sd(att.placebo.boot, na.rm=TRUE)
+            pvalue.placebo <- get.pvalue(att.placebo.boot)
+            est.placebo <- t(as.matrix(c(att.placebo, se.placebo, CI.placebo, pvalue.placebo)))
+            colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
+        }
+
     }
   
     ##storage
     result<-list(est.avg = est.avg,
                  att.avg.boot = att.avg.boot,
-                 est.att.on = est.att.on,
+                 est.att = est.att.on,
                  att.bound = att.bound,
-                 att.on.boot = att.on.boot,
-                 att.on.count.boot = att.on.count.boot,
-                 T0.on.p = T0.on.p)
+                 att.boot = att.on.boot,
+                 att.count.boot = att.on.count.boot)
+
     if (p>0) {
         result <- c(result,list(beta.boot = beta.boot))
         result <- c(result,list(est.beta = est.beta))
@@ -584,8 +637,7 @@ fect.boot <- function(Y,
         result<-c(result,list(est.att.off = est.att.off, 
                               att.off.boot = att.off.boot, 
                               att.off.bound = att.off.bound,
-                              att.off.count.boot = att.off.count.boot, 
-                              T0.off.p = T0.off.p))
+                              att.off.count.boot = att.off.count.boot))
     } 
 
     if (!is.null(placebo.period) & placeboTest == TRUE) {
@@ -596,3 +648,31 @@ fect.boot <- function(Y,
 
     
 } ## end of boot
+
+
+## jackknife se
+jackknifed <- function(x,  ## ols estimates
+                       y,
+                       alpha) { ## sub-sample ols estimates) 
+
+    p <- length(x)
+    N <- dim(y)[2]  ## sample size
+
+    X <- matrix(rep(c(x), N), p, N) * N
+    Y <- X - y * (N - 1)
+
+    Yvar <- apply(Y, 1, var)
+
+    Ysd <- sqrt(Yvar/N)  ## jackknife se
+
+    CI.l <- Ysd * qnorm(alpha/2) + c(x)
+    CI.u <- Ysd * qnorm(1 - alpha/2) + c(x)
+
+    ## wald test
+    P <- 2 * min(1 - pnorm(c(x)/Ysd), pnorm(c(x)/Ysd))
+
+    out <- list(se = Ysd, CI.l = CI.l, CI.u = CI.u, P = P)
+
+    return(out)
+    
+}

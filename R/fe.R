@@ -329,9 +329,9 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         niter = est.best$niter,
         validX = validX,
         validF = validF,
-        time.on = time.on,
-        att.on = att.on,
-        count.on = count.on,
+        time = time.on,
+        att = att.on,
+        count = count.on,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
         pre.sd = pre.sd)
