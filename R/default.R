@@ -59,7 +59,9 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  min.T0 = 5, # minimum T0
                  max.missing = NULL, # maximum missing
                  pre.period = NULL, # fit test period 
-                 off.period = NULL, # fit test period: switch-off 
+                 off.period = NULL, # fit test period: switch-off
+                 polynomial = FALSE,
+                 power = 2,  
                  wald = FALSE, # fit test
                  placebo.period = NULL, # placebo test period
                  placeboTest = FALSE, # placebo test
@@ -103,7 +105,9 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.period = NULL,
-                         off.period = NULL, # fit test period: switch-off 
+                         off.period = NULL, # fit test period: switch-off
+                         polynomial = FALSE,
+                         power = 2,  
                          wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
@@ -149,7 +153,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         vartype,
                         nboots, parallel, cores, tol, seed, min.T0,
                         max.missing, pre.period, 
-                        off.period, wald,
+                        off.period, polynomial, power, wald,
                         placebo.period, placeboTest, 
                         permute, m, normalize)
     
@@ -194,7 +198,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.period = NULL,
-                         off.period = NULL, # fit test period: switch-off 
+                         off.period = NULL, # fit test period: switch-off
+                         polynomial = FALSE,
+                         power = 2,  
                          wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
@@ -249,13 +255,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     ## method
-    if (!method %in% c("fe", "ife", "mc", "both")) {
+    if (!method %in% c("fe", "ife", "mc", "both", "polynomial")) {
         stop("\"method\" option misspecified; choose from c(\"fe\", \"ife\", \"mc\", \"both\").")
     }
     if (method == "fe") {
         r <- 0
         CV <- FALSE
         method <- "ife"
+    } else if (method == "polynomial") {
+        CV <- FALSE
     }
 
     if (!criterion %in% c("mspe", "pc", "both")) {
@@ -306,8 +314,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             }
         }
     } else {
-        if (! method %in% c("ife", "mc")) {
-            stop("\"method\" option misspecified; please choose from c(\"ife\", \"mc\").")
+        if (! method %in% c("ife", "mc", "polynomial")) {
+            stop("\"method\" option misspecified; please choose from c(\"ife\", \"mc\", \"polynomial\").")
         }
     }
 
@@ -846,7 +854,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                norm.para = norm.para,
                                placeboTest = placeboTest, 
                                placebo.period = placebo.period)
-            } else {
+            } else if (method == "mc") {
                 out <- fect.mc(Y = Y, D = D, X = X, I = I, II = II,
                                T.on = T.on, T.off = T.off, 
                                lambda.cv = lambda,
@@ -855,6 +863,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                norm.para = norm.para,
                                placeboTest = placeboTest, 
                                placebo.period = placebo.period)
+            } else if (method == "polynomial") {
+                out <- fect.polynomial(Y = Y, D = D, X = X, I = I, 
+                                       II = II, T.on = T.on, 
+                                       T.off = T.off, power = power,
+                                       force = force, hasRevs = hasRevs,
+                                       tol = tol, boot = 0, 
+                                       placeboTest = placeboTest,
+                                       placebo.period = placebo.period, 
+                                       norm.para = norm.para)
             }
 
         }
@@ -863,7 +880,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         
         out <- fect.boot(Y = Y, D = D, X = X, I = I, II = II,
                          T.on = T.on, T.off = T.off, cl = NULL,
-                         method = method, criterion = criterion,
+                         method = method, power = power,
+                         criterion = criterion,
                          CV = CV, k = k, r = r, r.end = r.end, 
                          nlambda = nlambda, lambda = lambda,
                          alpha = alpha, binary = binary, QR = QR,
@@ -905,7 +923,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         out.permute <- fect.permu(Y = Y, X = X, D = D, I = I, r.cv = out$r.cv,
                                   lambda.cv = out$lambda.cv, m = m, 
-                                  method = out$method, force = force,                      
+                                  method = out$method, power = power, 
+                                  force = force,                      
                                   tol = tol, norm.para = norm.para,
                                   nboots = nboots,
                                   parallel = parallel, cores = cores)

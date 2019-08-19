@@ -45,15 +45,16 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
     vy <- as.matrix(c(YY))
     vx.fit <- vx <- NULL
     if (p > 0) {
+        vx <- matrix(NA, N*TT, p)
         for (i in 1:p) {
             vx[, i] <- c(X[,, i])
         }
         vx.fit <- as.matrix(vx[oci,])
     }
-    vindex <- cbind(rep(1:N, each = TT), rep(1:TT, N))  ## id time
+    vindex <- cbind(rep(1:N, each = TT), rep(1:TT - 1, N))  ## id time
     if (power > 1) {
         for (i in 2:power) {
-            vindex <- cbind(vindex, rep((1:TT)^i, N))
+            vindex <- cbind(vindex, rep((1:TT - 1)^i, N))
         }
     }
 
@@ -231,7 +232,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
     ##-------------------------------##  
     out<-list(
         ## main results 
-        T.on = T.on,
+        method = "polynomial",
         Y.ct = Y.ct,
         eff = eff,
         att.avg = att.avg,
@@ -243,9 +244,9 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         beta = beta,
         est = est.best,
         validX = validX,
-        time.on = time.on,
-        att.on = att.on,
-        count.on = count.on,
+        time = time.on,
+        att = att.on,
+        count = count.on,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
         sigma2.pre = sigma2.pre)

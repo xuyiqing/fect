@@ -23,14 +23,12 @@ print.fect <- function(x,
                 }
             }
 
-            seq.on.min <- min(which(x$time.on >= time.on.lim[1]))
-            seq.on.max <- max(which(x$time.on <= time.on.lim[2]))
+            seq.on.min <- min(which(x$time >= time.on.lim[1]))
+            seq.on.max <- max(which(x$time <= time.on.lim[2]))
             seq.on <- seq.on.min:seq.on.max
         } else {
-            seq.on <- 1:length(x$time.on)
+            seq.on <- 1:length(x$time)
         }
-
-
     }
 
     if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
@@ -57,7 +55,7 @@ print.fect <- function(x,
         print(x$att.avg, digits = 4)
         if (switch.on == TRUE) {
             cat("\n   ~ Switch-on by Period:\n")
-            print(x$att.on[seq.on], digits = 4)
+            print(x$att[seq.on], digits = 4)
         }
         if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
             cat("\n   ~ Switch-on by Period:\n")
@@ -73,7 +71,7 @@ print.fect <- function(x,
         print(x$est.avg, digits = 4)
         if (switch.on == TRUE) {
             cat("\n   ~ Switch-on by Period:\n")
-            print(x$est.att.on[seq.on,], digits = 4)
+            print(x$est.att[seq.on,], digits = 4)
         }
         if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
             cat("\n   ~ Switch-on by Period:\n")

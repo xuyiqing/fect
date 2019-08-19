@@ -312,7 +312,6 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     out<-list(
         ## main results 
         method = method,
-        T.on = T.on,
         Y.ct = Y.ct,
         eff = eff,
         att.avg = att.avg,

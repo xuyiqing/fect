@@ -248,7 +248,7 @@ plot.fect <- function(x,
     index <- x$index
     unit.type <- x$unit.type
     obs.missing <- x$obs.missing
-    tname <- time <- x$time
+    tname <- time <- x$rawtime
 
     TT <- dim(Y)[1]
     N <- dim(Y)[2]

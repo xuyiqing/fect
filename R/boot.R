@@ -10,6 +10,7 @@ fect.boot <- function(Y,
                       T.on, 
                       T.off = NULL, 
                       method = "ife",
+                      power = 2,
                       criterion = "mspe",
                       CV,
                       k = 5,
@@ -76,7 +77,7 @@ fect.boot <- function(Y,
                            norm.para = norm.para, 
                            placebo.period = placebo.period,
                            placeboTest = placeboTest)
-        } else {
+        } else if (method == "mc") {
             out <- fect.mc(Y = Y, X = X, D = D, I = I, II = II,
                            T.on = T.on, T.off = T.off, 
                            lambda.cv = lambda, force = force, hasRevs = hasRevs, 
@@ -84,6 +85,15 @@ fect.boot <- function(Y,
                            norm.para = norm.para,
                            placebo.period = placebo.period,
                            placeboTest = placeboTest)
+        } else if (method == "polynomial") {
+            out <- fect.polynomial(Y = Y, D = D, X = X, I = I, 
+                                       II = II, T.on = T.on, 
+                                       T.off = T.off, power = power,
+                                       force = force, hasRevs = hasRevs,
+                                       tol = tol, boot = 0, 
+                                       placeboTest = placeboTest,
+                                       placebo.period = placebo.period, 
+                                       norm.para = norm.para)
         }
     } else {
         ## cross-valiadtion 
@@ -163,7 +173,7 @@ fect.boot <- function(Y,
     }
     
  
-    if (method == "ife") {
+    #if (method == "ife") {
         one.nonpara <- function(num = NULL) {
 
             if (is.null(num)) {
@@ -261,8 +271,10 @@ fect.boot <- function(Y,
                 if (placeboTest == TRUE) {
                     placebo.period.boot <- placebo.period
                 }
-                    
-                boot <- try(fect.fe(Y = Y[, boot.id], X = X.boot, D = D.boot,
+
+
+                if (method == "ife") {
+                    boot <- try(fect.fe(Y = Y[, boot.id], X = X.boot, D = D.boot,
                                     I = I.boot, II = II[, boot.id], 
                                     T.on = T.on[, boot.id], T.off = T.off.boot, 
                                     r.cv = out$r.cv, binary = binary,
@@ -272,6 +284,29 @@ fect.boot <- function(Y,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest), silent = TRUE)
+                } else if (method == "mc") {
+                    boot <- try(fect.mc(Y = Y[,boot.id], X = X.boot, D = D[,boot.id],
+                                    I = I[,boot.id], II = II[,boot.id],
+                                    T.on = T.on[,boot.id], T.off = T.off.boot, 
+                                    lambda.cv = out$lambda.cv, force = force, 
+                                    hasF = out$validF, hasRevs = hasRevs, 
+                                    tol = tol, boot = 1,
+                                    norm.para = norm.para,
+                                    time.on.seq = time.on, time.off.seq = time.off,
+                                    placebo.period = placebo.period.boot, 
+                                    placeboTest = placeboTest), silent = TRUE)
+
+                } else if (method == "polynomial") {
+                    boot <- try(fect.polynomial(Y = Y[,boot.id], X = X.boot, 
+                                                D = D[,boot.id],
+                                                I = I[,boot.id], II = II[,boot.id],
+                                                T.on = T.on[,boot.id], T.off = T.off.boot, 
+                                                power = power, force = force, hasRevs = hasRevs,
+                                                norm.para = norm.para, time.on.seq = time.on, 
+                                                time.off.seq = time.off,
+                                                placebo.period = placebo.period.boot, 
+                                                placeboTest = placeboTest), silent = TRUE)
+                }
 
                 if ('try-error' %in% class(boot)) {
                     boot0 <- list(att.avg = NA, att = NA, count = NA, 
@@ -284,129 +319,129 @@ fect.boot <- function(Y,
             }            
         } 
             
-    } else { ## mc
-        one.nonpara <- function() {
+    #} else { ## mc
+    #    one.nonpara <- function() {
 
-            if (is.null(num)) {
-                if (is.null(cl)) {
-                    if (hasRevs == 0) {
-                        if (Nco > 0) {
-                            repeat{
-                                fake.co <- sample(co, Nco, replace=TRUE)
-                                fake.tr <- sample(tr, Ntr, replace=TRUE)
-                                boot.id <- c(fake.tr, fake.co)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        } else {
-                            repeat{
-                                boot.id <- sample(tr, Ntr, replace=TRUE)
-                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                    break
-                                }
-                            }
-                        }
-                    } else {
-                        if (Ntr > 0) {
-                            if (Nco > 0) {
-                                repeat{
-                                    fake.co <- sample(co, Nco, replace=TRUE)
-                                    fake.tr <- sample(tr, Ntr, replace=TRUE)
-                                    fake.rev <- sample(rev, Nrev, replace=TRUE)
-                                    boot.id <- c(fake.rev, fake.tr, fake.co)
-                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                        break
-                                    }
-                                }
-                            } else {
-                                repeat{
-                                    fake.tr <- sample(tr, Ntr, replace=TRUE)
-                                    fake.rev <- sample(rev, Nrev, replace=TRUE)
-                                    boot.id <- c(fake.rev, fake.tr)
-                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                        break
-                                    }
-                                }
-                            }
-                        } else {
-                            if (Nco > 0) {
-                                repeat{
-                                    fake.co <- sample(co, Nco, replace=TRUE)
-                                    fake.rev <- sample(rev, Nrev, replace=TRUE)
-                                    boot.id <- c(fake.rev, fake.co)
-                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                        break
-                                    }
-                                }
-                            } else {
-                                repeat{
-                                    boot.id <- sample(rev, Nrev, replace=TRUE)
-                                    if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-                                        break
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
-                    cl.boot.uni <- unique(cl.boot)
-                    cl.boot.count <- as.numeric(table(cl.boot))
-                    boot.id <- c()
-                    for (kk in 1:length(cl.boot.uni)) {
-                        boot.id <- c(boot.id, rep(which(cl == cl.boot.uni[kk]), cl.boot.count[kk]))
-                    }
-                }
+    #        if (is.null(num)) {
+    #            if (is.null(cl)) {
+    #                if (hasRevs == 0) {
+    #                    if (Nco > 0) {
+    #                        repeat{
+    #                            fake.co <- sample(co, Nco, replace=TRUE)
+    #                            fake.tr <- sample(tr, Ntr, replace=TRUE)
+    #                            boot.id <- c(fake.tr, fake.co)
+    #                            if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+    #                                break
+    #                            }
+    #                        }
+    #                    } else {
+    #                        repeat{
+    #                            boot.id <- sample(tr, Ntr, replace=TRUE)
+    #                            if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+    #                                break
+    #                            }
+    #                        }
+    #                    }
+    #                } else {
+    #                    if (Ntr > 0) {
+    #                        if (Nco > 0) {
+    #                            repeat{
+    #                                fake.co <- sample(co, Nco, replace=TRUE)
+    #                                fake.tr <- sample(tr, Ntr, replace=TRUE)
+    #                                fake.rev <- sample(rev, Nrev, replace=TRUE)
+    #                                boot.id <- c(fake.rev, fake.tr, fake.co)
+    #                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+    #                                    break
+    #                                }
+    #                            }
+    #                        } else {
+    #                            repeat{
+    #                                fake.tr <- sample(tr, Ntr, replace=TRUE)
+    #                                fake.rev <- sample(rev, Nrev, replace=TRUE)
+    #                                boot.id <- c(fake.rev, fake.tr)
+    #                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+    #                                    break
+    #                                }
+    #                            }
+    #                        }
+    #                    } else {
+    #                        if (Nco > 0) {
+    #                            repeat{
+    #                                fake.co <- sample(co, Nco, replace=TRUE)
+    #                                fake.rev <- sample(rev, Nrev, replace=TRUE)
+    #                                boot.id <- c(fake.rev, fake.co)
+    #                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+    #                                    break
+    #                                }
+    #                            }
+    #                        } else {
+    #                            repeat{
+    #                                boot.id <- sample(rev, Nrev, replace=TRUE)
+    #                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
+    #                                    break
+    #                                }
+    #                            }
+    #                        }
+    #                    }
+    #                }
+    #            } else {
+    #                cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
+    #                cl.boot.uni <- unique(cl.boot)
+    #                cl.boot.count <- as.numeric(table(cl.boot))
+    #                boot.id <- c()
+    #                for (kk in 1:length(cl.boot.uni)) {
+    #                    boot.id <- c(boot.id, rep(which(cl == cl.boot.uni[kk]), cl.boot.count[kk]))
+    #                }
+    #            }
 
-            } else {
-                boot.id <- 1:N
-                boot.id <- boot.id[-num]
-            }
+    #        } else {
+    #            boot.id <- 1:N
+    #            boot.id <- boot.id[-num]
+    #        }
             
             
                 
-            X.boot <- X[,boot.id,,drop = FALSE]
-            D.boot <- D[, boot.id]
-            I.boot <- I[, boot.id]
+    #        X.boot <- X[,boot.id,,drop = FALSE]
+    #        D.boot <- D[, boot.id]
+    #        I.boot <- I[, boot.id]
 
-            if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
-                boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                              beta = NA, att.off = NA, count.off = NA, 
-                              att.placebo = NA)
-                return(boot0)
-            } else {
-                T.off.boot <- NULL
-                if (hasRevs == TRUE) {
-                    T.off.boot <- T.off[, boot.id]
-                }
-                placebo.period.boot <- NULL
-                if (placeboTest == TRUE) {
-                    placebo.period.boot <- placebo.period
-                }
+    #        if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
+    #            boot0 <- list(att.avg = NA, att = NA, count = NA, 
+    #                          beta = NA, att.off = NA, count.off = NA, 
+    #                          att.placebo = NA)
+    #            return(boot0)
+    #        } else {
+    #            T.off.boot <- NULL
+    #            if (hasRevs == TRUE) {
+    #                T.off.boot <- T.off[, boot.id]
+    #            }
+    #            placebo.period.boot <- NULL
+    #            if (placeboTest == TRUE) {
+    #                placebo.period.boot <- placebo.period
+    #            }
                 
-                boot <- try(fect.mc(Y = Y[,boot.id], X = X.boot, D = D[,boot.id],
-                                    I = I[,boot.id], II = II[,boot.id],
-                                    T.on = T.on[,boot.id], T.off = T.off.boot, 
-                                    lambda.cv = out$lambda.cv, force = force, 
-                                    hasF = out$validF, hasRevs = hasRevs, 
-                                    tol = tol, boot = 1,
-                                    norm.para = norm.para,
-                                    time.on.seq = time.on, time.off.seq = time.off,
-                                    placebo.period = placebo.period.boot, 
-                                    placeboTest = placeboTest), silent = TRUE)
+    #            boot <- try(fect.mc(Y = Y[,boot.id], X = X.boot, D = D[,boot.id],
+    #                                I = I[,boot.id], II = II[,boot.id],
+    #                                T.on = T.on[,boot.id], T.off = T.off.boot, 
+    #                                lambda.cv = out$lambda.cv, force = force, 
+    #                                hasF = out$validF, hasRevs = hasRevs, 
+    #                                tol = tol, boot = 1,
+    #                                norm.para = norm.para,
+    #                                time.on.seq = time.on, time.off.seq = time.off,
+    #                                placebo.period = placebo.period.boot, 
+    #                                placeboTest = placeboTest), silent = TRUE)
                 
-                if ('try-error' %in% class(boot)) {
-                    boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                                  beta = NA, att.off = NA, count.off = NA, 
-                                  att.placebo = NA)
-                    return(boot0)
-                } else {
-                    return(boot)
-                }
-            }                        
-        } 
-    }
+    #            if ('try-error' %in% class(boot)) {
+    #                boot0 <- list(att.avg = NA, att = NA, count = NA, 
+    #                              beta = NA, att.off = NA, count.off = NA, 
+    #                              att.placebo = NA)
+    #                return(boot0)
+    #            } else {
+    #                return(boot)
+    #            }
+    #        }                        
+    #    } 
+    #}
 
     ## jack.seq <- sample(1:N, N, replace = FALSE)
     boot.seq <- NULL
@@ -420,7 +455,7 @@ fect.boot <- function(Y,
     if (parallel == TRUE) { 
         boot.out <- foreach(j=1:nboots, 
                             .inorder = FALSE,
-                            .export = c("fect.fe", "fect.mc", "get_term"),
+                            .export = c("fect.fe", "fect.mc", "fect.polynomial", "get_term"),
                             .packages = c("fect")
                             ) %dopar% {
                                 return(one.nonpara(boot.seq[j]))

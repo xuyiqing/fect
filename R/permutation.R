@@ -9,6 +9,7 @@ fect.permu <- function(Y,
                        lambda.cv = NULL,
                        m = 2, 
                        method = "ife",
+                       power = 2,
                        force,                      
                        tol,
                        norm.para,
@@ -58,9 +59,11 @@ fect.permu <- function(Y,
                                 r.cv, 
                                 lambda.cv, 
                                 method,
+                                power,
                                 force, 
                                 tol,
                                 norm.para), silent = TRUE)
+
 
         if ('try-error' %in% class(result)) {
             return(NA)
@@ -115,6 +118,7 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
                       r.cv = 0, # initial number of factors considered if CV==1
                       lambda.cv = 1, 
                       method = "fe",
+                      power = 2, 
                       force, 
                       tol, # tolerance level
                       norm.para = NULL) {  
@@ -166,51 +170,103 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
     YY <- Y
     YY[which(II == 0)] <- 0 ## reset to 0 
     D[which(I == 0)] <- 0
-
-    if (sum(D) == 0) {
-        stop("No valid obserbations under treatment.\n")
-    }
-
-    ## initial fit using fastplm
-    data.ini <- matrix(NA, (TT*N), (2 + 1 + p))
-    data.ini[, 2] <- rep(1:N, each = TT)         ## unit fe
-    data.ini[, 3] <- rep(1:TT, N)                ## time fe
-    data.ini[, 1] <- c(Y)                        ## outcome
-    if (p > 0) {                                 ## covar
-        for (i in 1:p) {
-            data.ini[, (3 + i)] <- c(X[, , i])
-        }
-    }
-    ## observed Y0 indicator:
-    initialOut <- Y0 <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
     oci <- which(c(II) == 1)
 
-    initialOut <- initialFit(data = data.ini, force = force, oci = oci)
-    Y0 <- initialOut$Y0
-    beta0 <- initialOut$beta0
-    if (p > 0 && sum(is.na(beta0)) > 0) {
-        beta0[which(is.na(beta0))] <- 0
-    }
-    
-        ##-------------------------------##
-    ## ----------- Main Algorithm ----------- ##
-        ##-------------------------------##
-
-    est <- NULL
-    if (method == "fe") {
-        est <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
-    } else if (method == "ife") {
-        est <- inter_fe_ub(YY, Y0, X, II, beta0, r.cv, force = force, tol)
-    } else if (method == "mc") {
-        est <- inter_fe_mc(YY, Y0, X, II, beta0, 1, lambda.cv, force, tol)
+    if (sum(D) == 0) {
+        stop("No valid observations under treatment.\n")
     }
 
-    ## we first adjustment for normalization 
+    if (method == "polynomial") {
+        ## reshape 
+        vy <- as.matrix(c(YY))
+        vx.fit <- vx <- NULL
+        if (p > 0) {
+            vx <- matrix(NA, N*TT, p)
+            for (i in 1:p) {
+                vx[, i] <- c(X[,, i])
+            }
+            vx.fit <- as.matrix(vx[oci,])
+        }
+        vindex <- cbind(rep(1:N, each = TT), rep(1:TT - 1, N))  ## id time
+        if (power > 1) {
+            for (i in 2:power) {
+                vindex <- cbind(vindex, rep((1:TT - 1)^i, N))
+            }
+        }
+
+        if (force == 1) {
+            sf <- 1
+        } else if (force == 2) {
+            sf <- 2
+        } else {
+            sf <- c(1,2)
+        }
+
+        cf <- list(c(1,2))
+
+        if (power > 1) {
+            for (i in 2:power) {
+                cf <- c(cf, list(c(1, i + 1)))
+            }
+        }
+
+        est.best <- fastplm(y = as.matrix(vy[oci]), 
+                        x = vx.fit, 
+                        ind = as.matrix(vindex[oci,]),
+                        sfe = sf, cfe = cf, PCA = TRUE,
+                        se = FALSE)
+
+        yfit <- predict(est.best, x = vx, ind = vindex)
+
+        Y.ct <- matrix(yfit, TT, N)
+
+        if (!is.null(norm.para)) {
+            Y.ct <- Y.ct * norm.para[1]
+        }
+    } else {
+        ## initial fit using fastplm
+        data.ini <- matrix(NA, (TT*N), (2 + 1 + p))
+        data.ini[, 2] <- rep(1:N, each = TT)         ## unit fe
+        data.ini[, 3] <- rep(1:TT, N)                ## time fe
+        data.ini[, 1] <- c(Y)                        ## outcome
+        if (p > 0) {                                 ## covar
+            for (i in 1:p) {
+                data.ini[, (3 + i)] <- c(X[, , i])
+            }
+        }
+        ## observed Y0 indicator:
+        initialOut <- Y0 <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
+
+        initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+        Y0 <- initialOut$Y0
+        beta0 <- initialOut$beta0
+        if (p > 0 && sum(is.na(beta0)) > 0) {
+            beta0[which(is.na(beta0))] <- 0
+        }
+        
+            ##-------------------------------##
+        ## ----------- Main Algorithm ----------- ##
+            ##-------------------------------##
+
+        est <- NULL
+        if (method == "fe") {
+            est <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+        } else if (method == "ife") {
+            est <- inter_fe_ub(YY, Y0, X, II, beta0, r.cv, force = force, tol)
+        } else if (method == "mc") {
+            est <- inter_fe_mc(YY, Y0, X, II, beta0, 1, lambda.cv, force, tol)
+        } 
+
+        if (!is.null(norm.para)) {
+            est$fit <- est$fit * norm.para[1]
+        }
+        Y.ct <- est$fit
+    }
+
     if (!is.null(norm.para)) {
-        est$fit <- est$fit * norm.para[1]
+        Y <- Y * norm.para[1]
     }
 
-    Y.ct <- est$fit
     eff <- Y - Y.ct  
 
     att.avg <- sum(eff * D)/(sum(D))
