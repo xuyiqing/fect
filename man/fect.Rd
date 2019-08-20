@@ -5,12 +5,15 @@
 on interactive fixed effect models.}
 \usage{fect(formula = NULL, data, Y, D, X = NULL, na.rm = FALSE, 
        index, force = "unit", cl = "unit", r = 0, lambda = NULL, nlambda = 10,
-       CV = TRUE, k = 5, binary = FALSE, QR = FALSE,
-       method = "fe", criterion = "mspe",
-       se = FALSE, nboots = 200, 
+       CV = TRUE, k = 10, cv.prop = 0.1, cv.treat = TRUE, cv.nobs = 3,
+       binary = FALSE, QR = FALSE,
+       method = "fe", criterion = "mspe", alpha = 0.05,
+       se = FALSE, vartype = "bootstrap", nboots = 200, 
        parallel = FALSE, cores = NULL, tol = 0.001, seed = NULL, 
-       min.T0 = 5, max.missing = NULL, pre.period = NULL, fitTest = FALSE,
-       placebo.period = NULL, placeboTest = FALSE, normalize = FALSE)  
+       min.T0 = 5, max.missing = NULL, pre.period = NULL, off.period = NULL, 
+       polynomial = FALSE, power = 2, wald = FALSE,
+       placebo.period = NULL, placeboTest = FALSE, 
+       permute = FALSE, m = 2, normalize = FALSE)  
 }
 \arguments{
 \item{formula}{an object of class "formula": a symbolic description of
@@ -29,7 +32,7 @@ on interactive fixed effect models.}
     imposed. Must be one of the following,
     "none", "unit", "time", or "two-way". The default is "unit".}
 \item{cl}{a string indicator the cluster variable. The default value is 
-  \code{NULL}. If \code{cl = NULL}, bootstrap will be blocked at unit level.}
+  \code{"unit"}. If \code{cl = "unit"}, bootstrap will be blocked at unit level.}
 \item{r}{an integer specifying the number of factors. If \code{CV = TRUE}, 
   the cross validation procedure will select the optimal number of
   factors from \code{r} to 5.}
@@ -42,17 +45,30 @@ on interactive fixed effect models.}
   performed to select the optimal number of factors or hyper-parameter 
   in matrix completion algorithm. If \code{r} is not specified, the procedure will search through \code{r = 0} to \code{5}.}
 \item{k}{an integer specifying number of cross-validation rounds. Default is 
-  \code{k = 5}. }
+  \code{k = 10}. }
+\item{cv.prop}{a numerical value specifying the proportion of testing set compared 
+  to sample size during the cross-validation procedure.}
+\item{cv.treat}{a logical flag speficying whether to only use observations of treated 
+  units as testing set.}
+\item{cv.nobs}{an integer specifying the length of continuous observations within a 
+  unit in the testing set. Default is \code{cv.nobs = 3}.}
 \item{binary}{a logical flag indicating whether a probit link function will be 
   used.}
 \item{QR}{a logical flag indicating whether QR decomposition will be used for 
   factor analysis in probit model.}
 \item{method}{a string specifying which matrix completion algorithm 
-  will be used. \code{"fe"} for interactive fixed effects model and 
-  \code{"mc"} for matrix copletion method. Default is \code{method = "fe"}.}
+  will be used. \code{"fe"} for two-way fixed effects model, 
+  \code{"ife"} for interactive fixed effects model, 
+  \code{"mc"} for matrix copletion method, and \code{"polynomial"} for 
+  polynomial trend terms. Default is \code{method = "ife"}.}
 \item{criterion}{criterion used for model selection.}
+\item{alpha}{significant level for hypothesis test and CIs. Default value is 
+  \code{alpha = 0.05}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will
   be produced.}
+\item{vartype}{a string specifying the type of variance estimator. Choose 
+  from \code{vartype = c("bootstrap", "jackknife")}. Default value is 
+  \code{"bootstrap"}.}
 \item{nboots}{an integer specifying the number of bootstrap
   runs. Ignored if \code{se = FALSE}.}
 \item{parallel}{a logical flag indicating whether parallel computing
@@ -71,11 +87,22 @@ on interactive fixed effect models.}
   it will be removed. Ignored if this parameter is set "NULL"(i.e. \code{max.missing = NULL}, the default setting).}
 \item{pre.period}{a two-element numeric vector specifying the range of 
   pre-treatment period used for goodness-of-fit test. If left blank, all 
-  pre-treatment periods will be used. Ignore if \code{fitTest = FALSE}.}
-\item{fitTest}{a logic flag indicating whether to perform goodness-of-fit test.}
+  pre-treatment periods will be used. Ignore if \code{wald = FALSE}.}
+\item{off.period}{a two-element numeric vector specifying the range of 
+  pre-treatment period used for goodness-of-fit test in situations of 
+  treatment reversals. If left blank, all post-treatment periods will be used. 
+  Ignore if \code{wald = FALSE}.}
+\item{polynomial}{a logical flag indicating whether to fit a model with 
+  unit-specified polynomial trend terms.}
+\item{power}{an integer speficying the degree of polynomial trend terms.}
+\item{wald}{a logic flag indicating whether to perform wald test for pre-treatment 
+  fitting check.}
 \item{placebo.period}{an integer or a two-element numeric vector specifying the 
   range of pre-treatment period that will be assigned as "placebo" treatment period.}
 \item{placeboTest}{a logic flag indicating whether to perform placebo test.}
+\item{permute}{a logic flag indicating whether to perform permutation test.}
+\item{m}{an integer specifying the block length in permutation test. Default value is 
+  \code{m = 2}.}
 \item{normalize}{a logic flag indicating whether to scale outcome and 
   covariates. Useful for accelerating computing speed when magnitude of data is large. The default is \code{normalize=FALSE}.}
 }
@@ -101,7 +128,7 @@ on interactive fixed effect models.}
   \item{X}{name of the time-varying control variables.}
   \item{index}{name of the unit and time indicators.}
   \item{id}{a vector of unit IDs.}
-  \item{time}{a vector of time periods.}
+  \item{rawtime}{a vector of time periods.}
   \item{unit.type}{a vector storing type for each unit. \code{1} for always 
   under control, \code{2} for always under treatment, and \code{3} for unit 
   that has reversals.}
@@ -109,7 +136,15 @@ on interactive fixed effect models.}
     \code{1} for under treatment, \code{2} for under control, \code{3} for missing, \code{4} for removed units.}
   \item{Y.ct}{predicted Y(0).}
   \item{eff}{difference between actual outcome and predicted Y(0).}
+  \item{eff.pre}{difference between actual outcome and predicted Y(0) for 
+    observations of treated units under control.}
+  \item{eff.pre.equiv}{difference between actual outcome and predicted Y(0) for 
+    observations of treated units under control based on baseline 
+    (two-way fixed effects) model.}
+  \item{pre.sd}{by period residual standard deviation for estimated pre-treatment 
+    average treatment effects.}
   \item{att.avg}{average treatment effect on the treated.}
+  \item{att.placebo}{average treatment effect for placebo period.}
   \item{force}{user specified \code{force} option.}
   \item{T}{the number of time periods.}
   \item{N}{the total number of units.}
@@ -136,18 +171,21 @@ on interactive fixed effect models.}
   \item{alpha}{estimated unit fixed effects.}
   \item{validX}{a logic value indicating if multicollinearity exists.}
   \item{validF}{a logic value indicating if factor exists.}
-  \item{time.on}{term for switch-on treatment effect.}
-  \item{att.on}{switch-on treatment effect.}
-  \item{count.on}{count of each term for switch-on treatment effect.}
+  \item{time}{term for switch-on treatment effect.}
+  \item{att}{switch-on treatment effect.}
+  \item{count}{count of each term for switch-on treatment effect.}
   \item{time.off}{term for switch-off treatment effect.}
   \item{att.off}{switch-off treatment effect.}
   \item{count.off}{count of each term for switch-off treatment effect.}
   \item{est.att.avg}{inference for \code{att.avg}.}
-  \item{est.att.on}{inference for \code{att.on}.}
+  \item{est.att}{inference for \code{att.on}.}
   \item{est.att.off}{inference for \code{att.off}.}
+  \item{est.placebo}{inference for \code{att.placebo}.}
   \item{est.beta}{inference for \code{beta}.}
   \item{att.avg.boot}{bootstrap results for \code{att.avg}.}
   \item{beta.boot}{bootstrap results for \code{beta}.}
+  \item{wald}{wald test results for pre-treatment fitting check.}
+  \item{permute}{permutation test results for sharp null hypothesis.}
 }
 \author{
   Licheng Liu; Ye Wang; Yiqing Xu 

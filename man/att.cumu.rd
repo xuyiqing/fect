@@ -2,15 +2,17 @@
 \alias{att.cumu}
 \title{Calculate Cumulative Treatment Effects}
 \description{Calculate cumulative treatment effects}
-\usage{att.cumu(x, period, weighted = TRUE, type = "on")} 
+\usage{att.cumu(x, period, weighted = TRUE, alpha = 0.05, type = "on", plot = TRUE)} 
 \arguments{
   \item{x}{a \code{\link{fect}} object.}
   \item{period}{a two-element numeric vector specifying the range of term during which treatment effects are to be accumulated. 
   e.g. \code{time.on.lim = c(-1,1)}.}
   \item{weighted}{a logical flag specifying whether to calculate weigthed cumulative treatment effects based on counts at each period. Default is 
   \code{weighted = TRUE}.}
+  \item{alpha}{significant levels.}
   \item{type}{a string that specifies the type. Must be one of the following: "on" (switch-on treatment effect); "off" (switch-off treatment effect). Default 
   is \code{type = "on"}.}
+  \item{plot}{A logical flag indicating whether to plot cumulative effects.}
 }
 \author{
   Licheng Liu; Ye Wang; Yiqing Xu 

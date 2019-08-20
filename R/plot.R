@@ -43,7 +43,7 @@ plot.fect <- function(x,
     ##-------------------------------##
     ## Checking Parameters
     ##-------------------------------## 
-    ATT.ON2 <- ATT.ON3 <- ATT.ON4 <- NULL
+    ATT <- ATT2 <- ATT3 <- ATT4 <- NULL
     CI.lower3 <-  CI.lower4 <- CI.upper3 <- CI.upper4 <- NULL
 
     p <- NULL

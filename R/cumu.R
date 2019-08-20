@@ -9,6 +9,7 @@ att.cumu <- function(x, ## a fect object
                      plot = TRUE
                     ) {
 
+    end <- catt <- CI.lower <- CI.upper <- NULL
     if (is.null(period)) {
         period <- c(1, max(x$time))
     }

@@ -1,6 +1,6 @@
 ## Causal inference using counterfactual estimators 
 ## (fect: fixed effects counterfactuals)
-## Version 1.4.4
+## Version 0.1.0
 ## Author: Licheng Liu (Tsinghua), Ye Wang(NYU), Yiqing Xu(Stanford)
 ## Date: 2019.01.02
 
