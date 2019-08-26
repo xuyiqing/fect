@@ -11,7 +11,7 @@ on interactive fixed effect models.}
        se = FALSE, vartype = "bootstrap", nboots = 200, 
        parallel = FALSE, cores = NULL, tol = 0.001, seed = NULL, 
        min.T0 = 5, max.missing = NULL, pre.period = NULL, off.period = NULL, 
-       polynomial = FALSE, power = 2, wald = FALSE,
+       knots = NULL, degree = 2, wald = FALSE,
        placebo.period = NULL, placeboTest = FALSE, 
        permute = FALSE, m = 2, normalize = FALSE)  
 }
@@ -59,8 +59,9 @@ on interactive fixed effect models.}
 \item{method}{a string specifying which matrix completion algorithm 
   will be used. \code{"fe"} for two-way fixed effects model, 
   \code{"ife"} for interactive fixed effects model, 
-  \code{"mc"} for matrix copletion method, and \code{"polynomial"} for 
-  polynomial trend terms. Default is \code{method = "ife"}.}
+  \code{"mc"} for matrix copletion method, \code{"polynomial"} for 
+  polynomial trend terms and \code{"bspline"} for regression splines. 
+  Default is \code{method = "ife"}.}
 \item{criterion}{criterion used for model selection.}
 \item{alpha}{significant level for hypothesis test and CIs. Default value is 
   \code{alpha = 0.05}.}
@@ -92,9 +93,9 @@ on interactive fixed effect models.}
   pre-treatment period used for goodness-of-fit test in situations of 
   treatment reversals. If left blank, all post-treatment periods will be used. 
   Ignore if \code{wald = FALSE}.}
-\item{polynomial}{a logical flag indicating whether to fit a model with 
-  unit-specified polynomial trend terms.}
-\item{power}{an integer speficying the degree of polynomial trend terms.}
+\item{knots}{a numeric vector speicfying the knots for b-spline curve trend term.}
+\item{degree}{an integer speifcying the order of either the b-spline or the 
+  polynomial trend term.}
 \item{wald}{a logic flag indicating whether to perform wald test for pre-treatment 
   fitting check.}
 \item{placebo.period}{an integer or a two-element numeric vector specifying the 

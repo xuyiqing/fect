@@ -60,8 +60,8 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  max.missing = NULL, # maximum missing
                  pre.period = NULL, # fit test period 
                  off.period = NULL, # fit test period: switch-off
-                 polynomial = FALSE,
-                 power = 2,  
+                 knots = NULL,
+                 degree = 2,  
                  wald = FALSE, # fit test
                  placebo.period = NULL, # placebo test period
                  placeboTest = FALSE, # placebo test
@@ -106,8 +106,8 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          max.missing = NULL,
                          pre.period = NULL,
                          off.period = NULL, # fit test period: switch-off
-                         polynomial = FALSE,
-                         power = 2,  
+                         knots = NULL,
+                         degree = 2,   
                          wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
@@ -153,7 +153,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         vartype,
                         nboots, parallel, cores, tol, seed, min.T0,
                         max.missing, pre.period, 
-                        off.period, polynomial, power, wald,
+                        off.period, knots, degree, wald,
                         placebo.period, placeboTest, 
                         permute, m, normalize)
     
@@ -199,8 +199,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          max.missing = NULL,
                          pre.period = NULL,
                          off.period = NULL, # fit test period: switch-off
-                         polynomial = FALSE,
-                         power = 2,  
+                         knots = NULL,
+                         degree = 2,  
                          wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
@@ -255,14 +255,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     ## method
-    if (!method %in% c("fe", "ife", "mc", "both", "polynomial")) {
-        stop("\"method\" option misspecified; choose from c(\"fe\", \"ife\", \"mc\", \"both\").")
+    if (!method %in% c("fe", "ife", "mc", "both", "polynomial", "bspline")) {
+        stop("\"method\" option misspecified; choose from c(\"fe\", \"ife\", \"mc\", \"both\", \"polynomial\", \"bspline\").")
     }
     if (method == "fe") {
         r <- 0
         CV <- FALSE
         method <- "ife"
-    } else if (method == "polynomial") {
+    } else if (method %in% c("polynomial", "bspline")) {
         CV <- FALSE
     }
 
@@ -314,8 +314,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             }
         }
     } else {
-        if (! method %in% c("ife", "mc", "polynomial")) {
-            stop("\"method\" option misspecified; please choose from c(\"ife\", \"mc\", \"polynomial\").")
+        if (! method %in% c("ife", "mc", "polynomial", "bspline")) {
+            stop("\"method\" option misspecified; please choose from c(\"ife\", \"mc\", \"polynomial\", \"bspline\").")
+        }
+    }
+
+    if (method %in% c("polynomial", "bspline")) {
+        if (permute == 1) {
+            cat("Cannot do permutation test.\n")
+            permute <- 0
         }
     }
 
@@ -446,6 +453,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     p <- length(Xname)
     id.series <- unique(sort(data[,id])) ## unit id
     time.uni <- unique(sort(data[,time])) ## period
+
+    if (!is.null(knots)) {
+        for(i in 1:length(knots)) {
+            knots[i] <- which(time.uni == knots[i])
+        }
+    }
 
     ## sort data
     data <- data[order(data[,id], data[,time]), ]
@@ -666,8 +679,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (0%in%I.use) {
         for (i in 1:TT) {
             if (I.use[i] == 0) {
-                cat("There are not any observations under control at ",time.uni[i],", drop that period.\n")
+                cat("\nThere are not any observations under control at ",time.uni[i],", drop that period.\n")
             }
+        }
+        if (method %in% c("polynomial", "bspline")) {
+            cat("\nThere are not any observations at some periods. Estimation results may not be reliable. Please use time fixed effects.\n")
         }
         TT <- TT - sum(I.use == 0)
         time.uni <- time.uni[-which(I.use == 0)]
@@ -863,15 +879,21 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                norm.para = norm.para,
                                placeboTest = placeboTest, 
                                placebo.period = placebo.period)
-            } else if (method == "polynomial") {
-                out <- fect.polynomial(Y = Y, D = D, X = X, I = I, 
+            } else if (method %in% c("polynomial", "bspline")) {
+                out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
                                        II = II, T.on = T.on, 
-                                       T.off = T.off, power = power,
-                                       force = force, hasRevs = hasRevs,
-                                       tol = tol, boot = 0, 
+                                       T.off = T.off, method = method,
+                                       degree = degree, 
+                                       knots = knots, force = force, 
+                                       hasRevs = hasRevs, tol = tol, boot = 0, 
                                        placeboTest = placeboTest,
                                        placebo.period = placebo.period, 
-                                       norm.para = norm.para)
+                                       norm.para = norm.para), silent = TRUE)
+
+                if ('try-error' %in% class(out)) {
+                    stop("\nCannot estimate.\n")
+                }
+
             }
 
         }
@@ -880,8 +902,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         
         out <- fect.boot(Y = Y, D = D, X = X, I = I, II = II,
                          T.on = T.on, T.off = T.off, cl = NULL,
-                         method = method, power = power,
-                         criterion = criterion,
+                         method = method, degree = degree,
+                         knots = knots, criterion = criterion,
                          CV = CV, k = k, r = r, r.end = r.end, 
                          nlambda = nlambda, lambda = lambda,
                          alpha = alpha, binary = binary, QR = QR,
@@ -907,7 +929,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         out.wald <- fect.test(out = out, 
             Y = Y, D = D, X = X, I = I, II = II,
             T.on = T.on, T.off = NULL,
-            method = method, cl = cl, r = out$r.cv, 
+            method = method, degree = degree,
+            knots = knots, cl = cl, r = out$r.cv, 
             lambda = out$lambda.cv,
             force = force, hasRevs = hasRevs,
             tol = tol, norm.para = norm.para,
@@ -923,8 +946,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         out.permute <- fect.permu(Y = Y, X = X, D = D, I = I, r.cv = out$r.cv,
                                   lambda.cv = out$lambda.cv, m = m, 
-                                  method = out$method, power = power, 
-                                  force = force,                      
+                                  method = out$method, degree = degree, 
+                                  knots = knots, force = force,                      
                                   tol = tol, norm.para = norm.para,
                                   nboots = nboots,
                                   parallel = parallel, cores = cores)

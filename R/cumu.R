@@ -24,7 +24,7 @@ att.cumu <- function(x, ## a fect object
     att <- x$att
     est.att <- x$est.att
 
-    if (!is.null(est.att)) {
+    if (!is.null(est.att) & sum(abs(c(x$att.boot))) != 0) {
         se <- 1
     }
 

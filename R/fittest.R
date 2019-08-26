@@ -11,7 +11,8 @@ fect.test <- function(
     T.on,
     T.off = NULL,
     method = "ife",
-    power = 2, 
+    degree = 2,
+    knots = NULL, 
     cl = NULL,
     r = 0,
     lambda = Inf,
@@ -106,11 +107,11 @@ fect.test <- function(
                                 norm.para = norm.para,
                                 placebo.period = NULL, placeboTest = 0), silent = TRUE)
             }
-            else if (method == "polynomial") {
+            else if (method %in% c("polynomial", "bspline")) {
                 boot <- try(fect.polynomial(Y = Y.boot, X = X, D = D, I = I, II = II, 
-                                T.on = T.on, T.off = NULL, power = power,
-                                force = force, hasRevs = 0, 
-                                tol = tol, boot = 1,
+                                T.on = T.on, T.off = NULL, method = method, 
+                                degree = degree, knots = knots, 
+                                force = force, hasRevs = 0, tol = tol, boot = 1,
                                 norm.para = norm.para, 
                                 placebo.period = NULL, placeboTest = 0), silent = TRUE)
             }

@@ -10,7 +10,8 @@ fect.boot <- function(Y,
                       T.on, 
                       T.off = NULL, 
                       method = "ife",
-                      power = 2,
+                      degree = 2,
+                      knots = NULL,
                       criterion = "mspe",
                       CV,
                       k = 5,
@@ -85,15 +86,21 @@ fect.boot <- function(Y,
                            norm.para = norm.para,
                            placebo.period = placebo.period,
                            placeboTest = placeboTest)
-        } else if (method == "polynomial") {
-            out <- fect.polynomial(Y = Y, D = D, X = X, I = I, 
-                                       II = II, T.on = T.on, 
-                                       T.off = T.off, power = power,
-                                       force = force, hasRevs = hasRevs,
-                                       tol = tol, boot = 0, 
-                                       placeboTest = placeboTest,
-                                       placebo.period = placebo.period, 
-                                       norm.para = norm.para)
+        } else if (method %in% c("polynomial", "bspline")) {
+            out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
+                                   II = II, T.on = T.on, 
+                                   T.off = T.off,
+                                   method = method,degree = degree,
+                                   knots = knots, force = force, 
+                                   hasRevs = hasRevs,
+                                   tol = tol, boot = 0, 
+                                   placeboTest = placeboTest,
+                                   placebo.period = placebo.period, 
+                                   norm.para = norm.para), silent = TRUE)
+
+            if ('try-error' %in% class(out)) {
+                stop("\nCannot estimate.\n")
+            }
         }
     } else {
         ## cross-valiadtion 
@@ -296,12 +303,13 @@ fect.boot <- function(Y,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest), silent = TRUE)
 
-                } else if (method == "polynomial") {
+                } else if (method %in% c("polynomial", "bspline")) {
                     boot <- try(fect.polynomial(Y = Y[,boot.id], X = X.boot, 
                                                 D = D[,boot.id],
                                                 I = I[,boot.id], II = II[,boot.id],
                                                 T.on = T.on[,boot.id], T.off = T.off.boot, 
-                                                power = power, force = force, hasRevs = hasRevs,
+                                                method = method,degree = degree, knots = knots,
+                                                force = force, hasRevs = hasRevs,
                                                 norm.para = norm.para, time.on.seq = time.on, 
                                                 time.off.seq = time.off,
                                                 placebo.period = placebo.period.boot, 
@@ -696,15 +704,22 @@ jackknifed <- function(x,  ## ols estimates
     X <- matrix(rep(c(x), N), p, N) * N
     Y <- X - y * (N - 1)
 
-    Yvar <- apply(Y, 1, var)
+    Yvar <- apply(Y, 1, var, na.rm = TRUE)
+    vn <- N - apply(is.na(y), 1, sum) 
 
-    Ysd <- sqrt(Yvar/N)  ## jackknife se
+    Ysd <- sqrt(Yvar/vn)  ## jackknife se
 
     CI.l <- Ysd * qnorm(alpha/2) + c(x)
     CI.u <- Ysd * qnorm(1 - alpha/2) + c(x)
 
     ## wald test
-    P <- 2 * min(1 - pnorm(c(x)/Ysd), pnorm(c(x)/Ysd))
+    P <- NULL
+    for (i in 1:p) {
+        subz <- pnorm(c(x)[i]/Ysd[i])
+        P <- c(P, 2 * min(1 - subz, subz))
+    }
+
+    ## P <- 2 * min(1 - pnorm(c(x)/Ysd), pnorm(c(x)/Ysd))
 
     out <- list(se = Ysd, CI.l = CI.l, CI.u = CI.u, P = P)
 

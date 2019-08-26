@@ -8,7 +8,9 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
                             II, 
                             T.on, 
                             T.off = NULL, 
-                            power = 1,
+                            method,
+                            degree = 1,
+                            knots = NULL,
                             force, 
                             hasRevs = 1,
                             tol, # tolerance level
@@ -51,40 +53,68 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         }
         vx.fit <- as.matrix(vx[oci,])
     }
-    vindex <- cbind(rep(1:N, each = TT), rep(1:TT - 1, N))  ## id time
-    if (power > 1) {
-        for (i in 2:power) {
-            vindex <- cbind(vindex, rep((1:TT - 1)^i, N))
+    
+    vindex <- NULL
+    sp <- NULL
+    sf <- NULL
+    cf <- NULL
+    if (method == "polynomial") {
+        vindex <- cbind(rep(1:N, each = TT), rep(1:TT, N))  ## id time
+        if (degree > 1) {
+            for (i in 2:degree) {
+                vindex <- cbind(vindex, rep((1:TT)^i, N))
+            }
         }
-    }
+        if (force == 1) {
+            sf <- 1
+        } else if (force == 2) {
+            sf <- 2
+        } else {
+            sf <- c(1,2)
+        }
 
-    if (force == 1) {
-        sf <- 1
-    } else if (force == 2) {
-        sf <- 2
+        cf <- list(c(1,2))
+
+        if (degree > 1) {
+            for (i in 2:degree) {
+                cf <- c(cf, list(c(1, i + 1)))
+            }
+        }
+
+        est.best <- suppressWarnings(fastplm(y = as.matrix(vy[oci]), 
+                                            x = vx.fit, 
+                                            ind = as.matrix(vindex[oci,]),
+                                            sfe = sf, cfe = cf, PCA = TRUE,
+                                            se = FALSE))
+
+        yfit <- predict(est.best, x = vx, ind = vindex)
+
     } else {
-        sf <- c(1,2)
+        sf <- 1
+        vindex <- as.matrix(rep(1:N, each = TT))
+        sp <- as.matrix(rep(1:TT, N))
+
+        est.best <- suppressWarnings(fastplm(y = as.matrix(vy[oci]), 
+                                            x = vx.fit, 
+                                            ind = as.matrix(vindex[oci,]),
+                                            sp = as.matrix(sp[oci,]),
+                                            degree = degree,
+                                            sfe = sf, cfe = cf, PCA = 0,
+                                            se = FALSE))
+
+        yfit <- predict(est.best, x = vx, ind = vindex, sp = sp)
+
     }
-
-    cf <- list(c(1,2))
-
-    if (power > 1) {
-        for (i in 2:power) {
-            cf <- c(cf, list(c(1, i + 1)))
-        }
-    }
-
-    est.best <- fastplm(y = as.matrix(vy[oci]), 
-                        x = vx.fit, 
-                        ind = as.matrix(vindex[oci,]),
-                        sfe = sf, cfe = cf, PCA = TRUE,
-                        se = FALSE)
-
-    yfit <- predict(est.best, x = vx, ind = vindex)
+    
 
     Y.ct <- matrix(yfit, TT, N)
-
-    beta <- est.best$coefficients
+    
+    if (p > 0) {
+        beta <- as.matrix(c(est.best$coefficients)[1:p])
+    } else {
+        beta <- matrix(0, 1, 0)
+    }
+    
     
     validX <- ifelse(p > 0, 1, 0) 
 
@@ -232,7 +262,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
     ##-------------------------------##  
     out<-list(
         ## main results 
-        method = "polynomial",
+        method = method,
         Y.ct = Y.ct,
         eff = eff,
         att.avg = att.avg,
