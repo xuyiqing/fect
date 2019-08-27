@@ -498,6 +498,11 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     eff <- Y - est.best$fit  
     att.avg <- sum(eff * D)/(sum(D))
 
+    ## att.avg.unit
+    tr.pos <- which(apply(D, 2, sum) > 0)
+    att.unit <- sapply(1:length(tr.pos), function(vec){return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))})
+    att.avg.unit <- mean(att.unit)
+
     eff.equiv <- Y - est.equiv$fit
     equiv.att.avg <- sum(eff.equiv * D) / (sum(D))
 
@@ -589,6 +594,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         Y.ct = est.best$fit,
         eff = eff,
         att.avg = att.avg,
+        att.avg.unit = att.avg.unit,
         ## supporting
         force = force,
         T = TT,

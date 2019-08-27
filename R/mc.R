@@ -124,6 +124,12 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     ## 1. estimated att and counterfactuals
     eff <- Y - est.best$fit  
     att.avg <- sum(eff * D)/(sum(D))
+
+    ## att.avg.unit
+    tr.pos <- which(apply(D, 2, sum) > 0)
+    att.unit <- sapply(1:length(tr.pos), function(vec){return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))})
+    att.avg.unit <- mean(att.unit)
+
     
     equiv.att.avg <- eff.equiv <- NULL
     if (boot == FALSE) {
@@ -257,6 +263,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         Y.ct = est.best$fit,
         eff = eff,
         att.avg = att.avg,
+        att.avg.unit = att.avg.unit,
         ## supporting
         force = force,
         T = TT,

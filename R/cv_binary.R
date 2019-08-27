@@ -267,6 +267,11 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
     eff <- Y - Y.ct    
     att.avg <- sum(eff * D)/(sum(D))
 
+    ## att.avg.unit
+    tr.pos <- which(apply(D, 2, sum) > 0)
+    att.unit <- sapply(1:length(tr.pos), function(vec){return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))})
+    att.avg.unit <- mean(att.unit)
+
     ## 2. rmse for treated units' observations under control: useless for binary
 
     ## 3. unbalanced output
@@ -330,6 +335,7 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
         Y.ct = Y.ct,
         eff = eff,
         att.avg = att.avg,
+        att.avg.unit = att.avg.unit,
         ## supporting
         force = force,
         T = TT,

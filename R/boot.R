@@ -131,6 +131,7 @@ fect.boot <- function(Y,
     validX <- out$validX
     eff <- out$eff
     att.avg <- out$att.avg
+    att.avg.unit <- out$att.avg.unit
 
     att.on <- out$att
     time.on <- out$time
@@ -160,6 +161,7 @@ fect.boot <- function(Y,
     ## bootstrapped estimates
     ## eff.boot <- array(0,dim = c(TT, Ntr, nboots))  ## to store results
     att.avg.boot <- matrix(0, 1, nboots)
+    att.avg.unit.boot <- matrix(0, 1, nboots)
     att.on.boot <- matrix(0, length(time.on), nboots)
     att.on.count.boot <- matrix(0, length(time.on), nboots)
     if (hasRevs == 1) {
@@ -267,7 +269,7 @@ fect.boot <- function(Y,
             if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
                               beta = NA, att.off = NA, count.off = NA, 
-                              att.placebo = NA)
+                              att.placebo = NA, att.avg.unit = NA)
                 return(boot0)
             } else {
                 T.off.boot <- NULL
@@ -319,7 +321,7 @@ fect.boot <- function(Y,
                 if ('try-error' %in% class(boot)) {
                     boot0 <- list(att.avg = NA, att = NA, count = NA, 
                                   beta = NA, att.off = NA, count.off = NA, 
-                                  att.placebo = NA)
+                                  att.placebo = NA, att.avg.unit = NA)
                     return(boot0)
                 } else {
                     return(boot)
@@ -471,6 +473,7 @@ fect.boot <- function(Y,
 
         for (j in 1:nboots) { 
             att.avg.boot[,j] <- boot.out[[j]]$att.avg
+            att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
             att.on.boot[,j] <- boot.out[[j]]$att
             att.on.count.boot[,j] <- boot.out[[j]]$count
             if (p > 0) {
@@ -488,6 +491,7 @@ fect.boot <- function(Y,
         for (j in 1:nboots) { 
             boot <- one.nonpara(boot.seq[j]) 
             att.avg.boot[,j] <- boot$att.avg
+            att.avg.unit.boot[,j] <- boot$att.avg.unit
             att.on.boot[,j] <- boot$att
             att.on.count.boot[,j] <- boot$count
             if (p > 0) {
@@ -513,6 +517,7 @@ fect.boot <- function(Y,
     if (sum(is.na(c(att.avg.boot))) > 0) {
         boot.rm <- which(is.na(c(att.avg.boot)))
         att.avg.boot <- t(as.matrix(att.avg.boot[,-boot.rm]))
+        att.avg.unit.boot <- t(as.matrix(att.avg.unit.boot[,-boot.rm]))
         att.on.boot <- as.matrix(att.on.boot[,-boot.rm])
         att.on.count.boot <- as.matrix(att.on.count.boot[,-boot.rm])
         if (p > 0) {
@@ -581,6 +586,10 @@ fect.boot <- function(Y,
         est.avg <- t(as.matrix(c(att.avg, att.avg.j$se, att.avg.j$CI.l, att.avg.j$CI.u, att.avg.j$P)))
         colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
 
+        att.avg.unit.j <- jackknifed(att.avg.unit, att.avg.unit.boot, alpha)
+        est.avg.unit <- t(as.matrix(c(att.avg.unit, att.avg.unit.j$se, att.avg.unit.j$CI.l, att.avg.unit.j$CI.u, att.avg.unit.j$P)))
+        colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper", "p.value")
+
         ## regression coefficents
         if (p > 0) {
             beta.j <- jackknifed(beta, beta.boot, alpha)
@@ -640,6 +649,13 @@ fect.boot <- function(Y,
         est.avg <- t(as.matrix(c(att.avg, se.avg, CI.avg, pvalue.avg)))
         colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
 
+
+        CI.avg.unit <- quantile(att.avg.unit.boot, c(alpha, 1 - alpha/2), na.rm=TRUE)
+        se.avg.unit <- sd(att.avg.unit.boot, na.rm=TRUE)
+        pvalue.avg.unit <- get.pvalue(att.avg.unit.boot)
+        est.avg.unit <- t(as.matrix(c(att.avg.unit, se.avg.unit, CI.avg.unit, pvalue.avg.unit)))
+        colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper", "p.value")
+
         
         ## regression coefficents
         if (p > 0) {
@@ -667,6 +683,8 @@ fect.boot <- function(Y,
     ##storage
     result<-list(est.avg = est.avg,
                  att.avg.boot = att.avg.boot,
+                 est.avg.unit = est.avg.unit,
+                 att.avg.unit.boot = att.avg.unit.boot,
                  est.att = est.att.on,
                  att.bound = att.bound,
                  att.boot = att.on.boot,

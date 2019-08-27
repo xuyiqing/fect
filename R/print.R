@@ -53,6 +53,10 @@ print.fect <- function(x,
     if (is.null(x$est.avg) == TRUE) { # no uncertainties
         cat("\nAverage Treatment Effect:\n")
         print(x$att.avg, digits = 4)
+
+        cat("\nAverage Treatment Effect by Unit:\n")
+        print(x$att.avg.unit, digits = 4)
+
         if (switch.on == TRUE) {
             cat("\n   ~ Switch-on by Period:\n")
             print(x$att[seq.on], digits = 4)
@@ -69,6 +73,10 @@ print.fect <- function(x,
     } else {
         cat("\nAverage Treatment Effect:\n")
         print(x$est.avg, digits = 4)
+
+        cat("\nAverage Treatment Effect by Unit:\n")
+        print(x$est.avg.unit, digits = 4)
+
         if (switch.on == TRUE) {
             cat("\n   ~ Switch-on by Period:\n")
             print(x$est.att[seq.on,], digits = 4)

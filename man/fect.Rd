@@ -145,6 +145,7 @@ on interactive fixed effect models.}
   \item{pre.sd}{by period residual standard deviation for estimated pre-treatment 
     average treatment effects.}
   \item{att.avg}{average treatment effect on the treated.}
+  \item{att.avg.unit}{by unit average treatment effect on the treated.}
   \item{att.placebo}{average treatment effect for placebo period.}
   \item{force}{user specified \code{force} option.}
   \item{T}{the number of time periods.}
@@ -179,6 +180,7 @@ on interactive fixed effect models.}
   \item{att.off}{switch-off treatment effect.}
   \item{count.off}{count of each term for switch-off treatment effect.}
   \item{est.att.avg}{inference for \code{att.avg}.}
+  \item{est.att.avg.unit}{inference for \code{att.avg.unit}.}
   \item{est.att}{inference for \code{att.on}.}
   \item{est.att.off}{inference for \code{att.off}.}
   \item{est.placebo}{inference for \code{att.placebo}.}
