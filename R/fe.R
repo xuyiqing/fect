@@ -54,6 +54,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     ## observed Y0 indicator:
     initialOut <- Y0 <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
     oci <- which(c(II) == 1)
+
     if (binary == FALSE) { 
         initialOut <- initialFit(data = data.ini, force = force, oci = oci)
         Y0 <- initialOut$Y0

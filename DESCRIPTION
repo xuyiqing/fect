@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactuals
-Version: 0.1.4
-Date: 2019-08-26
+Version: 0.1.5
+Date: 2020-01-15
 Author: Licheng Liu, Ye Wang, Yiqing Xu
 Maintainer: Yiqing Xu <yiqingxu@ucsd.edu>
 Description: Estimates causal effects with panel data using the counterfactual method. 

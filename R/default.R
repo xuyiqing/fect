@@ -672,7 +672,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         #if (!is.null(cl)) {
         #    cl <- cl[-rm.id]
         #}
-    }  
+    }
+
+    ## cat("\nOK1\n")  
 
     ## 2. check if some periods when all units are missing
     I.use <- apply(II, 1, sum) 
@@ -704,6 +706,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             X <- array(0,dim = c(TT, (N - length(rm.id)), 0))
         }
     }
+
+    ## cat("\nOK2\n")  
 
     ## 4. relative period 
     T.on <- matrix(NA, TT, (N - length(rm.id)))
@@ -791,6 +795,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             T.off[, i] <-  get_term(D[,i], I[,i], type = "off")
         }
     } 
+
+    ## cat("\nOK3\n")
 
     ## if (AR1 == TRUE) {
     ##     Y.first <- Y[1,]
@@ -963,6 +969,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         stopCluster(para.clusters)
         ##closeAllConnections()
     }
+
+    ## cat("\nOK4\n")
 
        
     

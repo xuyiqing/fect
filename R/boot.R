@@ -78,6 +78,7 @@ fect.boot <- function(Y,
                            norm.para = norm.para, 
                            placebo.period = placebo.period,
                            placeboTest = placeboTest)
+        
         } else if (method == "mc") {
             out <- fect.mc(Y = Y, X = X, D = D, I = I, II = II,
                            T.on = T.on, T.off = T.off, 
@@ -86,6 +87,7 @@ fect.boot <- function(Y,
                            norm.para = norm.para,
                            placebo.period = placebo.period,
                            placeboTest = placeboTest)
+        
         } else if (method %in% c("polynomial", "bspline")) {
             out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
                                    II = II, T.on = T.on, 
@@ -559,6 +561,7 @@ fect.boot <- function(Y,
 
     ## ATT estimates
     if (vartype == "jackknife") {
+        
         att.on.j <- jackknifed(att.on, att.on.boot, alpha)
         est.att.on <- cbind(att.on, att.on.j$se, att.on.j$CI.l, att.on.j$CI.u, att.on.j$P, out$count)
         colnames(est.att.on) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
@@ -571,7 +574,7 @@ fect.boot <- function(Y,
 
         if (hasRevs == 1) {
             att.off.j <- jackknifed(att.off, att.off.boot, alpha)
-            est.att.off <- cbind(att.off, att.off.j$se, att.off.j$CI.l, att.off.j$CI.u, att.off.j$P, out$count.on)
+            est.att.off <- cbind(att.off, att.off.j$se, att.off.j$CI.l, att.off.j$CI.u, att.off.j$P, out$count.off)
             colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
                                       "p.value", "count.off")
             rownames(est.att.off) <- out$time.off
