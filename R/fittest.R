@@ -47,7 +47,13 @@ fect.test <- function(
         pre.period <- c(min(c(T.on), na.rm = TRUE), 0)
     }
 
+    if (is.null(off.period)) {
+        off.period <- c(0, max(c(T.off), na.rm = TRUE))
+    }
+
     pre.pos <- which(T.on <= pre.period[2] & T.on >= pre.period[1] & I == 1)
+
+    ## cat("\n OK3 \n")
 
     ## demean pre-treatment tr eff under H0 for wild bootstrap
     #eff[pre.pos] <- eff[pre.pos] - mean(eff[pre.pos])
@@ -61,6 +67,8 @@ fect.test <- function(
     #f <- ((sum(eff.pre[,"eff"]^2) - sum(res^2))/length(unique(eff.pre[,"period"])))/(sum(res^2)/(dim(eff.pre)[1] - length(unique(eff.pre[,"period"]))))
     f <- summary(lm.fit)$f[1]
     names(f) <- NULL
+
+    # cat("\n OK4 \n")
 
     f2 <- NULL
     if (hasRevs) {
@@ -79,6 +87,8 @@ fect.test <- function(
     if (hasRevs) {
         f2.boot <- rep(NA, nboots)
     }
+
+    ## cat("\n OK1 \n")
 
     #if (method == "ife") {
         one.nonpara <- function() {
@@ -229,6 +239,8 @@ fect.test <- function(
             }  
         }  
     } 
+
+    ## cat("\n OK2 \n")
 
     ## end of bootstrapping
     if (sum(is.na(f.boot)) > 0) {

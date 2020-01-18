@@ -934,7 +934,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         out.wald <- fect.test(out = out, 
             Y = Y, D = D, X = X, I = I, II = II,
-            T.on = T.on, T.off = NULL,
+            T.on = T.on, T.off = T.off,
             method = method, degree = degree,
             knots = knots, cl = cl, r = out$r.cv, 
             lambda = out$lambda.cv,
