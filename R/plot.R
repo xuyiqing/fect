@@ -54,7 +54,7 @@ plot.fect <- function(x,
     placeboTest <- x$placeboTest
     placebo.period <- x$placebo.period
     binary <- x$binary
-    wald <- !is.null(x$wald$p)
+    wald <- !is.null(x$wald)
 
 
     if (class(x) != "fect") {
@@ -693,7 +693,11 @@ plot.fect <- function(x,
             }
             ## wald
             if (wald == TRUE) {
-                p.label <- paste0("Wald p value: ", sprintf("%.3f",x$wald$p))
+                if (switch.on == TRUE) {
+                    p.label <- paste0("Wald p value: ", sprintf("%.3f",x$wald$wald.on$p))
+                } else {
+                    p.label <- paste0("Wald p value: ", sprintf("%.3f",x$wald$wald.off$p))
+                }
                 wald <- TRUE
             } 
         } else {
