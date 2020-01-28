@@ -6,7 +6,7 @@ att.cumu <- function(x, ## a fect object
                      weighted = TRUE, ## weighted cumulative effect
                      alpha = 0.05, 
                      type = "on", ## switch on or switch off
-                     plot = TRUE
+                     plot = FALSE
                     ) {
 
     end <- catt <- CI.lower <- CI.upper <- NULL

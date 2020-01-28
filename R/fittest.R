@@ -47,7 +47,7 @@ fect.test <- function(
         pre.period <- c(min(c(T.on), na.rm = TRUE), 0)
     }
 
-    if (is.null(off.period)) {
+    if (is.null(off.period) & hasRevs == TRUE) {
         off.period <- c(0, max(c(T.off), na.rm = TRUE))
     }
 
@@ -68,7 +68,7 @@ fect.test <- function(
     f <- summary(lm.fit)$f[1]
     names(f) <- NULL
 
-    # cat("\n OK4 \n")
+    ## cat("\n OK4 \n")
 
     f2 <- NULL
     if (hasRevs) {
