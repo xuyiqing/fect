@@ -109,13 +109,27 @@ plot.fect <- function(x,
     ## gap or equiv
     ytitle <- NULL
     if (type == "gap") {
-        if (is.null(bound) == TRUE) {
+        ## if (is.null(bound) == TRUE) {
             bound <- "none"
-        }
+        ## }
         maintext <- "Estimated Average Treatment Effect"
         ytitle <- paste("Effect on",x$Y)
 
     } else if (type == "equiv") {
+        
+        if (is.null(x$est.att)) {
+            stop("No uncertainty estimates.\n")
+        }
+
+        ## change to 90% CI
+        est.att <- x$est.att
+        est.bound <- x$att.bound
+
+        est.att[, "CI.lower"] <- est.bound[, "CI.lower"]
+        est.att[, "CI.upper"] <- est.bound[, "CI.upper"]
+
+        x$est.att <- est.att
+
         if (is.null(bound) == TRUE) {
             bound <- "both"
         }
@@ -302,6 +316,7 @@ plot.fect <- function(x,
             best.pos <- 0
         }
         max.count <- max(count.num)
+        ## bound <- "none"
     } else {
         if (!is.numeric(time[1])) {
             time <- 1:TT
@@ -344,9 +359,7 @@ plot.fect <- function(x,
         show <- show.time
     }
     
-    
 
-    
     if (length(show) <= 2) {
         stop("Cannot plot.\n")
     }    
@@ -418,7 +431,8 @@ plot.fect <- function(x,
                 } else {
                     time0 <- which(time[show] <= 0)
                 }
-                att.sub <- as.matrix(x$att.bound[show, ])
+                ## att.sub <- as.matrix(x$att.bound[show, ])
+                att.sub <- as.matrix(x$est.att[show, ])
 
             } else {
                 if (sum(time[show] > 0) == 0) {
@@ -456,7 +470,12 @@ plot.fect <- function(x,
             ## add legend for 95\% CI
             set.limits <- "ci"
             if (is.null(legend.labs)==TRUE) {
-                set.labels <- "ATT (w/ 95% CI)"                    
+                if (bound != "none") {
+                    set.labels <- "ATT (w/ 90% CI)" 
+                } else {
+                    set.labels <- "ATT (w/ 95% CI)" 
+                }
+                                   
             } else {
                 set.labels <- legend.labs
             }
@@ -464,7 +483,7 @@ plot.fect <- function(x,
             set.linetypes <- "solid"
             set.size <- 1
 
-                ## create a dataset for bound
+            ## create a dataset for bound
             if (bound == "equiv") {
                 data2 <- cbind.data.frame(c(rep(equiv.bound, each = length(bound.time))))
                 names(data2) <- "bound"
