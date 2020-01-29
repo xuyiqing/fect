@@ -3,7 +3,7 @@
 \title{Fixed Effects Counterfactuals}
 \description{Implements the matrix completion method based
 on interactive fixed effect models.}
-\usage{fect(formula = NULL, data, Y, D, X = NULL, na.rm = FALSE, 
+\usage{fect(formula = NULL, data, Y, D, X = NULL, group = NULL, na.rm = FALSE, 
        index, force = "unit", cl = "unit", r = 0, lambda = NULL, nlambda = 10,
        CV = TRUE, k = 10, cv.prop = 0.1, cv.treat = TRUE, cv.nobs = 3,
        binary = FALSE, QR = FALSE,
@@ -23,6 +23,7 @@ on interactive fixed effect models.}
 \item{Y}{outcome.}
 \item{D}{treatment.}
 \item{X}{time-varying covariates.}
+\item{group}{a string indicator of the group variable for average cohort effect.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete
   missing data. The algorithm will report an error if missing data
   exist.}
@@ -31,7 +32,7 @@ on interactive fixed effect models.}
 \item{force}{a string indicating whether unit or time fixed effects will be
     imposed. Must be one of the following,
     "none", "unit", "time", or "two-way". The default is "unit".}
-\item{cl}{a string indicator the cluster variable. The default value is 
+\item{cl}{a string indicator of the cluster variable. The default value is 
   \code{"unit"}. If \code{cl = "unit"}, bootstrap will be blocked at unit level.}
 \item{r}{an integer specifying the number of factors. If \code{CV = TRUE}, 
   the cross validation procedure will select the optimal number of

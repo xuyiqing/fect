@@ -2,7 +2,7 @@
 \alias{att.cumu}
 \title{Calculate Cumulative Treatment Effects}
 \description{Calculate cumulative treatment effects}
-\usage{att.cumu(x, period, weighted = TRUE, alpha = 0.05, type = "on", plot = TRUE)} 
+\usage{att.cumu(x, period = NULL, weighted = TRUE, alpha = 0.05, type = "on", plot = FALSE)} 
 \arguments{
   \item{x}{a \code{\link{fect}} object.}
   \item{period}{a two-element numeric vector specifying the range of term during which treatment effects are to be accumulated. 

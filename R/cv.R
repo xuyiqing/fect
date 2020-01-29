@@ -21,7 +21,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     force, 
                     hasRevs = 1,
                     tol, # tolerance level
-                    norm.para = NULL
+                    norm.para = NULL,
+                    group = NULL
                     ) {  
     
     ##-------------------------------##
@@ -582,6 +583,14 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         att.off <- as.numeric(tapply(eff.v.use2, t.off.use, mean)) ## NA already removed
         count.off <- as.numeric(table(t.off.use))
     }
+    ## 7. cohort effects
+    if (!is.null(group)) {
+        cohort <- cbind(c(group), c(D), c(eff.v))
+        rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
+        cohort <- cohort[-rm.pos, ]
+        group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean)) 
+    }
+    
 
     ##-------------------------------##
     ##           Storage 
@@ -654,6 +663,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
     if (!is.null(CV.out.mc)) {
         out <- c(out, list(CV.out.mc = CV.out.mc))
+    }
+
+    if (!is.null(group)) {
+        out <- c(out, list(group.att = group.att))
     }
  
     return(out)

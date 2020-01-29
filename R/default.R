@@ -32,6 +32,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  Y, # outcome
                  D, # treatment 
                  X = NULL, # time-varying covariates
+                 group = NULL, # cohort
                  na.rm = FALSE, # remove missing values
                  index, # c(unit, time) indicators
                  force = "unit", # fixed effects demeaning
@@ -78,6 +79,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          Y, # outcome
                          D, # treatment 
                          X = NULL, # time-varying covariates
+                         group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
                          index, # c(unit, time) indicators
                          force = "unit", # fixed effects demeaning
@@ -146,7 +148,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
 
     ## run the model
     out <- fect.default(formula = NULL, data = data, Y = Yname,
-                        D = Dname, X = Xname,
+                        D = Dname, X = Xname, group,
                         na.rm, index, force, cl, r, lambda, nlambda, 
                         CV, k, cv.prop, cv.treat, cv.nobs,
                         binary, QR, method, criterion, alpha, se, 
@@ -171,6 +173,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          Y, # outcome
                          D, # treatment 
                          X = NULL, # time-varying covariates
+                         group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
                          index, # c(unit, time) indicators
                          force = "unit", # fixed effects demeaning
@@ -379,6 +382,17 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## remove missing values
     if (is.logical(na.rm) == FALSE & !na.rm%in%c(0, 1)) {
         stop("\"na.rm\" is not a logical flag.")
+    }
+
+    # cohort 
+    if (!is.null(group)) {
+        if (! group %in% names(data)) {
+            stop("\"group\" misspecified.\n")
+        } else {
+            if (se == 1) {
+                vartype <- "jackknife"
+            }
+        }
     } 
 
     ## select variable that are to be used 
@@ -389,7 +403,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     #        data <- data[,c(index, Y, D, X, cl)]
     #    }
     #} else {
-        data <- data[,c(index, Y, D, X)] ## some variables may not be used
+        if (!is.null(group)) {
+            data <- data[,c(index, Y, D, X, group)]
+        } else {
+            data <- data[,c(index, Y, D, X)] ## some variables may not be used
+        }
+        
     #}
     
     if (na.rm == TRUE) {
@@ -466,6 +485,19 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## max.missing
     if (is.null(max.missing)) {
         max.missing <- TT
+    }
+
+    ## group.series <- NULL
+    group.ref <- NULL
+    if (!is.null(group)) {
+        data.id <- data[, c(id, group)]
+        rawgroup <- data.id[!duplicated(data.id[, 1]), 2]
+        group <- as.numeric(as.factor(rawgroup))
+
+        #group.ref <- cbind(group, rawgroup)
+        #group.ref <- group.ref[!duplicated(group.ref[, 1]), ]
+        #group.ref <- group.ref[order(group.ref[, 1]), ]
+        rawgroup <- unique(rawgroup)
     }
     
     ## check missingness
@@ -672,6 +704,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         #if (!is.null(cl)) {
         #    cl <- cl[-rm.id]
         #}
+        if (!is.null(group)) {
+            group <- group[-rm.id]
+        }
     }
 
     ## cat("\nOK1\n")  
@@ -760,6 +795,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             #if (!is.null(cl)) {
             #    cl <- cl[-rm.id.2.pos]
             #}
+            if (!is.null(group)) {
+                group <- group[-rm.id.2.pos]
+            }
         }  
     }
 
@@ -794,7 +832,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         for (i in 1:(N - length(rm.id))) {
             T.off[, i] <-  get_term(D[,i], I[,i], type = "off")
         }
-    } 
+    }
+
+    ## cohort
+    if (!is.null(group)) {
+        ng <- length(group)
+        group <- matrix(rep(group, each = TT), TT, ng)
+    }
+
 
     ## cat("\nOK3\n")
 
@@ -853,7 +898,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                r = r, r.end = r.end, 
                                nlambda = nlambda, lambda = lambda,
                                force = force, hasRevs = hasRevs, 
-                               tol = tol, norm.para = norm.para)
+                               tol = tol, norm.para = norm.para, 
+                               group = group)
             } else {
                 out <- fect.binary.cv(Y = Y, D = D, X = X,
                                       I = I, II = II, 
@@ -875,7 +921,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                tol = tol, boot = 0,
                                norm.para = norm.para,
                                placeboTest = placeboTest, 
-                               placebo.period = placebo.period)
+                               placebo.period = placebo.period,
+                               group = group)
             } else if (method == "mc") {
                 out <- fect.mc(Y = Y, D = D, X = X, I = I, II = II,
                                T.on = T.on, T.off = T.off, 
@@ -884,7 +931,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                tol = tol, boot = 0,
                                norm.para = norm.para,
                                placeboTest = placeboTest, 
-                               placebo.period = placebo.period)
+                               placebo.period = placebo.period,
+                               group = group)
             } else if (method %in% c("polynomial", "bspline")) {
                 out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
                                        II = II, T.on = T.on, 
@@ -894,7 +942,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                        hasRevs = hasRevs, tol = tol, boot = 0, 
                                        placeboTest = placeboTest,
                                        placebo.period = placebo.period, 
-                                       norm.para = norm.para), silent = TRUE)
+                                       norm.para = norm.para,
+                                       group = group), silent = TRUE)
 
                 if ('try-error' %in% class(out)) {
                     stop("\nCannot estimate.\n")
@@ -919,7 +968,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          placebo.period = placebo.period,
                          vartype = vartype,
                          nboots = nboots, parallel = parallel,
-                         cores = cores)
+                         cores = cores, group = group)
 
     }
 
@@ -1025,6 +1074,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }  
     colnames(out$eff) <- iname
     rownames(out$eff) <- tname
+
+    ## cohort effect
+    if (!is.null(group)) {
+        out$group <- rawgroup
+        if (se == 1) {
+            rownames(out$est.group.att) <- rawgroup
+        }
+    }
    
     output <- c(list(Y.dat = Y,
                      D.dat = D,

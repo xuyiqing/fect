@@ -18,7 +18,8 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                     placeboTest = 0,
                     placebo.period = NULL,
                     time.on.seq = NULL,
-                    time.off.seq = NULL) {  
+                    time.off.seq = NULL,
+                    group = NULL) {  
     
     
     ##-------------------------------##
@@ -252,7 +253,16 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
             count.off <- count.off.med
             time.off <- time.off.seq
         }
-    }  
+    }
+
+    ## 7. cohort effects
+    if (!is.null(group)) {
+        cohort <- cbind(c(group), c(D), c(eff.v))
+        rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
+        cohort <- cohort[-rm.pos, ]
+        group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean)) 
+    }
+
     ##-------------------------------##
     ## Storage 
     ##-------------------------------##  
@@ -313,5 +323,8 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         out <- c(out, list(att.placebo = att.placebo))
     }
 
+    if (!is.null(group)) {
+        out <- c(out, list(group.att = group.att))
+    }
     return(out)
 } ## mc functions ends

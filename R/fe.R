@@ -19,7 +19,8 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                     placebo.period = NULL,
                     norm.para = NULL,
                     time.on.seq = NULL,
-                    time.off.seq = NULL) {  
+                    time.off.seq = NULL,
+                    group = NULL) {  
     
     ##-------------------------------##
     ## Parsing data
@@ -309,6 +310,14 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
+    ## 7. cohort effects
+    if (!is.null(group)) {
+        cohort <- cbind(c(group), c(D), c(eff.v))
+        rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
+        cohort <- cohort[-rm.pos, ]
+        group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean)) 
+    }
+
     method <- ifelse(r.cv > 0, "ife", "fe")
 
   
@@ -379,5 +388,8 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         out <- c(out, list(att.placebo = att.placebo))
     }
 
+    if (!is.null(group)) {
+        out <- c(out, list(group.att = group.att))
+    }
     return(out)
 } ## fe functions ends. 

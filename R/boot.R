@@ -31,7 +31,8 @@ fect.boot <- function(Y,
                       vartype = "bootstrap",
                       nboots,
                       parallel = TRUE,
-                      cores = NULL) {
+                      cores = NULL,
+                      group = NULL) {
     
     
     na.pos <- NULL
@@ -77,7 +78,8 @@ fect.boot <- function(Y,
                            tol = tol, boot = 0,
                            norm.para = norm.para, 
                            placebo.period = placebo.period,
-                           placeboTest = placeboTest)
+                           placeboTest = placeboTest,
+                           group = group)
         
         } else if (method == "mc") {
             out <- fect.mc(Y = Y, X = X, D = D, I = I, II = II,
@@ -86,7 +88,8 @@ fect.boot <- function(Y,
                            tol = tol, boot = 0,
                            norm.para = norm.para,
                            placebo.period = placebo.period,
-                           placeboTest = placeboTest)
+                           placeboTest = placeboTest,
+                           group = group)
         
         } else if (method %in% c("polynomial", "bspline")) {
             out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
@@ -98,7 +101,8 @@ fect.boot <- function(Y,
                                    tol = tol, boot = 0, 
                                    placeboTest = placeboTest,
                                    placebo.period = placebo.period, 
-                                   norm.para = norm.para), silent = TRUE)
+                                   norm.para = norm.para,
+                                   group = group), silent = TRUE)
 
             if ('try-error' %in% class(out)) {
                 stop("\nCannot estimate.\n")
@@ -113,7 +117,8 @@ fect.boot <- function(Y,
                        k = k, r = r, r.end = r.end, 
                        nlambda = nlambda, lambda = lambda, 
                        force = force, hasRevs = hasRevs, 
-                       tol = tol, norm.para = norm.para)
+                       tol = tol, norm.para = norm.para,
+                       group = group)
 
             method <- out$method
         } else {
@@ -134,6 +139,8 @@ fect.boot <- function(Y,
     eff <- out$eff
     att.avg <- out$att.avg
     att.avg.unit <- out$att.avg.unit
+
+    group.att <- out$group.att
 
     att.on <- out$att
     time.on <- out$time
@@ -175,6 +182,11 @@ fect.boot <- function(Y,
     }
     if (!is.null(placebo.period) & placeboTest == TRUE) {
         att.placebo.boot <- matrix(0, 1, nboots)
+    }
+
+    group.att.boot <- NULL
+    if (!is.null(group.att)) {
+        group.att.boot <- matrix(0, length(group.att), nboots)
     } 
 
     if (vartype == "jackknife") {
@@ -259,7 +271,10 @@ fect.boot <- function(Y,
                     }
                 }
 
+                boot.group <- NULL
+
             } else { ## jackknife
+                boot.group <- group[,-num]
                 boot.id <- 1:N
                 boot.id <- boot.id[-num]
             }
@@ -294,7 +309,8 @@ fect.boot <- function(Y,
                                     norm.para = norm.para,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
-                                    placeboTest = placeboTest), silent = TRUE)
+                                    placeboTest = placeboTest,
+                                    group = boot.group), silent = TRUE)
                 } else if (method == "mc") {
                     boot <- try(fect.mc(Y = Y[,boot.id], X = X.boot, D = D[,boot.id],
                                     I = I[,boot.id], II = II[,boot.id],
@@ -305,7 +321,8 @@ fect.boot <- function(Y,
                                     norm.para = norm.para,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
-                                    placeboTest = placeboTest), silent = TRUE)
+                                    placeboTest = placeboTest,
+                                    group = boot.group), silent = TRUE)
 
                 } else if (method %in% c("polynomial", "bspline")) {
                     boot <- try(fect.polynomial(Y = Y[,boot.id], X = X.boot, 
@@ -317,7 +334,8 @@ fect.boot <- function(Y,
                                                 norm.para = norm.para, time.on.seq = time.on, 
                                                 time.off.seq = time.off,
                                                 placebo.period = placebo.period.boot, 
-                                                placeboTest = placeboTest), silent = TRUE)
+                                                placeboTest = placeboTest,
+                                                group = boot.group), silent = TRUE)
                 }
 
                 if ('try-error' %in% class(boot)) {
@@ -488,6 +506,9 @@ fect.boot <- function(Y,
             if (!is.null(placebo.period) & placeboTest == TRUE) {
                 att.placebo.boot[,j] <- boot.out[[j]]$att.placebo
             }
+            if (!is.null(group)) {
+                group.att.boot[,j] <- boot.out[[j]]$group.att
+            }
         } 
     } else {
         for (j in 1:nboots) { 
@@ -505,6 +526,9 @@ fect.boot <- function(Y,
             }
             if (!is.null(placebo.period) & placeboTest == TRUE) {
                 att.placebo.boot[,j] <- boot$att.placebo
+            }
+            if (!is.null(group)) {
+                group.att.boot[,j] <- boot$group.att
             }
             ## report progress
             if (j%%100 == 0)  {
@@ -534,6 +558,14 @@ fect.boot <- function(Y,
         }
         if (!is.null(placebo.period) & placeboTest == TRUE) {
             att.placebo.boot <- t(as.matrix(att.placebo.boot[,-boot.rm]))
+        }
+        if (!is.null(group)) {
+            if (dim(group.att.boot) == 1) {
+                group.att.boot <- t(as.matrix(group.att.boot[, -boot.rm]))
+            } else {
+                group.att.boot <- as.matrix(group.att.boot[, -boot.rm])
+            }
+            
         }
 
     }
@@ -606,6 +638,16 @@ fect.boot <- function(Y,
             att.placebo.j <- jackknifed(att.placebo, att.placebo.boot, alpha)
             est.placebo <- t(as.matrix(c(att.placebo, att.placebo.j$se, att.placebo.j$CI.l, att.placebo.j$CI.u, att.placebo.j$P)))
             colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
+        }
+
+        ## cohort effect
+        if (!is.null(group)) {
+            group.att.j <- jackknifed(group.att, group.att.boot, alpha)
+
+            est.group.att <- cbind(group.att, group.att.j$se, group.att.j$CI.l, group.att.j$CI.u, group.att.j$P)
+            
+            colnames(est.group.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                         "p.value")
         }
 
     } else {
@@ -706,6 +748,11 @@ fect.boot <- function(Y,
 
     if (!is.null(placebo.period) & placeboTest == TRUE) {
         result <- c(result, list(est.placebo = est.placebo, att.placebo.boot = att.placebo.boot))
+    }
+
+    if (!is.null(group)) {
+        result <- c(result, list(est.group.att = est.group.att))
+
     }
 
     return(c(out,result))
