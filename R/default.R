@@ -497,7 +497,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         #group.ref <- cbind(group, rawgroup)
         #group.ref <- group.ref[!duplicated(group.ref[, 1]), ]
         #group.ref <- group.ref[order(group.ref[, 1]), ]
-        rawgroup <- unique(rawgroup)
+        ## rawgroup <- unique(rawgroup)
     }
     
     ## check missingness
@@ -706,6 +706,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         #}
         if (!is.null(group)) {
             group <- group[-rm.id]
+            rawgroup <- rawgroup[-rm.id]
         }
     }
 
@@ -797,6 +798,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             #}
             if (!is.null(group)) {
                 group <- group[-rm.id.2.pos]
+                rawgroup <- rawgroup[-rm.id.2.pos]
             }
         }  
     }
@@ -836,6 +838,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     ## cohort
     if (!is.null(group)) {
+        tr.pos <- which(apply(D, 2, sum) > 0)
+        rawgroup <- unique(rawgroup[tr.pos])
         ng <- length(group)
         group <- matrix(rep(group, each = TT), TT, ng)
     }
@@ -1078,6 +1082,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## cohort effect
     if (!is.null(group)) {
         out$group <- rawgroup
+        #out$G <- group
+        #out$group2 <- rawgroup2
         if (se == 1) {
             rownames(out$est.group.att) <- rawgroup
         }
