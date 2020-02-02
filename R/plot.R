@@ -471,7 +471,7 @@ plot.fect <- function(x,
             set.limits <- "ci"
             if (is.null(legend.labs)==TRUE) {
                 if (bound != "none") {
-                    set.labels <- "ATT (w/ 90% CI)" 
+                    set.labels <- "Residual Average (w/ 90% CI)" 
                 } else {
                     set.labels <- "ATT (w/ 95% CI)" 
                 }

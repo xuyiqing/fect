@@ -26,7 +26,7 @@ fect.test <- function(
     parallel = TRUE,
     cores = NULL) {
     
-    
+
     x <- y <- na.pos <- NULL
     TT <- dim(Y)[1]
     N <- dim(Y)[2]
@@ -100,7 +100,7 @@ fect.test <- function(
             }
             Y.boot <- Y.f + res.p * eff
             Y.boot[which(I == 0)] <- 0
-            if (method == "ife") {
+            if (method %in% c("ife", "fe")) {
                 boot <- try(fect.fe(Y = Y.boot, X = X, D = D, I = I, II = II, 
                                 T.on = T.on, T.off = NULL,
                                 r.cv = r, force = force, hasRevs = 0, 
