@@ -1,8 +1,8 @@
 \name{fect}
 \alias{fect}
-\title{Fixed Effects Counterfactuals}
-\description{Implements the matrix completion method based
-on interactive fixed effect models.}
+\title{Fixed Effects Counterfactual Estimators}
+\description{Implements counterfactual estimators in TSCS data analysis and statistical tools to test their identification 
+assumptions.}
 \usage{fect(formula = NULL, data, Y, D, X = NULL, group = NULL, na.rm = FALSE, 
        index, force = "unit", cl = "unit", r = 0, lambda = NULL, nlambda = 10,
        CV = TRUE, k = 10, cv.prop = 0.1, cv.treat = TRUE, cv.nobs = 3,
@@ -109,17 +109,12 @@ on interactive fixed effect models.}
   covariates. Useful for accelerating computing speed when magnitude of data is large. The default is \code{normalize=FALSE}.}
 }
 \details{
-  \code{fect} implements the matrix completion method proposed by 
-  Athey, Susan, et al. It imputes missing values using observed
-  information based on a linear interactive fixed effects model that
-  incorporates unit-specific intercepts interacted with time-varying
-  coefficients. It provides two algorithms: the first one explictly 
-  estimates interactive fixed effects structure while the second one 
-  uses a low-rank matrix to approximate the interactive fixed effects 
-  structure. It does not distiguish between control and treated group 
-  units. With a built-in cross-validation
-  procedure, it avoids specification searches and thus is easy to
-  implement. Data must be with a dichotomous treatment.
+  \code{fect} implements counterfactual estimators in TSCS data analysis. These estimators first impute counterfactuals for 
+  each treated observation in a TSCS dataset by fitting an outcome model (fixed effects model, interactive fixed effects model, or
+  matrix completion) using the untreated observations. They then estimate the individualistic treatment effect for each treated 
+  observation by subtracting the predicted counterfactual outcome from its observed outcome. Finally, the average treatment effect
+  on the treated (ATT) or period-specific ATTs are calculated. A placebo test and an equivalence test are included to evaluate the
+  validity of identification assumptions behind these estimators. Data must be with a dichotomous treatment.
 }
 \value{
   \item{Y.dat}{a matrix storing data of the outcome variable.}
@@ -202,7 +197,12 @@ on interactive fixed effect models.}
   with Interactive Fixed Effects Models." Political Analysis, Vol. 25, 
   Iss. 1, January 2017, pp. 57-76. Available at: \url{https://doi.org/10.1017/pan.2016.2}.
 
-  Athey S, Bayati M, Doudchenko N, et al. Matrix completion methods for causal panel data models[J]. arXiv preprint arXiv:1710.10251, 2017.
+  Athey, Susan, et al. 2018 "Matrix completion methods for causal panel data models." arXiv preprint arXiv:1710.10251. Available 
+  at: \url{https://https://arxiv.org/abs/1710.10251}. 
+  
+  Licheng Liu, et al. 2020. "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional 
+  Data." Working paper. Available at: \url{https://polmeth.mit.edu/sites/default/files/documents/Yiqing_Xu.pdf}. 
+
 
   For more details about the matrix completion method, see \url{https://github.com/susanathey/MCPanel}. 
 }
