@@ -171,6 +171,8 @@ assumptions.}
   \item{validF}{a logic value indicating if factor exists.}
   \item{time}{term for switch-on treatment effect.}
   \item{att}{switch-on treatment effect.}
+  \item{group.att}{switch-on averge cohort effect.}
+  \item{est.group.att}{inference for \code{group.att}.}
   \item{count}{count of each term for switch-on treatment effect.}
   \item{time.off}{term for switch-off treatment effect.}
   \item{att.off}{switch-off treatment effect.}
@@ -182,6 +184,14 @@ assumptions.}
   \item{est.placebo}{inference for \code{att.placebo}.}
   \item{est.beta}{inference for \code{beta}.}
   \item{att.avg.boot}{bootstrap results for \code{att.avg}.}
+  \item{att.avg.unit.boot}{bootstrap results for \code{att.avg.unit}.}
+  \item{att.count.boot}{bootstrap results for \code{count}.}
+  \item{att.off.boot}{bootstrap results for \code{att.avg.off}.}
+  \item{att.off.count.boot}{bootstrap results for \code{count.off}.}
+  \item{att.placebo.boot}{bootstrap results for \code{att.placebo}.}
+  \item{att.bound}{equivalence confidence interval for equivalence test.}
+  \item{att.off.bound}{equivalence confidence interval for equivalence test for 
+  switch-off effect.}
   \item{beta.boot}{bootstrap results for \code{beta}.}
   \item{wald}{wald test results for pre-treatment fitting check.}
   \item{permute}{permutation test results for sharp null hypothesis.}
