@@ -17,7 +17,9 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
                            QR = FALSE, 
                            force, 
                            hasRevs = 1,
-                           tol # tolerance level
+                           tol, # tolerance level
+                           group.level = NULL,
+                           group = NULL
                            ) {  
     
     ##-------------------------------##
@@ -273,6 +275,14 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
     att.avg.unit <- mean(att.unit)
 
     ## 2. rmse for treated units' observations under control: useless for binary
+    ## average marginal effect
+    marginal <- NULL
+    #if (binary == TRUE) {
+        if (p > 0) {
+            dense <- dnorm(c(est.best$fit[which(II == 1)]))
+            marginal <- as.matrix(sapply(1:p, function(vec){ mean(beta[vec] * dense)} ))
+        }
+    #}
 
     ## 3. unbalanced output
     if (0%in%I) {
@@ -324,6 +334,19 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
         count.off <- as.numeric(table(t.off.use))
     }
 
+    ## 7. cohort effects
+    if (!is.null(group)) {
+        cohort <- cbind(c(group), c(D), c(eff.v))
+        rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
+        cohort <- cohort[-rm.pos, ]
+
+        g.level <- sort(unique(cohort[, 1]))
+        raw.group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean))
+
+        group.att <- rep(NA, length(group.level))
+        group.att[which(group.level %in% g.level)] <- raw.group.att 
+    }
+
     ##-------------------------------##
     ##           Storage 
     ##-------------------------------##  
@@ -370,6 +393,10 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
         out<-c(out,list(xi = est.best$xi))
     } else if (force == 3) {
         out<-c(out,list(alpha = est.best$alpha, xi = est.best$xi))
+    }
+
+    if (!is.null(group)) {
+        out <- c(out, list(group.att = group.att))
     }
  
     return(out)

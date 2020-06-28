@@ -19,6 +19,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                     placebo.period = NULL,
                     time.on.seq = NULL,
                     time.off.seq = NULL,
+                    group.level = NULL,
                     group = NULL) {  
     
     
@@ -260,7 +261,12 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         cohort <- cbind(c(group), c(D), c(eff.v))
         rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
         cohort <- cohort[-rm.pos, ]
-        group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean)) 
+
+        g.level <- sort(unique(cohort[, 1]))
+        raw.group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean))
+
+        group.att <- rep(NA, length(group.level))
+        group.att[which(group.level %in% g.level)] <- raw.group.att 
     }
 
     ##-------------------------------##

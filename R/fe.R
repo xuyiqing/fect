@@ -20,6 +20,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                     norm.para = NULL,
                     time.on.seq = NULL,
                     time.off.seq = NULL,
+                    group.level = NULL,
                     group = NULL) {  
     
     ##-------------------------------##
@@ -175,6 +176,15 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     eff <- Y - Y.ct    
     att.avg <- sum(eff * D)/(sum(D))
 
+    ## average marginal effect
+    marginal <- NULL
+    if (binary == TRUE) {
+        if (p > 0) {
+            dense <- dnorm(c(est.best$fit[which(II == 1)]))
+            marginal <- as.matrix(sapply(1:p, function(vec){ mean(beta[vec] * dense)} ))
+        }
+    }
+
     ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
     att.unit <- sapply(1:length(tr.pos), function(vec){return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))})
@@ -315,7 +325,12 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         cohort <- cbind(c(group), c(D), c(eff.v))
         rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
         cohort <- cohort[-rm.pos, ]
-        group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean)) 
+
+        g.level <- sort(unique(cohort[, 1]))
+        raw.group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean))
+
+        group.att <- rep(NA, length(group.level))
+        group.att[which(group.level %in% g.level)] <- raw.group.att 
     }
 
     method <- ifelse(r.cv > 0, "ife", "fe")
@@ -360,7 +375,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         #    out <- c(out, list(equiv.att.avg = equiv.att.avg))
         #}
     } else {
-        out <- c(out, list(loglikelihood = loglikelihood))
+        out <- c(out, list(loglikelihood = loglikelihood, marginal = marginal))
     }
     
     if (hasRevs == 1) {

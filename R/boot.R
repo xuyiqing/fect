@@ -15,6 +15,9 @@ fect.boot <- function(Y,
                       criterion = "mspe",
                       CV,
                       k = 5,
+                      cv.prop = 0.1, 
+                      cv.treat = 0, 
+                      cv.nobs = 1,
                       r = 0, 
                       r.end,
                       lambda = NULL,
@@ -32,6 +35,7 @@ fect.boot <- function(Y,
                       nboots,
                       parallel = TRUE,
                       cores = NULL,
+                      group.level = NULL,
                       group = NULL) {
     
     
@@ -79,7 +83,7 @@ fect.boot <- function(Y,
                            norm.para = norm.para, 
                            placebo.period = placebo.period,
                            placeboTest = placeboTest,
-                           group = group)
+                           group.level = group.level, group = group)
         
         } else if (method == "mc") {
             out <- fect.mc(Y = Y, X = X, D = D, I = I, II = II,
@@ -89,7 +93,7 @@ fect.boot <- function(Y,
                            norm.para = norm.para,
                            placebo.period = placebo.period,
                            placeboTest = placeboTest,
-                           group = group)
+                           group.level = group.level, group = group)
         
         } else if (method %in% c("polynomial", "bspline")) {
             out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
@@ -102,7 +106,7 @@ fect.boot <- function(Y,
                                    placeboTest = placeboTest,
                                    placebo.period = placebo.period, 
                                    norm.para = norm.para,
-                                   group = group), silent = TRUE)
+                                   group.level = group.level, group = group), silent = TRUE)
 
             if ('try-error' %in% class(out)) {
                 stop("\nCannot estimate.\n")
@@ -118,7 +122,9 @@ fect.boot <- function(Y,
                        nlambda = nlambda, lambda = lambda, 
                        force = force, hasRevs = hasRevs, 
                        tol = tol, norm.para = norm.para,
-                       group = group)
+                       group.level = group.level, group = group,
+                       cv.prop = cv.prop, cv.treat = cv.treat, 
+                       cv.nobs = cv.nobs)
 
             method <- out$method
         } else {
@@ -127,7 +133,8 @@ fect.boot <- function(Y,
                                   T.on = T.on, T.off = T.off,
                                   k = k, r = r, r.end = r.end, 
                                   QR = QR, force = force, 
-                                  hasRevs = hasRevs, tol = tol)
+                                  hasRevs = hasRevs, tol = tol,
+                                  group.level = group.level, group = group)
             method <- "ife"
         }
         
@@ -173,12 +180,16 @@ fect.boot <- function(Y,
     att.avg.unit.boot <- matrix(0, 1, nboots)
     att.on.boot <- matrix(0, length(time.on), nboots)
     att.on.count.boot <- matrix(0, length(time.on), nboots)
+    beta.boot <- marginal.boot <- att.off.boot <- att.off.count.boot <- NULL
     if (hasRevs == 1) {
         att.off.boot <- matrix(0, length(time.off), nboots) 
         att.off.count.boot <- matrix(0, length(time.off), nboots)   
     }
     if (p > 0) {
         beta.boot <- matrix(0, p, nboots)
+        if (binary == TRUE) {
+            marginal.boot <- matrix(0, p, nboots)
+        }
     }
     if (!is.null(placebo.period) & placeboTest == TRUE) {
         att.placebo.boot <- matrix(0, 1, nboots)
@@ -194,6 +205,46 @@ fect.boot <- function(Y,
     } else {
         cat("Bootstrapping for uncertainties ... ")
     }
+
+    if (binary == TRUE && vartype == "parametric") {
+
+        one.nonpara <- function(num = NULL) {
+            Y.boot <- Y
+            Y.fit <- out$Y.ct
+            Y.fit[which(is.na(Y.fit))] <- 0
+            Y.boot.new <- matrix(sapply(1:length(c(Y.fit)),function(i){rbinom(1,1,c(Y.fit)[i])}), TT, N)
+            Y.boot[which(II == 1)] <- Y.boot.new[which(II == 1)]
+
+            placebo.period.boot <- NULL
+            if (placeboTest == TRUE) {
+                placebo.period.boot <- placebo.period
+            }
+
+            boot <- try(fect.fe(Y = Y.boot, X = X, D = D,
+                                    I = I, II = II, 
+                                    T.on = T.on, T.off = T.off, 
+                                    r.cv = out$r.cv, binary = binary,
+                                    QR = QR, force = force,
+                                    hasRevs = hasRevs, tol = tol, boot = 1,
+                                    norm.para = norm.para,
+                                    time.on.seq = time.on, time.off.seq = time.off,
+                                    placebo.period = placebo.period.boot, 
+                                    placeboTest = placeboTest,
+                                    group.level = group.level,
+                                    group = group), silent = TRUE)
+
+            if ('try-error' %in% class(boot)) {
+                boot0 <- list(att.avg = NA, att = NA, count = NA, 
+                              beta = NA, att.off = NA, count.off = NA, 
+                              att.placebo = NA, att.avg.unit = NA,
+                              group.att = NA, marginal = NA)
+                return(boot0)
+            } else {
+                return(boot)
+            }
+
+        }
+    } else {
     
  
     #if (method == "ife") {
@@ -271,7 +322,7 @@ fect.boot <- function(Y,
                     }
                 }
 
-                boot.group <- NULL
+                boot.group <- group[, boot.id]
 
             } else { ## jackknife
                 boot.group <- group[,-num]
@@ -286,7 +337,8 @@ fect.boot <- function(Y,
             if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
                               beta = NA, att.off = NA, count.off = NA, 
-                              att.placebo = NA, att.avg.unit = NA)
+                              att.placebo = NA, att.avg.unit = NA,
+                              group.att = NA)
                 return(boot0)
             } else {
                 T.off.boot <- NULL
@@ -310,6 +362,7 @@ fect.boot <- function(Y,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
+                                    group.level = group.level,
                                     group = boot.group), silent = TRUE)
                 } else if (method == "mc") {
                     boot <- try(fect.mc(Y = Y[,boot.id], X = X.boot, D = D[,boot.id],
@@ -322,6 +375,7 @@ fect.boot <- function(Y,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
+                                    group.level = group.level,
                                     group = boot.group), silent = TRUE)
 
                 } else if (method %in% c("polynomial", "bspline")) {
@@ -335,19 +389,22 @@ fect.boot <- function(Y,
                                                 time.off.seq = time.off,
                                                 placebo.period = placebo.period.boot, 
                                                 placeboTest = placeboTest,
+                                                group.level = group.level,
                                                 group = boot.group), silent = TRUE)
                 }
 
                 if ('try-error' %in% class(boot)) {
                     boot0 <- list(att.avg = NA, att = NA, count = NA, 
                                   beta = NA, att.off = NA, count.off = NA, 
-                                  att.placebo = NA, att.avg.unit = NA)
+                                  att.placebo = NA, att.avg.unit = NA,
+                                  group.att = NA, marginal = NA)
                     return(boot0)
                 } else {
                     return(boot)
                 }
             }            
-        } 
+        }
+    } 
             
     #} else { ## mc
     #    one.nonpara <- function() {
@@ -498,6 +555,9 @@ fect.boot <- function(Y,
             att.on.count.boot[,j] <- boot.out[[j]]$count
             if (p > 0) {
                 beta.boot[,j] <- boot.out[[j]]$beta
+                if (binary == TRUE) {
+                    marginal.boot[, j] <- boot.out[[j]]$marginal
+                }
             }
             if (hasRevs == 1) {
                 att.off.boot[,j] <- boot.out[[j]]$att.off
@@ -519,6 +579,9 @@ fect.boot <- function(Y,
             att.on.count.boot[,j] <- boot$count
             if (p > 0) {
                 beta.boot[,j] <- boot$beta
+                if (binary == TRUE) {
+                    marginal.boot[,j] <- boot$marginal      
+                }
             }
             if (hasRevs == 1) {
                 att.off.boot[,j] <- boot$att.off
@@ -560,7 +623,7 @@ fect.boot <- function(Y,
             att.placebo.boot <- t(as.matrix(att.placebo.boot[,-boot.rm]))
         }
         if (!is.null(group)) {
-            if (dim(group.att.boot) == 1) {
+            if (dim(group.att.boot)[1] == 1) {
                 group.att.boot <- t(as.matrix(group.att.boot[, -boot.rm]))
             } else {
                 group.att.boot <- as.matrix(group.att.boot[, -boot.rm])
@@ -630,6 +693,12 @@ fect.boot <- function(Y,
             beta.j <- jackknifed(beta, beta.boot, alpha)
             est.beta <- cbind(beta, beta.j$se, beta.j$CI.l, beta.j$CI.u, beta.j$P)
             colnames(est.beta)<-c("beta", "S.E.", "CI.lower", "CI.upper", "p.value")
+
+            if (binary == TRUE) {
+                marginal.j <- jackknifed(out$marginal, marginal.boot, alpha)
+                est.marginal <- cbind(out$marginal, marginal.j$se, marginal.j$CI.l, marginal.j$CI.u, marginal.j$P)
+                colnames(est.marginal)<-c("marginal", "S.E.", "CI.lower", "CI.upper", "p.value")
+            }
         }
 
         ## placebo test
@@ -711,6 +780,16 @@ fect.boot <- function(Y,
             beta[na.pos] <- NA
             est.beta<-cbind(beta, se.beta, CI.beta, pvalue.beta)
             colnames(est.beta)<-c("beta", "S.E.", "CI.lower", "CI.upper", "p.value")
+
+            if (binary == TRUE) {
+                CI.marginal<-t(apply(marginal.boot, 1, function(vec)
+                quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+                se.marginal<-apply(marginal.boot, 1, function(vec)sd(vec,na.rm=TRUE))
+                pvalue.marginal <- apply(marginal.boot, 1, get.pvalue)
+                out$marginal[na.pos] <- NA
+                est.marginal<-cbind(out$marginal, se.marginal, CI.marginal, pvalue.marginal)
+                colnames(est.marginal)<-c("marginal", "S.E.", "CI.lower", "CI.upper", "p.value")
+            }
         }
 
         ## placebo test
@@ -722,6 +801,18 @@ fect.boot <- function(Y,
             est.placebo <- t(as.matrix(c(att.placebo, se.placebo, CI.placebo, pvalue.placebo)))
             colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
         }
+
+        ## group effect
+        if (!is.null(group)) {
+
+            CI.group.att <- t(apply(group.att.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+            se.group.att <- apply(group.att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+            pvalue.group.att.on <- apply(group.att.boot, 1, get.pvalue)
+
+            est.group.att <- cbind(out$group.att, se.group.att, CI.group.att, pvalue.group.att.on)
+            colnames(est.group.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value")
+        }
+
 
     }
   
@@ -738,6 +829,9 @@ fect.boot <- function(Y,
     if (p>0) {
         result <- c(result,list(beta.boot = beta.boot))
         result <- c(result,list(est.beta = est.beta))
+        if (binary == TRUE) {
+            result <- c(result,list(est.marginal = est.marginal))
+        }
     }
     if (hasRevs == 1) {
         result<-c(result,list(est.att.off = est.att.off, 

@@ -226,7 +226,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     if (se == 1) {
-        if (! vartype %in% c("bootstrap", "jackknife")) {
+        if (! vartype %in% c("bootstrap", "jackknife", "parametric")) {
             stop("\"vartype\" option misspecified.")
         }
     }
@@ -388,11 +388,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (!is.null(group)) {
         if (! group %in% names(data)) {
             stop("\"group\" misspecified.\n")
-        } else {
-            if (se == 1) {
-                vartype <- "jackknife"
-            }
-        }
+        } 
+        #else {
+        #    if (se == 1) {
+        #        vartype <- "jackknife"
+        #    }
+        #}
     } 
 
     ## select variable that are to be used 
@@ -488,17 +489,30 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     ## group.series <- NULL
-    group.ref <- NULL
-    if (!is.null(group)) {
-        data.id <- data[, c(id, group)]
-        rawgroup <- data.id[!duplicated(data.id[, 1]), 2]
-        group <- as.numeric(as.factor(rawgroup))
+    #group.ref <- NULL
+    #if (!is.null(group)) {
+    #    data.id <- data[, c(id, group)]
+    #    rawgroup <- data.id[!duplicated(data.id[, 1]), 2]
+    #    group <- as.numeric(as.factor(rawgroup))
 
         #group.ref <- cbind(group, rawgroup)
         #group.ref <- group.ref[!duplicated(group.ref[, 1]), ]
         #group.ref <- group.ref[order(group.ref[, 1]), ]
         ## rawgroup <- unique(rawgroup)
+    #}
+
+    ## gen group matrix
+    if (!is.null(group)) {
+        rawgroup <- data[, group]
+        newgroup <- as.numeric(as.factor(rawgroup))
+
+        data[, group] <- newgroup
+
+        rawgroup <- cbind.data.frame(rawgroup, newgroup)
+        rawgroup <- rawgroup[!duplicated(rawgroup[, 1]),]
     }
+
+    ##cat("\nOK1\n")
     
     ## check missingness
     if (sum(is.na(data[, Yname])) > 0) {
@@ -568,6 +582,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         #    }
         #} else {
             variable <- c(Yname, Dname, Xname)
+            if (!is.null(group)) {
+                variable <- c(Yname, Dname, Xname, group)
+            }
         #}
 
         data_I <- matrix(0, N * TT, 1)
@@ -583,7 +600,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     I[is.nan(Y.ind)] <- 0
     if (0%in%I) {
         data[is.nan(data)] <- 0
-    }    
+    } 
+    ## group indicator 
+    G <- NULL
+    if (!is.null(group)) {
+        G <- matrix(data[, group], TT, N)
+    }
+
+    ## cat("\nOK2\n")
+
     ##treatment indicator: incorporates reversal treatments
     D <- matrix(data[, Dname], TT, N)
     ##outcome variable
@@ -705,8 +730,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         #    cl <- cl[-rm.id]
         #}
         if (!is.null(group)) {
-            group <- group[-rm.id]
-            rawgroup <- rawgroup[-rm.id]
+            ## group <- group[-rm.id]
+            ## rawgroup <- rawgroup[-rm.id]
+            G <- as.matrix(G[,-rm.id])
         }
     }
 
@@ -730,6 +756,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         II <- II[-which(I.use == 0),] ## remove that period        
         D <- D[-which(I.use == 0),] ## remove that period
         Y <- Y[-which(I.use == 0),] ## remove that period
+
+        if (!is.null(group)) {
+            G <- G[-which(I.use == 0),]
+        }
 
         X.old <- X
         if (p > 0) {
@@ -797,8 +827,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             #    cl <- cl[-rm.id.2.pos]
             #}
             if (!is.null(group)) {
-                group <- group[-rm.id.2.pos]
-                rawgroup <- rawgroup[-rm.id.2.pos]
+                ## group <- group[-rm.id.2.pos]
+                ## rawgroup <- rawgroup[-rm.id.2.pos]
+
+                G <- as.matrix(G[,-rm.id.2.pos])
             }
         }  
     }
@@ -837,12 +869,24 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     ## cohort
+    g.level <- NULL
     if (!is.null(group)) {
-        tr.pos <- which(apply(D, 2, sum) > 0)
-        rawgroup <- unique(rawgroup[tr.pos])
-        ng <- length(group)
-        group <- matrix(rep(group, each = TT), TT, ng)
+        G[which(D == 0)] <- NA
+        g.level <- unique(c(G))
+        g.level <- g.level[!is.na(g.level)]
+
+        rawgroup <- rawgroup[order(rawgroup[, 2]),]
+        rawgroup <- rawgroup[which(rawgroup[, 2] %in% g.level), 1]
+
+        ## tr.pos <- which(apply(D, 2, sum) > 0)
+        ## rawgroup <- unique(rawgroup[tr.pos])
+        ## ng <- length(group)
+        ## group <- matrix(rep(group, each = TT), TT, ng)
+
+        ## G <- as.matrix(G[, tr.pos])
     }
+
+    ##cat("\nOK3\n")
 
 
     ## cat("\nOK3\n")
@@ -903,7 +947,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                nlambda = nlambda, lambda = lambda,
                                force = force, hasRevs = hasRevs, 
                                tol = tol, norm.para = norm.para, 
-                               group = group)
+                               group.level = g.level, group = G)
             } else {
                 out <- fect.binary.cv(Y = Y, D = D, X = X,
                                       I = I, II = II, 
@@ -913,7 +957,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                       cv.nobs = cv.nobs,
                                       r = r, r.end = r.end, 
                                       QR = QR, force = force, 
-                                      hasRevs = hasRevs, tol = tol)
+                                      hasRevs = hasRevs, tol = tol,
+                                      group.level = g.level, group = G)
             }
             
         } else { ## non-binary case
@@ -926,7 +971,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                norm.para = norm.para,
                                placeboTest = placeboTest, 
                                placebo.period = placebo.period,
-                               group = group)
+                               group.level = g.level, group = G)
             } else if (method == "mc") {
                 out <- fect.mc(Y = Y, D = D, X = X, I = I, II = II,
                                T.on = T.on, T.off = T.off, 
@@ -936,7 +981,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                norm.para = norm.para,
                                placeboTest = placeboTest, 
                                placebo.period = placebo.period,
-                               group = group)
+                               group.level = g.level, group = G)
             } else if (method %in% c("polynomial", "bspline")) {
                 out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
                                        II = II, T.on = T.on, 
@@ -947,7 +992,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                        placeboTest = placeboTest,
                                        placebo.period = placebo.period, 
                                        norm.para = norm.para,
-                                       group = group), silent = TRUE)
+                                       group.level = g.level, group = G), silent = TRUE)
 
                 if ('try-error' %in% class(out)) {
                     stop("\nCannot estimate.\n")
@@ -963,7 +1008,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          T.on = T.on, T.off = T.off, cl = NULL,
                          method = method, degree = degree,
                          knots = knots, criterion = criterion,
-                         CV = CV, k = k, r = r, r.end = r.end, 
+                         CV = CV, k = k, cv.prop = cv.prop,
+                         cv.treat = cv.treat, cv.nobs = cv.nobs,
+                         r = r, r.end = r.end, 
                          nlambda = nlambda, lambda = lambda,
                          alpha = alpha, binary = binary, QR = QR,
                          force = force, hasRevs = hasRevs,
@@ -972,7 +1019,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          placebo.period = placebo.period,
                          vartype = vartype,
                          nboots = nboots, parallel = parallel,
-                         cores = cores, group = group)
+                         cores = cores, group.level = g.level, group = G)
 
     }
 
@@ -1072,8 +1119,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (p > 0) {
         Xname.tmp <- Xname
         rownames(out$beta) <- Xname.tmp
+        if (binary == TRUE) {
+            rownames(out$marginal) <- Xname.tmp
+        }
         if (se == TRUE) {
             rownames(out$est.beta) <- Xname.tmp
+            if (binary == TRUE) {
+                rownames(out$est.marginal) <- Xname.tmp
+            }
         }
     }  
     colnames(out$eff) <- iname
