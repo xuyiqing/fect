@@ -1171,6 +1171,39 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         output <- c(output,list(permute = permute.result))
     }
     output <- c(output, list(call = match.call()))
+
+    ## equivalence test
+    if (se == 1) {
+        res <- data.frame(output$eff.pre)
+        ## period <- as.numeric(output$period)
+        unit_pos <- which(res$period == 0)
+        num_units <- length(unit_pos)
+        res$unit_new <- rep(c(1:num_units), (unit_pos - c(0, unit_pos[-num_units])))
+      
+        res <- res[order(res$period, res$unit_new), ]
+        num_units <- output$count[output$time <= 0]
+        res_wide <- reshape(res[, c("period", "unit_new", "eff")], 
+                            timevar = "period", 
+                            idvar = "unit_new", 
+                            direction = "wide", 
+                            v.names = "eff")
+
+        res_boot <- output$att.boot
+        nboots <- ncol(res_boot)
+        res_boot <- res_boot[output$time <= 0, ]
+        D <- apply(res_boot, 1, function(x) mean(x, na.rm = 1))
+        coef_mat <- res_boot[c((nrow(res_boot)-num_periods+1):nrow(res_boot)), ]
+        D <- D[c((nrow(res_boot)-num_periods+1):nrow(res_boot))]    
+        N_bar <- max(num_units[c((length(num_units)-num_periods+1):length(num_units))])
+        S <- cov(data.frame(t(coef_mat))) * N_bar
+      
+        psi <- N_bar * t(D) %*% solve(S) %*% D
+        threshold <- (((N_bar-1)*(num_periods-1))/(N_bar-num_periods+1))*qf(p = 0.05, df1 = num_periods - 1, df2 = N_bar - num_periods + 1, ncp = N_bar*.5^2)
+        
+        equiv <- list(psi = psi, threshold = threshold)
+        output <- c(output,list(equiv = equiv))
+    }
+
     class(output) <- "fect"
     return(output)
     
