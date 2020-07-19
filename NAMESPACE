@@ -25,7 +25,6 @@ importFrom("fastplm", "fastplm")
 
 
 
-
 export(fect)
 S3method("fect", "default")
 S3method("fect", "formula")
@@ -37,4 +36,6 @@ S3method("interFE", "formula")
 S3method("print", "interFE")
 export(att.cumu)
 export(equiv_test)
+
+
 

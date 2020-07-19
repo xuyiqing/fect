@@ -125,8 +125,8 @@ initialFit <- function(data, ## long form data
             ## res <- as.matrix(lm.fit$residuals)
         }
     } else {
-        lm.fit <- invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
-                           ind = as.matrix(ind[oci,])))
+        lm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
+                           ind = as.matrix(ind[oci,]))))
         y0 <- suppressWarnings(predict(lm.fit, x = x, ind = ind))
         Y0 <- matrix(y0, T, N)
         if (p > 0) {
@@ -200,8 +200,8 @@ BiInitialFit <- function(data, ## long form data
             FE <- mu
         }
     } else {         ## with additive fixed effects
-        plm.fit <- invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
-                           ind = as.matrix(ind[oci,])))
+        plm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
+                           ind = as.matrix(ind[oci,]))))
         y0 <- suppressWarnings(predict(plm.fit, x = x, ind = ind))
         Y0 <- matrix(y0, T, N)
         mu <- plm.fit$intercept
