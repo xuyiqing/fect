@@ -36,5 +36,5 @@ S3method("interFE", "default")
 S3method("interFE", "formula")
 S3method("print", "interFE")
 export(att.cumu)
-
+export(equiv_test)
 
