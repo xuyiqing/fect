@@ -1200,6 +1200,7 @@ equiv_test <- function(output,
     pre.pos <- NULL ## use
     con1 <- is.null(num_periods)
     con2 <- is.null(proportion)
+    
     if (con1 && con2) {
         pre.pos <- pos
     } else {
@@ -1208,14 +1209,13 @@ equiv_test <- function(output,
             pos <- pos[(count.len - num_periods +1):count.len]
             count <- count[(count.len - num_periods +1):count.len]
             pre.pos <- pos
-        }
-
-        if (!con2) {
-            count.pos <- which(count >= count0 * proportion)
-            pre.pos <- pos[count.pos]
-            count <- count[count.pos]
-        }
-        
+        } else {
+            if (!con2) {
+                count.pos <- which(count >= count0 * proportion)
+                pre.pos <- pos[count.pos]
+                count <- count[count.pos]
+            }
+        }        
     }
 
     res_boot <- output$att.boot
