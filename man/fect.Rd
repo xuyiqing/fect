@@ -10,8 +10,8 @@ assumptions.}
        method = "fe", criterion = "mspe", alpha = 0.05,
        se = FALSE, vartype = "bootstrap", nboots = 200, 
        parallel = FALSE, cores = NULL, tol = 0.001, seed = NULL, 
-       min.T0 = 5, max.missing = NULL, pre.period = NULL, off.period = NULL, 
-       knots = NULL, degree = 2, wald = FALSE,
+       min.T0 = 5, max.missing = NULL, pre.period = NULL, proportion = 0.3, 
+       threshold = 0.5, knots = NULL, degree = 2, ## wald = FALSE,
        placebo.period = NULL, placeboTest = FALSE, 
        permute = FALSE, m = 2, normalize = FALSE)  
 }
@@ -89,16 +89,15 @@ assumptions.}
   it will be removed. Ignored if this parameter is set "NULL"(i.e. \code{max.missing = NULL}, the default setting).}
 \item{pre.period}{a two-element numeric vector specifying the range of 
   pre-treatment period used for goodness-of-fit test. If left blank, all 
-  pre-treatment periods will be used. Ignore if \code{wald = FALSE}.}
-\item{off.period}{a two-element numeric vector specifying the range of 
-  pre-treatment period used for goodness-of-fit test in situations of 
-  treatment reversals. If left blank, all post-treatment periods will be used. 
-  Ignore if \code{wald = FALSE}.}
+  pre-treatment periods will be used. Ignore if \code{se = FALSE}.}
+\item{proportion}{a numeric value specifying pre-treatment periods that have 
+  observations larger than the proportion of observations at T0. 
+  Ignore if \code{se = FALSE}. Deafult is \code{proportion = 0.3}.}
+\item{threshold}{a numeric value speficying the threshold in the equivalent test.
+  Ignore if \code{se = FALSE}.  Deafult is \code{threshold = 0.3}.}
 \item{knots}{a numeric vector speicfying the knots for b-spline curve trend term.}
 \item{degree}{an integer speifcying the order of either the b-spline or the 
   polynomial trend term.}
-\item{wald}{a logic flag indicating whether to perform wald test for pre-treatment 
-  fitting check.}
 \item{placebo.period}{an integer or a two-element numeric vector specifying the 
   range of pre-treatment period that will be assigned as "placebo" treatment period.}
 \item{placeboTest}{a logic flag indicating whether to perform placebo test.}
@@ -193,7 +192,7 @@ assumptions.}
   \item{att.off.bound}{equivalence confidence interval for equivalence test for 
   switch-off effect.}
   \item{beta.boot}{bootstrap results for \code{beta}.}
-  \item{wald}{wald test results for pre-treatment fitting check.}
+  \item{pre.test}{fit test and equivalent test results for pre-treatment fitting check.}
   \item{permute}{permutation test results for sharp null hypothesis.}
 }
 \author{

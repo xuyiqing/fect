@@ -47,6 +47,7 @@
 \alias{interFE.default}
 \alias{interFE.formula}
 \alias{cv.sample}
+\alias{equiv_test}
 \title{Internal FEct Functions}
 \description{
  Internal fect functions

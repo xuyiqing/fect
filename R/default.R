@@ -59,11 +59,11 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  seed = NULL, # set seed
                  min.T0 = 5, # minimum T0
                  max.missing = NULL, # maximum missing
-                 pre.period = NULL, # fit test period 
-                 off.period = NULL, # fit test period: switch-off
+                 pre.period = NULL, # fit test period
+                 proportion = 0.3, #off.period = NULL, # fit test period: switch-off
+                 threshold = 0.5, # equiv
                  knots = NULL,
-                 degree = 2,  
-                 wald = FALSE, # fit test
+                 degree = 2,  # wald = FALSE, # fit test
                  placebo.period = NULL, # placebo test period
                  placeboTest = FALSE, # placebo test
                  permute = FALSE, ## permutation test
@@ -107,10 +107,10 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.period = NULL,
-                         off.period = NULL, # fit test period: switch-off
+                         proportion = 0.3, #off.period = NULL, # fit test period: switch-off
+                         threshold = 0.5, # equiv
                          knots = NULL,
-                         degree = 2,   
-                         wald = FALSE,
+                         degree = 2,   # wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
                          permute = FALSE, ## permutation test
@@ -154,8 +154,8 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         binary, QR, method, criterion, alpha, se, 
                         vartype,
                         nboots, parallel, cores, tol, seed, min.T0,
-                        max.missing, pre.period, 
-                        off.period, knots, degree, wald,
+                        max.missing, pre.period, proportion, threshold,
+                        knots, degree, ## wald,
                         placebo.period, placeboTest, 
                         permute, m, normalize)
     
@@ -201,10 +201,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.period = NULL,
-                         off.period = NULL, # fit test period: switch-off
+                         proportion = 0.3, #off.period = NULL, # fit test period: switch-off
+                         threshold = 0.5, # equiv
                          knots = NULL,
-                         degree = 2,  
-                         wald = FALSE,
+                         degree = 2,  # wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
                          permute = FALSE, ## permutation test
@@ -329,9 +329,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
-    if (placeboTest == TRUE) {
-        wald <- FALSE
+    wald <- FALSE 
+    if (se == TRUE && placeboTest == FALSE) {
+        wald <- TRUE
     }
+    #if (placeboTest == TRUE) {
+    #    wald <- FALSE
+    #}
 
     if (length(r) == 1) {
         if (r>=5) {
@@ -913,7 +917,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## Register clusters
     ##-------------------------------##
     
-    if ((se == TRUE | wald == TRUE | permute == TRUE) & parallel==TRUE) {
+    if ((se == TRUE | permute == TRUE) & parallel==TRUE) {
 
         ## set seed
         if (is.null(seed) == FALSE) {
@@ -1028,23 +1032,23 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }     
 
     # Wald test
-    if (wald == TRUE) {
+    #if (wald == TRUE) {
 
-        cat("Bootstrapping for Wald test ... ")
+    #    cat("Bootstrapping for Wald test ... ")
 
-        out.wald <- fect.test(out = out, 
-            Y = Y, D = D, X = X, I = I, II = II,
-            T.on = T.on, T.off = T.off,
-            method = out$method, degree = degree,
-            knots = knots, cl = cl, r = out$r.cv, 
-            lambda = out$lambda.cv,
-            force = force, hasRevs = hasRevs,
-            tol = tol, norm.para = norm.para,
-            pre.period = pre.period, 
-            off.period = off.period,
-            nboots = nboots,
-            parallel = parallel, cores = cores)
-    } 
+    #    out.wald <- fect.test(out = out, 
+    #        Y = Y, D = D, X = X, I = I, II = II,
+    #        T.on = T.on, T.off = T.off,
+    #        method = out$method, degree = degree,
+    #        knots = knots, cl = cl, r = out$r.cv, 
+    #        lambda = out$lambda.cv,
+    #        force = force, hasRevs = hasRevs,
+    #        tol = tol, norm.para = norm.para,
+    #        pre.period = pre.period, 
+    #        off.period = off.period,
+    #        nboots = nboots,
+    #        parallel = parallel, cores = cores)
+    #} 
 
     ## permutation test 
     if (permute == TRUE) {
@@ -1065,7 +1069,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     
-    if ((se == TRUE | wald == TRUE | permute) & parallel == TRUE) {
+    if ((se == TRUE | permute) & parallel == TRUE) {
         stopCluster(para.clusters)
         ##closeAllConnections()
     }
@@ -1165,7 +1169,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         ## cat("\n\n")
     }
     if (wald == TRUE) {
-        output <- c(output,list(wald = out.wald))
+        out.wald <- equiv_test(output, 
+                               pre.period = pre.period, 
+                               threshold = threshold,
+                               proportion = proportion)
+        ## output <- c(output,list(wald = out.wald))
+        output <- c(output, list(pre.test = out.wald))
     }
     if (permute == TRUE) {
         output <- c(output,list(permute = permute.result))
@@ -1178,8 +1187,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 } ## Program fect ends 
 
 equiv_test <- function(output, 
-                       num_periods = NULL, 
-                       epsilon = 0.5, 
+                       pre.period = NULL, 
+                       threshold = 0.5, 
                        proportion = NULL){
   
     #res <- data.frame(output$eff.pre)
@@ -1198,7 +1207,7 @@ equiv_test <- function(output,
     count.len <- length(pos)
 
     pre.pos <- NULL ## use
-    con1 <- is.null(num_periods)
+    con1 <- is.null(pre.period)
     con2 <- is.null(proportion)
     
     if (con1 && con2) {
@@ -1206,8 +1215,8 @@ equiv_test <- function(output,
     } else {
 
         if (!con1) {
-            pos <- pos[(count.len - num_periods +1):count.len]
-            count <- count[(count.len - num_periods +1):count.len]
+            pos <- pos[(count.len - pre.period  +1):count.len]
+            count <- count[(count.len - pre.period  +1):count.len]
             pre.pos <- pos
         } else {
             if (!con2) {
@@ -1227,7 +1236,8 @@ equiv_test <- function(output,
     }
     
     
-    D <- as.matrix(apply(res_boot, 1, function(x) mean(x, na.rm = 1)))
+    ## D <- as.matrix(apply(res_boot, 1, function(x) mean(x, na.rm = 1)))
+    D <- as.matrix(output$att[pre.pos])
     coef_mat <- res_boot    
     ## D <- D[c((nrow(res_boot)-num_periods+1):nrow(res_boot))]
     # coef_mat <- apply(res_boot, 2, function(x) x - D)
@@ -1236,10 +1246,26 @@ equiv_test <- function(output,
     N_bar <- max(count)
     S <- cov(t(coef_mat)) * N_bar
   
-    psi <- N_bar * t(D) %*% solve(S) %*% D
-    threshold <- (((N_bar-1)*(length(pre.pos)-1))/(N_bar-length(pre.pos)+1)) * qf(p = 0.05, 
-                                                                                  df1 = length(pre.pos) - 1, 
-                                                                                  df2 = N_bar - length(pre.pos) + 1, 
-                                                                                  ncp = N_bar * (epsilon)^2)
-    return(list(psi = psi, threshold = threshold))
+    psi <- as.numeric(N_bar * t(D) %*% solve(S) %*% D)
+    ## scale <- (((N_bar-1)*(length(pre.pos)-1))/(N_bar-length(pre.pos)+1))
+    scale <- ((N_bar-1)*length(pre.pos))/(N_bar-length(pre.pos))
+
+    ## F statistic 
+    Fstat <- psi * scale
+    Pvalue <- pf(Fstat, df1 = length(pre.pos), 
+                        df2 = N_bar - length(pre.pos), 
+                        lower.tail = FALSE)
+    
+    ## Equivalent test
+    #p.threshold <- scale * qf(p = 0.05, 
+    #                          df1 = length(pre.pos) - 1, 
+    #                          df2 = N_bar - length(pre.pos) + 1, 
+    #                          ncp = N_bar * (threshold)^2)
+    p.threshold <- qf(p = 0.05, 
+                      df1 = length(pre.pos), 
+                      df2 = N_bar - length(pre.pos), 
+                      ncp = N_bar * (threshold)^2)
+    
+    return(list(f.stat = Fstat, p.value = Pvalue, 
+                threshold = p.threshold))
 }
