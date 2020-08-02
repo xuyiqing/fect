@@ -1246,7 +1246,15 @@ equiv_test <- function(output,
     N_bar <- max(count)
     S <- cov(t(coef_mat)) * N_bar
   
-    psi <- as.numeric(N_bar * t(D) %*% solve(S) %*% D)
+    psi <- try(as.numeric(N_bar * t(D) %*% solve(S) %*% D), silent = TRUE)
+    if ('try-error' %in% class(psi)) {
+        cat("\n")
+        cat("The estimated covariance matrix is irreversible.")
+        cat("\n")
+        return(list(f.stat = NA, p.value = NA, 
+                    threshold = NA))
+
+    }
     ## scale <- (((N_bar-1)*(length(pre.pos)-1))/(N_bar-length(pre.pos)+1))
     scale <- ((N_bar-1)*length(pre.pos))/(N_bar-length(pre.pos))
 
