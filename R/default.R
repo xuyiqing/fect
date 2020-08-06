@@ -1202,6 +1202,7 @@ equiv_test <- function(output,
     #res_wide <- reshape(res[, c("period", "unit_new", "eff")], timevar = "period", idvar = "unit_new", direction = "wide", v.names = "eff")
   
     pos <- which(output$time <= 0)
+    l.pos <- length(pos)
     count <- output$count[output$time <= 0]
     count0 <- output$count[output$time == 0]
     count.len <- length(pos)
@@ -1211,7 +1212,7 @@ equiv_test <- function(output,
     con2 <- is.null(proportion)
     
     if (con1 && con2) {
-        pre.pos <- pos
+        pre.pos <- pos[-1]
     } else {
 
         if (!con1) {
@@ -1229,6 +1230,10 @@ equiv_test <- function(output,
 
     res_boot <- output$att.boot
     nboots <- ncol(res_boot)
+    if (length(pre.pos) == l.pos) {
+        pre.pos <- pre.pos[-1]
+        cat("Cannot use full pre-treatment periods. The first period is removed.\n")
+    }
     if (length(pre.pos) > 1) {
         res_boot <- res_boot[pre.pos, ]
     } else {
@@ -1246,7 +1251,8 @@ equiv_test <- function(output,
     N_bar <- max(count)
     S <- cov(t(coef_mat)) * N_bar
   
-    psi <- try(as.numeric(N_bar * t(D) %*% solve(S) %*% D), silent = TRUE)
+    ## psi <- try(as.numeric(N_bar * t(D) %*% solve(S) %*% D), silent = TRUE)
+    psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
     if ('try-error' %in% class(psi)) {
         cat("\n")
         cat("The estimated covariance matrix is irreversible.")
