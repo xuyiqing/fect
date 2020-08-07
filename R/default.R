@@ -1249,7 +1249,7 @@ equiv_test <- function(output,
     # S_fect_boot <- (1/(nboots - 1)) * (coef_mat_fect) %*% t(coef_mat_fect)
     ## N_bar <- max(num_units[c((length(num_units)-num_periods+1):length(num_units))])
     N_bar <- max(count)
-    S <- cov(t(coef_mat)) * N_bar
+    S <- cov(t(coef_mat)) ## * N_bar
   
     ## psi <- try(as.numeric(N_bar * t(D) %*% solve(S) %*% D), silent = TRUE)
     psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
@@ -1262,7 +1262,7 @@ equiv_test <- function(output,
 
     }
     ## scale <- (((N_bar-1)*(length(pre.pos)-1))/(N_bar-length(pre.pos)+1))
-    scale <- ((N_bar-1)*length(pre.pos))/(N_bar-length(pre.pos))
+    scale <- (N_bar-length(pre.pos))/((N_bar-1)*length(pre.pos))
 
     ## F statistic 
     Fstat <- psi * scale
