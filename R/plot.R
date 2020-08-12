@@ -54,8 +54,7 @@ plot.fect <- function(x,
     placeboTest <- x$placeboTest
     placebo.period <- x$placebo.period
     binary <- x$binary
-    wald <- !is.null(x$wald)
-
+    wald <- !is.null(x$pre.test)
 
     if (class(x) != "fect") {
         stop("Not a \"fect\" object.")
@@ -431,8 +430,8 @@ plot.fect <- function(x,
                 } else {
                     time0 <- which(time[show] <= 0)
                 }
-                ## att.sub <- as.matrix(x$att.bound[show, ])
-                att.sub <- as.matrix(x$est.att[show, ])
+                att.sub <- as.matrix(x$att.bound[show, ])
+                ## att.sub <- as.matrix(x$est.att[show, ])
 
             } else {
                 if (sum(time[show] > 0) == 0) {
@@ -713,11 +712,14 @@ plot.fect <- function(x,
             ## wald
             if (wald == TRUE) {
                 if (switch.on == TRUE) {
-                    p.label <- paste0("Wald p value: ", sprintf("%.3f",x$wald$wald.on$p))
-                } else {
-                    p.label <- paste0("Wald p value: ", sprintf("%.3f",x$wald$wald.off$p))
-                }
-                wald <- TRUE
+                    p.label1 <- paste0("F stat: ", sprintf("%.3f",x$pre.test$f.stat))
+                    p.label2 <- paste0("p-value: ", sprintf("%.3f",x$pre.test$p.value))
+                    p.label3 <- paste0("threshold: ", sprintf("%.3f",x$pre.test$threshold))
+                    p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
+                }# else {
+                #    p.label <- paste0("Wald p value: ", sprintf("%.3f",x$wald$wald.off$p))
+                #}
+                ## wald <- TRUE
             } 
         } else {
             ## point estimates
@@ -735,17 +737,17 @@ plot.fect <- function(x,
         }        
 
         ## mark p value from Wald
-        hpos <- NULL
+        hpos <- ifelse(switch.on == TRUE, 0, 1)
         if ((wald == TRUE | placeboTest == TRUE) & p.value == TRUE) {
             if (is.null(text.pos)) {                
                 if (switch.on == TRUE) {
                     text.pos[1] <- min(data[,"time"], na.rm = 1)
-                    hpos <- 0
+                    ## hpos <- 0
                 } else {
                     text.pos[1] <- max(data[,"time"], na.rm = 1)
-                    hpos <- 1
+                    ## hpos <- 1
                 }
-                text.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[2])                
+                text.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1) - 0.1*abs(max(data[,"CI.upper"], na.rm = 1)), ylim[2] - 0.1 * (abs(ylim[2])))                
             }
             p <- p + annotate("text", x = text.pos[1], y = text.pos[2], 
                 label = p.label, size = cex.text, hjust = hpos)        
