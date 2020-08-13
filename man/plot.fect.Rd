@@ -6,10 +6,10 @@
             bound = NULL, vis = "connected",
             count = TRUE, proportion = 0.3,
             equiv.bound = NULL, equiv.bound.size = 1,
-            effect.bound.ratio = FALSE, p.value = TRUE, main = NULL, 
+            effect.bound.ratio = FALSE, show.stats = TRUE, main = NULL, 
             xlim = NULL, ylim = NULL, xlab = NULL, ylab = NULL, 
             legendOff = FALSE, legend.pos = NULL, legend.nrow = NULL,
-            legend.labs = NULL, text.pos = NULL, theme.bw = TRUE,
+            legend.labs = NULL, stats.pos = NULL, theme.bw = TRUE,
             gridOff = FALSE, id = NULL,
             cex.main = NULL, cex.main.sub = NULL, cex.axis = NULL,
             cex.lab = NULL, cex.legend = NULL, cex.text = NULL,
@@ -36,7 +36,8 @@
   the equivalence margin.}
   \item{effect.bound.ratio}{a logical value specifiying whether to annotate 
   the ratio of estimated average treatment effects / minimun bound.}
-  \item{p.value}{a logical value specifying whether to label p value for placebo test.}
+  \item{show.stats}{a logical value specifying whether to label statistic for fit or 
+  placebo test.}
   \item{main}{a string that controls the title of the plot. If not
     supplied, no title will be shown.}
   \item{xlim}{a two-element numeric vector specifying the range of x-axis. When 
@@ -49,8 +50,8 @@
     legend will be setted at the bottom.}
   \item{legend.nrow}{an integer speficying rows of legend.}
   \item{legend.labs}{a string vector for user-defined legends.}
-  \item{text.pos}{a numeric vector of length 2 specifying the postion for 
-    labels of equivalence bounds.}
+  \item{stats.pos}{a numeric vector of length 2 specifying the postion for 
+    labels of test statistic value.}
   \item{theme.bw}{a logical flag specifying whether to use the black and 
     white theme.}
   \item{gridOff}{a logical flag specifying whether to move grid lines.}

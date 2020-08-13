@@ -15,7 +15,7 @@ plot.fect <- function(x,
   equiv.bound = NULL,
   equiv.bound.size = 1,
   effect.bound.ratio = FALSE,
-  p.value = TRUE,
+  show.stats = TRUE,
   main = NULL,
   xlim = NULL, 
   ylim = NULL,
@@ -25,7 +25,7 @@ plot.fect <- function(x,
   legend.pos = NULL,
   legend.nrow = NULL,
   legend.labs = NULL,
-  text.pos = NULL,
+  stats.pos = NULL,
   theme.bw = TRUE,
   gridOff = FALSE,
   id = NULL,
@@ -43,6 +43,10 @@ plot.fect <- function(x,
     ##-------------------------------##
     ## Checking Parameters
     ##-------------------------------## 
+    p.value <- show.stats
+    text.pos <- stats.pos
+    
+
     ATT <- ATT2 <- ATT3 <- ATT4 <- NULL
     CI.lower3 <-  CI.lower4 <- CI.upper3 <- CI.upper4 <- NULL
 
@@ -734,6 +738,7 @@ plot.fect <- function(x,
             p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF")
             ## p value
             p.label <- paste0("Placebo p value: ", sprintf("%.3f",x$est.placebo[5]))
+            p.label <- paste(p.label, "\n\n", sep = "")
         }        
 
         ## mark p value from Wald
@@ -747,10 +752,10 @@ plot.fect <- function(x,
                     text.pos[1] <- max(data[,"time"], na.rm = 1)
                     ## hpos <- 1
                 }
-                text.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1) - 0.1*abs(max(data[,"CI.upper"], na.rm = 1)), ylim[2] - 0.1 * (abs(ylim[2])))                
+                text.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1) - 0.15 * abs(max(data[,"CI.upper"], na.rm = 1)), ylim[2] - 0.15 * (abs(ylim[2])))                
             }
             p <- p + annotate("text", x = text.pos[1], y = text.pos[2], 
-                label = p.label, size = cex.text, hjust = hpos)        
+                              label = p.label, size = cex.text, hjust = hpos)        
         }    
 
         ## histogram
