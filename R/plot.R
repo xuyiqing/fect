@@ -44,9 +44,6 @@ plot.fect <- function(x,
     ## Checking Parameters
     ##-------------------------------## 
     p.value <- show.stats
-    text.pos <- stats.pos
-    
-
     ATT <- ATT2 <- ATT3 <- ATT4 <- NULL
     CI.lower3 <-  CI.lower4 <- CI.upper3 <- CI.upper4 <- NULL
 
@@ -58,7 +55,7 @@ plot.fect <- function(x,
     placeboTest <- x$placeboTest
     placebo.period <- x$placebo.period
     binary <- x$binary
-    wald <- !is.null(x$pre.test)
+    Ftest <- !is.null(x$pre.test)
 
     if (class(x) != "fect") {
         stop("Not a \"fect\" object.")
@@ -247,9 +244,9 @@ plot.fect <- function(x,
     }
 
     ## text label position
-    if (!is.null(text.pos)) {
-       if (length(text.pos) != 2) {
-           stop(" \"text.pos\" must be of length 2. ")
+    if (!is.null(stats.pos)) {
+       if (length(stats.pos) != 2) {
+           stop(" \"stats.pos\" must be of length 2. ")
        }
     }
 
@@ -656,12 +653,12 @@ plot.fect <- function(x,
                 size = guide_legend(title=NULL, nrow=legend.nrow)) 
 
             if (effect.bound.ratio == TRUE) {
-                if (is.null(text.pos)) {
-                    text.pos[1] <- min(data[,"time"], na.rm = 1)
-                    text.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[1])
+                if (is.null(stats.pos)) {
+                    stats.pos[1] <- min(data[,"time"], na.rm = 1)
+                    stats.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[1])
                 }
                 p.label <- paste("ATT / Min. Bound = ", sprintf("%.3f",x$att.avg / minBound), sep="")
-                p <- p + annotate("text", x = text.pos[1], y = text.pos[2], 
+                p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
                     label = p.label, size = cex.text, hjust = 0)                
             }
         } 
@@ -713,18 +710,15 @@ plot.fect <- function(x,
             if (CI == TRUE) {
                 p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)                
             }
-            ## wald
-            if (wald == TRUE) {
+            ## Ftest
+            if (Ftest == TRUE) {
                 if (switch.on == TRUE) {
                     p.label1 <- paste0("F stat: ", sprintf("%.3f",x$pre.test$f.stat))
                     p.label2 <- paste0("p-value: ", sprintf("%.3f",x$pre.test$p.value))
                     p.label3 <- paste0("threshold: ", sprintf("%.3f",x$pre.test$threshold))
                     p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
-                }# else {
-                #    p.label <- paste0("Wald p value: ", sprintf("%.3f",x$wald$wald.off$p))
-                #}
-                ## wald <- TRUE
-            } 
+                }
+            }          
         } else {
             ## point estimates
             p <- p + geom_line(data = data, aes(time, ATT3), size = 0.7)
@@ -738,24 +732,24 @@ plot.fect <- function(x,
             p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF")
             ## p value
             p.label <- paste0("Placebo p value: ", sprintf("%.3f",x$est.placebo[5]))
-            p.label <- paste(p.label, "\n\n\n", sep = "")
         }        
 
-        ## mark p value from Wald
+        ## mark p value from Ftest
         hpos <- ifelse(switch.on == TRUE, 0, 1)
-        if ((wald == TRUE | placeboTest == TRUE) & p.value == TRUE) {
-            if (is.null(text.pos)) {                
+        if ((Ftest == TRUE | placeboTest == TRUE) & p.value == TRUE) {
+            if (is.null(stats.pos)) {                
                 if (switch.on == TRUE) {
-                    text.pos[1] <- min(data[,"time"], na.rm = 1)
+                    stats.pos[1] <- min(data[,"time"], na.rm = 1)
                     ## hpos <- 0
                 } else {
-                    text.pos[1] <- max(data[,"time"], na.rm = 1)
+                    stats.pos[1] <- max(data[,"time"], na.rm = 1)
                     ## hpos <- 1
                 }
-                text.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1) - 0.15 * abs(max(data[,"CI.upper"], na.rm = 1)), ylim[2] - 0.15 * (abs(ylim[2])))                
+                ci.top <- max(data[,"CI.upper"], na.rm = 1)
+                stats.pos[2] <- ifelse(is.null(ylim), ci.top, ylim[2]) 
             }
-            p <- p + annotate("text", x = text.pos[1], y = text.pos[2], 
-                              label = p.label, size = cex.text, hjust = hpos)        
+            p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
+                              label = p.label, size = cex.text, hjust = hpos, vjust = "top")        
         }    
 
         ## histogram

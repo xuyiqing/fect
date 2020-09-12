@@ -59,7 +59,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  seed = NULL, # set seed
                  min.T0 = 5, # minimum T0
                  max.missing = NULL, # maximum missing
-                 pre.period = NULL, # fit test period
+                 pre.periods = NULL, # fit test period
                  proportion = 0.3, #off.period = NULL, # fit test period: switch-off
                  threshold = 0.5, # equiv
                  knots = NULL,
@@ -106,7 +106,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          seed = NULL, # set seed
                          min.T0 = 5,
                          max.missing = NULL,
-                         pre.period = NULL,
+                         pre.periods = NULL,
                          proportion = 0.3, #off.period = NULL, # fit test period: switch-off
                          threshold = 0.5, # equiv
                          knots = NULL,
@@ -154,7 +154,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         binary, QR, method, criterion, alpha, se, 
                         vartype,
                         nboots, parallel, cores, tol, seed, min.T0,
-                        max.missing, pre.period, proportion, threshold,
+                        max.missing, pre.periods, proportion, threshold,
                         knots, degree, ## wald,
                         placebo.period, placeboTest, 
                         permute, m, normalize)
@@ -200,7 +200,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          seed = NULL, # set seed
                          min.T0 = 5,
                          max.missing = NULL,
-                         pre.period = NULL,
+                         pre.periods = NULL,
                          proportion = 0.3, #off.period = NULL, # fit test period: switch-off
                          threshold = 0.5, # equiv
                          knots = NULL,
@@ -1044,7 +1044,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     #        lambda = out$lambda.cv,
     #        force = force, hasRevs = hasRevs,
     #        tol = tol, norm.para = norm.para,
-    #        pre.period = pre.period, 
+    #        pre.periods = pre.periods, 
     #        off.period = off.period,
     #        nboots = nboots,
     #        parallel = parallel, cores = cores)
@@ -1170,7 +1170,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
     if (wald == TRUE) {
         out.wald <- equiv_test(output, 
-                               pre.period = pre.period, 
+                               pre.periods = pre.periods, 
                                threshold = threshold,
                                proportion = proportion)
         ## output <- c(output,list(wald = out.wald))
@@ -1187,7 +1187,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 } ## Program fect ends 
 
 equiv_test <- function(output, 
-                       pre.period = NULL, 
+                       pre.periods = NULL, 
                        threshold = 0.5, 
                        proportion = NULL){
   
@@ -1208,7 +1208,7 @@ equiv_test <- function(output,
     count.len <- length(pos)
 
     pre.pos <- NULL ## use
-    con1 <- is.null(pre.period)
+    con1 <- is.null(pre.periods)
     con2 <- is.null(proportion)
     
     if (con1 && con2) {
@@ -1216,8 +1216,8 @@ equiv_test <- function(output,
     } else {
 
         if (!con1) {
-            pos <- pos[(count.len - pre.period  +1):count.len]
-            count <- count[(count.len - pre.period  +1):count.len]
+            pos <- pos[(count.len - pre.periods  +1):count.len]
+            count <- count[(count.len - pre.periods  +1):count.len]
             pre.pos <- pos
         } else {
             if (!con2) {
