@@ -8,6 +8,7 @@
 plot.fect <- function(x,  
   type = "gap",
   switch.on = TRUE,
+  Ftest = NULL,
   bound = NULL,
   vis = "connected",
   count = TRUE,
@@ -55,7 +56,9 @@ plot.fect <- function(x,
     placeboTest <- x$placeboTest
     placebo.period <- x$placebo.period
     binary <- x$binary
-    Ftest <- !is.null(x$pre.test)
+    if (is.null(Ftest)) {
+        Ftest <- !is.null(x$pre.test)
+    } 
 
     if (class(x) != "fect") {
         stop("Not a \"fect\" object.")
