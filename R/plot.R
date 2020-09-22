@@ -112,9 +112,9 @@ plot.fect <- function(x,
     ## gap or equiv
     ytitle <- NULL
     if (type == "gap") {
-        ## if (is.null(bound) == TRUE) {
+        if (is.null(bound) == TRUE) {
             bound <- "none"
-        ## }
+        }
         maintext <- "Estimated Average Treatment Effect"
         ytitle <- paste("Effect on",x$Y)
 
