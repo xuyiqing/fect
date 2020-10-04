@@ -718,8 +718,9 @@ plot.fect <- function(x,
                 if (switch.on == TRUE) {
                     p.label1 <- paste0("F stat: ", sprintf("%.3f",x$pre.test$f.stat))
                     p.label2 <- paste0("p-value: ", sprintf("%.3f",x$pre.test$p.value))
-                    p.label3 <- paste0("threshold: ", sprintf("%.3f",x$pre.test$threshold))
-                    p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
+                    #p.label3 <- paste0("threshold: ", sprintf("%.3f",x$pre.test$threshold))
+                    #p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
+                    p.label <- paste(p.label1, "\n", p.label2, sep = "")
                 }
             }          
         } else {
