@@ -5,7 +5,7 @@
 \usage{\method{plot}{fect}(x, type = "gap", switch.on = TRUE,
             bound = NULL, vis = "connected",
             count = TRUE, proportion = 0.3,
-            equiv.bound = NULL, equiv.bound.size = 1,
+            equiv.range = NULL, equiv.range.size = 1,
             effect.bound.ratio = FALSE, show.stats = TRUE, main = NULL, 
             xlim = NULL, ylim = NULL, xlab = NULL, ylab = NULL, 
             legendOff = FALSE, legend.pos = NULL, legend.nrow = NULL,
@@ -31,8 +31,8 @@
   \item{proportion}{a positive value specifying periods at which observations equal to 
     or greater than the proporation of the largest number of observations at a certain 
     period.}
-  \item{equiv.bound}{User defined equivalence margin.}
-  \item{equiv.bound.size}{a scale parameter for estimated ATT that is used as 
+  \item{equiv.range}{User defined equivalence margin.}
+  \item{equiv.range.size}{a scale parameter for estimated ATT that is used as 
   the equivalence margin.}
   \item{effect.bound.ratio}{a logical value specifiying whether to annotate 
   the ratio of estimated average treatment effects / minimun bound.}
