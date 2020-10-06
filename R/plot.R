@@ -44,6 +44,8 @@ plot.fect <- function(x,
     ##-------------------------------##
     ## Checking Parameters
     ##-------------------------------## 
+    equiv.p <- NULL
+    type.old <- type
     p.value <- show.stats
     ATT <- ATT2 <- ATT3 <- ATT4 <- NULL
     CI.lower3 <-  CI.lower4 <- CI.upper3 <- CI.upper4 <- NULL
@@ -418,9 +420,9 @@ plot.fect <- function(x,
                 cat("No uncertainty estimates.\n")
                 bound <- "none"
             }
-            if (placeboTest == TRUE) {
-                bound <- "none"
-            }
+            #if (placeboTest == TRUE) {
+            #    bound <- "none"
+            #}
         } 
 
         if (bound != "none") {
@@ -461,6 +463,37 @@ plot.fect <- function(x,
                     equiv.bound <- c(-abs(equiv.bound), abs(equiv.bound))
                 }
             }
+
+            ## calculate equivalence p value: 
+            #est.att.sub <- x$est.att[show, ]
+            #equiv.p <- sapply(1:dim(est.att.sub)[1], function(i) {
+            #                    p1 <- pnorm(equiv.bound[1],                 ## lower bound
+            #                                mean = est.att.sub[i, "ATT"], 
+            #                                sd = est.att.sub[i, "S.E."], 
+            #                                lower.tail = TRUE)
+
+            #                    p2 <- pnorm(equiv.bound[2], 
+            #                                mean = est.att.sub[i, "ATT"],   ## upper bound
+            #                                sd = est.att.sub[i, "S.E."], 
+            #                                lower.tail = FALSE)
+
+            #                    return(min(1, max(p1, p2) *2))
+            #                    })
+            
+            #equiv.p <- max(equiv.p) ## keep the maximum p value
+
+            ## calculate equivalence p value: 
+            att.boot.sub <- x$att.boot[show, ]
+            nboots <- dim(att.boot.sub)[2]
+            equiv.p <- sapply(1:dim(att.boot.sub)[1], function(i) {
+                                
+                                p1 <- sum(att.boot.sub[i, ] <= equiv.bound[1])/nboots ## lower bound
+                                p2 <- sum(att.boot.sub[i, ] >= equiv.bound[2])/nboots ## upper bound
+
+                                return(min(1, max(p1, p2) *2))
+                                })
+            equiv.p <- max(equiv.p) ## keep the maximum p value
+
 
             # bound period
             bound.time <- time[show]
@@ -735,7 +768,10 @@ plot.fect <- function(x,
             p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2)
             p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF")
             ## p value
-            p.label <- paste0("Placebo p value: ", sprintf("%.3f",x$est.placebo[5]))
+            p.label1 <- paste0("Placebo p value: ", sprintf("%.3f",x$est.placebo[5]))
+            p.label2 <- paste0("Equivalence p value: ", sprintf("%.3f", equiv.p))
+            p.label <- paste(p.label1, "\n", p.label2, sep = "")
+
         }        
 
         ## mark p value from Ftest
@@ -934,5 +970,7 @@ plot.fect <- function(x,
         suppressWarnings(print(p))
         ## end of missing plot
     }
+
+    return(list(equiv.p = equiv.p))
 }
 
