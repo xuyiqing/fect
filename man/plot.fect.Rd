@@ -5,7 +5,7 @@
 \usage{\method{plot}{fect}(x, type = "gap", switch.on = TRUE,
             bound = NULL, vis = "connected",
             count = TRUE, proportion = 0.3,
-            equiv.range = NULL, equiv.range.size = 1,
+            equiv.range = NULL, equiv.range.size = 0.36,
             effect.bound.ratio = FALSE, show.stats = TRUE, main = NULL, 
             xlim = NULL, ylim = NULL, xlab = NULL, ylab = NULL, 
             legendOff = FALSE, legend.pos = NULL, legend.nrow = NULL,

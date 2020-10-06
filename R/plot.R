@@ -14,7 +14,7 @@ plot.fect <- function(x,
   count = TRUE,
   proportion = 0.3,
   equiv.range = NULL,
-  equiv.range.size = 1,
+  equiv.range.size = 0.36,
   effect.bound.ratio = FALSE,
   show.stats = FALSE,
   main = NULL,
@@ -471,9 +471,9 @@ plot.fect <- function(x,
             ## define equivalence bound
             if (is.null(equiv.bound)) {
                 if (is.null(equiv.bound.size)) {
-                    equiv.bound.size <- 1
+                    equiv.bound.size <- 0.36
                 } 
-                equiv.bound <- c(-abs(equiv.bound.size * x$att.avg), abs(equiv.bound.size * x$att.avg))
+                equiv.bound <- c(-abs(equiv.bound.size * sqrt(x$sigma2)), abs(equiv.bound.size * sqrt(x$sigma2)))
             } else {
                 if (length(equiv.bound) == 1) {
                     equiv.bound <- c(-abs(equiv.bound), abs(equiv.bound))
@@ -500,28 +500,38 @@ plot.fect <- function(x,
 
             ## calculate equivalence p value: 
             if (type.old == "equiv") {
-                show.equiv <- show
-                if (switch.on == TRUE) {
-                    if (max(show) >= show.T0) {
-                        show.equiv <- show[1]:show.T0
+                if (placeboTest == FALSE) {
+                    show.equiv <- show
+                    if (switch.on == TRUE) {
+                        if (max(show) >= show.T0) {
+                            show.equiv <- show[1]:show.T0
+                        }
+                        att.boot.sub <- x$att.boot[show.equiv, ]
+                    } else {
+                        if (min(show) <= show.T0) {
+                            show.equiv <- show.T0:max(show)
+                        }
+                        att.boot.sub <- x$att.off.boot[show.equiv, ]
                     }
-                    att.boot.sub <- x$att.boot[show.equiv, ]
+
+                    nboots <- dim(att.boot.sub)[2]
+                    equiv.p <- sapply(1:dim(att.boot.sub)[1], function(i) {
+                                        
+                                        p1 <- sum(att.boot.sub[i, ] <= equiv.bound[1])/nboots ## lower bound
+                                        p2 <- sum(att.boot.sub[i, ] >= equiv.bound[2])/nboots ## upper bound
+
+                                        return(min(1, max(p1, p2) *2))
+                                        })
+                    equiv.p <- max(equiv.p) ## keep the maximum p value
                 } else {
-                    if (min(show) <= show.T0) {
-                        show.equiv <- show.T0:max(show)
-                    }
-                    att.boot.sub <- x$att.off.boot[show.equiv, ]
+                    att.placebo.boot <- c(x$att.placebo.boot)
+                    nboots <- length(att.placebo.boot)
+
+                    p1 <- sum(att.placebo.boot <= equiv.bound[1])/nboots ## lower bound
+                    p2 <- sum(att.placebo.boot >= equiv.bound[2])/nboots ## upper bound
+
+                    equiv.p <- min(1, max(p1, p2) *2)
                 }
-
-                nboots <- dim(att.boot.sub)[2]
-                equiv.p <- sapply(1:dim(att.boot.sub)[1], function(i) {
-                                    
-                                    p1 <- sum(att.boot.sub[i, ] <= equiv.bound[1])/nboots ## lower bound
-                                    p2 <- sum(att.boot.sub[i, ] >= equiv.bound[2])/nboots ## upper bound
-
-                                    return(min(1, max(p1, p2) *2))
-                                    })
-                equiv.p <- max(equiv.p) ## keep the maximum p value
             }
 
             ## recover bound type
