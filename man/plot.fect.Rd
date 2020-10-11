@@ -6,7 +6,8 @@
             bound = NULL, vis = "connected",
             count = TRUE, proportion = 0.3,
             equiv.range = NULL, equiv.range.size = 0.36,
-            effect.bound.ratio = FALSE, show.stats = TRUE, main = NULL, 
+            effect.bound.ratio = FALSE, show.stats = NULL, stats = NULL, 
+            main = NULL, 
             xlim = NULL, ylim = NULL, xlab = NULL, ylab = NULL, 
             legendOff = FALSE, legend.pos = NULL, legend.nrow = NULL,
             legend.labs = NULL, stats.pos = NULL, theme.bw = TRUE,
@@ -37,7 +38,10 @@
   \item{effect.bound.ratio}{a logical value specifiying whether to annotate 
   the ratio of estimated average treatment effects / minimun bound.}
   \item{show.stats}{a logical value specifying whether to label statistic for fit or 
-  placebo test.}
+  placebo test. For \code{"gap"} plot, the default value is \code{FALSE}, and 
+  for \code{"equiv"} plot, the default value is \code{TRUE}.}
+  \item{stats}{a string that specifices what statistics to be shown. For \code{"gap"} plot, choose from \code{c("none", "F.p", "equiv.p", "equiv.F.p",)}, and for 
+  \code{"equiv"} plot, choose from \code{c("none", "placebo.p", "equiv.placebo.p")} }. 
   \item{main}{a string that controls the title of the plot. If not
     supplied, no title will be shown.}
   \item{xlim}{a two-element numeric vector specifying the range of x-axis. When 

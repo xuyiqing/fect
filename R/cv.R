@@ -521,7 +521,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         est.best$fit[which(I == 0)] <- NA
         ## eff.equiv[which(I == 0)] <- NA
     }
-    est.best$residuals[which(II == 0)] <- NA    
+    est.best$residuals[which(II == 0)] <- NA
+    if (method == "mc") {
+        est.best$sigma2 <- mean(c(est.best$residuals[which(II == 1)])^2) ## mean squared error of residuals    
+    }    
 
     ## 4. dynamic effects
     t.on <- c(T.on)

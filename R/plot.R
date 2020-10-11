@@ -8,7 +8,6 @@
 plot.fect <- function(x,  
   type = "gap",
   switch.on = TRUE,
-  Ftest = NULL,
   bound = NULL,
   vis = "connected",
   count = TRUE,
@@ -16,7 +15,8 @@ plot.fect <- function(x,
   equiv.range = NULL,
   equiv.range.size = 0.36,
   effect.bound.ratio = FALSE,
-  show.stats = FALSE,
+  show.stats = NULL,  ## TRUE or FALSE
+  stats = NULL,       ## "none", "F.p", "equiv.p", "equiv.F.p", "placebo.p", "equiv.placebo.p"
   main = NULL,
   xlim = NULL, 
   ylim = NULL,
@@ -49,7 +49,7 @@ plot.fect <- function(x,
     equiv.bound.size <- equiv.range.size
     equiv.p <- NULL
     type.old <- type
-    p.value <- show.stats
+    ## p.value <- show.stats
     ATT <- ATT2 <- ATT3 <- ATT4 <- NULL
     CI.lower3 <-  CI.lower4 <- CI.upper3 <- CI.upper4 <- NULL
 
@@ -61,9 +61,9 @@ plot.fect <- function(x,
     placeboTest <- x$placeboTest
     placebo.period <- x$placebo.period
     binary <- x$binary
-    if (is.null(Ftest)) {
+    #if (is.null(Ftest)) {
         Ftest <- !is.null(x$pre.test)
-    } 
+    #} 
 
     if (class(x) != "fect") {
         stop("Not a \"fect\" object.")
@@ -113,6 +113,58 @@ plot.fect <- function(x,
             ylab <- ylab[1]
         }   
     }
+
+    if (!is.null(stats)) {
+        if (!placeboTest) {
+            if (!stats %in% c("none", "F.p", "equiv.p", "equiv.F.p")) {
+                stop ("Choose \" stats \" from c(\"none\", \"F.p\", \"equiv.p\", \"equiv.F.p\"). ")
+            }
+        } else {
+            if (!stats %in% c("none", "placebo.p", "equiv.p", "equiv.placebo.p")) {
+                stop ("Choose \" stats \" from c(\"none\", \"placebo.p\", \"equiv.p\", \"equiv.placebo.p\"). ")
+            }
+        }
+    }
+
+    ## show statistics
+    ## if (show.stats == FALSE) 
+
+    if (type == "gap") {
+        if (is.null(show.stats)) {
+            show.stats <- FALSE
+            if (is.null(stats)) {
+                stats <- "none"
+            }
+        } else {
+            if (is.null(stats)) {
+                if (show.stats == FALSE) {
+                    stats <- "none"
+                } else {
+                    stats <- ifelse(placeboTest, "placebo.p", "F.p")
+                }
+            }
+        }
+    } else if (type == "equiv") {
+        if (is.null(show.stats)) {
+            show.stats <- TRUE 
+            if (is.null(stats)) {
+                stats <- ifelse(placeboTest, "equiv.placebo.p", "equiv.p")
+            }
+        } else {
+            if (is.null(stats)) {
+                if (show.stats == FALSE) {
+                    stats <- "none"
+                } else {
+                    stats <- ifelse(placeboTest, "equiv.placebo.p", "equiv.p")
+                }
+            }
+        }
+    }
+
+    if (stats == "none") {
+        show.stats <- FALSE
+    } 
+    p.value <- show.stats
 
     ## gap or equiv
     ytitle <- NULL
@@ -813,23 +865,43 @@ plot.fect <- function(x,
                 p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)                
             }
             ## Ftest
-            if (Ftest == TRUE) {
-                if (switch.on == TRUE) {
+            p.label <- p.label1 <- p.label2 <- p.label3 <- NULL
+            if (switch.on == TRUE && show.stats == TRUE) {
+                if (Ftest == TRUE && stats %in% c("F.p", "equiv.F.p")) {
                     p.label1 <- paste0("F stat: ", sprintf("%.3f",x$pre.test$f.stat))
                     p.label2 <- paste0("p-value: ", sprintf("%.3f",x$pre.test$p.value))
+                }
+                if (!is.null(equiv.p) && stats %in% c("equiv.p", "equiv.F.p")) {
+                    p.label3 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
+                }
+                if (is.null(p.label1) || is.null(p.label2)) {
+                    p.label <- p.label3
+                } else if (is.null(p.label3)) {
+                    p.label <- paste(p.label1, "\n", p.label2, sep = "")
+                } else {
+                    p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
+                }  
+            }
+            
+
+            #if (Ftest == TRUE) {
+            #    if (switch.on == TRUE) {
+            #        p.label1 <- paste0("F stat: ", sprintf("%.3f",x$pre.test$f.stat))
+            #        p.label2 <- paste0("p-value: ", sprintf("%.3f",x$pre.test$p.value))
                     #p.label3 <- paste0("threshold: ", sprintf("%.3f",x$pre.test$threshold))
                     #p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
-                    p.label3 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
-                    if (is.null(equiv.p)) {
-                        p.label <- paste(p.label1, "\n", p.label2, sep = "")
-                    } else {
-                        p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
-                    }
+            #        p.label3 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
+            #        if (is.null(equiv.p)) {
+            #            p.label <- paste(p.label1, "\n", p.label2, sep = "")
+            #        } else {
+            #            p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
+            #        }
                     
-                }
-            }          
+            #    }
+            #}          
         } else {
             ## point estimates
+            p.label <- p.label1 <- p.label2 <- NULL
             p <- p + geom_line(data = data, aes(time, ATT3), size = 0.7)
             p <- p + geom_line(data = data, aes(time, ATT4), size = 0.7, colour = "#4671D5")
             if (vis == "connected") {
@@ -842,9 +914,12 @@ plot.fect <- function(x,
             ## p value
             p.label1 <- paste0("Placebo p-value: ", sprintf("%.3f",x$est.placebo[5]))
             p.label2 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
-            if (is.null(equiv.p)) {
+            
+            if (stats == "placebo.p") {
                 p.label <- p.label1
-            } else {
+            } else if (stats == "equiv.p") {
+                p.label <- p.label2
+            } else if (stats == "equiv.placebo.p") {
                 p.label <- paste(p.label1, "\n", p.label2, sep = "")
             }
 
@@ -864,8 +939,11 @@ plot.fect <- function(x,
                 ci.top <- max(data[,"CI.upper"], na.rm = 1)
                 stats.pos[2] <- ifelse(is.null(ylim), ci.top, ylim[2]) 
             }
-            p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
-                              label = p.label, size = cex.text, hjust = hpos, vjust = "top")        
+            if (!is.null(p.label)) {
+                p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
+                              label = p.label, size = cex.text, hjust = hpos, vjust = "top")
+            }
+            
         }    
 
         ## histogram
