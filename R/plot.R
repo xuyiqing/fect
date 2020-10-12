@@ -16,7 +16,7 @@ plot.fect <- function(x,
   equiv.range.size = 0.36,
   effect.bound.ratio = FALSE,
   show.stats = NULL,  ## TRUE or FALSE
-  stats = NULL,       ## "none", "F.p", "equiv.p", "equiv.F.p", "placebo.p", "equiv.placebo.p"
+  stats = NULL,       ## "none", "F.p", "equiv.p", "equiv.F.p", "placebo.p"
   main = NULL,
   xlim = NULL, 
   ylim = NULL,
@@ -116,13 +116,19 @@ plot.fect <- function(x,
 
     if (!is.null(stats)) {
         if (!placeboTest) {
-            if (!stats %in% c("none", "F.p", "equiv.p", "equiv.F.p")) {
-                stop ("Choose \" stats \" from c(\"none\", \"F.p\", \"equiv.p\", \"equiv.F.p\"). ")
-            }
+            for (i in 1:length(stats)) {
+                if (!stats[i] %in% c("none", "F.p", "equiv.p", "equiv.F.p")) {
+                    stop ("Choose \" stats \" from c(\"none\", \"F.p\", \"equiv.p\", \"equiv.F.p\"). ")
+                }
+
+            }    
         } else {
-            if (!stats %in% c("none", "placebo.p", "equiv.p", "equiv.placebo.p")) {
-                stop ("Choose \" stats \" from c(\"none\", \"placebo.p\", \"equiv.p\", \"equiv.placebo.p\"). ")
+            for (i in 1:length(stats)) {
+                 if (!stats[i] %in% c("none", "placebo.p", "equiv.p")) {
+                    stop ("Choose \" stats \" from c(\"none\", \"placebo.p\", \"equiv.p\"). ")
+                }
             }
+           
         }
     }
 
@@ -148,20 +154,20 @@ plot.fect <- function(x,
         if (is.null(show.stats)) {
             show.stats <- TRUE 
             if (is.null(stats)) {
-                stats <- ifelse(placeboTest, "equiv.placebo.p", "equiv.p")
+                stats <- ifelse(placeboTest, c("equiv.p", "placebo.p"), "equiv.p")
             }
         } else {
             if (is.null(stats)) {
                 if (show.stats == FALSE) {
                     stats <- "none"
                 } else {
-                    stats <- ifelse(placeboTest, "equiv.placebo.p", "equiv.p")
+                    stats <- ifelse(placeboTest, c("equiv.p", "placebo.p"), "equiv.p")
                 }
             }
         }
     }
 
-    if (stats == "none") {
+    if ("none" %in% stats) {
         show.stats <- FALSE
     } 
     p.value <- show.stats
@@ -865,22 +871,33 @@ plot.fect <- function(x,
                 p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)                
             }
             ## Ftest
-            p.label <- p.label1 <- p.label2 <- p.label3 <- NULL
+            p.label <- p.label1 <- p.label2 <- p.label3 <- p.label4 <- NULL
+            
             if (switch.on == TRUE && show.stats == TRUE) {
-                if (Ftest == TRUE && stats %in% c("F.p", "equiv.F.p")) {
+                
+                if (Ftest == TRUE && "F.p" %in% stats) {
                     p.label1 <- paste0("F stat: ", sprintf("%.3f",x$pre.test$f.stat))
                     p.label2 <- paste0("p-value: ", sprintf("%.3f",x$pre.test$p.value))
+                    p.label <- paste(p.label, p.label1, "\n", p.label2, "\n", sep = "")
                 }
-                if (!is.null(equiv.p) && stats %in% c("equiv.p", "equiv.F.p")) {
-                    p.label3 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
+
+                if (Ftest == TRUE && "equiv.F.p" %in% stats) {
+                    p.label3 <- paste0("F threshold: ", sprintf("%.3f",x$pre.test$threshold))
+                    p.label <- paste(p.label, p.label3, "\n", sep = "")
                 }
-                if (is.null(p.label1) || is.null(p.label2)) {
-                    p.label <- p.label3
-                } else if (is.null(p.label3)) {
-                    p.label <- paste(p.label1, "\n", p.label2, sep = "")
-                } else {
-                    p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
-                }  
+                
+                if (!is.null(equiv.p) && "equiv.p" %in% stats) {
+                    p.label4 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
+                    p.label <- paste(p.label, p.label4, sep = "")
+                }
+
+                #if (is.null(p.label1) || is.null(p.label2)) {
+                #    p.label <- p.label3
+                #} else if (is.null(p.label3)) {
+                #    p.label <- paste(p.label1, "\n", p.label2, sep = "")
+                #} else {
+                #    p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
+                #}  
             }
             
 
@@ -912,17 +929,19 @@ plot.fect <- function(x,
             p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2)
             p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF")
             ## p value
+            
             p.label1 <- paste0("Placebo p-value: ", sprintf("%.3f",x$est.placebo[5]))
             p.label2 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
             
-            if (stats == "placebo.p") {
-                p.label <- p.label1
-            } else if (stats == "equiv.p") {
-                p.label <- p.label2
-            } else if (stats == "equiv.placebo.p") {
-                p.label <- paste(p.label1, "\n", p.label2, sep = "")
-            }
-
+            if ("placebo.p" %in% stats) {
+                p.label <- paste(p.label, p.label1, "\n", sep = "")
+            } 
+            if ("equiv.p" %in% stats) {
+                p.label <- paste(p.label, p.label2, sep = "")
+            } 
+            #else if (stats == "equiv.placebo.p") {
+            #    p.label <- paste(p.label1, "\n", p.label2, sep = "")
+            #}
         }        
 
         ## mark p value from Ftest
@@ -1126,7 +1145,9 @@ plot.fect <- function(x,
     }
 
     if (!is.null(equiv.p)) {
-        return(list(equiv.p = equiv.p))
+        return(list(p = p, equiv.p = equiv.p))
+    } else {
+        return(list(p = p))
     }
     
 }
