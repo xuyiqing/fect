@@ -154,14 +154,19 @@ plot.fect <- function(x,
         if (is.null(show.stats)) {
             show.stats <- TRUE 
             if (is.null(stats)) {
-                stats <- ifelse(placeboTest, c("equiv.p", "placebo.p"), "equiv.p")
+                if (placeboTest) {
+                    stats <- c("equiv.p", "placebo.p")
+                } else {
+                    stats <- "equiv.p"
+                }
+                ## stats <- ifelse(placeboTest, c("equiv.p", "placebo.p"), "equiv.p")
             }
         } else {
             if (is.null(stats)) {
-                if (show.stats == FALSE) {
-                    stats <- "none"
+                if (placeboTest) {
+                    stats <- c("equiv.p", "placebo.p")
                 } else {
-                    stats <- ifelse(placeboTest, c("equiv.p", "placebo.p"), "equiv.p")
+                    stats <- "equiv.p"
                 }
             }
         }
