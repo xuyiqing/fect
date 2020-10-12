@@ -504,7 +504,7 @@ plot.fect <- function(x,
             #}
         } 
 
-        if (bound != "none") {
+        if (bound != "none"|| "equiv.p" %in% stats) {
 
             time0 <- NULL
 
@@ -562,7 +562,7 @@ plot.fect <- function(x,
             #equiv.p <- max(equiv.p) ## keep the maximum p value
 
             ## calculate equivalence p value: 
-            if (type.old == "equiv") {
+            if (type.old == "equiv" || "equiv.p" %in% stats) {
                 if (placeboTest == FALSE) {
                     show.equiv <- show
                     if (switch.on == TRUE) {
