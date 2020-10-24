@@ -476,6 +476,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         est.best$residuals <- est.best$residuals * norm.para[1] 
         est.best$fit <- est.best$fit * norm.para[1] 
         est.equiv$fit <- est.equiv$fit * norm.para[1]
+        est.equiv$sigma2 <- est.equiv$sigma2 * norm.para[1]
     }
 
     ## 0. revelant parameters
@@ -609,6 +610,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     ##control group residuals
     out<-list(
         ## main results 
+        sigma2 = est.best$sigma2,
+        equiv.sigma2 = est.equiv$sigma2,
         T.on = T.on,
         Y.ct = est.best$fit,
         eff = eff,
@@ -653,7 +656,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     if (method == "ife") {
-        out <- c(out, list(r.cv = r.cv, IC = IC, PC = PC, sigma2 = sigma2))
+        out <- c(out, list(r.cv = r.cv, IC = IC, PC = PC))
         if (r.cv > 0) {
             out <- c(out, list(factor = as.matrix(est.best$factor),
                                lambda = as.matrix(est.best$lambda))) 

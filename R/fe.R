@@ -142,6 +142,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         if (boot == FALSE) {
             est.equiv$fit <- est.equiv$fit * norm.para[1]
         }
+        est.equiv$sigma2 <- est.equiv$sigma2 * norm.para[1]
     }
 
     ## 0. relevant parameters
@@ -368,7 +369,8 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
 
     if (binary == 0) {
         out <- c(out, list(PC = PC,
-                           sigma2 = sigma2, 
+                           sigma2 = sigma2,
+                           equiv.sigma2 = est.equiv$sigma2, 
                            res = est.best$residuals,
                            rmse = rmse))
         #if (boot == FALSE) {

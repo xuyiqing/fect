@@ -110,6 +110,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         if (boot == FALSE) {
             est.equiv$fit <- est.equiv$fit * norm.para[1]
         }
+        est.equiv$sigma2 <- est.equiv$sigma2 * norm.para[1]
     }
 
     ## 0. revelant parameters
@@ -305,7 +306,8 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         pre.sd = pre.sd,
         rmse = rmse,
         res = est.best$residuals,
-        sigma2 = est.best$sigma2
+        sigma2 = est.best$sigma2,
+        equiv.sigma2 = est.equiv$sigma2
     )
 
     if (hasRevs == 1) {

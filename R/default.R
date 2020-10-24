@@ -1193,7 +1193,7 @@ diagtest <- function(
 
     if (is.null(tost.threshold)==TRUE) {
         print(output$sigma2)
-        tost.threshold <- 0.36 * sqrt(output$sigma2)
+        tost.threshold <- 0.36 * sqrt(output$equiv.sigma2)
     }
     if (is.null(f.threshold)==TRUE) {
         f.threshold <- 0.5
