@@ -60,8 +60,8 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  min.T0 = 5, # minimum T0
                  max.missing = NULL, # maximum missing
                  pre.periods = NULL, # fit test period
-                 proportion = 0.3, #off.period = NULL, # fit test period: switch-off
-                 threshold = 0.5, # equiv
+                 f.threshold = 0.5, # equiv
+                 tost.threshold = NULL, # equiv
                  knots = NULL,
                  degree = 2,  # wald = FALSE, # fit test
                  placebo.period = NULL, # placebo test period
@@ -107,8 +107,8 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.periods = NULL,
-                         proportion = 0.3, #off.period = NULL, # fit test period: switch-off
-                         threshold = 0.5, # equiv
+                         f.threshold = 0.5, # equiv
+                         tost.threshold = NULL, 
                          knots = NULL,
                          degree = 2,   # wald = FALSE,
                          placebo.period = NULL,
@@ -154,14 +154,15 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         binary, QR, method, criterion, alpha, se, 
                         vartype,
                         nboots, parallel, cores, tol, seed, min.T0,
-                        max.missing, pre.periods, proportion, threshold,
-                        knots, degree, ## wald,
+                        max.missing, pre.periods, 
+                        f.threshold, tost.threshold,
+                        knots, degree, 
                         placebo.period, placeboTest, 
                         permute, m, normalize)
     
     out$call <- match.call()
     out$formula <- formula
-    ## print(out)
+    print(out)
     return(out)
 
 }
@@ -201,8 +202,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          min.T0 = 5,
                          max.missing = NULL,
                          pre.periods = NULL,
-                         proportion = 0.3, #off.period = NULL, # fit test period: switch-off
-                         threshold = 0.5, # equiv
+                         f.threshold = 0.5, # equiv
+                         tost.threshold = NULL, 
                          knots = NULL,
                          degree = 2,  # wald = FALSE,
                          placebo.period = NULL,
@@ -329,10 +330,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
-    wald <- FALSE 
-    if (se == TRUE && placeboTest == FALSE) {
-        wald <- TRUE
-    }
+    # wald <- FALSE 
+    # if (se == TRUE && placeboTest == FALSE) {
+    #     wald <- TRUE
+    # }
     #if (placeboTest == TRUE) {
     #    wald <- FALSE
     #}
@@ -1029,26 +1030,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     if ((out$validX == 0) & (p!=0) ) {
         warning("Multi-colinearity among covariates. Try removing some of them.\r")
-    }     
-
-    # Wald test
-    #if (wald == TRUE) {
-
-    #    cat("Bootstrapping for Wald test ... ")
-
-    #    out.wald <- fect.test(out = out, 
-    #        Y = Y, D = D, X = X, I = I, II = II,
-    #        T.on = T.on, T.off = T.off,
-    #        method = out$method, degree = degree,
-    #        knots = knots, cl = cl, r = out$r.cv, 
-    #        lambda = out$lambda.cv,
-    #        force = force, hasRevs = hasRevs,
-    #        tol = tol, norm.para = norm.para,
-    #        pre.periods = pre.periods, 
-    #        off.period = off.period,
-    #        nboots = nboots,
-    #        parallel = parallel, cores = cores)
-    #} 
+    }
 
     ## permutation test 
     if (permute == TRUE) {
@@ -1123,13 +1105,19 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (p > 0) {
         Xname.tmp <- Xname
         rownames(out$beta) <- Xname.tmp
+        colnames(out$beta) <- c("Coef")
         if (binary == TRUE) {
             rownames(out$marginal) <- Xname.tmp
         }
         if (se == TRUE) {
             rownames(out$est.beta) <- Xname.tmp
+            colnames(out$est.beta) <- c("Coef","S.E.","CI.lower","CI.upper","p.value")
             if (binary == TRUE) {
                 rownames(out$est.marginal) <- Xname.tmp
+            }
+            if (placeboTest == TRUE) {
+                colnames(out$est.placebo) <- c("Coef","S.E.","CI.lower","CI.upper","p.value")
+                rownames(out$est.placebo) <- c("Placebo effect")
             }
         }
     }  
@@ -1167,15 +1155,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         output <- c(output,list(remove.id = remove.id))
         ## cat("list of removed units:",remove.id)
         ## cat("\n\n")
+    }    
+    
+    if (se == TRUE) { 
+        test.out <- diagtest(output, pre.periods = pre.periods, 
+            f.threshold = f.threshold, tost.threshold = tost.threshold)
+        output <- c(output, list(test.out = test.out))
     }
-    if (wald == TRUE) {
-        out.wald <- equiv_test(output, 
-                               pre.periods = pre.periods, 
-                               threshold = threshold,
-                               proportion = proportion)
-        ## output <- c(output,list(wald = out.wald))
-        output <- c(output, list(pre.test = out.wald))
-    }
+    
+    
     if (permute == TRUE) {
         output <- c(output,list(permute = permute.result))
     }
@@ -1186,100 +1174,114 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     
 } ## Program fect ends 
 
-equiv_test <- function(output, 
-                       pre.periods = NULL, 
-                       threshold = 0.5, 
-                       proportion = NULL){
-  
-    #res <- data.frame(output$eff.pre)
-    #unit_pos <- which(res$period == 0)
-    #num_units <- length(unit_pos)
-    #res$unit_new <- rep(c(1:num_units), (unit_pos - c(0, unit_pos[-num_units])))
-  
-    #res <- res[order(res$period, res$unit_new), ]
-    #num_units <- output$count[output$time <= 0]
+# diagnostic tests for no pre-trend and placebo effect
+diagtest <- function(
+    output, 
+    pre.periods = NULL, 
+    f.threshold = NULL, 
+    tost.threshold = NULL
+    ){
 
-    #res_wide <- reshape(res[, c("period", "unit_new", "eff")], timevar = "period", idvar = "unit_new", direction = "wide", v.names = "eff")
+    # get equivalence p values for two-one-sided-t tests
+    tost <- function(coef, se, range) {
+        z <- coef/se
+        p1 <- 1 - pnorm((-range[1]+coef)/se) # left bound
+        p2 <- 1 - pnorm((range[2]-coef)/se) # right bound
+        tost.p <- max(p1,p2)
+        return(tost.p)
+    }
+
+    if (is.null(tost.threshold)==TRUE) {
+        print(output$sigma2)
+        tost.threshold <- 0.36 * sqrt(output$sigma2)
+    }
+    if (is.null(f.threshold)==TRUE) {
+        f.threshold <- 0.5
+    }
+
+    # placebo test
+    if (output$placeboTest == TRUE) { 
+        est.out <- output$est.placebo
+        placebo.equiv.p <- tost(est.out[1], est.out[2], c(-tost.threshold, tost.threshold))
+        out <- list(placebo.p = est.out[5], placebo.equiv.p = placebo.equiv.p)
+
+    } # end of placebo test
   
-    pos <- which(output$time <= 0)
-    l.pos <- length(pos)
-    count <- output$count[output$time <= 0]
-    count0 <- output$count[output$time == 0]
-    count.len <- length(pos)
-
-    pre.pos <- NULL ## use
-    con1 <- is.null(pre.periods)
-    con2 <- is.null(proportion)
-    
-    if (con1 && con2) {
-        pre.pos <- pos[-1]
-    } else {
-
-        if (!con1) {
+    # testing no pre-trend
+    if (output$placeboTest == FALSE) {
+        pos <- which(output$time <= 0)
+        l.pos <- length(pos)
+        count <- output$count[output$time <= 0]
+        count0 <- output$count[output$time == 0]
+        count.len <- length(pos)
+        pre.pos <- NULL ## use
+        if (is.null(pre.periods)==TRUE) {
+            pre.pos <- pos[-1] # all but the first period
+        } else {
             pos <- pos[(count.len - pre.periods  +1):count.len]
             count <- count[(count.len - pre.periods  +1):count.len]
-            pre.pos <- pos
+            pre.pos <- pos                 
+        }
+        res_boot <- output$att.boot
+        nboots <- ncol(res_boot)
+        if (length(pre.pos) == l.pos) {
+            pre.pos <- pre.pos[-1]
+            cat("Cannot use full pre-treatment periods. The first period is removed.\n")
+        }
+        if (length(pre.pos) > 1) {
+            res_boot <- res_boot[pre.pos, ]
         } else {
-            if (!con2) {
-                count.pos <- which(count >= count0 * proportion)
-                pre.pos <- pos[count.pos]
-                count <- count[count.pos]
-            }
-        }        
-    }
+            res_boot <- t(as.matrix(res_boot[pre.pos, ]))
+        }
+        D <- as.matrix(output$att[pre.pos])
+        coef_mat <- res_boot    
+        N_bar <- max(count)
+        S <- cov(t(coef_mat)) ## * N_bar
+        psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
+        if ('try-error' %in% class(psi)) {
+            cat("\n")
+            cat("The estimated covariance matrix is irreversible.")
+            cat("\n")
+            f.stat <- f.p <- f.threshold <- NA            
+        } else {
+            scale <- (N_bar-length(pre.pos))/((N_bar-1)*length(pre.pos))
+            ## F statistic 
+            f.stat <- psi * scale
+            f.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
+                lower.tail = FALSE)
 
-    res_boot <- output$att.boot
-    nboots <- ncol(res_boot)
-    if (length(pre.pos) == l.pos) {
-        pre.pos <- pre.pos[-1]
-        cat("Cannot use full pre-treatment periods. The first period is removed.\n")
-    }
-    if (length(pre.pos) > 1) {
-        res_boot <- res_boot[pre.pos, ]
-    } else {
-        res_boot <- t(as.matrix(res_boot[pre.pos, ]))
-    }
-    
-    
-    ## D <- as.matrix(apply(res_boot, 1, function(x) mean(x, na.rm = 1)))
-    D <- as.matrix(output$att[pre.pos])
-    coef_mat <- res_boot    
-    ## D <- D[c((nrow(res_boot)-num_periods+1):nrow(res_boot))]
-    # coef_mat <- apply(res_boot, 2, function(x) x - D)
-    # S_fect_boot <- (1/(nboots - 1)) * (coef_mat_fect) %*% t(coef_mat_fect)
-    ## N_bar <- max(num_units[c((length(num_units)-num_periods+1):length(num_units))])
-    N_bar <- max(count)
-    S <- cov(t(coef_mat)) ## * N_bar
-  
-    ## psi <- try(as.numeric(N_bar * t(D) %*% solve(S) %*% D), silent = TRUE)
-    psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
-    if ('try-error' %in% class(psi)) {
-        cat("\n")
-        cat("The estimated covariance matrix is irreversible.")
-        cat("\n")
-        return(list(f.stat = NA, p.value = NA, 
-                    threshold = NA))
+            ## Equivalent F test
+            f.equiv.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
+              ncp = N_bar * f.threshold)
+        }
 
-    }
-    ## scale <- (((N_bar-1)*(length(pre.pos)-1))/(N_bar-length(pre.pos)+1))
-    scale <- (N_bar-length(pre.pos))/((N_bar-1)*length(pre.pos))
+        # TOST
+        est.att <- output$est.att[,c(1:2)]
+        T.est.att <- output$time
+        max.pre.periods <- min(T.est.att) * (-1) +1
+        if (is.null(pre.periods)==TRUE) {
+            pre.periods <- max.pre.periods # use all periods
+        } else {
+            pre.periods <- min(pre.periods, max.pre.periods)
+        }
+        est.att <- est.att[which(T.est.att<=0 & T.est.att> -1 * pre.periods),,drop = FALSE]
+        tost.equiv.p <- max(sapply(1:nrow(est.att), function(i){
+                        return(tost(est.att[i,1], est.att[i,2], c(-tost.threshold, tost.threshold)))
+                    })) # keep the maximum p value
 
-    ## F statistic 
-    Fstat <- psi * scale
-    Pvalue <- pf(Fstat, df1 = length(pre.pos), 
-                        df2 = N_bar - length(pre.pos), 
-                        lower.tail = FALSE)
-    
-    ## Equivalent test
-    #p.threshold <- scale * qf(p = 0.05, 
-    #                          df1 = length(pre.pos) - 1, 
-    #                          df2 = N_bar - length(pre.pos) + 1, 
-    #                          ncp = N_bar * (threshold)^2)
-    p.threshold <- qf(p = 0.05, 
-                      df1 = length(pre.pos), 
-                      df2 = N_bar - length(pre.pos), 
-                      ncp = N_bar * (threshold)^2)
-    
-    return(list(f.stat = Fstat, p.value = Pvalue, 
-                threshold = p.threshold))
+        out <- list(
+            f.stat = f.stat, 
+            f.p = f.p, 
+            f.threshold = f.threshold, 
+            f.equiv.p = f.equiv.p, 
+            df1 = length(pre.pos), 
+            df2 = N_bar - length(pre.pos),
+            tost.equiv.p = tost.equiv.p,
+            tost.threshold = tost.threshold
+            )
+        
+    } # end of testing no pre-trend   
+
+    return(out)
+
 }

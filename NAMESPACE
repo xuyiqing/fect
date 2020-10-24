@@ -22,7 +22,7 @@ importFrom("graphics", "plot")
 importFrom("gridExtra", "grid.arrange", "arrangeGrob")
 importFrom("grid", "textGrob", "gpar")
 importFrom("fastplm", "fastplm")
-export(equiv_test)
+export(diagtest)
 
 
 

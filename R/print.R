@@ -51,48 +51,46 @@ print.fect <- function(x,
     }
     
     if (is.null(x$est.avg) == TRUE) { # no uncertainties
-        cat("\nAverage Treatment Effect:\n")
-        print(x$att.avg, digits = 4)
-
-        cat("\nAverage Treatment Effect by Unit:\n")
-        print(x$att.avg.unit, digits = 4)
-
-        if (switch.on == TRUE) {
-            cat("\n   ~ Switch-on by Period:\n")
-            print(x$att[seq.on], digits = 4)
-        }
-        if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
-            cat("\n   ~ Switch-on by Period:\n")
-            print(x$att.off[seq.off], digits = 4)    
-        }
+        cat("\nATT:\n")
+        att.out <- rbind.data.frame(x$att.avg, x$att.avg.unit)
+        colnames(att.out) <- c("ATT")
+        rownames(att.out) <- c(
+            "Tr obs. equally weighted",
+            "Tr units equally weighted")
+        print(att.out, digits = 4)        
+        # if (switch.on == TRUE) {
+        #     cat("\n   ~ by Period:\n")
+        #     print(x$att[seq.on], digits = 4)
+        # }
+        # if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
+        #     cat("\n   ~ Switch-off by Period:\n")
+        #     print(x$att.off[seq.off], digits = 4)    
+        # }
         if (is.null(x$X) == FALSE) {
-            cat("\nCoefficients for the Covariates:\n")
+            cat("\nCovariates:\n")
             print(x$beta, digits = 4)
         }
         cat("\nUncertainty estimates not available.\n")
     } else {
-        cat("\nAverage Treatment Effect:\n")
-        print(x$est.avg, digits = 4)
-
-        cat("\nAverage Treatment Effect by Unit:\n")
-        print(x$est.avg.unit, digits = 4)
-
-        if (switch.on == TRUE) {
-            cat("\n   ~ Switch-on by Period:\n")
-            print(x$est.att[seq.on,], digits = 4)
-        }
-        if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
-            cat("\n   ~ Switch-on by Period:\n")
-            print(x$est.att.off[seq.off,], digits = 4)    
-        }
+        cat("\nATT:\n")
+        att.out <- rbind.data.frame(c(x$est.avg), c(x$est.avg.unit))
+        colnames(att.out) <- c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value")
+        rownames(att.out) <- c(
+            "Tr obs equally weighted",
+            "Tr units equally weighted")
+        print(att.out, digits = 4)
+        # if (switch.on == TRUE) {
+        #     cat("\n   ~ Switch-on by Period:\n")
+        #     print(x$est.att[seq.on,], digits = 4)
+        # }
+        # if (switch.off == TRUE & is.null(x$att.off) == FALSE) {
+        #     cat("\n   ~ Switch-on by Period:\n")
+        #     print(x$est.att.off[seq.off,], digits = 4)    
+        # }
         if (is.null(x$X) == FALSE) {
-            cat("\nCoefficients for the Covariates:\n")
+            cat("\nCovariates:\n")
             print(x$est.beta, digits = 4)
         }
-        ## cat("\n   ~ Chi-squared test for switch-on treatment effect of pre-treatment periods:\n")
-        ## cat("P =",x$T0.on.p)
-        ## cat("\n   ~ Chi-squared test for switch-off treatment effect of pre-treatment periods:\n")
-        ## cat("P =",x$T0.off.p)
     }
 
     if (!is.null(x$est.placebo)) {

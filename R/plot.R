@@ -6,17 +6,18 @@
 # main: whether to show the title;
 # id: plot a part of units
 plot.fect <- function(x,  
-  type = "gap",
+  type = "gap", # gap, equiv, missing
   switch.on = TRUE,
   bound = NULL,
   vis = "connected",
   count = TRUE,
-  proportion = 0.3,
-  equiv.range = NULL,
-  equiv.range.size = 0.36,
+  pre.periods = NULL, # for testing
+  proportion = 0.3, # control the xlim
+  f.threshold = NULL, # equiv f
+  tost.threshold = NULL, # pre-trend and placebo
   effect.bound.ratio = FALSE,
-  show.stats = NULL,  ## TRUE or FALSE
-  stats = NULL,       ## "none", "F.p", "equiv.p", "equiv.F.p", "placebo.p"
+  stats = NULL,       ## "none", "F.p", "F.equiv.p", "placebo.p", "equiv.p"
+  stats.labs = NULL,
   main = NULL,
   xlim = NULL, 
   ylim = NULL,
@@ -45,11 +46,8 @@ plot.fect <- function(x,
     ## Checking Parameters
     ##-------------------------------## 
     
-    equiv.bound <- equiv.range
-    equiv.bound.size <- equiv.range.size
     equiv.p <- NULL
     type.old <- type
-    ## p.value <- show.stats
     ATT <- ATT2 <- ATT3 <- ATT4 <- NULL
     CI.lower3 <-  CI.lower4 <- CI.upper3 <- CI.upper4 <- NULL
 
@@ -61,9 +59,8 @@ plot.fect <- function(x,
     placeboTest <- x$placeboTest
     placebo.period <- x$placebo.period
     binary <- x$binary
-    #if (is.null(Ftest)) {
-        Ftest <- !is.null(x$pre.test)
-    #} 
+    Ftest <- !is.null(x$pre.test)
+     
 
     if (class(x) != "fect") {
         stop("Not a \"fect\" object.")
@@ -117,66 +114,64 @@ plot.fect <- function(x,
     if (!is.null(stats)) {
         if (!placeboTest) {
             for (i in 1:length(stats)) {
-                if (!stats[i] %in% c("none", "F.p", "equiv.p", "equiv.F.p")) {
-                    stop ("Choose \" stats \" from c(\"none\", \"F.p\", \"equiv.p\", \"equiv.F.p\"). ")
+                if (!stats[i] %in% c("none", "F.p", "F.equiv.p", "F.stat","equiv.p")) {
+                    stop ("Choose \"stats\" from c(\"none\", \"F.stat\", \"F.p\", \"F.equiv.p\", \"equiv.p\").")
                 }
 
             }    
         } else {
             for (i in 1:length(stats)) {
                  if (!stats[i] %in% c("none", "placebo.p", "equiv.p")) {
-                    stop ("Choose \" stats \" from c(\"none\", \"placebo.p\", \"equiv.p\"). ")
+                    stop ("Choose \"stats\" from c(\"none\", \"placebo.p\", \"equiv.p\").")
                 }
-            }
-           
+            }          
+        }
+        if ("none" %in% stats) {
+            stats <- "none"
         }
     }
+
 
     ## show statistics
-    ## if (show.stats == FALSE) 
-
-    if (type == "gap") {
-        if (is.null(show.stats)) {
-            show.stats <- FALSE
-            if (is.null(stats)) {
-                stats <- "none"
+    if (is.null(stats)== TRUE) {
+        if (type == "gap") {
+            if (placeboTest == TRUE) {
+                stats <- "placebo.p"
+            } else {
+                stats <- c("none")
             }
         } else {
-            if (is.null(stats)) {
-                if (show.stats == FALSE) {
-                    stats <- "none"
-                } else {
-                    stats <- ifelse(placeboTest, "placebo.p", "F.p")
-                }
-            }
+            stats <- c("equiv.p","F.p")
         }
-    } else if (type == "equiv") {
-        if (is.null(show.stats)) {
-            show.stats <- TRUE 
-            if (is.null(stats)) {
-                if (placeboTest) {
-                    stats <- c("equiv.p", "placebo.p")
-                } else {
-                    stats <- "equiv.p"
-                }
-                ## stats <- ifelse(placeboTest, c("equiv.p", "placebo.p"), "equiv.p")
-            }
+    }
+
+    if (!("none" %in% stats)) {
+        if (is.null(stats.labs)==FALSE) {
+            if (length(stats.labs)!=length(stats)) {
+                stop("\"stats.lab\" should have the same length as \"stats\".")
+            }               
         } else {
-            if (is.null(stats)) {
-                if (placeboTest) {
-                    stats <- c("equiv.p", "placebo.p")
-                } else {
-                    stats <- "equiv.p"
+            stats.labs <- rep(NA, length(stats)) 
+            for (i in 1:length(stats)) {
+                if (stats[i] == "F.p") {
+                    stats.labs[i] <- "F p-value"
+                }
+                if (stats[i] == "F.equiv.p") {
+                    stats.labs[i] <- "F equivalence p-value"
+                }
+                if (stats[i] == "F.stat") {
+                    stats.labs[i] <- "F statistics"
+                }
+                if (stats[i] == "placebo.p") {
+                    stats.labs[i] <- "Placebo p-value"
+                }
+                if (stats[i] == "equiv.p") {
+                    stats.labs[i] <- ifelse(x$placeboTest, "Placebo equivalence p-value", "Equivalence p-value")
                 }
             }
         }
     }
-
-    if ("none" %in% stats) {
-        show.stats <- FALSE
-    } 
-    p.value <- show.stats
-
+    
     ## gap or equiv
     ytitle <- NULL
     bound.old <- bound
@@ -184,17 +179,17 @@ plot.fect <- function(x,
         if (is.null(bound) == TRUE) {
             bound.old <- bound <- "none"
         }
-        maintext <- "Estimated Average Treatment Effect"
+        maintext <- "Estimated ATT"
         ytitle <- paste("Effect on",x$Y)
 
-    } else if (type == "equiv") {
+    } else if (type == "equiv") { # equiv plot is a gap plot (with some options changes)
         
         if (is.null(x$est.att)) {
             stop("No uncertainty estimates.\n")
         }
 
         ## change to 90% CI
-        if (!placeboTest) {
+        if (placeboTest == FALSE) {
             est.att <- x$est.att
             est.bound <- x$att.bound
 
@@ -224,13 +219,11 @@ plot.fect <- function(x,
             ytitle <- paste("Residual Average of",x$Y)        
 
         } else {
-            maintext <- "Estimated Average Treatment Effect"
+            maintext <- "Estimated ATT"
             ytitle <- paste("Effect on",x$Y)
         }
 
-        #if (is.null(bound) == TRUE) {
-            bound <- "both"
-        #}
+        bound <- "both"
         type <- "gap"
     }       
 
@@ -464,15 +457,24 @@ plot.fect <- function(x,
     ## adjust x-axis
     scaleFUN <- function(x) sprintf("%.f", x) ## integer value at x axis
 
+    # get equivalence p values for two-one-sided-t tests
+    tost <- function(coef, se, range) {
+        z <- coef/se
+        p1 <- 1 - pnorm((-range[1]+coef)/se) # left bound
+        p2 <- 1 - pnorm((range[2]-coef)/se) # right bound
+        tost.p <- max(p1,p2)
+        return(tost.p)
+    }
+
     ############  START  ############### 
     if (type == "gap") {
 
         ## axes labels
         if (is.null(xlab) == TRUE) {
             if (switch.on == TRUE) {
-                xlab <- paste("Time relative to the Treatment")
+                xlab <- paste("Time Relative to the Treatment")
             } else {
-                xlab <- paste("Time relative to Exiting the Treatment")
+                xlab <- paste("Time Relative to Exiting the Treatment")
             }            
         } else if (xlab == "") {
             xlab <- NULL
@@ -531,71 +533,14 @@ plot.fect <- function(x,
             minBound <- max(abs(att.sub[time0, c("CI.lower", "CI.upper")]))
             minbound <- c(-minBound, minBound)
 
-            ## define equivalence bound
-            if (is.null(equiv.bound)) {
-                if (is.null(equiv.bound.size)) {
-                    equiv.bound.size <- 0.36
-                } 
-                equiv.bound <- c(-abs(equiv.bound.size * sqrt(x$sigma2)), abs(equiv.bound.size * sqrt(x$sigma2)))
-            } else {
-                if (length(equiv.bound) == 1) {
-                    equiv.bound <- c(-abs(equiv.bound), abs(equiv.bound))
-                }
+            ## equivalence range
+            if (is.null(f.threshold)==TRUE) {
+                f.threshold <- x$test.out$tost.threshold
             }
-
-            ## calculate equivalence p value: 
-            #est.att.sub <- x$est.att[show, ]
-            #equiv.p <- sapply(1:dim(est.att.sub)[1], function(i) {
-            #                    p1 <- pnorm(equiv.bound[1],                 ## lower bound
-            #                                mean = est.att.sub[i, "ATT"], 
-            #                                sd = est.att.sub[i, "S.E."], 
-            #                                lower.tail = TRUE)
-
-            #                    p2 <- pnorm(equiv.bound[2], 
-            #                                mean = est.att.sub[i, "ATT"],   ## upper bound
-            #                                sd = est.att.sub[i, "S.E."], 
-            #                                lower.tail = FALSE)
-
-            #                    return(min(1, max(p1, p2) *2))
-            #                    })
-            
-            #equiv.p <- max(equiv.p) ## keep the maximum p value
-
-            ## calculate equivalence p value: 
-            if (type.old == "equiv" || "equiv.p" %in% stats) {
-                if (placeboTest == FALSE) {
-                    show.equiv <- show
-                    if (switch.on == TRUE) {
-                        if (max(show) >= show.T0) {
-                            show.equiv <- show[1]:show.T0
-                        }
-                        att.boot.sub <- x$att.boot[show.equiv, ]
-                    } else {
-                        if (min(show) <= show.T0) {
-                            show.equiv <- show.T0:max(show)
-                        }
-                        att.boot.sub <- x$att.off.boot[show.equiv, ]
-                    }
-
-                    nboots <- dim(att.boot.sub)[2]
-                    equiv.p <- sapply(1:dim(att.boot.sub)[1], function(i) {
-                                        
-                                        p1 <- sum(att.boot.sub[i, ] <= equiv.bound[1])/nboots ## lower bound
-                                        p2 <- sum(att.boot.sub[i, ] >= equiv.bound[2])/nboots ## upper bound
-
-                                        return(min(1, max(p1, p2) *2))
-                                        })
-                    equiv.p <- max(equiv.p) ## keep the maximum p value
-                } else {
-                    att.placebo.boot <- c(x$att.placebo.boot)
-                    nboots <- length(att.placebo.boot)
-
-                    p1 <- sum(att.placebo.boot <= equiv.bound[1])/nboots ## lower bound
-                    p2 <- sum(att.placebo.boot >= equiv.bound[2])/nboots ## upper bound
-
-                    equiv.p <- min(1, max(p1, p2) *2)
-                }
+            if (is.null(tost.threshold)==TRUE) {
+                tost.threshold <- x$test.out$tost.threshold
             }
+            equiv.range <- c(-1 * tost.threshold, tost.threshold)
 
             ## recover bound type
             if (placeboTest == TRUE) {
@@ -650,7 +595,7 @@ plot.fect <- function(x,
 
             ## create a dataset for bound
             if (bound.old == "equiv") {
-                data2 <- cbind.data.frame(c(rep(equiv.bound, each = length(bound.time))))
+                data2 <- cbind.data.frame(c(rep(equiv.range, each = length(bound.time))))
                 names(data2) <- "bound"
                 data2$time <- rep(bound.time, 2)
                 data2$type <- rep(c("equiv"), 2 * length(bound.time))
@@ -674,7 +619,7 @@ plot.fect <- function(x,
                 data2$id <- rep(1:2, each = length(bound.time))
                 set.limits <- c(set.limits, "min")
                 if (is.null(legend.labs)==TRUE) {
-                    set.labels <- c(set.labels, "Min. Bound")
+                    set.labels <- c(set.labels, "Min. Range")
                 } else {
                     set.labels <- legend.labs
                 }
@@ -683,14 +628,14 @@ plot.fect <- function(x,
                 set.size <- c(set.size, 0.7)
             }
             else if (bound.old == "both") {
-                data2 <- cbind.data.frame(c(rep(minbound, each = length(bound.time)), rep(equiv.bound, each = length(bound.time))))
+                data2 <- cbind.data.frame(c(rep(minbound, each = length(bound.time)), rep(equiv.range, each = length(bound.time))))
                 names(data2) <- "bound"
                 data2$time <- rep(bound.time, 4)
                 data2$type <- rep(c("min", "equiv"), each = 2 * length(bound.time))
                 data2$id <- rep(1:4, each = length(bound.time))
                 set.limits <- c(set.limits, "min", "equiv")
                 if (is.null(legend.labs)==TRUE) {
-                    set.labels <- c(set.labels, "Min. Bound", "Equiv. Range")
+                    set.labels <- c(set.labels, "Min. Range", "Equiv. Range")
                 } else {
                     set.labels <- legend.labs
                 }
@@ -745,35 +690,7 @@ plot.fect <- function(x,
                 }
             }
 
-        }
-        ## switch-off effects
-        else if (switch.on == FALSE) { 
-            
-            if (CI==FALSE) {                 
-                
-                data <- cbind.data.frame(time, ATT = x$att.off, count = x$count.off)[show,]                
-
-            } else {                
-                tb <- x$est.att.off
-                data <- cbind.data.frame(time, tb, count = x$count.off)[show,]
-                colnames(data)[2] <- "ATT"
-
-                ## needs debugging
-                if (placeboTest == TRUE) {
-                    data[,"ATT4"] <- data[,"ATT3"] <- data[,"ATT2"] <- data[,"ATT"]
-                    data[,"CI.lower4"] <- data[,"CI.lower3"] <- data[,"CI.lower2"] <- data[,"CI.lower"]
-                    data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,"CI.upper"]                    
-                    pos1 <- intersect(which(data[,"time"] >= (placebo.period[1] + 1)), which(data[,"time"] <= (placebo.period[2] - 1)))
-                    pos2 <- c(which(data[,"time"] <= (placebo.period[1] - 1)), which(data[,"time"] >= (placebo.period[2] + 1)))
-                    pos3 <- intersect(which(data[,"time"] >= (placebo.period[1])), which(data[,"time"] <= (placebo.period[2] - 1)))
-                    pos4 <- c(which(data[,"time"] <= (placebo.period[1] - 2)), which(data[,"time"] >= (placebo.period[2] + 1)))
-                    data[pos1, c("ATT","CI.lower","CI.upper")] <- NA
-                    data[pos2, c("ATT2","CI.lower2","CI.upper2")] <- NA
-                    data[pos3, c("ATT3","CI.lower3","CI.upper3")] <- NA
-                    data[pos4, c("ATT4","CI.lower4","CI.upper4")] <- NA
-                }                
-            }
-        }  
+        }        
 
         # height of the histogram
         if (CI == FALSE) {
@@ -822,7 +739,7 @@ plot.fect <- function(x,
                     stats.pos[1] <- min(data[,"time"], na.rm = 1)
                     stats.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[1])
                 }
-                p.label <- paste("ATT / Min. Bound = ", sprintf("%.3f",x$att.avg / minBound), sep="")
+                p.label <- paste("ATT / Min. Range = ", sprintf("%.3f",x$att.avg / minBound), sep="")
                 p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
                     label = p.label, size = cex.text, hjust = 0)                
             }
@@ -875,55 +792,49 @@ plot.fect <- function(x,
             if (CI == TRUE) {
                 p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)                
             }
-            ## Ftest
-            p.label <- p.label1 <- p.label2 <- p.label3 <- p.label4 <- NULL
-            
-            if (switch.on == TRUE && show.stats == TRUE) {
-                
-                if (Ftest == TRUE && "F.p" %in% stats) {
-                    p.label1 <- paste0("F stat: ", sprintf("%.3f",x$pre.test$f.stat))
-                    p.label2 <- paste0("p-value: ", sprintf("%.3f",x$pre.test$p.value))
-                    p.label <- paste(p.label, p.label1, "\n", p.label2, "\n", sep = "")
+            ## stats
+            p.label <- NULL
+            for (i in 1:length(stats)) {
+                if ("F.p" %in% stats[i]) {
+                    p.label1 <- NULL
+                    p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f",x$test.out$f.p))
+                    p.label <- paste0(p.label, p.label1, "\n")
                 }
-
-                if (Ftest == TRUE && "equiv.F.p" %in% stats) {
-                    p.label3 <- paste0("F threshold: ", sprintf("%.3f",x$pre.test$threshold))
-                    p.label <- paste(p.label, p.label3, "\n", sep = "")
+                if ("F.stat" %in% stats[i]) {
+                    p.label1 <- NULL
+                    p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f",x$test.out$f.stat))
+                    p.label <- paste0(p.label, p.label1, "\n")
                 }
-                
-                if (!is.null(equiv.p) && "equiv.p" %in% stats) {
-                    p.label4 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
-                    p.label <- paste(p.label, p.label4, sep = "")
+                if ("F.equiv.p" %in% stats[i]) {
+                    # calculate new p value
+                    if (is.null(f.threshold)==FALSE | is.null(pre.periods) == FALSE) {
+                        test.out <- diagtest(x, pre.periods = pre.periods, f.threshold = f.threshold)
+                        f.equiv.p <- test.out$f.equiv.p
+                    } else {
+                        f.equiv.p <- x$test.out$f.equiv.p
+                    }
+                    p.label1 <- NULL
+                    p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f",f.equiv.p))
+                    p.label <- paste0(p.label, p.label1, "\n")
                 }
+                if ("equiv.p" %in% stats[i]) {
+                    # calculate new p value
+                    if (is.null(tost.threshold)==FALSE | is.null(pre.periods) == FALSE) {
+                        test.out <- diagtest(x, pre.periods = pre.periods, tost.threshold = tost.threshold)
+                        tost.equiv.p <- test.out$tost.equiv.p
+                    } else {
+                        tost.equiv.p <- x$test.out$tost.equiv.p
+                    }
+                    p.label1 <- NULL
+                    p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f",tost.equiv.p))
+                    p.label <- paste0(p.label, p.label1, "\n")
+                }
+            }                
+               
 
-                #if (is.null(p.label1) || is.null(p.label2)) {
-                #    p.label <- p.label3
-                #} else if (is.null(p.label3)) {
-                #    p.label <- paste(p.label1, "\n", p.label2, sep = "")
-                #} else {
-                #    p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
-                #}  
-            }
-            
-
-            #if (Ftest == TRUE) {
-            #    if (switch.on == TRUE) {
-            #        p.label1 <- paste0("F stat: ", sprintf("%.3f",x$pre.test$f.stat))
-            #        p.label2 <- paste0("p-value: ", sprintf("%.3f",x$pre.test$p.value))
-                    #p.label3 <- paste0("threshold: ", sprintf("%.3f",x$pre.test$threshold))
-                    #p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
-            #        p.label3 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
-            #        if (is.null(equiv.p)) {
-            #            p.label <- paste(p.label1, "\n", p.label2, sep = "")
-            #        } else {
-            #            p.label <- paste(p.label1, "\n", p.label2, "\n", p.label3, sep = "")
-            #        }
-                    
-            #    }
-            #}          
-        } else {
+        } else { # placebo plot
             ## point estimates
-            p.label <- p.label1 <- p.label2 <- NULL
+            p.label <- NULL
             p <- p + geom_line(data = data, aes(time, ATT3), size = 0.7)
             p <- p + geom_line(data = data, aes(time, ATT4), size = 0.7, colour = "#4671D5")
             if (vis == "connected") {
@@ -933,25 +844,31 @@ plot.fect <- function(x,
             ## CIs
             p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2)
             p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF")
-            ## p value
             
-            p.label1 <- paste0("Placebo p-value: ", sprintf("%.3f",x$est.placebo[5]))
-            p.label2 <- paste0("Equivalence p-value: ", sprintf("%.3f", equiv.p))
-            
-            if ("placebo.p" %in% stats) {
-                p.label <- paste(p.label, p.label1, "\n", sep = "")
-            } 
-            if ("equiv.p" %in% stats) {
-                p.label <- paste(p.label, p.label2, sep = "")
-            } 
-            #else if (stats == "equiv.placebo.p") {
-            #    p.label <- paste(p.label1, "\n", p.label2, sep = "")
-            #}
+            ## stats
+            for (i in 1:length(stats)) {
+                if ("placebo.p" %in% stats[i]) {
+                    p.label1 <- NULL
+                    p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f",x$test.out$placebo.p))
+                    p.label <- paste0(p.label, p.label1, "\n")
+                }
+                if ("equiv.p" %in% stats[i]) {
+                    p.label1 <- NULL
+                    if (is.null(tost.threshold)==FALSE| is.null(pre.periods) == FALSE) {
+                        test.out <- diagtest(x, pre.periods = pre.periods, tost.threshold = tost.threshold)
+                        placebo.equiv.p <- test.out$placebo.equiv.p
+                    } else {
+                        placebo.equiv.p <- x$test.out$placebo.equiv.p
+                    }
+                    p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f", placebo.equiv.p))
+                    p.label <- paste0(p.label, p.label1, "\n")
+                }                
+            }
         }        
 
-        ## mark p value from Ftest
+        ## mark stats
         hpos <- ifelse(switch.on == TRUE, 0, 1)
-        if ((Ftest == TRUE | placeboTest == TRUE) & p.value == TRUE) {
+        if ("none" %in% stats == FALSE) {
             if (is.null(stats.pos)) {                
                 if (switch.on == TRUE) {
                     stats.pos[1] <- min(data[,"time"], na.rm = 1)
@@ -966,8 +883,7 @@ plot.fect <- function(x,
             if (!is.null(p.label)) {
                 p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
                               label = p.label, size = cex.text, hjust = hpos, vjust = "top")
-            }
-            
+            }            
         }    
 
         ## histogram
@@ -995,8 +911,7 @@ plot.fect <- function(x,
         ## ylim
         if (is.null(ylim) == FALSE) {
             p <- p + coord_cartesian(ylim = ylim)
-        }
-        suppressWarnings(print(p))
+        }        
     }
 
 
@@ -1144,16 +1059,16 @@ plot.fect <- function(x,
         
         if(length(all)>=4) {
             p <- p + guides(fill=guide_legend(nrow=2,byrow=TRUE))
-        }
-        suppressWarnings(print(p))
+        }        
         ## end of missing plot
     }
 
-    if (!is.null(equiv.p)) {
-        return(list(p = p, equiv.p = equiv.p))
-    } else {
-        return(list(p = p))
-    }
+    # if (!is.null(equiv.p)) {
+    #     return(list(p = p, equiv.p = equiv.p))
+    # } else {
+    #     return(list(p = p))
+    # }
+    return(suppressWarnings(print(p)))
     
 }
 

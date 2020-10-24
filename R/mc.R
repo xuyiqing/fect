@@ -154,6 +154,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     est.best$residuals[which(II == 0)] <- NA
 
     est.best$sigma2 <- mean(c(est.best$residuals[which(II == 1)])^2) ## mean squared error of residuals    
+    
 
     ## 4. dynamic effects
     t.on <- c(T.on)
@@ -303,7 +304,8 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         eff.pre.equiv = eff.pre.equiv,
         pre.sd = pre.sd,
         rmse = rmse,
-        res = est.best$residuals
+        res = est.best$residuals,
+        sigma2 = est.best$sigma2
     )
 
     if (hasRevs == 1) {
