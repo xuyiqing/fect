@@ -59,7 +59,6 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  seed = NULL, # set seed
                  min.T0 = 5, # minimum T0
                  max.missing = NULL, # maximum missing
-                 proportion = 0.3, # use to fit the f test and equivalence test
                  pre.periods = NULL, # fit test period
                  f.threshold = 0.5, # equiv
                  tost.threshold = NULL, # equiv
@@ -107,7 +106,6 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          seed = NULL, # set seed
                          min.T0 = 5,
                          max.missing = NULL,
-                         proportion = 0.3,
                          pre.periods = NULL,
                          f.threshold = 0.5, # equiv
                          tost.threshold = NULL, 
@@ -156,7 +154,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         binary, QR, method, criterion, alpha, se, 
                         vartype,
                         nboots, parallel, cores, tol, seed, min.T0,
-                        max.missing, proportion, pre.periods, 
+                        max.missing, pre.periods, 
                         f.threshold, tost.threshold,
                         knots, degree, 
                         placebo.period, placeboTest, 
@@ -203,7 +201,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          seed = NULL, # set seed
                          min.T0 = 5,
                          max.missing = NULL,
-                         proportion = 0.3,
                          pre.periods = NULL,
                          f.threshold = 0.5, # equiv
                          tost.threshold = NULL, 
@@ -1179,8 +1176,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
 # diagnostic tests for no pre-trend and placebo effect
 diagtest <- function(
-    x, # fect object
-    proportion = 0.3,
+    output, 
     pre.periods = NULL, 
     f.threshold = NULL, 
     tost.threshold = NULL
@@ -1196,48 +1192,36 @@ diagtest <- function(
     }
 
     if (is.null(tost.threshold)==TRUE) {
-        tost.threshold <- 0.36 * sqrt(x$sigma2.fect)
+        tost.threshold <- 0.36 * sqrt(output$sigma2.fect)
     }
     if (is.null(f.threshold)==TRUE) {
         f.threshold <- 0.5
     }
 
     # placebo test
-    if (x$placeboTest == TRUE) { 
-        est.out <- x$est.placebo
+    if (output$placeboTest == TRUE) { 
+        est.out <- output$est.placebo
         placebo.equiv.p <- tost(est.out[1], est.out[2], c(-tost.threshold, tost.threshold))
         out <- list(placebo.p = est.out[5], placebo.equiv.p = placebo.equiv.p)
 
     } # end of placebo test
-
-    if (is.null(proportion)==TRUE) {
-        proportion <- 0    
-    }
-    max.pre.periods <- sum(x$time<=0)
-    if (is.null(pre.periods)==TRUE) {        
-        pre.periods <- max.pre.periods        
-    } else {
-        pre.periods <- min(pre.periods, max.pre.periods)
-    }
-    max.count <- max(x$count)
-    pre.periods <- length(x$time[which(x$count >= max.count * proportion & x$time<=0)])
   
     # testing no pre-trend
-    if (x$placeboTest == FALSE) {
-        pos <- which(x$time <= 0)
+    if (output$placeboTest == FALSE) {
+        pos <- which(output$time <= 0)
         l.pos <- length(pos)
-        count <- x$count[x$time <= 0]
-        count0 <- x$count[x$time == 0]
+        count <- output$count[output$time <= 0]
+        count0 <- output$count[output$time == 0]
         count.len <- length(pos)
         pre.pos <- NULL ## use
-        if (pre.periods==max.pre.periods) {
+        if (is.null(pre.periods)==TRUE) {
             pre.pos <- pos[-1] # all but the first period
         } else {
             pos <- pos[(count.len - pre.periods  +1):count.len]
             count <- count[(count.len - pre.periods  +1):count.len]
             pre.pos <- pos                 
         }
-        res_boot <- x$att.boot
+        res_boot <- output$att.boot
         nboots <- ncol(res_boot)
         if (length(pre.pos) == l.pos) {
             pre.pos <- pre.pos[-1]
@@ -1248,7 +1232,7 @@ diagtest <- function(
         } else {
             res_boot <- t(as.matrix(res_boot[pre.pos, ]))
         }
-        D <- as.matrix(x$att[pre.pos])
+        D <- as.matrix(output$att[pre.pos])
         coef_mat <- res_boot    
         N_bar <- max(count)
         S <- cov(t(coef_mat)) ## * N_bar
@@ -1271,10 +1255,15 @@ diagtest <- function(
         }
 
         # TOST
-        est.att <- x$est.att[,c(1:2)]
-        pos.zero <- which(x$time == 0)
-        first.test.period <- x$time[pos.zero - pre.periods + 1]
-        est.att <- est.att[which(x$time<=0 & x$time>first.test.period),,drop = FALSE]
+        est.att <- output$est.att[,c(1:2)]
+        T.est.att <- output$time
+        max.pre.periods <- min(T.est.att) * (-1) +1
+        if (is.null(pre.periods)==TRUE) {
+            pre.periods <- max.pre.periods # use all periods
+        } else {
+            pre.periods <- min(pre.periods, max.pre.periods)
+        }
+        est.att <- est.att[which(T.est.att<=0 & T.est.att> -1 * pre.periods),,drop = FALSE]
         tost.equiv.p <- max(sapply(1:nrow(est.att), function(i){
                         return(tost(est.att[i,1], est.att[i,2], c(-tost.threshold, tost.threshold)))
                     })) # keep the maximum p value

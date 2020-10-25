@@ -11,8 +11,8 @@ plot.fect <- function(x,
   bound = NULL,
   vis = "connected",
   count = TRUE,
-  proportion = 0.3, # control the xlim
   pre.periods = NULL, # for testing
+  proportion = 0.3, # control the xlim
   f.threshold = NULL, # equiv f
   tost.threshold = NULL, # pre-trend and placebo
   effect.bound.ratio = FALSE,
@@ -672,7 +672,7 @@ plot.fect <- function(x,
             } else {
 
                 tb <- x$est.att
-                data <- cbind.data.frame(time, tb)[show,]
+                data <- cbind.data.frame(time, tb, count = count.num)[show,]
                 colnames(data)[2] <- "ATT"
 
                 if (placeboTest == TRUE) {
@@ -807,8 +807,8 @@ plot.fect <- function(x,
                 }
                 if ("F.equiv.p" %in% stats[i]) {
                     # calculate new p value
-                    if (is.null(f.threshold)==FALSE | is.null(proportion) == FALSE | is.null(pre.periods) == FALSE) {
-                        test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, f.threshold = f.threshold)
+                    if (is.null(f.threshold)==FALSE | is.null(pre.periods) == FALSE) {
+                        test.out <- diagtest(x, pre.periods = pre.periods, f.threshold = f.threshold)
                         f.equiv.p <- test.out$f.equiv.p
                     } else {
                         f.equiv.p <- x$test.out$f.equiv.p
@@ -819,8 +819,8 @@ plot.fect <- function(x,
                 }
                 if ("equiv.p" %in% stats[i]) {
                     # calculate new p value
-                    if (is.null(tost.threshold)==FALSE | is.null(proportion) == FALSE | is.null(pre.periods) == FALSE) {
-                        test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, tost.threshold = tost.threshold)
+                    if (is.null(tost.threshold)==FALSE | is.null(pre.periods) == FALSE) {
+                        test.out <- diagtest(x, pre.periods = pre.periods, tost.threshold = tost.threshold)
                         tost.equiv.p <- test.out$tost.equiv.p
                     } else {
                         tost.equiv.p <- x$test.out$tost.equiv.p
@@ -854,8 +854,8 @@ plot.fect <- function(x,
                 }
                 if ("equiv.p" %in% stats[i]) {
                     p.label1 <- NULL
-                    if (is.null(tost.threshold)==FALSE | is.null(proportion) == FALSE| is.null(pre.periods) == FALSE) {
-                        test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, tost.threshold = tost.threshold)
+                    if (is.null(tost.threshold)==FALSE| is.null(pre.periods) == FALSE) {
+                        test.out <- diagtest(x, pre.periods = pre.periods, tost.threshold = tost.threshold)
                         placebo.equiv.p <- test.out$placebo.equiv.p
                     } else {
                         placebo.equiv.p <- x$test.out$placebo.equiv.p
