@@ -81,14 +81,14 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         ##-------------------------------##
     
     validX <- 1 ## no multi-colinearity
-    est.equiv <- NULL
+    est.fect <- NULL
     if (binary == FALSE) {
         est.best <- inter_fe_ub(YY, Y0, X, II, beta0, r.cv, force = force, tol) 
         if (boot == FALSE) {
             if (r.cv == 0) {
-                est.equiv <- est.best
+                est.fect <- est.best
             } else {
-                est.equiv <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+                est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
             }
         }
     } else {
@@ -140,9 +140,9 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         est.best$fit <- est.best$fit * norm.para[1]
         ## ini.res <- ini.res * norm.para[1] 
         if (boot == FALSE) {
-            est.equiv$fit <- est.equiv$fit * norm.para[1]
+            est.fect$fit <- est.fect$fit * norm.para[1]
         }
-        est.equiv$sigma2 <- est.equiv$sigma2 * norm.para[1]
+        est.fect$sigma2 <- est.fect$sigma2 * norm.para[1]
     }
 
     ## 0. relevant parameters
@@ -169,7 +169,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     if (binary == FALSE) {
         Y.ct <- est.best$fit
         if (boot == FALSE) {
-            Y.ct.equiv <- est.equiv$fit
+            Y.ct.equiv <- est.fect$fit
         }
     } else {
         Y.ct <- pnorm(est.best$fit)
@@ -370,7 +370,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     if (binary == 0) {
         out <- c(out, list(PC = PC,
                            sigma2 = sigma2,
-                           equiv.sigma2 = est.equiv$sigma2, 
+                           sigma2.fect = est.fect$sigma2, 
                            res = est.best$residuals,
                            rmse = rmse))
         #if (boot == FALSE) {

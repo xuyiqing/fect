@@ -141,7 +141,7 @@ plot.fect <- function(x,
                 stats <- c("none")
             }
         } else {
-            stats <- c("equiv.p","F.p")
+            stats <- c("F.p","equiv.p")
         }
     }
 

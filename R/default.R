@@ -1192,8 +1192,7 @@ diagtest <- function(
     }
 
     if (is.null(tost.threshold)==TRUE) {
-        print(output$sigma2)
-        tost.threshold <- 0.36 * sqrt(output$equiv.sigma2)
+        tost.threshold <- 0.36 * sqrt(output$sigma2.fect)
     }
     if (is.null(f.threshold)==TRUE) {
         f.threshold <- 0.5
@@ -1242,7 +1241,7 @@ diagtest <- function(
             cat("\n")
             cat("The estimated covariance matrix is irreversible.")
             cat("\n")
-            f.stat <- f.p <- f.threshold <- NA            
+            f.stat <- f.p <- f.equiv.p <- f.threshold <- NA            
         } else {
             scale <- (N_bar-length(pre.pos))/((N_bar-1)*length(pre.pos))
             ## F statistic 

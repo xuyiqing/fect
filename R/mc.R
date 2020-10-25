@@ -76,9 +76,9 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     est.best <- inter_fe_mc(YY, Y0, X, II, beta0, hasF, lambda.cv, force, tol) 
     validX <- est.best$validX
     validF <- est.best$validF
-    est.equiv <- NULL
+    est.fect <- NULL
     if (boot == FALSE) {
-        est.equiv <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+        est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
     }
     
         ##------------------------------##
@@ -108,9 +108,9 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         est.best$residuals <- est.best$residuals * norm.para[1] 
         est.best$fit <- est.best$fit * norm.para[1] 
         if (boot == FALSE) {
-            est.equiv$fit <- est.equiv$fit * norm.para[1]
+            est.fect$fit <- est.fect$fit * norm.para[1]
         }
-        est.equiv$sigma2 <- est.equiv$sigma2 * norm.para[1]
+        est.fect$sigma2 <- est.fect$sigma2 * norm.para[1]
     }
 
     ## 0. revelant parameters
@@ -136,7 +136,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     
     equiv.att.avg <- eff.equiv <- NULL
     if (boot == FALSE) {
-        eff.equiv <- Y - est.equiv$fit
+        eff.equiv <- Y - est.fect$fit
         equiv.att.avg <- sum(eff.equiv * D)/(sum(D))
     }
 
@@ -307,7 +307,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         rmse = rmse,
         res = est.best$residuals,
         sigma2 = est.best$sigma2,
-        equiv.sigma2 = est.equiv$sigma2
+        sigma2.fect = est.fect$sigma2
     )
 
     if (hasRevs == 1) {

@@ -430,12 +430,12 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     ## 00. run a fect to obtain residuals
     if (method == "ife") {
         if (r.cv == 0) {
-            est.equiv <- est.best
+            est.fect <- est.best
         } else {
-            est.equiv <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+            est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
         }
     } else {
-        est.equiv <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+        est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
     }
            
 
@@ -475,8 +475,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         #}
         est.best$residuals <- est.best$residuals * norm.para[1] 
         est.best$fit <- est.best$fit * norm.para[1] 
-        est.equiv$fit <- est.equiv$fit * norm.para[1]
-        est.equiv$sigma2 <- est.equiv$sigma2 * norm.para[1]
+        est.fect$fit <- est.fect$fit * norm.para[1]
+        est.fect$sigma2 <- est.fect$sigma2 * norm.para[1]
     }
 
     ## 0. revelant parameters
@@ -506,7 +506,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     att.unit <- sapply(1:length(tr.pos), function(vec){return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))})
     att.avg.unit <- mean(att.unit)
 
-    eff.equiv <- Y - est.equiv$fit
+    eff.equiv <- Y - est.fect$fit
     equiv.att.avg <- sum(eff.equiv * D) / (sum(D))
 
     ## 2. rmse for treated units' observations under control
@@ -611,7 +611,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     out<-list(
         ## main results 
         sigma2 = est.best$sigma2,
-        equiv.sigma2 = est.equiv$sigma2,
+        sigma2.fect = est.fect$sigma2,
         T.on = T.on,
         Y.ct = est.best$fit,
         eff = eff,
