@@ -149,7 +149,7 @@ fect.boot <- function(Y,
 
     group.att <- out$group.att
 
-    att.on <- out$att
+    att <- out$att
     time.on <- out$time
 
     time.off <- NULL
@@ -178,8 +178,8 @@ fect.boot <- function(Y,
     ## eff.boot <- array(0,dim = c(TT, Ntr, nboots))  ## to store results
     att.avg.boot <- matrix(0, 1, nboots)
     att.avg.unit.boot <- matrix(0, 1, nboots)
-    att.on.boot <- matrix(0, length(time.on), nboots)
-    att.on.count.boot <- matrix(0, length(time.on), nboots)
+    att.boot <- matrix(0, length(time.on), nboots)
+    att.count.boot <- matrix(0, length(time.on), nboots)
     beta.boot <- marginal.boot <- att.off.boot <- att.off.count.boot <- NULL
     if (hasRevs == 1) {
         att.off.boot <- matrix(0, length(time.off), nboots) 
@@ -551,8 +551,8 @@ fect.boot <- function(Y,
         for (j in 1:nboots) { 
             att.avg.boot[,j] <- boot.out[[j]]$att.avg
             att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
-            att.on.boot[,j] <- boot.out[[j]]$att
-            att.on.count.boot[,j] <- boot.out[[j]]$count
+            att.boot[,j] <- boot.out[[j]]$att
+            att.count.boot[,j] <- boot.out[[j]]$count
             if (p > 0) {
                 beta.boot[,j] <- boot.out[[j]]$beta
                 if (binary == TRUE) {
@@ -575,8 +575,8 @@ fect.boot <- function(Y,
             boot <- one.nonpara(boot.seq[j]) 
             att.avg.boot[,j] <- boot$att.avg
             att.avg.unit.boot[,j] <- boot$att.avg.unit
-            att.on.boot[,j] <- boot$att
-            att.on.count.boot[,j] <- boot$count
+            att.boot[,j] <- boot$att
+            att.count.boot[,j] <- boot$count
             if (p > 0) {
                 beta.boot[,j] <- boot$beta
                 if (binary == TRUE) {
@@ -602,13 +602,13 @@ fect.boot <- function(Y,
     ## end of bootstrapping
     
     ## remove failure bootstrap
-    ## alternative condition? max(apply(is.na(att.on.boot),2,sum)) == dim(att.on.boot)[1]
+    ## alternative condition? max(apply(is.na(att.boot),2,sum)) == dim(att.boot)[1]
     if (sum(is.na(c(att.avg.boot))) > 0) {
         boot.rm <- which(is.na(c(att.avg.boot)))
         att.avg.boot <- t(as.matrix(att.avg.boot[,-boot.rm]))
         att.avg.unit.boot <- t(as.matrix(att.avg.unit.boot[,-boot.rm]))
-        att.on.boot <- as.matrix(att.on.boot[,-boot.rm])
-        att.on.count.boot <- as.matrix(att.on.count.boot[,-boot.rm])
+        att.boot <- as.matrix(att.boot[,-boot.rm])
+        att.count.boot <- as.matrix(att.count.boot[,-boot.rm])
         if (p > 0) {
             beta.boot <- as.matrix(beta.boot[,-boot.rm])
             if (dim(beta.boot)[2] == 1) {
@@ -632,7 +632,7 @@ fect.boot <- function(Y,
         }
 
     }
-    cat(dim(att.on.boot)[2], " runs\n", sep = "")
+    cat(dim(att.boot)[2], " runs\n", sep = "")
      
     ####################################
     ## Variance and CIs
@@ -657,13 +657,13 @@ fect.boot <- function(Y,
     ## ATT estimates
     if (vartype == "jackknife") {
         
-        att.on.j <- jackknifed(att.on, att.on.boot, alpha)
-        est.att.on <- cbind(att.on, att.on.j$se, att.on.j$CI.l, att.on.j$CI.u, att.on.j$P, out$count)
-        colnames(est.att.on) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+        att.j <- jackknifed(att, att.boot, alpha)
+        est.att <- cbind(att, att.j$se, att.j$CI.l, att.j$CI.u, att.j$P, out$count)
+        colnames(est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                   "p.value", "count.on")
-        rownames(est.att.on) <- out$time
+        rownames(est.att) <- out$time
 
-        att.bound <- cbind(att.on + qnorm(alpha)*att.on.j$se, att.on + qnorm(1 - alpha)*att.on.j$se)
+        att.bound <- cbind(att + qnorm(alpha)*att.j$se, att + qnorm(1 - alpha)*att.j$se)
         colnames(att.bound) <- c("CI.lower", "CI.upper")
         rownames(att.bound) <- out$time
 
@@ -719,21 +719,19 @@ fect.boot <- function(Y,
                                          "p.value")
         }
 
+    # end of jackknife S.E. and CI
     } else {
 
-        CI.att.on <- t(apply(att.on.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
-        se.att.on <- apply(att.on.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-        pvalue.att.on <- apply(att.on.boot, 1, get.pvalue)
-
-        est.att.on <- cbind(att.on, se.att.on, CI.att.on, pvalue.att.on, out$count)
-        colnames(est.att.on) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
-                                  "p.value", "count.on")
-        rownames(est.att.on) <- out$time
-        #T0.on.l <- sum(out$time.on <= 0)
-        #norm.att.on.sq <- (att.on/se.att.on)^2
-        #T0.on.p <- 1 - pchisq(sum(norm.att.on.sq[1:T0.on.l]), df = T0.on.l)
-
-        att.bound <- t(apply(att.on.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+        se.att <- apply(att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+        CI.att <- cbind(att - se.att * qnorm(1-alpha/2), att + se.att * qnorm(1-alpha/2)) # normal approximation
+        pvalue.att <- (1-pnorm(abs(att/se.att)))*2
+        est.att <- cbind(att, se.att, CI.att, pvalue.att, out$count)
+        colnames(est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                  "p.value", "count")
+        rownames(est.att) <- out$time
+        
+        # for equivalence test
+        att.bound <- cbind(att - se.att * qnorm(1-alpha), att + se.att * qnorm(1-alpha)) # one-sided
         colnames(att.bound) <- c("CI.lower", "CI.upper")
         rownames(att.bound) <- out$time
         
@@ -757,63 +755,59 @@ fect.boot <- function(Y,
         }
 
         ## average (over time) ATT
-        CI.avg <- quantile(att.avg.boot, c(alpha, 1 - alpha/2), na.rm=TRUE)
         se.avg <- sd(att.avg.boot, na.rm=TRUE)
-        pvalue.avg <- get.pvalue(att.avg.boot)
+        CI.avg <- c(att.avg - se.avg * qnorm(1-alpha/2), att.avg + se.avg * qnorm(1-alpha/2))
+        pvalue.avg <- (1-pnorm(abs(att.avg/se.avg)))*2
         est.avg <- t(as.matrix(c(att.avg, se.avg, CI.avg, pvalue.avg)))
         colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
 
-
-        CI.avg.unit <- quantile(att.avg.unit.boot, c(alpha, 1 - alpha/2), na.rm=TRUE)
         se.avg.unit <- sd(att.avg.unit.boot, na.rm=TRUE)
-        pvalue.avg.unit <- get.pvalue(att.avg.unit.boot)
+        CI.avg.unit <- c(att.avg.unit - se.avg.unit * qnorm(1-alpha/2), 
+                        att.avg.unit + se.avg.unit * qnorm(1-alpha/2))
+        pvalue.avg.unit <- (1-pnorm(abs(att.avg.unit/se.avg.unit)))*2
         est.avg.unit <- t(as.matrix(c(att.avg.unit, se.avg.unit, CI.avg.unit, pvalue.avg.unit)))
         colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper", "p.value")
-
         
+       
         ## regression coefficents
         if (p > 0) {
-            CI.beta<-t(apply(beta.boot, 1, function(vec)
-                quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
             se.beta<-apply(beta.boot, 1, function(vec)sd(vec,na.rm=TRUE))
-            pvalue.beta <- apply(beta.boot, 1, get.pvalue)
-            beta[na.pos] <- NA
-            est.beta<-cbind(beta, se.beta, CI.beta, pvalue.beta)
-            colnames(est.beta)<-c("beta", "S.E.", "CI.lower", "CI.upper", "p.value")
+            CI.beta<-cbind(c(beta) - se.beta * qnorm(1-alpha/2), c(beta) + se.beta * qnorm(1-alpha/2))
+            pvalue.beta <- (1-pnorm(abs(beta/se.beta)))*2
+            est.beta<-cbind(c(beta), se.beta, CI.beta, pvalue.beta)
+            colnames(est.beta)<-c("Coef", "S.E.", "CI.lower", "CI.upper", "p.value")
 
             if (binary == TRUE) {
-                CI.marginal<-t(apply(marginal.boot, 1, function(vec)
-                quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
-                se.marginal<-apply(marginal.boot, 1, function(vec)sd(vec,na.rm=TRUE))
-                pvalue.marginal <- apply(marginal.boot, 1, get.pvalue)
                 out$marginal[na.pos] <- NA
+                se.marginal<-apply(marginal.boot, 1, function(vec)sd(vec,na.rm=TRUE))
+                CI.marginal<-cbind(c(out$marginal) - se.marginal * qnorm(1-alpha/2), 
+                                c(out$marginal) + se.marginal * qnorm(1-alpha/2))
+                pvalue.marginal <- (1-pnorm(abs(out$marginal/se.marginal)))*2
                 est.marginal<-cbind(out$marginal, se.marginal, CI.marginal, pvalue.marginal)
                 colnames(est.marginal)<-c("marginal", "S.E.", "CI.lower", "CI.upper", "p.value")
-            }
+         }
         }
 
         ## placebo test
         if (!is.null(placebo.period) & placeboTest == TRUE) {
             att.placebo <- out$att.placebo        
-            CI.placebo <- quantile(att.placebo.boot, c(alpha/2, 1- alpha/2), na.rm=TRUE)
             se.placebo <- sd(att.placebo.boot, na.rm=TRUE)
-            pvalue.placebo <- get.pvalue(att.placebo.boot)
+            CI.placebo <- c(att.placebo - se.placebo * qnorm(1-alpha/2), 
+                        att.placebo + se.placebo * qnorm(1-alpha/2))
+            pvalue.placebo <- (1-pnorm(abs(att.placebo/se.placebo)))*2
             est.placebo <- t(as.matrix(c(att.placebo, se.placebo, CI.placebo, pvalue.placebo)))
             colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
         }
 
         ## group effect
         if (!is.null(group)) {
-
-            CI.group.att <- t(apply(group.att.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
             se.group.att <- apply(group.att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-            pvalue.group.att.on <- apply(group.att.boot, 1, get.pvalue)
-
-            est.group.att <- cbind(out$group.att, se.group.att, CI.group.att, pvalue.group.att.on)
+            CI.group.att <- cbind(c(out$group.att) - se.group.att * qnorm(1-alpha/2), 
+                                c(out$group.att) + se.group.att * qnorm(1-alpha/2))
+            pvalue.placebo <- (1-pnorm(abs(out$group.att/se.group.att)))*2
+            est.group.att <- cbind(out$group.att, se.group.att, CI.group.att, pvalue.group.att)
             colnames(est.group.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value")
-        }
-
-
+         }
     }
   
     ##storage
@@ -821,10 +815,10 @@ fect.boot <- function(Y,
                  att.avg.boot = att.avg.boot,
                  est.avg.unit = est.avg.unit,
                  att.avg.unit.boot = att.avg.unit.boot,
-                 est.att = est.att.on,
+                 est.att = est.att,
                  att.bound = att.bound,
-                 att.boot = att.on.boot,
-                 att.count.boot = att.on.count.boot)
+                 att.boot = att.boot,
+                 att.count.boot = att.count.boot)
 
     if (p>0) {
         result <- c(result,list(beta.boot = beta.boot))
