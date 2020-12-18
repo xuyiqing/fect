@@ -804,7 +804,7 @@ fect.boot <- function(Y,
             se.group.att <- apply(group.att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
             CI.group.att <- cbind(c(out$group.att) - se.group.att * qnorm(1-alpha/2), 
                                 c(out$group.att) + se.group.att * qnorm(1-alpha/2))
-            pvalue.placebo <- (1-pnorm(abs(out$group.att/se.group.att)))*2
+            pvalue.group.att <- (1-pnorm(abs(out$group.att/se.group.att)))*2
             est.group.att <- cbind(out$group.att, se.group.att, CI.group.att, pvalue.group.att)
             colnames(est.group.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value")
          }
