@@ -358,7 +358,7 @@ cv.sample <- function(I, D, count,
     }
     
     if (length(oci) <= count) {
-        stop("Too few observations are valid for cross-validation.\n")
+        stop("Too few observations are valid for cross-validation. Try to set the option cv.treat to FALSE.\n")
     }
 
     if (cv.count == 1 || count <= 2) {  ## randomly missing
