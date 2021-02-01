@@ -920,19 +920,27 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ##-------------------------------##
     ## Register clusters
     ##-------------------------------##
+
+    if((se == TRUE | permute == TRUE) & parallel==FALSE){
+        ## set seed
+        if (is.null(seed) == FALSE) {
+            set.seed(seed)
+        } 
+    }
     
     if ((se == TRUE | permute == TRUE) & parallel==TRUE) {
-
         ## set seed
         if (is.null(seed) == FALSE) {
             set.seed(seed)
         }
-   
         if (is.null(cores) == TRUE) {
             cores <- detectCores()
         }
         para.clusters <- makeCluster(cores)
         registerDoParallel(para.clusters)
+        if (is.null(seed) == FALSE) {
+            registerDoRNG(seed)
+        }
         cat("Parallel computing ...\n")
     }
     
@@ -1161,8 +1169,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }    
     
     if (se == TRUE) { 
-        test.out <- diagtest(output, pre.periods = pre.periods, 
-            f.threshold = f.threshold, tost.threshold = tost.threshold)
+        suppressWarnings(test.out <- diagtest(output, pre.periods = pre.periods, 
+            f.threshold = f.threshold, tost.threshold = tost.threshold))
         output <- c(output, list(test.out = test.out))
     }
     

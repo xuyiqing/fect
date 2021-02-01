@@ -10,8 +10,8 @@ NeedsCompilation: yes
 License: GPL-2
 Imports: Rcpp (>= 0.12.3), ggplot2 (>= 2.1.0), GGally (>= 1.0.1),
          doParallel (>= 1.0.10), foreach (>= 1.4.3), abind (>= 1.4-0), 
-         gridExtra, grid, fastplm
+         gridExtra, grid, fastplm, doRNG
 SystemRequirements: A C++11 compiler.
 Depends: R (>= 3.5.0)
 LinkingTo: Rcpp, RcppArmadillo
-RoxygenNote: 6.0.1
+RoxygenNote: 7.1.0

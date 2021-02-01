@@ -21,48 +21,16 @@ panel_beta <- function(X, xxinv, Y, FE) {
     .Call(`_fect_panel_beta`, X, xxinv, Y, FE)
 }
 
-Y_demean <- function(Y, force) {
-    .Call(`_fect_Y_demean`, Y, force)
-}
-
-fe_add <- function(alpha_Y, xi_Y, mu_Y, T, N, force) {
-    .Call(`_fect_fe_add`, alpha_Y, xi_Y, mu_Y, T, N, force)
-}
-
 panel_est <- function(X, Y, MF) {
     .Call(`_fect_panel_est`, X, Y, MF)
 }
 
-panel_factor <- function(E, r) {
-    .Call(`_fect_panel_factor`, E, r)
+inter_fe_d_qr <- function(Y, Y_fit0, FE0, factor0, xi0, X, r, force, mniter = 5000L, w = 1.0, tol = 1e-5) {
+    .Call(`_fect_inter_fe_d_qr`, Y, Y_fit0, FE0, factor0, xi0, X, r, force, mniter, w, tol)
 }
 
-panel_FE <- function(E, lambda, hard) {
-    .Call(`_fect_panel_FE`, E, lambda, hard)
-}
-
-ife <- function(E, force, mc, r, hard, lambda) {
-    .Call(`_fect_ife`, E, force, mc, r, hard, lambda)
-}
-
-fe_ad_iter <- function(Y, Y0, I, force, tolerate) {
-    .Call(`_fect_fe_ad_iter`, Y, Y0, I, force, tolerate)
-}
-
-fe_ad_covar_iter <- function(XX, xxinv, Y, Y0, I, beta0, force, tolerate) {
-    .Call(`_fect_fe_ad_covar_iter`, XX, xxinv, Y, Y0, I, beta0, force, tolerate)
-}
-
-fe_ad_inter_iter <- function(Y, Y0, I, force, mc, r, hard, lambda, tolerate) {
-    .Call(`_fect_fe_ad_inter_iter`, Y, Y0, I, force, mc, r, hard, lambda, tolerate)
-}
-
-fe_ad_inter_covar_iter <- function(XX, xxinv, Y, Y0, I, beta0, force, mc, r, hard, lambda, tolerate) {
-    .Call(`_fect_fe_ad_inter_covar_iter`, XX, xxinv, Y, Y0, I, beta0, force, mc, r, hard, lambda, tolerate)
-}
-
-beta_iter <- function(X, xxinv, Y, r, tolerate, beta0) {
-    .Call(`_fect_beta_iter`, X, xxinv, Y, r, tolerate, beta0)
+inter_fe_d_qr_ub <- function(Y, Y_fit0, FE0, factor0, xi0, X, I, r, force, mniter = 5000L, w = 1.0, tol = 1e-5) {
+    .Call(`_fect_inter_fe_d_qr_ub`, Y, Y_fit0, FE0, factor0, xi0, X, I, r, force, mniter, w, tol)
 }
 
 qr_factor <- function(F, L) {
@@ -93,18 +61,6 @@ fe_ub <- function(E, I, F_old, xi_old, force, r) {
     .Call(`_fect_fe_ub`, E, I, F_old, xi_old, force, r)
 }
 
-inter_fe <- function(Y, X, r, force, beta0, tol = 1e-5) {
-    .Call(`_fect_inter_fe`, Y, X, r, force, beta0, tol)
-}
-
-inter_fe_ub <- function(Y, Y0, X, I, beta0, r, force, tol = 1e-5) {
-    .Call(`_fect_inter_fe_ub`, Y, Y0, X, I, beta0, r, force, tol)
-}
-
-inter_fe_mc <- function(Y, Y0, X, I, beta0, r, lambda, force, tol = 1e-5) {
-    .Call(`_fect_inter_fe_mc`, Y, Y0, X, I, beta0, r, lambda, force, tol)
-}
-
 inter_fe_d <- function(Y, Y_fit0, FE0, X, r, force, mniter = 5000L, w = 1.0, tol = 1e-5) {
     .Call(`_fect_inter_fe_d`, Y, Y_fit0, FE0, X, r, force, mniter, w, tol)
 }
@@ -113,11 +69,55 @@ inter_fe_d_ub <- function(Y, Y_fit0, FE0, X, I, r, force, mniter = 5000L, w = 1.
     .Call(`_fect_inter_fe_d_ub`, Y, Y_fit0, FE0, X, I, r, force, mniter, w, tol)
 }
 
-inter_fe_d_qr <- function(Y, Y_fit0, FE0, factor0, xi0, X, r, force, mniter = 5000L, w = 1.0, tol = 1e-5) {
-    .Call(`_fect_inter_fe_d_qr`, Y, Y_fit0, FE0, factor0, xi0, X, r, force, mniter, w, tol)
+Y_demean <- function(Y, force) {
+    .Call(`_fect_Y_demean`, Y, force)
 }
 
-inter_fe_d_qr_ub <- function(Y, Y_fit0, FE0, factor0, xi0, X, I, r, force, mniter = 5000L, w = 1.0, tol = 1e-5) {
-    .Call(`_fect_inter_fe_d_qr_ub`, Y, Y_fit0, FE0, factor0, xi0, X, I, r, force, mniter, w, tol)
+fe_add <- function(alpha_Y, xi_Y, mu_Y, T, N, force) {
+    .Call(`_fect_fe_add`, alpha_Y, xi_Y, mu_Y, T, N, force)
+}
+
+panel_factor <- function(E, r) {
+    .Call(`_fect_panel_factor`, E, r)
+}
+
+panel_FE <- function(E, lambda, hard) {
+    .Call(`_fect_panel_FE`, E, lambda, hard)
+}
+
+ife <- function(E, force, mc, r, hard, lambda) {
+    .Call(`_fect_ife`, E, force, mc, r, hard, lambda)
+}
+
+inter_fe <- function(Y, X, r, force, beta0, tol = 1e-5) {
+    .Call(`_fect_inter_fe`, Y, X, r, force, beta0, tol)
+}
+
+inter_fe_ub <- function(Y, Y0, X, I, beta0, r, force, tol = 1e-5) {
+    .Call(`_fect_inter_fe_ub`, Y, Y0, X, I, beta0, r, force, tol)
+}
+
+fe_ad_iter <- function(Y, Y0, I, force, tolerate) {
+    .Call(`_fect_fe_ad_iter`, Y, Y0, I, force, tolerate)
+}
+
+fe_ad_covar_iter <- function(XX, xxinv, Y, Y0, I, beta0, force, tolerate) {
+    .Call(`_fect_fe_ad_covar_iter`, XX, xxinv, Y, Y0, I, beta0, force, tolerate)
+}
+
+fe_ad_inter_iter <- function(Y, Y0, I, force, mc, r, hard, lambda, tolerate) {
+    .Call(`_fect_fe_ad_inter_iter`, Y, Y0, I, force, mc, r, hard, lambda, tolerate)
+}
+
+fe_ad_inter_covar_iter <- function(XX, xxinv, Y, Y0, I, beta0, force, mc, r, hard, lambda, tolerate) {
+    .Call(`_fect_fe_ad_inter_covar_iter`, XX, xxinv, Y, Y0, I, beta0, force, mc, r, hard, lambda, tolerate)
+}
+
+beta_iter <- function(X, xxinv, Y, r, tolerate, beta0) {
+    .Call(`_fect_beta_iter`, X, xxinv, Y, r, tolerate, beta0)
+}
+
+inter_fe_mc <- function(Y, Y0, X, I, beta0, r, lambda, force, tol = 1e-5) {
+    .Call(`_fect_inter_fe_mc`, Y, Y0, X, I, beta0, r, lambda, force, tol)
 }
 
