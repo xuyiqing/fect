@@ -148,7 +148,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     break
                 }
                 if (cv.n > 100) {
-                    stop("Some units have too few pre-treatment observations. Try to remove them.")
+                    stop("Some units have too few pre-treatment observations. Try to remove them or set the option \"cv.treat\" to FALSE.")
                 }
                 ## cv.id.all <- c(cv.id.all, list(cv.id))
             }
