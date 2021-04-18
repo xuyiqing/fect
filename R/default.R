@@ -2,7 +2,7 @@
 ## (fect: fixed effects counterfactuals)
 ## Version 0.1.0
 ## Author: Licheng Liu (Tsinghua), Ye Wang(NYU), Yiqing Xu(Stanford)
-## Date: 2019.01.02
+## Date: 2021.04.17
 
 ## MAIN FUNCTION
 ## fect.formula()
@@ -67,6 +67,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  degree = 2,  # wald = FALSE, # fit test
                  placebo.period = NULL, # placebo test period
                  placeboTest = FALSE, # placebo test
+                 placeboEquiv = FALSE, # leave one period out placebo  
                  permute = FALSE, ## permutation test
                  m = 2, ## block length
                  normalize = FALSE # accelerate option
@@ -115,6 +116,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          degree = 2,   # wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
+                         placeboEquiv = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
                          normalize = FALSE
@@ -159,7 +161,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         max.missing, proportion, pre.periods, 
                         f.threshold, tost.threshold,
                         knots, degree, 
-                        placebo.period, placeboTest, 
+                        placebo.period, placeboTest, placeboEquiv,
                         permute, m, normalize)
     
     out$call <- match.call()
@@ -211,6 +213,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          degree = 2,  # wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
+                         placeboEquiv = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
                          normalize = FALSE
@@ -299,6 +302,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             r <- 0
         }
     } 
+
+    ## leave one period out placebo 
+    if (placeboEquiv == TRUE) {
+        se <- TRUE 
+        placeboTest <- FALSE
+    }
 
     ## CV
     if (method == "both") {
@@ -1043,6 +1052,144 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         warning("Multi-colinearity among covariates. Try removing some of them.\r")
     }
 
+    pre.est.att <- pre.att.bound <- NULL
+    ## leave one period out placebo test for pre-treatment periods 
+    if (placeboEquiv == TRUE) {
+
+        r.cv <- out$r.cv 
+        lambda.cv <- out$lambda.cv 
+        method <- out$method
+        if (method == "fe") {
+            method <- "ife"
+        }
+
+        cat("\nBootstrap for pre-treatment periods.\n")
+        ## cat(out$method)
+        pre.term.min <- min(c(T.on), na.rm = TRUE)
+        if (is.null(placebo.period)) {
+            pre.term <- pre.term.min:0
+        } else {
+            pre.term.bound <- sort(placebo.period)
+            pre.term <- pre.term.bound[1]:pre.term.bound[2]
+        }  
+
+        pre.est.att <- matrix(NA, length(pre.term), 6)
+        pre.att.bound <- matrix(NA, length(pre.term), 2)
+
+        rownames(pre.est.att) <- rownames(pre.att.bound) <- pre.term
+        colnames(pre.est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                  "p.value", "count.on")
+        colnames(pre.att.bound) <- c("CI.lower", "CI.upper")
+
+        jj <- 1 
+        for (kk in pre.term) {
+            
+            placebo.pos <- which(T.on == kk)
+
+            pX <- X 
+            pY <- Y 
+            pD <- D 
+            pI <- I 
+            pII <- II 
+            pT.on <- T.on
+            pG <- G
+
+            pII[placebo.pos] <- 0
+
+
+            ## remove treated units that have too few observations
+            T0.2 <- apply(pII, 2, sum)
+
+            if (sum(T0.2[which(apply(D, 2, sum) > 0)] >= min.T0) == 0) {
+                cat("\n")
+                cat(paste("All treated units have been removed for period ", kk, sep = ""))
+                cat("\n")
+                jj <- jj + 1
+            } else {
+
+                rm.id.2.pos <- sort(which(T0.2 < min.T0))
+                rm.id.2 <- rem.id[rm.id.2.pos] 
+                rem.id.2 <- setdiff(rem.id, rm.id.2)
+
+                rem.id <- rem.id.2
+                rm.id <- setdiff(1:N, rem.id)
+                 
+                if (length(rm.id.2) > 0) {
+                    X.old <- pX
+                    if (p > 0) {
+                        pX <- array(0,dim = c(TT, (N - length(rm.id)), p))
+                        for (i in 1:p) {
+                            subX <- X.old[, , i]
+                            pX[, , i] <- as.matrix(subX[, -rm.id.2.pos])
+                        }
+                    } else {
+                        pX <- array(0,dim = c(TT, (N - length(rm.id)), 0))
+                    }
+
+                    # N <- N - length(rm.id)
+                    pY <- as.matrix(Y[,-rm.id.2.pos])
+                    pD <- as.matrix(D[,-rm.id.2.pos])
+                    pI <- as.matrix(I[,-rm.id.2.pos]) ## after removing
+                    pII <- as.matrix(II[,-rm.id.2.pos])
+                    pT.on <- as.matrix(T.on[,-rm.id.2.pos])
+                    #if (!is.null(cl)) {
+                    #    cl <- cl[-rm.id.2.pos]
+                    #}
+                    if (!is.null(group)) {
+                        ## group <- group[-rm.id.2.pos]
+                        ## rawgroup <- rawgroup[-rm.id.2.pos]
+                        pG <- as.matrix(G[,-rm.id.2.pos])
+                    }
+                }
+
+                p.out <- fect.boot(Y = pY, D = pD, X = pX, I = pI, II = pII,
+                             T.on = pT.on, T.off = T.off, cl = NULL,
+                             method = method, degree = degree,
+                             knots = knots, criterion = criterion,
+                             CV = 0, k = k, cv.prop = cv.prop,
+                             cv.treat = cv.treat, cv.nobs = cv.nobs,
+                             r = r.cv, r.end = r.end, 
+                             nlambda = nlambda, lambda = lambda,
+                             alpha = alpha, binary = binary, QR = QR,
+                             force = force, hasRevs = hasRevs,
+                             tol = tol, norm.para = norm.para,
+                             placeboTest = 0, 
+                             placebo.period = NULL,
+                             vartype = vartype,
+                             nboots = nboots, parallel = parallel,
+                             cores = cores, group.level = NULL, group = NULL)
+                #p.out <- fect.boot(Y = pY, D = pD, X = pX, I = pI, II = pII,
+                #              T.on = pT.on, T.off = T.off, cl = NULL,
+                #              method = out$method, degree = degree,
+                #              knots = knots, criterion = criterion,
+                #              CV = 0, k = k, cv.prop = cv.prop,
+                #              cv.treat = cv.treat, cv.nobs = cv.nobs,
+                #              r = out$r.cv, r.end = r.end, 
+                #              nlambda = nlambda, lambda = out$lambda.cv,
+                #              alpha = alpha, binary = binary, QR = QR,
+                #              force = force, hasRevs = hasRevs,
+                #              tol = tol, norm.para = norm.para,
+                #              placeboTest = 0, 
+                #              placebo.period = NULL,
+                #              vartype = vartype,
+                #              nboots = nboots, parallel = parallel,
+                #              cores = cores, group.level = NULL, group = NULL)
+
+                p.est.att <- p.out$est.att 
+                p.att.bound <- p.out$att.bound 
+                p.pos <- which(as.numeric(rownames(p.est.att)) == kk)
+
+                pre.est.att[jj, ] <- p.est.att[p.pos, ]
+                pre.att.bound[jj, ] <- p.att.bound[p.pos, ]
+
+                jj <- jj + 1
+            }
+        }   
+    }
+
+
+
+
     ## permutation test 
     if (permute == TRUE) {
         cat("Permuting under sharp null hypothesis ... ")
@@ -1178,6 +1325,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (permute == TRUE) {
         output <- c(output,list(permute = permute.result))
     }
+
+    if (placeboEquiv == TRUE) {
+        output <- c(output, list(pre.est.att = pre.est.att, pre.att.bound = pre.att.bound))
+    }
+
+
     output <- c(output, list(call = match.call()))
 
     class(output) <- "fect"

@@ -39,4 +39,4 @@ S3method("interFE", "formula")
 S3method("print", "interFE")
 export(att.cumu)
 
-
+export(fect.boot)

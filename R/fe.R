@@ -336,6 +336,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
 
     method <- ifelse(r.cv > 0, "ife", "fe")
 
+
   
     ##-------------------------------##
     ##            Storage            ##
