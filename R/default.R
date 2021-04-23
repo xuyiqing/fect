@@ -945,7 +945,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if (is.null(cores) == TRUE) {
             cores <- detectCores()
         }
-        para.clusters <- makeCluster(cores)
+        para.clusters <- future::makeClusterPSOCK(cores)
         registerDoParallel(para.clusters)
         if (is.null(seed) == FALSE) {
             registerDoRNG(seed)
