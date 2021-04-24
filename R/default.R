@@ -67,7 +67,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  degree = 2,  # wald = FALSE, # fit test
                  placebo.period = NULL, # placebo test period
                  placeboTest = FALSE, # placebo test
-                 placeboEquiv = FALSE, # leave one period out placebo  
+                 loo = FALSE, # leave one period out placebo  
                  permute = FALSE, ## permutation test
                  m = 2, ## block length
                  normalize = FALSE # accelerate option
@@ -116,7 +116,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          degree = 2,   # wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
-                         placeboEquiv = FALSE, # leave one period out placebo
+                         loo = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
                          normalize = FALSE
@@ -161,7 +161,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                         max.missing, proportion, pre.periods, 
                         f.threshold, tost.threshold,
                         knots, degree, 
-                        placebo.period, placeboTest, placeboEquiv,
+                        placebo.period, placeboTest, loo,
                         permute, m, normalize)
     
     out$call <- match.call()
@@ -213,7 +213,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          degree = 2,  # wald = FALSE,
                          placebo.period = NULL,
                          placeboTest = FALSE,
-                         placeboEquiv = FALSE, # leave one period out placebo
+                         loo = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
                          normalize = FALSE
@@ -222,6 +222,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ##-------------------------------##
     ## Checking Parameters
     ##-------------------------------## 
+    placeboEquiv <- loo 
     ## read data 
     if (is.data.frame(data) == FALSE || length(class(data)) > 1) {
         data <- as.data.frame(data)
@@ -1070,8 +1071,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             pre.term <- pre.term.min:0
         } else {
             pre.term.bound <- sort(placebo.period)
-            pre.term <- pre.term.bound[1]:pre.term.bound[2]
-        }  
+            pre.term <- pre.term.bound[1]:pre.term.bound[length(pre.term.bound)]
+        } 
+
+        placebo.period <- pre.term[1]:pre.term[length(pre.term)] 
 
         pre.est.att <- matrix(NA, length(pre.term), 6)
         pre.att.bound <- matrix(NA, length(pre.term), 2)
@@ -1107,23 +1110,24 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 jj <- jj + 1
             } else {
 
+                rem.id.new <- rem.id
                 rm.id.2.pos <- sort(which(T0.2 < min.T0))
-                rm.id.2 <- rem.id[rm.id.2.pos] 
-                rem.id.2 <- setdiff(rem.id, rm.id.2)
+                rm.id.2 <- rem.id.new[rm.id.2.pos] 
+                rem.id.2 <- setdiff(rem.id.new, rm.id.2)
 
-                rem.id <- rem.id.2
-                rm.id <- setdiff(1:N, rem.id)
+                rem.id.new <- rem.id.2
+                rm.id.new <- setdiff(1:N, rem.id.new)
                  
                 if (length(rm.id.2) > 0) {
                     X.old <- pX
                     if (p > 0) {
-                        pX <- array(0,dim = c(TT, (N - length(rm.id)), p))
+                        pX <- array(0,dim = c(TT, (N - length(rm.id.new)), p))
                         for (i in 1:p) {
                             subX <- X.old[, , i]
                             pX[, , i] <- as.matrix(subX[, -rm.id.2.pos])
                         }
                     } else {
-                        pX <- array(0,dim = c(TT, (N - length(rm.id)), 0))
+                        pX <- array(0,dim = c(TT, (N - length(rm.id.new)), 0))
                     }
 
                     # N <- N - length(rm.id)
@@ -1151,7 +1155,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                              r = r.cv, r.end = r.end, 
                              nlambda = nlambda, lambda = lambda,
                              alpha = alpha, binary = binary, QR = QR,
-                             force = force, hasRevs = hasRevs,
+                             force = force, hasRevs = 0,
                              tol = tol, norm.para = norm.para,
                              placeboTest = 0, 
                              placebo.period = NULL,

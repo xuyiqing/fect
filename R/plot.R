@@ -7,6 +7,9 @@
 # id: plot a part of units
 plot.fect <- function(x,  
   type = "gap", # gap, equiv, missing
+  loo = FALSE,
+  highlight = TRUE,
+  plot.ci = "95", ## "90", "95", "both"
   switch.on = TRUE,
   bound = NULL,
   vis = "connected",
@@ -45,6 +48,7 @@ plot.fect <- function(x,
     ##-------------------------------##
     ## Checking Parameters
     ##-------------------------------## 
+    pequiv <- !is.null(x$pre.est.att) ## leave one out pre-treatment  
     
     equiv.p <- NULL
     type.old <- type
@@ -60,6 +64,18 @@ plot.fect <- function(x,
     placebo.period <- x$placebo.period
     binary <- x$binary
     Ftest <- !is.null(x$pre.test)
+
+    if (!plot.ci  %in% c("90", "95", "none") && is.null(x$est.att)) {
+        stop("No uncertainty estimates.")
+    }
+
+    if (pequiv) {
+        placeboTest <- TRUE
+    }
+
+    if (loo == TRUE && pequiv == FALSE) {
+        stop("No leave one out results for pre-treatment periods.")
+    }
      
 
     if (class(x) != "fect") {
@@ -171,6 +187,40 @@ plot.fect <- function(x,
             }
         }
     }
+
+
+    ## generate new data containing 90% ci 
+    est.bound <- est.att <- NULL 
+    if (!is.null(x$est.att)) {
+        est.att <- x$est.att 
+        est.bound <- x$att.bound
+        colnames(est.bound) <- c("CI.lower.90", "CI.upper.90") ## 90% ci 
+        est.att <- cbind(est.att, est.bound)
+    }
+
+    pre.est.att <- pre.att.bound <- NULL
+    if (pequiv) {
+        pre.est.att <- x$pre.est.att
+        pre.att.bound <- x$pre.att.bound 
+
+        colnames(pre.att.bound) <- c("CI.lower.90", "CI.upper.90") ## 90% ci
+        pre.est.att <- cbind(pre.est.att, pre.att.bound)
+
+        ## replace pre-treatment period with loo results 
+        t0 <- t1 <- NULL 
+        t.s <- t.e <- NULL
+        if (loo) {
+            t0 <- rownames(pre.est.att)
+            t1 <- rownames(est.att)
+
+            t.s <- which(t1 == t0[1])
+            t.e <- which(t1 == t0[length(t0)])
+
+            est.att[t.s:t.e ,] <- pre.est.att 
+
+        } 
+    }
+
     
     ## gap or equiv
     ytitle <- NULL
@@ -190,13 +240,13 @@ plot.fect <- function(x,
 
         ## change to 90% CI
         if (placeboTest == FALSE) {
-            est.att <- x$est.att
-            est.bound <- x$att.bound
+            #est.att <- x$est.att
+            #est.bound <- x$att.bound
 
-            est.att[, "CI.lower"] <- est.bound[, "CI.lower"]
-            est.att[, "CI.upper"] <- est.bound[, "CI.upper"]
+            #est.att[, "CI.lower"] <- est.bound[, "CI.lower"]
+            #est.att[, "CI.upper"] <- est.bound[, "CI.upper"]
 
-            x$est.att <- est.att
+            #x$est.att <- est.att
 
             if (switch.on == TRUE) {
                 if (length(xlim)==0) {
@@ -461,7 +511,7 @@ plot.fect <- function(x,
     tost <- function(coef, se, range) {
         z <- coef/se
         p1 <- 1 - pnorm((-range[1]+coef)/se) # left bound
-        p2 <- 1 - pnorm((range[2]-coef)/se) # right bound
+        p2 <- 1 - pnorm((range[2]-coef)/se)  # right bound
         tost.p <- max(p1,p2)
         return(tost.p)
     }
@@ -517,8 +567,10 @@ plot.fect <- function(x,
                 } else {
                     time0 <- which(time[show] <= 0)
                 }
-                att.sub <- as.matrix(x$att.bound[show, ])
+                ## att.sub <- as.matrix(x$att.bound[show, ])
                 ## att.sub <- as.matrix(x$est.att[show, ])
+                att.sub <- as.matrix(est.att[show, c("CI.lower.90", "CI.upper.90")])
+                minBound <- max(abs(att.sub[time0, c("CI.lower.90", "CI.upper.90")]))
 
             } else {
                 if (sum(time[show] > 0) == 0) {
@@ -528,9 +580,9 @@ plot.fect <- function(x,
                     time0 <- which(time[show] >= 1)
                 }
                 att.sub <- as.matrix(x$att.off.bound[show, ])
+                minBound <- max(abs(att.sub[time0, c("CI.lower", "CI.upper")]))
             }
-
-            minBound <- max(abs(att.sub[time0, c("CI.lower", "CI.upper")]))
+            
             minbound <- c(-minBound, minBound)
 
             ## equivalence range
@@ -555,12 +607,12 @@ plot.fect <- function(x,
 
             ## change ci if plot bounds
             if (bound.old != "none") {
-                if (!is.null(x$est.att)) {
-                    c.est.att <- x$est.att
-                    c.est.att[, "CI.lower"] <- x$att.bound[, "CI.lower"]
-                    c.est.att[, "CI.upper"] <- x$att.bound[, "CI.upper"]
-                    x$est.att <- c.est.att
-                }
+                #if (!is.null(x$est.att)) {
+                #    c.est.att <- x$est.att
+                #    c.est.att[, "CI.lower"] <- x$att.bound[, "CI.lower"]
+                #    c.est.att[, "CI.upper"] <- x$att.bound[, "CI.upper"]
+                #    x$est.att <- c.est.att
+                #}
                 if (!is.null(x$est.att.off)) {
                     c.est.att <- x$est.att.off
                     c.est.att[, "CI.lower"] <- x$att.off.bound[, "CI.lower"]
@@ -577,6 +629,7 @@ plot.fect <- function(x,
                 bound.time <- bound.time[which(bound.time >= 1)]
             }
             
+
             ## add legend for 95\% CI
             set.limits <- "ci"
             if (is.null(legend.labs)==TRUE) {
@@ -661,35 +714,46 @@ plot.fect <- function(x,
         }
         
 
+        
+
         ## data frame for main estimates
         if (switch.on == TRUE) {            
 
             ## switch-on effect
-            if (CI==FALSE) {               
+            if (CI == FALSE) {               
 
                 data <- cbind.data.frame(time, ATT = x$att, count = count.num)[show,]                
 
             } else {
 
-                tb <- x$est.att
+                tb <- est.att
                 data <- cbind.data.frame(time, tb)[show,]
                 colnames(data)[2] <- "ATT"
 
-                if (placeboTest == TRUE) {
-                    data[,"ATT4"] <- data[,"ATT3"] <- data[,"ATT2"] <- data[,"ATT"]
-                    data[,"CI.lower4"] <- data[,"CI.lower3"] <- data[,"CI.lower2"] <- data[,"CI.lower"]
-                    data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,"CI.upper"]                    
-                    pos1 <- intersect(which(data[,"time"] >= (placebo.period[1] + 1)), which(data[,"time"] <= (placebo.period[2] - 1)))
-                    pos2 <- c(which(data[,"time"] <= (placebo.period[1] - 1)), which(data[,"time"] >= (placebo.period[2] + 1)))
-                    pos3 <- intersect(which(data[,"time"] >= (placebo.period[1])), which(data[,"time"] <= (placebo.period[2] - 1)))
-                    pos4 <- c(which(data[,"time"] <= (placebo.period[1] - 2)), which(data[,"time"] >= (placebo.period[2] + 1)))
-                    data[pos1, c("ATT","CI.lower","CI.upper")] <- NA
-                    data[pos2, c("ATT2","CI.lower2","CI.upper2")] <- NA
-                    data[pos3, c("ATT3","CI.lower3","CI.upper3")] <- NA
-                    data[pos4, c("ATT4","CI.lower4","CI.upper4")] <- NA
+                if (plot.ci %in% c("90", "95")) {
+                    if (placeboTest == TRUE && length(placebo.period) != 1) {
+                        data[,"ATT4"] <- data[,"ATT3"] <- data[,"ATT2"] <- data[,"ATT"]
+                        
+                        ci.name <- NULL
+                        if (plot.ci == "95") {
+                            ci.name <- c("CI.lower", "CI.upper")
+                        } else if (plot.ci == "90") {
+                            ci.name <- c("CI.lower.90", "CI.upper.90")
+                        }
+                        data[,"CI.lower4"] <- data[,"CI.lower3"] <- data[,"CI.lower2"] <- data[,ci.name[1]]
+                        data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]                    
+                        
+                        pos1 <- intersect(which(data[,"time"] >= (placebo.period[1] + 1)), which(data[,"time"] <= (placebo.period[2] - 1)))
+                        pos2 <- c(which(data[,"time"] <= (placebo.period[1] - 1)), which(data[,"time"] >= (placebo.period[2] + 1)))
+                        pos3 <- intersect(which(data[,"time"] >= (placebo.period[1])), which(data[,"time"] <= (placebo.period[2] - 1)))
+                        pos4 <- c(which(data[,"time"] <= (placebo.period[1] - 2)), which(data[,"time"] >= (placebo.period[2] + 1)))
+                        data[pos1, c("ATT", ci.name[1], ci.name[2])] <- NA
+                        data[pos2, c("ATT2","CI.lower2","CI.upper2")] <- NA
+                        data[pos3, c("ATT3","CI.lower3","CI.upper3")] <- NA
+                        data[pos4, c("ATT4","CI.lower4","CI.upper4")] <- NA
+                    }
                 }
             }
-
         }        
 
         # height of the histogram
@@ -760,7 +824,7 @@ plot.fect <- function(x,
         }
 
         # horizontal 0 line
-        p <- p + geom_hline(yintercept = 0, colour=lcolor,size = lwidth)
+        p <- p + geom_hline(yintercept = 0, colour = lcolor,size = lwidth)
             # vertical 0 line
         if (length(xlim)!=0) {
             if ((xlim[2]>=1 & switch.on == TRUE) | (xlim[1]<=0 & switch.on == FALSE)) {
@@ -784,16 +848,59 @@ plot.fect <- function(x,
          plot.title = element_text(size = cex.main, hjust = 0.5, face="bold", margin = margin(10, 0, 10, 0)))
 
 
-        ## point estimates
-        if (placeboTest == FALSE) {
+        ## point estimates 
+        if (highlight == FALSE || (length(placebo.period) == 1 && plot.ci %in% c("90", "95")) || placeboTest == FALSE) {
             ## point estimates
-            p <- p + geom_line(data = data, aes(time, ATT), size = 1.2)
-            ## CIs
-            if (CI == TRUE) {
-                p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)                
+            if (plot.ci %in% c("90", "95")) {
+                p <- p + geom_line(data = data, aes(time, ATT), size = 1.2)
+                if (vis == "connected") {
+                    p <- p + geom_point(data = data, aes(time, ATT), size = 1.2)
+                }
+                ## CIs
+                if (CI == TRUE) {
+                    p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)                
+                }
+            } else {
+                p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.2)
+                p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=1)
             }
-            ## stats
+
+        } else {
+            ## point estimates
             p.label <- NULL
+            if (plot.ci %in% c("90", "95")) {
+                p <- p + geom_line(data = data, aes(time, ATT3), size = 0.7)
+                p <- p + geom_line(data = data, aes(time, ATT4), size = 0.7, colour = "#4671D5")
+                if (vis == "connected") {
+                    p <- p + geom_point(data = data, aes(time, ATT), size = 1.2)
+                    p <- p + geom_point(data = data, aes(time, ATT2), size = 1.2, colour = "#4671D5")
+                }
+                ## CIs
+                p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2)
+                p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF")
+            } else {
+                
+                pos.ci <- intersect(which(data[,"time"] >= (placebo.period[1])), which(data[,"time"] <= (placebo.period[length(placebo.period)])))
+                pos.ci2 <- setdiff(1:dim(data)[1], pos.ci)
+
+
+                p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.2, color="blue", fill="blue")
+                p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=1, color="blue", fill="blue")
+
+                p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.2)
+                p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=1)
+
+            }
+
+        }
+
+
+        ## stats
+        p.label <- NULL
+        #if (highlight == FALSE || placeboTest == FALSE ) {
+        if (placeboTest == FALSE || loo) {
+
+            
             for (i in 1:length(stats)) {
                 if ("F.p" %in% stats[i]) {
                     p.label1 <- NULL
@@ -829,21 +936,12 @@ plot.fect <- function(x,
                     p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f",tost.equiv.p))
                     p.label <- paste0(p.label, p.label1, "\n")
                 }
-            }                
+            } 
+        } else {               
                
 
-        } else { # placebo plot
-            ## point estimates
-            p.label <- NULL
-            p <- p + geom_line(data = data, aes(time, ATT3), size = 0.7)
-            p <- p + geom_line(data = data, aes(time, ATT4), size = 0.7, colour = "#4671D5")
-            if (vis == "connected") {
-                p <- p + geom_point(data = data, aes(time, ATT), size = 1.2)
-                p <- p + geom_point(data = data, aes(time, ATT2), size = 1.2, colour = "#4671D5")
-            }
-            ## CIs
-            p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2)
-            p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF")
+        #} else { # placebo plot
+            
             
             ## stats
             for (i in 1:length(stats)) {
@@ -864,7 +962,8 @@ plot.fect <- function(x,
                     p.label <- paste0(p.label, p.label1, "\n")
                 }                
             }
-        }        
+        #} 
+        }       
 
         ## mark stats
         hpos <- ifelse(switch.on == TRUE, 0, 1)
