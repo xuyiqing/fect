@@ -1054,6 +1054,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     pre.est.att <- pre.att.bound <- NULL
+    pre.term <- NULL
+    N_bar <- NULL
     ## leave one period out placebo test for pre-treatment periods 
     if (placeboEquiv == TRUE) {
 
@@ -1064,27 +1066,44 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             method <- "ife"
         }
 
-        cat("\nBootstrap for pre-treatment periods.\n")
-        ## cat(out$method)
-        pre.term.min <- min(c(T.on), na.rm = TRUE)
-        if (is.null(placebo.period)) {
-            pre.term <- pre.term.min:0
+        cat("\nOut-of-Sample Test…\n")
+        
+        ## pre.periods 
+        if (is.null(proportion)==TRUE) {
+            proportion <- 0    
+        }
+        max.count <- max(out$count)
+        max.pre.periods <- out$time[which(out$count >= max.count * proportion & out$time <= 0)]
+        if (is.null(pre.periods) == TRUE) {        
+            pre.periods <- max.pre.periods        
         } else {
-            pre.term.bound <- sort(placebo.period)
-            pre.term <- pre.term.bound[1]:pre.term.bound[length(pre.term.bound)]
-        } 
+            pre.periods <- intersect(pre.periods[1]:pre.periods[length(pre.periods)], max.pre.periods)
+        }
+
+        pre.term <- pre.periods
+        N_bar <- max(out$count[which(out$time >= pre.periods[1] & out$time <= pre.periods[2])])
+
+        #if (is.null(placebo.period)) {
+        #    pre.term <- pre.term.min:0
+        #} else {
+        #    pre.term.bound <- sort(placebo.period)
+        #    pre.term <- pre.term.bound[1]:pre.term.bound[length(pre.term.bound)]
+        #} 
 
         placebo.period <- pre.term[1]:pre.term[length(pre.term)] 
 
         pre.est.att <- matrix(NA, length(pre.term), 6)
         pre.att.bound <- matrix(NA, length(pre.term), 2)
+        pre.att.boot <- matrix(NA, length(pre.term), nboots)
 
         rownames(pre.est.att) <- rownames(pre.att.bound) <- pre.term
         colnames(pre.est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                   "p.value", "count.on")
         colnames(pre.att.bound) <- c("CI.lower", "CI.upper")
 
-        jj <- 1 
+        jj <- length(pre.term)
+        pre.term <- sort(pre.term, decreasing = TRUE)
+
         for (kk in pre.term) {
             
             placebo.pos <- which(T.on == kk)
@@ -1107,8 +1126,17 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 cat("\n")
                 cat(paste("All treated units have been removed for period ", kk, sep = ""))
                 cat("\n")
-                jj <- jj + 1
+                jj <- jj - 1
+            
             } else {
+
+                te <- paste("Pre-period ", kk, sep = "")
+                if (kk == 0) {
+                    te <- paste(te, "(one period before treatment)", sep = " ")
+                }
+                cat("\n")
+                cat(te)
+                cat("\n")
 
                 rem.id.new <- rem.id
                 rm.id.2.pos <- sort(which(T0.2 < min.T0))
@@ -1161,7 +1189,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                              placebo.period = NULL,
                              vartype = vartype,
                              nboots = nboots, parallel = parallel,
-                             cores = cores, group.level = NULL, group = NULL)
+                             cores = cores, group.level = NULL, group = NULL, 
+                             dis = FALSE)
                 #p.out <- fect.boot(Y = pY, D = pD, X = pX, I = pI, II = pII,
                 #              T.on = pT.on, T.off = T.off, cl = NULL,
                 #              method = out$method, degree = degree,
@@ -1185,8 +1214,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
                 pre.est.att[jj, ] <- p.est.att[p.pos, ]
                 pre.att.bound[jj, ] <- p.att.bound[p.pos, ]
+                pre.att.boot[jj, ] <- p.out$att.boot[p.pos, ]
 
-                jj <- jj + 1
+                jj <- jj - 1
             }
         }   
     }
@@ -1319,11 +1349,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         ## cat("\n\n")
     }    
     
-    if (se == TRUE) { 
-        suppressWarnings(test.out <- diagtest(output, pre.periods = pre.periods, 
-            f.threshold = f.threshold, tost.threshold = tost.threshold))
-        output <- c(output, list(test.out = test.out))
-    }
+    #if (se == TRUE) { 
+    #    suppressWarnings(test.out <- diagtest(output, pre.periods = pre.periods, 
+    #        f.threshold = f.threshold, tost.threshold = tost.threshold))
+    #    output <- c(output, list(test.out = test.out))
+    #}
     
     
     if (permute == TRUE) {
@@ -1331,7 +1361,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     if (placeboEquiv == TRUE) {
-        output <- c(output, list(pre.est.att = pre.est.att, pre.att.bound = pre.att.bound))
+        output <- c(output, list(pre.est.att = pre.est.att, pre.att.bound = pre.att.bound, pre.att.boot = pre.att.boot))
+    }
+
+    if (placeboEquiv || placeboTest) {
+        suppressWarnings(test.out <- diagtest(output, pre.periods = pre.periods, 
+            f.threshold = f.threshold, tost.threshold = tost.threshold, N_bar = N_bar))
+        output <- c(output, list(test.out = test.out))
     }
 
 
@@ -1348,7 +1384,8 @@ diagtest <- function(
     proportion = 0.3,
     pre.periods = NULL, 
     f.threshold = NULL, 
-    tost.threshold = NULL
+    tost.threshold = NULL,
+    N_bar = 1
     ){
 
     # get equivalence p values for two-one-sided-t tests
@@ -1375,36 +1412,38 @@ diagtest <- function(
 
     } # end of placebo test
 
-    if (is.null(proportion)==TRUE) {
-        proportion <- 0    
-    }
-    max.pre.periods <- sum(x$time<=0)
-    if (is.null(pre.periods)==TRUE) {        
-        pre.periods <- max.pre.periods        
-    } else {
-        pre.periods <- min(pre.periods, max.pre.periods)
-    }
-    max.count <- max(x$count)
-    pre.periods <- length(x$time[which(x$count >= max.count * proportion & x$time<=0)])
+    #if (is.null(proportion)==TRUE) {
+    #    proportion <- 0    
+    #}
+    max.pre.periods <- pre.pos <- NULL
+    #if (is.null(pre.periods)==TRUE) {        
+    #    pre.periods <- max.pre.periods        
+    #} else {
+    #    pre.periods <- min(pre.periods, max.pre.periods)
+    #}
+    #max.count <- max(x$count)
+    #pre.periods <- length(x$time[which(x$count >= max.count * proportion & x$time<=0)])
   
     # testing no pre-trend
     if (x$placeboTest == FALSE) {
-        pos <- which(x$time <= 0)
-        l.pos <- length(pos)
-        count <- x$count[x$time <= 0]
-        count0 <- x$count[x$time == 0]
-        count.len <- length(pos)
-        pre.pos <- NULL ## use
-        if (pre.periods==max.pre.periods) {
-            pre.pos <- pos[-1] # all but the first period
-        } else {
-            pos <- pos[(count.len - pre.periods  +1):count.len]
-            count <- count[(count.len - pre.periods  +1):count.len]
-            pre.pos <- pos                 
-        }
-        res_boot <- x$att.boot
+        max.pre.periods <- sum(x$time<=0)
+        pre.pos <- 1:dim(x$pre.att.boot)[1]
+        #pos <- which(x$time <= 0)
+        #l.pos <- length(pos)
+        #count <- x$count[x$time <= 0]
+        #count0 <- x$count[x$time == 0]
+        #count.len <- length(pos)
+        #pre.pos <- NULL ## use
+        #if (pre.periods==max.pre.periods) {
+        #    pre.pos <- pos[-1] # all but the first period
+        #} else {
+        #    pos <- pos[(count.len - pre.periods + 1):count.len]
+        #    count <- count[(count.len - pre.periods  + 1):count.len]
+        #    pre.pos <- pos                 
+        #}
+        res_boot <- x$pre.att.boot
         nboots <- ncol(res_boot)
-        if (length(pre.pos) == l.pos) {
+        if (length(pre.pos) == max.pre.periods) {
             pre.pos <- pre.pos[-1]
             cat("Cannot use full pre-treatment periods. The first period is removed.\n")
         }
@@ -1413,9 +1452,10 @@ diagtest <- function(
         } else {
             res_boot <- t(as.matrix(res_boot[pre.pos, ]))
         }
-        D <- as.matrix(x$att[pre.pos])
+        
+        D <- as.matrix(x$pre.est.att[pre.pos, 1])
         coef_mat <- res_boot    
-        N_bar <- max(count)
+        #N_bar <- max(count)
         S <- cov(t(coef_mat)) ## * N_bar
         psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
         if ('try-error' %in% class(psi)) {
@@ -1436,10 +1476,10 @@ diagtest <- function(
         }
 
         # TOST
-        est.att <- x$est.att[,c(1:2)]
-        pos.zero <- which(x$time == 0)
-        first.test.period <- x$time[pos.zero - pre.periods + 1]
-        est.att <- est.att[which(x$time<=0 & x$time>first.test.period),,drop = FALSE]
+        est.att <- x$pre.est.att[,c(1:2)]
+        #pos.zero <- which(x$time == 0)
+        #first.test.period <- x$time[pos.zero - pre.periods + 1]
+        #est.att <- est.att[which(x$time<=0 & x$time>first.test.period),,drop = FALSE]
         tost.equiv.p <- max(sapply(1:nrow(est.att), function(i){
                         return(tost(est.att[i,1], est.att[i,2], c(-tost.threshold, tost.threshold)))
                     })) # keep the maximum p value

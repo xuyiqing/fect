@@ -8,11 +8,11 @@
 plot.fect <- function(x,  
   type = "gap", # gap, equiv, missing
   loo = FALSE,
-  highlight = TRUE,
-  plot.ci = "95", ## "90", "95", "both"
+  highlight = NULL,
+  plot.ci = NULL, ## "90", "95", "both"
   switch.on = TRUE,
   bound = NULL,
-  vis = "connected",
+  vis = NULL,
   count = TRUE,
   proportion = 0.3, # control the xlim
   pre.periods = NULL, # for testing
@@ -65,12 +65,32 @@ plot.fect <- function(x,
     binary <- x$binary
     Ftest <- !is.null(x$pre.test)
 
-    if (!plot.ci  %in% c("90", "95", "none") && is.null(x$est.att)) {
-        stop("No uncertainty estimates.")
+    if (!is.null(plot.ci)) {
+        if (!plot.ci  %in% c("90", "95", "none") && is.null(x$est.att)) {
+            stop("No uncertainty estimates.")
+        }
+    } else {
+        if (pequiv) {
+            plot.ci <- "90"
+        } else {
+            plot.ci <- "95"
+        }
     }
 
-    if (pequiv) {
-        placeboTest <- TRUE
+    if (is.null(vis)) {
+        if (placeboTest) {
+            vis <- "connected"
+        } else {
+            vis <- "none"
+        }
+    }
+
+    if (is.null(highlight)) {
+        if (placeboTest) {
+            highlight <- TRUE
+        } else {
+            highlight <- FALSE
+        }
     }
 
     if (loo == TRUE && pequiv == FALSE) {
@@ -152,8 +172,11 @@ plot.fect <- function(x,
     if (is.null(stats)== TRUE) {
         if (type == "gap") {
             if (placeboTest == TRUE) {
-                stats <- "placebo.p"
-            } else {
+                stats <- c("placebo.p", "equiv.p")
+            } else if (loo == TRUE && pequiv) {
+                stats <- c("F.p", "equiv.p")
+            }
+            else {
                 stats <- c("none")
             }
         } else {
@@ -188,6 +211,13 @@ plot.fect <- function(x,
         }
     }
 
+    if (pequiv && loo) {
+        placeboTest <- TRUE
+    }
+
+    if (loo == TRUE && pequiv == TRUE && plot.ci == "90" && is.null(bound)) {
+        bound <- "both"
+    }
 
     ## generate new data containing 90% ci 
     est.bound <- est.att <- NULL 
@@ -858,7 +888,13 @@ plot.fect <- function(x,
                 }
                 ## CIs
                 if (CI == TRUE) {
-                    p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)                
+                    if (plot.ci == "95") {
+                            p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)                
+                        } else {
+                            p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower.90, ymax=CI.upper.90),alpha=0.2)                
+
+                        }
+                    
                 }
             } else {
                 p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.2)
@@ -914,24 +950,24 @@ plot.fect <- function(x,
                 }
                 if ("F.equiv.p" %in% stats[i]) {
                     # calculate new p value
-                    if (is.null(f.threshold)==FALSE | is.null(proportion) == FALSE | is.null(pre.periods) == FALSE) {
-                        test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, f.threshold = f.threshold)
-                        f.equiv.p <- test.out$f.equiv.p
-                    } else {
+                    #if (is.null(f.threshold)==FALSE | is.null(proportion) == FALSE | is.null(pre.periods) == FALSE) {
+                    #    test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, f.threshold = f.threshold)
+                    #    f.equiv.p <- test.out$f.equiv.p
+                    #} else {
                         f.equiv.p <- x$test.out$f.equiv.p
-                    }
+                    #}
                     p.label1 <- NULL
                     p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f",f.equiv.p))
                     p.label <- paste0(p.label, p.label1, "\n")
                 }
                 if ("equiv.p" %in% stats[i]) {
                     # calculate new p value
-                    if (is.null(tost.threshold)==FALSE | is.null(proportion) == FALSE | is.null(pre.periods) == FALSE) {
-                        test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, tost.threshold = tost.threshold)
-                        tost.equiv.p <- test.out$tost.equiv.p
-                    } else {
+                    #if (is.null(tost.threshold)==FALSE | is.null(proportion) == FALSE | is.null(pre.periods) == FALSE) {
+                    #    test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, tost.threshold = tost.threshold)
+                    #    tost.equiv.p <- test.out$tost.equiv.p
+                    #} else {
                         tost.equiv.p <- x$test.out$tost.equiv.p
-                    }
+                    #}
                     p.label1 <- NULL
                     p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f",tost.equiv.p))
                     p.label <- paste0(p.label, p.label1, "\n")
@@ -952,12 +988,12 @@ plot.fect <- function(x,
                 }
                 if ("equiv.p" %in% stats[i]) {
                     p.label1 <- NULL
-                    if (is.null(tost.threshold)==FALSE | is.null(proportion) == FALSE| is.null(pre.periods) == FALSE) {
-                        test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, tost.threshold = tost.threshold)
-                        placebo.equiv.p <- test.out$placebo.equiv.p
-                    } else {
+                    #if (is.null(tost.threshold)==FALSE | is.null(proportion) == FALSE| is.null(pre.periods) == FALSE) {
+                    #    test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, tost.threshold = tost.threshold)
+                    #    placebo.equiv.p <- test.out$placebo.equiv.p
+                    #} else {
                         placebo.equiv.p <- x$test.out$placebo.equiv.p
-                    }
+                    #}
                     p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f", placebo.equiv.p))
                     p.label <- paste0(p.label, p.label1, "\n")
                 }                

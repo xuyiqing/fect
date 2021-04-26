@@ -36,7 +36,8 @@ fect.boot <- function(Y,
                       parallel = TRUE,
                       cores = NULL,
                       group.level = NULL,
-                      group = NULL) {
+                      group = NULL,
+                      dis = TRUE) {
     
     
     na.pos <- NULL
@@ -86,14 +87,18 @@ fect.boot <- function(Y,
                            group.level = group.level, group = group)
         
         } else if (method == "mc") {
-            out <- fect.mc(Y = Y, X = X, D = D, I = I, II = II,
+            out <- try(fect.mc(Y = Y, X = X, D = D, I = I, II = II,
                            T.on = T.on, T.off = T.off, 
                            lambda.cv = lambda, force = force, hasRevs = hasRevs, 
                            tol = tol, boot = 0,
                            norm.para = norm.para,
                            placebo.period = placebo.period,
                            placeboTest = placeboTest,
-                           group.level = group.level, group = group)
+                           group.level = group.level, group = group), silent = TRUE)
+            if ('try-error' %in% class(out)) {
+                stop("\nCannot estimate using full data with MC algorithm.\n")
+            }
+
         
         } else if (method %in% c("polynomial", "bspline")) {
             out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
@@ -200,10 +205,12 @@ fect.boot <- function(Y,
         group.att.boot <- matrix(0, length(group.att), nboots)
     } 
 
-    if (vartype == "jackknife") {
-        cat("Jackknife estimates ... ")
-    } else {
-        cat("Bootstrapping for uncertainties ... ")
+    if (dis) {
+      if (vartype == "jackknife") {
+          cat("Jackknife estimates ... ")
+      } else {
+          cat("Bootstrapping for uncertainties ... ")
+      }
     }
 
     if (binary == TRUE && vartype == "parametric") {
@@ -632,7 +639,10 @@ fect.boot <- function(Y,
         }
 
     }
-    cat(dim(att.boot)[2], " runs\n", sep = "")
+    if (dis) {
+      cat(dim(att.boot)[2], " runs\n", sep = "")
+    }
+    
      
     ####################################
     ## Variance and CIs
