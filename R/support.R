@@ -340,14 +340,88 @@ cv.sample2 <- function(I, count) {
 
 
 ## cross validation sampling
+#cv.sample <- function(I, D, count, 
+#                      cv.count = 3, 
+#                      cv.treat = FALSE) {
+    
+#    N <- dim(I)[2]
+#    TT <- dim(I)[1]
+#    tr.pos <- which(apply(D, 2, sum) >= 1) ## treated units
+#    D.fake <- matrix(0, TT, N)
+
+#    cv.id <- NULL
+#    if (cv.treat == FALSE) {
+#        oci <- which(c(I) == 1)
+#    } else {
+#        D.fake[, tr.pos] <- 1
+#        oci <- which(c(I) == 1 & c(D.fake) == 1)
+#    }
+    
+#    if (length(oci) <= count) {
+#        stop("Too few observations are valid for cross-validation. Try setting the option cv.treat to FALSE.\n")
+#    }
+
+#    if (cv.count == 1 || count <= 2) {  ## randomly missing
+#        cv.id <- sample(oci, count, replace = FALSE)
+#    } else {
+        ## remove boundary observation 
+#        if (cv.treat == FALSE) {
+#            rm.pos <- c()
+#            for (i in 1:(cv.count - 1)) {
+#                rm.pos <- c(rm.pos, (TT * (0:(N-1)) + i))
+#            }
+#            oci2 <- setdiff(oci, rm.pos)
+#        } else {
+#            rm.pos <- c()
+#            for (i in 1:(cv.count - 1)) {
+#                rm.pos <- c(rm.pos, (TT * (tr.pos - 1) + i))
+#            }
+#            oci2 <- setdiff(oci, rm.pos)
+#        }
+
+        ## randomly select 1/cv.count
+#        subcount <- floor(count/cv.count)
+#        if (subcount == 0) {
+#            subcount <- 1
+#        }
+#        rm.id <- sample(oci2, subcount, replace = FALSE)
+#        rm.id.all <- c()
+#        for (i in 1:(cv.count - 1)) {
+#            rm.id.all <- c(rm.id.all, rm.id - i)
+#        }
+#        rm.id.all <- c(rm.id.all, rm.id)
+
+#        cv.id1 <- unique(rm.id.all)
+#        pos <- unlist(sapply(1:length(cv.id1), function(i) cv.id1[i] %in% oci))
+#        cv.id1 <- cv.id1[pos]
+
+#        if (length(cv.id1) >= count) {
+#            cv.id1 <- cv.id1[1:count]
+#            cv.id2 <- NULL
+#        } else {
+#            cv.id2 <- sample(setdiff(oci, cv.id1), (count - length(cv.id1)), replace = FALSE)
+#        }
+#        
+#        cv.id <- sort(c(cv.id1, cv.id2))
+#    }
+    
+#    return(cv.id)
+#}
+
+## cross validation sampling
 cv.sample <- function(I, D, count, 
                       cv.count = 3, 
-                      cv.treat = FALSE) {
+                      cv.treat = FALSE,
+                      cv.donut = 1) {
     
+    ## prop <- sum(c(I))
+
     N <- dim(I)[2]
     TT <- dim(I)[1]
     tr.pos <- which(apply(D, 2, sum) >= 1) ## treated units
     D.fake <- matrix(0, TT, N)
+
+    prop <- (TT * N) / sum(c(I))
 
     cv.id <- NULL
     if (cv.treat == FALSE) {
@@ -358,52 +432,114 @@ cv.sample <- function(I, D, count,
     }
     
     if (length(oci) <= count) {
-        stop("Too few observations are valid for cross-validation. Try to set the option cv.treat to FALSE.\n")
+        stop("Too few observations are valid for cross-validation. Try setting the option cv.treat to FALSE.\n")
     }
 
     if (cv.count == 1 || count <= 2) {  ## randomly missing
         cv.id <- sample(oci, count, replace = FALSE)
+        rm.id.use <- cv.id
     } else {
-        ## remove boundary observation 
-        if (cv.treat == FALSE) {
-            rm.pos <- c()
-            for (i in 1:(cv.count - 1)) {
-                rm.pos <- c(rm.pos, (TT * (0:(N-1)) + i))
-            }
-            oci2 <- setdiff(oci, rm.pos)
-        } else {
-            rm.pos <- c()
-            for (i in 1:(cv.count - 1)) {
-                rm.pos <- c(rm.pos, (TT * (tr.pos - 1) + i))
-            }
-            oci2 <- setdiff(oci, rm.pos)
-        }
+        res <- TT %% cv.count 
+        int <- floor(TT / cv.count)
+        rm.pos <- c()
 
         ## randomly select 1/cv.count
-        subcount <- floor(count/cv.count)
+        subcount <- floor(count/cv.count * prop)
+        
         if (subcount == 0) {
             subcount <- 1
         }
-        rm.id <- sample(oci2, subcount, replace = FALSE)
-        rm.id.all <- c()
-        for (i in 1:(cv.count - 1)) {
-            rm.id.all <- c(rm.id.all, rm.id - i)
-        }
-        rm.id.all <- c(rm.id.all, rm.id)
 
-        cv.id1 <- unique(rm.id.all)
-        pos <- unlist(sapply(1:length(cv.id1), function(i) cv.id1[i]%in%oci))
-        cv.id1 <- cv.id1[pos]
-
-        if (length(cv.id1) >= count) {
-            cv.id1 <- cv.id1[1:count]
-            cv.id2 <- NULL
+        if (cv.treat == FALSE) {
+            for (i in 1:N) {
+                rm.pos <- c(rm.pos, (TT * (i - 1) + res) + seq(from = 1, by = cv.count, length.out = int))
+            }
         } else {
-            cv.id2 <- sample(setdiff(oci, cv.id1), (count - length(cv.id1)), replace = FALSE)
+            for (i in tr.pos) {
+                rm.pos <- c(rm.pos, (TT * (i - 1) + res) + seq(from = 1, by = cv.count, length.out = int))
+            }
         }
+
+        rm.id <- sample(rm.pos, subcount, replace = FALSE)
+        rm.id.all <- rm.id 
+        rm.id.use <- NULL
+
+        if (cv.count == 2) {
+            rm.id.all <- c(rm.id, rm.id + 1)
+            rm.id.use <- rm.id.all
+        } else {
+            for (i in 1:(cv.count -  1)) {
+                rm.id.all <- c(rm.id.all, rm.id + i)
+                if (i >= cv.donut && i <= (cv.count - cv.donut - 1)) {
+                    rm.id.use <- c(rm.id.use, rm.id + i)
+                }
+            }
+        }
+
+        ##rm.id.all <- c(rm.id, rm.id + 1, rm.id + 2)
         
-        cv.id <- sort(c(cv.id1, cv.id2))
+        rm.id.all <- intersect(rm.id.all, oci) ## remove missing values
+        rm.id.all <- sort(rm.id.all)
+
+        rm.id.use <- intersect(rm.id.use, oci)
+        rm.id.use <- sort(rm.id.use)
+
+        cv.id2 <- NULL
+        if (length(rm.id.all) >= count) {
+            cv.id <- rm.id.all[1:count]
+            pos.cv <- which(rm.id.use >= min(cv.id) & rm.id.use <= max(cv.id))
+            rm.id.use <- rm.id.use[pos.cv]
+            #if (length(rm.id.use) >= count) {
+            #    rm.id.use <- rm.id.use[1:count]
+            #}
+        } else {
+            cv.id2 <- sample(setdiff(oci, rm.id.all), (count - length(rm.id.all)), replace = FALSE)
+            cv.id <- sort(c(rm.id.all, cv.id2))
+            ## rm.id.use <- sort(c(rm.id.use, cv.id2))
+
+        }
+
+        ## remove boundary observation 
+        #if (cv.treat == FALSE) {
+        #    rm.pos <- c()
+        #    for (i in 1:(cv.count - 1)) {
+        #        rm.pos <- c(rm.pos, (TT * (0:(N-1)) + i))
+        #    }
+        #    oci2 <- setdiff(oci, rm.pos)
+        #} else {
+        #    rm.pos <- c()
+        #    for (i in 1:(cv.count - 1)) {
+        #        rm.pos <- c(rm.pos, (TT * (tr.pos - 1) + i))
+        #    }
+        #    oci2 <- setdiff(oci, rm.pos)
+        #}
+
+        ## randomly select 1/cv.count
+        #subcount <- floor(count/cv.count)
+        #if (subcount == 0) {
+        #    subcount <- 1
+        #}
+        #rm.id <- sample(oci2, subcount, replace = FALSE)
+        #rm.id.all <- c()
+        #for (i in 1:(cv.count - 1)) {
+        #    rm.id.all <- c(rm.id.all, rm.id - i)
+        #}
+        #rm.id.all <- c(rm.id.all, rm.id)
+
+        #cv.id1 <- unique(rm.id.all)
+        #pos <- unlist(sapply(1:length(cv.id1), function(i) cv.id1[i] %in% oci))
+        #cv.id1 <- cv.id1[pos]
+
+        #if (length(cv.id1) >= count) {
+        #    cv.id1 <- cv.id1[1:count]
+        #    cv.id2 <- NULL
+        #} else {
+        #    cv.id2 <- sample(setdiff(oci, cv.id1), (count - length(cv.id1)), replace = FALSE)
+        #}
+        
+        #cv.id <- sort(c(cv.id1, cv.id2))
     }
     
-    return(cv.id)
+    return(list(cv.id = cv.id,         ## marked id
+                est.id = rm.id.use))   ## id used for mspe
 }

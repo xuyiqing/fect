@@ -45,6 +45,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  cv.prop = 0.1, ## proportion of CV counts
                  cv.treat = TRUE, ## cv targeting treated units
                  cv.nobs = 3,  ## cv taking consecutive units
+                 cv.donut = 1, ## cv mspe
                  binary = FALSE, # probit model
                  QR = FALSE, # QR or SVD for binary probit 
                  method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
@@ -94,6 +95,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
                          cv.prop = 0.1, ## proportion of CV counts
                          cv.treat = TRUE, 
                          cv.nobs = 3,
+                         cv.donut = 1, ## cv mspe
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
@@ -154,7 +156,7 @@ fect.formula <- function(formula = NULL,data, # a data frame (long-form)
     out <- fect.default(formula = NULL, data = data, Y = Yname,
                         D = Dname, X = Xname, group,
                         na.rm, index, force, cl, r, lambda, nlambda, 
-                        CV, k, cv.prop, cv.treat, cv.nobs,
+                        CV, k, cv.prop, cv.treat, cv.nobs, cv.donut,
                         binary, QR, method, criterion, alpha, se, 
                         vartype,
                         nboots, parallel, cores, tol, seed, min.T0,
@@ -191,6 +193,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          cv.prop = 0.1,
                          cv.treat = TRUE, 
                          cv.nobs = 3,
+                         cv.donut = 1, ## cv mspe
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: ife for interactive fe; mc for matrix completion

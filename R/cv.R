@@ -14,6 +14,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     cv.prop = 0.1,
                     cv.treat = TRUE, 
                     cv.nobs = 3,
+                    cv.donut = 1,
                     r = 0, # initial number of factors considered if CV==1
                     r.end,
                     nlambda = 10, 
@@ -125,6 +126,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
         ociCV <- matrix(NA, cv.count, k) ## store indicator
         rmCV <- matrix(NA, rm.count, k) ## removed indicator
+        estCV <- NULL ## used for mspe 
+
+
         Y0CV <- array(NA, dim = c(TT, N, k)) ## store initial Y0
         if (p > 0) {
            beta0CV <- array(NA, dim = c(p, 1, k)) 
@@ -138,7 +142,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             repeat{
                 cv.n <- cv.n + 1
                 ## cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
-                cv.id <- cv.sample(II, D, rm.count, cv.nobs, cv.treat)
+                get.cv <- cv.sample(II, D, rm.count, cv.nobs, cv.treat, cv.donut)
+                cv.id <- get.cv$cv.id
                 ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
                 II.cv <- II
                 II.cv[cv.id] <- 0
@@ -155,6 +160,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             rmCV[,i] <- cv.id
             ocicv <- setdiff(oci, cv.id)
             ociCV[,i] <- ocicv
+
+            estCV <- c(estCV, list(get.cv$est.id))
 
             initialOutCv <- initialFit(data = data.ini, force = force, oci = ocicv)
             Y0CV[,,i] <- initialOutCv$Y0
@@ -202,9 +209,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         YY.cv <- YY
                         YY.cv[rmCV[,ii]] <- 0
                         est.cv.fit <- inter_fe_ub(YY.cv, as.matrix(Y0CV[,,ii]), X, II.cv, as.matrix(beta0CV[,,ii]), r, force, tol)$fit
-                        SSE <- SSE + sum((YY[rmCV[,ii]]-est.cv.fit[rmCV[,ii]])^2)
+                        
+                        SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) ## sum((YY[rmCV[,ii]]-est.cv.fit[rmCV[,ii]])^2)
                     }
-                    MSPE <- SSE/(k*(sum(II) - cv.count))
+                    MSPE <- SSE/(length(unlist(estCV)))
                 }
                 
 
@@ -353,9 +361,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     YY.cv <- YY
                     YY.cv[rmCV[,ii]] <- 0
                     est.cv.fit <- inter_fe_mc(YY.cv, as.matrix(Y0CV[,,ii]), X, II.cv, as.matrix(beta0CV[,,ii]), 1, lambda[i], force, tol)$fit
-                    SSE <- SSE + sum((YY[rmCV[,ii]]-est.cv.fit[rmCV[,ii]])^2)
+                    SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) ## sum((YY[rmCV[,ii]]-est.cv.fit[rmCV[,ii]])^2)
                 }
-                MSPE <- SSE/(k*(sum(II) - cv.count))
+                MSPE <- SSE/(length(unlist(estCV)))
 
                 est.cv <- inter_fe_mc(YY, Y0, X, II, beta0, 1, lambda[i], force, tol) ## overall
                 ## sigma2 <- est.cv$sigma2
