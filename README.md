@@ -7,7 +7,7 @@
 
 **Maintainer:** Licheng Liu
 
-**How to Uses:** [Examples](http://yiqingxu.org/software/fect/fect_examples.html)
+**How to Uses:** [Examples](http://yiqingxu.org/software/fect/fect.html)
 
 **Reference:**  Licheng Liu, Ye Wang, Yiqing Xu (2019). "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data." Working Paper, Stanford University.
 
