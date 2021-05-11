@@ -1184,7 +1184,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                              CV = 0, k = k, cv.prop = cv.prop,
                              cv.treat = cv.treat, cv.nobs = cv.nobs,
                              r = r.cv, r.end = r.end, 
-                             nlambda = nlambda, lambda = lambda,
+                             nlambda = nlambda, lambda = lambda.cv,
                              alpha = alpha, binary = binary, QR = QR,
                              force = force, hasRevs = 0,
                              tol = tol, norm.para = norm.para,
