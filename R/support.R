@@ -125,8 +125,11 @@ initialFit <- function(data, ## long form data
             ## res <- as.matrix(lm.fit$residuals)
         }
     } else {
+        fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
+                           ind = as.matrix(ind[oci,]),drop.singletons = FALSE)
+
         lm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
-                           ind = as.matrix(ind[oci,]))))
+                           ind = as.matrix(ind[oci,]),drop.singletons = FALSE)))
         y0 <- suppressWarnings(predict(lm.fit, x = x, ind = ind))
         Y0 <- matrix(y0, T, N)
         if (p > 0) {
@@ -201,7 +204,7 @@ BiInitialFit <- function(data, ## long form data
         }
     } else {         ## with additive fixed effects
         plm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
-                           ind = as.matrix(ind[oci,]))))
+                           ind = as.matrix(ind[oci,]),drop.singletons = FALSE)))
         y0 <- suppressWarnings(predict(plm.fit, x = x, ind = ind))
         Y0 <- matrix(y0, T, N)
         mu <- plm.fit$intercept
@@ -415,7 +418,6 @@ cv.sample <- function(I, D, count,
                       cv.donut = 1) {
     
     ## prop <- sum(c(I))
-
     N <- dim(I)[2]
     TT <- dim(I)[1]
     tr.pos <- which(apply(D, 2, sum) >= 1) ## treated units
@@ -429,16 +431,16 @@ cv.sample <- function(I, D, count,
     } else {
         D.fake[, tr.pos] <- 1
         oci <- which(c(I) == 1 & c(D.fake) == 1)
-    }
-    
-    if (length(oci) <= count) {
-        stop("Too few observations are valid for cross-validation. Try setting the option cv.treat to FALSE.\n")
+        if (length(oci) <= count) {
+            stop("Too few observations are valid for cross-validation. Try to set the option cv.treat to FALSE or set a smaller cv.prop.\n")
+        }
     }
 
     if (cv.count == 1 || count <= 2) {  ## randomly missing
         cv.id <- sample(oci, count, replace = FALSE)
         rm.id.use <- cv.id
-    } else {
+    } 
+    else {
         res <- TT %% cv.count 
         int <- floor(TT / cv.count)
         rm.pos <- c()
@@ -468,7 +470,7 @@ cv.sample <- function(I, D, count,
             rm.id.all <- c(rm.id, rm.id + 1)
             rm.id.use <- rm.id.all
         } else {
-            for (i in 1:(cv.count -  1)) {
+            for (i in 0:(cv.count -  1)) {
                 rm.id.all <- c(rm.id.all, rm.id + i)
                 if (i >= cv.donut && i <= (cv.count - cv.donut - 1)) {
                     rm.id.use <- c(rm.id.use, rm.id + i)

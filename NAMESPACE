@@ -17,7 +17,7 @@ importFrom("ggplot2", "ggplot_build", "geom_boxplot", "geom_density", "geom_tile
            "scale_linetype_manual", "scale_size_manual", "theme", "geom_area", 
            "scale_colour_manual", "aes", "annotate", "ggtitle", "geom_rect", 
            "scale_color_discrete", "scale_color_manual", "ggplotGrob", 
-           "guide_legend", "margin", "geom_jitter",  
+           "guide_legend", "margin", "geom_jitter", "geom_pointrange", 
            "guides","xlab","ylab","element_rect","geom_errorbar")
 importFrom("abind", "abind")
 importFrom("GGally", "ggpairs")
@@ -27,17 +27,16 @@ importFrom("grid", "textGrob", "gpar")
 importFrom("fastplm", "fastplm")
 export(diagtest)
 
-
-
 export(fect)
+export(get.cohort)
 S3method("fect", "default")
 S3method("fect", "formula")
 S3method("print", "fect")
 S3method("plot", "fect")
 export(interFE)
+
 S3method("interFE", "default")
 S3method("interFE", "formula")
 S3method("print", "interFE")
 export(att.cumu)
-
 export(fect.boot)

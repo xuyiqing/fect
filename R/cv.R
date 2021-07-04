@@ -15,8 +15,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     cv.treat = TRUE, 
                     cv.nobs = 3,
                     cv.donut = 1,
+                    min.T0 = 5,
                     r = 0, # initial number of factors considered if CV==1
                     r.end,
+                    proportion = 0,
                     nlambda = 10, 
                     lambda = NULL,
                     force, 
@@ -60,7 +62,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
     ## observed Y0 indicator:
     oci <- which(c(II) == 1)
-    initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+    initialOut <- initialFit(data = data.ini, 
+                             force = force, 
+                             oci = oci)
     Y0 <- initialOut$Y0
     beta0 <- initialOut$beta0
     if (p > 0 && sum(is.na(beta0)) > 0) {
@@ -76,13 +80,13 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
     if (r.end >= T0.min) {
         if (method %in% c("both", "ife")) {
-            cat("Facotr number should not be greater than ", T0.min-1, "\n", sep = "")
+            cat("Factor number should not be greater than ", T0.min-1, "\n", sep = "")
         }
         r.end <- T0.min-1
     } else {
         if (obs.con) {
             if (method %in% c("both", "ife")) {
-                cat("Facotr number should not be greater than ", r.end, "\n", sep = "")
+                cat("Factor number should not be greater than ", r.end, "\n", sep = "")
             }
         }
     }
@@ -102,19 +106,44 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     r.cv <- 0 ## initial value
 
     if (method %in% c("ife", "both") && r.max == 0) {
-        
         r.cv <- 0
         cat("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
-        est.best <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
-
+        est.best <- inter_fe_ub(YY, Y0, 
+                                X, II, beta0, 
+                                0, force = force, 
+                                tol)
     } else {
 
         r.old <- r ## save the minimal number of factors 
         cat("Cross-validating ...","\n") 
+        if(criterion=='mspe'){
+            cat("Criterion: Mean Squared Prediction Error\n")
+        }
+        else if(criterion=='wmspe'){
+            cat("Criterion: Weighted Mean Squared Prediction Error\n")
+        }
+        else if(criterion=='gmspe'){
+            cat("Criterion: Geometric Mean Squared Prediction Error\n")
+        }
+        else if(criterion=='wgmspe'){
+            cat("Criterion: Weighted Geometric Mean Squared Prediction Error\n")
+        }
+        else if(criterion=='mad'){
+            cat("Criterion: Median Absolute Deviation\n")
+        }
+        else if(criterion=='moment'){
+            cat("Criterion: Moment Conditions\n")
+        }
+        else if(criterion=='gmoment'){
+            cat("Criterion: Geometric Moment Conditions\n")
+        }
+        else if(criterion=='pc'){
+            cat("Criterion: PC\n")
+        }
 
-                         ## ----- ##
+        ## ----- ##
         ## ------------- initialize ------------ ##
-                         ## ----- ##
+        ## ----- ##
         
         cv.pos <- which(t.on<=0)
         t.on.cv <- t.on[cv.pos]
@@ -124,8 +153,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         rm.count <- floor(sum(II)*cv.prop)
         cv.count <- sum(II) - rm.count
 
-        ociCV <- matrix(NA, cv.count, k) ## store indicator
-        rmCV <- matrix(NA, rm.count, k) ## removed indicator
+        #ociCV <- matrix(NA, cv.count, k) ## store indicator
+        #rmCV <- matrix(NA, rm.count, k) ## removed indicator
+        ociCV <- list()
+        rmCV <- list()
         estCV <- NULL ## used for mspe 
 
 
@@ -137,33 +168,66 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         }
         
         ## cv.id.all <- c()
+        flag <- 0
         for (i in 1:k) {
             cv.n <- 0
             repeat{
                 cv.n <- cv.n + 1
-                ## cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
-                get.cv <- cv.sample(II, D, rm.count, cv.nobs, cv.treat, cv.donut)
+                #cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
+                get.cv <- cv.sample(II, D, 
+                                    count = rm.count, 
+                                    cv.count = cv.nobs, 
+                                    cv.treat = cv.treat, 
+                                    cv.donut = cv.donut)
                 cv.id <- get.cv$cv.id
                 ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
-                II.cv <- II
+                II.cv.valid <- II.cv <- II
                 II.cv[cv.id] <- 0
+                II.cv.valid[cv.id] <- -1
+                ## ziyi: if certain rows or columns doesn't satisfy con1 or con2,
+                ## replace the row or column of II.cv using the corresponding rows or columns in II
+                
                 con1 <- sum(apply(II.cv, 1, sum) >= 1) == TT
-                con2 <- sum(apply(II.cv, 2, sum) >= 1) == N
-                if (con1 & con2) {
+                con2 <- sum(apply(II.cv, 2, sum) >= min.T0) == N
+
+                if(con1==TRUE & con2==TRUE) {
                     break
                 }
-                if (cv.n > 100) {
-                    stop("Some units have too few pre-treatment observations. Try to remove them or set the option \"cv.treat\" to FALSE.")
+
+                if (cv.n>=200) {
+                    flag <- 1
+                    #cat("Some units have too few pre-treatment observations. Remove them automatically in Cross-Validation.")
+                    keep.1 <- which(apply(II.cv, 1, sum) < 1)
+                    keep.2 <- which(apply(II.cv, 2, sum) < min.T0)
+                    II.cv[keep.1,] <- II[keep.1,]
+                    II.cv[,keep.2] <- II[,keep.2]
+                    II.cv.valid[keep.1,] <- II[keep.1,]
+                    II.cv.valid[,keep.2] <- II[,keep.2]
+                    cv.id <- which(II.cv.valid!=II)
+                    break
                 }
-                ## cv.id.all <- c(cv.id.all, list(cv.id))
             }
-            rmCV[,i] <- cv.id
+
+            if(length(cv.id)==0){
+                stop("Some units have too few pre-treatment observations. Set a larger \"cv.prop\" or set \"cv.treat\" to FALSE.")
+            }
+
+            rmCV[[i]] <- cv.id
             ocicv <- setdiff(oci, cv.id)
-            ociCV[,i] <- ocicv
+            ociCV[[i]] <- ocicv
+            
+            if(cv.n<200){
+                estCV <- c(estCV, list(get.cv$est.id))
+            }
+            else{
+                cv.id.old <- get.cv$cv.id
+                cv.diff <- setdiff(cv.id.old, cv.id)
+                estCV <- c(estCV,list(setdiff(get.cv$est.id,cv.diff)))
+            }
 
-            estCV <- c(estCV, list(get.cv$est.id))
-
-            initialOutCv <- initialFit(data = data.ini, force = force, oci = ocicv)
+            initialOutCv <- initialFit(data = data.ini, 
+                                       force = force, 
+                                       oci = ocicv)
             Y0CV[,,i] <- initialOutCv$Y0
             
             if (p > 0) {
@@ -174,49 +238,118 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 beta0CV[,,i] <- beta0cv
             }
         }
+
+        if(flag == 1){
+            cat("Some units have too few pre-treatment observations. Remove them automatically in Cross-Validation.\n")
+        }
     
+        ## get weighted matrix
+        count.T.cv <- count.T.cv.old <- table(T.on)
+        count.T.cv.old <- count.T.cv <- count.T.cv[which(as.numeric(names(count.T.cv))<=0)]
+        cv.prop.cut <- max(count.T.cv.old)*proportion
+        cv.drop.index <- which(count.T.cv.old<=cv.prop.cut)
+
+        count.T.cv <- count.T.cv/mean(count.T.cv)
+        name.count.T.cv <- names(count.T.cv)
+        count.T.cv <- c(count.T.cv,median(count.T.cv))
+        names(count.T.cv) <- c(name.count.T.cv,"Control")
+        count.T.cv[cv.drop.index] <- 0 # set weights to 0 for the periods when the number of treated observations is less than ..
+
         ##  --------------------------------------------- ##
 ##  ---------------- cross validation for ife model ------------------  ##
         ##  --------------------------------------------- ##
         
         if (method %in% c("ife", "both")) {
             
-            # cat("Interactive fixed effects model...\n")
+            cat("Interactive fixed effects model...\n")
             
-            r.pc <- est.pc.best <- MSPE.best <- MSPE.pc.best <- NULL
+            r.pc <- est.pc.best <- MSPE.best <- WMSPE.best <- MSPE.pc.best <- NULL
+            gmoment.best <- moment.best <- MAD.best <- GMSPE.best <- WGMSPE.best <- NULL
+            
             if (criterion == "PC") {
                 CV.out.ife <- matrix(NA, (r.max - r.old + 1), 6)
                 colnames(CV.out.ife) <- c("r", "sigma2", "IC", "PC", "MSPTATT", "MSE")
-            } else {
-                CV.out.ife <- matrix(NA, (r.max - r.old + 1), 7)
-                colnames(CV.out.ife) <- c("r", "sigma2", "IC", "PC", "MSPE", "MSPTATT", "MSE")
+            } 
+            else {
+                CV.out.ife <- matrix(NA, (r.max - r.old + 1), 13)
+                colnames(CV.out.ife) <- c("r", "sigma2", "IC", "PC", 
+                                          "MSPE","WMSPE","GMSPE","WGMSPE", "MAD", "Moment", "GMoment", "MSPTATT", "MSE")
             }
             
             CV.out.ife[,"r"] <- c(r.old:r.max)
-            CV.out.ife[,"PC"] <- CV.out.ife[,"MSPE"] <- 1e20
-                        
-            for (i in 1:dim(CV.out.ife)[1]) { ## cross-validation loop starts 
+            CV.out.ife[,"PC"] <- CV.out.ife[,"GMoment"] <- CV.out.ife[,"Moment"] <- CV.out.ife[,"MAD"] <- CV.out.ife[,"MSPE"] <- CV.out.ife[,"WMSPE"] <- CV.out.ife[,"GMSPE"] <- CV.out.ife[,"WGMSPE"] <- 1e20
 
+            for (i in 1:dim(CV.out.ife)[1]) { ## cross-validation loop starts 
                 ## inter FE based on control, before & after 
                 r <- CV.out.ife[i, "r"]  
                 ## k <- 5
-                
-                if (criterion %in% c("mspe", "both")) {
+                if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment")) {
                     SSE <- 0
+                    WSSE <- 0
+                    GSSE <- 0
+                    WGSSE <- 0
+                    ll.length <- 0
+                    moment.list <- c()
+                    index.moment.list <- c()
+                    MAD.list <- c()
                     for (ii in 1:k) {
                         II.cv <- II
-                        II.cv[rmCV[,ii]] <- 0
+                        II.cv[rmCV[[ii]]] <- 0
                         YY.cv <- YY
-                        YY.cv[rmCV[,ii]] <- 0
+                        YY.cv[rmCV[[ii]]] <- 0
                         est.cv.fit <- inter_fe_ub(YY.cv, as.matrix(Y0CV[,,ii]), X, II.cv, as.matrix(beta0CV[,,ii]), r, force, tol)$fit
-                        
-                        SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) ## sum((YY[rmCV[,ii]]-est.cv.fit[rmCV[,ii]])^2)
+                        index.cv <- as.character(T.on[estCV[[ii]]])
+                        index.cv[which(is.na(index.cv))] <- "Control"
+                        weight.cv <- count.T.cv[index.cv]
+                        names(weight.cv) <- NULL
+                        SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) 
+                        WSSE <- WSSE + sum(weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
+                        GSSE <- GSSE + sum(log((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2))
+                        ll <- weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2
+                        ll <- ll[which(ll>0)] 
+                        WGSSE <- WGSSE + sum(log(ll))
+                        ll.length <- ll.length + length(ll)
+                        MAD.list <- c(MAD.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
+                        # moment conditions
+                        moment.list <- c(moment.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]]))
+                        index.moment.list <- c(index.moment.list,index.cv)
+                        #resid.mean <- tapply((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]]), index.cv, mean)
+                        #resid.mean <- abs(resid.mean)
+                        #weight.cv <- count.T.cv[names(resid.mean)]
+                        #names(weight.cv) <- NULL
+                        #moment <- c(moment, sum(weight.cv*resid.mean)/sum(weight.cv))
                     }
                     MSPE <- SSE/(length(unlist(estCV)))
+                    WMSPE <- WSSE/(length(unlist(estCV)))
+                    GMSPE <- exp(GSSE/(length(unlist(estCV))))
+                    WGMSPE <- exp(WGSSE/ll.length)
+                    MAD <- median(abs(MAD.list-median(MAD.list)))
+                    
+                    # moment
+                    resid.mean <- tapply(moment.list,index.moment.list, mean)
+                    resid.mean <- abs(resid.mean)
+                    # g-moment
+                    gm_mean = function(x){
+                        exp(sum(log(x)) / length(x))
+                    }
+                    resid.g.mean <- tapply(abs(moment.list),index.moment.list, gm_mean)
+                    weight.cv.g <- count.T.cv[names(resid.g.mean)]
+                    weight.cv <- count.T.cv[names(resid.mean)]
+                    names(weight.cv) <- NULL
+                    names(weight.cv.g) <- NULL
+                    moment <- sum(weight.cv*resid.mean)/sum(weight.cv)
+                    gmoment <- sum(weight.cv.g*resid.g.mean)/sum(weight.cv)
+                     
                 }
-                
 
-                est.cv <- inter_fe_ub(YY, Y0, X, II, beta0, r, force, tol) ## overall
+                est.cv <- inter_fe_ub(YY, 
+                                      Y0, 
+                                      X, 
+                                      II, 
+                                      beta0, 
+                                      r, 
+                                      force, 
+                                      tol) ## overall
                 sigma2 <- est.cv$sigma2 
                 IC <- est.cv$IC
                 PC <- est.cv$PC
@@ -224,21 +357,26 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 eff.v.cv <- c(Y - est.cv$fit)[cv.pos]
                 meff <- as.numeric(tapply(eff.v.cv, t.on.cv, mean))
                 MSPTATT <- sum(meff^2*count.on.cv)/sum(count.on.cv)
-
                 MSE <- sum(eff.v.cv^2)/length(eff.v.cv)
 
                 if(!is.null(norm.para)) {
-                    if (criterion %in% c("mspe", "both")) {
+                    if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
                         MSPE <- MSPE*(norm.para[1]^2)
+                        WMSPE <- WMSPE*(norm.para[1]^2)
+                        GMSPE <- GMSPE*(norm.para[1]^2)
+                        WGMSPE <- WGMSPE*(norm.para[1]^2)
+                        MAD <- MAD*(norm.para[1]^2)
+                        moment <- moment*(norm.para[1]^2)
+                        gmoment <- gmoment*(norm.para[1]^2)
                     }
                     sigma2 <- sigma2*(norm.para[1]^2)
                     IC <- est.cv$IC - log(est.cv$sigma2) + log(sigma2)
                     PC <- PC*(norm.para[1]^2)
                 }
 
-                if (criterion %in% c("mspe", "both")) {
-                    if ((min(CV.out.ife[,"MSPE"]) - MSPE) > 0.05*min(CV.out.ife[,"MSPE"])) {
-                        ## at least 10% improvement for MPSE
+                if (criterion == "mspe") {
+                    if ((min(CV.out.ife[,"MSPE"]) - MSPE) > 0.01*min(CV.out.ife[,"MSPE"])) {
+                        ## at least 1% improvement for MPSE
                         MSPE.best <- MSPE
                         est.best <- est.cv  
                         r.cv <- r
@@ -246,23 +384,82 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         if (r == r.cv + 1) cat("*")
                     }
                 }
-
-                if (PC < min(CV.out.ife[,"PC"])) {
-                    if (criterion == "both") {
-                        MSPE.pc.best <- MSPE
+                else if(criterion == 'wmspe'){
+                    if ((min(CV.out.ife[,"WMSPE"]) - WMSPE) > 0.01*min(CV.out.ife[,"WMSPE"])) {
+                        ## at least 1% improvement for MPSE
+                        WMSPE.best <- WMSPE
+                        est.best <- est.cv  
+                        r.cv <- r
+                    } 
+                    else {
+                        if (r == r.cv + 1) cat("*")
                     }
-                    est.pc.best <- est.cv  
-                    r.pc <- r
+                }
+                else if(criterion == 'gmspe'){
+                    if ((min(CV.out.ife[,"GMSPE"]) - GMSPE) > 0.01*min(CV.out.ife[,"GMSPE"])) {
+                        ## at least 1% improvement for MPSE
+                        GMSPE.best <- GMSPE
+                        est.best <- est.cv  
+                        r.cv <- r
+                    } 
+                    else {
+                        if (r == r.cv + 1) cat("*")
+                    }
+                }
+                else if(criterion == 'wgmspe'){
+                    if ((min(CV.out.ife[,"WGMSPE"]) - WGMSPE) > 0.01*min(CV.out.ife[,"WGMSPE"])) {
+                        ## at least 1% improvement for MPSE
+                        WGMSPE.best <- WGMSPE
+                        est.best <- est.cv  
+                        r.cv <- r
+                    } 
+                    else {
+                        if (r == r.cv + 1) cat("*")
+                    }
+                }
+                else if(criterion == 'mad'){
+                    if ((min(CV.out.ife[,"MAD"]) - MAD) > 0.01*min(CV.out.ife[,"MAD"])) {
+                        MAD.best <- MAD
+                        est.best <- est.cv  
+                        r.cv <- r
+                    } 
+                    else {
+                        if (r == r.cv + 1) cat("*")
+                    }
+                }
+                else if(criterion == 'moment'){
+                    if ((min(CV.out.ife[,"Moment"]) - moment) > 0.01*min(CV.out.ife[,"Moment"])) {
+                        moment.best <- moment
+                        est.best <- est.cv  
+                        r.cv <- r
+                    } 
+                    else {
+                        if (r == r.cv + 1) cat("*")
+                    }
+                }
+                else if(criterion == 'gmoment'){
+                    if ((min(CV.out.ife[,"GMoment"]) - gmoment) > 0.01*min(CV.out.ife[,"GMoment"])) {
+                        gmoment.best <- gmoment
+                        est.best <- est.cv  
+                        r.cv <- r
+                    } 
+                    else {
+                        if (r == r.cv + 1) cat("*")
+                    }
+                }
+                else if(criterion == "pc"){
+                    if (PC < min(CV.out.ife[,"PC"])) {
+                        est.pc.best <- est.cv  
+                        r.pc <- r
+                    }
                 }
 
-
                 if (criterion != "pc") {
-                    CV.out.ife[i, 2:7] <- c(sigma2, IC, PC, MSPE, MSPTATT, MSE)
+                    CV.out.ife[i, 2:12] <- c(sigma2, IC, PC, MSPE, WMSPE, GMSPE, WGMSPE, MAD, moment, MSPTATT, MSE)
                 } else {
                     CV.out.ife[i, 2:6] <- c(sigma2, IC, PC, MSPTATT, MSE)
                 }
                 
-
                 if (criterion == "pc") {
                     cat("\n r = ",r, "; sigma2 = ",
                         sprintf("%.5f",sigma2), "; IC = ",
@@ -276,13 +473,12 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         sprintf("%.5f",sigma2), "; IC = ",
                         sprintf("%.5f",IC), "; PC = ",
                         sprintf("%.5f",PC), "; MSPE = ",
-                        sprintf("%.5f",MSPE), "; MSPTATT = ",
+                        sprintf("%.5f",MSPE), "; GMSPE = ",
+                        sprintf("%.5f",GMSPE), "; Moment = ",
+                        sprintf("%.5f",moment), "; MSPTATT = ",
                         sprintf("%.5f",MSPTATT), "; MSE = ",
                         sprintf("%.5f",MSE), sep="")
-
                 }
-                
-            
             } ## end of while: search for r_star over  
 
             #MSPE.best <- min(CV.out[,"MSPE"])
@@ -306,6 +502,12 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             else {
                 est.best.ife <- est.best
                 MSPE.best.ife <- MSPE.best
+                WMSPE.best.ife <- WMSPE.best
+                GMSPE.best.ife <- GMSPE.best
+                WGMSPE.best.ife <- WGMSPE.best
+                MAD.best.ife <- MAD.best
+                moment.best.ife <- moment.best
+                gmoment.best.ife <- gmoment.best
             }
             
             if (r > (TT-1)) {cat(" (r hits maximum)")}
@@ -323,11 +525,6 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 ## create the hyper-parameter sequence
                 ## biggest candidate lambda 
                 ## Y.lambda <- YY 
-                ## if (p > 0) {
-                ##     for (i in 1:p) {
-                ##         Y.lambda <- Y.lambda - X[,,i] * beta0[i,1]
-                ##     }
-                ## }
                 Y.lambda <- YY - Y0
                 ## Y.lambda[which(II == 0)] <- Y0[which(II == 0)]
                 Y.lambda[which(II == 0)] <- 0
@@ -339,69 +536,258 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     lambda[i] <- 10^(lambda.max - (i - 1) * lambda.by)
                 }
                 lambda[nlambda] <- 0
-            } else {
+            } 
+            else {
                 Y.lambda <- YY - Y0
                 Y.lambda[which(II == 0)] <- 0
                 eigen.all <- svd( Y.lambda / (TT * N) )$d
             }
 
             ## store all MSPE
-            MSPE.best <- NULL 
-            CV.out.mc <- matrix(NA, length(lambda), 4)
-            colnames(CV.out.mc) <- c("lambda.norm", "MSPE", "MSPTATT", "MSE")
+            MSPE.best <- WMSPE.best <- GMSPE.best <- WGMSPE.best <- MAD.best <- moment.best <- gmoment.best <- NULL
+            CV.out.mc <- matrix(NA, length(lambda), 10)
+            colnames(CV.out.mc) <- c("lambda.norm", "MSPE", "WMSPE","GMSPE", "WGMSPE", "MAD", "Moment", "GMoment", "MSPTATT", "MSE")
             CV.out.mc[,"lambda.norm"] <- c(lambda/max(eigen.all))
-            CV.out.mc[,"MSPE"] <- 1e20
+            CV.out.mc[,"GMoment"] <- CV.out.mc[,"Moment"] <- CV.out.mc[,"MAD"] <- CV.out.mc[,"WGMSPE"] <- CV.out.mc[,"WGMSPE"] <- CV.out.mc[,"GMSPE"] <- CV.out.mc[,"WMSPE"] <- CV.out.mc[,"MSPE"] <- 1e20
 
+            break_count <- 0
+            break_check <- 0
             for (i in 1:length(lambda)) {    
                 ## k <- 5
                 SSE <- 0
+                WSSE <- 0
+                GSSE <- 0
+                WGSSE <- 0
+                ll.length <- 0
+                moment.list <- c()
+                index.moment.list <- c()
+                MAD.list <- c()
                 for (ii in 1:k) {
                     II.cv <- II
-                    II.cv[rmCV[,ii]] <- 0
+                    II.cv[rmCV[[ii]]] <- 0
                     YY.cv <- YY
-                    YY.cv[rmCV[,ii]] <- 0
-                    est.cv.fit <- inter_fe_mc(YY.cv, as.matrix(Y0CV[,,ii]), X, II.cv, as.matrix(beta0CV[,,ii]), 1, lambda[i], force, tol)$fit
-                    SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) ## sum((YY[rmCV[,ii]]-est.cv.fit[rmCV[,ii]])^2)
+                    YY.cv[rmCV[[ii]]] <- 0
+                    est.cv.fit <- inter_fe_mc(YY.cv, as.matrix(Y0CV[,,ii]), 
+                                              X, II.cv, as.matrix(beta0CV[,,ii]), 
+                                              1, lambda[i], force, tol)$fit
+                    index.cv <- as.character(T.on[estCV[[ii]]])
+                    index.cv[which(is.na(index.cv))] <- "Control"
+                    weight.cv <- count.T.cv[index.cv]
+                    names(weight.cv) <- NULL
+                    SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) 
+                    WSSE <- WSSE + sum(weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
+                    GSSE <- GSSE + sum(log((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2))
+                    ll <- weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2
+                    ll <- ll[which(ll>0)] 
+                    WGSSE <- WGSSE + sum(log(ll))
+                    ll.length <- ll.length + length(ll)
+                    MAD.list <- c(MAD.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
+                    # moment conditions
+                    moment.list <- c(moment.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]]))
+                    index.moment.list <- c(index.moment.list,index.cv)
+                    #resid.mean <- tapply((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]]), index.cv, mean)
+                    #resid.mean <- abs(resid.mean)
+                    #weight.cv <- count.T.cv[names(resid.mean)]
+                    #names(weight.cv) <- NULL
+                    #moment <- c(moment, sum(weight.cv*resid.mean)/sum(weight.cv))
                 }
                 MSPE <- SSE/(length(unlist(estCV)))
+                WMSPE <- WSSE/(length(unlist(estCV)))
+                GMSPE <- exp(GSSE/(length(unlist(estCV))))
+                WGMSPE <- exp(WGSSE/ll.length)
+                MAD <- median(abs(MAD.list-median(MAD.list)))
+                    
+                # moment
+                resid.mean <- tapply(moment.list,index.moment.list, mean)
+                resid.mean <- abs(resid.mean)
+                # g-moment
+                gm_mean = function(x){
+                    exp(sum(log(x)) / length(x))
+                }
+                resid.g.mean <- tapply(abs(moment.list),index.moment.list, gm_mean)
+                weight.cv.g <- count.T.cv[names(resid.g.mean)]
+                weight.cv <- count.T.cv[names(resid.mean)]
+                names(weight.cv) <- NULL
+                names(weight.cv.g) <- NULL
+                moment <- sum(weight.cv*resid.mean)/sum(weight.cv)
+                gmoment <- sum(weight.cv.g*resid.g.mean)/sum(weight.cv)
 
-                est.cv <- inter_fe_mc(YY, Y0, X, II, beta0, 1, lambda[i], force, tol) ## overall
-                ## sigma2 <- est.cv$sigma2
+                est.cv <- inter_fe_mc(YY, Y0, X, II, beta0, 
+                                      1, lambda[i], 
+                                      force, tol) ## overall
 
                 eff.v.cv <- c(Y - est.cv$fit)[cv.pos]
                 meff <- as.numeric(tapply(eff.v.cv, t.on.cv, mean))
                 MSPTATT <- sum(meff^2*count.on.cv)/sum(count.on.cv) 
-
                 MSE <- sum(eff.v.cv^2)/length(eff.v.cv)
 
-                if(!is.null(norm.para)){
+                if(!is.null(norm.para)) {
                     MSPE <- MSPE*(norm.para[1]^2)
-                    ## sigma2 <- sigma2*(norm.para[1]^2)
+                    WMSPE <- WMSPE*(norm.para[1]^2)
+                    GMSPE <- GMSPE*(norm.para[1]^2)
+                    WGMSPE <- WGMSPE*(norm.para[1]^2)
+                    MAD <- MAD*(norm.para[1]^2)
+                    moment <- moment*(norm.para[1]^2)
+                    gmoment <- gmoment*(norm.para[1]^2)
                 }
 
-                if ((min(CV.out.mc[,"MSPE"]) - MSPE) > 0.05*min(CV.out.mc[,"MSPE"])) {
-                    ## at least 10% improvement for MPSE
-                    est.best <- est.cv  
-                    lambda.cv <- lambda[i]
-                    MSPE.best <- MSPE
-                } else {
-                    if (i > 1) {
-                        if (lambda.cv == lambda[i-1]) cat("*")
+                if (criterion == "mspe") {
+                    if ((min(CV.out.mc[,"MSPE"]) - MSPE) > 0.01*min(CV.out.mc[,"MSPE"])) {
+                        ## at least 1% improvement for MPSE
+                        MSPE.best <- MSPE
+                        est.best <- est.cv  
+                        lambda.cv <- lambda[i]
+                        break_count <- 0
+                        break_check <- 0
+                    } else {
+                        if (i > 1) {
+                            if (lambda.cv == lambda[i-1]){
+                                cat("*")
+                                break_check <- 1
+                                break_count <- 0  
+                            } 
+                        }
                     }
                 }
-                ## CV.out[i, "MSPE"] <- MSPE
-                ## CV.out[i, "sigma2"] <- sigma2 
-                CV.out.mc[i, 2:4] <- c(MSPE, MSPTATT, MSE)
+                else if(criterion == 'wmspe'){
+                    if ((min(CV.out.mc[,"WMSPE"]) - WMSPE) > 0.01*min(CV.out.mc[,"WMSPE"])) {
+                        ## at least 1% improvement for MPSE
+                        WMSPE.best <- WMSPE
+                        est.best <- est.cv  
+                        lambda.cv <- lambda[i]
+                        break_check <- 0
+                        break_count <- 0
+                    } 
+                    else {
+                        if (i > 1) {
+                            if (lambda.cv == lambda[i-1]){
+                                cat("*")
+                                break_check <- 1
+                                break_count <- 0  
+                            }
+                        }
+                    }
+                }
+                else if(criterion == 'gmspe'){
+                    if ((min(CV.out.mc[,"GMSPE"]) - GMSPE) > 0.01*min(CV.out.mc[,"GMSPE"])) {
+                        ## at least 1% improvement for MPSE
+                        GMSPE.best <- GMSPE
+                        est.best <- est.cv  
+                        lambda.cv <- lambda[i]
+                        break_check <- 0
+                        break_count <- 0
+                    } 
+                    else {
+                        if (i > 1) {
+                            if (lambda.cv == lambda[i-1]){
+                                cat("*")
+                                break_check <- 1
+                                break_count <- 0  
+                            }
+                        }
+                    }
+                }
+                else if(criterion == 'wgmspe'){
+                    if ((min(CV.out.mc[,"WGMSPE"]) - WGMSPE) > 0.01*min(CV.out.mc[,"WGMSPE"])) {
+                        ## at least 1% improvement for MPSE
+                        WGMSPE.best <- WGMSPE
+                        est.best <- est.cv  
+                        lambda.cv <- lambda[i]
+                        break_check <- 0
+                        break_count <- 0
+                    } 
+                    else {
+                        if (i > 1) {
+                            if (lambda.cv == lambda[i-1]){
+                                cat("*")
+                                break_check <- 1
+                                break_count <- 0  
+                            }
+                        }
+                    }
+                }
+                else if(criterion == 'mad'){
+                    if ((min(CV.out.mc[,"MAD"]) - MAD) > 0.01*min(CV.out.mc[,"MAD"])) {
+                        ## at least 1% improvement for MPSE
+                        MAD.best <- MAD
+                        est.best <- est.cv  
+                        lambda.cv <- lambda[i]
+                        break_check <- 0
+                        break_count <- 0
+                    } 
+                    else {
+                        if (i > 1) {
+                            if (lambda.cv == lambda[i-1]){
+                                cat("*")
+                                break_check <- 1
+                                break_count <- 0  
+                            }
+                        }
+                    }
+                }
+                else if(criterion == 'moment'){
+                    if ((min(CV.out.mc[,"Moment"]) - moment) > 0.01*min(CV.out.mc[,"Moment"])) {
+                        ## at least 1% improvement for MPSE
+                        moment.best <- moment
+                        est.best <- est.cv  
+                        lambda.cv <- lambda[i]
+                        break_check <- 0
+                        break_count <- 0
+                    } 
+                    else {
+                        if (i > 1) {
+                            if (lambda.cv == lambda[i-1]){
+                                cat("*")
+                                break_check <- 1
+                                break_count <- 0  
+                            }
+                        }
+                    }
+                }
+                else if(criterion == 'gmoment'){
+                    if ((min(CV.out.mc[,"GMoment"]) - gmoment) > 0.01*min(CV.out.mc[,"GMoment"])) {
+                        ## at least 1% improvement for MPSE
+                        gmoment.best <- gmoment
+                        est.best <- est.cv  
+                        lambda.cv <- lambda[i]
+                        break_check <- 0
+                        break_count <- 0
+                    } 
+                    else {
+                        if (i > 1) {
+                            if (lambda.cv == lambda[i-1]){
+                                cat("*")
+                                break_check <- 1
+                                break_count <- 0  
+                            }
+                        }
+                    }
+                }
 
+                if(break_check == 1){
+                    break_count <-  break_count + 1
+                }
+
+                CV.out.mc[i, 2:10] <- c(MSPE, WMSPE, GMSPE, WGMSPE, MAD, moment, gmoment, MSPTATT, MSE)
                 cat("\n lambda.norm = ",
                 sprintf("%.5f",lambda[i]/max(eigen.all)),"; MSPE = ",
-                sprintf("%.5f",MSPE), "; MSPTATT = ",
+                sprintf("%.5f",MSPE), "; GMSPE = ",
+                sprintf("%.5f",GMSPE), "; Moment = ",
+                sprintf("%.5f",moment),  "; MSPTATT = ",
                 sprintf("%.5f",MSPTATT), "; MSE = ", 
                 sprintf("%.5f",MSE), sep="")
-
+                if(break_count == 3){
+                    break
+                }
             }
             est.best.mc <- est.best 
             MSPE.best.mc <- MSPE.best
+            WMSPE.best.mc <- WMSPE.best
+            GMSPE.best.mc <- GMSPE.best
+            WGMSPE.best.mc <- WGMSPE.best
+            MAD.best.mc <- MAD.best
+            moment.best.mc <- moment.best
+            gmoment.best.mc <- gmoment.best
             cat("\n\n lambda.norm* = ",lambda.cv/max(eigen.all), sep="")
             cat("\n\n")
         }
@@ -417,14 +803,82 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         validF <- est.best$validF
     }
     else {
-        if (MSPE.best.ife <= MSPE.best.mc) {
-            est.best <- est.best.ife
-            validF <- ifelse(r.cv > 0, 1, 0) 
-            method <- "ife"
-        } else {
-            est.best <- est.best.mc
-            validF <- est.best$validF
-            method <- "mc"
+        if(criterion == 'mspe'){
+            if (MSPE.best.ife <= MSPE.best.mc) {
+                est.best <- est.best.ife
+                validF <- ifelse(r.cv > 0, 1, 0) 
+                method <- "ife"
+            } else {
+                est.best <- est.best.mc
+                validF <- est.best$validF
+                method <- "mc"
+            }
+        }
+        if(criterion == 'wmspe'){
+            if (WMSPE.best.ife <= WMSPE.best.mc) {
+                est.best <- est.best.ife
+                validF <- ifelse(r.cv > 0, 1, 0) 
+                method <- "ife"
+            } else {
+                est.best <- est.best.mc
+                validF <- est.best$validF
+                method <- "mc"
+            }
+        }
+        if(criterion == 'gmspe'){
+            if (GMSPE.best.ife <= GMSPE.best.mc) {
+                est.best <- est.best.ife
+                validF <- ifelse(r.cv > 0, 1, 0) 
+                method <- "ife"
+            } else {
+                est.best <- est.best.mc
+                validF <- est.best$validF
+                method <- "mc"
+            }
+        }
+        if(criterion == 'wgmspe'){
+            if (WGMSPE.best.ife <= WGMSPE.best.mc) {
+                est.best <- est.best.ife
+                validF <- ifelse(r.cv > 0, 1, 0) 
+                method <- "ife"
+            } else {
+                est.best <- est.best.mc
+                validF <- est.best$validF
+                method <- "mc"
+            }
+        }
+        if(criterion == 'mad'){
+            if (MAD.best.ife <= MAD.best.mc) {
+                est.best <- est.best.ife
+                validF <- ifelse(r.cv > 0, 1, 0) 
+                method <- "ife"
+            } else {
+                est.best <- est.best.mc
+                validF <- est.best$validF
+                method <- "mc"
+            }
+        }
+        if(criterion == 'moment'){
+            if (moment.best.ife <= moment.best.mc) {
+                est.best <- est.best.ife
+                validF <- ifelse(r.cv > 0, 1, 0) 
+                method <- "ife"
+            } else {
+                est.best <- est.best.mc
+                validF <- est.best$validF
+                method <- "mc"
+            }
+        }
+        if(criterion == 'gmoment'){
+            if (gmoment.best.ife <= gmoment.best.mc) {
+                est.best <- est.best.ife
+                validF <- ifelse(r.cv > 0, 1, 0) 
+                method <- "ife"
+            } else {
+                est.best <- est.best.mc
+                validF <- est.best$validF
+                method <- "mc"
+            }
         }
         cat("\n\n Recommended method through cross-validation: ", method, sep = "")
         cat("\n\n")
@@ -597,6 +1051,17 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         count.off <- as.numeric(table(t.off.use))
     }
     ## 7. cohort effects
+    #if (!is.null(group)) {
+    #    cohort <- cbind(c(group), c(D), c(eff.v))
+    #    rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
+    #    cohort <- cohort[-rm.pos, ]
+
+    #    g.level <- sort(unique(cohort[, 1]))
+    #    raw.group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean))
+
+    #    group.att <- rep(NA, length(group.level))
+    #    group.att[which(group.level %in% g.level)] <- raw.group.att 
+    #}
     if (!is.null(group)) {
         cohort <- cbind(c(group), c(D), c(eff.v))
         rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
@@ -606,7 +1071,67 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         raw.group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean))
 
         group.att <- rep(NA, length(group.level))
-        group.att[which(group.level %in% g.level)] <- raw.group.att 
+        group.att[which(group.level %in% g.level)] <- raw.group.att
+
+        # by-group dynamic effects
+        group.level.name <- names(group.level)
+
+        group.output <- list()
+        for(i in c(1:length(group.level))){
+            sub.group <- group.level[i]
+            sub.group.name <- group.level.name[i]
+
+            ## by-group dynamic effects
+            t.on.sub <- c(T.on[which(group==sub.group)])
+            eff.v.sub <- c(eff[which(group==sub.group)]) ## a vector
+            rm.pos1.sub <- which(is.na(eff.v.sub))
+            rm.pos2.sub <- which(is.na(t.on.sub)) 
+            eff.v.use1.sub <- eff.v.sub
+            t.on.use.sub <- t.on.sub
+            if (NA %in% eff.v.sub | NA %in% t.on.sub) {
+                eff.v.use1.sub <- eff.v.sub[-c(rm.pos1.sub, rm.pos2.sub)]
+                t.on.use.sub <- t.on.sub[-c(rm.pos1.sub, rm.pos2.sub)]
+            }
+            if(length(t.on.use.sub)>0){
+                time.on.sub <- sort(unique(t.on.use.sub))
+                att.on.sub <- as.numeric(tapply(eff.v.use1.sub, 
+                                            t.on.use.sub, 
+                                            mean)) ## NA already removed
+                count.on.sub <- as.numeric(table(t.on.use.sub))
+            }else{
+                time.on.sub <- att.on.sub <- count.on.sub <- NULL
+            }
+            
+            suboutput <- list(att.on=att.on.sub,
+                              time.on=time.on.sub,
+                              count.on=count.on.sub)
+
+
+            ## T.off
+            if (hasRevs == 1) {    
+                t.off.sub <- c(T.off[which(group==sub.group)])
+                rm.pos3.sub <- which(is.na(t.off.sub))
+                eff.v.use2.sub <- eff.v.sub
+                t.off.use.sub <- t.off.sub
+                if (NA %in% eff.v.sub | NA %in% t.off.sub) {
+                    eff.v.use2.sub <- eff.v.sub[-c(rm.pos1.sub, rm.pos3.sub)]
+                    t.off.use.sub <- t.off.sub[-c(rm.pos1.sub, rm.pos3.sub)]
+                }
+                if(length(t.off.use.sub)>0){
+                    time.off.sub <- sort(unique(t.off.use.sub))
+                    att.off.sub <- as.numeric(tapply(eff.v.use2.sub, t.off.use.sub, mean)) ## NA already removed
+                    count.off.sub <- as.numeric(table(t.off.use.sub))
+                }else{
+                    time.off.sub <- att.off.sub <- count.off.sub <- NULL
+                }
+
+                suboutput <- c(suboutput, list(att.off = att.off.sub,
+                                               count.off = count.off.sub,
+                                               time.off = time.off.sub))
+
+            }
+            group.output[[sub.group.name]] <- suboutput
+        }
     }
 
     
@@ -644,6 +1169,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         eff.pre.equiv = eff.pre.equiv,
         pre.sd = pre.sd,
         rmse = rmse,
+        rmCV = rmCV,
+        estCV = estCV,
         res = est.best$res)
 
     if (hasRevs == 1) {
@@ -687,7 +1214,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     if (!is.null(group)) {
-        out <- c(out, list(group.att = group.att))
+        out <- c(out, list(group.att = group.att,
+                           group.output = group.output))
     }
  
     return(out)

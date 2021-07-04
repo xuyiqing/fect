@@ -15,7 +15,11 @@ att.cumu <- function(x, ## a fect object
     }
 
     if (length(period) != 2) {
-        stop(" Length of \"period\" should equal 2.")
+        stop(" Length of \"period\" should equal 2.\n")
+    }
+
+    if(period[1] > period[2]){
+        stop("period[1] should be smaller than period[2].\n")
     }
 
     ## start point
@@ -24,7 +28,7 @@ att.cumu <- function(x, ## a fect object
     att <- x$att
     est.att <- x$est.att
 
-    if (!is.null(est.att) & sum(abs(c(x$att.boot))) != 0) {
+    if (!is.null(est.att) & sum(abs(c(x$att.boot)),na.rm = TRUE) != 0) {
         se <- 1
     }
 
@@ -35,7 +39,6 @@ att.cumu <- function(x, ## a fect object
         if (is.null(time)) {
             stop("No switch-off effect.")
         }
-
     }
 
     p.start <- max(period[1], min(time))
@@ -43,17 +46,18 @@ att.cumu <- function(x, ## a fect object
 
     pl <- p.end - p.start + 1 
 
-    cumu.att <- matrix(NA, pl, 3)
-    colnames(cumu.att) <- c("start", "end", "catt")
-
-    cumu.att[1, c(1,2)] <- p.start
-    cumu.att[1, 3] <- att[which(time == p.start)]
-
-    if (se == 1) {
+    if(se == 0){
+        cumu.att <- matrix(NA, pl, 3)
+        cumu.att[1, c(1,2)] <- p.start
+        cumu.att[1, 3] <- att[which(time == p.start)]
+        colnames(cumu.att) <- c("start", "end", "catt")
+    }
+    else if (se == 1) {
         cumu.att <- matrix(NA, pl, 7)
-        colnames(cumu.att) <- c("start", "end", "catt", "S.E.", "CI.lower", "CI.upper", "p.value")
-
+        cumu.att[1, c(1,2)] <- p.start
+        cumu.att[1, 3] <- att[which(time == p.start)]
         cumu.att[1, 4:7] <- est.att[which(time == p.start), c("S.E.", "CI.lower", "CI.upper", "p.value")]
+        colnames(cumu.att) <- c("start", "end", "catt", "S.E.", "CI.lower", "CI.upper", "p.value")
     }
 
     for(i in 2:pl) {

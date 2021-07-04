@@ -17,16 +17,20 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                     norm.para = NULL,
                     placeboTest = 0,
                     placebo.period = NULL,
+                    carryoverTest = 0,
+                    carryover.period = NULL,
                     time.on.seq = NULL,
                     time.off.seq = NULL,
                     group.level = NULL,
-                    group = NULL) {  
+                    group = NULL,
+                    time.on.seq.group = NULL,
+                    time.off.seq.group = NULL) {  
     
     
     ##-------------------------------##
     ## Parsing data
     ##-------------------------------##  
-    placebo.pos <-  na.pos <- NULL
+    carryover.pos <- placebo.pos <-  na.pos <- NULL
    
     ## unit id and time
     TT <- dim(Y)[1]
@@ -126,18 +130,25 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
    
     ## 1. estimated att and counterfactuals
     eff <- Y - est.best$fit  
-    att.avg <- sum(eff * D)/(sum(D))
+    complete.index <- which(!is.na(eff)) 
+    missing.index <- which(is.na(eff))
+    if(length(missing.index)>0){
+        I[missing.index] <- 0
+        II[missing.index] <- 0
+    } 
+    att.avg <- sum(eff[complete.index] * D[complete.index])/(sum(D[complete.index]))
 
     ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
     att.unit <- sapply(1:length(tr.pos), function(vec){return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))})
-    att.avg.unit <- mean(att.unit)
+    att.avg.unit <- mean(att.unit,na.rm=TRUE)
 
     
     equiv.att.avg <- eff.equiv <- NULL
     if (boot == FALSE) {
         eff.equiv <- Y - est.fect$fit
-        equiv.att.avg <- sum(eff.equiv * D)/(sum(D))
+        complete.index <- which(!is.na(eff.equiv)) 
+        equiv.att.avg <- sum(eff.equiv[complete.index] * D[complete.index])/(sum(D[complete.index]))
     }
 
     ## 2. rmse for treated units' observations under control
@@ -148,10 +159,12 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     rmse <- sqrt(mean(v.eff.tr^2))
 
     ## 3. unbalanced output
+    Y.ct.full <- est.best$fit
     if (0%in%I) {
         eff[which(I == 0)] <- NA
         est.best$fit[which(I == 0)] <- NA
     }
+    res.full <- est.best$residuals
     est.best$residuals[which(II == 0)] <- NA
 
     est.best$sigma2 <- mean(c(est.best$residuals[which(II == 1)])^2) ## mean squared error of residuals    
@@ -260,7 +273,18 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
-    ## 7. cohort effects
+    ## 7. carryover effects
+    if (!is.null(carryover.period) && carryoverTest == 1 && hasRevs) {              
+        if (length(carryover.period) == 1) {
+            carryover.pos <- which(time.off == carryover.period)
+            att.carryover <- att.off[carryover.pos]
+        } else {
+            carryover.pos <- which(time.off >= carryover.period[1] & time.off <= carryover.period[2])
+            att.carryover <- sum(att.off[carryover.pos] * count.off[carryover.pos]) / sum(count.off[carryover.pos])
+        }
+    }
+
+    ## 8. cohort effects
     if (!is.null(group)) {
         cohort <- cbind(c(group), c(D), c(eff.v))
         rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
@@ -270,7 +294,117 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         raw.group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean))
 
         group.att <- rep(NA, length(group.level))
-        group.att[which(group.level %in% g.level)] <- raw.group.att 
+        group.att[which(group.level %in% g.level)] <- raw.group.att
+
+        # by-group dynamic effects
+        group.level.name <- names(group.level)
+
+        group.output <- list()
+        for(i in c(1:length(group.level))){
+            sub.group <- group.level[i]
+            sub.group.name <- group.level.name[i]
+
+            ## by-group dynamic effects
+            t.on.sub <- c(T.on[which(group==sub.group)])
+            eff.v.sub <- c(eff[which(group==sub.group)]) ## a vector
+            rm.pos1.sub <- which(is.na(eff.v.sub))
+            rm.pos2.sub <- which(is.na(t.on.sub)) 
+            eff.v.use1.sub <- eff.v.sub
+            t.on.use.sub <- t.on.sub
+            if (NA %in% eff.v.sub | NA %in% t.on.sub) {
+                eff.v.use1.sub <- eff.v.sub[-c(rm.pos1.sub, rm.pos2.sub)]
+                t.on.use.sub <- t.on.sub[-c(rm.pos1.sub, rm.pos2.sub)]
+            }
+            if(length(t.on.use.sub)>0){
+                time.on.sub <- sort(unique(t.on.use.sub))
+                att.on.sub <- as.numeric(tapply(eff.v.use1.sub, 
+                                            t.on.use.sub, 
+                                            mean)) ## NA already removed
+                count.on.sub <- as.numeric(table(t.on.use.sub))
+            }else{
+                time.on.sub <- att.on.sub <- count.on.sub <- NULL
+            }
+            
+            if (!is.null(time.on.seq.group)) {
+                count.on.med.sub <- att.on.med.sub <- rep(NA, length(time.on.seq.group[[sub.group.name]]))
+                time.on.seq.sub <- time.on.seq.group[[sub.group.name]]
+                att.on.med.sub[which(time.on.seq.sub %in% time.on.sub)] <- att.on.sub
+                count.on.med.sub[which(time.on.seq.sub %in% time.on.sub)] <- count.on.sub
+                att.on.sub <- att.on.med.sub
+                count.on.sub <- count.on.med.sub
+                time.on.sub<- time.on.seq.sub
+            }
+            suboutput <- list(att.on=att.on.sub,
+                              time.on=time.on.sub,
+                              count.on=count.on.sub)
+
+            ## placebo effect, if placeboTest == 1 
+            if (!is.null(placebo.period) && placeboTest == 1) {              
+                if (length(placebo.period) == 1) {
+                    placebo.pos.sub <- which(time.on.sub == placebo.period)
+                    if(length(placebo.pos.sub)>0){
+                        att.placebo.sub <- att.on.sub[placebo.pos.sub]
+                    }
+                    else{att.placebo.sub <- NULL} 
+                } 
+                else {
+                    placebo.pos.sub <- which(time.on.sub >= placebo.period[1] & time.on.sub <= placebo.period[2])
+                    if(length(placebo.pos.sub)>0){
+                        att.placebo.sub <- sum(att.on.sub[placebo.pos.sub] * count.on.sub[placebo.pos.sub]) / sum(count.on.sub[placebo.pos.sub])
+                    }
+                    else{att.placebo.sub <- NULL} 
+                }
+                suboutput <- c(suboutput, list(att.placebo = att.placebo.sub))
+            }
+
+            ## T.off
+            if (hasRevs == 1) {    
+                t.off.sub <- c(T.off[which(group==sub.group)])
+                rm.pos3.sub <- which(is.na(t.off.sub))
+                eff.v.use2.sub <- eff.v.sub
+                t.off.use.sub <- t.off.sub
+                if (NA %in% eff.v.sub | NA %in% t.off.sub) {
+                    eff.v.use2.sub <- eff.v.sub[-c(rm.pos1.sub, rm.pos3.sub)]
+                    t.off.use.sub <- t.off.sub[-c(rm.pos1.sub, rm.pos3.sub)]
+                }
+                if(length(t.off.use.sub)>0){
+                    time.off.sub <- sort(unique(t.off.use.sub))
+                    att.off.sub <- as.numeric(tapply(eff.v.use2.sub, t.off.use.sub, mean)) ## NA already removed
+                    count.off.sub <- as.numeric(table(t.off.use.sub))
+                }else{
+                    time.off.sub <- att.off.sub <- count.off.sub <- NULL
+                }
+
+                if (!is.null(time.off.seq.group)) {
+                    count.off.med.sub <- att.off.med.sub <- rep(NA, length(time.off.seq.group[[sub.group.name]]))
+                    time.off.seq.sub <- time.off.seq.group[[sub.group.name]]
+                    att.off.med.sub[which(time.off.seq.sub %in% time.off.sub)] <- att.off.sub
+                    count.off.med.sub[which(time.off.seq.sub %in% time.off.sub)] <- count.off.sub
+                    att.off.sub <- att.off.med.sub
+                    count.off.sub <- count.off.med.sub
+                    time.off.sub <- time.off.seq.sub
+                }
+                suboutput <- c(suboutput, list(att.off = att.off.sub,
+                                               count.off = count.off.sub,
+                                               time.off = time.off.sub))
+
+                if (!is.null(carryover.period) && carryoverTest == 1) {
+                    if (length(carryover.period) == 1) {
+                        carryover.pos.sub <- which(time.off.sub == carryover.period.sub)
+                        if(length(carryover.pos.sub)>0){
+                            att.carryover.sub <- att.off.sub[carryover.pos.sub]
+                        } else{att.carryover.sub <- NULL}      
+                    } else {
+                        carryover.pos.sub <- which(time.off.sub >= carryover.period[1] & time.off.sub <= carryover.period[2])
+                        if(length(carryover.pos.sub)>0){
+                            att.carryover.sub <- sum(att.off.sub[carryover.pos.sub] * count.off.sub[carryover.pos.sub]) / sum(count.off.sub[carryover.pos.sub])
+                        } else{att.carryover.sub <- NULL}  
+                    }
+                    suboutput <- c(suboutput,list(att.carryover = att.carryover.sub))
+                }
+            }
+            group.output[[sub.group.name]] <- suboutput
+        }
     }
 
     ##-------------------------------##
@@ -281,7 +415,10 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         method = "mc",
         T.on = T.on,
         Y.ct = est.best$fit,
+        Y.ct.full = Y.ct.full,
         eff = eff,
+        I = I,
+        II = II,
         att.avg = att.avg,
         att.avg.unit = att.avg.unit,
         ## supporting
@@ -335,8 +472,13 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         out <- c(out, list(att.placebo = att.placebo))
     }
 
+    if (!is.null(carryover.period) && carryoverTest == 1) {
+        out <- c(out, list(att.carryover = att.carryover))
+    }
+
     if (!is.null(group)) {
-        out <- c(out, list(group.att = group.att))
+        out <- c(out, list(group.att = group.att,
+                           group.output = group.output))
     }
     return(out)
 } ## mc functions ends

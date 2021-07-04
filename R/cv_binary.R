@@ -124,8 +124,10 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
         rm.count <- floor(sum(II)*cv.prop)
         cv.count <- sum(II) - rm.count
 
-        ociCV <- matrix(NA, cv.count, k) ## store indicator
-        rmCV <- matrix(NA, (length(oci) - cv.count), k) ## removed indicator
+        #ociCV <- matrix(NA, cv.count, k) ## store indicator
+        #rmCV <- matrix(NA, (length(oci) - cv.count), k) ## removed indicator
+        ociCV <- list()
+        rmCV <- list()
         Y0CV <- array(NA, dim = c(TT, N, k)) ## store initial Y0
         if (p > 0) {
            beta0CV <- array(NA, dim = c(p, 1, k)) 
@@ -140,19 +142,30 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
                 cv.id <- cv.sample(II, D, rm.count, cv.nobs, cv.treat)
                 ## cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
                 ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
-                II.cv <- II
+                #II.cv <- II
+                #II.cv[cv.id] <- 0
+                II.cv.valid <- II.cv <- II
                 II.cv[cv.id] <- 0
+                II.cv.valid[cv.id] <- -1
                 con1 <- sum(apply(II.cv, 1, sum) >= 1) == TT
                 con2 <- sum(apply(II.cv, 2, sum) >= 1) == N
                 if (con1 & con2) {
                     break
                 }
-                if (cv.n > 100) {
-                    stop("Some units have too few pre-treatment observations. Try to remove them.")
+                if (cv.n>=100) {
+                    cat("Some units have too few pre-treatment observations. Remove them automatically.")
+                    keep.1 <- which(apply(II.cv, 1, sum) < 1)
+                    keep.2 <- which(apply(II.cv, 2, sum) < 1)
+                    II.cv[keep.1,] <- II[keep.1,]
+                    II.cv[,keep.2] <- II[,keep.2]
+                    II.cv.valid[keep.1,] <- II[keep.1,]
+                    II.cv.valid[,keep.2] <- II[,keep.2]
+                    cv.id <- which(II.cv.valid!=II)
+                    break
                 }
             }
-            rmCV[,i] <- cv.id
-            ociCV[,i] <- setdiff(oci, cv.id)
+            rmCV[[i]] <- cv.id
+            ociCV[[i]] <- setdiff(oci, cv.id)
 
         }
     
@@ -179,11 +192,11 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
             SSE <- 0
             for (ii in 1:k) {
                 II.cv <- II
-                II.cv[rmCV[,ii]] <- 0
+                II.cv[rmCV[[ii]]] <- 0
                 YY.cv <- YY
-                YY.cv[rmCV[,ii]] <- 0 
+                YY.cv[rmCV[[ii]]] <- 0 
 
-                CVinitialOut <- BiInitialFit(data = data.ini, QR = QR, r = r, force = force, oci = ociCV[,ii])
+                CVinitialOut <- BiInitialFit(data = data.ini, QR = QR, r = r, force = force, oci = ociCV[[ii]])
                 Y0.cv <- CVinitialOut$Y0
                 FE0.cv <- CVinitialOut$FE0
                 if (QR == 1) {
@@ -197,7 +210,7 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
                 fit.cv <- ifelse(est.cv.fit$fit >= 0, 1, 0)
 
-                SSE <- SSE + sum((YY[rmCV[,ii]]-fit.cv[rmCV[,ii]])^2)
+                SSE <- SSE + sum((YY[rmCV[[ii]]]-fit.cv[rmCV[[ii]]])^2)
             }
             MSPE <- SSE/(k*(sum(II) - cv.count))
 

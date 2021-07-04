@@ -11,6 +11,9 @@ fect.boot <- function(Y,
                       T.off = NULL, 
                       method = "ife",
                       degree = 2,
+                      sfe = NULL,
+                      cfe = NULL,
+                      ind.matrix = NULL,
                       knots = NULL,
                       criterion = "mspe",
                       CV,
@@ -31,6 +34,8 @@ fect.boot <- function(Y,
                       norm.para,
                       placebo.period = NULL,
                       placeboTest = FALSE,
+                      carryoverTest = FALSE,
+                      carryover.period = NULL,
                       vartype = "bootstrap",
                       nboots,
                       parallel = TRUE,
@@ -48,7 +53,7 @@ fect.boot <- function(Y,
     } else {
         p <- 0
     }
-
+    
     if (hasRevs == 1) {
         ## D.fake : check reversals
         D.fake <- apply(D, 2, function(vec){cumsum(vec)})
@@ -84,6 +89,8 @@ fect.boot <- function(Y,
                            norm.para = norm.para, 
                            placebo.period = placebo.period,
                            placeboTest = placeboTest,
+                           carryover.period = carryover.period,
+                           carryoverTest = carryoverTest,
                            group.level = group.level, group = group)
         
         } else if (method == "mc") {
@@ -94,30 +101,39 @@ fect.boot <- function(Y,
                            norm.para = norm.para,
                            placebo.period = placebo.period,
                            placeboTest = placeboTest,
+                           carryover.period = carryover.period,
+                           carryoverTest = carryoverTest,
                            group.level = group.level, group = group), silent = TRUE)
             if ('try-error' %in% class(out)) {
                 stop("\nCannot estimate using full data with MC algorithm.\n")
             }
 
         
-        } else if (method %in% c("polynomial", "bspline")) {
+        } else if (method %in% c("polynomial", "bspline","cfe")) {
             out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
                                    II = II, T.on = T.on, 
                                    T.off = T.off,
                                    method = method,degree = degree,
                                    knots = knots, force = force, 
+                                   sfe = sfe, cfe = cfe,
+                                   ind.matrix = ind.matrix,
                                    hasRevs = hasRevs,
                                    tol = tol, boot = 0, 
                                    placeboTest = placeboTest,
                                    placebo.period = placebo.period, 
+                                   carryover.period = carryover.period,
+                                   carryoverTest = carryoverTest,
                                    norm.para = norm.para,
-                                   group.level = group.level, group = group), silent = TRUE)
-
+                                   group.level = group.level, 
+                                   group = group),silent = TRUE)
+            #I.report <- out$I
+            #II.report <- out$II
             if ('try-error' %in% class(out)) {
                 stop("\nCannot estimate.\n")
             }
         }
-    } else {
+    } 
+    else {
         ## cross-valiadtion 
         if (binary == 0) {
             out <- fect.cv(Y = Y, X = X, D = D, I = I, II = II, 
@@ -146,6 +162,7 @@ fect.boot <- function(Y,
     }
     
     
+    
     ## output
     validX <- out$validX
     eff <- out$eff
@@ -161,6 +178,23 @@ fect.boot <- function(Y,
     if (hasRevs == 1) {
         att.off <- out$att.off
         time.off <- out$time.off
+    }
+
+    eff.out <- out$eff
+    fit.out <- out$Y.ct
+    N_unit <- dim(out$res)[2]
+
+    if(!is.null(group)){
+        group.output.origin <- out$group.output
+        group.output.name <- names(out$group.output)
+        group.time.on <- list()
+        group.time.off <- list()
+        for(sub.name in group.output.name){
+            group.time.on[[sub.name]] <- out$group.output[[sub.name]]$time.on
+            if(hasRevs == 1){
+                group.time.off[[sub.name]] <- out$group.output[[sub.name]]$time.off
+            }
+        }
     }
 
     if (p > 0) {
@@ -199,11 +233,39 @@ fect.boot <- function(Y,
     if (!is.null(placebo.period) & placeboTest == TRUE) {
         att.placebo.boot <- matrix(0, 1, nboots)
     }
+    if (!is.null(carryover.period) & carryoverTest == TRUE) {
+        att.carryover.boot <- matrix(0, 1, nboots)
+    }
 
     group.att.boot <- NULL
     if (!is.null(group.att)) {
         group.att.boot <- matrix(0, length(group.att), nboots)
-    } 
+    }
+
+    group.atts.boot <- NULL
+    group.atts.off.boot <- NULL
+    group.atts.placebo.boot <-NULL
+    group.atts.carryover.boot <- NULL
+    if(!is.null(group)){
+        group.atts.boot <- list()
+        group.atts.off.boot <- list()
+        group.att.placebo.boot <- list()
+        group.att.carryover.boot <- list()
+        for(sub.name in group.output.name){
+            subgroup.time.on <- group.time.on[[sub.name]]
+            group.atts.boot[[sub.name]] <- matrix(0, length(subgroup.time.on), nboots)
+            if(hasRevs == 1){
+                subgroup.time.off <- group.time.off[[sub.name]]
+                group.atts.off.boot[[sub.name]] <- matrix(0, length(subgroup.time.off), nboots)
+            }
+            if(placeboTest){
+                group.att.placebo.boot[[sub.name]] <- matrix(0, 1, nboots)
+            }
+            if(carryoverTest){
+                group.att.carryover.boot[[sub.name]] <- matrix(0, 1, nboots)
+            }
+        }   
+    }
 
     if (dis) {
       if (vartype == "jackknife") {
@@ -223,8 +285,12 @@ fect.boot <- function(Y,
             Y.boot[which(II == 1)] <- Y.boot.new[which(II == 1)]
 
             placebo.period.boot <- NULL
+            carryover.period.boot <- NULL
             if (placeboTest == TRUE) {
                 placebo.period.boot <- placebo.period
+            }
+            if (carryoverTest == TRUE) {
+                carryover.period.boot <- carryover.period
             }
 
             boot <- try(fect.fe(Y = Y.boot, X = X, D = D,
@@ -237,13 +303,15 @@ fect.boot <- function(Y,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
+                                    carryoverTest = carryoverTest,
+                                    carryover.period = carryover.period.boot,
                                     group.level = group.level,
                                     group = group), silent = TRUE)
 
             if ('try-error' %in% class(boot)) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
                               beta = NA, att.off = NA, count.off = NA, 
-                              att.placebo = NA, att.avg.unit = NA,
+                              att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                               group.att = NA, marginal = NA)
                 return(boot0)
             } else {
@@ -251,12 +319,73 @@ fect.boot <- function(Y,
             }
 
         }
-    } else {
-    
- 
-    #if (method == "ife") {
-        one.nonpara <- function(num = NULL) {
+    }
+    else if(vartype == 'wild'){
+        one.nonpara <- function(num = NULL){
+            six.weight <- sample(c(-1,1,-sqrt(0.5),sqrt(0.5),-sqrt(1.5),sqrt(1.5)),size = N_unit, replace = T)
+            wild.res <- eff.out * rep(six.weight, rep(nrow(eff.out), ncol(eff.out)))
+            Y.boot <- Y - eff.out + wild.res
+            #Y.boot[which(II==0)] <- Y[which(II==0)]
+            #print(which(is.na(Y.boot)))
+            if (method == "ife") {
+                boot <- try(fect.fe(Y = Y.boot, X = X, D = D, I = I, II = II, 
+                            T.on = T.on, T.off = T.off,
+                            r.cv = r, binary = binary, QR = QR,
+                            force = force, hasRevs = hasRevs, 
+                            tol = tol, boot = 0,
+                            norm.para = norm.para, 
+                            placebo.period = placebo.period,
+                            placeboTest = placeboTest,
+                            carryover.period = carryover.period,
+                            carryoverTest = carryoverTest,
+                            group.level = group.level, group = group),silent = TRUE)
+            
+            } else if (method == "mc") {
+                boot <- try(fect.mc(Y = Y.boot, X = X, D = D, I = I, II = II,
+                            T.on = T.on, T.off = T.off, 
+                            lambda.cv = lambda, force = force, hasRevs = hasRevs, 
+                            tol = tol, boot = 0,
+                            norm.para = norm.para,
+                            placebo.period = placebo.period,
+                            placeboTest = placeboTest,
+                            carryover.period = carryover.period,
+                            carryoverTest = carryoverTest,
+                            group.level = group.level, group = group), silent = TRUE)
 
+            } else if (method %in% c("polynomial", "bspline","cfe")) {
+                boot <- try(fect.polynomial(Y = Y.boot, D = D, X = X, I = I, 
+                                    II = II, T.on = T.on, 
+                                    T.off = T.off,
+                                    method = method,degree = degree,
+                                    knots = knots, force = force,
+                                    sfe = sfe, cfe = cfe,
+                                    ind.matrix = ind.matrix, 
+                                    hasRevs = hasRevs,
+                                    tol = tol, boot = 0, 
+                                    placeboTest = placeboTest,
+                                    placebo.period = placebo.period, 
+                                    carryover.period = carryover.period,
+                                    carryoverTest = carryoverTest,
+                                    norm.para = norm.para,
+                                    group.level = group.level, group = group), silent = TRUE)
+            }
+
+            if ('try-error' %in% class(boot)) {
+                boot0 <- list(att.avg = NA, att = NA, count = NA, 
+                                  beta = NA, att.off = NA, count.off = NA, 
+                                  att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
+                                  group.att = NA, marginal = NA,
+                                  group.output = list())
+                return(boot0)
+            }
+            else{
+                return(boot)
+            }
+        }
+    } 
+    else {
+        
+        one.nonpara <- function(num = NULL) {
             if (is.null(num)) {
                 if (is.null(cl)) {
                     if (hasRevs == 0) {
@@ -269,7 +398,8 @@ fect.boot <- function(Y,
                                     break
                                 }
                             }
-                        } else {
+                        } 
+                        else {
                             repeat{
                                 boot.id <- sample(tr, Ntr, replace=TRUE)
                                 if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
@@ -277,7 +407,8 @@ fect.boot <- function(Y,
                                 }
                             }
                         }
-                    } else {
+                    } 
+                    else {
                         if (Ntr > 0) {
                             if (Nco > 0) {
                                 repeat{
@@ -289,7 +420,8 @@ fect.boot <- function(Y,
                                         break
                                     }
                                 }
-                            } else {
+                            } 
+                            else {
                                 repeat{
                                     fake.tr <- sample(tr, Ntr, replace=TRUE)
                                     fake.rev <- sample(rev, Nrev, replace=TRUE)
@@ -299,7 +431,8 @@ fect.boot <- function(Y,
                                     }
                                 }
                             }
-                        } else {
+                        } 
+                        else {
                             if (Nco > 0) {
                                 repeat{
                                     fake.co <- sample(co, Nco, replace=TRUE)
@@ -309,7 +442,8 @@ fect.boot <- function(Y,
                                         break
                                     }
                                 }
-                            } else {
+                            } 
+                            else {
                                 repeat{
                                     boot.id <- sample(rev, Nrev, replace=TRUE)
                                     if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
@@ -319,7 +453,8 @@ fect.boot <- function(Y,
                             }
                         }
                     }
-                } else {
+                } 
+                else {
                     cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
                     cl.boot.uni <- unique(cl.boot)
                     cl.boot.count <- as.numeric(table(cl.boot))
@@ -341,10 +476,17 @@ fect.boot <- function(Y,
             D.boot <- D[, boot.id]
             I.boot <- I[, boot.id]
 
+            if(method=='cfe'){
+                ind.matrix.boot <- list()
+                for(ind.name in names(ind.matrix)){
+                    ind.matrix.boot[[ind.name]] <- as.matrix(ind.matrix[[ind.name]][,boot.id])
+                }
+            }
+
             if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
                               beta = NA, att.off = NA, count.off = NA, 
-                              att.placebo = NA, att.avg.unit = NA,
+                              att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                               group.att = NA)
                 return(boot0)
             } else {
@@ -355,6 +497,10 @@ fect.boot <- function(Y,
                 placebo.period.boot <- NULL
                 if (placeboTest == TRUE) {
                     placebo.period.boot <- placebo.period
+                }
+                carryover.period.boot <- NULL
+                if(carryoverTest == TRUE){
+                    carryover.period.boot <- carryover.period
                 }
 
 
@@ -369,8 +515,12 @@ fect.boot <- function(Y,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
+                                    carryoverTest = carryoverTest,
+                                    carryover.period = carryover.period.boot,
                                     group.level = group.level,
-                                    group = boot.group), silent = TRUE)
+                                    group = boot.group,
+                                    time.on.seq.group = group.time.on,
+                                    time.off.seq.group = group.time.off), silent = TRUE)
                 } else if (method == "mc") {
                     boot <- try(fect.mc(Y = Y[,boot.id], X = X.boot, D = D[,boot.id],
                                     I = I[,boot.id], II = II[,boot.id],
@@ -382,29 +532,45 @@ fect.boot <- function(Y,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
+                                    carryoverTest = carryoverTest,
+                                    carryover.period = carryover.period.boot,
                                     group.level = group.level,
-                                    group = boot.group), silent = TRUE)
+                                    group = boot.group,
+                                    time.on.seq.group = group.time.on,
+                                    time.off.seq.group = group.time.off), silent = TRUE)
 
-                } else if (method %in% c("polynomial", "bspline")) {
+                } else if (method %in% c("polynomial", "bspline", "cfe")) {
+                    
                     boot <- try(fect.polynomial(Y = Y[,boot.id], X = X.boot, 
-                                                D = D[,boot.id],
-                                                I = I[,boot.id], II = II[,boot.id],
-                                                T.on = T.on[,boot.id], T.off = T.off.boot, 
-                                                method = method,degree = degree, knots = knots,
-                                                force = force, hasRevs = hasRevs,
-                                                norm.para = norm.para, time.on.seq = time.on, 
-                                                time.off.seq = time.off,
-                                                placebo.period = placebo.period.boot, 
-                                                placeboTest = placeboTest,
-                                                group.level = group.level,
-                                                group = boot.group), silent = TRUE)
+                                                    D = D[,boot.id],
+                                                    I = I[,boot.id], II = II[,boot.id],
+                                                    T.on = T.on[,boot.id], T.off = T.off.boot, 
+                                                    method = method, degree = degree, 
+                                                    sfe = sfe, cfe = cfe,
+                                                    ind.matrix = ind.matrix.boot,
+                                                    knots = knots,
+                                                    force = force, hasRevs = hasRevs,
+                                                    tol = tol,boot = 1,
+                                                    norm.para = norm.para, time.on.seq = time.on, 
+                                                    time.off.seq = time.off,
+                                                    placebo.period = placebo.period.boot, 
+                                                    carryoverTest = carryoverTest,
+                                                    carryover.period = carryover.period.boot,
+                                                    placeboTest = placeboTest,
+                                                    group.level = group.level,
+                                                    group = boot.group,
+                                                    time.on.seq.group = group.time.on,
+                                                    time.off.seq.group = group.time.off),silent = TRUE)
+                                            
+                                 
                 }
 
                 if ('try-error' %in% class(boot)) {
                     boot0 <- list(att.avg = NA, att = NA, count = NA, 
                                   beta = NA, att.off = NA, count.off = NA, 
-                                  att.placebo = NA, att.avg.unit = NA,
-                                  group.att = NA, marginal = NA)
+                                  att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
+                                  group.att = NA, marginal = NA,
+                                  group.output = list())
                     return(boot0)
                 } else {
                     return(boot)
@@ -413,130 +579,7 @@ fect.boot <- function(Y,
         }
     } 
             
-    #} else { ## mc
-    #    one.nonpara <- function() {
-
-    #        if (is.null(num)) {
-    #            if (is.null(cl)) {
-    #                if (hasRevs == 0) {
-    #                    if (Nco > 0) {
-    #                        repeat{
-    #                            fake.co <- sample(co, Nco, replace=TRUE)
-    #                            fake.tr <- sample(tr, Ntr, replace=TRUE)
-    #                            boot.id <- c(fake.tr, fake.co)
-    #                            if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-    #                                break
-    #                            }
-    #                        }
-    #                    } else {
-    #                        repeat{
-    #                            boot.id <- sample(tr, Ntr, replace=TRUE)
-    #                            if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-    #                                break
-    #                            }
-    #                        }
-    #                    }
-    #                } else {
-    #                    if (Ntr > 0) {
-    #                        if (Nco > 0) {
-    #                            repeat{
-    #                                fake.co <- sample(co, Nco, replace=TRUE)
-    #                                fake.tr <- sample(tr, Ntr, replace=TRUE)
-    #                                fake.rev <- sample(rev, Nrev, replace=TRUE)
-    #                                boot.id <- c(fake.rev, fake.tr, fake.co)
-    #                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-    #                                    break
-    #                                }
-    #                            }
-    #                        } else {
-    #                            repeat{
-    #                                fake.tr <- sample(tr, Ntr, replace=TRUE)
-    #                                fake.rev <- sample(rev, Nrev, replace=TRUE)
-    #                                boot.id <- c(fake.rev, fake.tr)
-    #                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-    #                                    break
-    #                                }
-    #                            }
-    #                        }
-    #                    } else {
-    #                        if (Nco > 0) {
-    #                            repeat{
-    #                                fake.co <- sample(co, Nco, replace=TRUE)
-    #                                fake.rev <- sample(rev, Nrev, replace=TRUE)
-    #                                boot.id <- c(fake.rev, fake.co)
-    #                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-    #                                    break
-    #                                }
-    #                            }
-    #                        } else {
-    #                            repeat{
-    #                                boot.id <- sample(rev, Nrev, replace=TRUE)
-    #                                if (sum(apply(as.matrix(I[,boot.id]),1,sum)>=1)==TT) {
-    #                                    break
-    #                                }
-    #                            }
-    #                        }
-    #                    }
-    #                }
-    #            } else {
-    #                cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
-    #                cl.boot.uni <- unique(cl.boot)
-    #                cl.boot.count <- as.numeric(table(cl.boot))
-    #                boot.id <- c()
-    #                for (kk in 1:length(cl.boot.uni)) {
-    #                    boot.id <- c(boot.id, rep(which(cl == cl.boot.uni[kk]), cl.boot.count[kk]))
-    #                }
-    #            }
-
-    #        } else {
-    #            boot.id <- 1:N
-    #            boot.id <- boot.id[-num]
-    #        }
-            
-            
-                
-    #        X.boot <- X[,boot.id,,drop = FALSE]
-    #        D.boot <- D[, boot.id]
-    #        I.boot <- I[, boot.id]
-
-    #        if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
-    #            boot0 <- list(att.avg = NA, att = NA, count = NA, 
-    #                          beta = NA, att.off = NA, count.off = NA, 
-    #                          att.placebo = NA)
-    #            return(boot0)
-    #        } else {
-    #            T.off.boot <- NULL
-    #            if (hasRevs == TRUE) {
-    #                T.off.boot <- T.off[, boot.id]
-    #            }
-    #            placebo.period.boot <- NULL
-    #            if (placeboTest == TRUE) {
-    #                placebo.period.boot <- placebo.period
-    #            }
-                
-    #            boot <- try(fect.mc(Y = Y[,boot.id], X = X.boot, D = D[,boot.id],
-    #                                I = I[,boot.id], II = II[,boot.id],
-    #                                T.on = T.on[,boot.id], T.off = T.off.boot, 
-    #                                lambda.cv = out$lambda.cv, force = force, 
-    #                                hasF = out$validF, hasRevs = hasRevs, 
-    #                                tol = tol, boot = 1,
-    #                                norm.para = norm.para,
-    #                                time.on.seq = time.on, time.off.seq = time.off,
-    #                                placebo.period = placebo.period.boot, 
-    #                                placeboTest = placeboTest), silent = TRUE)
-                
-    #            if ('try-error' %in% class(boot)) {
-    #                boot0 <- list(att.avg = NA, att = NA, count = NA, 
-    #                              beta = NA, att.off = NA, count.off = NA, 
-    #                              att.placebo = NA)
-    #                return(boot0)
-    #            } else {
-    #                return(boot)
-    #            }
-    #        }                        
-    #    } 
-    #}
-
+    
     ## jack.seq <- sample(1:N, N, replace = FALSE)
     boot.seq <- NULL
     if (vartype == "jackknife") {
@@ -544,7 +587,9 @@ fect.boot <- function(Y,
         ## boot.seq <- jack.seq[1:nboots]
         boot.seq <- 1:N 
     }
-    
+
+   
+
     ## computing
     if (parallel == TRUE) { 
         boot.out <- foreach(j=1:nboots, 
@@ -573,11 +618,43 @@ fect.boot <- function(Y,
             if (!is.null(placebo.period) & placeboTest == TRUE) {
                 att.placebo.boot[,j] <- boot.out[[j]]$att.placebo
             }
+            if (!is.null(carryover.period) & carryoverTest == TRUE) {
+                att.carryover.boot[,j] <- boot.out[[j]]$att.carryover
+            }
             if (!is.null(group)) {
-                group.att.boot[,j] <- boot.out[[j]]$group.att
+                group.att.boot[,j] <- boot.out[[j]]$group.att  
+                for(sub.name in group.output.name){
+                    if(is.null(boot.out[[j]]$group.output[[sub.name]]$att.on)){
+                        group.atts.boot[[sub.name]][,j] <- NA
+                    }else{
+                        group.atts.boot[[sub.name]][,j] <- boot.out[[j]]$group.output[[sub.name]]$att.on
+                    }
+                    if(hasRevs == 1){
+                        if(is.null(boot.out[[j]]$group.output[[sub.name]]$att.off)){
+                            group.atts.off.boot[[sub.name]][,j] <- NA
+                        }else{
+                           group.atts.off.boot[[sub.name]][,j] <- boot.out[[j]]$group.output[[sub.name]]$att.off
+                        }
+                    }
+                    if(placeboTest){
+                        if(is.null(boot.out[[j]]$group.output[[sub.name]]$att.placebo)){
+                            group.att.placebo.boot[[sub.name]][,j] <- NA
+                        }else{
+                           group.att.placebo.boot[[sub.name]][,j] <- boot.out[[j]]$group.output[[sub.name]]$att.placebo
+                        }
+                    }
+                    if(carryoverTest){
+                        if(is.null(boot.out[[j]]$group.output[[sub.name]]$att.carryover)){
+                            group.att.carryover.boot[[sub.name]][,j] <- NA
+                        }else{
+                           group.att.carryover.boot[[sub.name]][,j] <- boot.out[[j]]$group.output[[sub.name]]$att.carryover
+                        }
+                    }
+                }   
             }
         } 
-    } else {
+    } 
+    else {
         for (j in 1:nboots) { 
             boot <- one.nonpara(boot.seq[j]) 
             att.avg.boot[,j] <- boot$att.avg
@@ -597,8 +674,39 @@ fect.boot <- function(Y,
             if (!is.null(placebo.period) & placeboTest == TRUE) {
                 att.placebo.boot[,j] <- boot$att.placebo
             }
+            if (!is.null(carryover.period) & carryoverTest == TRUE) {
+                att.carryover.boot[,j] <- boot$att.carryover
+            }
             if (!is.null(group)) {
-                group.att.boot[,j] <- boot$group.att
+                group.att.boot[,j] <- boot$group.att  
+                for(sub.name in group.output.name){
+                    if(is.null(boot$group.output[[sub.name]]$att.on)){
+                        group.atts.boot[[sub.name]][,j] <- NA
+                    }else{
+                        group.atts.boot[[sub.name]][,j] <- boot$group.output[[sub.name]]$att.on
+                    }
+                    if(hasRevs == 1){
+                        if(is.null(boot$group.output[[sub.name]]$att.off)){
+                            group.atts.off.boot[[sub.name]][,j] <- NA
+                        }else{
+                           group.atts.off.boot[[sub.name]][,j] <- boot$group.output[[sub.name]]$att.off
+                        }
+                    }
+                    if(placeboTest){
+                        if(is.null(boot$group.output[[sub.name]]$att.placebo)){
+                            group.att.placebo.boot[[sub.name]][,j] <- NA
+                        }else{
+                           group.att.placebo.boot[[sub.name]][,j] <- boot$group.output[[sub.name]]$att.placebo
+                        }
+                    }
+                    if(carryoverTest){
+                        if(is.null(boot$group.output[[sub.name]]$att.carryover)){
+                            group.att.carryover.boot[[sub.name]][,j] <- NA
+                        }else{
+                           group.att.carryover.boot[[sub.name]][,j] <- boot$group.output[[sub.name]]$att.carryover
+                        }
+                    }
+                }   
             }
             ## report progress
             if (j%%100 == 0)  {
@@ -607,7 +715,7 @@ fect.boot <- function(Y,
         }  
     } 
     ## end of bootstrapping
-    
+
     ## remove failure bootstrap
     ## alternative condition? max(apply(is.na(att.boot),2,sum)) == dim(att.boot)[1]
     if (sum(is.na(c(att.avg.boot))) > 0) {
@@ -629,21 +737,35 @@ fect.boot <- function(Y,
         if (!is.null(placebo.period) & placeboTest == TRUE) {
             att.placebo.boot <- t(as.matrix(att.placebo.boot[,-boot.rm]))
         }
+        if (!is.null(carryover.period) & carryoverTest == TRUE) {
+            att.carryover.boot <- t(as.matrix(att.carryover.boot[,-boot.rm]))
+        }
         if (!is.null(group)) {
             if (dim(group.att.boot)[1] == 1) {
                 group.att.boot <- t(as.matrix(group.att.boot[, -boot.rm]))
             } else {
                 group.att.boot <- as.matrix(group.att.boot[, -boot.rm])
             }
-            
-        }
 
+            for(sub.name in group.output.name){
+                group.atts.boot[[sub.name]] <- as.matrix(group.atts.boot[[sub.name]][,-boot.rm])
+                if(hasRevs == 1){
+                    group.atts.off.boot[[sub.name]] <- as.matrix(group.atts.off.boot[[sub.name]][,-boot.rm])
+                }
+                if(placeboTest){
+                    group.att.placebo.boot[[sub.name]] <- t(as.matrix(group.att.placebo.boot[[sub.name]][,-boot.rm]))
+                }
+                if(carryoverTest){
+                    group.att.carryover.boot[[sub.name]] <- t(as.matrix(group.att.carryover.boot[[sub.name]][,-boot.rm]))
+                }
+            }  
+        }
     }
     if (dis) {
-      cat(dim(att.boot)[2], " runs\n", sep = "")
+        cat(dim(att.boot)[2], " runs\n", sep = "")
     }
-    
-     
+
+
     ####################################
     ## Variance and CIs
     ####################################
@@ -670,7 +792,7 @@ fect.boot <- function(Y,
         att.j <- jackknifed(att, att.boot, alpha)
         est.att <- cbind(att, att.j$se, att.j$CI.l, att.j$CI.u, att.j$P, out$count)
         colnames(est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
-                                  "p.value", "count.on")
+                                  "p.value", "count")
         rownames(est.att) <- out$time
 
         att.bound <- cbind(att + qnorm(alpha)*att.j$se, att + qnorm(1 - alpha)*att.j$se)
@@ -681,7 +803,7 @@ fect.boot <- function(Y,
             att.off.j <- jackknifed(att.off, att.off.boot, alpha)
             est.att.off <- cbind(att.off, att.off.j$se, att.off.j$CI.l, att.off.j$CI.u, att.off.j$P, out$count.off)
             colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
-                                      "p.value", "count.off")
+                                      "p.value", "count")
             rownames(est.att.off) <- out$time.off
 
             att.off.bound <- cbind(att.off + qnorm(alpha)*att.off.j$se, att.off + qnorm(1 - alpha)*att.off.j$se)
@@ -719,18 +841,109 @@ fect.boot <- function(Y,
             colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
         }
 
-        ## cohort effect
-        if (!is.null(group)) {
-            group.att.j <- jackknifed(group.att, group.att.boot, alpha)
-
-            est.group.att <- cbind(group.att, group.att.j$se, group.att.j$CI.l, group.att.j$CI.u, group.att.j$P)
-            
-            colnames(est.group.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
-                                         "p.value")
+        ## carryover test
+        if (!is.null(carryover.period) & carryoverTest == TRUE) {
+            att.carryover <- out$att.carryover
+            att.carryover.j <- jackknifed(att.carryover, att.carryover.boot, alpha)
+            est.carryover <- t(as.matrix(c(att.carryover, att.carryover.j$se, att.carryover.j$CI.l, att.carryover.j$CI.u, att.carryover.j$P)))
+            colnames(est.carryover) <- c("ATT.carryover", "S.E.", "CI.lower", "CI.upper", "p.value")
         }
 
-    # end of jackknife S.E. and CI
-    } else {
+        ## cohort effect
+        est.group.out <- NULL
+        if (!is.null(group)) {
+            group.att.j <- jackknifed(group.att, group.att.boot, alpha)
+            est.group.att <- cbind(group.att, group.att.j$se, group.att.j$CI.l, group.att.j$CI.u, group.att.j$P)
+            colnames(est.group.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                         "p.value")
+            
+            est.group.out <- list()
+            for(sub.name in group.output.name){
+                subgroup.atts <- group.output.origin[[sub.name]]$att.on
+                subgroup.atts.boot <- group.atts.boot[[sub.name]]
+                subgroup.est.att <- NULL
+                subgroup.att.bound <- NULL
+                
+                if(dim(subgroup.atts.boot)[1]>0){
+                    subgroup.att.j <- jackknifed(subgroup.atts, subgroup.atts.boot, alpha)
+                    subgroup.est.att <- cbind(subgroup.atts, subgroup.att.j$se, subgroup.att.j$CI.l, 
+                                            subgroup.att.j$CI.u, subgroup.att.j$P, 
+                                            group.output.origin[[sub.name]]$count.on)
+                    colnames(subgroup.est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                        "p.value", "count")
+                    rownames(subgroup.est.att) <- group.output.origin[[sub.name]]$time.on
+                
+                    subgroup.att.bound <- cbind(subgroup.atts + qnorm(alpha)*subgroup.att.j$se, 
+                                                subgroup.atts + qnorm(1 - alpha)*subgroup.att.j$se)
+                    colnames(subgroup.att.bound) <- c("CI.lower", "CI.upper")
+                    rownames(subgroup.att.bound) <- group.output.origin[[sub.name]]$time.on
+                }
+                
+                subgroup.est.att.off <- NULL
+                subgroup.att.off.bound <- NULL
+                if(hasRevs == 1){
+                    subgroup.atts.off <- group.output.origin[[sub.name]]$att.off
+                    subgroup.atts.off.boot <- group.atts.off.boot[[sub.name]]
+                    if(dim(subgroup.atts.off.boot)[1]>0){
+                        subgroup.att.off.j <- jackknifed(subgroup.atts.off, subgroup.atts.off.boot, alpha)
+                        subgroup.est.att.off <- cbind(subgroup.atts.off, subgroup.att.off.j$se, subgroup.att.off.j$CI.l, 
+                                                subgroup.att.off.j$CI.u, subgroup.att.off.j$P, 
+                                                group.output.origin[[sub.name]]$count.off)
+                        colnames(subgroup.est.att.off) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                                            "p.value", "count")
+                        rownames(subgroup.est.att.off) <- group.output.origin[[sub.name]]$time.off
+                    
+                        subgroup.att.off.bound <- cbind(subgroup.atts.off + qnorm(alpha)*subgroup.att.off.j$se, 
+                                                    subgroup.atts.off + qnorm(1 - alpha)*subgroup.att.off.j$se)
+                        colnames(subgroup.att.off.bound) <- c("CI.lower", "CI.upper")
+                        rownames(subgroup.att.off.bound) <- group.output.origin[[sub.name]]$time.off                      
+                    }
+                }
+
+                subgroup.est.placebo <- NULL
+                if(placeboTest){
+                    subgroup.att.placebo <- group.output.origin[[sub.name]]$att.placebo
+                    if(length(subgroup.att.placebo)>0){
+                        subgroup.att.placebo.j <- jackknifed(subgroup.att.placebo, group.att.placebo.boot[[sub.name]], alpha)
+                        subgroup.est.placebo <- t(as.matrix(c(subgroup.att.placebo, 
+                                                            subgroup.att.placebo.j$se, 
+                                                            subgroup.att.placebo.j$CI.l, 
+                                                            subgroup.att.placebo.j$CI.u, 
+                                                            subgroup.att.placebo.j$P)))
+                        colnames(subgroup.est.placebo) <- c("ATT.placebo", "S.E.", 
+                                                            "CI.lower", "CI.upper", "p.value")
+                                            
+                    }
+                }
+
+                subgroup.est.carryover <- NULL
+                if(carryoverTest){
+                    subgroup.att.carryover <- group.output.origin[[sub.name]]$att.carryover
+                    if(length(subgroup.att.carryover)>0){
+                        subgroup.att.carryover.j <- jackknifed(subgroup.att.carryover, group.att.carryover.boot[[sub.name]], alpha)
+                        subgroup.est.carryover <- t(as.matrix(c(subgroup.att.carryover, 
+                                                            subgroup.att.carryover.j$se, 
+                                                            subgroup.att.carryover.j$CI.l, 
+                                                            subgroup.att.carryover.j$CI.u, 
+                                                            subgroup.att.carryover.j$P)))
+                        colnames(subgroup.est.carryover) <- c("ATT.carryover", "S.E.", 
+                                                            "CI.lower", "CI.upper", "p.value")
+                                            
+                    }
+                }
+
+                est.group.out[[sub.name]] <- list(att.on = subgroup.est.att,
+                                                  att.on.bound = subgroup.att.bound,
+                                                  att.on.boot = group.atts.boot[[sub.name]],
+                                                  att.off = subgroup.est.att.off,
+                                                  att.off.bound = subgroup.att.off.bound,
+                                                  att.off.boot = group.atts.off.boot[[sub.name]],
+                                                  att.placebo = subgroup.est.placebo,
+                                                  att.carryover = subgroup.est.carryover)
+            }
+        }
+    } 
+    else {
 
         se.att <- apply(att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
         CI.att <- cbind(att - se.att * qnorm(1-alpha/2), att + se.att * qnorm(1-alpha/2)) # normal approximation
@@ -745,7 +958,6 @@ fect.boot <- function(Y,
         colnames(att.bound) <- c("CI.lower", "CI.upper")
         rownames(att.bound) <- out$time
         
-
         if (hasRevs == 1) {
             CI.att.off <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
             se.att.off <- apply(att.off.boot, 1, function(vec) sd(vec, na.rm=TRUE))
@@ -795,7 +1007,7 @@ fect.boot <- function(Y,
                 pvalue.marginal <- (1-pnorm(abs(out$marginal/se.marginal)))*2
                 est.marginal<-cbind(out$marginal, se.marginal, CI.marginal, pvalue.marginal)
                 colnames(est.marginal)<-c("marginal", "S.E.", "CI.lower", "CI.upper", "p.value")
-         }
+            }
         }
 
         ## placebo test
@@ -809,6 +1021,17 @@ fect.boot <- function(Y,
             colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
         }
 
+        ## carryover test
+        if (!is.null(carryover.period) & carryoverTest == TRUE) {
+            att.carryover <- out$att.carryover      
+            se.carryover <- sd(att.carryover.boot, na.rm=TRUE)
+            CI.carryover <- c(att.carryover - se.carryover * qnorm(1-alpha/2), 
+                        att.carryover + se.carryover * qnorm(1-alpha/2))
+            pvalue.carryover <- (1-pnorm(abs(att.carryover/se.carryover)))*2
+            est.carryover <- t(as.matrix(c(att.carryover, se.carryover, CI.carryover, pvalue.carryover)))
+            colnames(est.carryover) <- c("ATT.carryover", "S.E.", "CI.lower", "CI.upper", "p.value")
+        }
+
         ## group effect
         if (!is.null(group)) {
             se.group.att <- apply(group.att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
@@ -817,9 +1040,105 @@ fect.boot <- function(Y,
             pvalue.group.att <- (1-pnorm(abs(out$group.att/se.group.att)))*2
             est.group.att <- cbind(out$group.att, se.group.att, CI.group.att, pvalue.group.att)
             colnames(est.group.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value")
-         }
+        
+            est.group.out <- list()
+            for(sub.name in group.output.name){
+                subgroup.atts <- group.output.origin[[sub.name]]$att.on
+                subgroup.atts.boot <- group.atts.boot[[sub.name]]
+                subgroup.est.att <- NULL
+                subgroup.att.bound <- NULL
+                if(dim(subgroup.atts.boot)[1]>0){
+                    subgroup.se.att <- apply(subgroup.atts.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+                    #subgroup.CI.att <- cbind(subgroup.atts - subgroup.se.att * qnorm(1-alpha/2), 
+                    #                        subgroup.atts + subgroup.se.att * qnorm(1-alpha/2)) # normal approximation
+                    subgroup.CI.att <- t(apply(subgroup.atts.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+                    subgroup.pvalue.att <- (1-pnorm(abs(subgroup.atts/subgroup.se.att)))*2
+                    subgroup.est.att <- cbind(subgroup.atts, subgroup.se.att , 
+                                            subgroup.CI.att, subgroup.pvalue.att, 
+                                            group.output.origin[[sub.name]]$count.on)
+                    colnames(subgroup.est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                                    "p.value", "count")
+                    rownames(subgroup.est.att) <- group.output.origin[[sub.name]]$time.on
+                    
+                    # for equivalence test
+                    subgroup.att.bound <- cbind(subgroup.atts - subgroup.se.att * qnorm(1-alpha), 
+                                                subgroup.atts + subgroup.se.att * qnorm(1-alpha)) # one-sided
+                    colnames(subgroup.att.bound) <- c("CI.lower", "CI.upper")
+                    rownames(subgroup.att.bound) <- group.output.origin[[sub.name]]$time.on
+                }
+                
+                subgroup.att.off.bound <- NULL
+                subgroup.est.att.off <- NULL
+                if (hasRevs == 1){
+                    subgroup.atts.off <- group.output.origin[[sub.name]]$att.off
+                    subgroup.atts.off.boot <- group.atts.off.boot[[sub.name]]
+
+                    if(dim(subgroup.atts.off.boot)[1]>0){
+                        subgroup.CI.att.off <- t(apply(subgroup.atts.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+                        subgroup.se.att.off <- apply(subgroup.atts.off.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+                        subgroup.pvalue.att.off <- apply(subgroup.atts.off.boot, 1, get.pvalue)
+
+                        subgroup.est.att.off <- cbind(subgroup.atts.off, 
+                                                    subgroup.se.att.off, 
+                                                    subgroup.CI.att.off, 
+                                                    subgroup.pvalue.att.off, 
+                                                    group.output.origin[[sub.name]]$count.off)
+                        colnames(subgroup.est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
+                                                            "p.value", "count.off")
+                        rownames(subgroup.est.att.off) <- group.output.origin[[sub.name]]$time.off
+                        
+                        subgroup.att.off.bound <- t(apply(subgroup.atts.off.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+                        colnames(subgroup.att.off.bound) <- c("CI.lower", "CI.upper")
+                        rownames(subgroup.att.off.bound) <- group.output.origin[[sub.name]]$time.off                         
+                    }   
+                }
+
+                ## placebo test
+                subgroup.est.placebo <- NULL
+                if (!is.null(placebo.period) & placeboTest == TRUE) {
+                    subgroup.att.placebo <- group.output.origin[[sub.name]]$att.placebo
+                    if(length(subgroup.att.placebo)>0){
+                        subgroup.se.placebo <- sd(group.att.placebo.boot[[sub.name]], na.rm=TRUE)
+                        subgroup.CI.placebo <- c(subgroup.att.placebo - subgroup.se.placebo * qnorm(1-alpha/2), 
+                                                subgroup.att.placebo + subgroup.se.placebo * qnorm(1-alpha/2))
+                        subgroup.pvalue.placebo <- (1-pnorm(abs(subgroup.att.placebo/subgroup.se.placebo)))*2
+                        subgroup.est.placebo <- t(as.matrix(c(subgroup.att.placebo, 
+                                                            subgroup.se.placebo, 
+                                                            subgroup.CI.placebo, 
+                                                            subgroup.pvalue.placebo)))
+                        colnames(subgroup.est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")                      
+                    }        
+                }
+
+                ## carryover test
+                subgroup.est.carryover <- NULL
+                if (!is.null(carryover.period) & carryoverTest == TRUE) {
+                    subgroup.att.carryover <- group.output.origin[[sub.name]]$att.carryover        
+                    if(length(subgroup.att.carryover)>0){
+                        subgroup.se.carryover <- sd(group.att.carryover.boot[[sub.name]], na.rm=TRUE)
+                        subgroup.CI.carryover <- c(subgroup.att.carryover - subgroup.se.carryover * qnorm(1-alpha/2), 
+                                                subgroup.att.carryover + subgroup.se.carryover * qnorm(1-alpha/2))
+                        subgroup.pvalue.carryover <- (1-pnorm(abs(subgroup.att.carryover/subgroup.se.carryover)))*2
+                        subgroup.est.carryover <- t(as.matrix(c(subgroup.att.carryover, 
+                                                            subgroup.se.carryover, 
+                                                            subgroup.CI.carryover, 
+                                                            subgroup.pvalue.carryover)))
+                        colnames(subgroup.est.carryover) <- c("ATT.carryover", "S.E.", "CI.lower", "CI.upper", "p.value")                 
+                    }
+                }
+
+                est.group.out[[sub.name]] <- list(att.on = subgroup.est.att,
+                                                  att.on.bound = subgroup.att.bound,
+                                                  att.on.boot = group.atts.boot[[sub.name]],
+                                                  att.off = subgroup.est.att.off,
+                                                  att.off.bound = subgroup.att.off.bound,
+                                                  att.off.boot = group.atts.off.boot[[sub.name]],
+                                                  att.placebo = subgroup.est.placebo,
+                                                  att.carryover = subgroup.est.carryover)
+            }
+        }
     }
-  
+
     ##storage
     result<-list(est.avg = est.avg,
                  att.avg.boot = att.avg.boot,
@@ -848,8 +1167,13 @@ fect.boot <- function(Y,
         result <- c(result, list(est.placebo = est.placebo, att.placebo.boot = att.placebo.boot))
     }
 
+    if (!is.null(carryover.period) & carryoverTest == TRUE) {
+        result <- c(result, list(est.carryover = est.carryover, att.carryover.boot = att.carryover.boot))
+    }
+
     if (!is.null(group)) {
-        result <- c(result, list(est.group.att = est.group.att))
+        result <- c(result, list(est.group.att = est.group.att,
+                                 est.group.output = est.group.out))
 
     }
 

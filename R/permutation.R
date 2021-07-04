@@ -5,6 +5,7 @@ fect.permu <- function(Y,
                        X,
                        D,
                        I,
+                       permu.dimension = 'time',
                        r.cv = NULL,
                        lambda.cv = NULL,
                        m = 2, 
@@ -19,60 +20,89 @@ fect.permu <- function(Y,
                        cores = NULL) {
 
     TT <- dim(Y)[1]
-
     n.shuffle <- TT %/% m
-
     t.pos <- rep(1:n.shuffle, each = m)
-
     if (TT > n.shuffle * m) {
         t.pos <- c(t.pos, rep(n.shuffle + 1, TT - n.shuffle * m))
     }
-
     tt <- 1:TT 
-
     ## list 
     l.tt <- split(tt, t.pos)
 
+    if(permu.dimension == 'time'){
+        sub.permu <- function() {
 
-    sub.permu <- function() {
-
-        sub.pos <- c()
-        tt.length <- length(l.tt)
-
-        one.rank <- sample(1:tt.length, tt.length, replace = FALSE)
-
-        for (i in 1:tt.length) {
-            sub.pos <- c(sub.pos, unlist(l.tt[[one.rank[i]]]))
-        }
-
-        Y.permu <- as.matrix(Y[sub.pos, ])
-        I.permu <- as.matrix(I[sub.pos, ])
-        #D.permu <- as.matrix(D[sub.pos, ])
-
-        if (!is.null(X)) {
-            X.permu <- X[sub.pos,,,drop = FALSE]
-        }
-
-        result <- try(one.permu(Y.permu, 
-                                X.permu, 
-                                D,  
-                                I.permu, 
-                                r.cv, 
-                                lambda.cv, 
-                                method,
-                                degree,
-                                knots,
-                                force, 
-                                tol,
-                                norm.para), silent = TRUE)
+            sub.pos <- c()
+            tt.length <- length(l.tt)
+            one.rank <- sample(1:tt.length, tt.length, replace = FALSE)
+            for (i in 1:tt.length) {
+                sub.pos <- c(sub.pos, unlist(l.tt[[one.rank[i]]]))
+            }
+            Y.permu <- as.matrix(Y[sub.pos, ])
+            I.permu <- as.matrix(I[sub.pos, ])
+            #D.permu <- as.matrix(D[sub.pos, ])
+            if (!is.null(X)) {
+                X.permu <- X[sub.pos,,,drop = FALSE]
+            }
+            result <- try(one.permu(Y.permu, 
+                                    X.permu, 
+                                    D,  
+                                    I.permu, 
+                                    r.cv, 
+                                    lambda.cv, 
+                                    method,
+                                    degree,
+                                    knots,
+                                    force, 
+                                    tol,
+                                    norm.para), silent = TRUE)
 
 
-        if ('try-error' %in% class(result)) {
-            return(NA)
-        } else {
-            return(result)
-        }
+            if ('try-error' %in% class(result)) {
+                return(NA)
+            } else {
+                return(result)
+            }
+        }        
     }
+
+    if(permu.dimension == 'unit'){
+        NN <- dim(Y)[2]
+        index.NN <- c(1:NN)
+    
+        sub.permu <- function() {
+
+            sample.unit <- sample(index.NN,
+                                  size=length(index.NN),
+                                  replace=FALSE)
+
+            Y.permu <- as.matrix(Y[, sample.unit])
+            I.permu <- as.matrix(I[, sample.unit])
+            if (!is.null(X)) {
+                X.permu <- X[,sample.unit,,drop = FALSE]
+            }
+            result <- try(one.permu(Y.permu, 
+                                    X.permu, 
+                                    D,  
+                                    I.permu, 
+                                    r.cv, 
+                                    lambda.cv, 
+                                    method,
+                                    degree,
+                                    knots,
+                                    force, 
+                                    tol,
+                                    norm.para), silent = TRUE)
+
+
+            if ('try-error' %in% class(result)) {
+                return(NA)
+            } else {
+                return(result)
+            }
+        }  
+    }
+
 
     att.avg.permu <- rep(NA, nboots)
 
@@ -226,7 +256,8 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
         if (!is.null(norm.para)) {
             Y.ct <- Y.ct * norm.para[1]
         }
-    } else if (method == "bspline") {
+    } 
+    else if (method == "bspline") {
         
         ## reshape 
         vy <- as.matrix(c(YY))
@@ -258,7 +289,8 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
         if (!is.null(norm.para)) {
             Y.ct <- Y.ct * norm.para[1]
         }
-    } else {
+    } 
+    else {
         ## initial fit using fastplm
         data.ini <- matrix(NA, (TT*N), (2 + 1 + p))
         data.ini[, 2] <- rep(1:N, each = TT)         ## unit fe
