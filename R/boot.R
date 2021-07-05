@@ -837,16 +837,31 @@ fect.boot <- function(Y,
         if (!is.null(placebo.period) & placeboTest == TRUE) {
             att.placebo <- out$att.placebo
             att.placebo.j <- jackknifed(att.placebo, att.placebo.boot, alpha)
-            est.placebo <- t(as.matrix(c(att.placebo, att.placebo.j$se, att.placebo.j$CI.l, att.placebo.j$CI.u, att.placebo.j$P)))
-            colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
+            att.placebo.bound <- c(att.placebo + qnorm(alpha)*att.placebo.j$se, 
+                                   att.placebo + qnorm(1 - alpha)*att.placebo.j$se)
+            est.placebo <- t(as.matrix(c(att.placebo, att.placebo.j$se, 
+                                         att.placebo.j$CI.l, att.placebo.j$CI.u, 
+                                         att.placebo.j$P,
+                                         att.placebo.bound)))
+            colnames(est.placebo) <- c("ATT.placebo", "S.E.", 
+                                       "CI.lower", "CI.upper", 
+                                       "p.value", "CI.lower(90%)","CI.upper(90%)")
         }
 
         ## carryover test
         if (!is.null(carryover.period) & carryoverTest == TRUE) {
             att.carryover <- out$att.carryover
             att.carryover.j <- jackknifed(att.carryover, att.carryover.boot, alpha)
-            est.carryover <- t(as.matrix(c(att.carryover, att.carryover.j$se, att.carryover.j$CI.l, att.carryover.j$CI.u, att.carryover.j$P)))
-            colnames(est.carryover) <- c("ATT.carryover", "S.E.", "CI.lower", "CI.upper", "p.value")
+            att.carryover.bound <- c(att.carryover + qnorm(alpha)*att.carryover.j$se, 
+                                   att.carryover + qnorm(1 - alpha)*att.carryover.j$se)
+            
+            est.carryover <- t(as.matrix(c(att.carryover, att.carryover.j$se, 
+                                           att.carryover.j$CI.l, att.carryover.j$CI.u, 
+                                           att.carryover.j$P,
+                                           att.carryover.bound)))
+            colnames(est.carryover) <- c("ATT.carryover", "S.E.", 
+                                         "CI.lower", "CI.upper", 
+                                         "p.value", "CI.lower(90%)","CI.upper(90%)")
         }
 
         ## cohort effect
@@ -905,13 +920,18 @@ fect.boot <- function(Y,
                     subgroup.att.placebo <- group.output.origin[[sub.name]]$att.placebo
                     if(length(subgroup.att.placebo)>0){
                         subgroup.att.placebo.j <- jackknifed(subgroup.att.placebo, group.att.placebo.boot[[sub.name]], alpha)
+                        att.placebo.bound <- c(subgroup.att.placebo + qnorm(alpha)*subgroup.att.placebo.j$se, 
+                                               subgroup.att.placebo + qnorm(1 - alpha)*subgroup.att.placebo.j$se)
+            
                         subgroup.est.placebo <- t(as.matrix(c(subgroup.att.placebo, 
                                                             subgroup.att.placebo.j$se, 
                                                             subgroup.att.placebo.j$CI.l, 
                                                             subgroup.att.placebo.j$CI.u, 
-                                                            subgroup.att.placebo.j$P)))
+                                                            subgroup.att.placebo.j$P,
+                                                            att.placebo.bound)))
                         colnames(subgroup.est.placebo) <- c("ATT.placebo", "S.E.", 
-                                                            "CI.lower", "CI.upper", "p.value")
+                                                            "CI.lower", "CI.upper", "p.value",
+                                                            "CI.lower(90%)","CI.upper(90%)")
                                             
                     }
                 }
@@ -921,13 +941,18 @@ fect.boot <- function(Y,
                     subgroup.att.carryover <- group.output.origin[[sub.name]]$att.carryover
                     if(length(subgroup.att.carryover)>0){
                         subgroup.att.carryover.j <- jackknifed(subgroup.att.carryover, group.att.carryover.boot[[sub.name]], alpha)
+                        att.carryover.bound <- c(subgroup.att.carryover + qnorm(alpha)*subgroup.att.carryover.j$se, 
+                                                 subgroup.att.carryover + qnorm(1 - alpha)*subgroup.att.carryover.j$se)
+                                    
                         subgroup.est.carryover <- t(as.matrix(c(subgroup.att.carryover, 
                                                             subgroup.att.carryover.j$se, 
                                                             subgroup.att.carryover.j$CI.l, 
                                                             subgroup.att.carryover.j$CI.u, 
-                                                            subgroup.att.carryover.j$P)))
+                                                            subgroup.att.carryover.j$P,
+                                                            att.carryover.bound)))
                         colnames(subgroup.est.carryover) <- c("ATT.carryover", "S.E.", 
-                                                            "CI.lower", "CI.upper", "p.value")
+                                                              "CI.lower", "CI.upper", "p.value",
+                                                              "CI.lower(90%)","CI.upper(90%)")
                                             
                     }
                 }
@@ -1015,10 +1040,18 @@ fect.boot <- function(Y,
             att.placebo <- out$att.placebo        
             se.placebo <- sd(att.placebo.boot, na.rm=TRUE)
             CI.placebo <- c(att.placebo - se.placebo * qnorm(1-alpha/2), 
-                        att.placebo + se.placebo * qnorm(1-alpha/2))
+                            att.placebo + se.placebo * qnorm(1-alpha/2))
+            CI.placebo.bound <- c(att.placebo - se.placebo * qnorm(1-alpha), 
+                                  att.placebo + se.placebo * qnorm(1-alpha))
             pvalue.placebo <- (1-pnorm(abs(att.placebo/se.placebo)))*2
-            est.placebo <- t(as.matrix(c(att.placebo, se.placebo, CI.placebo, pvalue.placebo)))
-            colnames(est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
+            est.placebo <- t(as.matrix(c(att.placebo, 
+                                         se.placebo, 
+                                         CI.placebo, 
+                                         pvalue.placebo,
+                                         CI.placebo.bound)))
+            colnames(est.placebo) <- c("ATT.placebo", "S.E.", 
+                                       "CI.lower", "CI.upper", "p.value",
+                                       "CI.lower(90%)", "CI.upper(90%)")
         }
 
         ## carryover test
@@ -1027,9 +1060,15 @@ fect.boot <- function(Y,
             se.carryover <- sd(att.carryover.boot, na.rm=TRUE)
             CI.carryover <- c(att.carryover - se.carryover * qnorm(1-alpha/2), 
                         att.carryover + se.carryover * qnorm(1-alpha/2))
+            CI.carryover.bound <- c(att.carryover - se.carryover * qnorm(1-alpha), 
+                                    att.carryover + se.carryover * qnorm(1-alpha))
             pvalue.carryover <- (1-pnorm(abs(att.carryover/se.carryover)))*2
-            est.carryover <- t(as.matrix(c(att.carryover, se.carryover, CI.carryover, pvalue.carryover)))
-            colnames(est.carryover) <- c("ATT.carryover", "S.E.", "CI.lower", "CI.upper", "p.value")
+            est.carryover <- t(as.matrix(c(att.carryover, se.carryover, 
+                                           CI.carryover, pvalue.carryover,
+                                           CI.carryover.bound)))
+            colnames(est.carryover) <- c("ATT.carryover", "S.E.", 
+                                         "CI.lower", "CI.upper", "p.value",
+                                         "CI.lower(90%)","CI.upper(90%)")
         }
 
         ## group effect
@@ -1101,12 +1140,17 @@ fect.boot <- function(Y,
                         subgroup.se.placebo <- sd(group.att.placebo.boot[[sub.name]], na.rm=TRUE)
                         subgroup.CI.placebo <- c(subgroup.att.placebo - subgroup.se.placebo * qnorm(1-alpha/2), 
                                                 subgroup.att.placebo + subgroup.se.placebo * qnorm(1-alpha/2))
+                        subgroup.CI.placebo.bound <- c(subgroup.att.placebo - subgroup.se.placebo * qnorm(1-alpha), 
+                                                       subgroup.att.placebo + subgroup.se.placebo * qnorm(1-alpha))
                         subgroup.pvalue.placebo <- (1-pnorm(abs(subgroup.att.placebo/subgroup.se.placebo)))*2
                         subgroup.est.placebo <- t(as.matrix(c(subgroup.att.placebo, 
                                                             subgroup.se.placebo, 
                                                             subgroup.CI.placebo, 
-                                                            subgroup.pvalue.placebo)))
-                        colnames(subgroup.est.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")                      
+                                                            subgroup.pvalue.placebo,
+                                                            subgroup.CI.placebo.bound)))
+                        colnames(subgroup.est.placebo) <- c("ATT.placebo", "S.E.", 
+                                                            "CI.lower", "CI.upper", "p.value",
+                                                            "CI.lower(90%)","CI.upper(90%)")                      
                     }        
                 }
 
@@ -1117,13 +1161,19 @@ fect.boot <- function(Y,
                     if(length(subgroup.att.carryover)>0){
                         subgroup.se.carryover <- sd(group.att.carryover.boot[[sub.name]], na.rm=TRUE)
                         subgroup.CI.carryover <- c(subgroup.att.carryover - subgroup.se.carryover * qnorm(1-alpha/2), 
-                                                subgroup.att.carryover + subgroup.se.carryover * qnorm(1-alpha/2))
+                                                   subgroup.att.carryover + subgroup.se.carryover * qnorm(1-alpha/2))
+                        subgroup.CI.carryover.bound <- c(subgroup.att.carryover - subgroup.se.carryover * qnorm(1-alpha), 
+                                                         subgroup.att.carryover + subgroup.se.carryover * qnorm(1-alpha))
+                        
                         subgroup.pvalue.carryover <- (1-pnorm(abs(subgroup.att.carryover/subgroup.se.carryover)))*2
                         subgroup.est.carryover <- t(as.matrix(c(subgroup.att.carryover, 
                                                             subgroup.se.carryover, 
                                                             subgroup.CI.carryover, 
-                                                            subgroup.pvalue.carryover)))
-                        colnames(subgroup.est.carryover) <- c("ATT.carryover", "S.E.", "CI.lower", "CI.upper", "p.value")                 
+                                                            subgroup.pvalue.carryover,
+                                                            subgroup.pvalue.carryover.bound)))
+                        colnames(subgroup.est.carryover) <- c("ATT.carryover", "S.E.", 
+                                                              "CI.lower", "CI.upper", "p.value",
+                                                              "CI.lower(90%)","CI.upper(90%)")                 
                     }
                 }
 

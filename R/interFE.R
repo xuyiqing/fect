@@ -2,6 +2,7 @@
 # Version 1.02
 # LLC WY XYQ, 2019.2.2
 
+
 ## generic function
 interFE <- function(formula=NULL,
                     data, # a data frame

@@ -1677,11 +1677,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 rownames(out$est.marginal) <- Xname.tmp
             }
             if (placeboTest == TRUE) {
-                colnames(out$est.placebo) <- c("Coef","S.E.","CI.lower","CI.upper","p.value")
+                colnames(out$est.placebo) <- c("Coef","S.E.","CI.lower","CI.upper","p.value","CI.lower(90%)","CI.upper(90%)")
                 rownames(out$est.placebo) <- c("Placebo effect")
             }
             if (carryoverTest == TRUE) {
-                colnames(out$est.carryover) <- c("Coef","S.E.","CI.lower","CI.upper","p.value")
+                colnames(out$est.carryover) <- c("Coef","S.E.","CI.lower","CI.upper","p.value","CI.lower(90%)","CI.upper(90%)")
                 rownames(out$est.carryover) <- c("Carryover effect")
             }
         }

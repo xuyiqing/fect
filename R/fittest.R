@@ -1,6 +1,7 @@
 #####################################
 ## goodness of fit test: wild
 #####################################
+
 fect.test <- function(
     out, # from fect
     Y,

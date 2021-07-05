@@ -2,6 +2,7 @@
 ## Print
 ##########
 ## a fect object
+
 print.fect <- function(x,
                        switch.on = TRUE,
                        switch.off = FALSE,

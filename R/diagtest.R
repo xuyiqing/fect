@@ -23,7 +23,7 @@ diagtest <- function(
         tost.threshold <- 0.36 * sqrt(x$sigma2.fect)
     }
     if (is.null(f.threshold)==TRUE) {
-        f.threshold <- 0.5
+        f.threshold <- 0.6
     }
 
     # placebo test
@@ -91,14 +91,23 @@ diagtest <- function(
         else {
             scale <- (N_bar-length(pre.pos))/((N_bar-1)*length(pre.pos))
             ## F statistic 
-            f.stat <- psi * scale
-            
-            f.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
-                      lower.tail = FALSE)
 
-            ## Equivalent F test
-            f.equiv.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
-              ncp = N_bar * f.threshold)
+            if(scale <= 0){
+                warnings("Can't calculate the F statistic because of insufficient treated units.\n")
+                f.stat <- NA
+                f.p <- NA
+                f.equiv.p <- NA
+            }
+            else{
+                f.stat <- psi * scale
+                f.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
+                        lower.tail = FALSE)
+
+                ## Equivalent F test
+                f.equiv.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
+                                ncp = N_bar * f.threshold)                
+            }
+
         }
 
         # TOST
@@ -156,15 +165,21 @@ diagtest <- function(
         else {
             scale <- (N_bar-length(pre.pos))/((N_bar-1)*length(pre.pos))
             ## F statistic 
-            f.stat <- psi * scale
-            
-            f.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
-                lower.tail = FALSE)
-            
-            ## Equivalent F test
-            f.equiv.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
-              ncp = N_bar * f.threshold)
-            
+            if(scale <= 0){
+                warnings("Can't calculate the F statistic because of insufficient treated units.\n")
+                f.stat <- NA
+                f.p <- NA
+                f.equiv.p <- NA
+            }
+            else{
+                f.stat <- psi * scale
+                f.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
+                        lower.tail = FALSE)
+
+                ## Equivalent F test
+                f.equiv.p <- pf(f.stat, df1 = length(pre.pos), df2 = N_bar - length(pre.pos), 
+                                ncp = N_bar * f.threshold)                
+            }
         }
 
         # TOST
