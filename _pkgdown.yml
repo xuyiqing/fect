@@ -1,0 +1,59 @@
+home:
+  title: fect--fixed effects counterfactual estimators
+  description: estimating treatment effects using panel imputation methods
+  links:
+  - text: Yiqing's homepage
+    href: https://yiqingxu.org/
+  - text: Research paper
+    href: https://papers.ssrn.com/abstract=3555463
+
+
+url: https://yiqingxu.org/packages/fect/
+template:
+  bootstrap: 5
+
+navbar:
+  left:
+    - text: "Tutorial"
+      href: articles/tutorial.html
+    - text: "Functions"
+      href: reference/index.html
+    - text: "Changelog"
+      href: news/index.html
+    - text: "Stata"
+      href: https://yiqingxu.org/packages/fect/stata/fect_md.html
+    - text: "Paper"
+      href: https://papers.ssrn.com/abstract=3555463
+  right:
+   - icon: fa-github
+     href: https://github.com/xuyiqing/interflex
+
+footer:
+  structure:
+    left: developed_by
+    right: package
+
+reference:
+  - title: Functions
+  - contents:
+    - fect
+    - interFE
+    - att.cumu
+  - title: S3 methods
+  - contents:
+    - print.fect
+    - plot.fect
+    - print.interFE
+  - title: Datasets
+  - contents:
+    - simdata1
+    - simdata2
+    - turnout
+    - capactiy
+
+authors:
+  Yiqing Xu:
+    href: "https://yiqingxu.org/"
+
+
+

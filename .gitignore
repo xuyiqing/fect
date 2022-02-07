@@ -1,9 +1,10 @@
 # History files
 .Rhistory
 .Rapp.history
+.Ruserdata
 
 # Session Data files
-.RData
+.Data
 
 # Example code in package build process
 *-Ex.R
@@ -20,6 +21,8 @@
 # produced vignettes
 vignettes/*.html
 vignettes/*.pdf
+vignettes/tutorial_cache
+
 
 # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
 .httr-oauth
@@ -31,7 +34,9 @@ vignettes/*.pdf
 # Temporary files created by R markdown
 *.utf8.md
 *.knit.md
+.DS_Store
 
-# Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
-rsconnect/
-R/.DS_Store
+docs
+
+
+

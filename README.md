@@ -1,23 +1,100 @@
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
 # fect
 
-## Fixed Effects Counterfactual Estimators
----
+<!-- badges: start -->
 
-**Authors:** Licheng Liu [<liulch.16@sem.tsinghua.edu.cn>]; Ye Wang[<yw1576@nyu.edu>], Yiqing Xu [<yiqingxu@stanford.edu>]
+[![Lifecycle:
+experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental)
+[![License:
+MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<!-- badges: end -->
 
-**Maintainer:** Licheng Liu
+**R** package for implementing counterfactual estimators in panel
+fixed-effect settings. It is suitable for panel/TSCS analysis with
+binary treatments under (hypothetically) baseline randomization. It
+allows a treatment to switch on and off and limited carryover effects.
+It supports linear factor models—hence, a generalization of
+[**gsynth**](https://yiqingxu.org/packages/gsynth/index.html)—and the
+matrix completion method.
 
-**How to Uses:** [Examples](https://yiqingxu.org/packages/fect/fect.html)
+**Repo:** [GitHub](https://github.com/xuyiqing/fect) (0.4.1)
 
-**Reference:**  Licheng Liu, Ye Wang, Yiqing Xu (2021). "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data." [Working Paper](https://arxiv.org/abs/2107.00856), Stanford University.
+**Examples:** R code used in the
+[tutorial](https://yiqingxu.org/packages/fect/articles/tutorial.html)
+can be downloaded from [here](fect_examples.R).
 
-**Note:**
+**Reference:** Licheng Liu, Ye Wang, Yiqing Xu (2021). [A Practical
+Guide to Counterfactual Estimators for Causal Inference with Time-Series
+Cross-Sectional Data](https://papers.ssrn.com/abstract=3555463).
+*American Journal of Political Science*, conditionally accepted.
 
-Rcpp, RcppArmadillo and MacOS "-lgfortran" and "-lquadmath" error, see: http://thecoatlessprofessor.com/programming/rcpp-rcpparmadillo-and-os-x-mavericks-lgfortran-and-lquadmath-error/
+## Installation
 
-Installation failture related to OpenMP on MacOS, see:
-http://thecoatlessprofessor.com/programming/openmp-in-r-on-os-x/
+<!---
+You can install **fect** directly from CRAN by typing the following command in the **R** console: 
 
-To fix these problems, consider installing: 
-gfortran 6.1 from https://gcc.gnu.org/wiki/GFortranBinaries#MacOS
-clang4 R Binaries from https://github.com/coatless/r-macos-clang
+
+```r
+install.packages('fect', type = 'source')
+```
+--->
+
+You can install the development version of **fect** from GitHub by
+typing the following commands:
+
+``` r
+devtools::install_github('xuyiqing/fastplm')
+devtools::install_github('xuyiqing/fect')
+```
+
+**panelview** for panel data visualization is also highly recommended:
+
+``` r
+devtools::install_github('xuyiqing/panelview')
+```
+
+**fect** depends on the following packages, which will be installed
+automatically when **fect** is being installed. You can also install
+them manually.
+
+``` r
+## for processing C++ code
+require(Rcpp) 
+## for plotting
+require(ggplot2)  
+require(GGally) 
+require(grid)
+require(gridExtra)
+## for parallel computing 
+require(foreach)
+require(future)  
+require(doParallel) 
+require(abind) 
+```
+
+### Notes on installation failures
+
+1.  Windows users please consider upgrading R to 4.0.0 or higher and
+    installing the [latest
+    Rtools](https://cran.r-project.org/bin/windows/Rtools/) to avoid
+    C++17 complier errors when installing fastplm.
+2.  For Rcpp, RcppArmadillo and MacOS “-lgfortran” and “-lquadmath”
+    error, click
+    [here](http://thecoatlessprofessor.com/programming/rcpp-rcpparmadillo-and-os-x-mavericks-lgfortran-and-lquadmath-error/)
+    for details.
+3.  Installation failure related to OpenMP on MacOS, click
+    [here](http://thecoatlessprofessor.com/programming/openmp-in-r-on-os-x/)
+    for a solution.
+4.  To fix these issues, try installing gfortran 6.1 from
+    [here](https://gcc.gnu.org/wiki/GFortranBinaries#MacOS%20clang4%20R%20Binaries%20from%20https://github.com/coatless/r-macos-clang).
+5.  Mac users who have updated to MacOS Big Sur will likely encounter
+    compilation problems. See
+    [here](http://yiqingxu.org/public/BigSurError.pdf) for a potential
+    solution.
+
+## Report bugs
+
+Please report bugs to **yiqingxu \[at\] stanford.edu** with your sample
+code and data file. Much appreciated!
