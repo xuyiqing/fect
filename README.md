@@ -76,23 +76,23 @@ require(abind)
 
 ### Notes on installation failures
 
-1.  Windows users please consider upgrading R to 4.0.0 or higher and
+1.  Mac users who have updated to MacOS BigSur or Monterey will likely
+    encounter compilation problems. See
+    [here](http://yiqingxu.org/public/BigSurError.pdf) for a potential
+    solution.
+2.  Windows users please consider upgrading R to 4.0.0 or higher and
     installing the [latest
     Rtools](https://cran.r-project.org/bin/windows/Rtools/) to avoid
     C++17 complier errors when installing fastplm.
-2.  For Rcpp, RcppArmadillo and MacOS “-lgfortran” and “-lquadmath”
+3.  For Rcpp, RcppArmadillo and MacOS “-lgfortran” and “-lquadmath”
     error, click
     [here](http://thecoatlessprofessor.com/programming/rcpp-rcpparmadillo-and-os-x-mavericks-lgfortran-and-lquadmath-error/)
     for details.
-3.  Installation failure related to OpenMP on MacOS, click
+4.  Installation failure related to OpenMP on MacOS, click
     [here](http://thecoatlessprofessor.com/programming/openmp-in-r-on-os-x/)
     for a solution.
-4.  To fix these issues, try installing gfortran 6.1 from
+5.  To fix these issues, try installing gfortran from
     [here](https://gcc.gnu.org/wiki/GFortranBinaries#MacOS%20clang4%20R%20Binaries%20from%20https://github.com/coatless/r-macos-clang).
-5.  Mac users who have updated to MacOS Big Sur will likely encounter
-    compilation problems. See
-    [here](http://yiqingxu.org/public/BigSurError.pdf) for a potential
-    solution.
 
 ## Report bugs
 

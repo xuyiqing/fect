@@ -1,7 +1,7 @@
 \name{turnout}
 \docType{data}
 \alias{turnout}
-\title{turnout}
+\title{EDR and voter turnout in the US}
 \description{State-level voter turnout data.}
 \format{dataframe}
 \keyword{datasets}

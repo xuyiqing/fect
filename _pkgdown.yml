@@ -38,7 +38,6 @@ reference:
   - contents:
     - fect
     - interFE
-    - att.cumu
   - title: S3 methods
   - contents:
     - print.fect
@@ -46,10 +45,8 @@ reference:
     - print.interFE
   - title: Datasets
   - contents:
-    - simdata1
-    - simdata2
+    - simdata
     - turnout
-    - capactiy
 
 authors:
   Yiqing Xu:

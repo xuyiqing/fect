@@ -121,4 +121,3 @@ inter_fe_mc <- function(Y, Y0, X, I, beta0, r, lambda, force, tol = 1e-5) {
     .Call(`_fect_inter_fe_mc`, Y, Y0, X, I, beta0, r, lambda, force, tol)
 }
 
-
