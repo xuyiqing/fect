@@ -39,10 +39,10 @@ ls()
 
 ### Visualizing the treatment and outcome variables
 
-Before conducting any statistical analysis, we use the **panelview** package to visualize the treatment and outcome variables in the data. 
+Before conducting any statistical analysis, we use the **panelView** package to visualize the treatment and outcome variables in the data. 
 The following line of code plots the treatment status of all units in **simdata**:
 ```{r simdata_panelview_treat, message = FALSE, warning = FALSE}
-library(panelview)
+library(panelView)
 panelview(Y ~ D, data = simdata, index = c("id","time"), 
   axis.lab = "time", xlab = "Time", ylab = "Unit", 
   background = "white", main = "Simulated Data: Treatment Status")
@@ -161,13 +161,6 @@ out.mc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 ```{r fig.width = 6}
 plot(out.mc, main = "Estimated ATT (MC)")
 ```  
-
-**Auto-selection of the superior approach.** If users cannot determine which method to use, the cross-validation procedure with `method = "both"` can automatically determine the method based on both methods' out-of-sample predication performance. In this case, the algorithm selects the IFE method, which is the correct model specification. Note that FEct is a special case of IFEct when $r = 0$.
-```{r simdata_both, eval=TRUE, cache = TRUE}
-out.both <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
-          force = "two-way", method = "both", CV = TRUE, 
-          se = TRUE, nboots = 200, parallel = TRUE)
-```
 
 ---
 
