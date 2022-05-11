@@ -5,7 +5,7 @@
 # id: plot a part of units
 
 plot.fect <- function(x,  
-  type = NULL, # gap, equiv, status, exit
+  type = NULL, # gap, equiv, status, exit, factors, loadings,
   loo = FALSE,
   highlight = NULL, ## for carryover test and placebo test
   plot.ci = NULL, ## "90", "95", "none"
@@ -33,6 +33,8 @@ plot.fect <- function(x,
   legend.labs = NULL,
   stats.pos = NULL,
   theme.bw = TRUE,
+  nfactors = NULL,
+  include.FE = TRUE,
   id = NULL,
   cex.main = NULL,
   cex.main.sub = NULL,
@@ -44,6 +46,8 @@ plot.fect <- function(x,
   axis.lab = "both",
   axis.lab.gap = c(0, 0),
   ...){
+
+
 
     # come needed variables
     equiv.p <- NULL
@@ -59,6 +63,7 @@ plot.fect <- function(x,
     if (class(x) != "fect") {
         stop("Not a \"fect\" object.")
     }
+
 
     # check if the input has the loo results
     pequiv <- !is.null(x$pre.est.att) ## if have leave one out pre-treatment results
@@ -87,18 +92,12 @@ plot.fect <- function(x,
         all.group.name <- names(x$g.level)
         if(!show.group%in%all.group.name){
             stop("\"show.group\" should be one of group names.\n")
-        }
-        #if(loo){
-        #    stop("\"show.group\" can't be used with \"loo\".\n")
-        #}
-        #if(dim(x$est.group.output[[show.group]]$att.on.boot)[1]==0){
-        #    stop("The specified group only contains control variables.\n")
-        #}  
+        } 
     }
 
     # check the key option type
     if(!is.null(type)){
-        if (!type %in% c("status", "gap","equiv","exit")) {
+        if (!type %in% c("status", "gap","equiv","exit","factors","loadings")) {
             stop("\"type\" option misspecified. Must be one of followings:\"status\",\"gap\",\"equiv\",\"exit\".")
         }
         if (type == "exit" && is.null(x$att.off)) {
@@ -120,6 +119,224 @@ plot.fect <- function(x,
         }
     }
     type.old <- type
+
+    # factors, loadings, fe
+    if(type %in% c("loadings","factors")){
+        if(type == "loadings"){
+            if(!x$method %in% c("gsynth","ife","fe")){
+                stop("Can't Visualize the Loadings.\n")
+            }
+            if (x$r.cv==0) {
+                stop("No factors are included in the model.\n") 
+            } 
+            else {
+                ## number of loadings to be plotted
+                if (is.null(nfactors)==TRUE) {
+                    nfactors<-min(x$r.cv,4) 
+                } 
+                else if (nfactors>x$r.cv) {
+                    cat("Too many factors specified. ")
+                    nfactors<-min(x$r.cv,4) 
+                }
+                if (nfactors == 1) {
+                    cat("Loadings for the first factor are shown...\n")
+                } 
+                else if (nfactors < x$r.cv) {
+                    cat(paste("Loadings for the first",nfactors,"factors are shown...\n"))
+                }
+
+                ## title
+                if (is.null(main) == TRUE) {
+                    main <- "Factor Loadings"
+                } 
+                else if (main=="") {
+                    main <- NULL
+                }
+
+                ## prepare data
+                L.hat <- rbind(x$lambda.tr, x$lambda.co)
+                Lname <- Llabel <- c()
+                r <- x$r.cv
+                for (i in 1:r) {
+                    Lname<-c(Lname,paste("L",i,sep=""))
+                    Llabel<-c(Llabel,paste("Factor",i))
+                }
+                colnames(L.hat) <- Lname
+                rownames(L.hat) <- c()
+
+                if(x$force %in% c(1,3) & include.FE == TRUE){
+                    L.hat <- cbind(c(x$alpha.tr,x$alpha.co),L.hat)
+                    colnames(L.hat) <- c(paste("Factor",0),Lname)
+                    rownames(L.hat) <- c()
+                    nfactors <- nfactors + 1
+                    Llabel<-c("FE",Llabel)
+                }
+
+                data <- cbind.data.frame(L.hat,
+                                         "id"=c(x$tr, x$co),
+                                         "group"=as.factor(c(rep("Treated",x$Ntr),
+                                         rep("Control",x$Nco))))
+
+                if (nfactors == 1) {
+                    p <- ggplot(data, aes(x=group, y=L1, fill = group)) +
+                    geom_boxplot(alpha = 0.7) +
+                    coord_flip() + guides(fill=FALSE) +
+                    xlab("") + ylab("Factor Loading")  
+                } 
+                else {
+                    if (x$Ntr < 5) {
+                        my_dens <- function(data, mapping, ...) {
+                        ggplot(data = data, mapping = mapping) +
+                        geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
+                        }
+                        p <- GGally::ggpairs(data, mapping = aes(color = group),
+                        columns = 1:nfactors,
+                        columnLabels = Llabel[1:nfactors],
+                        diag = list(continuous = my_dens),
+                        title = main)
+                    } 
+                    else {
+                        my_dens <- function(data, mapping, ...) {
+                        ggplot(data = data, mapping = mapping) +
+                        geom_density(..., alpha = 0.7, color = NA)
+                        }
+                        p <- GGally::ggpairs(data, mapping = aes(color = group, fill = group),
+                        columns = 1:nfactors,
+                        columnLabels = Llabel[1:nfactors],
+                        diag = list(continuous = my_dens),
+                        title = main) +
+                        theme(plot.title = element_text(hjust = 0.5))
+                    }
+                }
+                #suppressWarnings(print(p))
+                return(p)
+            }
+        }
+        if(type == "factors"){
+            if (theme.bw == TRUE) {
+                line.color <- "#AAAAAA70"
+            } 
+            else {
+                line.color <- "white"
+            }
+            if (axis.adjust==TRUE) {
+                angle <- 45
+                x.v <- 1
+                x.h <- 1
+            } 
+            else {
+                angle <- 0
+                x.v <- 0
+                if (type=="missing") {
+                    x.h <- 0.5
+                } else {
+                    x.h <- 0
+                }
+            }
+            r <- x$r.cv
+            if(!x$method %in% c("gsynth","ife")){
+                stop("Can't Visualize the Loadings.\n")
+            }
+            if (x$r.cv==0) {
+                stop("No factors are included in the model.\n") 
+            }
+
+            time <- x$rawtime
+            if (!is.numeric(time[1])) {
+                time <- 1:x$T
+            }
+            if (length(xlim) != 0) {
+                show <- which(time>=xlim[1]& time<=xlim[2])
+            } 
+            else {
+                show <- 1:length(time)
+            }
+            nT <- length(show)
+            time.label <- x$rawtime[show]
+            F.hat <- x$factor
+
+            if(x$force %in% c(2,3) & include.FE == TRUE){
+                F.hat <- cbind(x$xi,F.hat)
+                r <- r + 1
+            }
+
+            if (x$r.cv==0) {
+                cat("No factors included in the model.\n")
+            } 
+            else {
+                ## axes labels
+                if (is.null(xlab)==TRUE) {
+                    xlab <- x$index[2]
+                } else if (xlab == "") {
+                    xlab <- NULL
+                }
+                if (is.null(ylab)==TRUE) {
+                    ylab <- "Estimate"
+                } else if (ylab == "") {
+                    ylab <- NULL
+                }
+                ## title
+                if (is.null(main) == TRUE) {
+                    main <- "Latent Factors"
+                } else if (main=="") {
+                    main <- NULL
+                }
+                ## prepare data
+                L.co <- x$lambda.co
+                
+                if(x$force %in% c(2:3) & include.FE == TRUE){
+                    L.co <- cbind(rep(1,dim(L.co)[1]),L.co)
+                    r.use <- c(0:(r-1))
+                }
+                else{
+                    r.use <- c(1:r)
+                }
+                norm<-sqrt(diag(t(L.co)%*%L.co)/(x$N-x$Ntr))
+                data <- cbind.data.frame("time" = rep(time[show],r),
+                                        "factor" = c(F.hat[show,])*rep(norm,each=nT),
+                                        "group" = as.factor(c(rep(r.use,each=nT))))
+                ## theme
+                p <- ggplot(data) 
+                if (theme.bw == TRUE) {
+                    p <- p + theme_bw()
+                }
+                p <- p + xlab(xlab) +  ylab(ylab) + ggtitle(main) +
+                    geom_hline(yintercept=0,colour=line.color,size = 2) +
+                    theme(legend.position = legend.pos,
+                        axis.text.x = element_text(angle = angle, hjust=x.h, vjust=x.v),
+                        plot.title = element_text(size=20,
+                                                    hjust = 0.5,
+                                                    face="bold",
+                                                    margin = margin(10, 0, 10, 0)))  
+                ## main plot
+                p <- p + geom_line(aes(time, factor,
+                                    colour = group,
+                                    group = group), size = 1.2)
+
+
+                brew.colors <- c("black","steelblue","#8DD3C7","#FFFFB3","#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5","#D9D9D9")
+                set.colors = brew.colors[1:r]
+                p <- p + scale_colour_manual(values =set.colors) 
+
+                ## legend
+                p <- p + guides(colour = guide_legend(title="Factor(s)", ncol=4)) 
+
+                if (!is.numeric(time.label)) {
+                    p <- p + 
+                        scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
+                }
+            
+                ## ylim
+                if (is.null(ylim) == FALSE) {
+                    p <- p + coord_cartesian(ylim = ylim)
+                }            
+                #suppressWarnings(print(p))
+                return(p)
+            }
+
+        }
+    }
+
 
     if(!is.null(show.group)){
         if(is.null(x$group.output[[show.group]]$att.on) & type!='status'){

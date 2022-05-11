@@ -53,7 +53,8 @@ fect.boot <- function(Y,
     } else {
         p <- 0
     }
-    
+
+
     if (hasRevs == 1) {
         ## D.fake : check reversals
         D.fake <- apply(D, 2, function(vec){cumsum(vec)})
@@ -68,19 +69,33 @@ fect.boot <- function(Y,
         Nrev <- length(rev)
         Ntr <- length(tr)
         Nco <- length(co)
-    } else {
+    } 
+    else {
         ## treatement indicator
         tr <- which(apply(D, 2, sum) > 0)
         co <- which(apply(D, 2, sum) == 0)
-
         Ntr <- length(tr)
         Nco <- length(co)
+        
     }
 
     
     ## estimation
     if (CV == 0) { 
-        if (method == "ife") {
+        if(method == "gsynth"){
+            out <- fect.gsynth(Y = Y, X = X, D = D, I = I, II = II, 
+                           T.on = T.on, T.off = T.off, CV = 0,
+                           r = r, binary = binary, QR = QR,
+                           force = force, hasRevs = hasRevs, 
+                           tol = tol, boot = 0,
+                           norm.para = norm.para, 
+                           placebo.period = placebo.period,
+                           placeboTest = placeboTest,
+                           carryover.period = carryover.period,
+                           carryoverTest = carryoverTest,
+                           group.level = group.level, group = group)
+
+        } else if (method == "ife") {
             out <- fect.fe(Y = Y, X = X, D = D, I = I, II = II, 
                            T.on = T.on, T.off = T.off,
                            r.cv = r, binary = binary, QR = QR,
@@ -107,8 +122,6 @@ fect.boot <- function(Y,
             if ('try-error' %in% class(out)) {
                 stop("\nCannot estimate using full data with MC algorithm.\n")
             }
-
-        
         } else if (method %in% c("polynomial", "bspline","cfe")) {
             out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
                                    II = II, T.on = T.on, 
@@ -275,7 +288,7 @@ fect.boot <- function(Y,
       }
     }
 
-    if (binary == TRUE && vartype == "parametric") {
+    if (binary == TRUE & vartype == "parametric") {
 
         one.nonpara <- function(num = NULL) {
             Y.boot <- Y
@@ -320,39 +333,275 @@ fect.boot <- function(Y,
 
         }
     }
-    else if(vartype == 'wild'){
+    else if(binary == FALSE & method %in% c("gsynth") & vartype == "parametric"){
+        cat("Parametric Bootstrap \n")
+        sum.D <- colSums(out$D)
+        id.tr <- which(sum.D>0)
+        I.tr <- as.matrix(out$I[,id.tr])
+        id.co <- which(sum.D==0)
+        Nco <- length(co)
+        Ntr <- length(tr)
+        fit.out[which(out$I==0)] <- 0
+        error.co <- out$res.full[,id.co]
+        I.co <- out$I[,id.co]
+        T0.ub <- apply(as.matrix(out$D[,id.tr] == 0), 2, sum) 
+        T0.ub.min <- min(T0.ub)
+        co.pre <- apply(as.matrix(I.co[1:T0.ub.min, ]), 2, sum)
+        co.post <- apply(as.matrix(I.co[(max(T0.ub)+1):TT, ]), 2, sum)
+        if (force %in% c(1, 3)) {
+            valid.co <- id.co[(co.pre >= (out$r.cv + 1)) & (co.post >= 1)]
+        } 
+        else {
+            valid.co <- id.co[(co.pre >= out$r.cv) & (co.post >= 1)]
+        }
+
+        draw.error <- function() {
+            repeat {
+                fake.tr <- sample(id.co, 1, replace = FALSE)
+                if (fake.tr %in% valid.co) {
+                    break
+                }
+            }
+            
+            id.co.rest <- id.co[which(!id.co %in% fake.tr)]
+            repeat {
+                id.co.pseudo <- sample(id.co.rest, Nco, replace = TRUE)
+                if (sum(apply(as.matrix(out$I[, id.co.pseudo]), 1, sum) >= 1) == TT) {
+                    break
+                }
+            }
+                      
+            id.pseudo <- c(rep(fake.tr, Ntr), id.co.pseudo)  ## Ntr + ...
+            I.id.pseudo <- out$I[, id.pseudo] 
+            II.id.pseudo <- out$II[,id.pseudo]
+            ## obtain the prediction eror
+            D.pseudo <- out$D[, c(id.tr, id.co.pseudo)]  ## fake.tr + control left
+            Y.pseudo <- out$Y[, id.pseudo]
+            X.pseudo <- NULL
+            if (p > 0) {
+                X.pseudo <- out$X[,id.pseudo,,drop = FALSE]
+            }
+
+            ## output
+            #synth.out <- try(fect.gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
+            #                             I = I.id.pseudo, II = II.id.pseudo,
+            #                             force = force, r = out$r.cv, CV = 0,
+            #                             tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
+
+            synth.out <- try(fect.gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
+                                         I = I.id.pseudo, II = II.id.pseudo,T.on = T.on, hasRevs = hasRevs,
+                                         force = force, r = out$r.cv, CV = 0,
+                                         tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
+   
+            if ('try-error' %in% class(synth.out)) {
+                return(matrix(NA, TT, Ntr))
+            } 
+            else {
+                if ("eff" %in% names(synth.out)) {
+                    if (is.null(norm.para)) {
+                        output <- synth.out$eff.tr
+                    } 
+                    else {
+                        output <- synth.out$eff.tr/norm.para[1]
+                    }
+                                   
+                    return(as.matrix(output)) ## TT * Ntr
+                } 
+                else {
+                    return(matrix(NA, TT, Ntr))
+                }
+            }             
+        }
+
+        cat("\rSimulating errors ...")
+        if (parallel == TRUE) {
+        error.tr <- foreach(j = 1:nboots,
+                            .combine = function(...) abind(...,along=3),
+                            .multicombine = TRUE,
+                            .export = c("fect.gsynth","initialFit"),
+                            .packages = c("fect","mvtnorm","fastplm"),
+                            .inorder = FALSE)  %dopar% {
+                                return(draw.error())
+                            } 
+        } 
+        else {
+            error.tr <- array(NA, dim = c(TT, Ntr, nboots))
+            for (j in 1:nboots) {
+                error.tr[,,j] <- draw.error()
+                if (j %% 100 == 0) {
+                    cat(".")
+                }
+            }
+        }
+
+
+
+        if (0%in%I) {
+            ## calculate vcov of ep_tr
+            na.sum <- sapply(1:nboots, function(vec){sum(is.na(c(error.tr[,,vec])))})
+            na.rm <- na.sum == TT * Ntr
+            na.rm.count <- sum(na.rm)
+            rm.pos <- which(na.rm == TRUE)
+
+            if (na.rm.count > 0) {
+                if (na.rm.count == nboots) {
+                    stop("fail to simulate errors.\n")
+                }
+                error.tr <- error.tr[,,-rm.pos, drop = FALSE]
+            }
+
+            error.tr.adj <- array(NA, dim = c(TT, nboots - na.rm.count, Ntr))
+            for(i in 1:Ntr){
+                error.tr.adj[,,i] <- error.tr[,i,]
+            }
+            vcov_tr <- array(NA, dim = c(TT, TT, Ntr))
+            for(i in 1:Ntr){
+                vcov_tr[,,i] <- res.vcov(res = error.tr.adj[,,i],cov.ar = 0)
+                vcov_tr[,,i][is.na(vcov_tr[,,i]) | is.nan(vcov_tr[,,i])] <- 0
+            }  
+            ## calculate vcov of e_co
+            vcov_co <- res.vcov(res = error.co, cov.ar = 0)
+            vcov_co[is.na(vcov_co) | is.nan(vcov_co)] <- 0
+        }
+
+        
         one.nonpara <- function(num = NULL){
-            six.weight <- sample(c(-1,1,-sqrt(0.5),sqrt(0.5),-sqrt(1.5),sqrt(1.5)),size = N_unit, replace = T)
-            wild.res <- eff.out * rep(six.weight, rep(nrow(eff.out), ncol(eff.out)))
-            Y.boot <- Y - eff.out + wild.res
-            #Y.boot[which(II==0)] <- Y[which(II==0)]
-            #print(which(is.na(Y.boot)))
+            ## boostrap ID
+            repeat {
+                fake.co <- sample(id.co,Nco, replace=TRUE)
+                if (sum(apply(as.matrix(I[,fake.co]), 1, sum) >= 1) == TT) {
+                    break
+                }
+            }
+            id.boot <- c(id.tr, fake.co)
+                
+            ## get the error for the treated and control
+            error.tr.boot <- matrix(NA, TT, Ntr)
+            if (0 %in% I) {        
+                for (w in 1:Ntr) {
+                    error.tr.boot[,w] <- t(rmvnorm(n = 1, rep(0, TT), vcov_tr[,,w], method = "svd"))
+                } 
+                error.tr.boot[which(I.tr == 0)] <- 0
+                error.co.boot <- t(rmvnorm(n = Nco, rep(0, TT), vcov_co, method = "svd"))
+                error.co.boot[which(as.matrix(I[,fake.co]) == 0)] <- 0    
+            } 
+            else {
+                for (w in 1:Ntr) {
+                    error.tr.boot[,w] <- error.tr[,w,sample(1:nboots,1,replace = TRUE)]
+                }
+                error.co.boot <- error.co[, sample(1:Nco, Nco, replace = TRUE)]   
+            }
+
+            Y.boot <- fit.out[,id.boot]
+            Y.boot[,1:Ntr] <- as.matrix(Y.boot[,1:Ntr] + error.tr.boot)
+            Y.boot[,(Ntr+1):length(id.boot)] <- Y.boot[,(Ntr+1):length(id.boot)] + error.co.boot 
+            X.boot <- NULL
+            if (p > 0) {
+                X.boot <- X[,id.boot,,drop = FALSE] 
+            }
+            D.boot <- out$D[,id.boot] 
+            I.boot <- out$I[,id.boot]
+            II.boot <- out$II[,id.boot]
+          
+            synth.out <- try(fect.gsynth(Y = Y.boot, X = X.boot, D = D.boot,
+                                         I = I.boot, II = II.boot,T.on = T.on, hasRevs = hasRevs,
+                                         force = force, r = out$r.cv, CV = 0, boot = 1,
+                                         placeboTest = placeboTest,
+                                         placebo.period = placebo.period, 
+                                         carryover.period = carryover.period,
+                                         carryoverTest = carryoverTest,
+                                         time.on.seq = time.on, time.off.seq = time.off,
+                                         time.on.seq.group = group.time.on,
+                                         time.off.seq.group = group.time.off,
+                                         norm.para = norm.para,tol = tol,
+                                         group.level = group.level, group = group), silent = TRUE)
+
+            if ('try-error' %in% class(synth.out)) {
+                boot0 <- list(att.avg = NA, att = NA, count = NA, 
+                                  beta = NA, att.off = NA, count.off = NA, 
+                                  att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
+                                  group.att = NA, marginal = NA,
+                                  group.output = list())
+                return(boot0)
+            }
+            else{
+                return(synth.out)
+            }
+        }
+
+    }
+    else if(binary == FALSE & method %in% c("ife","mc","polynomial", "bspline","cfe") & vartype == 'parametric'){
+        cat("Parametric Bootstrap \n")
+        sum.D <- colSums(out$D)
+        tr <- which(sum.D>0)
+        co <- which(sum.D==0)
+        Nco <- length(co)
+        Ntr <- length(tr)
+        fit.out[which(out$I==0)] <- 0
+        error.co <- out$res[,co]
+        #error.tr <- out$eff[,tr]
+        
+        if (0%in%out$I) {
+            vcov_co <- res.vcov(res = error.co, cov.ar = 0)
+            vcov_co[is.na(vcov_co)|is.nan(vcov_co)] <- 0
+            #vcov_tr <- res.vcov(res = error.tr, cov.ar = 0)
+            #vcov_tr[is.na(vcov_tr)|is.nan(vcov_tr)] <- 0
+        }
+        
+        one.nonpara <- function(num = NULL){
+            error.id <- sample(1:Nco, N, replace = TRUE)    
+
+            ## produce the new outcome data
+            if (0%in%I) {
+                error.boot <- t(rmvnorm(n=N,rep(0,TT),vcov_co,method="svd"))
+                #error.boot.co <- t(rmvnorm(n=Nco,rep(0,TT),vcov_co,method="svd"))
+                #error.boot.tr <- t(rmvnorm(n=Ntr,rep(0,TT),vcov_tr,method="svd"))
+                Y.boot <- fit.out + out$eff + error.boot
+                #Y.boot <- fit.out
+                #Y.boot[,tr] <- Y.boot[,tr] +  error.boot.tr  
+                #Y.boot[,co] <- Y.boot[,co] +  error.boot.co  
+            } 
+            else {
+                Y.boot <- fit.out + out$eff + error.co[,error.id]
+                #Y.boot <- fit.out
+                #Y.boot[,tr] <- Y.boot[,tr] + error.tr[,error.id.tr]
+                #Y.boot[,co] <- Y.boot[,co] + error.co[,error.id.co]
+            }
+            
             if (method == "ife") {
                 boot <- try(fect.fe(Y = Y.boot, X = X, D = D, I = I, II = II, 
                             T.on = T.on, T.off = T.off,
                             r.cv = r, binary = binary, QR = QR,
                             force = force, hasRevs = hasRevs, 
-                            tol = tol, boot = 0,
+                            tol = tol, boot = 1,
                             norm.para = norm.para, 
                             placebo.period = placebo.period,
                             placeboTest = placeboTest,
                             carryover.period = carryover.period,
                             carryoverTest = carryoverTest,
-                            group.level = group.level, group = group),silent = TRUE)
+                            group.level = group.level, group = group,
+                            time.on.seq = time.on, time.off.seq = time.off,
+                            time.on.seq.group = group.time.on,
+                            time.off.seq.group = group.time.off),silent = TRUE)
             
-            } else if (method == "mc") {
+            } 
+            else if (method == "mc") {
                 boot <- try(fect.mc(Y = Y.boot, X = X, D = D, I = I, II = II,
                             T.on = T.on, T.off = T.off, 
                             lambda.cv = lambda, force = force, hasRevs = hasRevs, 
-                            tol = tol, boot = 0,
+                            tol = tol, boot = 1,
                             norm.para = norm.para,
                             placebo.period = placebo.period,
                             placeboTest = placeboTest,
                             carryover.period = carryover.period,
                             carryoverTest = carryoverTest,
-                            group.level = group.level, group = group), silent = TRUE)
+                            group.level = group.level, group = group,
+                            time.on.seq = time.on, time.off.seq = time.off,
+                            time.on.seq.group = group.time.on,
+                            time.off.seq.group = group.time.off), silent = TRUE)
 
-            } else if (method %in% c("polynomial", "bspline","cfe")) {
+            } 
+            else if (method %in% c("polynomial", "bspline","cfe")) {
                 boot <- try(fect.polynomial(Y = Y.boot, D = D, X = X, I = I, 
                                     II = II, T.on = T.on, 
                                     T.off = T.off,
@@ -361,13 +610,16 @@ fect.boot <- function(Y,
                                     sfe = sfe, cfe = cfe,
                                     ind.matrix = ind.matrix, 
                                     hasRevs = hasRevs,
-                                    tol = tol, boot = 0, 
+                                    tol = tol, boot = 1, 
                                     placeboTest = placeboTest,
                                     placebo.period = placebo.period, 
                                     carryover.period = carryover.period,
                                     carryoverTest = carryoverTest,
                                     norm.para = norm.para,
-                                    group.level = group.level, group = group), silent = TRUE)
+                                    group.level = group.level, group = group,
+                                    time.on.seq = time.on, time.off.seq = time.off,
+                                    time.on.seq.group = group.time.on,
+                                    time.off.seq.group = group.time.off), silent = TRUE)
             }
 
             if ('try-error' %in% class(boot)) {
@@ -384,8 +636,7 @@ fect.boot <- function(Y,
         }
     } 
     else {
-        
-        one.nonpara <- function(num = NULL) {
+        one.nonpara <- function(num = NULL) { ## bootstrap
             if (is.null(num)) {
                 if (is.null(cl)) {
                     if (hasRevs == 0) {
@@ -489,7 +740,8 @@ fect.boot <- function(Y,
                               att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                               group.att = NA)
                 return(boot0)
-            } else {
+            } 
+            else {
                 T.off.boot <- NULL
                 if (hasRevs == TRUE) {
                     T.off.boot <- T.off[, boot.id]
@@ -503,8 +755,25 @@ fect.boot <- function(Y,
                     carryover.period.boot <- carryover.period
                 }
 
-
-                if (method == "ife") {
+                if(method == "gsynth") {
+                    boot <- try(fect.gsynth(Y = Y[, boot.id], X = X.boot, D = D.boot,
+                                    I = I.boot, II = II[, boot.id], 
+                                    T.on = T.on[, boot.id], T.off = T.off.boot, CV = 0,
+                                    r = out$r.cv, binary = binary,
+                                    QR = QR, force = force,
+                                    hasRevs = hasRevs, tol = tol, boot = 1,
+                                    norm.para = norm.para,
+                                    time.on.seq = time.on, time.off.seq = time.off,
+                                    placebo.period = placebo.period.boot, 
+                                    placeboTest = placeboTest,
+                                    carryoverTest = carryoverTest,
+                                    carryover.period = carryover.period.boot,
+                                    group.level = group.level,
+                                    group = boot.group,
+                                    time.on.seq.group = group.time.on,
+                                    time.off.seq.group = group.time.off) )           
+                }
+                else if (method == "ife") {
                     boot <- try(fect.fe(Y = Y[, boot.id], X = X.boot, D = D.boot,
                                     I = I.boot, II = II[, boot.id], 
                                     T.on = T.on[, boot.id], T.off = T.off.boot, 
@@ -588,14 +857,13 @@ fect.boot <- function(Y,
         boot.seq <- 1:N 
     }
 
-   
 
     ## computing
     if (parallel == TRUE) { 
         boot.out <- foreach(j=1:nboots, 
                             .inorder = FALSE,
-                            .export = c("fect.fe", "fect.mc", "fect.polynomial", "get_term"),
-                            .packages = c("fect")
+                            .export = c("fect.fe", "fect.mc", "fect.polynomial", "get_term","fect.gsynth","initialFit"),
+                            .packages = c("fect","mvtnorm","fastplm")
                             ) %dopar% {
                                 return(one.nonpara(boot.seq[j]))
                             }

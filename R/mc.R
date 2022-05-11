@@ -135,7 +135,11 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     if(length(missing.index)>0){
         I[missing.index] <- 0
         II[missing.index] <- 0
+    }
+    if (0 %in% I) {
+        eff[which(I == 0)] <- NA
     } 
+    complete.index <- which(!is.na(eff))
     att.avg <- sum(eff[complete.index] * D[complete.index])/(sum(D[complete.index]))
 
     ## att.avg.unit
@@ -147,6 +151,9 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     equiv.att.avg <- eff.equiv <- NULL
     if (boot == FALSE) {
         eff.equiv <- Y - est.fect$fit
+        if (0 %in% I) {
+            eff.equiv[which(I == 0)] <- NA
+        }
         complete.index <- which(!is.na(eff.equiv)) 
         equiv.att.avg <- sum(eff.equiv[complete.index] * D[complete.index])/(sum(D[complete.index]))
     }
@@ -419,6 +426,9 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         eff = eff,
         I = I,
         II = II,
+        D = D,
+        Y = Y,
+        X = X,
         att.avg = att.avg,
         att.avg.unit = att.avg.unit,
         ## supporting

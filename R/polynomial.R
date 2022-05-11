@@ -494,6 +494,9 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         eff = eff,
         I = I,
         II = II,
+        D = D,
+        Y = Y,
+        X = X,
         att.avg = att.avg,
         att.avg.unit = att.avg.unit,
         ## supporting

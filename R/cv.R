@@ -50,6 +50,14 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     t.on <- c(T.on)
     T0.min <- min(apply(II, 2, sum))
 
+    D.c <- apply(D, 2, function(vec){cumsum(vec)})
+    D.c <- ifelse(D.c > 0, 1, 0)
+    D.sum <- colSums(D.c)
+    tr <- which(D.sum>=1)
+    Ntr <- length(tr)
+    co <- which(D.sum==0)
+    Nco <- length(co)
+
     ##  --------- initial fit using fastplm --------- ##
     data.ini <- matrix(NA, (TT*N), (2 + 1 + p))
     data.ini[, 2] <- rep(1:N, each = TT)         ## unit fe
@@ -79,13 +87,14 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
     if (r.end >= T0.min) {
-        if (method %in% c("both", "ife")) {
+        if (method %in% c("both", "ife", "gsynth")) {
             cat("Factor number should not be greater than ", T0.min-1, "\n", sep = "")
         }
         r.end <- T0.min-1
-    } else {
+    } 
+    else {
         if (obs.con) {
-            if (method %in% c("both", "ife")) {
+            if (method %in% c("both", "ife", "gsynth")) {
                 cat("Factor number should not be greater than ", r.end, "\n", sep = "")
             }
         }
@@ -105,14 +114,15 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     r.max <- min(TT, r.end)
     r.cv <- 0 ## initial value
 
-    if (method %in% c("ife", "both") && r.max == 0) {
+    if (method %in% c("ife", "both", "gsynth") && r.max == 0) {
         r.cv <- 0
         cat("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
         est.best <- inter_fe_ub(YY, Y0, 
                                 X, II, beta0, 
                                 0, force = force, 
                                 tol)
-    } else {
+    } 
+    else {
 
         r.old <- r ## save the minimal number of factors 
         cat("Cross-validating ...","\n") 
@@ -139,6 +149,18 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         }
         else if(criterion=='pc'){
             cat("Criterion: PC\n")
+        }
+
+        ## for gsynth, use the cross-validation function in fect.gsynth
+        if(method == "gsynth"){
+            cat("Interactive fixed effects model...\n")
+            out <- fect.gsynth(Y = Y, D = D, X = X, I = I, II = II,
+                               T.on = T.on, T.off = T.off, r = r, r.end = r.end, CV = 1,
+                               force = force, hasRevs = hasRevs, 
+                               tol = tol, boot = 0,
+                               norm.para = norm.para,
+                               group.level = group.level, group = group)
+            return(out)    
         }
 
         ## ----- ##
@@ -469,15 +491,20 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         sprintf("%.5f",MSE), sep="")
 
                 } else {
+                    #cat("\n r = ",r, "; sigma2 = ",
+                    #    sprintf("%.5f",sigma2), "; IC = ",
+                    #    sprintf("%.5f",IC), "; PC = ",
+                    #    sprintf("%.5f",PC), "; MSPE = ",
+                    #    sprintf("%.5f",MSPE), "; GMSPE = ",
+                    #    sprintf("%.5f",GMSPE), "; Moment = ",
+                    #    sprintf("%.5f",moment), "; MSPTATT = ",
+                    #    sprintf("%.5f",MSPTATT), "; MSE = ",
+                    #    sprintf("%.5f",MSE), sep="")
                     cat("\n r = ",r, "; sigma2 = ",
                         sprintf("%.5f",sigma2), "; IC = ",
                         sprintf("%.5f",IC), "; PC = ",
                         sprintf("%.5f",PC), "; MSPE = ",
-                        sprintf("%.5f",MSPE), "; GMSPE = ",
-                        sprintf("%.5f",GMSPE), "; Moment = ",
-                        sprintf("%.5f",moment), "; MSPTATT = ",
-                        sprintf("%.5f",MSPTATT), "; MSE = ",
-                        sprintf("%.5f",MSE), sep="")
+                        sprintf("%.5f",MSPE))
                 }
             } ## end of while: search for r_star over  
 
@@ -771,9 +798,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 CV.out.mc[i, 2:10] <- c(MSPE, WMSPE, GMSPE, WGMSPE, MAD, moment, gmoment, MSPTATT, MSE)
                 cat("\n lambda.norm = ",
                 sprintf("%.5f",lambda[i]/max(eigen.all)),"; MSPE = ",
-                sprintf("%.5f",MSPE), "; GMSPE = ",
-                sprintf("%.5f",GMSPE), "; Moment = ",
-                sprintf("%.5f",moment),  "; MSPTATT = ",
+                sprintf("%.5f",MSPE),   "; MSPTATT = ",
                 sprintf("%.5f",MSPTATT), "; MSE = ", 
                 sprintf("%.5f",MSE), sep="")
                 if(break_count == 3){
@@ -893,10 +918,12 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     if (method == "ife") {
         if (r.cv == 0) {
             est.fect <- est.best
-        } else {
+        } 
+        else {
             est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
         }
-    } else {
+    } 
+    else {
         est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
     }
            
@@ -909,7 +936,6 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     if (!is.null(norm.para)) {
 
         Y <- Y * norm.para[1]
-        
         if (method == "ife") {
             ## variance of the error term 
             sigma2 <- est.best$sigma2 * (norm.para[1]^2)
@@ -960,8 +986,20 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
    
     ## 1. estimated att and counterfactuals
-    eff <- Y - est.best$fit  
-    att.avg <- sum(eff * D)/(sum(D))
+    Y.ct.equiv <- Y.ct <- NULL
+    Y.ct <- est.best$fit
+    eff <- Y - Y.ct   
+    missing.index <- which(is.na(eff))
+    if(length(missing.index)>0){
+        I[missing.index] <- 0
+        II[missing.index] <- 0
+    }
+    if (0 %in% I) {
+        eff[which(I == 0)] <- NA
+    } 
+    complete.index <- which(!is.na(eff))
+    att.avg <- sum(eff[complete.index] * D[complete.index])/(sum(D[complete.index]))
+
 
     ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
@@ -1051,17 +1089,6 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         count.off <- as.numeric(table(t.off.use))
     }
     ## 7. cohort effects
-    #if (!is.null(group)) {
-    #    cohort <- cbind(c(group), c(D), c(eff.v))
-    #    rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
-    #    cohort <- cohort[-rm.pos, ]
-
-    #    g.level <- sort(unique(cohort[, 1]))
-    #    raw.group.att <- as.numeric(tapply(cohort[, 3], cohort[, 1], mean))
-
-    #    group.att <- rep(NA, length(group.level))
-    #    group.att[which(group.level %in% g.level)] <- raw.group.att 
-    #}
     if (!is.null(group)) {
         cohort <- cbind(c(group), c(D), c(eff.v))
         rm.pos <- unique(c(rm.pos1, which(cohort[, 2] == 0)))
@@ -1154,7 +1181,16 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         force = force,
         T = TT,
         N = N,
+        Ntr = Ntr,
+        Nco = Nco,
         p = p, 
+        D = D,
+        Y = Y,
+        X = X,
+        I = I,
+        II = II,
+        tr = tr,
+        co = co,
         est = est.best,
         method = method,
         mu = est.best$mu,
@@ -1183,18 +1219,24 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     if (force == 1) {
-        out<-c(out, list(alpha = est.best$alpha))
+        out<-c(out, list(alpha = est.best$alpha,
+                         alpha.tr = as.matrix(est.best$alpha[tr,]),
+                         alpha.co = as.matrix(est.best$alpha[co,])))
     } else if (force == 2) {
         out<-c(out,list(xi = est.best$xi))
     } else if (force == 3) {
-        out<-c(out,list(alpha = est.best$alpha, xi = est.best$xi))
+        out<-c(out,list(alpha = est.best$alpha, xi = est.best$xi,
+                        alpha.tr = as.matrix(est.best$alpha[tr,]),
+                        alpha.co = as.matrix(est.best$alpha[co,])))
     }
 
     if (method == "ife") {
         out <- c(out, list(r.cv = r.cv, IC = IC, PC = PC))
         if (r.cv > 0) {
             out <- c(out, list(factor = as.matrix(est.best$factor),
-                               lambda = as.matrix(est.best$lambda))) 
+                               lambda = as.matrix(est.best$lambda),
+                               lambda.tr = as.matrix(est.best$lambda[tr,]),
+                               lambda.co = as.matrix(est.best$lambda[co,]))) 
         }
     }
 

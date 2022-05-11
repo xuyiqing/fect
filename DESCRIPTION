@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactuals
-Version: 0.4.1
-Date: 2021-06-29
+Version: 0.5.0
+Date: 2022-05-05
 Authors@R: 
   c(person("Licheng", "Liu", ,"liulch@mit.edu", role = c("aut")), 
   person("Ye", "Wang", , "yezhehuzhi@gmail.com", role = c("aut")), 

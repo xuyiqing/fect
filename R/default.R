@@ -217,7 +217,7 @@ fect.formula <- function(formula = NULL,
     
     out$call <- match.call()
     out$formula <- formula
-    print(out)
+    #print(out)
     return(out)
 
 }
@@ -280,6 +280,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## Checking Parameters
     ##-------------------------------## 
     placeboEquiv <- loo 
+
     ## read data 
     if (is.data.frame(data) == FALSE || length(class(data)) > 1) {
         data <- as.data.frame(data)
@@ -323,8 +324,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     ## method
-    if (!method %in% c("fe", "ife", "mc", "both", "polynomial", "bspline", "cfe")) {
-        stop("\"method\" option misspecified; choose from c(\"fe\", \"ife\", \"mc\", \"both\", \"polynomial\", \"bspline\",\"cfe\").")
+    if (!method %in% c("fe", "ife", "mc", "both", "polynomial", "bspline", "cfe","gsynth")) {
+        stop("\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"polynomial\", \"bspline\",\"cfe\").")
     }
     if (method == "fe") {
         r <- 0
@@ -395,7 +396,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             stop("Carry-over test cannot be performed while doing cross-validation.")
         }
 
-        if (method %in% c("ife", "both")) {
+        if (method %in% c("ife", "both","gsynth")) {
             if (length(r) == 2 & r[1] > r[2]) {
                 stop("\"r\" option misspecified.")
             }
@@ -407,8 +408,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     } 
     else {
-        if (! method %in% c("ife", "mc", "polynomial", "bspline","cfe")) {
-            stop("\"method\" option misspecified; please choose from c(\"ife\", \"mc\", \"polynomial\", \"bspline\").")
+        if (! method %in% c("gsynth","ife", "mc", "polynomial", "bspline","cfe")) {
+            stop("\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"polynomial\", \"bspline\").")
         }
     }
 
@@ -649,7 +650,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## sort data
     data <- data[order(data[,id], data[,time]), ]
     if(na.rm==FALSE){
-        # ziyi: if X and Y have missing values while D doesn't have missing values, save the value of D
+        # if X and Y have missing values while D doesn't have missing values, save the value of D
         # check if some units or periods are completely missing after drop missing values of X or Y
         data.full <- data[,c(Dname,id,time)]
         data <- na.omit(data)
@@ -690,18 +691,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         max.missing <- TT
     }
 
-    ## group.series <- NULL
-    #group.ref <- NULL
-    #if (!is.null(group)) {
-    #    data.id <- data[, c(id, group)]
-    #    rawgroup <- data.id[!duplicated(data.id[, 1]), 2]
-    #    group <- as.numeric(as.factor(rawgroup))
 
-        #group.ref <- cbind(group, rawgroup)
-        #group.ref <- group.ref[!duplicated(group.ref[, 1]), ]
-        #group.ref <- group.ref[order(group.ref[, 1]), ]
-        ## rawgroup <- unique(rawgroup)
-    #}
 
     ## gen group matrix
     if (!is.null(group)) {
@@ -904,7 +894,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## ----------------------------------------------------------- ##
     II <- I
     II[which(D==1)] <- 0 ## regard treated values as missing
-    
+
     # Unbalance Check
     ## 1. remove units that have too control status
     T0 <- apply(II, 2, sum)
@@ -1019,6 +1009,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     hasRevs <- ifelse(Nrev > 0, 1, 0)
     if(hasRevs == FALSE & carryoverTest == TRUE){
         stop("Treatment status have no reversals. Cannot perform \"carryoverTest\" in this case.")
+    }
+    if(hasRevs == TRUE & method == "gsynth"){
+        warning("The Gsynth method can't be applied to the case when treatment status have Reversals. Default to Staggered Adoption.\n")
+        hasRevs <- FALSE
     }
 
     ## 5. switch-off periods
@@ -1290,6 +1284,19 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                carryoverTest = carryoverTest,
                                carryover.period = carryover.period,
                                group.level = g.level, group = G), silent = TRUE)
+            }
+            else if(method == "gsynth"){
+                out <- try(fect.gsynth(Y = Y, D = D, X = X, I = I, II = II,
+                               T.on = T.on, T.off = T.off, r = r, CV = 0,
+                               binary = binary, QR = QR,
+                               force = force, hasRevs = hasRevs, 
+                               tol = tol, boot = 0,
+                               norm.para = norm.para,
+                               placeboTest = placeboTest, 
+                               placebo.period = placebo.period,
+                               carryoverTest = carryoverTest,
+                               carryover.period = carryover.period,
+                               group.level = g.level, group = G), silent = TRUE)                
             } 
             else if (method == "mc") {
                 out <- try(fect.mc(Y = Y, D = D, X = X, I = I, II = II,
@@ -1519,6 +1526,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                     }
                 }
 
+          
                 p.out <- fect.boot(Y = pY, D = pD, X = pX, I = pI, II = pII,
                              T.on = pT.on, T.off = pT.off, cl = NULL,
                              method = method, degree = degree,

@@ -47,6 +47,13 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     YY <- Y
     YY[which(II == 0)] <- 0 ## reset to 0 
 
+    D.c <- apply(D, 2, function(vec){cumsum(vec)})
+    D.c <- ifelse(D.c > 0, 1, 0)
+    D.sum <- colSums(D.c)
+    tr <- which(D.sum>=1)
+    Ntr <- length(tr)
+    co <- which(D.sum==0)
+    Nco <- length(co)
     ## initial fit using fastplm
     data.ini <- matrix(NA, (TT*N), (2 + 1 + p))
     data.ini[, 2] <- rep(1:N, each = TT)         ## unit fe
@@ -102,7 +109,6 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         } else {
             est.best <- inter_fe_d_qr_ub(YY, Y0, FE0, factor0, xi0, X, II, r.cv, force, tol = tol)
         }
-        
     }
     validX <- est.best$validX
     validF <- ifelse(r.cv > 0, 1, 0)
@@ -180,12 +186,15 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         Y.ct <- pnorm(est.best$fit)
     }
     eff <- Y - Y.ct   
-    complete.index <- which(!is.na(eff))
     missing.index <- which(is.na(eff))
     if(length(missing.index)>0){
         I[missing.index] <- 0
         II[missing.index] <- 0
+    }
+    if (0 %in% I) {
+        eff[which(I == 0)] <- NA
     } 
+    complete.index <- which(!is.na(eff))
     att.avg <- sum(eff[complete.index] * D[complete.index])/(sum(D[complete.index]))
 
 
@@ -206,6 +215,9 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     equiv.att.avg <- eff.equiv <- NULL
     if (binary == FALSE && boot == FALSE) {
         eff.equiv <- Y - Y.ct.equiv
+        if (0 %in% I) {
+            eff.equiv[which(I == 0)] <- NA
+        }
         complete.index <- which(!is.na(eff.equiv)) 
         equiv.att.avg <- sum(eff.equiv[complete.index] * D[complete.index])/(sum(D[complete.index]))
     }
@@ -492,6 +504,9 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         method = method,
         Y.ct = Y.ct,
         Y.ct.full = Y.ct.full,
+        D = D,
+        Y = Y,
+        X = X,
         eff = eff,
         I = I,
         II = II,
@@ -501,6 +516,10 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         force = force,
         T = TT,
         N = N,
+        Ntr = Ntr,
+        Nco = Nco,
+        tr = tr,
+        co = co,
         p = p,
         r.cv = r.cv, 
         IC = IC, 
@@ -541,15 +560,21 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     }
     if (r.cv > 0) {
         out<-c(out,list(factor = as.matrix(est.best$factor),
-                        lambda = as.matrix(est.best$lambda))) 
+                        lambda = as.matrix(est.best$lambda),
+                        lambda.tr = as.matrix(est.best$lambda[tr,]),
+                        lambda.co = as.matrix(est.best$lambda[co,])) )
     }
 
     if (force == 1) {
-        out<-c(out, list(alpha = est.best$alpha))
+        out<-c(out, list(alpha = est.best$alpha, 
+                         alpha.tr = as.matrix(est.best$alpha[tr,]),
+                         alpha.co = as.matrix(est.best$alpha[co,])))
     } else if (force == 2) {
         out<-c(out,list(xi = est.best$xi))
     } else if (force == 3) {
-        out<-c(out,list(alpha = est.best$alpha, xi = est.best$xi))
+        out<-c(out,list(alpha = est.best$alpha, xi = est.best$xi,
+                        alpha.tr = as.matrix(est.best$alpha[tr,]),
+                        alpha.co = as.matrix(est.best$alpha[co,])))
     }
 
     if (!is.null(placebo.period) && placeboTest == 1) {

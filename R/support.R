@@ -545,3 +545,31 @@ cv.sample <- function(I, D, count,
     return(list(cv.id = cv.id,         ## marked id
                 est.id = rm.id.use))   ## id used for mspe
 }
+
+res.vcov <- function(res, ## TT*Nboots
+                     cov.ar = 1) {
+    T <- dim(res)[1]
+    I <- is.na(res)
+    count <- matrix(NA,T,T)
+
+    res[is.na(res)] <- 0
+    vcov <- res%*%t(res)
+
+
+    for (i in 1:T) {
+        for (j in 1:T) {
+            if (i > j) {
+                count[i, j] <- count[j, i]
+            } else {
+                if ((j-i) <= cov.ar) {
+                  II <- I[i,] + I[j,]
+                  count[i, j] <- min( 1/sum(II==0), 1)
+                } else {
+                  count[i, j] <- 0
+                }
+            }
+        }
+    }
+    vcov <- vcov*count
+    return(vcov)
+}
