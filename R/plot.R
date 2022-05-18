@@ -45,6 +45,7 @@ plot.fect <- function(x,
   axis.adjust = FALSE,
   axis.lab = "both",
   axis.lab.gap = c(0, 0),
+  start0 = FALSE,
   ...){
 
 
@@ -410,6 +411,12 @@ plot.fect <- function(x,
     }
 
     if(show.point){
+        if(is.null(plot.ci)){
+            plot.ci.point <- "both"
+        }
+        else{
+            plot.ci.point <- plot.ci
+        }   
         plot.ci <- "both"
     }
 
@@ -1222,6 +1229,18 @@ plot.fect <- function(x,
 
         ## plotting
         ## line
+
+        if(start0 == TRUE){
+            data$time <- data$time - 1
+            data2$time <- data2$time - 1
+            if(!is.null(placebo.period)){
+                placebo.period <- placebo.period - 1
+            }
+            if(!is.null(carryover.period)){
+                carryover.period <- carryover.period - 1
+            }
+        }
+
         if (bound.old == "none") {
             p <- ggplot(data)             
         } 
@@ -1267,10 +1286,21 @@ plot.fect <- function(x,
         # vertical 0 line
         if (length(xlim)!=0) {
             if ((xlim[2]>=1 & switch.on == TRUE) | (xlim[1]<=0 & switch.on == FALSE)) {
-                p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)
+                if(start0 == FALSE){
+                    p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)                    
+                }
+                else{
+                    p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)
+                }
             }
-        } else {
-            p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)
+        } 
+        else {
+                if(start0 == FALSE){
+                    p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)                    
+                }
+                else{
+                    p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)
+                }
         }
 
         ## legend and axes
@@ -1318,8 +1348,12 @@ plot.fect <- function(x,
                 }
             } 
             else if(plot.ci == 'both') {
-                p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.2)
-                p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=1)
+                if(plot.ci.point %in% c("both","95")){
+                    p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                }
+                if(plot.ci.point %in% c("both","90")){
+                    p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                }
             }
         } 
         else if(classic==0 && switch.on==TRUE) {
@@ -1344,10 +1378,15 @@ plot.fect <- function(x,
             else if(plot.ci == "both") {
                 pos.ci <- intersect(which(data[,"time"] >= (placebo.period[1])), which(data[,"time"] <= (placebo.period[length(placebo.period)])))
                 pos.ci2 <- setdiff(1:dim(data)[1], pos.ci)
-                p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.2, color="blue", fill="blue")
-                p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=1, color="blue", fill="blue")
-                p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.2)
-                p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=1)
+                #print(plot.ci.point)
+                if(plot.ci.point %in% c("both","95")){
+                    p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="blue", fill="blue",fatten = 2)
+                    p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                }
+                if(plot.ci.point %in% c("both","90")){
+                    p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="blue", fill="blue",fatten = 2)
+                    p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                }
             }
         }
         else if(classic==0 && switch.on==FALSE){
@@ -1372,10 +1411,14 @@ plot.fect <- function(x,
             else if(plot.ci == "both") {
                 pos.ci <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[length(carryover.period)])))
                 pos.ci2 <- setdiff(1:dim(data)[1], pos.ci)
-                p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.2, color="red", fill="red")
-                p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=1, color="red", fill="red")
-                p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.2)
-                p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=1)
+                if(plot.ci.point %in% c("both","95")){
+                    p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="red", fill="red",fatten = 2)
+                    p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                }
+                if(plot.ci.point %in% c("both","90")){
+                    p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="red", fill="red",fatten = 2)
+                    p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                }
             }
         }
 
