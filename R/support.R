@@ -28,9 +28,14 @@ get_term <- function(d,
     }
     d1 <- dd[1:(T-1)]
     d2 <- dd[2:T]
-    if (sum(d1 == d2) == (T-1)) {
+    
+    if(T==1){
+        term <- rep(NA, 1)
+    }
+    else if (sum(d1 == d2) == (T-1)) {
         term <- rep(NA, T)
-    } else {
+    } 
+    else {
         change.pos <- which(d1 != d2) + 1
         change.length <- length(change.pos)
         term <- NULL    
@@ -79,7 +84,7 @@ get_term <- function(d,
 }
 
 ###################################
-## fastplm for initial values
+## regressions for initial values
 ###################################
 
 initialFit <- function(data, ## long form data 
@@ -99,7 +104,10 @@ initialFit <- function(data, ## long form data
     beta0 <- matrix(0, 1, 1)
 
     ind <- NULL
-    if (force == 1) {
+    if(force == 0){
+        ind <- NULL
+    }
+    else if (force == 1) {
         ind <- as.matrix(data[,2])
     } else if (force == 2) {
         ind <- as.matrix(data[,3])
@@ -112,7 +120,8 @@ initialFit <- function(data, ## long form data
             mu <- mean(c(y)[oci])
             Y0 <- matrix(mu, T, N)
             ## res <- as.matrix(c(y) - mu)
-        } else {
+        } 
+        else {
             lm.fit <- lm(as.matrix(c(y)[oci])~x.sub)
             coef <- lm.fit$coefficients
             mu <- coef[1]
@@ -124,25 +133,44 @@ initialFit <- function(data, ## long form data
             Y0 <- matrix(y0, T, N)
             ## res <- as.matrix(lm.fit$residuals)
         }
-    } else {
-        fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
-                           ind = as.matrix(ind[oci,]),drop.singletons = FALSE)
+    } 
+    else {
+        
+        colnames(y) <- y.name <- 'y'
+        colnames(ind) <- ind.name <- paste0("id.",c(1:dim(ind)[2]))
+        if(p>0){
+            colnames(x) <- x.name <- paste0("x.",c(1:dim(x)[2]))
+            data.reg <- cbind.data.frame(y,x,ind)
+            formula.reg <- paste0("y~",paste(x.name,collapse="+"),"|",paste(ind.name,collapse="+"))
+        }
+        else{
+            data.reg <- cbind.data.frame(y,ind)
+            formula.reg <- paste0("y~1|",paste(ind.name,collapse="+"))
+        }
+        formula.reg <- as.formula(formula.reg)
 
-        lm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
-                           ind = as.matrix(ind[oci,]),drop.singletons = FALSE)))
-        y0 <- suppressWarnings(predict(lm.fit, x = x, ind = ind))
+
+        lm.fit <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                   data = data.reg[oci,],
+                                                   fixef.rm = "none")))
+        
+        y0 <- suppressWarnings(predict(lm.fit, newdata = data.reg))
+        #lm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
+        #                   ind = as.matrix(ind[oci,]),drop.singletons = FALSE)))
+        #y0 <- suppressWarnings(predict(lm.fit, x = x, ind = ind))
         Y0 <- matrix(y0, T, N)
         if (p > 0) {
             beta0 <- lm.fit$coefficients
+            names(beta0) <- NULL
+            beta0 <- as.matrix(beta0)
         }
-        ## res <- lm.fit$residuals
     }
     result <- list(Y0 = Y0, beta0 = beta0)
     return(result)
 }
 
 ################################################
-##  fastplm for initial values, probit model  ##
+##  regressions for initial values, probit model  ##
 ################################################
 
 ## if we do QR : the fixed effects term doesn't contain mu, and we need Y0, FE0, xi0, factor0
@@ -203,8 +231,9 @@ BiInitialFit <- function(data, ## long form data
             FE <- mu
         }
     } else {         ## with additive fixed effects
-        plm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
-                           ind = as.matrix(ind[oci,]),drop.singletons = FALSE)))
+        #plm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 
+        #                   ind = as.matrix(ind[oci,]),drop.singletons = FALSE)))
+        plm.fit <- NULL #to delete
         y0 <- suppressWarnings(predict(plm.fit, x = x, ind = ind))
         Y0 <- matrix(y0, T, N)
         mu <- plm.fit$intercept

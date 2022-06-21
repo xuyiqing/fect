@@ -8,8 +8,8 @@ plot.fect <- function(x,
   type = NULL, # gap, equiv, status, exit, factors, loadings,
   loo = FALSE,
   highlight = NULL, ## for carryover test and placebo test
-  plot.ci = NULL, ## "90", "95", "none"
-  show.point = FALSE,
+  plot.ci = NULL, ## "0.9", "0.95", "none"
+  show.point = NULL,
   show.group = NULL,
   bound = NULL, # "none", "min", "equiv", "both"
   vis = NULL,
@@ -66,6 +66,8 @@ plot.fect <- function(x,
     }
 
 
+
+
     # check if the input has the loo results
     pequiv <- !is.null(x$pre.est.att) ## if have leave one out pre-treatment results
     if (loo == TRUE && pequiv == FALSE) {
@@ -92,7 +94,8 @@ plot.fect <- function(x,
         }
         all.group.name <- names(x$g.level)
         if(!show.group%in%all.group.name){
-            stop("\"show.group\" should be one of group names.\n")
+            cat("The specified group does not exist or its treatment effects cannot be estimated.\n")
+            return(0)
         } 
     }
 
@@ -177,7 +180,7 @@ plot.fect <- function(x,
                                          "id"=c(x$tr, x$co),
                                          "group"=as.factor(c(rep("Treated",x$Ntr),
                                          rep("Control",x$Nco))))
-
+                
                 if (nfactors == 1) {
                     p <- ggplot(data, aes(x=group, y=L1, fill = group)) +
                     geom_boxplot(alpha = 0.7) +
@@ -185,18 +188,7 @@ plot.fect <- function(x,
                     xlab("") + ylab("Factor Loading")  
                 } 
                 else {
-                    if (x$Ntr < 5) {
-                        my_dens <- function(data, mapping, ...) {
-                        ggplot(data = data, mapping = mapping) +
-                        geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
-                        }
-                        p <- GGally::ggpairs(data, mapping = aes(color = group),
-                        columns = 1:nfactors,
-                        columnLabels = Llabel[1:nfactors],
-                        diag = list(continuous = my_dens),
-                        title = main)
-                    } 
-                    else {
+                    if (x$Ntr >= 5) {
                         my_dens <- function(data, mapping, ...) {
                         ggplot(data = data, mapping = mapping) +
                         geom_density(..., alpha = 0.7, color = NA)
@@ -207,6 +199,28 @@ plot.fect <- function(x,
                         diag = list(continuous = my_dens),
                         title = main) +
                         theme(plot.title = element_text(hjust = 0.5))
+                    } 
+                    else if(x$Ntr > 1) {
+                        my_dens <- function(data, mapping, ...) {
+                        ggplot(data = data, mapping = mapping) +
+                        geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
+                        }
+                        p <- GGally::ggpairs(data, mapping = aes(color = group),
+                        columns = 1:nfactors,
+                        columnLabels = Llabel[1:nfactors],
+                        diag = list(continuous = my_dens),
+                        title = main)
+                    }
+                    else{
+                        my_dens <- function(data, mapping, ...) {
+                        ggplot(data = data, mapping = mapping) +
+                        geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
+                        }
+                        p <- GGally::ggpairs(data, mapping = aes(color = group),
+                        columns = 1:nfactors, upper = 'blank',
+                        columnLabels = Llabel[1:nfactors],
+                        diag = list(continuous = my_dens),
+                        title = main)                     
                     }
                 }
                 #suppressWarnings(print(p))
@@ -360,16 +374,16 @@ plot.fect <- function(x,
     }
 
     if (!is.null(plot.ci)) {
-        if(!plot.ci  %in% c("90", "95", "none")){
-            stop("\"plot.ci\" must be one of \"95\", \"90\" or \"none\".")
+        if(!plot.ci  %in% c("0.9", "0.95", "none")){
+            stop("\"plot.ci\" must be one of \"0.95\", \"0.9\" or \"none\".")
         }
-        if (plot.ci  %in% c("90", "95") && is.null(x$est.att)) {
+        if (plot.ci  %in% c("0.90", "0.95") && is.null(x$est.att)) {
             stop("No uncertainty estimates.")
         }
-        if(plot.ci == "90" && type%in%c("gap","exit")){
+        if(plot.ci == "0.90" && type%in%c("gap","exit")){
             warning("90% CI in gap plots or exiting treatment plots.\n")
         }
-        if(plot.ci == "95" && type=="equiv"){
+        if(plot.ci == "0.95" && type=="equiv"){
             warning("95% CI in equivalence test plots.\n")
         }
     } 
@@ -378,11 +392,18 @@ plot.fect <- function(x,
             plot.ci <- "none"
         }
         else if(type=='equiv'){
-            plot.ci <- "90"
+            plot.ci <- "0.9"
         } 
         else { #gap plot or exiting plot
-            plot.ci <- "95"
+            plot.ci <- "0.95"
         }
+    }
+
+    if(plot.ci == "0.95"){
+        plot.ci <- "95"
+    }
+    if(plot.ci == "0.9"){
+        plot.ci <- "90"
     }
     
     if(type=='equiv' && plot.ci=='none'){
@@ -403,6 +424,20 @@ plot.fect <- function(x,
     else{
         if (!vis %in% c("connected","none")){
             stop("\"vis\" must be \"connected\" or \"none\".")
+        }
+    }
+
+    if(is.null(show.point)){
+        if(placeboTest==TRUE){
+            if(length(placebo.period)==1){
+                show.point <- TRUE
+            }
+            else {
+                show.point <- FALSE
+            }
+        }
+        else {
+            show.point <- FALSE
         }
     }
 
@@ -535,7 +570,8 @@ plot.fect <- function(x,
             if (length(stats.labs)!=length(stats)) {
                 stop("\"stats.lab\" should have the same length as \"stats\".")
             }               
-        } else {
+        } 
+        else {
             stats.labs <- rep(NA, length(stats)) 
             for (i in 1:length(stats)) {
                 if (stats[i] == "F.p") {
@@ -604,14 +640,6 @@ plot.fect <- function(x,
         }
     }
     else if (type=='exit') {
-       #if (length(xlim)==0) {
-        #    xlim <- c(1, 1e5)
-        #} 
-        #else {
-        #    if (xlim[1]<=0) {
-        #        xlim[1]<-1
-        #    }
-        #}
         maintext <- "Estimated ATT"
         ytitle <- paste("Effect on",x$Y)
         if(carryoverTest==1){
@@ -718,6 +746,7 @@ plot.fect <- function(x,
         target.group <- x$est.group.output[[show.group]]
         info.group <- x$group.output[[show.group]]
 
+        x$att <- info.group$att.on
         x$time <- info.group$time.on
         x$count <- info.group$count.on
         x$time.off <- info.group$time.off
@@ -1141,7 +1170,7 @@ plot.fect <- function(x,
         ## data frame for main estimates
         if (switch.on == TRUE) {            
             ## switch-on effect
-            if (CI == FALSE) {               
+            if (CI == FALSE) {             
                 data <- cbind.data.frame(time, ATT = x$att, count = count.num)[show,]                
             } 
             else {
@@ -1348,12 +1377,18 @@ plot.fect <- function(x,
                 }
             } 
             else if(plot.ci == 'both') {
-                if(plot.ci.point %in% c("both","95")){
-                    p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                if(CI==TRUE){
+                    if(plot.ci.point %in% c("both","95")){
+                        p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                    }
+                    if(plot.ci.point %in% c("both","90")){
+                        p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                    }                    
                 }
-                if(plot.ci.point %in% c("both","90")){
-                    p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                else{
+                    p <- p + geom_point(data = data, aes(x = time, y = ATT), size=1.2)                    
                 }
+
             }
         } 
         else if(classic==0 && switch.on==TRUE) {
@@ -1378,14 +1413,19 @@ plot.fect <- function(x,
             else if(plot.ci == "both") {
                 pos.ci <- intersect(which(data[,"time"] >= (placebo.period[1])), which(data[,"time"] <= (placebo.period[length(placebo.period)])))
                 pos.ci2 <- setdiff(1:dim(data)[1], pos.ci)
-                #print(plot.ci.point)
-                if(plot.ci.point %in% c("both","95")){
-                    p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="blue", fill="blue",fatten = 2)
-                    p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                if(CI==TRUE){
+                    if(plot.ci.point %in% c("both","95")){
+                        p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="blue", fill="blue",fatten = 2)
+                        p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                    }
+                    if(plot.ci.point %in% c("both","90")){
+                        p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="blue", fill="blue",fatten = 2)
+                        p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                    }                    
                 }
-                if(plot.ci.point %in% c("both","90")){
-                    p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="blue", fill="blue",fatten = 2)
-                    p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                else{
+                    p <- p + geom_point(data = data[pos.ci,], aes(x = time, y = ATT), lwd=0.6, color="blue", fill="blue",size=1.2)
+                    p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6,size=1.2)                    
                 }
             }
         }
@@ -1411,13 +1451,19 @@ plot.fect <- function(x,
             else if(plot.ci == "both") {
                 pos.ci <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[length(carryover.period)])))
                 pos.ci2 <- setdiff(1:dim(data)[1], pos.ci)
-                if(plot.ci.point %in% c("both","95")){
-                    p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="red", fill="red",fatten = 2)
-                    p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                if(CI==TRUE){
+                    if(plot.ci.point %in% c("both","95")){
+                        p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="red", fill="red",fatten = 2)
+                        p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                    }
+                    if(plot.ci.point %in% c("both","90")){
+                        p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="red", fill="red",fatten = 2)
+                        p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                    }
                 }
-                if(plot.ci.point %in% c("both","90")){
-                    p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="red", fill="red",fatten = 2)
-                    p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                else{
+                    p <- p + geom_point(data = data[pos.ci,], aes(x = time, y = ATT), lwd=0.6, color="red", fill="red",size=1.2)
+                    p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6,size=1.2)                    
                 }
             }
         }
@@ -1433,7 +1479,7 @@ plot.fect <- function(x,
             loo.equiv <- 0
         }
         
-        if (type == 'equiv' && loo.equiv == 0) { 
+        if (type %in% c('equiv','gap') && loo.equiv == 0) { 
             for (i in 1:length(stats)) {
                 if ("F.p" %in% stats[i]) {
                     if (change.proportion | change.pre.periods | !is.null(show.group)) {
@@ -1532,7 +1578,7 @@ plot.fect <- function(x,
                 } 
             } 
         }
-        else if(type == 'equiv' && loo.equiv == 1){ #loo
+        else if(type %in% c('equiv','gap') && loo.equiv == 1){ #loo
             for (i in 1:length(stats)) {
                 if ("F.p" %in% stats[i]) {
                     if (change.proportion | change.pre.periods | !is.null(show.group)) {
@@ -1664,6 +1710,7 @@ plot.fect <- function(x,
                 }                
             } 
         }
+        
 
 
 

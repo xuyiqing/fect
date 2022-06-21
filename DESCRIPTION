@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactuals
-Version: 0.5.0
-Date: 2022-05-05
+Version: 0.6.2
+Date: 2022-06-20
 Authors@R: 
   c(person("Licheng", "Liu", ,"liulch@mit.edu", role = c("aut")), 
   person("Ye", "Wang", , "yezhehuzhi@gmail.com", role = c("aut")), 
@@ -14,9 +14,14 @@ Description: Estimates causal effects with panel data using the counterfactual m
 NeedsCompilation: yes
 License: MIT + file LICENSE
 Imports: Rcpp (>= 0.12.3), ggplot2 (>= 2.1.0), GGally (>= 1.0.1),
-         doParallel (>= 1.0.10), foreach (>= 1.4.3), abind (>= 1.4-0), 
-         gridExtra, grid, fastplm (>= 1.0.8), doRNG, future, mvtnorm
+        doParallel (>= 1.0.10), foreach (>= 1.4.3), abind (>= 1.4-0),
+        gridExtra, grid, fixest, doRNG, future
 SystemRequirements: A C++11 compiler.
 Depends: R (>= 3.5.0)
 LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 7.1.0
+Packaged: 2022-06-20 20:18:09 UTC; ziyil
+Author: Licheng Liu [aut],
+  Ye Wang [aut],
+  Yiqing Xu [aut, cre] (<https://orcid.org/0000-0003-2041-6671>),
+  Ziyi Liu [aut]

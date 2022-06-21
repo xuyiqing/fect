@@ -113,15 +113,15 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     
     r.max <- min(TT, r.end)
     r.cv <- 0 ## initial value
-
-    if (method %in% c("ife", "both", "gsynth") && r.max == 0) {
+    
+    if(method %in% c("ife", "both", "gsynth") && FALSE){
         r.cv <- 0
-        cat("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
         est.best <- inter_fe_ub(YY, Y0, 
                                 X, II, beta0, 
                                 0, force = force, 
                                 tol)
-    } 
+        cat("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
+    }
     else {
 
         r.old <- r ## save the minimal number of factors 

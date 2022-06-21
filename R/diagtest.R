@@ -69,7 +69,7 @@ diagtest <- function(
         nboots <- ncol(res_boot)
         if (length(pre.pos) == max.pre.periods) {
             pre.pos <- pre.pos[-1]
-            cat("Cannot use full pre-treatment periods. The first period is removed.\n")
+            cat("Cannot use full pre-treatment periods in F-test. The first period is removed.\n")
         }
         if (length(pre.pos) > 1) {
             res_boot <- res_boot[pre.pos, ]

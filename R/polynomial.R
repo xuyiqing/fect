@@ -41,7 +41,8 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
     N <- dim(Y)[2]
     if (is.null(X) == FALSE) {
         p <- dim(X)[3]
-    } else {
+    } 
+    else {
         p <- 0
         X <- array(0, dim = c(1, 1, 0))
     }
@@ -81,6 +82,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         for (i in 1:p) {
             vx[, i] <- c(X[,, i])
         }
+        colnames(vx) <- paste0("x.",c(1:p))
         vx.fit <- as.matrix(vx[oci,])
     }
     
@@ -106,89 +108,92 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
             vindex <- cbind(vindex,matrix(ind.matrix[[ind.name]],ncol=1))
         }
 
-        ind.name <- c("id","time",names(ind.matrix))
+        ind.name <- c("forceid","forcetime",names(ind.matrix))
         ind.index <- c(1:(2+length(names(ind.matrix))))
-        names(ind.index) <- ind.name
+        colnames(vindex) <- names(ind.index) <- ind.name
+        
+        if(p>0){
+            data.reg <- cbind.data.frame(vy,vx,vindex)
+            formula.reg <- paste0("vy~",paste(paste0("x.",c(1:p)),collapse="+"),"|")    
+        }
+        else{
+            data.reg <- cbind.data.frame(vy,vindex)
+            formula.reg <- paste0("vy~1|")   
+        }
+        
+        if(force==1){
+            formula.reg <- paste0(formula.reg,"forceid")
+        }
+        else if(force==2){
+            formula.reg <- paste0(formula.reg,"forcetime")
+        }
+        else if(force==3){
+            formula.reg <- paste0(formula.reg,"forceid+forcetime")
+        }
+
 
         if(!is.null(sfe)){
-            for(sub.sfe in sfe){
-                sf.add <- ind.index[sub.sfe]
-                names(sf.add) <- NULL
-                sf <- c(sf,sf.add)
-            }
+            formula.reg <- paste0(formula.reg,"+", paste(sfe,collapse="+"))
         }
 
         if(!is.null(cfe)){
             for(sub.cfe in cfe){
-                sub.cf <- c(ind.index[sub.cfe[1]], ind.index[sub.cfe[2]])
-                names(sub.cf) <- NULL
-                cf <- c(cf, list(sub.cf))
+                sub.cf <- paste0(sub.cfe[1],"[",sub.cfe[2],"]")
+                formula.reg <- paste0(formula.reg,"+",sub.cf)
             }
         }
-
-        est.best <- suppressWarnings(fastplm(y = as.matrix(vy[oci]), 
-                                             x = vx.fit, 
-                                             ind = as.matrix(vindex[oci,]),
-                                             sfe = sf, cfe = cf, PCA = TRUE,
-                                             se = FALSE,
-                                             drop.singletons = FALSE))
-        yfit <- predict(est.best, x = vx, ind = vindex)
+        formula.reg <- as.formula(formula.reg)
+        est.best <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                   data = data.reg[oci,],
+                                                   fixef.rm = "none")))
+        
+        yfit <- suppressWarnings(predict(est.best, newdata = data.reg))
 
     }
     else if (method == "polynomial") {
         vindex <- cbind(rep(1:N, each = TT), rep(1:TT, N))  ## id time
-        if (degree > 1) {
-            for (i in 2:degree) {
-                vindex <- cbind(vindex, rep((1:TT)^i, N))
-            }
+        for (i in 1:degree) {
+            vindex <- cbind(vindex, rep((1:TT)^i, N))
         }
-        if (force == 1) {
-            sf <- 1
-        } else if (force == 2) {
-            sf <- 2
-        } else {
-            sf <- c(1,2)
+        
+        colnames(vindex) <- c("forceid","forcetime",paste0("forcetime.",c(1:degree)))
+        
+        if(p>0){
+            data.reg <- cbind.data.frame(vy,vx,vindex)
+            formula.reg <- paste0("vy~",paste(paste0("x.",c(1:p)),collapse="+"),"|")    
         }
-
-        cf <- list(c(1,2))
-
-        if (degree > 1) {
-            for (i in 2:degree) {
-                cf <- c(cf, list(c(1, i + 1)))
-            }
+        else{
+            data.reg <- cbind.data.frame(vy,vindex)
+            formula.reg <- paste0("vy~1|")   
         }
 
-        est.best <- suppressWarnings(fastplm(y = as.matrix(vy[oci]), 
-                                            x = vx.fit, 
-                                            ind = as.matrix(vindex[oci,]),
-                                            sfe = sf, cfe = cf, PCA = TRUE,
-                                            se = FALSE))
+        if(force==1){
+            formula.reg <- paste0(formula.reg,"forceid")
+        }
+        else if(force==2){
+            formula.reg <- paste0(formula.reg,"forcetime")
+        }
+        else if(force==3){
+            formula.reg <- paste0(formula.reg,"forceid+forcetime")
+        }
 
-        yfit <- predict(est.best, x = vx, ind = vindex)
-
-
+        for (i in 1:degree) {
+            formula.reg <- paste0(formula.reg,paste0("+forceid","[",paste0("forcetime.",i),"]"))
+        }
+        formula.reg <- as.formula(formula.reg)
+        est.best <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                   data = data.reg[oci,],
+                                                   fixef.rm = "none")))
+        
+        yfit <- suppressWarnings(predict(est.best, newdata = data.reg))
     } 
-    else {
-        sf <- 1
-        vindex <- as.matrix(rep(1:N, each = TT))
-        sp <- as.matrix(rep(1:TT, N))
-        est.best <- suppressWarnings(fastplm(y = as.matrix(vy[oci]), 
-                                            x = vx.fit, 
-                                            ind = as.matrix(vindex[oci,]),
-                                            sp = as.matrix(sp[oci,]),
-                                            degree = degree,
-                                            sfe = sf, cfe = cf, PCA = 0,
-                                            se = FALSE))
-
-        yfit <- predict(est.best, x = vx, ind = vindex, sp = sp)
-
-    }
 
 
     Y.ct <- matrix(yfit, TT, N)
     if (p > 0) {
         beta <- as.matrix(c(est.best$coefficients)[1:p])
-    } else {
+    } 
+    else {
         beta <- matrix(0, 1, 0)
     }
     est.best$beta <- beta

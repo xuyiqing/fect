@@ -60,7 +60,7 @@ get.cohort <- function(data,
     ## check if uniquely identified
     unique_label <- unique(paste(data[,index[1]],"_",data[,index[2]],sep=""))
     if (length(unique_label)!= dim(data)[1]) {
-        stop("Unit and time variables do not uniquely identify all observations. Some may be duplicated or Incorrectly marked in the dataset.")
+        stop("Observations are not uniquely defined by unit and time indicators.")
     }
 
     if (!(class(data[, D]) %in% c("numeric", "integer"))) {
@@ -128,14 +128,25 @@ get.cohort <- function(data,
     Dname <- D
     I <- D <- NULL
     if (dim(data)[1] != TT*N) {
-        data[,index.id] <- as.numeric(as.factor(data[,index.id]))
         data[,index.time] <- as.numeric(as.factor(data[,index.time]))
-        I <- matrix(0, TT, N)
-        D <- matrix(0, TT, N)
-        for (i in 1:dim(data)[1]) {
-            D[data[i,index.time],data[i,index.id]] <- data[i,Dname]
-            I[data[i,index.time],data[i,index.id]] <- 1
+        ob.indicator <- data[,index.time]
+        id.indicator <- table(data[, index.id])
+        sub.start <- 1
+        for (i in 1:(N - 1)) { 
+            sub.start <- sub.start + id.indicator[i] 
+            sub.end <- sub.start + id.indicator[i+1] - 1 
+            ob.indicator[sub.start:sub.end] <- ob.indicator[sub.start:sub.end] + i * TT
         }
+        variable <- c(Dname)
+        data_I <- matrix(0, N * TT, 1)
+        data_I[ob.indicator, 1] <- 1
+        data_D <- as.matrix(data[, variable])
+        data_D <- data_ub_adj(data_I, data_D)
+        colnames(data_D) <- variable
+        I <- matrix(1, TT, N)
+        D <- matrix(data_D[, Dname],TT,N)
+        I[is.nan(D)] <- 0
+        D[is.nan(D)] <- 0
     } 
     else {
         data[,index.id] <- as.numeric(as.factor(data[,index.id]))
@@ -148,12 +159,13 @@ get.cohort <- function(data,
     co.pos <- which(apply(D, 2, sum) == 0)
     tr.name <- names(id.match)[tr.pos]
     co.name <- names(id.match)[co.pos]
-
+    
     D.cum1 <- apply(D,2,cumsum)
     D.cum2 <- apply(D.cum1,2,cumsum)
     T0.tr <- apply(D.cum2[,tr.pos],2,function(vec){which(vec==1)})
     T0.tr.origin <- as.numeric(sapply(T0.tr,function(x){names(time.match)[which(time.match==x)]}))
     T0.co.origin <- rep(NA,length(co.name))
+
 
     first.treat <- cbind.data.frame(index.id = c(tr.name,co.name),
                                     FirstTreat = c(T0.tr.origin,T0.co.origin))

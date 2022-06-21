@@ -161,7 +161,8 @@ fect.boot <- function(Y,
                        cv.nobs = cv.nobs)
 
             method <- out$method
-        } else {
+        } 
+        else {
             out <- fect.binary.cv(Y = Y, X = X, D = D, 
                                   I = I, II = II, 
                                   T.on = T.on, T.off = T.off,
@@ -419,7 +420,7 @@ fect.boot <- function(Y,
                             .combine = function(...) abind(...,along=3),
                             .multicombine = TRUE,
                             .export = c("fect.gsynth","initialFit"),
-                            .packages = c("fect","mvtnorm","fastplm"),
+                            .packages = c("fect","mvtnorm","fixest"),
                             .inorder = FALSE)  %dopar% {
                                 return(draw.error())
                             } 
@@ -571,7 +572,7 @@ fect.boot <- function(Y,
             if (method == "ife") {
                 boot <- try(fect.fe(Y = Y.boot, X = X, D = D, I = I, II = II, 
                             T.on = T.on, T.off = T.off,
-                            r.cv = r, binary = binary, QR = QR,
+                            r.cv = out$r.cv, binary = binary, QR = QR,
                             force = force, hasRevs = hasRevs, 
                             tol = tol, boot = 1,
                             norm.para = norm.para, 
@@ -586,9 +587,10 @@ fect.boot <- function(Y,
             
             } 
             else if (method == "mc") {
+                
                 boot <- try(fect.mc(Y = Y.boot, X = X, D = D, I = I, II = II,
                             T.on = T.on, T.off = T.off, 
-                            lambda.cv = lambda, force = force, hasRevs = hasRevs, 
+                            lambda.cv = out$lambda.cv, force = force, hasRevs = hasRevs, 
                             tol = tol, boot = 1,
                             norm.para = norm.para,
                             placebo.period = placebo.period,
@@ -598,7 +600,7 @@ fect.boot <- function(Y,
                             group.level = group.level, group = group,
                             time.on.seq = time.on, time.off.seq = time.off,
                             time.on.seq.group = group.time.on,
-                            time.off.seq.group = group.time.off), silent = TRUE)
+                            time.off.seq.group = group.time.off),silent = TRUE)
 
             } 
             else if (method %in% c("polynomial", "bspline","cfe")) {
@@ -863,7 +865,7 @@ fect.boot <- function(Y,
         boot.out <- foreach(j=1:nboots, 
                             .inorder = FALSE,
                             .export = c("fect.fe", "fect.mc", "fect.polynomial", "get_term","fect.gsynth","initialFit"),
-                            .packages = c("fect","mvtnorm","fastplm")
+                            .packages = c("fect","mvtnorm","fixest")
                             ) %dopar% {
                                 return(one.nonpara(boot.seq[j]))
                             }

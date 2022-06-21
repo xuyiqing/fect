@@ -40,10 +40,10 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  r = 0, # number of factors
                  lambda = NULL, # mc method: regularization parameter
                  nlambda = 10, ## mc method: regularization parameter
-                 CV = TRUE, # cross-validation
+                 CV = NULL, # cross-validation
                  k = 10, # times of CV
                  cv.prop = 0.1, ## proportion of CV counts
-                 cv.treat = TRUE, ## cv targeting treated units
+                 cv.treat = FALSE, ## cv targeting treated units
                  cv.nobs = 3,  ## cv taking consecutive units
                  cv.donut = 0, ## cv mspe
                  binary = FALSE, # probit model
@@ -58,7 +58,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  cores = NULL, # number of cores
                  tol = 0.001, # tolerance level
                  seed = NULL, # set seed
-                 min.T0 = 5, # minimum T0
+                 min.T0 = NULL, # minimum T0
                  max.missing = NULL, # maximum missing
                  proportion = 0.3, # use to fit the f test and equivalence test
                  pre.periods = NULL, # fit test period
@@ -96,10 +96,10 @@ fect.formula <- function(formula = NULL,
                          r = 0, # nubmer of factors
                          lambda = NULL, # mc method: regularization parameter
                          nlambda = 10, ## mc method: regularization parameter
-                         CV = TRUE, # cross-validation
+                         CV = NULL, # cross-validation
                          k = 10, # times of CV
                          cv.prop = 0.1, ## proportion of CV counts
-                         cv.treat = TRUE, 
+                         cv.treat = FALSE, 
                          cv.nobs = 3,
                          cv.donut = 0, ## cv mspe
                          binary = FALSE, # probit model
@@ -114,7 +114,7 @@ fect.formula <- function(formula = NULL,
                          cores = NULL, # number of cores
                          tol = 0.001, # tolerance level
                          seed = NULL, # set seed
-                         min.T0 = 5,
+                         min.T0 = NULL,
                          max.missing = NULL,
                          proportion = 0.3,
                          pre.periods = NULL,
@@ -236,8 +236,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          cl = "unit", 
                          r = 0, # nubmer of factors
                          lambda = NULL, ## mc method: regularization parameter
-                         nlambda = 0, ## mc method: regularization parameter
-                         CV = TRUE, # cross-validation
+                         nlambda = 0, 
+                         CV = NULL, # cross-validation
                          k = 10, # times of CV
                          cv.prop = 0.1,
                          cv.treat = TRUE, 
@@ -251,11 +251,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          se = FALSE, # report uncertainties
                          vartype = "bootstrap", # bootstrap or jackknife
                          nboots = 200, # number of bootstraps
-                         parallel = FALSE, # parallel computing
+                         parallel = TRUE, # parallel computing
                          cores = NULL, # number of cores
                          tol = 0.001, # tolerance level
                          seed = NULL, # set seed
-                         min.T0 = 5,
+                         min.T0 = NULL,
                          max.missing = NULL,
                          proportion = 0.3,
                          pre.periods = NULL,
@@ -300,7 +300,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## check duplicated observations
     unique_label <- unique(paste(data[,index[1]],"_",data[,index[2]],sep=""))
     if (length(unique_label)!= dim(data)[1]) {
-        stop("Some records may be duplicated or wrongly marked in the data set. Check the index.")
+        stop("Observations are not uniquely defined by unit and time indicators.")
     }
 
     ## force
@@ -313,6 +313,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     } else if (force == "two-way") { # force = 3 "two-way": two-way fixed-effect 
         force <- 3
     }
+    
     if (!force %in% c(0, 1, 2, 3)) {
         stop("\"force\" option misspecified; choose from c(\"none\", \"unit\", \"time\", \"two-way\").")
     } 
@@ -324,16 +325,75 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     ## method
-    if (!method %in% c("fe", "ife", "mc", "both", "polynomial", "bspline", "cfe","gsynth")) {
-        stop("\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"polynomial\", \"bspline\",\"cfe\").")
+    if (!method %in% c("fe", "ife", "mc", "both", "polynomial", "cfe","gsynth")) {
+        stop("\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"polynomial\",\"cfe\").")
     }
-    if (method == "fe") {
-        r <- 0
-        CV <- FALSE
-        method <- "ife"
-    } else if (method %in% c("polynomial", "bspline","cfe")) {
-        CV <- FALSE
+
+    if(is.null(min.T0)){
+        if(method == "fe"){
+            min.T0 <- 1
+        }
+        if(method %in% c("ife","mc","both","gsynth")){
+            min.T0 <- 5
+        }
+        if(method %in% c("polynomial","cfe")){
+            min.T0 <- 2
+        }
     }
+    else{
+        if(min.T0 <= 0){
+            stop("\"min.T0\" option should be larger than 0.\n")
+        }
+    }
+
+    ## the default setting of CV
+    if(is.null(CV)){
+        if (method == "fe") {
+            r <- 0
+            CV <- FALSE
+            method <- "ife"
+        } 
+        else if (method %in% c("polynomial","cfe")) {
+            CV <- FALSE
+        }
+        else if(method == "both"){
+            CV <- TRUE
+            if(length(r)==1 & r==0){
+                r <- c(0:5)
+            }
+        }
+        else if(method %in% c("ife","gsynth")){
+            if(length(r)==1){
+                CV <- FALSE
+            }
+            else if(length(r)>1){
+                CV <- TRUE
+            }
+        }
+        else if(method == "mc"){
+            if(length(lambda)==1){
+                CV <- FALSE
+            }
+            else if(length(lambda)>1 | is.null(lambda)){
+                CV <- TRUE
+            }
+        }        
+    }
+    else{
+        if (method == "fe") {
+            r <- 0
+            CV <- FALSE
+            method <- "ife"
+        } 
+        else if (method %in% c("polynomial","cfe")) {
+            CV <- FALSE
+        }
+        else if(method == "both"){
+            CV <- TRUE
+        }
+    }
+
+
 
     if (!criterion %in% c("mspe", "wmspe", "gmspe", "moment", "gmoment", "mad", "pc")) {
         stop("\"criterion\" option misspecified; choose from c(\"mspe\", \"wmspe\", \"mad\", \"gmspe\",\"moment\",\"gmoment\", \"pc\").")
@@ -383,9 +443,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     ## CV
-    if (method == "both") {
-        CV <- TRUE
-    }
+    
     if (CV == TRUE) {
         
         if (placeboTest == TRUE) {
@@ -398,35 +456,29 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         if (method %in% c("ife", "both","gsynth")) {
             if (length(r) == 2 & r[1] > r[2]) {
-                stop("\"r\" option misspecified.")
+                stop("\"r\" option misspecified. The first element should be smaller than the second element in r().\n")
             }
         } 
         if (method %in% c("mc", "both")) {
             if (nlambda <= 0) {
-                stop("\"nlambda\" option misspecified.")
+                stop("\"nlambda\" option misspecified.\n")
             }
         }
     } 
     else {
-        if (! method %in% c("gsynth","ife", "mc", "polynomial", "bspline","cfe")) {
-            stop("\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"polynomial\", \"bspline\").")
+        if (! method %in% c("gsynth","ife", "mc", "polynomial","cfe")) {
+            stop("\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"polynomial\").")
         }
     }
 
-    if (method %in% c("polynomial", "bspline","cfe")) {
+    if (method %in% c("polynomial","cfe")) {
         if (permute == 1) {
             cat("Cannot do permutation test.\n")
             permute <- 0
         }
     }
 
-    # wald <- FALSE 
-    # if (se == TRUE && placeboTest == FALSE) {
-    #     wald <- TRUE
-    # }
-    #if (placeboTest == TRUE) {
-    #    wald <- FALSE
-    #}
+
     if(permute == 1){
         if(placeboTest == TRUE){
             stop("\"permute\" can't be used with \"placeboTest\".")
@@ -443,15 +495,19 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     if (length(r) == 1) {
-        if (r>=5) {
-            r.end <- r
-        } else {
-            r.end <- 5
-        }
-    } else {
-        r.end <- r[2]; r <- r[1]
+        #if (r>=5) {
+        #    r.end <- r
+        #} 
+        #else {
+        #    r.end <- 5
+        #}
+        r.end <- r
+    } 
+    else {
+        r.end <- max(r)
+        r <- min(r)
     }
-
+    
     ## uncertainty estimates
     if (is.logical(se) == FALSE & !se%in%c(0, 1)) {
         stop("\"se\" is not a logical flag.")
@@ -594,6 +650,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
+    ## deal with Inf and -Inf
+    if(Inf %in% data[,Y] | -Inf %in% data[,Y]){
+        data[which(data[,Y]==Inf),Y] <- NA
+        data[which(data[,Y]==-Inf),Y] <- NA
+        warning("Detect infinite values in outcome, automatically replace them with NA.\n")
+    }
+
     ##-------------------------------##
     ## Parsing raw data
     ##-------------------------------##  
@@ -671,7 +734,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if(length(setdiff(data.full[,id],data[,id]))>0){
             rm.na.id <- setdiff(data.full[,id],data[,id])
             data.full <- data.full[which(!data.full[,id] %in% rm.na.id),]
-        }else{
+        }
+        else{
             rm.na.id <- NULL
         }
 
@@ -758,16 +822,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (dim(data)[1] < TT*N) {
         
         data[,time] <- as.numeric(as.factor(data[,time]))
-        ## ob <- "time_ob_ls"
-        
-        ## while (ob %in% colnames(data)) {
-        ##     ob <- paste(ob, ob, sep = "_")
-        ## }
-
-        ## data[, ob] <- data[, time]
-        ## for (i in 1:N) {
-        ##     data[data[,id] == id.series[i], ob] <- data[data[,id] == id.series[i],time] + (i - 1) * TT  
-        ## }
 
         ob.indicator <- data[,time]
         id.indicator <- table(data[, id])
@@ -778,13 +832,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             ob.indicator[sub.start:sub.end] <- ob.indicator[sub.start:sub.end] + i * TT
         }
 
-        #if (!is.null(clname)) {
-        #    if (!clname %in% index) {
-        #        variable <- c(Yname, Dname, Xname, clname)
-        #    } else {
-        #        variable <- c(Yname, Dname, Xname)
-        #    }
-        #} else {
         variable <- c(Yname, Dname, Xname)
         if (!is.null(group)) {
             variable <- c(Yname, Dname, Xname, group)
@@ -901,14 +948,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     T0.min <- min(T0)
 
     if (sum(T0[which(apply(D, 2, sum) > 0)] >= min.T0) == 0) {
-        stop ("All treated units have been removed.\n")
+        stop ("All treated units have been removed. Please specify a smaller min.T0.\n")
     }   
     ## T0.min : minimum T0  
     ## min.T0: manually set
     ## rm.tr.id: relative location of treated units (within all treated units) 
     ## that will be removed 
     if (T0.min < min.T0) {
-        cat("Some treated units has too few pre-treatment periods; they are removed automatically.\n")
+        cat(paste0("For identification purposes, units whose number of untreated periods <",min.T0," are dropped automatically.\n"))
     }
 
     rm.id <- sort(unique(c(which((TT - apply(I, 2, sum)) > max.missing), which(T0 < min.T0))))
@@ -959,7 +1006,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 cat("\nThere are not any observations under control at ",time.uni[i],", drop that period.\n")
             }
         }
-        if (method %in% c("polynomial", "bspline")) {
+        if (method %in% c("polynomial")) {
             cat("\nThere are not any observations at some periods. Estimation results may not be reliable. Please use time fixed effects.\n")
         }
         TT <- TT - sum(I.use == 0)
@@ -1000,6 +1047,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     for (i in 1:(N - length(rm.id))) {
         T.on[, i] <-  get_term(D[, i], I.D[, i], type = "on")
     }
+    calender.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
 
     ## 4. check reversals
     D.fake <- apply(D, 2, function(vec){cumsum(vec)})
@@ -1163,48 +1211,17 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             stop("Some units do not have any observations. Please set a smaller range for carryover period.")
         }
         else{
-            stop("Some units do not have any observations.")
+            stop("Some units do not have any untreated observations.")
         }
     }
     ## cohort
     g.level <- NULL
     if (!is.null(group)) {
-        #G[which(D == 0)] <- NA
         g.level <- unique(c(G))
         g.level <- g.level[!is.na(g.level)]
         rownames(rawgroup) <- rawgroup[,'newgroup']
         names(g.level) <- rawgroup[as.character(g.level),'rawgroup']
-        #rawgroup <- rawgroup[order(rawgroup[, 2]),]
-        #rawgroup <- rawgroup[which(rawgroup[, 2] %in% g.level), 1]
-        ## tr.pos <- which(apply(D, 2, sum) > 0)
-        ## rawgroup <- unique(rawgroup[tr.pos])
-        ## ng <- length(group)
-        ## group <- matrix(rep(group, each = TT), TT, ng)
-        ## G <- as.matrix(G[, tr.pos])
     }
-
-    ##cat("\nOK3\n")
-
-
-    ## cat("\nOK3\n")
-
-    ## if (AR1 == TRUE) {
-    ##     Y.first <- Y[1,]
-    ##     Y.lag <- Y[1:(T-1),]
-    ##     Y <- Y[2:T,]
-    ##     D <- D[2:T,]
-    ##     if (p == 0) {
-    ##         X <- array(NA, dim=c((T-1),N,1))
-    ##         X[,,1] <- Y.lag
-    ##     } else {
-    ##         X.first <- X[1,,]
-    ##         X.sav <- X[2:T,,]
-    ##         X <- array(NA,dim=c((T-1),N,(p+1)))
-    ##         X[,,1] <- Y.lag
-    ##         X[,,2:(p+1)] <- X.sav
-    ##     }
-    ##     T <- T-1
-    ## } 
 
     ##-------------------------------##
     ## Register clusters
@@ -1311,7 +1328,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                carryover.period = carryover.period,
                                group.level = g.level, group = G), silent = TRUE)
             } 
-            else if (method %in% c("polynomial", "bspline", "cfe")) {
+            else if (method %in% c("polynomial",  "cfe")) {
                 out <- fect.polynomial(Y = Y, D = D, X = X, I = I, 
                                        II = II, T.on = T.on, 
                                        T.off = T.off, method = method,
@@ -1334,7 +1351,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 stop("\nCannot estimate.\n")
             }
             # only for polynomial methods
-            if(method %in% c("polynomial", "bspline", "cfe")){
+            if(method %in% c("polynomial",  "cfe")){
                 I <- out$I
                 II <- out$II
             }
@@ -1364,7 +1381,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          nboots = nboots, parallel = parallel,
                          cores = cores, group.level = g.level, group = G)
 
-        if(method %in% c("polynomial", "bspline", "cfe")){
+        if(method %in% c("polynomial",  "cfe")){
             I <- out$I
             II <- out$II
         }
@@ -1613,7 +1630,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     
     if ((se == TRUE | permute) & parallel == TRUE) {
         stopCluster(para.clusters)
-        ##closeAllConnections()
+        closeAllConnections()
     }
 
     ## cat("\nOK4\n")
@@ -1696,6 +1713,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }  
     colnames(out$eff) <- iname
     rownames(out$eff) <- tname
+    D.missing <- D
+    D.missing[which(D==0)] <- NA
+    eff.align <- apply(out$eff*D.missing,1,mean,na.rm=TRUE)
+    count.align <- apply(!is.na(out$eff*D.missing),1,sum)
+    eff.align.use <- cbind(count.align,eff.align)
+    colnames(eff.align.use) <- c('Num.Obs',"Effect")
+    out$eff.align <- eff.align.use
+
 
     ## cohort effect
     if (!is.null(group)) {

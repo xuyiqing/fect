@@ -69,12 +69,14 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     oci <- which(c(II) == 1)
 
     if (binary == FALSE) { 
+        
         initialOut <- initialFit(data = data.ini, force = force, oci = oci)
         Y0 <- initialOut$Y0
         beta0 <- initialOut$beta0
         if (p > 0 && sum(is.na(beta0)) > 0) {
             beta0[which(is.na(beta0))] <- 0
         }
+        
         ## ini.res <- initialOut$res
     } 
     else {
@@ -99,11 +101,13 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         if (boot == FALSE) {
             if (r.cv == 0) {
                 est.fect <- est.best
-            } else {
+            } 
+            else {
                 est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
             }
         }
-    } else {
+    } 
+    else {
         if (QR == FALSE) {
             est.best <- inter_fe_d_ub(YY, Y0, FE0, X, II, r.cv, force, tol = tol)
         } else {
@@ -397,7 +401,8 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                                             t.on.use.sub, 
                                             mean)) ## NA already removed
                 count.on.sub <- as.numeric(table(t.on.use.sub))
-            }else{
+            }
+            else{
                 time.on.sub <- att.on.sub <- count.on.sub <- NULL
             }
             
@@ -561,7 +566,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     if (r.cv > 0) {
         out<-c(out,list(factor = as.matrix(est.best$factor),
                         lambda = as.matrix(est.best$lambda),
-                        lambda.tr = as.matrix(est.best$lambda[tr,]),
+                        lambda.tr = matrix(est.best$lambda[tr,],ncol = r.cv),
                         lambda.co = as.matrix(est.best$lambda[co,])) )
     }
 
