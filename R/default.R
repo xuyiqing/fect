@@ -1630,7 +1630,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     
     if ((se == TRUE | permute) & parallel == TRUE) {
         stopCluster(para.clusters)
-        closeAllConnections()
+        #closeAllConnections()
     }
 
     ## cat("\nOK4\n")
