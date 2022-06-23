@@ -132,12 +132,12 @@ diagtest <- function(
     }
 
     if (x$placeboTest == FALSE & x$carryoverTest == FALSE & x$loo == FALSE) {
-        
+
         max.pre.periods <- sum(x$time<=0)
         pre.pos <- which(x$time %in% pre.periods)
         if (length(pre.pos) == max.pre.periods) {
             pre.pos <- pre.pos[-1]
-            cat("Cannot use full pre-treatment periods. The first period is removed.\n")
+            cat("Cannot use full pre-treatment periods in the F test. The first period is removed.\n")
         }
 
         res_boot <- x$att.boot
@@ -184,13 +184,20 @@ diagtest <- function(
         }
 
         # TOST
+
         est.att <- x$est.att[,c(1:2)]
         pos.zero <- which(x$time == 0)
         est.att <- est.att[pre.pos,,drop = FALSE]
-        tost.equiv.p <- sapply(1:nrow(est.att), function(i){
-                        return(tost(est.att[i,1], est.att[i,2], c(-tost.threshold, tost.threshold)))
-                    }) # keep the maximum p value
-        tost.equiv.p <- max(tost.equiv.p)
+        if(dim(est.att)[1]>0){
+            tost.equiv.p <- sapply(1:nrow(est.att), function(i){
+                            return(tost(est.att[i,1], est.att[i,2], c(-tost.threshold, tost.threshold)))
+                        }) # keep the maximum p value
+            tost.equiv.p <- max(tost.equiv.p)            
+        }
+        else{
+            tost.equiv.p <- NA
+        }
+
 
         out <- list(
             f.stat = f.stat, 

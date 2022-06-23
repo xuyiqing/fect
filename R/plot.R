@@ -936,7 +936,7 @@ plot.fect <- function(x,
         show <- show.time
     }
 
-    if (length(show) <= 2 & type %in% c("gap","equiv","exit")) {
+    if (length(show) < 2 & type %in% c("gap","equiv","exit")) {
         stop("Cannot plot.\n")
     }    
     
@@ -1340,7 +1340,7 @@ plot.fect <- function(x,
 
 
         ## xlab and ylab 
-        p <- p + xlab(xlab) +  ylab(ylab) + scale_x_continuous(labels=scaleFUN)
+        p <- p + xlab(xlab) +  ylab(ylab) 
 
         ## theme
         if (theme.bw == TRUE) {
@@ -1872,6 +1872,13 @@ plot.fect <- function(x,
                     label = max.count, size = cex.text * 0.8, hjust = 0.5)                
         }
 
+        if(dim(data)[1]>4){
+            p <- p + scale_x_continuous(labels=scaleFUN)
+        }
+        else{
+            p <- p + scale_x_continuous(breaks=c(data[,'time']))
+        }
+
             
         ## title
         if (is.null(main) == TRUE) {
@@ -1936,15 +1943,31 @@ plot.fect <- function(x,
                     rect.length <- (max(c(data.1,data.2), na.rm = TRUE) - min(c(data.1,data.2), na.rm = TRUE))/2
                     rect.min <- min(c(data.1,data.2), na.rm = TRUE) - rect.length
                 }
-                d1 <- data.1 <- x$eff.calendar[which(!is.na(x$eff.calendar[,1])),]
-                d2 <- data.2 <- x$eff.calendar.fit[which(!is.na(x$eff.calendar.fit[,1])),]
+                d1 <- data.1 <- as.matrix(x$eff.calendar[which(!is.na(x$eff.calendar[,1])),])
+                d2 <- data.2 <- as.matrix(x$eff.calendar.fit[which(!is.na(x$eff.calendar.fit[,1])),])
+                if(dim(d1)[2]==1){
+                    d1 <- data.1 <- t(d1)
+                    rownames(d1) <- rownames(data.1) <- rownames(x$eff.calendar)[which(!is.na(x$est.eff.calendar[,1]))]
+                }
+                if(dim(d2)[2]==1){
+                    d2 <- data.2 <- t(d2)
+                    rownames(d2) <- rownames(data.2) <- rownames(x$eff.calendar.fit)[which(!is.na(x$est.eff.calendar.fit[,1]))]
+                }
         } 
         else {
                 if(is.null(x$est.eff.calendar)){
                     stop("Uncertainty estimates not available.\n")
                 }
-                d1 <- data.1 <- x$est.eff.calendar[which(!is.na(x$est.eff.calendar[,1])),]
-                d2 <- data.2 <- x$est.eff.calendar.fit[which(!is.na(x$est.eff.calendar.fit[,1])),]
+                d1 <- data.1 <- as.matrix(x$est.eff.calendar[which(!is.na(x$est.eff.calendar[,1])),])
+                d2 <- data.2 <- as.matrix(x$est.eff.calendar.fit[which(!is.na(x$est.eff.calendar.fit[,1])),])
+                if(dim(d1)[2]==1){
+                    d1 <- data.1 <- t(d1)
+                    rownames(d1) <- rownames(data.1) <- rownames(x$est.eff.calendar)[which(!is.na(x$est.eff.calendar[,1]))]
+                }
+                if(dim(d2)[2]==1){
+                    d2 <- data.2 <- t(d2)
+                    rownames(d2) <- rownames(data.2) <- rownames(x$est.eff.calendar.fit)[which(!is.na(x$est.eff.calendar.fit[,1]))]
+                }
                 
                 if (length(ylim) != 0) {
                     rect.length <- (ylim[2] - ylim[1]) / 5
@@ -1973,6 +1996,7 @@ plot.fect <- function(x,
 
         TTT <- as.numeric(rownames(data.1))
         TTT.2 <- as.numeric(rownames(data.2))
+
         if(CI==FALSE){
             p <- p + geom_point(aes(x=TTT,y=d1[,1]),color='gray50',fill='gray50',alpha=1,size=1.2)
             p <- p + geom_line(aes(x=TTT.2,y=d2[,1]),color='skyblue',size=1.1)
@@ -2091,6 +2115,14 @@ plot.fect <- function(x,
             p <- p + theme_bw() 
         }
 
+        ## title
+        if (is.null(main) == TRUE) {
+            p <- p + ggtitle(maintext)
+        } 
+        else if (main!=""){
+            p <- p + ggtitle(main)
+        }
+
         ## grid
         if (gridOff == TRUE) {
             p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
@@ -2194,6 +2226,17 @@ plot.fect <- function(x,
                     y = max(data.toplot$ymax) + 0.1 * rect.length, 
                     label = max(data.count[,2]), size = cex.text * 0.7, hjust = 0.5)       
         }
+
+        p <- p + theme(legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
+         legend.position = legend.pos,
+         legend.background = element_rect(fill="transparent",colour=NA),
+         axis.title=element_text(size=cex.lab),
+         axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
+         axis.title.y = element_text(margin = margin(t = 0, r = 0, b = 0, l = 0)),
+         axis.text = element_text(color="black", size=cex.axis),
+         axis.text.x = element_text(size = cex.axis, angle = angle, hjust=x.h, vjust=x.v),
+         axis.text.y = element_text(size = cex.axis),
+         plot.title = element_text(size = cex.main, hjust = 0.5, face="bold", margin = margin(10, 0, 10, 0)))
 
 
     }

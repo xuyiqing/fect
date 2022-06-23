@@ -1489,9 +1489,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         proportion <- 0    
     }
     max.count <- max(out$count)
+    
     max.pre.periods <- out$time[which(out$count >= max.count * proportion & out$time <= 0)]
     if (is.null(pre.periods) == TRUE) {        
-        pre.periods <- max.pre.periods        
+        pre.periods <- max.pre.periods     
     } 
     else {
         pre.periods <- intersect(pre.periods[1]:pre.periods[length(pre.periods)], max.pre.periods)
