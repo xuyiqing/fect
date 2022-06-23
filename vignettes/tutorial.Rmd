@@ -96,7 +96,7 @@ out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
   method = "fe", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200)
 ```
 
-The **plot** can then visualize the estimated period-wise ATTs as well as their uncertainty estimates.
+The **plot** can then visualize the estimated period-wise ATTs as well as their uncertainty estimates. `stats = "F.p"` shows the p-value for the F test of no-pretrend (more details below). 
 ```{r fect_plot_nse, fig.width = 6, fig.height = 4.5}
 p <- plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y", 
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")

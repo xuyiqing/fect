@@ -41,13 +41,12 @@ install.packages('fect', type = 'source')
 
 You can install the development version of **fect** from GitHub by typing the following commands:
 ```{r eval=FALSE}
-devtools::install_github('xuyiqing/fastplm')
 devtools::install_github('xuyiqing/fect')
 ```
 
 **panelview** for panel data visualization is also highly recommended:
 ```{r eval=FALSE}
-devtools::install_github('xuyiqing/panelview')
+devtools::install_github('xuyiqing/panelView')
 ```
 
 **fect** depends on the following packages, which will be installed automatically when **fect** is being installed. You can also install them manually.
