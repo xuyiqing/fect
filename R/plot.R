@@ -936,7 +936,7 @@ plot.fect <- function(x,
         show <- show.time
     }
 
-    if (length(show) <= 2) {
+    if (length(show) <= 2 & type %in% c("gap","equiv","exit")) {
         stop("Cannot plot.\n")
     }    
     
@@ -2118,9 +2118,10 @@ plot.fect <- function(x,
             data.count <- data.count[which(data.count[,'time']>=min(xlim) & data.count[,'time']<=max(xlim)),]
             data.toplot <- data.toplot[which(data.toplot[,'time']>=min(xlim) & data.toplot[,'time']<=max(xlim)),]
         }
+        
 
         data.use <- merge(data.toplot,data.count,by = "time")
-
+        #print(data.use)
 
         if (length(ylim) != 0) {
             rect.length <- (ylim[2] - ylim[1]) / 5
@@ -2132,16 +2133,16 @@ plot.fect <- function(x,
         }
 
         if(start0==FALSE){
-            data.pre.1 <- data.use[which(data.use$time<=0 & data.use$count>=5),]
-            data.pre.2 <- data.use[which(data.use$time<=0 & data.use$count<5),]
-            data.post.1 <- data.use[which(data.use$time>0 & data.use$count>=5),]
-            data.post.2 <- data.use[which(data.use$time>0 & data.use$count<5),]
+            data.pre.1 <- data.use[which(data.use$time<=0 & data.use$count>=10),]
+            data.pre.2 <- data.use[which(data.use$time<=0 & data.use$count<10),]
+            data.post.1 <- data.use[which(data.use$time>0 & data.use$count>=10),]
+            data.post.2 <- data.use[which(data.use$time>0 & data.use$count<10),]
         }
         else{
-            data.pre.1 <- data.use[which(data.use$time<0 & data.use$count>=5),]
-            data.pre.2 <- data.use[which(data.use$time<0 & data.use$count<5),]
-            data.post.1 <- data.use[which(data.use$time>=0 & data.use$count>=5),]
-            data.post.2 <- data.use[which(data.use$time>=0 & data.use$count<5),]
+            data.pre.1 <- data.use[which(data.use$time<0 & data.use$count>=10),]
+            data.pre.2 <- data.use[which(data.use$time<0 & data.use$count<10),]
+            data.post.1 <- data.use[which(data.use$time>=0 & data.use$count>=10),]
+            data.post.2 <- data.use[which(data.use$time>=0 & data.use$count<10),]
         }
 
 

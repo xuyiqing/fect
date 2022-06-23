@@ -1116,7 +1116,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     }
     rm(D1, D2)
-    calender.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
+    calendar.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
 
     
     ## 4. check reversals
@@ -1803,16 +1803,16 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }  
     colnames(out$eff) <- iname
     rownames(out$eff) <- tname
-    out$eff.calender <- cbind(matrix(out$eff.calender,ncol=1),out$N.calender)
-    out$eff.calender.fit <- cbind(matrix(out$eff.calender.fit,ncol=1),out$N.calender)
-    rownames(out$eff.calender) <- tname
-    rownames(out$eff.calender.fit) <- tname
-    colnames(out$eff.calender) <- c("ATT-Calender","count")
-    colnames(out$eff.calender.fit) <- c("ATT-Calender Fitted","count")
+    out$eff.calendar <- cbind(matrix(out$eff.calendar,ncol=1),out$N.calendar)
+    out$eff.calendar.fit <- cbind(matrix(out$eff.calendar.fit,ncol=1),out$N.calendar)
+    rownames(out$eff.calendar) <- tname
+    rownames(out$eff.calendar.fit) <- tname
+    colnames(out$eff.calendar) <- c("ATT-calendar","count")
+    colnames(out$eff.calendar.fit) <- c("ATT-calendar Fitted","count")
 
     if(se==TRUE){
-        rownames(out$est.eff.calender) <- tname
-        rownames(out$est.eff.calender.fit) <- tname
+        rownames(out$est.eff.calendar) <- tname
+        rownames(out$est.eff.calendar.fit) <- tname
     }
 
     ## cohort effect

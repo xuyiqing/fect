@@ -20,7 +20,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                     placebo.period = NULL,
                     carryoverTest = 0,
                     carryover.period = NULL,
-                    calender.enp.seq = NULL,
+                    calendar.enp.seq = NULL,
                     time.on.seq = NULL,
                     time.off.seq = NULL,
                     time.on.carry.seq = NULL,
@@ -321,35 +321,35 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
     ## 9. loess HTE by time
     D.missing <- D
     D.missing[which(D==0)] <- NA
-    eff.calender <- apply(eff*D.missing,1,mean,na.rm=TRUE)
-    N.calender <- apply(!is.na(eff*D.missing),1,sum)
-    T.calender <- c(1:TT)
-    if(sum(!is.na(eff.calender))>1){
+    eff.calendar <- apply(eff*D.missing,1,mean,na.rm=TRUE)
+    N.calendar <- apply(!is.na(eff*D.missing),1,sum)
+    T.calendar <- c(1:TT)
+    if(sum(!is.na(eff.calendar))>1){
         #loess fit
-        if(!is.null(calender.enp.seq)){
-            if(length(calender.enp.seq)==1 & is.na(calender.enp.seq)){
-                calender.enp.seq <- NULL
+        if(!is.null(calendar.enp.seq)){
+            if(length(calendar.enp.seq)==1 & is.na(calendar.enp.seq)){
+                calendar.enp.seq <- NULL
             }
         }
-        if(is.null(calender.enp.seq)){
-            loess.fit <- suppressWarnings(try(loess(eff.calender~T.calender,weights = N.calender),silent=TRUE))      
+        if(is.null(calendar.enp.seq)){
+            loess.fit <- suppressWarnings(try(loess(eff.calendar~T.calendar,weights = N.calendar),silent=TRUE))      
         }
         else{
-            loess.fit <- suppressWarnings(try(loess(eff.calender~T.calender,weights = N.calender,enp.target=calender.enp.seq),silent=TRUE))
+            loess.fit <- suppressWarnings(try(loess(eff.calendar~T.calendar,weights = N.calendar,enp.target=calendar.enp.seq),silent=TRUE))
         }
         if('try-error' %in% class(loess.fit)){
-            eff.calender.fit <- eff.calender
-            calender.enp <- NULL
+            eff.calendar.fit <- eff.calendar
+            calendar.enp <- NULL
         }
         else{
-            eff.calender.fit <- eff.calender
-            eff.calender.fit[which(!is.na(eff.calender))] <- loess.fit$fit
-            calender.enp <- loess.fit$enp              
+            eff.calendar.fit <- eff.calendar
+            eff.calendar.fit[which(!is.na(eff.calendar))] <- loess.fit$fit
+            calendar.enp <- loess.fit$enp              
         }
     }
     else{
-        eff.calender.fit <- eff.calender
-        calender.enp <- NULL
+        eff.calendar.fit <- eff.calendar
+        calendar.enp <- NULL
     }
 
     ## 8. cohort effects
@@ -509,10 +509,10 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         time = time.on,
         att = att.on,
         count = count.on,
-        eff.calender = eff.calender,
-        N.calender = N.calender,
-        eff.calender.fit = eff.calender.fit,
-        calender.enp = calender.enp,
+        eff.calendar = eff.calendar,
+        N.calendar = N.calendar,
+        eff.calendar.fit = eff.calendar.fit,
+        calendar.enp = calendar.enp,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
         pre.sd = pre.sd,

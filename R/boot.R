@@ -183,15 +183,15 @@ fect.boot <- function(Y,
     eff <- out$eff
     att.avg <- out$att.avg
     att.avg.unit <- out$att.avg.unit
-    calender.eff <- out$eff.calender
-    calender.eff.fit <- out$eff.calender.fit
-    calender.N <- out$N.calender
+    calendar.eff <- out$eff.calendar
+    calendar.eff.fit <- out$eff.calendar.fit
+    calendar.N <- out$N.calendar
 
     group.att <- out$group.att
 
     att <- out$att
     time.on <- out$time
-    target.enp <- out$calender.enp
+    target.enp <- out$calendar.enp
 
     time.off <- NULL
     if (hasRevs == 1) {
@@ -244,8 +244,8 @@ fect.boot <- function(Y,
     att.boot <- matrix(0, length(time.on), nboots)
     att.count.boot <- matrix(0, length(time.on), nboots)
     beta.boot <- marginal.boot <- att.off.boot <- att.off.count.boot <- NULL
-    calender.eff.boot <- matrix(0,TT,nboots)
-    calender.eff.fit.boot <- matrix(0,TT,nboots)
+    calendar.eff.boot <- matrix(0,TT,nboots)
+    calendar.eff.fit.boot <- matrix(0,TT,nboots)
 
     if (hasRevs == 1) {
         att.off.boot <- matrix(0, length(time.off), nboots) 
@@ -331,7 +331,7 @@ fect.boot <- function(Y,
                                     QR = QR, force = force,
                                     hasRevs = hasRevs, tol = tol, boot = 1,
                                     norm.para = norm.para,
-                                    calender.enp.seq = target.enp,
+                                    calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     time.on.carry.seq = carry.time,
                                     placebo.period = placebo.period.boot, 
@@ -343,7 +343,7 @@ fect.boot <- function(Y,
 
             if ('try-error' %in% class(boot)) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                              beta = NA, att.off = NA, count.off = NA, eff.calender = NA, eff.calender.fit = NA,
+                              beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, eff.calendar.fit = NA,
                               att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                               group.att = NA, marginal = NA,carry.att = NA)
                 return(boot0)
@@ -530,7 +530,7 @@ fect.boot <- function(Y,
                                          placebo.period = placebo.period, 
                                          carryover.period = carryover.period,
                                          carryoverTest = carryoverTest,
-                                         calender.enp.seq = target.enp,
+                                         calendar.enp.seq = target.enp,
                                          time.on.seq = time.on, time.off.seq = time.off,
                                          time.on.seq.group = group.time.on,
                                          time.off.seq.group = group.time.off,
@@ -539,7 +539,7 @@ fect.boot <- function(Y,
 
             if ('try-error' %in% class(synth.out)) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                                  beta = NA, att.off = NA, count.off = NA, eff.calender = NA, eff.calender.fit = NA,
+                                  beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, eff.calendar.fit = NA,
                                   att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                                   group.att = NA, marginal = NA,
                                   group.output = list())
@@ -601,7 +601,7 @@ fect.boot <- function(Y,
                             carryover.period = carryover.period,
                             carryoverTest = carryoverTest,
                             group.level = group.level, group = group,
-                            calender.enp.seq = target.enp,
+                            calendar.enp.seq = target.enp,
                             time.on.seq = time.on, time.off.seq = time.off,
                             time.on.carry.seq = carry.time,
                             time.on.seq.group = group.time.on,
@@ -620,7 +620,7 @@ fect.boot <- function(Y,
                             carryover.period = carryover.period,
                             carryoverTest = carryoverTest,
                             group.level = group.level, group = group,
-                            calender.enp.seq = target.enp,
+                            calendar.enp.seq = target.enp,
                             time.on.seq = time.on, time.off.seq = time.off,
                             time.on.carry.seq = carry.time,
                             time.on.seq.group = group.time.on,
@@ -643,7 +643,7 @@ fect.boot <- function(Y,
                                     carryoverTest = carryoverTest,
                                     norm.para = norm.para,
                                     group.level = group.level, group = group,
-                                    calender.enp.seq = target.enp,
+                                    calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     time.on.carry.seq = carry.time,
                                     time.on.seq.group = group.time.on,
@@ -652,7 +652,7 @@ fect.boot <- function(Y,
 
             if ('try-error' %in% class(boot)) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                                  beta = NA, att.off = NA, count.off = NA, eff.calender = NA, eff.calender.fit = NA,
+                                  beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, eff.calendar.fit = NA,
                                   att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                                   group.att = NA, marginal = NA,carry.att = NA,
                                   group.output = list())
@@ -792,7 +792,7 @@ fect.boot <- function(Y,
                                     QR = QR, force = force,
                                     hasRevs = hasRevs, tol = tol, boot = 1,
                                     norm.para = norm.para,
-                                    calender.enp.seq = target.enp,
+                                    calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
@@ -811,7 +811,7 @@ fect.boot <- function(Y,
                                     QR = QR, force = force,
                                     hasRevs = hasRevs, tol = tol, boot = 1,
                                     norm.para = norm.para,
-                                    calender.enp.seq = target.enp,
+                                    calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     time.on.carry.seq = carry.time,
                                     placebo.period = placebo.period.boot, 
@@ -829,7 +829,7 @@ fect.boot <- function(Y,
                                     lambda.cv = out$lambda.cv, force = force, 
                                     hasF = out$validF, hasRevs = hasRevs, 
                                     tol = tol, boot = 1,
-                                    norm.para = norm.para,calender.enp.seq = target.enp,
+                                    norm.para = norm.para,calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     time.on.carry.seq = carry.time,
                                     placebo.period = placebo.period.boot, 
@@ -854,7 +854,7 @@ fect.boot <- function(Y,
                                                     force = force, hasRevs = hasRevs,
                                                     tol = tol,boot = 1,
                                                     norm.para = norm.para, time.on.seq = time.on, 
-                                                    calender.enp.seq = target.enp,
+                                                    calendar.enp.seq = target.enp,
                                                     time.off.seq = time.off,
                                                     time.on.carry.seq = carry.time,
                                                     placebo.period = placebo.period.boot, 
@@ -871,7 +871,7 @@ fect.boot <- function(Y,
 
                 if ('try-error' %in% class(boot)) {
                     boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                                  beta = NA, att.off = NA, count.off = NA, eff.calender = NA, eff.calender.fit = NA,
+                                  beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, eff.calendar.fit = NA,
                                   att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                                   group.att = NA, marginal = NA,carry.att = NA,
                                   group.output = list())
@@ -908,8 +908,8 @@ fect.boot <- function(Y,
             att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
             att.boot[,j] <- boot.out[[j]]$att
             att.count.boot[,j] <- boot.out[[j]]$count
-            calender.eff.boot[,j] <- boot.out[[j]]$eff.calender
-            calender.eff.fit.boot[,j] <- boot.out[[j]]$eff.calender.fit
+            calendar.eff.boot[,j] <- boot.out[[j]]$eff.calendar
+            calendar.eff.fit.boot[,j] <- boot.out[[j]]$eff.calendar.fit
             if (p > 0) {
                 beta.boot[,j] <- boot.out[[j]]$beta
                 if (binary == TRUE) {
@@ -969,8 +969,8 @@ fect.boot <- function(Y,
             att.avg.unit.boot[,j] <- boot$att.avg.unit
             att.boot[,j] <- boot$att
             att.count.boot[,j] <- boot$count
-            calender.eff.boot[,j] <- boot$eff.calender
-            calender.eff.fit.boot[,j] <- boot$eff.calender.fit
+            calendar.eff.boot[,j] <- boot$eff.calendar
+            calendar.eff.fit.boot[,j] <- boot$eff.calendar.fit
             if (p > 0) {
                 beta.boot[,j] <- boot$beta
                 if (binary == TRUE) {
@@ -1037,8 +1037,8 @@ fect.boot <- function(Y,
         att.avg.unit.boot <- t(as.matrix(att.avg.unit.boot[,-boot.rm]))
         att.boot <- as.matrix(att.boot[,-boot.rm])
         att.count.boot <- as.matrix(att.count.boot[,-boot.rm])
-        calender.eff.boot <- as.matrix(calender.eff.boot[,-boot.rm])
-        calender.eff.fit.boot <- as.matrix(calender.eff.fit.boot[,-boot.rm])
+        calendar.eff.boot <- as.matrix(calendar.eff.boot[,-boot.rm])
+        calendar.eff.fit.boot <- as.matrix(calendar.eff.fit.boot[,-boot.rm])
         if (p > 0) {
             beta.boot <- as.matrix(beta.boot[,-boot.rm])
             if (dim(beta.boot)[2] == 1) {
@@ -1117,13 +1117,13 @@ fect.boot <- function(Y,
         colnames(att.bound) <- c("CI.lower", "CI.upper")
         rownames(att.bound) <- out$time
 
-        eff.calender.j <- jackknifed(calender.eff, calender.eff.boot, alpha)
-        est.eff.calender <- cbind(calender.eff, eff.calender.j$se, eff.calender.j$CI.l, eff.calender.j$CI.u, eff.calender.j$P, calender.N)
-        colnames(est.eff.calender) <- c("ATT-Calender", "S.E.", "CI.lower", "CI.upper","p.value", "count")
+        eff.calendar.j <- jackknifed(calendar.eff, calendar.eff.boot, alpha)
+        est.eff.calendar <- cbind(calendar.eff, eff.calendar.j$se, eff.calendar.j$CI.l, eff.calendar.j$CI.u, eff.calendar.j$P, calendar.N)
+        colnames(est.eff.calendar) <- c("ATT-calendar", "S.E.", "CI.lower", "CI.upper","p.value", "count")
 
-        eff.calender.fit.j <- jackknifed(calender.eff.fit, calender.eff.fit.boot, alpha)
-        est.eff.calender.fit <- cbind(calender.eff.fit, eff.calender.fit.j$se, eff.calender.fit.j$CI.l, eff.calender.fit.j$CI.u, eff.calender.fit.j$P, calender.N)
-        colnames(est.eff.calender.fit) <- c("ATT-Calender Fitted", "S.E.", "CI.lower", "CI.upper","p.value", "count")
+        eff.calendar.fit.j <- jackknifed(calendar.eff.fit, calendar.eff.fit.boot, alpha)
+        est.eff.calendar.fit <- cbind(calendar.eff.fit, eff.calendar.fit.j$se, eff.calendar.fit.j$CI.l, eff.calendar.fit.j$CI.u, eff.calendar.fit.j$P, calendar.N)
+        colnames(est.eff.calendar.fit) <- c("ATT-calendar Fitted", "S.E.", "CI.lower", "CI.upper","p.value", "count")
 
         if (hasRevs == 1) {
             att.off.j <- jackknifed(att.off, att.off.boot, alpha)
@@ -1370,17 +1370,17 @@ fect.boot <- function(Y,
         est.avg.unit <- t(as.matrix(c(att.avg.unit, se.avg.unit, CI.avg.unit, pvalue.avg.unit)))
         colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper", "p.value")
         
-        se.eff.calender <- apply(calender.eff.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-        CI.eff.calender <- cbind(calender.eff - se.eff.calender * qnorm(1-alpha/2), calender.eff + se.eff.calender * qnorm(1-alpha/2))
-        pvalue.eff.calender <- (1-pnorm(abs(calender.eff/se.eff.calender)))*2
-        est.eff.calender <- cbind(calender.eff, se.eff.calender, CI.eff.calender, pvalue.eff.calender,calender.N)
-        colnames(est.eff.calender) <- c("ATT-Calender", "S.E.", "CI.lower", "CI.upper","p.value", "count")
+        se.eff.calendar <- apply(calendar.eff.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+        CI.eff.calendar <- cbind(calendar.eff - se.eff.calendar * qnorm(1-alpha/2), calendar.eff + se.eff.calendar * qnorm(1-alpha/2))
+        pvalue.eff.calendar <- (1-pnorm(abs(calendar.eff/se.eff.calendar)))*2
+        est.eff.calendar <- cbind(calendar.eff, se.eff.calendar, CI.eff.calendar, pvalue.eff.calendar,calendar.N)
+        colnames(est.eff.calendar) <- c("ATT-calendar", "S.E.", "CI.lower", "CI.upper","p.value", "count")
 
-        se.eff.calender.fit <- apply(calender.eff.fit.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-        CI.eff.calender.fit <- cbind(calender.eff.fit - se.eff.calender.fit * qnorm(1-alpha/2), calender.eff.fit + se.eff.calender.fit * qnorm(1-alpha/2))
-        pvalue.eff.calender.fit <- (1-pnorm(abs(calender.eff.fit/se.eff.calender.fit)))*2
-        est.eff.calender.fit <- cbind(calender.eff.fit, se.eff.calender.fit, CI.eff.calender.fit, pvalue.eff.calender.fit,calender.N)
-        colnames(est.eff.calender.fit) <- c("ATT-Calender Fitted", "S.E.", "CI.lower", "CI.upper","p.value", "count")
+        se.eff.calendar.fit <- apply(calendar.eff.fit.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+        CI.eff.calendar.fit <- cbind(calendar.eff.fit - se.eff.calendar.fit * qnorm(1-alpha/2), calendar.eff.fit + se.eff.calendar.fit * qnorm(1-alpha/2))
+        pvalue.eff.calendar.fit <- (1-pnorm(abs(calendar.eff.fit/se.eff.calendar.fit)))*2
+        est.eff.calendar.fit <- cbind(calendar.eff.fit, se.eff.calendar.fit, CI.eff.calendar.fit, pvalue.eff.calendar.fit,calendar.N)
+        colnames(est.eff.calendar.fit) <- c("ATT-calendar Fitted", "S.E.", "CI.lower", "CI.upper","p.value", "count")
 
         ## regression coefficents
         if (p > 0) {
@@ -1560,8 +1560,8 @@ fect.boot <- function(Y,
                  att.avg.boot = att.avg.boot,
                  est.avg.unit = est.avg.unit,
                  att.avg.unit.boot = att.avg.unit.boot,
-                 est.eff.calender = est.eff.calender,
-                 est.eff.calender.fit = est.eff.calender.fit,                 
+                 est.eff.calendar = est.eff.calendar,
+                 est.eff.calendar.fit = est.eff.calendar.fit,                 
                  est.att = est.att,
                  att.bound = att.bound,
                  att.boot = att.boot,
