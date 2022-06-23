@@ -19,7 +19,7 @@ It supports linear factor models—hence, a generalization of
 [**gsynth**](https://yiqingxu.org/packages/gsynth/index.html)—and the
 matrix completion method.
 
-**Repo:** [GitHub](https://github.com/xuyiqing/fect) (0.4.1)
+**Repo:** [GitHub](https://github.com/xuyiqing/fect) (0.6.2)
 
 **Examples:** R code used in the
 [tutorial](https://yiqingxu.org/packages/fect/articles/tutorial.html)
@@ -28,7 +28,7 @@ can be downloaded from [here](fect_examples.R).
 **Reference:** Licheng Liu, Ye Wang, Yiqing Xu (2021). [A Practical
 Guide to Counterfactual Estimators for Causal Inference with Time-Series
 Cross-Sectional Data](https://papers.ssrn.com/abstract=3555463).
-*American Journal of Political Science*, conditionally accepted.
+*American Journal of Political Science*, forthcoming.
 
 ## Installation
 
@@ -45,14 +45,13 @@ You can install the development version of **fect** from GitHub by
 typing the following commands:
 
 ``` r
-devtools::install_github('xuyiqing/fastplm')
 devtools::install_github('xuyiqing/fect')
 ```
 
 **panelview** for panel data visualization is also highly recommended:
 
 ``` r
-devtools::install_github('xuyiqing/panelview')
+devtools::install_github('xuyiqing/panelView')
 ```
 
 **fect** depends on the following packages, which will be installed
@@ -72,6 +71,8 @@ require(foreach)
 require(future)  
 require(doParallel) 
 require(abind) 
+## for fast fixed effects estimation
+require(fixest)
 ```
 
 ### Notes on installation failures

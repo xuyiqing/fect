@@ -5,11 +5,11 @@
 # id: plot a part of units
 
 plot.fect <- function(x,  
-  type = NULL, # gap, equiv, status, exit, factors, loadings,
+  type = NULL, # gap, equiv, status, exit, factors, loadings, calendar
   loo = FALSE,
   highlight = NULL, ## for carryover test and placebo test
   plot.ci = NULL, ## "0.9", "0.95", "none"
-  show.point = NULL,
+  show.points = NULL,
   show.group = NULL,
   bound = NULL, # "none", "min", "equiv", "both"
   vis = NULL,
@@ -101,8 +101,8 @@ plot.fect <- function(x,
 
     # check the key option type
     if(!is.null(type)){
-        if (!type %in% c("status", "gap","equiv","exit","factors","loadings")) {
-            stop("\"type\" option misspecified. Must be one of followings:\"status\",\"gap\",\"equiv\",\"exit\".")
+        if (!type %in% c("status", "gap","equiv","exit","factors","loadings","calendar","box")) {
+            stop("\"type\" option misspecified. Must be one of followings:\"status\",\"gap\",\"equiv\",\"exit\",\"calendar\",\"box\".")
         }
         if (type == "exit" && is.null(x$att.off)) {
             stop("No exiting treatment effect to be plotted.")
@@ -427,25 +427,25 @@ plot.fect <- function(x,
         }
     }
 
-    if(is.null(show.point)){
+    if(is.null(show.points)){
         if(placeboTest==TRUE){
             if(length(placebo.period)==1){
-                show.point <- TRUE
+                show.points <- TRUE
             }
             else {
-                show.point <- FALSE
+                show.points <- FALSE
             }
         }
         else {
-            show.point <- FALSE
+            show.points <- FALSE
         }
     }
 
-    if(!show.point %in% c(TRUE,FALSE)){
-        stop("\"show.point\" mis-specified.\n")
+    if(!show.points %in% c(TRUE,FALSE)){
+        stop("\"show.points\" mis-specified.\n")
     }
 
-    if(show.point){
+    if(show.points){
         if(is.null(plot.ci)){
             plot.ci.point <- "both"
         }
@@ -499,7 +499,8 @@ plot.fect <- function(x,
     if (is.null(xlab)==FALSE) {
         if (is.character(xlab) == FALSE) {
             stop("\"xlab\" is not a string.")
-        } else {
+        } 
+        else {
             xlab <- xlab[1]
         }   
     }
@@ -564,6 +565,10 @@ plot.fect <- function(x,
         }
     }
 
+    if(type=='calendar'){
+        stats <- "none"
+    }
+
     # names for all statistics
     if (!("none" %in% stats)) {
         if (is.null(stats.labs)==FALSE) {
@@ -575,29 +580,29 @@ plot.fect <- function(x,
             stats.labs <- rep(NA, length(stats)) 
             for (i in 1:length(stats)) {
                 if (stats[i] == "F.p") {
-                    stats.labs[i] <- "F p-value"
+                    stats.labs[i] <- "F test p-value"
                 }
                 if (stats[i] == "F.equiv.p") {
-                    stats.labs[i] <- "F equivalence p-value"
+                    stats.labs[i] <- "F equivalence test p-value"
                 }
                 if (stats[i] == "F.stat") {
                     stats.labs[i] <- "F statistics"
                 }
                 if (stats[i] == "placebo.p") {
-                    stats.labs[i] <- "Placebo p-value"
+                    stats.labs[i] <- "Placebo test p-value"
                 }
                 if (stats[i] == "carryover.p") {
-                    stats.labs[i] <- "Carryover p-value"
+                    stats.labs[i] <- "Carryover effect test p-value"
                 }
                 if (stats[i] == "equiv.p") {
                     if(placeboTest){
-                        stats.labs[i] <- "Placebo equivalence p-value"
+                        stats.labs[i] <- "Placebo equivalence test p-value"
                     }
                     else if(carryoverTest){
-                        stats.labs[i] <- "Carryover equivalence p-value"
+                        stats.labs[i] <- "Carryover effect equivalence test p-value"
                     }
                     else{
-                        stats.labs[i] <- "Equivalence p-value"
+                        stats.labs[i] <- "Equivalence test p-value"
                     }
                 }
             }
@@ -611,7 +616,7 @@ plot.fect <- function(x,
         maintext <- "Estimated ATT"
         ytitle <- paste("Effect on",x$Y)
         if(placeboTest==1){
-            maintext <- "Placebo Tests: Estimated ATT"
+            maintext <- "Placebo Test"
         }
     }
     else if (type == "equiv") { # equiv plot is a gap plot (with some options changes)
@@ -643,8 +648,12 @@ plot.fect <- function(x,
         maintext <- "Estimated ATT"
         ytitle <- paste("Effect on",x$Y)
         if(carryoverTest==1){
-            maintext <- "Carryover Tests: Estimated ATT"
+            maintext <- "Carryover Effects"
         }
+    }
+    else if (type=='calendar'){
+        maintext <- "ATT by Calendar Time"
+        ytitle <- paste("Effect on",x$Y)
     }
 
     if (is.logical(legendOff) == FALSE & is.numeric(legendOff)==FALSE) {
@@ -681,9 +690,9 @@ plot.fect <- function(x,
         if (is.numeric(cex.main)==FALSE) {
             stop("\"cex.main\" is not numeric.")
         }
-        cex.main <- 18 * cex.main
+        cex.main <- 16 * cex.main
     } else {
-        cex.main <- 18
+        cex.main <- 16
     }
     ## subtitle
     if (is.null(cex.main.sub)==FALSE) {
@@ -726,9 +735,9 @@ plot.fect <- function(x,
         if (is.numeric(cex.text)==FALSE) {
             stop("\"cex.text\" is not numeric.")
         }
-        cex.text <- 6 * cex.text
+        cex.text <- 5 * cex.text
     }  else {
-        cex.text <- 6
+        cex.text <- 5
     }
 
     ## text label position
@@ -820,7 +829,13 @@ plot.fect <- function(x,
 
     ##-------------------------------##
     ## Plotting
-    ##-------------------------------## 
+    ##-------------------------------##
+
+
+
+
+
+
     show.T0 <- which(x$time == 0)
     if (type == 'exit') {
         show.T0 <- which(x$time.off == 0)
@@ -916,14 +931,15 @@ plot.fect <- function(x,
                 max.count.pos <- max.count.pos[1]
             }
         }
-    } else {
+    } 
+    else {
         show <- show.time
     }
 
     if (length(show) <= 2) {
         stop("Cannot plot.\n")
     }    
-
+    
     nT <- length(show)
     time.label <- tname[show]
     T.b <- 1:length(show)
@@ -1212,23 +1228,45 @@ plot.fect <- function(x,
                 colnames(data)[7] <- 'count'
                 if (plot.ci %in% c("90", "95")) {
                     if (carryoverTest == TRUE && length(carryover.period) != 1) {
-                        data[,"ATT4"] <- data[,"ATT3"] <- data[,"ATT2"] <- data[,"ATT"]
+                        data[,"ATT6"] <- data[,"ATT5"] <- data[,"ATT4"] <- data[,"ATT3"] <- data[,"ATT2"] <- data[,"ATT"]
                         ci.name <- NULL
                         if (plot.ci == "95") {
                             ci.name <- c("CI.lower", "CI.upper")
                         } else if (plot.ci == "90") {
                             ci.name <- c("CI.lower.90", "CI.upper.90")
                         }
-                        data[,"CI.lower4"] <- data[,"CI.lower3"] <- data[,"CI.lower2"] <- data[,ci.name[1]]
-                        data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]                    
-                        pos1 <- intersect(which(data[,"time"] >= (carryover.period[1] + 1)), which(data[,"time"] <= (carryover.period[2] - 1)))
-                        pos2 <- c(which(data[,"time"] <= (carryover.period[1] - 1)), which(data[,"time"] >= (carryover.period[2] + 1)))
-                        pos3 <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[2] - 1)))
-                        pos4 <- c(which(data[,"time"] <= (carryover.period[1] - 2)), which(data[,"time"] >= (carryover.period[2] + 1)))
-                        data[pos1, c("ATT", ci.name[1], ci.name[2])] <- NA
-                        data[pos2, c("ATT2","CI.lower2","CI.upper2")] <- NA
-                        data[pos3, c("ATT3","CI.lower3","CI.upper3")] <- NA
-                        data[pos4, c("ATT4","CI.lower4","CI.upper4")] <- NA
+                        if (is.null(x$est.carry.att)) {
+                            data[,"CI.lower4"] <- data[,"CI.lower3"] <- data[,"CI.lower2"] <- data[,ci.name[1]]
+                            data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]                    
+                            pos1 <- intersect(which(data[,"time"] >= (carryover.period[1] + 1)), which(data[,"time"] <= (carryover.period[2] - 1)))
+                            pos2 <- c(which(data[,"time"] <= (carryover.period[1] - 1)), which(data[,"time"] >= (carryover.period[2] + 1)))
+                            pos3 <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[2] - 1)))
+                            pos4 <- c(which(data[,"time"] <= (carryover.period[1] - 2)), which(data[,"time"] >= (carryover.period[2] + 1)))
+                            data[pos1, c("ATT", ci.name[1], ci.name[2])] <- NA
+                            data[pos2, c("ATT2","CI.lower2","CI.upper2")] <- NA
+                            data[pos3, c("ATT3","CI.lower3","CI.upper3")] <- NA
+                            data[pos4, c("ATT4","CI.lower4","CI.upper4")] <- NA
+                        } 
+                        else {
+                            data[,"CI.lower6"] <- data[,"CI.lower5"] <- data[,"CI.lower4"] <- data[,"CI.lower3"] <- data[,"CI.lower2"] <- data[,ci.name[1]]
+                            data[,"CI.upper6"] <- data[,"CI.upper5"] <- data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]                    
+                            
+                            pos1 <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[2])))
+                            pos2 <- c(which(data[,"time"] <= min(-dim(x$est.carry.att)[1] -1 , -2)), which(data[,"time"] >= (carryover.period[2]) + 1))
+                            pos5 <- intersect(which(data[,"time"] >= min(-dim(x$est.carry.att)[1], -1)), which(data[,"time"] <= -1))
+                            
+                            pos3 <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[2] - 1)))
+                            pos4 <- c(which(data[,"time"] <= min(-dim(x$est.carry.att)[1]-1, -3)), which(data[,"time"] >= (carryover.period[2] + 1)))
+                            pos6 <- intersect(which(data[,"time"] >= min(-dim(x$est.carry.att)[1] + 1, -1)), which(data[,"time"] <=  -1))
+
+                            data[unique(c(pos1, pos5)), c("ATT", ci.name[1], ci.name[2])] <- NA
+                            data[unique(c(pos2, pos5)), c("ATT2","CI.lower2","CI.upper2")] <- NA
+                            data[unique(c(pos3, pos6)), c("ATT3","CI.lower3","CI.upper3")] <- NA
+                            data[unique(c(pos4, pos6)), c("ATT4","CI.lower4","CI.upper4")] <- NA
+                            data[unique(c(pos1, pos2)), c("ATT5","CI.lower5","CI.upper5")] <- NA
+                            data[unique(c(pos3, pos4)), c("ATT6","CI.lower6","CI.upper6")] <- NA
+                            
+                        }
                     }
                 }
             } 
@@ -1237,23 +1275,23 @@ plot.fect <- function(x,
 
         # height of the histogram
         if (CI == FALSE) {
-            cat("Uncertainty estimates not available.\n")
-            if (length(ylim) != 0) {
-                rect.length <- (ylim[2] - ylim[1]) / 5
-                rect.min <- ylim[1]
-            } else {
-                rect.length <- (max(data[,"ATT"], na.rm = TRUE) - min(data[,"ATT"], na.rm = TRUE))/2
-                rect.min <- min(data[,"ATT"], na.rm = TRUE) - rect.length
-            } 
+                cat("Uncertainty estimates not available.\n")
+                if (length(ylim) != 0) {
+                    rect.length <- (ylim[2] - ylim[1]) / 5
+                    rect.min <- ylim[1]
+                } else {
+                    rect.length <- (max(data[,"ATT"], na.rm = TRUE) - min(data[,"ATT"], na.rm = TRUE))/2
+                    rect.min <- min(data[,"ATT"], na.rm = TRUE) - rect.length
+                } 
         } 
         else {
-            if (length(ylim) != 0) {
-                rect.length <- (ylim[2] - ylim[1]) / 5
-                rect.min <- ylim[1]
-            } else {
-                rect.length <- (max(data[,"CI.upper"], na.rm = TRUE) - min(data[,"CI.lower"], na.rm = TRUE))/2
-                rect.min <- min(data[,"CI.lower"], na.rm = TRUE) - rect.length 
-            }  
+                if (length(ylim) != 0) {
+                    rect.length <- (ylim[2] - ylim[1]) / 5
+                    rect.min <- ylim[1]
+                } else {
+                    rect.length <- (max(data[,"CI.upper"], na.rm = TRUE) - min(data[,"CI.lower"], na.rm = TRUE))/2
+                    rect.min <- min(data[,"CI.lower"], na.rm = TRUE) - rect.length 
+                }  
         }
 
         ## plotting
@@ -1270,32 +1308,36 @@ plot.fect <- function(x,
             }
         }
 
-        if (bound.old == "none") {
-            p <- ggplot(data)             
-        } 
-        else { ## with bounds
-            p <- ggplot(data2) 
-            p <- p + geom_line(aes(time, bound, colour = type, linetype = type, size = type, group = id)) 
-            ## legends for bounds
-            if (is.null(legend.nrow) == TRUE) {
-                legend.nrow <- ifelse(length(set.limits) <= 3, 1, 2)    
+        
+            # plot bound
+            if (bound.old == "none") {
+                p <- ggplot(data)             
             } 
-            p <- p + scale_colour_manual(limits = set.limits, labels = set.labels, values =set.colors) +
-                scale_size_manual(limits = set.limits, labels = set.labels, values = set.size) +  
-                scale_linetype_manual(limits = set.limits, labels = set.labels, values = set.linetypes) +
-                guides(linetype = guide_legend(title=NULL, nrow=legend.nrow), colour = guide_legend(title=NULL, nrow=legend.nrow),
-                size = guide_legend(title=NULL, nrow=legend.nrow)) 
+            else { ## with bounds
+                p <- ggplot(data2) 
+                p <- p + geom_line(aes(time, bound, colour = type, linetype = type, size = type, group = id)) 
+                ## legends for bounds
+                if (is.null(legend.nrow) == TRUE) {
+                    legend.nrow <- ifelse(length(set.limits) <= 3, 1, 2)    
+                } 
+                p <- p + scale_colour_manual(limits = set.limits, labels = set.labels, values =set.colors) +
+                    scale_size_manual(limits = set.limits, labels = set.labels, values = set.size) +  
+                    scale_linetype_manual(limits = set.limits, labels = set.labels, values = set.linetypes) +
+                    guides(linetype = guide_legend(title=NULL, nrow=legend.nrow), colour = guide_legend(title=NULL, nrow=legend.nrow),
+                    size = guide_legend(title=NULL, nrow=legend.nrow)) 
 
-            if (effect.bound.ratio == TRUE) {
-                if (is.null(stats.pos)) {
-                    stats.pos[1] <- min(data[,"time"], na.rm = 1)
-                    stats.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[1])
+                if (effect.bound.ratio == TRUE) {
+                    if (is.null(stats.pos)) {
+                        stats.pos[1] <- min(data[,"time"], na.rm = 1)
+                        stats.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[1])
+                    }
+                    p.label <- paste("ATT / Min. Range = ", sprintf("%.3f",x$att.avg / minBound), sep="")
+                    p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
+                        label = p.label, size = cex.text, hjust = 0)                
                 }
-                p.label <- paste("ATT / Min. Range = ", sprintf("%.3f",x$att.avg / minBound), sep="")
-                p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
-                    label = p.label, size = cex.text, hjust = 0)                
-            }
-        } 
+            } 
+
+
 
         ## xlab and ylab 
         p <- p + xlab(xlab) +  ylab(ylab) + scale_x_continuous(labels=scaleFUN)
@@ -1313,24 +1355,51 @@ plot.fect <- function(x,
         # horizontal 0 line
         p <- p + geom_hline(yintercept = 0, colour = lcolor,size = lwidth)
         # vertical 0 line
-        if (length(xlim)!=0) {
-            if ((xlim[2]>=1 & switch.on == TRUE) | (xlim[1]<=0 & switch.on == FALSE)) {
-                if(start0 == FALSE){
-                    p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)                    
-                }
-                else{
-                    p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)
-                }
+
+            if (plot.ci == "both") {
+                lwidth <- lwidth * 0.5
             }
-        } 
-        else {
-                if(start0 == FALSE){
-                    p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)                    
+        
+            if (length(xlim)!=0) {
+                if ((xlim[2]>=1 & switch.on == TRUE) | (xlim[1]<=0 & switch.on == FALSE)) {
+                    if(start0 == FALSE){
+                        if(plot.ci == 'both'){                                
+                                p <- p + geom_vline(xintercept = 0.5, colour=lcolor,size = lwidth)
+                            }
+                            else{                                
+                                p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)                             
+                            }
+                        }
+                        else{
+                            if(plot.ci == 'both'){                                
+                                p <- p + geom_vline(xintercept = -0.5, colour=lcolor,size = lwidth)
+                            }
+                            else{
+                                p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)                             
+                            }
+                        }
                 }
-                else{
-                    p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)
-                }
-        }
+            } 
+            else {
+                    if(start0 == FALSE){
+                        if(plot.ci == 'both'){
+                            p <- p + geom_vline(xintercept = 0.5, colour=lcolor,size = lwidth)
+                        }
+                        else{
+                            p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)                             
+                        }
+                    }
+                    else{
+                        if(plot.ci == 'both'){
+                            p <- p + geom_vline(xintercept = -0.5, colour=lcolor,size = lwidth)
+                        }
+                        else{
+                            p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)                             
+                        }
+                    }
+            }            
+        
+
 
         ## legend and axes
         p <- p + theme(legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
@@ -1358,6 +1427,8 @@ plot.fect <- function(x,
         if(carryoverTest == FALSE && placeboTest==FALSE){
             classic <- 1
         }
+
+
 
         if (classic==1) {
             ## point estimates
@@ -1434,37 +1505,90 @@ plot.fect <- function(x,
             ## carryover tests
             p.label <- NULL
             if (plot.ci %in% c("90", "95","none")) {
-                if(vis == "none"){
-                    p <- p + geom_line(data = data, aes(time, ATT3), size = 1.2)
-                    p <- p + geom_line(data = data, aes(time, ATT4), size = 1.2, colour = "red")
-                }
-                if (vis == "connected") {
-                    p <- p + geom_line(data = data, aes(time, ATT3), size = 0.7)
-                    p <- p + geom_line(data = data, aes(time, ATT4), size = 0.7, colour = "red")
-                    p <- p + geom_point(data = data, aes(time, ATT), size = 1.2 , na.rm=TRUE)
-                    p <- p + geom_point(data = data, aes(time, ATT2), size = 1.2, colour = "red", na.rm=TRUE)
-                }
-                ## CIs
-                p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2,na.rm = FALSE)
-                p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "pink",na.rm = FALSE)
+                if (plot.ci %in% c("90", "95","none")) {
+                    if (is.null(x$est.carry.att)) {
+                        if(vis == "none"){
+                            p <- p + geom_line(data = data, aes(time, ATT3), size = 1.2)
+                            p <- p + geom_line(data = data, aes(time, ATT4), size = 1.2, colour = "red")
+                        }
+                        if (vis == "connected") {
+                            p <- p + geom_line(data = data, aes(time, ATT3), size = 0.7)
+                            p <- p + geom_line(data = data, aes(time, ATT4), size = 0.7, colour = "red")
+                            p <- p + geom_point(data = data, aes(time, ATT), size = 1.2 , na.rm=TRUE)
+                            p <- p + geom_point(data = data, aes(time, ATT2), size = 1.2, colour = "red", na.rm=TRUE)
+                        }
+                        ## CIs
+                        p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2,na.rm = FALSE)
+                        p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "pink",na.rm = FALSE)
+                    } 
+                    else {
+                        data[,'time'] <- length(x$carry.att) + data[,'time']
+                        if(vis == "none"){
+                            p <- p + geom_line(data = data, aes(time, ATT3), size = 1.2)
+                            p <- p + geom_line(data = data, aes(time, ATT4), size = 1.2, colour = "red")
+                            p <- p + geom_line(data = data, aes(time, ATT6), size = 1.2, colour = "blue")
+                        }
+                        if (vis == "connected") {
+                            p <- p + geom_line(data = data, aes(time, ATT3), size = 0.7)
+                            p <- p + geom_line(data = data, aes(time, ATT4), size = 0.7, colour = "red")
+                            p <- p + geom_line(data = data, aes(time, ATT6), size = 0.7, colour = "blue")
+                            p <- p + geom_point(data = data, aes(time, ATT), size = 1.2 , na.rm=TRUE)
+                            p <- p + geom_point(data = data, aes(time, ATT2), size = 1.2, colour = "red", na.rm=TRUE)
+                            p <- p + geom_point(data = data, aes(time, ATT5), size = 1.2, colour = "blue", na.rm=TRUE)
+                            p <- p + geom_point(aes(x=0, y=data[which(data$time==0),'ATT5']), size = 1.2 , na.rm=TRUE)
+                        }
+                        ## CIs
+                        p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2,na.rm = FALSE)
+                        p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "pink",na.rm = FALSE)
+                        p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower6, ymax=CI.upper6),alpha=0.2, fill = "blue",na.rm = FALSE)
+                    }
+                } 
             } 
             else if(plot.ci == "both") {
-                pos.ci <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[length(carryover.period)])))
-                pos.ci2 <- setdiff(1:dim(data)[1], pos.ci)
-                if(CI==TRUE){
-                    if(plot.ci.point %in% c("both","95")){
-                        p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="red", fill="red",fatten = 2)
-                        p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                if (is.null(x$est.carry.att)) {
+                    pos.ci <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[length(carryover.period)])))
+                    pos.ci2 <- setdiff(1:dim(data)[1], pos.ci)
+                    if(CI==TRUE){
+                        if(plot.ci.point %in% c("both","95")){
+                            p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="red", fill="red",fatten = 2)
+                            p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6,fatten = 2)
+                        }
+                        if(plot.ci.point %in% c("both","90")){
+                            p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="red", fill="red",fatten = 2)
+                            p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                        }
                     }
-                    if(plot.ci.point %in% c("both","90")){
-                        p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="red", fill="red",fatten = 2)
-                        p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
-                    }
+                    else{
+                        p <- p + geom_point(data = data[pos.ci,], aes(x = time, y = ATT), lwd=0.6, color="red", fill="red",size=1.2)
+                        p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6,size=1.2)                    
+                    }                    
                 }
                 else{
-                    p <- p + geom_point(data = data[pos.ci,], aes(x = time, y = ATT), lwd=0.6, color="red", fill="red",size=1.2)
-                    p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6,size=1.2)                    
+                    T.carry <- -dim(x$est.carry.att)[1] + 1
+                    pos.ci <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[length(carryover.period)])))
+                    pos.ci2 <- intersect(which(data[,"time"] >= T.carry), which(data[,"time"] <= 0))
+                    pos.ci3 <- setdiff(1:dim(data)[1], c(pos.ci, pos.ci2))
+                    data[,'time'] <- length(x$carry.att) + data[,'time']
+                    if(CI==TRUE){
+                        if(plot.ci.point %in% c("both","95")){
+                            p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="red", fill="red",fatten = 2)
+                            p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6, color="blue", fill="blue",fatten = 2)
+                            p <- p + geom_pointrange(data = data[pos.ci3,], aes(x = time, y = ATT, ymin=CI.lower, ymax=CI.upper), lwd=0.6 ,fatten = 2)
+                        }
+                        if(plot.ci.point %in% c("both","90")){
+                            p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="red", fill="red",fatten = 2)
+                            p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="blue", fill="blue",fatten = 2)
+                            p <- p + geom_pointrange(data = data[pos.ci3,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
+                        }
+                    }
+                    else{
+                        p <- p + geom_point(data = data[pos.ci,], aes(x = time, y = ATT), lwd=0.6, color="red", fill="red",size=1.2)
+                        p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6, color="blue", fill="red",size=1.2)
+                        p <- p + geom_point(data = data[pos.ci3,], aes(x = time, y = ATT), lwd=0.6, size=1.2)                       
+                    }
+  
                 }
+
             }
         }
 
@@ -1742,10 +1866,10 @@ plot.fect <- function(x,
             data[,"ymax"] <- rect.min + (data[,"count"]/max.count) * 0.8 * rect.length
             xx <- range(data$time)
             p <- p + geom_rect(data = data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
-                fill = "grey70", colour = "grey69", alpha = 0.4, size = 0.2)
+                    fill = "grey70", colour = "grey69", alpha = 0.4, size = 0.2)
             p <- p + annotate("text", x = max.count.pos - 0.02 * (xx[2]-xx[1]), 
-                y = max(data$ymax) + 0.2 * rect.length, 
-                label = max.count, size = cex.text * 0.8, hjust = 0.5)
+                    y = max(data$ymax) + 0.2 * rect.length, 
+                    label = max.count, size = cex.text * 0.8, hjust = 0.5)                
         }
 
             
@@ -1761,7 +1885,316 @@ plot.fect <- function(x,
             p <- p + coord_cartesian(ylim = ylim)
         }
 
+        ##xlim
+
         
+    }
+
+    if(type == "calendar"){
+
+        CI <- NULL
+        if (is.null(x$est.eff.calendar)==TRUE) {
+            CI <- FALSE
+        } 
+        else {
+            CI <- TRUE
+        }
+        if(plot.ci=="none"){
+            CI <- FALSE
+        }
+        ## axes labels
+        if (is.null(xlab) == TRUE) {
+            xlab <- "Calendar Time"         
+        } 
+        else if (xlab == "") {
+            xlab <- NULL
+        }
+
+        if (is.null(ylab) == TRUE) {
+            ylab <- ytitle
+        } 
+        else if (ylab == "") {
+            ylab <- NULL
+        }
+
+        ## y=0 line type
+        lcolor <- "white"
+        lwidth <- 2
+        if (theme.bw == TRUE) {
+            lcolor <- "#AAAAAA70"
+            lwidth <- 1.5
+        }
+
+        if (CI == FALSE) {
+            cat("Uncertainty estimates not available.\n")
+            data.1 <- x$eff.calendar
+                data.2 <- x$eff.calendar.fit
+                if (length(ylim) != 0) {
+                    rect.length <- (ylim[2] - ylim[1]) / 5
+                    rect.min <- ylim[1]
+                } else {
+                    rect.length <- (max(c(data.1,data.2), na.rm = TRUE) - min(c(data.1,data.2), na.rm = TRUE))/2
+                    rect.min <- min(c(data.1,data.2), na.rm = TRUE) - rect.length
+                }
+                d1 <- data.1 <- x$eff.calendar[which(!is.na(x$eff.calendar[,1])),]
+                d2 <- data.2 <- x$eff.calendar.fit[which(!is.na(x$eff.calendar.fit[,1])),]
+        } 
+        else {
+                if(is.null(x$est.eff.calendar)){
+                    stop("Uncertainty estimates not available.\n")
+                }
+                d1 <- data.1 <- x$est.eff.calendar[which(!is.na(x$est.eff.calendar[,1])),]
+                d2 <- data.2 <- x$est.eff.calendar.fit[which(!is.na(x$est.eff.calendar.fit[,1])),]
+                
+                if (length(ylim) != 0) {
+                    rect.length <- (ylim[2] - ylim[1]) / 5
+                    rect.min <- ylim[1]
+                } else {
+                    rect.length <- (max(c(data.1[,4],data.2[,4]), na.rm = TRUE) - min(c(data.1[,3],data.2[,3]), na.rm = TRUE))/2
+                    rect.min <- min(c(data.1[,3],data.2[,3]), na.rm = TRUE) - rect.length 
+                }  
+        }
+        p <- ggplot()
+        ## xlab and ylab 
+        p <- p + xlab(xlab) +  ylab(ylab)
+
+        ## theme
+        if (theme.bw == TRUE) {
+            p <- p + theme_bw() 
+        }
+
+        ## grid
+        if (gridOff == TRUE) {
+            p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+        }
+
+        # horizontal 0 line
+        p <- p + geom_hline(yintercept = 0, colour = lcolor,size = lwidth)
+
+        TTT <- as.numeric(rownames(data.1))
+        TTT.2 <- as.numeric(rownames(data.2))
+        if(CI==FALSE){
+            p <- p + geom_point(aes(x=TTT,y=d1[,1]),color='gray50',fill='gray50',alpha=1,size=1.2)
+            p <- p + geom_line(aes(x=TTT.2,y=d2[,1]),color='skyblue',size=1.1)
+        }
+        else{
+            p <- p + geom_line(aes(x=TTT.2,y=d2[,1]),color='skyblue',size=1.1)
+            p <- p + geom_ribbon(aes(x=TTT.2,ymin=d2[,3],ymax=d2[,4]),color='skyblue',fill='skyblue',alpha=0.5,size=0)
+            p <- p + geom_pointrange(aes(x=TTT,y=d1[,1],ymin=d1[,3],ymax=d1[,4]),color='gray50',fill='gray50',alpha=1,size=0.6)
+        }
+
+        if(count==TRUE){
+                T.start <- c()
+                T.end <- c()
+                ymin <- c()
+                ymax <- c()
+                T.gap <- (max(TTT)-min(TTT))/length(TTT)
+                for(i in c(1:dim(d1)[1])){
+                    T.start <- c(T.start,TTT[i]-0.25*T.gap)
+                    T.end <- c(T.end,TTT[i]+0.25*T.gap)
+                    ymin <- c(ymin, rect.min)
+                    ymax <- c(ymax, rect.min+rect.length*d1[i,'count']/max(d1[,'count']))
+                }
+                data.toplot <- cbind.data.frame(xmin=T.start,
+                                                xmax=T.end,
+                                                ymin=ymin,
+                                                ymax=ymax)
+                max.count.pos <- mean(TTT[which.max(d1[,'count'])])
+                p <- p + geom_rect(aes(xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax),data=data.toplot,fill='gray50',alpha=0.3,size=0.3,color='black')
+                p <- p + annotate("text", x = max.count.pos - 0.02 * T.gap, 
+                    y = max(data.toplot$ymax) + 0.2 * rect.length, 
+                    label = max(x$N.calendar), size = cex.text * 0.8, hjust = 0.5)                  
+        }
+
+        ## title
+        if (is.null(main) == TRUE) {
+            p <- p + ggtitle(maintext)
+        } else if (main!=""){
+            p <- p + ggtitle(main)
+        }
+
+        ## ylim
+        if (is.null(ylim) == FALSE) {
+            p <- p + coord_cartesian(ylim = ylim)
+        }
+
+        if(length(TTT)<=4){
+            p <- p + scale_x_continuous(breaks=TTT)
+        }
+        else{
+            p <- p + scale_x_continuous(labels=scaleFUN)
+        }
+
+        # ## xlim
+        # if(is.null(xlim)){
+        #     if(is.na(d1[1,1])){
+        #         ## drop all periods before first non-missing
+        #         for(j in c(2:dim(d1)[1])){
+        #             if(!is.na(d1[j,1])){
+        #                 xlim <- c(TTT[j],max(TTT))
+        #                 break
+        #             }
+        #         }
+        #     }            
+        # }
+        ## xlim
+        if (is.null(xlim) == FALSE) {
+            p <- p + coord_cartesian(xlim = xlim)
+        }
+
+        p <- p + geom_hline(yintercept = x$att.avg,color='red',size=0.8,linetype='dashed')
+
+        p <- p + theme(legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
+         legend.position = legend.pos,
+         legend.background = element_rect(fill="transparent",colour=NA),
+         axis.title=element_text(size=cex.lab),
+         axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
+         axis.title.y = element_text(margin = margin(t = 0, r = 0, b = 0, l = 0)),
+         axis.text = element_text(color="black", size=cex.axis),
+         axis.text.x = element_text(size = cex.axis, angle = angle, hjust=x.h, vjust=x.v),
+         axis.text.y = element_text(size = cex.axis),
+         plot.title = element_text(size = cex.main, hjust = 0.5, face="bold", margin = margin(10, 0, 10, 0)))
+
+    }
+
+    if(type == "box"){
+        if (is.null(xlab)==TRUE) {
+            xlab <- index[2]
+        } else if (xlab == "") {
+            xlab <- NULL
+        }
+        if (is.null(ylab)==TRUE) {
+            ylab <- "Estimated Treatment Effects"
+        } else if (ylab == "") {
+            ylab <- NULL
+        }
+        if (is.null(main)==TRUE) {
+            main <- "Treatment Effects"
+        } else if (main == "") {
+            main <- NULL
+        }
+
+        ## y=0 line type
+        lcolor <- "white"
+        lwidth <- 2
+        if (theme.bw == TRUE) {
+            lcolor <- "#AAAAAA70"
+            lwidth <- 1.5
+        }
+
+        p <- ggplot()
+        ## xlab and ylab 
+        p <- p + xlab(xlab) +  ylab(ylab) 
+
+        ## theme
+        if (theme.bw == TRUE) {
+            p <- p + theme_bw() 
+        }
+
+        ## grid
+        if (gridOff == TRUE) {
+            p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+        }
+
+        # horizontal 0 line
+        p <- p + geom_hline(yintercept = 0, colour = lcolor,size = lwidth)
+
+        complete.index.eff <- which(!is.na(x$eff))
+        complete.index.time <- which(!is.na(x$T.on))
+        complete.index <- intersect(complete.index.eff,complete.index.time)
+        eff.use <- x$eff[complete.index]
+        time.use <- x$T.on[complete.index]
+        id.mat <- rep(colnames(x$eff),each=dim(x$eff)[1])
+        id.use <- id.mat[complete.index]
+        data.toplot <- cbind.data.frame(time=time.use,id=id.use,eff=eff.use)
+        data.count <- cbind.data.frame(time=x$time,count=x$count)
+
+        if(start0==TRUE){
+            data.toplot$time <- data.toplot$time - 1
+            data.count$time <- data.count$time - 1
+        }
+
+        if(!is.null(xlim)){
+            data.count <- data.count[which(data.count[,'time']>=min(xlim) & data.count[,'time']<=max(xlim)),]
+            data.toplot <- data.toplot[which(data.toplot[,'time']>=min(xlim) & data.toplot[,'time']<=max(xlim)),]
+        }
+
+        data.use <- merge(data.toplot,data.count,by = "time")
+
+
+        if (length(ylim) != 0) {
+            rect.length <- (ylim[2] - ylim[1]) / 5
+            rect.min <- ylim[1]
+        } 
+        else {
+            rect.length <- (max(data.use[,'eff'], na.rm = TRUE) - min(data.use[,'eff'], na.rm = TRUE))/3
+            rect.min <- min(data.use[,'eff'], na.rm = TRUE) - rect.length
+        }
+
+        if(start0==FALSE){
+            data.pre.1 <- data.use[which(data.use$time<=0 & data.use$count>=5),]
+            data.pre.2 <- data.use[which(data.use$time<=0 & data.use$count<5),]
+            data.post.1 <- data.use[which(data.use$time>0 & data.use$count>=5),]
+            data.post.2 <- data.use[which(data.use$time>0 & data.use$count<5),]
+        }
+        else{
+            data.pre.1 <- data.use[which(data.use$time<0 & data.use$count>=5),]
+            data.pre.2 <- data.use[which(data.use$time<0 & data.use$count<5),]
+            data.post.1 <- data.use[which(data.use$time>=0 & data.use$count>=5),]
+            data.post.2 <- data.use[which(data.use$time>=0 & data.use$count<5),]
+        }
+
+
+        levels <- as.factor(as.character(data.count[,1]))
+        data.pre.1$time <- as.character(data.pre.1$time)
+        data.pre.2$time <- as.character(data.pre.2$time)
+        data.post.1$time <- as.character(data.post.1$time)
+        data.post.2$time <- as.character(data.post.2$time)
+        data.pre.1$time <- factor(data.pre.1$time,levels=levels)
+        data.pre.2$time <- factor(data.pre.2$time,levels=levels)
+        data.post.1$time <- factor(data.post.1$time,levels=levels)
+        data.post.2$time <- factor(data.post.2$time,levels=levels)
+
+        p <- p + geom_boxplot(aes(x=time,y=eff),position="dodge", alpha=0.5, 
+                        data = data.pre.1,fill='skyblue',
+                        outlier.fill='skyblue',outlier.size = 1.25,
+                        outlier.color='skyblue',
+                        outlier.alpha = 0.5)
+        p <- p + geom_boxplot(aes(x=time,y=eff),position="dodge", alpha=0.5, 
+                            data = data.post.1,fill='pink',outlier.fill = 'pink',
+                            outlier.size = 1.25,outlier.color = 'pink',
+                            outlier.alpha = 0.5)
+
+        p <- p + geom_point(aes(x=time,y=eff),data = data.post.2,
+                            color="pink", size=1.25, alpha=0.8)
+        p <- p + geom_point(aes(x=time,y=eff),data = data.pre.2,
+                            color="skyblue", size=1.25, alpha=0.8)
+        p <- p + scale_x_discrete(limits =levels)
+        
+        if(count==TRUE){
+                T.start <- c()
+                T.end <- c()
+                ymin <- c()
+                ymax <- c()
+                T.gap <- 1
+                for(i in c(1:dim(data.count)[1])){
+                    T.start <- c(T.start,data.count[i,1]-0.25*T.gap- min(data.count[,1]) + 1) 
+                    T.end <- c(T.end,data.count[i,1]+0.25*T.gap- min(data.count[,1])+1) 
+                    ymin <- c(ymin, rect.min)
+                    ymax <- c(ymax, rect.min+rect.length*data.count[i,2]/max(data.count[,2]))
+                }
+                data.toplot <- cbind.data.frame(xmin=T.start,
+                                                xmax=T.end,
+                                                ymin=ymin,
+                                                ymax=ymax)
+                max.count.pos <- data.count[which.max(data.count[,2]),1][1]- min(data.count[,1])+1
+                p <- p + geom_rect(aes(xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax),data=data.toplot,fill='gray50',alpha=0.3,size=0.3,color='black')
+                p <- p + annotate("text", x = max.count.pos - 0.02 * T.gap, 
+                    y = max(data.toplot$ymax) + 0.1 * rect.length, 
+                    label = max(data.count[,2]), size = cex.text * 0.7, hjust = 0.5)       
+        }
+
+
     }
 
 
@@ -1817,12 +2250,18 @@ plot.fect <- function(x,
             breaks <- c(breaks,5)
             if(placeboTest==TRUE){
                 col <- c(col,'#66C2A5')
-                label <- c(label,"Placebo Periods")
+                label <- c(label,"Placebo Tests")
             }
             else if(carryoverTest==TRUE){
                 col <- c(col,"#E78AC3")
-                label <- c(label,"Carryover Periods")
+                label <- c(label,"Carryover Tests")
             }
+        }
+        if(6%in%all){
+            col <- c(col,"#ffc425")
+            col2 <- c(col2, "6"=NA)
+            breaks <- c(breaks,6)
+            label <- c(label,"Carryover Removed")
         }
         
         TT <- dim(m)[1]
@@ -1927,6 +2366,7 @@ plot.fect <- function(x,
         }
     }
 
+    suppressWarnings(print(p))
     return(p)
 
 }

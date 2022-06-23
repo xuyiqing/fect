@@ -8,6 +8,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     II, 
                     T.on, 
                     T.off = NULL, 
+                    T.on.carry = NULL, 
                     method = "ife",
                     criterion = "mspe",  
                     k = 5, # CV time
@@ -1060,8 +1061,34 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     att.on <- as.numeric(tapply(eff.v.use1, t.on.use, mean)) ## NA already removed
     count.on <- as.numeric(table(t.on.use))
 
-    eff.off <- eff.equiv <- off.sd <- NULL
+    
+    ## 5 carryover effect 
+    carry.att <- NULL 
+    if (!is.null(T.on.carry)) {
+        t.on.carry <- c(T.on.carry)
+        rm.pos4 <- which(is.na(t.on.carry)) 
+        t.on.carry.use <- t.on.carry
+
+        if (NA %in% eff.v | NA %in% t.on.carry) {
+            eff.v.use3  <- eff.v[-c(rm.pos1, rm.pos4)]
+            t.on.carry.use <- t.on.carry[-c(rm.pos1, rm.pos4)]        
+        }
+
+        carry.time <- sort(unique(t.on.carry.use))
+        carry.att <- as.numeric(tapply(eff.v.use3, t.on.carry.use, mean)) ## NA already removed
+
+        #if (!is.null(time.on.carry.seq)) {
+        #    carry.att.med <- rep(NA, length(time.on.carry.seq))
+        #    carry.att.med[which(time.on.carry.seq %in% carry.time)] <- carry.att
+        #    carry.att <- carry.att.med
+            
+        #}
+    }
+
+
+
     ## 6. switch-off effects
+    eff.off <- eff.equiv <- off.sd <- NULL
     if (hasRevs == 1) {    
         t.off <- c(T.off)
         rm.pos3 <- which(is.na(t.off))
@@ -1088,6 +1115,31 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         att.off <- as.numeric(tapply(eff.v.use2, t.off.use, mean)) ## NA already removed
         count.off <- as.numeric(table(t.off.use))
     }
+
+    ## 8. loess HTE by time
+    D.missing <- D
+    D.missing[which(D==0)] <- NA
+    eff.calender <- apply(eff*D.missing,1,mean,na.rm=TRUE)
+    N.calender <- apply(!is.na(eff*D.missing),1,sum)
+    T.calender <- c(1:TT)
+    if(sum(!is.na(eff.calender))>1){
+        #loess fit
+        loess.fit <- suppressWarnings(try(loess(eff.calender~T.calender,weights = N.calender),silent=TRUE))       
+        if('try-error' %in% class(loess.fit)){
+            eff.calender.fit <- eff.calender
+            calender.enp <- NULL
+        }
+        else{
+            eff.calender.fit <- eff.calender
+            eff.calender.fit[which(!is.na(eff.calender))] <- loess.fit$fit
+            calender.enp <- loess.fit$enp              
+        }
+    }
+    else{
+        eff.calender.fit <- eff.calender
+        calender.enp <- NULL
+    }
+
     ## 7. cohort effects
     if (!is.null(group)) {
         cohort <- cbind(c(group), c(D), c(eff.v))
@@ -1201,6 +1253,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         time = time.on,
         att = att.on,
         count = count.on,
+        eff.calender = eff.calender,
+        N.calender = N.calender,
+        eff.calender.fit = eff.calender.fit,
+        calender.enp = calender.enp,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
         pre.sd = pre.sd,
@@ -1216,6 +1272,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                            eff.off = eff.off,
                            eff.off.equiv = eff.off.equiv,
                            off.sd = off.sd))
+    }
+
+    if (!is.null(T.on.carry)) {
+        out <- c(out, list(carry.att = carry.att, carry.time = carry.time))
     }
 
     if (force == 1) {

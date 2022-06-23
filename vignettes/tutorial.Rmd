@@ -41,16 +41,16 @@ ls()
 
 Before conducting any statistical analysis, we use the **panelView** package to visualize the treatment and outcome variables in the data. 
 The following line of code plots the treatment status of all units in **simdata**:
-```{r simdata_panelview_treat, message = FALSE, warning = FALSE}
+```{r simdata_panelview_treat, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 library(panelView)
 panelview(Y ~ D, data = simdata, index = c("id","time"), 
   axis.lab = "time", xlab = "Time", ylab = "Unit", 
+  gridOff = TRUE, by.timing = TRUE,
   background = "white", main = "Simulated Data: Treatment Status")
-
 ```
 
 We then take a look at the outcome variable. In the figure below, blue and gray represent treatment and control conditions. 
-```{r simdata_panelview_outcome}
+```{r simdata_panelview_outcome, fig.width = 6, fig.height = 4.5}
 panelview(Y ~ D, data = simdata, index = c("id","time"), 
   axis.lab = "time", xlab = "Time", ylab = "Unit", 
   theme.bw = TRUE, type = "outcome", main = "Simulated Data: Outcome")
@@ -79,14 +79,14 @@ By default, the **plot** function produces a "gap" plot -- as if we type `plot(o
 The bar plot at the bottom of the plot shows the number of treated units for each time period.The options `cex.main`, `cex.lab`, `cex.axis`, and `cex.text` adjust the font sizes of the title, axis labels, axis numbers, and in-graph text, respectively. 
 
 Users can choose to plot only those periods whose **number of treated observations** exceeds a threshold, which is set as a proportion of the largest number of treated observations in a period (the default is `proportion = 0.3`).
-```{r fect_plot_nose, fig.width = 6}
-plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y", 
+```{r fect_plot_nose, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y", 
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
 ```
 
 You can then save the graph, a **ggplot2** object, by using the **ggsave** (preferred) function or the **print** function. 
 
-**Uncertainty Estimates.** The algorithm produces uncertainty estimates when `se = TRUE`. One can use the non-parametric bootstrap procedure by setting `vartype = "bootstrap"`. Note that it only works well when the number of units is relatively large and many experience the treatment condition. The number of bootstrap runs is set by `nboots`. 
+**Uncertainty estimates.** The algorithm produces uncertainty estimates when `se = TRUE`. One can use the non-parametric bootstrap procedure by setting `vartype = "bootstrap"`. Note that it only works well when the number of units is relatively large and many experience the treatment condition. The number of bootstrap runs is set by `nboots`. 
 
 Alternatively, users can obtain uncertainty estimates using the jackknife method by specifying `vartype = "jackknife"`. The algorithm obtains standard errors by iteratively dropping one unit (the entire time-series) from the dataset. 
 
@@ -97,9 +97,9 @@ out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 ```
 
 The **plot** can then visualize the estimated period-wise ATTs as well as their uncertainty estimates.
-```{r fect_plot_nse, fig.width = 6}
-plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y", 
-  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+```{r fect_plot_nse, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y", 
+  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")
 ```
 
 **Result summary.** Users can use the **print** function to take a look at a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. 
@@ -126,8 +126,7 @@ For the IFE approach, we need to specify the number of factors using option `r`.
 
 In each round, some untreated observations are removed as the testing set to evaluate the prediction ability of the model with a certain tuning parameter. The option `cv.prop` specifies the size of testing set comparing to the set of observations under control (default: `cv.prop = 0.1`). If we want to restrict the testing set to untreated observations only from treated units (those whose treatment statuses have changed), set `cv.treat = TRUE`. 
 
-An additional issue is the serial correlation within a unit. We remove a consecutive number of observations from a unit as elements in the testing set in order to avoid over fitting caused by serial correlation. 
-The consecutive number is specified in option `cv.nobs` (e.g. when `cv.nobs = 3`, the test set is a number of triplets). 
+An additional issue is the serial correlation within a unit. We remove a consecutive number of observations from a unit as elements in the testing set in order to avoid over fitting caused by serial correlation. The consecutive number is specified in option `cv.nobs` (e.g. when `cv.nobs = 3`, the test set is a number of triplets). 
 
 We can also remove triplets in the fitting procedure but only include the middle observation of each triplet in the test set using the option `cv.donut` (e.g. when `cv.donut = 1`, the first and the last observation in each removed triplet will **not** be included in the test set).
 
@@ -143,8 +142,8 @@ out.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 ```
 
 The figure below shows the estimated ATT using the IFE method. The cross-validation procedure selects the correct number of factors ($r=2$). 
-```{r fig.width = 6}
-plot(out.ife, main = "Estimated ATT (IFEct)")
+```{r  fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife, main = "Estimated ATT (IFEct)")
 ```
 
 ### The matrix completion (MC) estimator
@@ -158,9 +157,16 @@ out.mc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
           se = TRUE, nboots = 200, parallel = TRUE)
 ```
 
-```{r fig.width = 6}
-plot(out.mc, main = "Estimated ATT (MC)")
+```{r fig.width = 6, fig.height = 4.5}
+p <- plot(out.mc, main = "Estimated ATT (MC)")
 ```  
+
+### Heterogeneous treatment effects
+
+One way to explore treatment effects heterogeneity is to use a series of box plots to visualize the estimated individualistic treatment effects of observations under the treatment condition (by setting `type = "box"`). Although these effects are not identified at the observation level, their distribution reveals important information of treatment effects heterogeneity.
+```{r hte, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife, type = "box", xlim = c(-15, 10))
+```
 
 ---
 
@@ -190,25 +196,27 @@ out.mc.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
 
 The placebo test conducts two types of tests:
 
-**t test.** If t-test p-value is smaller than a pre-specified threshold (e.g. 5\%), the placebo test is deemed failed.
+**t test.** If t-test p-value is smaller than a pre-specified threshold (e.g. 5\%), we reject the null of no-differences. Hence, the placebo test is deemed failed.
 
-**TOST.** The TOST checks whether the 90% confidence intervals for estimated ATTs in the placebo period exceed a pre-specified range, or the equivalence range. A TOST p-value smaller than a pre-specified threshold suggests that the placebo test is passed.
+**TOST.** The TOST checks whether the 90% confidence intervals for estimated ATTs in the placebo period exceed a pre-specified range (defined by a threshold), or the equivalence range. A TOST p-value smaller than a pre-specified threshold suggests that the null of difference bigger than the threshold is rejected; hence, the placebo test is passed.
 
 By default, the plot will display the p-value of the $t$-test (`stats = "placebo.p"`). 
 Users can also add the p-value of a corresponding TOST test by setting `stats = c("placebo.p","equiv.p")`. 
 A larger placebo p-value from a t-test and a smaller placebo TOST p-value are preferred.
 
 Users can turn off the dotted plot in placebo periods by setting `vis = "none"`. 
-```{r placebo_1, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.fect.p, cex.text = 0.8, stats = c("placebo.p","equiv.p"), 
+```{r placebo_1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect.p, cex.text = 0.8, stats = c("placebo.p","equiv.p"), 
      main = "Estimated ATT (TWFE)")
 ```
-```{r placebo_2, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.ife.p, ylab = "Effect of D on Y", main = "Estimated ATT (IFE)", 
+
+```{r placebo_2, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife.p, ylab = "Effect of D on Y", main = "Estimated ATT (IFE)", 
      cex.text = 0.8, stats = c("placebo.p","equiv.p"))
 ```
-```{r placebo_3, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.mc.p, vis = "none", cex.text = 0.8, stats = c("placebo.p","equiv.p"),
+
+```{r placebo_3, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.mc.p, vis = "none", cex.text = 0.8, stats = c("placebo.p","equiv.p"),
      main = "Estimated ATT (MC)")
 ```
 
@@ -234,16 +242,18 @@ For the gap plot, the default is `stats = "none"`. For the equivalence plot, the
 Users can adjust its position using the `stats.pos` option, for example `stats.pos = c(-30, 4)`. To turn off the statistics, set `stats = "none"`.  
 
 Below, we visualize the result of the equivalence test for each of the three estimators using our simulated data. These figures show that both the IFE and MC methods pass the equivalence test while the FE method does not. 
-```{r pretrend1, eval = TRUE, cache = TRUE}
-plot(out.fect, type = "equiv", ylim = c(-4,4), 
+```{r pretrend1, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect, type = "equiv", ylim = c(-4,4), 
      cex.legend = 0.6, main = "Testing Pre-Trend (FEct)", cex.text = 0.8)
 ```
-```{r pretrend2, eval = TRUE, cache = TRUE}
-plot(out.ife, type = "equiv", ylim = c(-4,4), 
+
+```{r pretrend2, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife, type = "equiv", ylim = c(-4,4), 
      cex.legend = 0.6, main = "Testing Pre-Trend (IFEct)", cex.text = 0.8)
 ```
-```{r pretrend3, eval = TRUE, cache = TRUE}
-plot(out.mc, type = "equiv", ylim = c(-4,4),
+
+```{r pretrend3, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.mc, type = "equiv", ylim = c(-4,4),
      cex.legend = 0.6, main = "Testing Pre-Trend (MC)", cex.text = 0.8)
 ```
 
@@ -253,7 +263,7 @@ From the above plots, we see that FEct fails both tests; IFEct passes both tests
 
 Instead of using estimated ATTs for periods prior to the treatment to test for pre-trends, we can use a leave-one-out (LOO) approach (`loo = TRUE`) to consecutively hide one pretreatment period (relative to the timing of the treatment) and repeatedly estimate the pseudo treatment effects for that pretreatment period. 
 The LOO approach can be understood as an extension of the placebo test. It has the benefit of providing users with a more holistic view of whether the identifying assumptions likely hold. However, as the program needs to conduct uncertainty estimates for each turn, it is much more time-consuming than the original one.
-```{r simdata_fect_loo, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r simdata_fect_loo, eval=FALSE, cache = TRUE, message = FALSE, results = 'hide'}
 out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
   method = "fe", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200, loo = TRUE)
 out.ife.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
@@ -263,20 +273,18 @@ out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 ```
 
 After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the **plot** function.
-```{r pretrend_loo1, eval = TRUE, cache = TRUE}
-plot(out.fect.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
+```{r pretrend_loo1, eval = FALSE, cache = TRUE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
      cex.legend = 0.6, main = "Testing Pre-Trend LOO (FEct)", cex.text = 0.8)
-```
-```{r pretrend_loo2, eval = TRUE, cache = TRUE}
-plot(out.ife.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
+
+p <- plot(out.ife.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
      cex.legend = 0.6, main = "Testing Pre-Trend LOO (IFEct)", cex.text = 0.8)
-```
-```{r pretrend_loo3, eval = TRUE, cache = TRUE}
-plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE, 
+
+p <- plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE, 
      cex.legend = 0.6, main = "Testing Pre-Trend LOO (MC)", cex.text = 0.8)
 ```
 
-For the LOO pre-trend test, the IFE estimator still passes both tests based on its LOO pre-trends, while the MC estimator fails both tests.
+Note that the LOO test usually takes lots of computational power. For our example, we find that the IFE estimator still passes both the F test and the equivalence test based on its LOO pre-trends, while the MC estimator fails both tests.
 
 
 ### Exiting the treatment 
@@ -284,14 +292,16 @@ For the LOO pre-trend test, the IFE estimator still passes both tests based on i
 **fect** allows the treatment to switch back and forth and provides diagnostic tools for this setting. After the estimation, we can visualize the period-wise ATTs relative to the **exit** of treatments by setting `type = "exit"` (one can still draw the classic gap plot by setting `type = "gap"`). 
 The x-axis is then realigned based on the timing of the treatment’s exit, not onset, e.g., 1 represents 1 period after the treatment ends.
 
-```{r exit_1, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.fect, type = "exit", ylim = c(-2.5,4.5),main = "Estimated ATT (FE)")
+```{r exit_1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect, type = "exit", ylim = c(-2.5,4.5), main = "What Happens after the Treatment Switches Off?")
 ```
-```{r exit_2, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.ife, type = "exit", ylim = c(-2.5,4.5), main = "Estimated ATT (IFE)")
+
+```{r exit_2, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife, type = "exit", ylim = c(-2.5,4.5), main = "Exit Plot (IFE)")
 ```
-```{r exit_3, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.mc, type = "exit", ylim = c(-2.5,4.5), main = "Estimated ATT (MC)")
+
+```{r exit_3, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.mc, type = "exit", ylim = c(-2.5,4.5), main = "Exit Plot (MC)")
 ```
 
 ### Tests for (no) carryover effects
@@ -316,27 +326,32 @@ out.mc.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
 ```
 
 Like the placebo test, the plot will display the p-value of the carryover effect test (`stats = "carryover.p"`). 
-Usesrs can also add the p-value of a corresponding TOST test by setting `stats = c("carryover.p","equiv.p")`. 
-```{r carryover1, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.fect.c, type = "exit", ylim = c(-2.5,4.5), cex.text = 0.8, main = "Estimated ATT (FE)")
+Users can also add the p-value of a corresponding TOST test by setting `stats = c("carryover.p","equiv.p")`. 
+```{r carryover1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect.c, type = "exit", ylim = c(-2.5,4.5), 
+          cex.text = 0.8, main = "Carryover Effects (FE)")
 ```
-```{r carryover2, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.ife.c, type = "exit", ylim = c(-2.5,4.5), cex.text = 0.8, main = "Estimated ATT (IFE)")
+
+```{r carryover2, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife.c, type = "exit", ylim = c(-2.5,4.5), 
+          cex.text = 0.8, main = "Carryover Effects (IFE)")
 ```
-```{r carryover3, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.mc.c, type = "exit", ylim = c(-2.5,4.5), cex.text = 0.8, main = "Estimated ATT (MC)")
+
+```{r carryover3, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.mc.c, type = "exit", ylim = c(-2.5,4.5), 
+          cex.text = 0.8, main = "Carryover Effects (MC)")
 ```
 
 Once again, the IFE estimator outperforms the other two. 
 
-Using real-world data, researchers will likely find that carryover effects exist. If such effects are limited, researchers can consider removing a few periods after the treatment ended for the treated units from the first-stage estimation (using the `carryover.rm` option) and re-estimated the model (and re-conduct the test). We provide such an example in the paper. Here, we illustrate the option using **simdata**.
-```{r carryover_rm, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
+Using real-world data, researchers will likely find that carryover effects exist. If such effects are limited, researchers can consider removing a few periods after the treatment ended for the treated units from the first-stage estimation (using the `carryover.period` option) and re-estimated the model (and re-conduct the test). We provide such an example in the paper. Here, we illustrate the option using **simdata**.
+```{r carryover_rm, eval = TRUE, cache = TRUE, message = FALSE, results='hide', fig.width = 6, fig.height = 4.5}
 out.ife.rm.test <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife", r = 2, CV = 0, 
-  parallel = TRUE, se = TRUE, carryover.rm = 3, # remove three periods
-  nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
+  parallel = TRUE, se = TRUE,  carryover.rm = 3,
+  nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))# remove three periods
 
-plot(out.ife.rm.test)
+plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(7, 2.5))
 ```
 
 In the above plot, the three periods in blue are droppred from the first-stage estimation of the factor model while the periods in red are reserved for the (no) carryover effects test.
@@ -353,44 +368,52 @@ We provide a few other options for estimation and visualization.
 The **plot()** function shipped in **fect** offers some options that help to improve the visualization.
 
 We can remove the bar plot at the bottom of the plot by setting `count = FALSE`
-```{r bar_0, eval = TRUE, cache = TRUE}
-plot(out.ife, count = FALSE)
+```{r bar_0, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife, count = FALSE)
 ```
 
-By setting the option `show.point = TRUE`, we visualize the estimated period-wise ATTs as well as their uncertainty estimates in point-wise vertical intervals.
+By setting the option `show.points = TRUE`, we visualize the estimated period-wise ATTs as well as their uncertainty estimates in point-wise vertical intervals.
 The shorter interval at each point corresponds to the 90% confidence interval of ATT while the longer interval corresponds to the 95% confidence interval.
-```{r point_1, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.ife, show.point = TRUE)
+```{r point_1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife, show.points = TRUE)
 ```
-```{r point_2, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.ife.p, show.point = TRUE)
+
+```{r point_2, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife.p, show.points = TRUE)
 ```
-```{r point_3, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.ife.c, type = "exit", show.point = TRUE, stats.pos = c(2.3,4))
+
+```{r point_3, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife.c, type = "exit", show.points = TRUE, stats.pos = c(2.3,4))
 ```
 
 By setting the option `type = "status"`, we can visualize the treatment status of all observations. 
 We only present the label of the time by setting `axis.lab = "time"`.
-```{r status_0, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.fect, type = 'status', axis.lab = "time", cex.axis  = 0.6)
+```{r status_0, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect, type = 'status', axis.lab = "time", cex.axis  = 0.6)
 ```
 
 For the placebo test, the manually hided observations are marked in cyan.
 We can show only a sub-group's treatment status by specifying the option `id` to certain units.
-```{r status_p, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.fect.p, type = 'status', axis.lab = "both", id = c(101:120), cex.axis  = 0.6)
+```{r status_p, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect.p, type = 'status', axis.lab = "both", id = c(101:120), cex.axis  = 0.6)
 ```
 
 For the carryover test, the manually hidden observations are marked in light red.
 We can also move grid lines by setting `gridOff = TRUE`.
-```{r status_c, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.fect.c, type = 'status', axis.lab = "off", gridOff = TRUE)
+```{r status_c, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.fect.c, type = 'status', axis.lab = "off", gridOff = TRUE)
 ```
+
+For the carryover test with removed observation, the removed observations are marked in yellow.
+```{r status_cm, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife.rm.test, type = 'status', axis.lab = "off", gridOff = TRUE)
+```
+
 
 ### Average cohort effect
 
 **fect** allows us to estimate and visualize the ATTs for sub-groups of treated units. For example, it can draw the gap plot for units that adopt the treatment at the same time under staggered adoption, which is defined as "Cohort" in @Sun2021-ss. Our simulated dataset is not ideal to demonstrate this functionality because the treatment switches on and off. To improve feasibility, we define a cohort as a group of treated units that first adopt the treatment at the same time. 
-```{r simdata_panelview_cohort}
+```{r simdata_panelview_cohort , fig.width = 6, fig.height = 4.5}
 panelview(Y ~ D, data = simdata, index = c("id","time"), by.timing = TRUE,
   axis.lab = "time", xlab = "Time", ylab = "Unit", 
   background = "white", main = "Simulated Data: Treatment Status")
@@ -422,9 +445,10 @@ out.ife.g.p <- fect(Y ~ D + X1 + X2, data = simdata.cohort, index = c("id","time
 ```
 
 
-Then one can draw the gap as well as the equivalence plot for each sub-group, here we present the gap plot for Cohort 22.
-```{r cohort_plot1, eval = TRUE, cache = TRUE, warning = FALSE}
-plot(out.ife.g, show.group = "Cohort:22", xlim = c(-15, 10))
+Then one can draw the gap plot, as well as the equivalence plot, for each sub-group. Here we present the gap plot for Cohort 22.
+```{r cohort_plot1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife.g, show.group = "Cohort:22", 
+          xlim = c(-15, 10), ylim = c(-10, 10))
 ```
 
 
@@ -438,21 +462,21 @@ It accepts two options: `sfe` specifies simple (additive) fixed effects in addit
 and `cfe` receives a *list* object and each component in the list is a vector of length 2. 
 The value of the first element of each component is the name of *group* variable for which fixed effects are to be estimated (e.g. unit names); the value of the second element is the name of a regressor (e.g., a time trend).
 For example, we can estimate a model with an additional fixed effects **FE3** along with a unit-specific time trend.
-```{r simdata_cfe, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r simdata_cfe, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide', fig.width = 6, fig.height = 4.5}
 simdata[,"FE3"] <- sample(c(1,2,3,4,5), size = dim(simdata)[1], replace = TRUE)
 out.cfe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
   method = "cfe", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200,
   sfe = c("FE3"), cfe = list(c("id","time")))
-plot(out.cfe)
+p <- plot(out.cfe)
 ```
 
 **Polynomial.** When only need to include unit-specific time trends, we can use the **"polynomial"** estimator.
 By setting `degree = 2`, we can estimate the ATT based on a linear model with unit and time fixed effects, along with a unit-specific time trend and quadratic time trend.
-```{r simdata_poly, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r simdata_poly, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide', fig.width = 6, fig.height = 4.5}
 out.poly <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
   method = "polynomial", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200,
   degree = 2)
-plot(out.poly)
+p <- plot(out.poly)
 ```
 
 ---

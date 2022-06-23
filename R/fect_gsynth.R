@@ -20,6 +20,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
                         carryoverTest = 0,
                         carryover.period = NULL,
                         norm.para = NULL,
+                        calender.enp.seq = NULL,
                         time.on.seq = NULL,
                         time.off.seq = NULL,
                         group.level = NULL,
@@ -783,6 +784,41 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
             att.carryover <- sum(att.off[carryover.pos] * count.off[carryover.pos]) / sum(count.off[carryover.pos])
         }
     }
+
+    ## 9. loess HTE by time
+    D.missing <- D
+    D.missing[which(D==0)] <- NA
+    eff.calender <- apply(eff*D.missing,1,mean,na.rm=TRUE)
+    N.calender <- apply(!is.na(eff*D.missing),1,sum)
+    T.calender <- c(1:TT)
+    if(sum(!is.na(eff.calender))>1){
+        #loess fit
+        if(!is.null(calender.enp.seq)){
+            if(length(calender.enp.seq)==1 & is.na(calender.enp.seq)){
+                calender.enp.seq <- NULL
+            }
+        }
+        if(is.null(calender.enp.seq)){
+            loess.fit <- suppressWarnings(try(loess(eff.calender~T.calender,weights = N.calender),silent=TRUE))      
+        }
+        else{
+            loess.fit <- suppressWarnings(try(loess(eff.calender~T.calender,weights = N.calender,enp.target=calender.enp.seq),silent=TRUE))
+        }
+        if('try-error' %in% class(loess.fit)){
+            eff.calender.fit <- eff.calender
+            calender.enp <- NULL
+        }
+        else{
+            eff.calender.fit <- eff.calender
+            eff.calender.fit[which(!is.na(eff.calender))] <- loess.fit$fit
+            calender.enp <- loess.fit$enp              
+        }
+    }
+    else{
+        eff.calender.fit <- eff.calender
+        calender.enp <- NULL
+    }
+
 
     ## 8. cohort effects
     if (!is.null(group)) {

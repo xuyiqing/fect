@@ -73,7 +73,8 @@ diagtest <- function(
         }
         if (length(pre.pos) > 1) {
             res_boot <- res_boot[pre.pos, ]
-        } else {
+        } 
+        else {
             res_boot <- t(as.matrix(res_boot[pre.pos, ]))
         }
 

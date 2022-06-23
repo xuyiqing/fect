@@ -8,6 +8,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                     II, 
                     T.on, 
                     T.off = NULL, 
+                    T.on.carry = NULL, 
                     lambda.cv = 1e10,
                     force,
                     hasF = 1,
@@ -19,8 +20,10 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                     placebo.period = NULL,
                     carryoverTest = 0,
                     carryover.period = NULL,
+                    calender.enp.seq = NULL,
                     time.on.seq = NULL,
                     time.off.seq = NULL,
+                    time.on.carry.seq = NULL,
                     group.level = NULL,
                     group = NULL,
                     time.on.seq.group = NULL,
@@ -228,6 +231,30 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         time.on <- time.on.seq
     }
 
+    ## 4.1 carryover effect 
+    carry.att <- NULL 
+    if (!is.null(T.on.carry)) {
+        t.on.carry <- c(T.on.carry)
+        rm.pos4 <- which(is.na(t.on.carry)) 
+        t.on.carry.use <- t.on.carry
+
+        if (NA %in% eff.v | NA %in% t.on.carry) {
+            eff.v.use3  <- eff.v[-c(rm.pos1, rm.pos4)]
+            t.on.carry.use <- t.on.carry[-c(rm.pos1, rm.pos4)]        
+        }
+
+        carry.time <- sort(unique(t.on.carry.use))
+        carry.att <- as.numeric(tapply(eff.v.use3, t.on.carry.use, mean)) ## NA already removed
+
+        if (!is.null(time.on.carry.seq)) {
+            carry.att.med <- rep(NA, length(time.on.carry.seq))
+            carry.att.med[which(time.on.carry.seq %in% carry.time)] <- carry.att
+            carry.att <- carry.att.med
+            carry.time <- time.on.carry.seq
+            
+        }
+    }
+
     ## 5. placebo effect, if placeboTest == 1 
     if (!is.null(placebo.period) && placeboTest == 1) {              
         if (length(placebo.period) == 1) {
@@ -289,6 +316,40 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
             carryover.pos <- which(time.off >= carryover.period[1] & time.off <= carryover.period[2])
             att.carryover <- sum(att.off[carryover.pos] * count.off[carryover.pos]) / sum(count.off[carryover.pos])
         }
+    }
+
+    ## 9. loess HTE by time
+    D.missing <- D
+    D.missing[which(D==0)] <- NA
+    eff.calender <- apply(eff*D.missing,1,mean,na.rm=TRUE)
+    N.calender <- apply(!is.na(eff*D.missing),1,sum)
+    T.calender <- c(1:TT)
+    if(sum(!is.na(eff.calender))>1){
+        #loess fit
+        if(!is.null(calender.enp.seq)){
+            if(length(calender.enp.seq)==1 & is.na(calender.enp.seq)){
+                calender.enp.seq <- NULL
+            }
+        }
+        if(is.null(calender.enp.seq)){
+            loess.fit <- suppressWarnings(try(loess(eff.calender~T.calender,weights = N.calender),silent=TRUE))      
+        }
+        else{
+            loess.fit <- suppressWarnings(try(loess(eff.calender~T.calender,weights = N.calender,enp.target=calender.enp.seq),silent=TRUE))
+        }
+        if('try-error' %in% class(loess.fit)){
+            eff.calender.fit <- eff.calender
+            calender.enp <- NULL
+        }
+        else{
+            eff.calender.fit <- eff.calender
+            eff.calender.fit[which(!is.na(eff.calender))] <- loess.fit$fit
+            calender.enp <- loess.fit$enp              
+        }
+    }
+    else{
+        eff.calender.fit <- eff.calender
+        calender.enp <- NULL
     }
 
     ## 8. cohort effects
@@ -448,6 +509,10 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         time = time.on,
         att = att.on,
         count = count.on,
+        eff.calender = eff.calender,
+        N.calender = N.calender,
+        eff.calender.fit = eff.calender.fit,
+        calender.enp = calender.enp,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
         pre.sd = pre.sd,
@@ -464,6 +529,10 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                            eff.off = eff.off,
                            eff.off.equiv = eff.off.equiv,
                            off.sd = off.sd))
+    }
+
+    if (!is.null(T.on.carry)) {
+        out <- c(out, list(carry.att = carry.att, carry.time = carry.time))
     }
 
     #if (boot == FALSE) {

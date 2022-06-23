@@ -5,7 +5,7 @@
 assumptions.}
 \usage{fect(formula = NULL, data, Y, D, X = NULL, group = NULL, na.rm = FALSE, 
        index, force = "unit", cl = "unit", r = 0, lambda = NULL, nlambda = 10,
-       CV = TRUE, k = 10, cv.prop = 0.1, cv.treat = TRUE, cv.nobs = 3,
+       CV = TRUE, k = 10, cv.prop = 0.1, cv.treat = FALSE, cv.nobs = 3,
        binary = FALSE, QR = FALSE,
        method = "fe", criterion = "mspe", alpha = 0.05,
        se = FALSE, vartype = "bootstrap", nboots = 200, 
