@@ -343,7 +343,8 @@ fect.boot <- function(Y,
 
             if ('try-error' %in% class(boot)) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                              beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, eff.calendar.fit = NA,
+                              beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, 
+                              eff.calendar.fit = NA,
                               att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                               group.att = NA, marginal = NA,carry.att = NA)
                 return(boot0)
@@ -539,7 +540,8 @@ fect.boot <- function(Y,
 
             if ('try-error' %in% class(synth.out)) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                                  beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, eff.calendar.fit = NA,
+                                  beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, 
+                                  eff.calendar.fit = NA,
                                   att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                                   group.att = NA, marginal = NA,
                                   group.output = list())
@@ -652,7 +654,8 @@ fect.boot <- function(Y,
 
             if ('try-error' %in% class(boot)) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                                  beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, eff.calendar.fit = NA,
+                                  beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, 
+                                  eff.calendar.fit = NA,
                                   att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                                   group.att = NA, marginal = NA,carry.att = NA,
                                   group.output = list())
@@ -664,6 +667,7 @@ fect.boot <- function(Y,
         }
     } 
     else {
+        
         one.nonpara <- function(num = NULL) { ## bootstrap
             if (is.null(num)) {
                 if (is.null(cl)) {
@@ -765,7 +769,8 @@ fect.boot <- function(Y,
 
             if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
                 boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                              beta = NA, att.off = NA, count.off = NA, 
+                              beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, 
+                              eff.calendar.fit = NA,
                               att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                               group.att = NA)
                 return(boot0)
@@ -871,7 +876,8 @@ fect.boot <- function(Y,
 
                 if ('try-error' %in% class(boot)) {
                     boot0 <- list(att.avg = NA, att = NA, count = NA, 
-                                  beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, eff.calendar.fit = NA,
+                                  beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, 
+                                  eff.calendar.fit = NA,
                                   att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                                   group.att = NA, marginal = NA,carry.att = NA,
                                   group.output = list())
@@ -908,6 +914,7 @@ fect.boot <- function(Y,
             att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
             att.boot[,j] <- boot.out[[j]]$att
             att.count.boot[,j] <- boot.out[[j]]$count
+            
             calendar.eff.boot[,j] <- boot.out[[j]]$eff.calendar
             calendar.eff.fit.boot[,j] <- boot.out[[j]]$eff.calendar.fit
             if (p > 0) {
@@ -969,6 +976,7 @@ fect.boot <- function(Y,
             att.avg.unit.boot[,j] <- boot$att.avg.unit
             att.boot[,j] <- boot$att
             att.count.boot[,j] <- boot$count
+
             calendar.eff.boot[,j] <- boot$eff.calendar
             calendar.eff.fit.boot[,j] <- boot$eff.calendar.fit
             if (p > 0) {
