@@ -161,13 +161,23 @@ out.mc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 p <- plot(out.mc, main = "Estimated ATT (MC)")
 ```  
 
-### Heterogeneous treatment effects
+## Heterogeneous treatment effects
 
-One way to explore treatment effects heterogeneity is to use a series of box plots to visualize the estimated individualistic treatment effects of observations under the treatment condition (by setting `type = "box"`). Although these effects are not identified at the observation level, their distribution reveals important information of treatment effects heterogeneity.
+We provide several methods for researchers to explore heterogeneous treatment effects (HTE)。
+
+### Box plots
+
+One way to understand HTE is to use a series of box plots to visualize the estimated individualistic treatment effects of observations under the treatment condition (by setting `type = "box"`). Although these effects are not identified at the individual observation level, their level of dispersion is informative of treatment effects heterogeneity at different (relative) time periods, as well as model performance.
 ```{r hte, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 p <- plot(out.ife, type = "box", xlim = c(-15, 10))
 ```
 
+### By calendar time
+
+Another way to explore HTE is to investigate how the treatment effect evolves over time. In the plot below, the point estimates represents the ATTs by calendar time; the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively; and the red horizontal dashed line represents the ATT (averaged over all time periods). 
+```{r hte_time, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+p <- plot(out.ife, type = "calendar", xlim = c(1, 35))
+```
 ---
 
 ## Diagostic tests

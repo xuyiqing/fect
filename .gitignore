@@ -22,6 +22,7 @@
 vignettes/*.html
 vignettes/*.pdf
 vignettes/tutorial_cache
+vignettes/tutorial_files
 
 
 # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
