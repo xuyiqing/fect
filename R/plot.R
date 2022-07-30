@@ -46,6 +46,7 @@ plot.fect <- function(x,
   axis.lab = "both",
   axis.lab.gap = c(0, 0),
   start0 = FALSE,
+  return.test = TRUE,
   ...){
 
 
@@ -64,7 +65,7 @@ plot.fect <- function(x,
     if (class(x) != "fect") {
         stop("Not a \"fect\" object.")
     }
-
+    loo.test.out <- test.out <- x$test.out
 
 
 
@@ -1000,6 +1001,7 @@ plot.fect <- function(x,
         }
 
         ## equivalence range
+
         if (is.null(f.threshold)==TRUE) {
             f.threshold <- x$test.out$f.threshold
             change.f.threshold <- 0
@@ -2410,7 +2412,13 @@ plot.fect <- function(x,
         }
     }
 
-    suppressWarnings(print(p))
-    return(p)
+    #suppressWarnings(print(p))
+    if(return.test==TRUE){
+        return(list(p=p,test.out=test.out))        
+    }
+    else{
+        return(p)
+    }
+
 
 }
