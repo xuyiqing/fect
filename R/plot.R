@@ -443,11 +443,11 @@ plot.fect <- function(x,
                 show.points <- TRUE
             }
             else {
-                show.points <- FALSE
+                show.points <- TRUE
             }
         }
         else {
-            show.points <- FALSE
+            show.points <- TRUE
         }
     }
 
