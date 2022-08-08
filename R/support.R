@@ -602,3 +602,21 @@ res.vcov <- function(res, ## TT*Nboots
     vcov <- vcov*count
     return(vcov)
 }
+
+
+v_replace <- function(needle, haystack) { 
+  sieved <- which(haystack == needle[1L]) 
+  for(i in seq.int(1L, length(needle) - 1L)) {
+    sieved <- sieved[haystack[sieved + i] == needle[i + 1L]]
+  }
+  out <- rep(NA,length(haystack))
+  if(length(sieved)==0){
+    return(out)
+  }
+  for(index in sieved){
+    if(!is.na(index)){
+      out[c(index:(index+length(needle)-1))] <- needle
+    }
+  }
+  return(out)
+}

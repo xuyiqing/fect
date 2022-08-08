@@ -47,6 +47,7 @@ plot.fect <- function(x,
   axis.lab.gap = c(0, 0),
   start0 = FALSE,
   return.test = TRUE,
+  balance = FALSE,
   ...){
 
 
@@ -67,6 +68,11 @@ plot.fect <- function(x,
     }
     loo.test.out <- test.out <- x$test.out
 
+    if(balance){
+        if(is.null(x$balance.period)){
+            balance <- FALSE
+        }
+    }
 
 
     # check if the input has the loo results
@@ -795,6 +801,19 @@ plot.fect <- function(x,
         }
     }
 
+    use.balance <- FALSE
+    if(!is.null(x$balance.period) & balance==TRUE){
+        x$att <- x$balance.att
+        x$time <- x$balance.time
+        x$count <- x$balance.count
+        x$att.avg <- x$balance.att.avg
+        x$est.att <- x$est.balance.att
+        x$att.bound <- x$balance.att.bound
+        x$att.boot <- x$balance.att.boot
+        x$est.placebo <- x$est.balance.placebo
+        x$obs.missing <- x$obs.missing.balance
+        use.balance <- TRUE
+    }
 
 
     if (!is.null(x$est.att)) { # have uncertainty estimation
@@ -1608,7 +1627,7 @@ plot.fect <- function(x,
         if (type %in% c('equiv','gap') && loo.equiv == 0) { 
             for (i in 1:length(stats)) {
                 if ("F.p" %in% stats[i]) {
-                    if (change.proportion | change.pre.periods | !is.null(show.group)) {
+                    if (change.proportion | change.pre.periods | !is.null(show.group) | use.balance) {
                         x$loo <- FALSE
                         test.out <- diagtest(x, 
                                              proportion = proportion, 
@@ -1624,7 +1643,7 @@ plot.fect <- function(x,
                     p.label <- paste0(p.label, p.label1, "\n")
                 }
                 if ("F.stat" %in% stats[i]) {
-                    if (change.proportion | change.pre.periods | !is.null(show.group)) {
+                    if (change.proportion | change.pre.periods | !is.null(show.group) | use.balance) {
                         x$loo <- FALSE
                         test.out <- diagtest(x, 
                                              proportion = proportion, 
@@ -1641,7 +1660,7 @@ plot.fect <- function(x,
                 }
                 if ("F.equiv.p" %in% stats[i]) {
                     # calculate new p value (ziyi: re-add this)
-                    if (change.f.threshold | change.proportion | change.pre.periods | !is.null(show.group)) {
+                    if (change.f.threshold | change.proportion | change.pre.periods | !is.null(show.group)|use.balance) {
                         x$loo <- FALSE
                         # some problems here, should change to change.f.threshold; change.proportion; change.pre.periods
                         test.out <- diagtest(x, 
@@ -1659,7 +1678,7 @@ plot.fect <- function(x,
                 }
                 if ("equiv.p" %in% stats[i] && placeboTest == 0) {
                     # calculate new p value (ziyi: re-add this)
-                    if (change.tost.threshold | change.proportion | change.pre.periods | !is.null(show.group)) {
+                    if (change.tost.threshold | change.proportion | change.pre.periods | !is.null(show.group)|use.balance) {
                         x$loo <- FALSE
                         test.out <- diagtest(x, 
                                              proportion = proportion, 
@@ -2308,6 +2327,18 @@ plot.fect <- function(x,
             col2 <- c(col2, "6"=NA)
             breaks <- c(breaks,6)
             label <- c(label,"Carryover Removed")
+        }
+        if(7%in%all){
+            col <- c(col,"#00852B")
+            col2 <- c(col2, "7"=NA)
+            breaks <- c(breaks,7)
+            label <- c(label,"Balanced Sample: Post")
+        }
+        if(8%in%all){
+            col <- c(col,"#A5CA18")
+            col2 <- c(col2, "8"=NA)
+            breaks <- c(breaks,8)
+            label <- c(label,"Balanced Sample: Pre")
         }
         
         TT <- dim(m)[1]

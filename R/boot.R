@@ -10,6 +10,8 @@ fect.boot <- function(Y,
                       T.on, 
                       T.off = NULL, 
                       T.on.carry = NULL,
+                      T.on.balance = NULL,
+                      balance.period = NULL,
                       method = "ife",
                       degree = 2,
                       sfe = NULL,
@@ -86,6 +88,8 @@ fect.boot <- function(Y,
         if(method == "gsynth"){
             out <- fect.gsynth(Y = Y, X = X, D = D, I = I, II = II, 
                            T.on = T.on, T.off = T.off, CV = 0, 
+                           T.on.balance = T.on.balance,
+                           balance.period = balance.period,
                            r = r, binary = binary, QR = QR,
                            force = force, hasRevs = hasRevs, 
                            tol = tol, boot = 0,
@@ -99,6 +103,8 @@ fect.boot <- function(Y,
         } else if (method == "ife") {
             out <- fect.fe(Y = Y, X = X, D = D, I = I, II = II, 
                            T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
+                           T.on.balance = T.on.balance,
+                           balance.period = balance.period,
                            r.cv = r, binary = binary, QR = QR,
                            force = force, hasRevs = hasRevs, 
                            tol = tol, boot = 0,
@@ -112,6 +118,8 @@ fect.boot <- function(Y,
         } else if (method == "mc") {
             out <- try(fect.mc(Y = Y, X = X, D = D, I = I, II = II,
                            T.on = T.on, T.off = T.off,  T.on.carry = T.on.carry,
+                           T.on.balance = T.on.balance,
+                           balance.period = balance.period,
                            lambda.cv = lambda, force = force, hasRevs = hasRevs, 
                            tol = tol, boot = 0,
                            norm.para = norm.para,
@@ -126,6 +134,8 @@ fect.boot <- function(Y,
         } else if (method %in% c("polynomial", "bspline","cfe")) {
             out <- try(fect.polynomial(Y = Y, D = D, X = X, I = I, 
                                    II = II, T.on = T.on,  T.on.carry = T.on.carry,
+                                   T.on.balance = T.on.balance,
+                                   balance.period = balance.period,
                                    T.off = T.off,
                                    method = method,degree = degree,
                                    knots = knots, force = force, 
@@ -152,6 +162,8 @@ fect.boot <- function(Y,
         if (binary == 0) {
             out <- fect.cv(Y = Y, X = X, D = D, I = I, II = II, 
                        T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
+                       T.on.balance = T.on.balance,
+                       balance.period = balance.period,
                        method = method, criterion = criterion,
                        k = k, r = r, r.end = r.end, 
                        nlambda = nlambda, lambda = lambda, 
@@ -204,6 +216,16 @@ fect.boot <- function(Y,
       carry.time <- out$carry.time 
     }
 
+    if(!is.null(balance.period)){
+        balance.att <- out$balance.att
+        balance.time <- out$balance.time
+        balance.count <- out$balance.count
+        balance.avg.att <- out$balance.avg.att
+        if (!is.null(placebo.period) & placeboTest == TRUE) {
+            balance.att.placebo <- out$balance.att.placebo
+        }
+    }
+
     eff.out <- out$eff
     fit.out <- out$Y.ct
     N_unit <- dim(out$res)[2]
@@ -253,6 +275,14 @@ fect.boot <- function(Y,
     }
     if (!is.null(T.on.carry)) {
         carry.att.boot <- matrix(0, length(carry.att), nboots)
+    }
+    if (!is.null(balance.period)) {
+        balance.att.boot <- matrix(0, length(balance.att), nboots) # dynamic att
+        balance.count.boot <- matrix(0, length(balance.att), nboots) 
+        balance.avg.att.boot <- matrix(0, 1, nboots)
+        if (!is.null(placebo.period) & placeboTest == TRUE) {
+            balance.att.placebo.boot <- matrix(0, 1, nboots)
+        }
     }
 
     if (p > 0) {
@@ -327,6 +357,8 @@ fect.boot <- function(Y,
             boot <- try(fect.fe(Y = Y.boot, X = X, D = D,
                                     I = I, II = II, 
                                     T.on = T.on, T.off = T.off,  T.on.carry = T.on.carry,
+                                    T.on.balance = T.on.balance,
+                                    balance.period = balance.period,
                                     r.cv = out$r.cv, binary = binary,
                                     QR = QR, force = force,
                                     hasRevs = hasRevs, tol = tol, boot = 1,
@@ -334,6 +366,7 @@ fect.boot <- function(Y,
                                     calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     time.on.carry.seq = carry.time,
+                                    time.on.balance.seq = balance.time,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
                                     carryoverTest = carryoverTest,
@@ -346,7 +379,9 @@ fect.boot <- function(Y,
                               beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, 
                               eff.calendar.fit = NA,
                               att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
-                              group.att = NA, marginal = NA,carry.att = NA)
+                              group.att = NA, marginal = NA,carry.att = NA,balance.att = NA, 
+                              balance.att.placebo = NA, balance.count = NA, 
+                              balance.avg.att = NA, balance.time = NA,group.output = list())
                 return(boot0)
             } else {
                 return(boot)
@@ -409,10 +444,10 @@ fect.boot <- function(Y,
             #                             force = force, r = out$r.cv, CV = 0,
             #                             tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
 
-            synth.out <- try(fect.gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
-                                         I = I.id.pseudo, II = II.id.pseudo,T.on = T.on, hasRevs = hasRevs,
-                                         force = force, r = out$r.cv, CV = 0,
-                                         tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
+            synth.out <- fect.gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
+                                     I = I.id.pseudo, II = II.id.pseudo,T.on = T.on, hasRevs = hasRevs,
+                                     force = force, r = out$r.cv, CV = 0,
+                                     tol = tol, norm.para = norm.para, boot = 1)
    
             if ('try-error' %in% class(synth.out)) {
                 return(matrix(NA, TT, Ntr))
@@ -525,7 +560,10 @@ fect.boot <- function(Y,
             II.boot <- out$II[,id.boot]
           
             synth.out <- try(fect.gsynth(Y = Y.boot, X = X.boot, D = D.boot,
-                                         I = I.boot, II = II.boot,T.on = T.on, hasRevs = hasRevs,
+                                         I = I.boot, II = II.boot,T.on = T.on[,id.boot], 
+                                         T.on.balance = T.on.balance[,id.boot],
+                                         balance.period = balance.period,
+                                         hasRevs = hasRevs,
                                          force = force, r = out$r.cv, CV = 0, boot = 1,
                                          placeboTest = placeboTest,
                                          placebo.period = placebo.period, 
@@ -535,6 +573,7 @@ fect.boot <- function(Y,
                                          time.on.seq = time.on, time.off.seq = time.off,
                                          time.on.seq.group = group.time.on,
                                          time.off.seq.group = group.time.off,
+                                         time.on.balance.seq = balance.time,
                                          norm.para = norm.para,tol = tol,
                                          group.level = group.level, group = group), silent = TRUE)
 
@@ -544,6 +583,8 @@ fect.boot <- function(Y,
                                   eff.calendar.fit = NA,
                                   att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                                   group.att = NA, marginal = NA,
+                                  balance.att = NA, balance.att.placebo = NA, balance.count = NA, 
+                                  balance.avg.att = NA, balance.time = NA,
                                   group.output = list())
                 return(boot0)
             }
@@ -594,6 +635,8 @@ fect.boot <- function(Y,
             if (method == "ife") {
                 boot <- try(fect.fe(Y = Y.boot, X = X, D = D, I = I, II = II, 
                             T.on = T.on, T.off = T.off,T.on.carry = T.on.carry,
+                            T.on.balance = T.on.balance,
+                            balance.period = balance.period,
                             r.cv = out$r.cv, binary = binary, QR = QR,
                             force = force, hasRevs = hasRevs, 
                             tol = tol, boot = 1,
@@ -606,6 +649,7 @@ fect.boot <- function(Y,
                             calendar.enp.seq = target.enp,
                             time.on.seq = time.on, time.off.seq = time.off,
                             time.on.carry.seq = carry.time,
+                            time.on.balance.seq = balance.time,
                             time.on.seq.group = group.time.on,
                             time.off.seq.group = group.time.off),silent = TRUE)
             
@@ -614,6 +658,8 @@ fect.boot <- function(Y,
                 
                 boot <- try(fect.mc(Y = Y.boot, X = X, D = D, I = I, II = II,
                             T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
+                            T.on.balance = T.on.balance,
+                            balance.period = balance.period,
                             lambda.cv = out$lambda.cv, force = force, hasRevs = hasRevs, 
                             tol = tol, boot = 1,
                             norm.para = norm.para,
@@ -625,6 +671,7 @@ fect.boot <- function(Y,
                             calendar.enp.seq = target.enp,
                             time.on.seq = time.on, time.off.seq = time.off,
                             time.on.carry.seq = carry.time,
+                            time.on.balance.seq = balance.time,
                             time.on.seq.group = group.time.on,
                             time.off.seq.group = group.time.off),silent = TRUE)
 
@@ -633,6 +680,8 @@ fect.boot <- function(Y,
                 boot <- try(fect.polynomial(Y = Y.boot, D = D, X = X, I = I, 
                                     II = II, T.on = T.on, 
                                     T.off = T.off,T.on.carry = T.on.carry,
+                                    T.on.balance = T.on.balance,
+                                    balance.period = balance.period,
                                     method = method,degree = degree,
                                     knots = knots, force = force,
                                     sfe = sfe, cfe = cfe,
@@ -648,6 +697,7 @@ fect.boot <- function(Y,
                                     calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     time.on.carry.seq = carry.time,
+                                    time.on.balance.seq = balance.time,
                                     time.on.seq.group = group.time.on,
                                     time.off.seq.group = group.time.off), silent = TRUE)
             }
@@ -657,7 +707,9 @@ fect.boot <- function(Y,
                                   beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, 
                                   eff.calendar.fit = NA,
                                   att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
-                                  group.att = NA, marginal = NA,carry.att = NA,
+                                  group.att = NA, marginal = NA,carry.att = NA, 
+                                  balance.att = NA, balance.att.placebo = NA, balance.count = NA, 
+                                  balance.avg.att = NA, balance.time = NA,
                                   group.output = list())
                 return(boot0)
             }
@@ -772,7 +824,9 @@ fect.boot <- function(Y,
                               beta = NA, att.off = NA, count.off = NA, eff.calendar = NA, 
                               eff.calendar.fit = NA,
                               att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
-                              group.att = NA)
+                              group.att = list(),
+                              balance.att = NA, balance.att.placebo = NA, balance.count = NA, 
+                              balance.avg.att = NA, balance.time = NA)
                 return(boot0)
             } 
             else {
@@ -793,6 +847,8 @@ fect.boot <- function(Y,
                     boot <- try(fect.gsynth(Y = Y[, boot.id], X = X.boot, D = D.boot,
                                     I = I.boot, II = II[, boot.id], 
                                     T.on = T.on[, boot.id], T.off = T.off.boot, CV = 0,
+                                    T.on.balance = T.on.balance[, boot.id],
+                                    balance.period = balance.period,
                                     r = out$r.cv, binary = binary,
                                     QR = QR, force = force,
                                     hasRevs = hasRevs, tol = tol, boot = 1,
@@ -801,6 +857,7 @@ fect.boot <- function(Y,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
+                                    time.on.balance.seq = balance.time,
                                     carryoverTest = carryoverTest,
                                     carryover.period = carryover.period.boot,
                                     group.level = group.level,
@@ -811,7 +868,10 @@ fect.boot <- function(Y,
                 else if (method == "ife") {
                     boot <- try(fect.fe(Y = Y[, boot.id], X = X.boot, D = D.boot,
                                     I = I.boot, II = II[, boot.id], 
-                                    T.on = T.on[, boot.id], T.off = T.off.boot, T.on.carry = T.on.carry[, boot.id],
+                                    T.on = T.on[, boot.id], T.off = T.off.boot, 
+                                    T.on.carry = T.on.carry[, boot.id],
+                                    T.on.balance = T.on.balance[, boot.id],
+                                    balance.period = balance.period,
                                     r.cv = out$r.cv, binary = binary,
                                     QR = QR, force = force,
                                     hasRevs = hasRevs, tol = tol, boot = 1,
@@ -819,6 +879,7 @@ fect.boot <- function(Y,
                                     calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     time.on.carry.seq = carry.time,
+                                    time.on.balance.seq = balance.time,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
                                     carryoverTest = carryoverTest,
@@ -830,13 +891,17 @@ fect.boot <- function(Y,
                 } else if (method == "mc") {
                     boot <- try(fect.mc(Y = Y[,boot.id], X = X.boot, D = D[,boot.id],
                                     I = I[,boot.id], II = II[,boot.id],
-                                    T.on = T.on[,boot.id], T.off = T.off.boot,  T.on.carry = T.on.carry[, boot.id],
+                                    T.on = T.on[,boot.id], T.off = T.off.boot,  
+                                    T.on.carry = T.on.carry[, boot.id],
+                                    T.on.balance = T.on.balance[, boot.id],
+                                    balance.period = balance.period,
                                     lambda.cv = out$lambda.cv, force = force, 
                                     hasF = out$validF, hasRevs = hasRevs, 
                                     tol = tol, boot = 1,
                                     norm.para = norm.para,calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, time.off.seq = time.off,
                                     time.on.carry.seq = carry.time,
+                                    time.on.balance.seq = balance.time,
                                     placebo.period = placebo.period.boot, 
                                     placeboTest = placeboTest,
                                     carryoverTest = carryoverTest,
@@ -851,7 +916,10 @@ fect.boot <- function(Y,
                     boot <- try(fect.polynomial(Y = Y[,boot.id], X = X.boot, 
                                                     D = D[,boot.id],
                                                     I = I[,boot.id], II = II[,boot.id],
-                                                    T.on = T.on[,boot.id], T.off = T.off.boot,  T.on.carry = T.on.carry[, boot.id],
+                                                    T.on = T.on[,boot.id], T.off = T.off.boot,  
+                                                    T.on.carry = T.on.carry[, boot.id],
+                                                    T.on.balance = T.on.balance[, boot.id],
+                                                    balance.period = balance.period,
                                                     method = method, degree = degree, 
                                                     sfe = sfe, cfe = cfe,
                                                     ind.matrix = ind.matrix.boot,
@@ -862,6 +930,7 @@ fect.boot <- function(Y,
                                                     calendar.enp.seq = target.enp,
                                                     time.off.seq = time.off,
                                                     time.on.carry.seq = carry.time,
+                                                    time.on.balance.seq = balance.time,
                                                     placebo.period = placebo.period.boot, 
                                                     carryoverTest = carryoverTest,
                                                     carryover.period = carryover.period.boot,
@@ -880,7 +949,9 @@ fect.boot <- function(Y,
                                   eff.calendar.fit = NA,
                                   att.placebo = NA, att.avg.unit = NA, att.carryover = NA,
                                   group.att = NA, marginal = NA,carry.att = NA,
-                                  group.output = list())
+                                  group.output = list(),
+                                  balance.att = NA, balance.att.placebo = NA, balance.count = NA, 
+                                  balance.avg.att = NA, balance.time = NA)
                     return(boot0)
                 } else {
                     return(boot)
@@ -930,6 +1001,15 @@ fect.boot <- function(Y,
             if (!is.null(T.on.carry)) {
                 carry.att.boot[,j] <- boot.out[[j]]$carry.att
             }
+            if(!is.null(balance.period)){
+                balance.att.boot[,j] <- boot.out[[j]]$balance.att
+                balance.count.boot[,j] <- boot.out[[j]]$balance.count
+                balance.avg.att.boot[,j] <- boot.out[[j]]$balance.avg.att
+                if (!is.null(placebo.period) & placeboTest == TRUE) {
+                    balance.att.placebo.boot[,j] <- boot.out[[j]]$balance.att.placebo
+                }
+            }
+
             if (!is.null(placebo.period) & placeboTest == TRUE) {
                 att.placebo.boot[,j] <- boot.out[[j]]$att.placebo
             }
@@ -991,6 +1071,14 @@ fect.boot <- function(Y,
             }
             if (!is.null(T.on.carry)) {
                 carry.att.boot[,j] <- boot$carry.att
+            }
+            if(!is.null(balance.period)){
+                balance.att.boot[,j] <- boot$balance.att
+                balance.count.boot[,j] <- boot$balance.count
+                balance.avg.att.boot[,j] <- boot$balance.avg.att
+                if (!is.null(placebo.period) & placeboTest == TRUE) {
+                    balance.att.placebo.boot[,j] <- boot$balance.att.placebo
+                }
             }
             if (!is.null(placebo.period) & placeboTest == TRUE) {
                 att.placebo.boot[,j] <- boot$att.placebo
@@ -1059,6 +1147,14 @@ fect.boot <- function(Y,
         }
         if (!is.null(T.on.carry)) {
             carry.att.boot <- as.matrix(carry.att.boot[, -boot.rm])
+        }
+        if(!is.null(balance.period)){
+            balance.att.boot <- as.matrix(balance.att.boot[, -boot.rm])
+            balance.count.boot <- as.matrix(balance.count.boot[, -boot.rm])
+            balance.avg.att.boot <- t(as.matrix(balance.avg.att.boot[,-boot.rm]))
+            if (!is.null(placebo.period) & placeboTest == TRUE) {
+                balance.att.placebo.boot <- t(as.matrix(balance.att.placebo.boot[,-boot.rm]))
+            }
         }
         if (!is.null(placebo.period) & placeboTest == TRUE) {
             att.placebo.boot <- t(as.matrix(att.placebo.boot[,-boot.rm]))
@@ -1153,6 +1249,29 @@ fect.boot <- function(Y,
             colnames(est.carry.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                       "p.value")
             rownames(est.carry.att) <- carry.time
+        }
+
+        if(!is.null(balance.period)){
+            balance.att.j <- jackknifed(balance.att, balance.att.boot, alpha)
+            est.balance.att <- cbind(balance.att, balance.att.j$se, balance.att.j$CI.l, balance.att.j$CI.u, balance.att.j$P, out$balance.count)
+            colnames(est.balance.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                           "p.value", "count")
+            rownames(est.balance.att) <- out$balance.time
+            
+            balance.avg.att.j <- jackknifed(balance.avg.att, balance.avg.att.boot, alpha)
+            est.balance.avg <- t(as.matrix(c(balance.avg.att, balance.avg.att.j$se, balance.avg.att.j$CI.l, balance.avg.att.j$CI.u, balance.avg.att.j$P)))
+            colnames(est.balance.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
+
+            balance.att.bound <- cbind(balance.att + qnorm(alpha)*balance.att.j$se, balance.att + qnorm(1 - alpha)*balance.att.j$se)
+            colnames(balance.att.bound) <- c("CI.lower", "CI.upper")
+            rownames(balance.att.bound) <- out$balance.time
+
+            if (!is.null(placebo.period) & placeboTest == TRUE) {
+                balance.att.placebo.j <- jackknifed(balance.att.placebo, balance.att.placebo.boot, alpha)
+                est.balance.placebo <- t(as.matrix(c(balance.att.placebo, balance.att.placebo.j$se, balance.att.placebo.j$CI.l, balance.att.placebo.j$CI.u, balance.att.placebo.j$P)))
+                colnames(est.balance.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
+            } 
+
         }
 
         ## average (over time) ATT
@@ -1348,20 +1467,58 @@ fect.boot <- function(Y,
         }
 
         if (!is.null(T.on.carry)) {
-            carry.att.j <- jackknifed(carry.att, carry.att.boot, alpha)
-            
             se.carry.att <- apply(carry.att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
             CI.carry.att <- cbind(carry.att - se.carry.att * qnorm(1-alpha/2), 
                                   carry.att + se.carry.att * qnorm(1-alpha/2)) # normal approximation
-            
             pvalue.carry.att <- (1-pnorm(abs(carry.att/se.carry.att)))*2
-
             est.carry.att <- cbind(carry.att, se.carry.att, 
                              CI.carry.att, pvalue.carry.att)
 
             colnames(est.carry.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                       "p.value")
             rownames(est.carry.att) <- carry.time
+        }
+
+        if(!is.null(balance.period)){
+            se.balance.att <- apply(balance.att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+            CI.balance.att <- cbind(balance.att - se.balance.att * qnorm(1-alpha/2), 
+                                    balance.att + se.balance.att * qnorm(1-alpha/2))
+            pvalue.balance.att <- (1-pnorm(abs(balance.att/se.balance.att)))*2
+
+            est.balance.att <- cbind(balance.att, se.balance.att, CI.balance.att, 
+                                     pvalue.balance.att, out$balance.count)
+            colnames(est.balance.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                           "p.value", "count")
+            rownames(est.balance.att) <- out$balance.time
+            
+            se.balance.avg.att <- sd(balance.avg.att.boot, na.rm=TRUE)
+            CI.balance.avg.att <- c(balance.avg.att - se.balance.avg.att  * qnorm(1-alpha/2), 
+                                    balance.avg.att + se.balance.avg.att  * qnorm(1-alpha/2))
+            p.balance.avg.att <- (1-pnorm(abs(balance.avg.att/se.balance.avg.att)))*2
+            est.balance.avg <- t(as.matrix(c(balance.avg.att, se.balance.avg.att, CI.balance.avg.att, p.balance.avg.att)))
+            colnames(est.balance.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
+
+            balance.att.bound <- t(apply(balance.att.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+            colnames(balance.att.bound) <- c("CI.lower", "CI.upper")
+            rownames(balance.att.bound) <- out$balance.time
+
+            if (!is.null(placebo.period) & placeboTest == TRUE) {
+                balance.att.placebo <- out$balance.att.placebo        
+                balance.se.placebo <- sd(balance.att.placebo.boot, na.rm=TRUE)
+                balance.CI.placebo <- c(balance.att.placebo - balance.se.placebo * qnorm(1-alpha/2), 
+                                        balance.att.placebo + balance.se.placebo * qnorm(1-alpha/2))
+                balance.CI.placebo.bound <- c(balance.att.placebo - balance.se.placebo * qnorm(1-alpha), 
+                                              balance.att.placebo + balance.se.placebo * qnorm(1-alpha))
+                balance.pvalue.placebo <- (1-pnorm(abs(balance.att.placebo/balance.se.placebo)))*2
+                est.balance.placebo <- t(as.matrix(c(balance.att.placebo, 
+                                            balance.se.placebo, 
+                                            balance.CI.placebo, 
+                                            balance.pvalue.placebo,
+                                            balance.CI.placebo.bound)))
+                colnames(est.balance.placebo) <- c("ATT.placebo", "S.E.", 
+                                        "CI.lower", "CI.upper", "p.value",
+                                        "CI.lower(90%)", "CI.upper(90%)")
+            }
         }
 
         ## average (over time) ATT
@@ -1591,6 +1748,17 @@ fect.boot <- function(Y,
 
     if (!is.null(T.on.carry)) {
         result <- c(result, list(est.carry.att = est.carry.att))
+    }
+
+    if(!is.null(balance.period)){
+        result <- c(result, list(est.balance.att = est.balance.att))
+        result <- c(result,list(est.balance.avg = est.balance.avg))
+        result <- c(result,list(balance.att.bound = balance.att.bound,
+                                balance.att.boot = balance.att.boot,
+                                balance.count.boot = balance.count.boot))
+        if (!is.null(placebo.period) & placeboTest == TRUE) {
+            result <- c(result, list(est.balance.placebo = est.balance.placebo, balance.att.placebo.boot = balance.att.placebo.boot))
+        }
     } 
 
     if (!is.null(placebo.period) & placeboTest == TRUE) {

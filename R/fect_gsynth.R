@@ -5,6 +5,9 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
                         II, 
                         T.on, 
                         T.off = NULL,
+                        T.on.carry = NULL,           
+                        T.on.balance = NULL,
+                        balance.period = NULL,
                         CV = TRUE, 
                         criterion = "mspe",
                         r = 0, # r.end when CV==TRUE
@@ -23,6 +26,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
                         calendar.enp.seq = NULL,
                         time.on.seq = NULL,
                         time.off.seq = NULL,
+                        time.on.balance.seq = NULL,
                         group.level = NULL,
                         group = NULL,
                         time.on.seq.group = NULL,
@@ -633,6 +637,12 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
     att.avg <- sum(eff[complete.index] * D[complete.index])/(sum(D[complete.index]))
     marginal <- NULL
 
+    att.avg.balance <- NA
+    if(!is.null(balance.period)){
+        complete.index2 <- which(!is.na(T.on.balance))
+        att.avg.balance <- sum(eff[complete.index2] * D[complete.index2])/(sum(D[complete.index2]))
+    }
+
      ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
     att.unit <- sapply(1:length(tr.pos), function(vec){return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))})
@@ -718,6 +728,47 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
         att.on <- att.on.med
         count.on <- count.on.med
         time.on <- time.on.seq
+    }
+
+    ## 4.2 balance effect 
+    balance.att <- NULL 
+    if (!is.null(balance.period)) {
+        t.on.balance <- c(T.on.balance)
+        rm.pos4 <- which(is.na(t.on.balance)) 
+        t.on.balance.use <- t.on.balance
+
+        if (NA %in% eff.v | NA %in% t.on.balance) {
+            eff.v.use3  <- eff.v[-c(rm.pos1, rm.pos4)]
+            t.on.balance.use <- t.on.balance[-c(rm.pos1, rm.pos4)]        
+        }
+
+        balance.time <- sort(unique(t.on.balance.use))
+        balance.att <- as.numeric(tapply(eff.v.use3, t.on.balance.use, mean)) ## NA already removed
+        balance.count <- as.numeric(table(t.on.balance.use))
+
+        if (!is.null(time.on.balance.seq)) {
+            balance.att.med <- rep(NA, length(time.on.balance.seq))
+            balance.count.med <- rep(0, length(time.on.balance.seq))
+            balance.att.med[which(time.on.balance.seq %in% balance.time)] <- balance.att
+            if(length(balance.count)>0){
+                balance.count.med[which(time.on.balance.seq %in% balance.time)] <- balance.count                
+            }
+            balance.count <- balance.count.med
+            balance.att <- balance.att.med
+            balance.time <- time.on.balance.seq
+        }
+
+        #placebo for balanced samples
+        if(!is.null(placebo.period) && placeboTest == 1){
+            if (length(placebo.period) == 1) {
+                balance.placebo.pos <- which(balance.time == placebo.period)
+                balance.att.placebo <- balance.att[balance.placebo.pos]
+            } 
+            else {
+                balance.placebo.pos <- which(balance.time >= placebo.period[1] & balance.time <= placebo.period[2])
+                balance.att.placebo <- sum(balance.att[balance.placebo.pos] * balance.count[balance.placebo.pos]) / sum(balance.count[balance.placebo.pos])
+            }
+        }
     }
 
     ## 5. placebo effect, if placeboTest == 1 
@@ -990,6 +1041,9 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
         time = time.on,
         att = att.on,
         count = count.on,
+        eff.calendar = eff.calendar,
+        N.calendar = N.calendar,
+        eff.calendar.fit = eff.calendar.fit,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
         pre.sd = pre.sd)
@@ -1038,6 +1092,13 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
 
     if (!is.null(placebo.period) && placeboTest == 1) {
         out <- c(out, list(att.placebo = att.placebo))
+    }
+
+    if(!is.null(balance.period)){
+        out <- c(out, list(balance.att = balance.att, balance.time = balance.time,balance.count = balance.count,balance.avg.att = att.avg.balance))        
+        if (!is.null(placebo.period) && placeboTest == 1) {
+            out <- c(out, list(balance.att.placebo = balance.att.placebo))
+        }    
     }
 
     if (!is.null(carryover.period) && carryoverTest == 1) {

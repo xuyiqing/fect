@@ -9,6 +9,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     T.on, 
                     T.off = NULL, 
                     T.on.carry = NULL, 
+                    T.on.balance = NULL,
+                    balance.period = NULL,
                     method = "ife",
                     criterion = "mspe",  
                     k = 5, # CV time
@@ -1001,6 +1003,12 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     complete.index <- which(!is.na(eff))
     att.avg <- sum(eff[complete.index] * D[complete.index])/(sum(D[complete.index]))
 
+    att.avg.balance <- NA
+    if(!is.null(balance.period)){
+        complete.index2 <- which(!is.na(T.on.balance))
+        att.avg.balance <- sum(eff[complete.index2] * D[complete.index2])/(sum(D[complete.index2]))
+    }
+
 
     ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
@@ -1060,6 +1068,25 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     time.on <- sort(unique(t.on.use))
     att.on <- as.numeric(tapply(eff.v.use1, t.on.use, mean)) ## NA already removed
     count.on <- as.numeric(table(t.on.use))
+
+    ## 4.2 balance effect 
+    balance.att <- NULL 
+    if (!is.null(balance.period)) {
+        t.on.balance <- c(T.on.balance)
+        rm.pos4 <- which(is.na(t.on.balance)) 
+        t.on.balance.use <- t.on.balance
+
+        if (NA %in% eff.v | NA %in% t.on.balance) {
+            eff.v.use3  <- eff.v[-c(rm.pos1, rm.pos4)]
+            t.on.balance.use <- t.on.balance[-c(rm.pos1, rm.pos4)]        
+        }
+
+        balance.time <- sort(unique(t.on.balance.use))
+        balance.att <- as.numeric(tapply(eff.v.use3, t.on.balance.use, mean)) ## NA already removed
+        balance.count <- as.numeric(table(t.on.balance.use))
+
+    }
+
 
     
     ## 5 carryover effect 
@@ -1276,6 +1303,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
     if (!is.null(T.on.carry)) {
         out <- c(out, list(carry.att = carry.att, carry.time = carry.time))
+    }
+
+    if(!is.null(balance.period)){
+        out <- c(out, list(balance.att = balance.att, balance.time = balance.time,balance.count = balance.count,balance.avg.att = att.avg.balance))        
     }
 
     if (force == 1) {

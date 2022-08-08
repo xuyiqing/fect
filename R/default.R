@@ -1,8 +1,8 @@
 ## Causal inference using counterfactual estimators 
 ## (fect: fixed effects counterfactuals)
-## Version 0.1.0
-## Author: Licheng Liu (Tsinghua), Ye Wang(NYU), Yiqing Xu(Stanford)
-## Date: 2021.04.17
+## Version 0.7.0
+## Author: Licheng Liu (Tsinghua), Ye Wang(NYU), Yiqing Xu(Stanford), Ziyi Liu(Uchicago)
+## Date: 2022.08.07
 
 ## MAIN FUNCTION
 ## fect.formula()
@@ -34,6 +34,8 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  X = NULL, # time-varying covariates
                  group = NULL, # cohort
                  na.rm = FALSE, # remove missing values
+                 balance.period = NULL, # the pre and post periods for balanced samples
+                 balance.missing = TRUE, # whether to balance missing observations
                  index, # c(unit, time) indicators
                  force = "two-way", # fixed effects demeaning
                  cl = "unit", 
@@ -91,6 +93,8 @@ fect.formula <- function(formula = NULL,
                          X = NULL, # time-varying covariates
                          group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
+                         balance.period = NULL, # the pre and post periods for balanced samples
+                         balance.missing = TRUE, # whether to balance missing observations
                          index, # c(unit, time) indicators
                          force = "two-way", # fixed effects demeaning
                          cl = "unit", 
@@ -173,6 +177,8 @@ fect.formula <- function(formula = NULL,
                         X = Xname, 
                         group = group,
                         na.rm = na.rm, 
+                        balance.period = balance.period,
+                        balance.missing = balance.missing,
                         index = index, 
                         force = force, 
                         cl = cl, 
@@ -234,6 +240,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          X = NULL, # time-varying covariates
                          group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
+                         balance.period = NULL, # the pre and post periods for balanced samples
+                         balance.missing = FALSE, # whether to balance missing observations
                          index, # c(unit, time) indicators
                          force = "two-way", # fixed effects demeaning
                          cl = "unit", 
@@ -553,6 +561,29 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         stop("\"na.rm\" is not a logical flag.")
     }
 
+    if(!is.null(balance.period)){
+        if(length(balance.period)!=2){
+            stop(" should be of length 2.")
+        }
+        if(balance.period[1]>0){
+            stop("The first element in \"balance.period\" should be no larger than 0.")
+        }
+        if(balance.period[2]<1){
+            stop("The second element in \"balance.period\" should be no smaller than 1.")
+        }
+        if (is.logical(balance.missing) == FALSE & !balance.missing%in%c(0, 1)) {
+            stop("\"balance.missing\" is not a logical flag.")
+        }
+        if (!is.null(group)) {
+            stop("\"group\" should not be used with \"balance.period\".\n")
+        }
+        if(!is.null(carryover.rm)){
+            stop("\"balance.period\" should not be used with \"carryover.rm\".\n")            
+        }
+        balance.periods <- c(balance.period[1]:balance.period[2])
+        # treat the units with history balance.periods as a certain group
+    }
+
     # cohort 
     if (!is.null(group)) {
         if (! group %in% names(data)) {
@@ -813,16 +844,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
 
-
-    ## gen group matrix
-    if (!is.null(group)) {
-        rawgroup <- data[, group]
-        newgroup <- as.numeric(as.factor(rawgroup))
-        data[, group] <- newgroup
-        rawgroup <- cbind.data.frame(rawgroup, newgroup)
-        rawgroup <- rawgroup[!duplicated(rawgroup[, 1]),]
-    }
-
     if(method=='cfe'){
         if(!is.null(sfe)){
             for(sub.sfe in sfe){
@@ -835,6 +856,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 data[,sub.cfe[1]] <- as.numeric(as.factor(data[,sub.cfe[1]]))
             }        
         }        
+    }
+
+    ## gen group matrix
+    if (!is.null(group)) {
+        rawgroup <- data[, group]
+        newgroup <- as.numeric(as.factor(rawgroup))
+        data[, group] <- newgroup
+        rawgroup <- cbind.data.frame(rawgroup, newgroup)
+        rawgroup <- rawgroup[!duplicated(rawgroup[, 1]),]
     }
 
     ##cat("\nOK1\n")
@@ -928,6 +958,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (0%in%I) {
         data[is.nan(data)] <- 0
     }
+
+
+
+
 
     ## group indicator 
     G.old <- G <- NULL
@@ -1118,6 +1152,22 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     rm(D1, D2)
     calendar.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
 
+    ##3.1 balance samples     
+    ## for balance group, add group indicator
+    T.on.balance <- matrix(NA, TT, (N - length(rm.id)))
+    if(!is.null(balance.period)){
+        if(balance.missing == TRUE){
+            T.on.miss <- T.on
+            T.on.miss[which(I==0)] <- NA
+            T.on.balance <- apply(T.on.miss,2,function(x) v_replace(balance.periods,x))
+        }
+        if(balance.missing == FALSE){
+            T.on.balance <- apply(T.on,2,function(x) v_replace(balance.periods,x))
+        }
+        if(sum(!is.na(T.on.balance))==0){ 
+            stop("No Balanced Sample Found.\n")
+        }
+    }
     
     ## 4. check reversals
     D1 <- D 
@@ -1131,6 +1181,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     hasRevs <- ifelse(Nrev > 0, 1, 0)
     if(hasRevs == FALSE & carryoverTest == TRUE){
         stop("Treatment status have no reversals. Cannot perform \"carryoverTest\" in this case.")
+    }
+    if(hasRevs == TRUE & method == "gsynth"){
+        stop("Gsynth can't be used when treatments have reversals.")
     }
 
     ## 5. switch-off periods
@@ -1346,6 +1399,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             if (binary == FALSE) {
                 out <- fect.cv(Y = Y, D = D, X = X, I = I, II = II, 
                                T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, 
+                               T.on.balance = T.on.balance, 
+                               balance.period = balance.period,
                                method = method,
                                criterion = criterion,
                                k = k, cv.prop = cv.prop,
@@ -1376,8 +1431,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         } 
         else { ## non-binary case
             if (method == "ife") {
-                out <- try(fect.fe(Y = Y, D = D, X = X, I = I, II = II,
+                out <- fect.fe(Y = Y, D = D, X = X, I = I, II = II,
                                T.on = T.on, T.off = T.off, r.cv = r, T.on.carry = T.on.carry, 
+                               T.on.balance = T.on.balance, 
+                               balance.period = balance.period,
                                binary = binary, QR = QR,
                                force = force, hasRevs = hasRevs, 
                                tol = tol, boot = 0,
@@ -1386,11 +1443,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                placebo.period = placebo.period,
                                carryoverTest = carryoverTest,
                                carryover.period = carryover.period,
-                               group.level = g.level, group = G), silent = TRUE)
+                               group.level = g.level, group = G)
             }
             else if(method == "gsynth"){
-                out <- try(fect.gsynth(Y = Y, D = D, X = X, I = I, II = II,
+                out <- fect.gsynth(Y = Y, D = D, X = X, I = I, II = II,
                                T.on = T.on, T.off = T.off, r = r, CV = 0, 
+                               T.on.balance = T.on.balance, 
+                               balance.period = balance.period,
                                binary = binary, QR = QR,
                                force = force, hasRevs = hasRevs, 
                                tol = tol, boot = 0,
@@ -1399,11 +1458,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                placebo.period = placebo.period,
                                carryoverTest = carryoverTest,
                                carryover.period = carryover.period,
-                               group.level = g.level, group = G), silent = TRUE)                
+                               group.level = g.level, group = G)               
             } 
             else if (method == "mc") {
                 out <- try(fect.mc(Y = Y, D = D, X = X, I = I, II = II,
                                T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, 
+                               T.on.balance = T.on.balance, 
+                               balance.period = balance.period,
                                lambda.cv = lambda,
                                force = force, hasRevs = hasRevs, 
                                tol = tol, boot = 0,
@@ -1417,6 +1478,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             else if (method %in% c("polynomial",  "cfe")) {
                 out <- fect.polynomial(Y = Y, D = D, X = X, I = I, 
                                        II = II, T.on = T.on, T.on.carry = T.on.carry, 
+                                       T.on.balance = T.on.balance, 
+                                       balance.period = balance.period,
                                        T.off = T.off, method = method,
                                        degree = degree,
                                        sfe = sfe, cfe = cfe,
@@ -1448,6 +1511,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         
         out <- fect.boot(Y = Y, D = D, X = X, I = I, II = II,
                          T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, cl = NULL,
+                         T.on.balance = T.on.balance, balance.period = balance.period,
                          method = method, degree = degree,
                          sfe = sfe, cfe = cfe,
                          ind.matrix = index.matrix,
@@ -1777,6 +1841,16 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     colnames(obs.missing) <- unique(sort(data.old[,id]))
     rownames(obs.missing) <- tname
 
+    obs.missing.balance <- NA
+    if(!is.null(balance.period)){
+        obs.missing.balance <- obs.missing
+        obs.missing.sub <- obs.missing[,rem.id]
+        obs.missing.sub[which(T.on.balance>0)] <- 7
+        obs.missing.sub[which(T.on.balance<=0)] <- 8
+        obs.missing.sub[which(I==0)] <- 3
+        obs.missing.balance[,rem.id] <- obs.missing.sub
+    }
+
     # if cross-validation:
 
     if (p > 0) {
@@ -1839,8 +1913,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                      X = Xname,
                      T.on = T.on,
                      G = G.old,
+                     balance.period = balance.period,
                      hasRevs = hasRevs,
                      T.off = T.off,
+                     T.on.balance = T.on.balance,
                      index = index,
                      id = iname,
                      rawtime = tname,
@@ -1854,7 +1930,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                      carryoverTest = carryoverTest,
                      carryover.period = carryover.period,
                      unit.type = unit.type,
-                     obs.missing = obs.missing), 
+                     obs.missing = obs.missing,
+                     obs.missing.balance = obs.missing.balance), 
                      out)
     
                 
