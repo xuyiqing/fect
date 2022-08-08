@@ -35,7 +35,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  group = NULL, # cohort
                  na.rm = FALSE, # remove missing values
                  balance.period = NULL, # the pre and post periods for balanced samples
-                 balance.missing = TRUE, # whether to balance missing observations
+                 fill.missing = FALSE, # whether to balance missing observations
                  index, # c(unit, time) indicators
                  force = "two-way", # fixed effects demeaning
                  cl = "unit", 
@@ -94,7 +94,7 @@ fect.formula <- function(formula = NULL,
                          group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
                          balance.period = NULL, # the pre and post periods for balanced samples
-                         balance.missing = TRUE, # whether to balance missing observations
+                         fill.missing = FALSE, # whether to balance missing observations
                          index, # c(unit, time) indicators
                          force = "two-way", # fixed effects demeaning
                          cl = "unit", 
@@ -178,7 +178,7 @@ fect.formula <- function(formula = NULL,
                         group = group,
                         na.rm = na.rm, 
                         balance.period = balance.period,
-                        balance.missing = balance.missing,
+                        fill.missing = fill.missing,
                         index = index, 
                         force = force, 
                         cl = cl, 
@@ -241,7 +241,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
                          balance.period = NULL, # the pre and post periods for balanced samples
-                         balance.missing = FALSE, # whether to balance missing observations
+                         fill.missing = FALSE, # whether to balance missing observations
                          index, # c(unit, time) indicators
                          force = "two-way", # fixed effects demeaning
                          cl = "unit", 
@@ -571,8 +571,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if(balance.period[2]<1){
             stop("The second element in \"balance.period\" should be no smaller than 1.")
         }
-        if (is.logical(balance.missing) == FALSE & !balance.missing%in%c(0, 1)) {
-            stop("\"balance.missing\" is not a logical flag.")
+        if (is.logical(fill.missing) == FALSE & !fill.missing%in%c(0, 1)) {
+            stop("\"fill.missing\" is not a logical flag.")
         }
         if (!is.null(group)) {
             stop("\"group\" should not be used with \"balance.period\".\n")
@@ -1156,12 +1156,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## for balance group, add group indicator
     T.on.balance <- matrix(NA, TT, (N - length(rm.id)))
     if(!is.null(balance.period)){
-        if(balance.missing == TRUE){
+        if(fill.missing == FALSE){
             T.on.miss <- T.on
             T.on.miss[which(I==0)] <- NA
             T.on.balance <- apply(T.on.miss,2,function(x) v_replace(balance.periods,x))
         }
-        if(balance.missing == FALSE){
+        if(fill.missing == TRUE){
             T.on.balance <- apply(T.on,2,function(x) v_replace(balance.periods,x))
         }
         if(sum(!is.na(T.on.balance))==0){ 

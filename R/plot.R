@@ -47,7 +47,7 @@ plot.fect <- function(x,
   axis.lab.gap = c(0, 0),
   start0 = FALSE,
   return.test = TRUE,
-  balance = FALSE,
+  balance = NULL,
   ...){
 
 
@@ -68,8 +68,11 @@ plot.fect <- function(x,
     }
     loo.test.out <- test.out <- x$test.out
 
-    if(balance){
-        if(is.null(x$balance.period)){
+    if(is.null(balance)){
+        if(!is.null(x$balance.period)){
+            balance <- TRUE
+        }
+        else{
             balance <- FALSE
         }
     }
