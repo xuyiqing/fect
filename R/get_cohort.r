@@ -114,10 +114,9 @@ get.cohort <- function(data,
         }
     }
 
-
     ## sort data
-    data <- data[order(data[,index.id], data[,index.time]), ]
-
+    data <- data[order(data[,index.id], data[,index.time]), ]    
+    data.raw <- data
     id.match <- as.numeric(as.factor(raw.id))
     names(id.match) <- as.character(raw.id)
     time.match <- as.numeric(as.factor(raw.time))
@@ -126,8 +125,9 @@ get.cohort <- function(data,
     ## generate first treated
     ## check balanced panel and fill unbalanced panel
     Dname <- D
-    I <- D <- NULL
+    T.on <- I <- D <- NULL
     if (dim(data)[1] != TT*N) {
+        data[,index.id] <- as.numeric(as.factor(data[,index.id]))
         data[,index.time] <- as.numeric(as.factor(data[,index.time]))
         ob.indicator <- data[,index.time]
         id.indicator <- table(data[, index.id])
@@ -155,6 +155,15 @@ get.cohort <- function(data,
         D <- matrix(data[,Dname], TT, N)
     }
 
+    T.on <- matrix(NA, TT, N)
+    for (i in 1:N) {
+        T.on[, i] <-  get_term(D[, i], I[, i], type = "on")
+    }
+    
+    t.on <- c(T.on)
+    use.index <- (data[,index.id]-1)*TT + data[,index.time]
+    t.on <- t.on[use.index]-1
+
     tr.pos <- which(apply(D, 2, sum) > 0)
     co.pos <- which(apply(D, 2, sum) == 0)
     tr.name <- names(id.match)[tr.pos]
@@ -176,7 +185,7 @@ get.cohort <- function(data,
     }
     data.raw <- merge(data.raw,first.treat,by.x = index.id, by.y = "index.id")
     data.raw[,varname2] <- 'Control'
-    
+    data.raw[,'Time_to_Treatment'] <- t.on
     if(stagger==1){
         all.first.treat <- sort(unique(data.raw[,varname1]))
         for(sub.first in all.first.treat){
