@@ -1963,7 +1963,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     # classic equivalence test, placeboTest, and carryoverTest
     # this can also be used in placeboTest
     
-    # 👇this is the classic equivalence test
+    # this is the classic equivalence test
     if(loo==TRUE){
         output$loo <- FALSE
     }
@@ -1979,7 +1979,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
 
-    # 👇this is the loo equivalence test
+    # this is the loo equivalence test
     if(loo==TRUE){
         output$loo <- TRUE
     }

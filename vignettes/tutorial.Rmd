@@ -29,7 +29,7 @@ In this tutorial, we illustrate how to use the **fect** package in **R** to impl
 
 ##  Simulated data
 
-**fect**  ships two datasets. In this demo, we will primarily be using **simdata**, in which the treatment is allowed to switch on and off. There are 200 units and 35 time periods. We describe its DGP in the [paper](https://papers.ssrn.com/abstract=3555463). T
+**fect**  ships two datasets. In this demo, we will primarily be using **simdata**, in which the treatment is allowed to switch on and off. There are 200 units and 35 time periods. We describe its DGP in the [paper](https://papers.ssrn.com/abstract=3555463). 
 ```{r message = FALSE, warning = FALSE}
 set.seed(1234)
 library(fect)
@@ -159,6 +159,19 @@ out.mc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 
 ```{r fig.width = 6, fig.height = 4.5}
 p <- plot(out.mc, main = "Estimated ATT (MC)")
+```  
+
+### Balanced sample
+
+```{r simdata_bal, eval=TRUE, cache = TRUE}
+out.bal <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
+  balance.period = c(-4, 4), force = "two-way", method = "ife", 
+  CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
+```
+
+
+```{r fig.width = 6, fig.height = 4.5}
+plot(out.bal, main = "Estimated ATT (Balanced Sample)")
 ```  
 
 ## Heterogeneous treatment effects
@@ -423,7 +436,7 @@ p <- plot(out.ife.rm.test, type = 'status', axis.lab = "off", gridOff = TRUE)
 ### Average cohort effect
 
 **fect** allows us to estimate and visualize the ATTs for sub-groups of treated units. For example, it can draw the gap plot for units that adopt the treatment at the same time under staggered adoption, which is defined as "Cohort" in @Sun2021-ss. Our simulated dataset is not ideal to demonstrate this functionality because the treatment switches on and off. To improve feasibility, we define a cohort as a group of treated units that first adopt the treatment at the same time. 
-```{r simdata_panelview_cohort , fig.width = 6, fig.height = 4.5}
+```{r simdata_panelview_cohort, fig.width = 6, fig.height = 4.5}
 panelview(Y ~ D, data = simdata, index = c("id","time"), by.timing = TRUE,
   axis.lab = "time", xlab = "Time", ylab = "Unit", 
   background = "white", main = "Simulated Data: Treatment Status")

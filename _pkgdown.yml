@@ -46,6 +46,13 @@ reference:
   - contents:
     - simdata
     - turnout
+    - capacity
+  - title: Internal
+  - contents:
+    - fect-package
+    - fect-internal
+    - att.cumu
+
 
 authors:
   Yiqing Xu:
