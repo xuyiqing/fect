@@ -395,9 +395,11 @@ fect.boot <- function(Y,
         id.tr <- which(sum.D>0)
         I.tr <- as.matrix(out$I[,id.tr])
         id.co <- which(sum.D==0)
-        Nco <- length(co)
-        Ntr <- length(tr)
+        Nco <- length(id.co)
+        Ntr <- length(id.tr)
+
         fit.out[which(out$I==0)] <- 0
+
         error.co <- out$res.full[,id.co]
         I.co <- out$I[,id.co]
         T0.ub <- apply(as.matrix(out$D[,id.tr] == 0), 2, sum) 
@@ -433,9 +435,11 @@ fect.boot <- function(Y,
             ## obtain the prediction eror
             D.pseudo <- out$D[, c(id.tr, id.co.pseudo)]  ## fake.tr + control left
             Y.pseudo <- out$Y[, id.pseudo]
+            T.on.pseudo <- T.on[,id.pseudo]
+            
             X.pseudo <- NULL
             if (p > 0) {
-                X.pseudo <- out$X[,id.pseudo,,drop = FALSE]
+                X.pseudo <- X[,id.pseudo,,drop = FALSE]
             }
 
             ## output
@@ -444,10 +448,11 @@ fect.boot <- function(Y,
             #                             force = force, r = out$r.cv, CV = 0,
             #                             tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
 
-            synth.out <- fect.gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
-                                     I = I.id.pseudo, II = II.id.pseudo,T.on = T.on, hasRevs = hasRevs,
+            synth.out <- try(fect.gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
+                                     I = I.id.pseudo, II = II.id.pseudo,
+                                     T.on = T.on.pseudo, hasRevs = hasRevs,
                                      force = force, r = out$r.cv, CV = 0,
-                                     tol = tol, norm.para = norm.para, boot = 1)
+                                     tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
    
             if ('try-error' %in% class(synth.out)) {
                 return(matrix(NA, TT, Ntr))
@@ -460,7 +465,7 @@ fect.boot <- function(Y,
                     else {
                         output <- synth.out$eff.tr/norm.para[1]
                     }
-                                   
+                    
                     return(as.matrix(output)) ## TT * Ntr
                 } 
                 else {
@@ -471,14 +476,14 @@ fect.boot <- function(Y,
 
         cat("\rSimulating errors ...")
         if (parallel == TRUE) {
-        error.tr <- foreach(j = 1:nboots,
-                            .combine = function(...) abind(...,along=3),
-                            .multicombine = TRUE,
-                            .export = c("fect.gsynth","initialFit"),
-                            .packages = c("fect","mvtnorm","fixest"),
-                            .inorder = FALSE)  %dopar% {
-                                return(draw.error())
-                            } 
+            error.tr <- foreach(j = 1:nboots,
+                                .combine = function(...) abind(...,along=3),
+                                .multicombine = TRUE,
+                                .export = c("fect.gsynth","initialFit"),
+                                .packages = c("fect","mvtnorm","fixest"),
+                                .inorder = FALSE)  %dopar% {
+                                    return(draw.error())
+                                } 
         } 
         else {
             error.tr <- array(NA, dim = c(TT, Ntr, nboots))
