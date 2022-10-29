@@ -66,16 +66,15 @@ interFE.formula <- function(formula=NULL, data, # a data frame
                            normalize)
     out$call <- match.call()
     out$formula <- formula
-    print(out)
     return(out)
 }
 
 
 print.interFE <- function(x,
                          ...) {
-    cat("Call:\n")
+    message("Call:\n")
     print(x$call, digits = 4)
-    cat("\nEstimated Coefficients:\n")
+    message("\nEstimated Coefficients:\n")
     print(x$est.table, digits = 4) 
 }
 
@@ -236,7 +235,7 @@ interFE.default <- function(formula=NULL, data, # a data frame
             #        if (tot.var.unit == 0) {
                         ## time invariant covar can be removed
             #            xp[i] <- 1
-            #            cat(paste("Variable \"", Xname[i],"\" is time-invariant.\n", sep = ""))   
+            #            message(paste("Variable \"", Xname[i],"\" is time-invariant.\n", sep = ""))   
             #        }
             #    }
             #}
@@ -252,7 +251,7 @@ interFE.default <- function(formula=NULL, data, # a data frame
             #        if (tot.var.time == 0) {
                         ## can be removed in inter_fe
             #            xp[i] <- 1
-            #            cat(paste("Variable \"", Xname[i],"\" has no cross-sectional variation.\n", sep = ""))
+            #            message(paste("Variable \"", Xname[i],"\" has no cross-sectional variation.\n", sep = ""))
             #        }
             #    }
             #} 
@@ -382,7 +381,7 @@ interFE.default <- function(formula=NULL, data, # a data frame
         }
         ## to store results
         est.boot <- matrix(NA,nboots,(p+1))
-        cat("Bootstraping...\n")
+        message("Bootstraping...\n")
         for (i in 1:nboots) {
             smp <- sample(1:N, N , replace=TRUE)
             Y.boot <- Y[,smp]
@@ -449,9 +448,9 @@ interFE.default <- function(formula=NULL, data, # a data frame
                 }
             }
             
-            if (i%%100==0) {cat(".")}
+            if (i%%100==0) {message(".")}
         }
-        cat("\r")
+        message("\r")
         ## T*2: lower,upper
         CI<-t(apply(est.boot,2,function(vec)
             quantile(vec,c(0.025,0.975),na.rm=TRUE)))

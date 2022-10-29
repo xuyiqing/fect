@@ -46,11 +46,11 @@ plot.fect <- function(x,
   axis.lab = "both",
   axis.lab.gap = c(0, 0),
   start0 = FALSE,
-  return.test = TRUE,
+  return.test = FALSE,
   balance = NULL,
   ...){
 
-
+    group <- ATT5 <- ATT6 <- CI.lower.90 <- CI.lower6 <- CI.upper.90 <- CI.upper6 <- L1 <- eff <- NULL
 
     # come needed variables
     equiv.p <- NULL
@@ -63,7 +63,7 @@ plot.fect <- function(x,
     xmax <- xmin <- ymax <- ymin <- NULL
 
     # check the class
-    if (class(x) != "fect") {
+    if (class(x)[1] != "fect") {
         stop("Not a \"fect\" object.")
     }
     loo.test.out <- test.out <- x$test.out
@@ -104,7 +104,7 @@ plot.fect <- function(x,
         }
         all.group.name <- names(x$g.level)
         if(!show.group%in%all.group.name){
-            cat("The specified group does not exist or its treatment effects cannot be estimated.\n")
+            message("The specified group does not exist or its treatment effects cannot be estimated.\n")
             return(0)
         } 
     }
@@ -149,14 +149,14 @@ plot.fect <- function(x,
                     nfactors<-min(x$r.cv,4) 
                 } 
                 else if (nfactors>x$r.cv) {
-                    cat("Too many factors specified. ")
+                    message("Too many factors specified. ")
                     nfactors<-min(x$r.cv,4) 
                 }
                 if (nfactors == 1) {
-                    cat("Loadings for the first factor are shown...\n")
+                    message("Loadings for the first factor are shown...\n")
                 } 
                 else if (nfactors < x$r.cv) {
-                    cat(paste("Loadings for the first",nfactors,"factors are shown...\n"))
+                    message(paste("Loadings for the first",nfactors,"factors are shown...\n"))
                 }
 
                 ## title
@@ -286,7 +286,7 @@ plot.fect <- function(x,
             }
 
             if (x$r.cv==0) {
-                cat("No factors included in the model.\n")
+                message("No factors included in the model.\n")
             } 
             else {
                 ## axes labels
@@ -1075,7 +1075,7 @@ plot.fect <- function(x,
         data2 <- NULL
         if (bound != "none") {
             if (is.null(x$est.att)) {
-                cat("No uncertainty estimates.\n")
+                message("No uncertainty estimates.\n")
                 bound <- "none"
             }
         }
@@ -1083,7 +1083,7 @@ plot.fect <- function(x,
             time0 <- NULL
             if (switch.on == TRUE) {
                 if (sum(time[show] <= 0) == 0) {
-                    cat("No pretreatment periods are to be plotted.\n")
+                    message("No pretreatment periods are to be plotted.\n")
                     time0 <- 1:length(time[show])
                 } else {
                     time0 <- which(time[show] <= 0)
@@ -1093,7 +1093,7 @@ plot.fect <- function(x,
             } 
             else {
                 if (sum(time[show] > 0) == 0) {
-                    cat("No non-treatment periods are to be plotted.\n")
+                    message("No non-treatment periods are to be plotted.\n")
                     time0 <- 1:length(time[show])
                 } else {
                     time0 <- which(time[show] >= 1)
@@ -1299,7 +1299,7 @@ plot.fect <- function(x,
 
         # height of the histogram
         if (CI == FALSE) {
-                cat("Uncertainty estimates not available.\n")
+                message("Uncertainty estimates not available.\n")
                 if (length(ylim) != 0) {
                     rect.length <- (ylim[2] - ylim[1]) / 5
                     rect.min <- ylim[1]
@@ -1957,7 +1957,7 @@ plot.fect <- function(x,
         }
 
         if (CI == FALSE) {
-            cat("Uncertainty estimates not available.\n")
+            message("Uncertainty estimates not available.\n")
             data.1 <- x$eff.calendar
                 data.2 <- x$eff.calendar.fit
                 if (length(ylim) != 0) {

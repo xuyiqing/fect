@@ -330,9 +330,9 @@ fect.boot <- function(Y,
 
     if (dis) {
       if (vartype == "jackknife") {
-          cat("Jackknife estimates ... ")
+          message("Jackknife estimates ... ")
       } else {
-          cat("Bootstrapping for uncertainties ... ")
+          message("Bootstrapping for uncertainties ... ")
       }
     }
 
@@ -390,7 +390,7 @@ fect.boot <- function(Y,
         }
     }
     else if(binary == FALSE & method %in% c("gsynth") & vartype == "parametric"){
-        cat("Parametric Bootstrap \n")
+        message("Parametric Bootstrap \n")
         sum.D <- colSums(out$D)
         id.tr <- which(sum.D>0)
         I.tr <- as.matrix(out$I[,id.tr])
@@ -474,7 +474,7 @@ fect.boot <- function(Y,
             }             
         }
 
-        cat("\rSimulating errors ...")
+        message("\rSimulating errors ...")
         if (parallel == TRUE) {
             error.tr <- foreach(j = 1:nboots,
                                 .combine = function(...) abind(...,along=3),
@@ -490,7 +490,7 @@ fect.boot <- function(Y,
             for (j in 1:nboots) {
                 error.tr[,,j] <- draw.error()
                 if (j %% 100 == 0) {
-                    cat(".")
+                    message(".")
                 }
             }
         }
@@ -600,7 +600,7 @@ fect.boot <- function(Y,
 
     }
     else if(binary == FALSE & method %in% c("ife","mc","polynomial", "bspline","cfe") & vartype == 'parametric'){
-        cat("Parametric Bootstrap \n")
+        message("Parametric Bootstrap \n")
         sum.D <- colSums(out$D)
         tr <- which(sum.D>0)
         co <- which(sum.D==0)
@@ -1124,7 +1124,7 @@ fect.boot <- function(Y,
             }
             ## report progress
             if (j%%100 == 0)  {
-                cat(".")   
+                message(".")   
             }  
         }  
     } 
@@ -1189,7 +1189,7 @@ fect.boot <- function(Y,
         }
     }
     if (dis) {
-        cat(dim(att.boot)[2], " runs\n", sep = "")
+        message(dim(att.boot)[2], " runs\n", sep = "")
     }
 
 
@@ -1706,7 +1706,7 @@ fect.boot <- function(Y,
                                                             subgroup.se.carryover, 
                                                             subgroup.CI.carryover, 
                                                             subgroup.pvalue.carryover,
-                                                            subgroup.pvalue.carryover.bound)))
+                                                            subgroup.CI.carryover.bound)))
                         colnames(subgroup.est.carryover) <- c("ATT.carryover", "S.E.", 
                                                               "CI.lower", "CI.upper", "p.value",
                                                               "CI.lower(90%)","CI.upper(90%)")                 

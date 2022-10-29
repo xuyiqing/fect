@@ -549,7 +549,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
 
                 if (!is.null(carryover.period) && carryoverTest == 1) {
                     if (length(carryover.period) == 1) {
-                        carryover.pos.sub <- which(time.off.sub == carryover.period.sub)
+                        carryover.pos.sub <- which(time.off.sub == carryover.period)
                         if(length(carryover.pos.sub)>0){
                             att.carryover.sub <- att.off.sub[carryover.pos.sub]
                         } else{att.carryover.sub <- NULL}      

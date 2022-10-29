@@ -128,7 +128,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
     if(CV==TRUE){
         ## starting r    
         if ((r > (T0.min-1) & force%in%c(0,2)) | (r > (T0.min-2) & force%in%c(1,3))) {
-            cat("Warning: r is too big compared with T0; reset to 0.\n")
+            message("Warning: r is too big compared with T0; reset to 0.\n")
             r <- 0
         }
 
@@ -142,7 +142,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
 
         if (r.max == 0) {
             r.cv <- 0
-            cat("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
+            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
             if (!0%in%I.co) {
                 est.co.best <- inter_fe(Y.co, X.co, 0, force = force, beta0 = beta0, tol) 
             } else {
@@ -153,7 +153,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
         else {
             r.old <- r ## save the minimal number of factors 
             
-            cat("Cross-validating ...","\r")
+            message("Cross-validating ...","\r")
             CV.out <- matrix(NA, (r.max - r.old + 1), 5)
             colnames(CV.out) <- c("r", "sigma2", "IC", "PC", "MSPE")
             CV.out[,"r"] <- c(r.old:r.max)
@@ -309,7 +309,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
                     r.cv <- r
                 } 
                 else {
-                    if (r == r.cv + 1) cat("*")
+                    if (r == r.cv + 1) message("*")
                 }
 
                 if (PC < min(CV.out[,"PC"])) {
@@ -317,7 +317,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
                     est.co.pc.best <- est.co
                 } 
                 CV.out[i, 2:5] <- c(sigma2, IC, PC, MSPE)
-                cat("\n r = ",r, "; sigma2 = ",
+                message("\n r = ",r, "; sigma2 = ",
                     sprintf("%.5f",sigma2), "; IC = ",
                     sprintf("%.5f",IC), "; PC = ",
                     sprintf("%.5f",PC), "; MSPE = ",
@@ -326,9 +326,9 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
             } ## end of while: search for r_star over
 
             MSPE.best <- min(CV.out[,"MSPE"])    
-            if (r > (T0.min-1)) {cat(" (r hits maximum)")}
-            cat("\n\n r* = ",r.cv, sep="")
-            cat("\n\n") 
+            if (r > (T0.min-1)) {message(" (r hits maximum)")}
+            message("\n\n r* = ",r.cv, sep="")
+            message("\n\n") 
         }
     }
     else{
@@ -984,7 +984,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
 
                 if (!is.null(carryover.period) && carryoverTest == 1) {
                     if (length(carryover.period) == 1) {
-                        carryover.pos.sub <- which(time.off.sub == carryover.period.sub)
+                        carryover.pos.sub <- which(time.off.sub == carryover.period)
                         if(length(carryover.pos.sub)>0){
                             att.carryover.sub <- att.off.sub[carryover.pos.sub]
                         } else{att.carryover.sub <- NULL}      

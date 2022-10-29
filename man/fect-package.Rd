@@ -20,16 +20,17 @@
   Ye Wang <yw1576@nyu.edu>, New York University
   
   Yiqing Xu <yiqingxu@stanford.edu >, Stanford University
+
+  Ziyi Liu <zyliu2020@uchicago.edu>, University of Chicago
 }
 \references{
-  Jushan Bai. 2009. "Panel Data Models with Interactive Fixed Effects." Econometrica 77:1229--1279.
+  Jushan Bai. 2009. "Panel Data Models with Interactive Fixed Effects." Econometrica.
   
   Yiqing Xu. 2017. "Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models." Political 
-  Analysis, Vol. 25, Iss. 1, January 2017, pp. 57-76. Available at: \url{https://doi.org/10.1017/pan.2016.2}. 
+  Analysis. 
   
-  Athey, Susan, et al. 2018 "Matrix completion methods for causal panel data models." arXiv preprint arXiv:1710.10251. Available at
-  : \url{https://https://arxiv.org/abs/1710.10251}. 
+  Athey, Susan, et al. 2021 "Matrix completion methods for causal panel data models." Journal of the American Statistical Association. 
   
-  Licheng Liu, et al. 2020. "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional 
-  Data." Working paper. Available at: \url{https://polmeth.mit.edu/sites/default/files/documents/Yiqing_Xu.pdf}. 
+  Licheng Liu, et al. 2022. "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional 
+  Data." American Journal of Political Science. 
 }

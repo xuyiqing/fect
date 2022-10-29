@@ -63,7 +63,7 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
 
     if (r.max == 0) {
         r.cv <- 0
-        cat("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
+        message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
         initialOut <- BiInitialFit(data = data.ini, QR = QR, r = 0, force = force, oci = oci)
         Y0 <- initialOut$Y0
         FE0 <- initialOut$FE0
@@ -87,11 +87,11 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
     if (r.end >= T0.min) {
-        cat("Facotr number should not be greater than ", T0.min - 1, "\n", sep = "")
+        message("Facotr number should not be greater than ", T0.min - 1, "\n", sep = "")
         r.end <- T0.min-1
     } else {
         if (obs.con) {
-            cat("Facotr number should not be greater than ", r.end, "\n", sep = "")
+            message("Facotr number should not be greater than ", r.end, "\n", sep = "")
         }
     }
 
@@ -110,7 +110,7 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
     if (r.max > 0) {
 
         r.old <- r ## save the minimal number of factors 
-        cat("Cross-validating ...","\n") 
+        message("Cross-validating ...","\n") 
 
                          ## ----- ##
         ## ------------- initialize ------------ ##
@@ -153,7 +153,7 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
                     break
                 }
                 if (cv.n>=100) {
-                    cat("Some units have too few pre-treatment observations. Remove them automatically.")
+                    message("Some units have too few pre-treatment observations. Remove them automatically.")
                     keep.1 <- which(apply(II.cv, 1, sum) < 1)
                     keep.2 <- which(apply(II.cv, 2, sum) < 1)
                     II.cv[keep.1,] <- II[keep.1,]
@@ -174,7 +174,7 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
         ##  --------------------------------------------- ##
         
             
-        cat("Probit model with interactive fixed effects ...\n")
+        message("Probit model with interactive fixed effects ...\n")
         
         MSPE.best <- NULL
         CV.out <- matrix(NA, (r.max - r.old + 1), 4)
@@ -237,19 +237,19 @@ fect.binary.cv <- function(Y, # Outcome variable, (T*N) matrix
                 est.best <- est.cv  
                 r.cv <- r
             } else {
-                if (r == r.cv + 1) cat("*")
+                if (r == r.cv + 1) message("*")
             }
 
             CV.out[i, 2:4] <- c(IC, Loglikelihood, MSPE)
 
-            cat("\n r = ",r, "; IC = ",
+            message("\n r = ",r, "; IC = ",
                 sprintf("%.5f",IC), "; Log-likelihood = ",
                 sprintf("%.5f",Loglikelihood), "; MSPE = ",
                 sprintf("%.5f",MSPE), sep="")
         }
-        if (r > (TT-1)) {cat(" (r hits maximum)")}
-        cat("\n\n r* = ",r.cv, sep="")
-        cat("\n\n") 
+        if (r > (TT-1)) {message(" (r hits maximum)")}
+        message("\n\n r* = ",r.cv, sep="")
+        message("\n\n") 
 
     }    ## End of Cross-Validation 
     validF <- ifelse(r.cv > 0, 1, 0)

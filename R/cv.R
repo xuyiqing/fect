@@ -91,14 +91,14 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
     if (r.end >= T0.min) {
         if (method %in% c("both", "ife", "gsynth")) {
-            cat("Factor number should not be greater than ", T0.min-1, "\n", sep = "")
+            message("Factor number should not be greater than ", T0.min-1, "\n", sep = "")
         }
         r.end <- T0.min-1
     } 
     else {
         if (obs.con) {
             if (method %in% c("both", "ife", "gsynth")) {
-                cat("Factor number should not be greater than ", r.end, "\n", sep = "")
+                message("Factor number should not be greater than ", r.end, "\n", sep = "")
             }
         }
     }
@@ -123,40 +123,40 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                                 X, II, beta0, 
                                 0, force = force, 
                                 tol)
-        cat("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
+        message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
     }
     else {
 
         r.old <- r ## save the minimal number of factors 
-        cat("Cross-validating ...","\n") 
+        message("Cross-validating ...","\n") 
         if(criterion=='mspe'){
-            cat("Criterion: Mean Squared Prediction Error\n")
+            message("Criterion: Mean Squared Prediction Error\n")
         }
         else if(criterion=='wmspe'){
-            cat("Criterion: Weighted Mean Squared Prediction Error\n")
+            message("Criterion: Weighted Mean Squared Prediction Error\n")
         }
         else if(criterion=='gmspe'){
-            cat("Criterion: Geometric Mean Squared Prediction Error\n")
+            message("Criterion: Geometric Mean Squared Prediction Error\n")
         }
         else if(criterion=='wgmspe'){
-            cat("Criterion: Weighted Geometric Mean Squared Prediction Error\n")
+            message("Criterion: Weighted Geometric Mean Squared Prediction Error\n")
         }
         else if(criterion=='mad'){
-            cat("Criterion: Median Absolute Deviation\n")
+            message("Criterion: Median Absolute Deviation\n")
         }
         else if(criterion=='moment'){
-            cat("Criterion: Moment Conditions\n")
+            message("Criterion: Moment Conditions\n")
         }
         else if(criterion=='gmoment'){
-            cat("Criterion: Geometric Moment Conditions\n")
+            message("Criterion: Geometric Moment Conditions\n")
         }
         else if(criterion=='pc'){
-            cat("Criterion: PC\n")
+            message("Criterion: PC\n")
         }
 
         ## for gsynth, use the cross-validation function in fect.gsynth
         if(method == "gsynth"){
-            cat("Interactive fixed effects model...\n")
+            message("Interactive fixed effects model...\n")
             out <- fect.gsynth(Y = Y, D = D, X = X, I = I, II = II,
                                T.on = T.on, T.off = T.off, r = r, r.end = r.end, CV = 1,
                                force = force, hasRevs = hasRevs, 
@@ -221,7 +221,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
                 if (cv.n>=200) {
                     flag <- 1
-                    #cat("Some units have too few pre-treatment observations. Remove them automatically in Cross-Validation.")
+                    #message("Some units have too few pre-treatment observations. Remove them automatically in Cross-Validation.")
                     keep.1 <- which(apply(II.cv, 1, sum) < 1)
                     keep.2 <- which(apply(II.cv, 2, sum) < min.T0)
                     II.cv[keep.1,] <- II[keep.1,]
@@ -265,7 +265,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         }
 
         if(flag == 1){
-            cat("Some units have too few pre-treatment observations. Remove them automatically in Cross-Validation.\n")
+            message("Some units have too few pre-treatment observations. Remove them automatically in Cross-Validation.\n")
         }
     
         ## get weighted matrix
@@ -286,7 +286,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         
         if (method %in% c("ife", "both")) {
             
-            cat("Interactive fixed effects model...\n")
+            message("Interactive fixed effects model...\n")
             
             r.pc <- est.pc.best <- MSPE.best <- WMSPE.best <- MSPE.pc.best <- NULL
             gmoment.best <- moment.best <- MAD.best <- GMSPE.best <- WGMSPE.best <- NULL
@@ -406,7 +406,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         est.best <- est.cv  
                         r.cv <- r
                     } else {
-                        if (r == r.cv + 1) cat("*")
+                        if (r == r.cv + 1) message("*")
                     }
                 }
                 else if(criterion == 'wmspe'){
@@ -417,7 +417,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         r.cv <- r
                     } 
                     else {
-                        if (r == r.cv + 1) cat("*")
+                        if (r == r.cv + 1) message("*")
                     }
                 }
                 else if(criterion == 'gmspe'){
@@ -428,7 +428,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         r.cv <- r
                     } 
                     else {
-                        if (r == r.cv + 1) cat("*")
+                        if (r == r.cv + 1) message("*")
                     }
                 }
                 else if(criterion == 'wgmspe'){
@@ -439,7 +439,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         r.cv <- r
                     } 
                     else {
-                        if (r == r.cv + 1) cat("*")
+                        if (r == r.cv + 1) message("*")
                     }
                 }
                 else if(criterion == 'mad'){
@@ -449,7 +449,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         r.cv <- r
                     } 
                     else {
-                        if (r == r.cv + 1) cat("*")
+                        if (r == r.cv + 1) message("*")
                     }
                 }
                 else if(criterion == 'moment'){
@@ -459,7 +459,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         r.cv <- r
                     } 
                     else {
-                        if (r == r.cv + 1) cat("*")
+                        if (r == r.cv + 1) message("*")
                     }
                 }
                 else if(criterion == 'gmoment'){
@@ -469,7 +469,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         r.cv <- r
                     } 
                     else {
-                        if (r == r.cv + 1) cat("*")
+                        if (r == r.cv + 1) message("*")
                     }
                 }
                 else if(criterion == "pc"){
@@ -486,7 +486,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
                 
                 if (criterion == "pc") {
-                    cat("\n r = ",r, "; sigma2 = ",
+                    message("\n r = ",r, "; sigma2 = ",
                         sprintf("%.5f",sigma2), "; IC = ",
                         sprintf("%.5f",IC), "; PC = ",
                         sprintf("%.5f",PC), "; MSPTATT = ",
@@ -494,7 +494,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         sprintf("%.5f",MSE), sep="")
 
                 } else {
-                    #cat("\n r = ",r, "; sigma2 = ",
+                    #message("\n r = ",r, "; sigma2 = ",
                     #    sprintf("%.5f",sigma2), "; IC = ",
                     #    sprintf("%.5f",IC), "; PC = ",
                     #    sprintf("%.5f",PC), "; MSPE = ",
@@ -503,7 +503,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     #    sprintf("%.5f",moment), "; MSPTATT = ",
                     #    sprintf("%.5f",MSPTATT), "; MSE = ",
                     #    sprintf("%.5f",MSE), sep="")
-                    cat("\n r = ",r, "; sigma2 = ",
+                    message("\n r = ",r, "; sigma2 = ",
                         sprintf("%.5f",sigma2), "; IC = ",
                         sprintf("%.5f",IC), "; PC = ",
                         sprintf("%.5f",PC), "; MSPE = ",
@@ -517,7 +517,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             ## compare 
             if (criterion == "both") {
                 if (r.cv > r.pc) {
-                    cat("\n\n Factor number selected via cross validation may be larger than the true number. Using the PC criterion.\n\n ")
+                    message("\n\n Factor number selected via cross validation may be larger than the true number. Using the PC criterion.\n\n ")
                     r.cv <- r.pc 
                     est.best <- est.pc.best
                     MSPE.best <- MSPE.pc.best
@@ -540,16 +540,16 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 gmoment.best.ife <- gmoment.best
             }
             
-            if (r > (TT-1)) {cat(" (r hits maximum)")}
-            cat("\n\n r* = ",r.cv, sep="")
-            cat("\n\n") 
+            if (r > (TT-1)) {message(" (r hits maximum)")}
+            message("\n\n r* = ",r.cv, sep="")
+            message("\n\n") 
         }
 
         ##  ------------------------------------- ##
 ##  ---------------- cross validation for mc ---------------  ##
         ##  ------------------------------------- ##
         if (method %in% c("mc", "both")) {
-            cat("Matrix completion method...\n")
+            message("Matrix completion method...\n")
             eigen.all <- NULL
             if (is.null(lambda) || length(lambda) == 1) {
                 ## create the hyper-parameter sequence
@@ -672,7 +672,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     } else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
-                                cat("*")
+                                message("*")
                                 break_check <- 1
                                 break_count <- 0  
                             } 
@@ -691,7 +691,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
-                                cat("*")
+                                message("*")
                                 break_check <- 1
                                 break_count <- 0  
                             }
@@ -710,7 +710,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
-                                cat("*")
+                                message("*")
                                 break_check <- 1
                                 break_count <- 0  
                             }
@@ -729,7 +729,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
-                                cat("*")
+                                message("*")
                                 break_check <- 1
                                 break_count <- 0  
                             }
@@ -748,7 +748,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
-                                cat("*")
+                                message("*")
                                 break_check <- 1
                                 break_count <- 0  
                             }
@@ -767,7 +767,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
-                                cat("*")
+                                message("*")
                                 break_check <- 1
                                 break_count <- 0  
                             }
@@ -786,7 +786,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
-                                cat("*")
+                                message("*")
                                 break_check <- 1
                                 break_count <- 0  
                             }
@@ -799,7 +799,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
                 CV.out.mc[i, 2:10] <- c(MSPE, WMSPE, GMSPE, WGMSPE, MAD, moment, gmoment, MSPTATT, MSE)
-                cat("\n lambda.norm = ",
+                message("\n lambda.norm = ",
                 sprintf("%.5f",lambda[i]/max(eigen.all)),"; MSPE = ",
                 sprintf("%.5f",MSPE),   "; MSPTATT = ",
                 sprintf("%.5f",MSPTATT), "; MSE = ", 
@@ -816,8 +816,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             MAD.best.mc <- MAD.best
             moment.best.mc <- moment.best
             gmoment.best.mc <- gmoment.best
-            cat("\n\n lambda.norm* = ",lambda.cv/max(eigen.all), sep="")
-            cat("\n\n")
+            message("\n\n lambda.norm* = ",lambda.cv/max(eigen.all), sep="")
+            message("\n\n")
         }
     }    ## End of Cross-Validation 
 
@@ -908,8 +908,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 method <- "mc"
             }
         }
-        cat("\n\n Recommended method through cross-validation: ", method, sep = "")
-        cat("\n\n")
+        message("\n\n Recommended method through cross-validation: ", method, sep = "")
+        message("\n\n")
     }    
     validX <- est.best$validX 
 

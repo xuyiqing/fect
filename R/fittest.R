@@ -54,7 +54,7 @@ fect.test <- function(
 
     pre.pos <- which(T.on <= pre.period[2] & T.on >= pre.period[1] & I == 1)
 
-    ## cat("\n OK3 \n")
+    ## message("\n OK3 \n")
 
     ## demean pre-treatment tr eff under H0 for wild bootstrap
     #eff[pre.pos] <- eff[pre.pos] - mean(eff[pre.pos])
@@ -69,7 +69,7 @@ fect.test <- function(
     f <- summary(lm.fit)$f[1]
     names(f) <- NULL
 
-    ## cat("\n OK4 \n")
+    ## message("\n OK4 \n")
 
     f2 <- NULL
     if (hasRevs) {
@@ -89,7 +89,7 @@ fect.test <- function(
         f2.boot <- rep(NA, nboots)
     }
 
-    ## cat("\n OK1 \n")
+    ## message("\n OK1 \n")
 
     #if (method == "ife") {
         one.nonpara <- function() {
@@ -128,11 +128,11 @@ fect.test <- function(
             }
             
             if ('try-error' %in% class(boot)) {
-                ## cat("NA")
+                ## message("NA")
                 return(list(f.boot = NA, f.boot.2 = NA))
             } else {
-                ## cat(boot$niter)
-                ## cat("\n")
+                ## message(boot$niter)
+                ## message("\n")
                 data <- as.data.frame(boot$eff.pre)
                 #colnames(data) <- c("period", "eff")
                 data <- data[which(data[,"period"] <= pre.period[2] & data[,"period"] >= pre.period[1]),]
@@ -182,11 +182,11 @@ fect.test <- function(
     #                            placebo.period = NULL, placeboTest = 0), silent = TRUE)
 
     #        if ('try-error' %in% class(boot)) {
-                ## cat("NA")
+                ## message("NA")
     #            return(list(f.boot = NA, f.boot.2 = NA))
     #        } else {
-                ## cat(boot$niter)
-                ## cat("\n")
+                ## message(boot$niter)
+                ## message("\n")
     #            data <- as.data.frame(boot$eff.pre)
                 #colnames(data) <- c("period", "eff")
     #            data <- data[which(data[,"period"] <= pre.period[2] & data[,"period"] >= pre.period[1]),]
@@ -236,18 +236,18 @@ fect.test <- function(
             f.boot[j] <- one.boot$f.boot
             ## report progress
             if (j%%100 == 0)  {
-                cat(".")   
+                message(".")   
             }  
         }  
     } 
 
-    ## cat("\n OK2 \n")
+    ## message("\n OK2 \n")
 
     ## end of bootstrapping
     if (sum(is.na(f.boot)) > 0) {
         f.boot <- f.boot[-which(is.na(f.boot))]
     }
-    cat(length(f.boot), " runs\n", sep = "")
+    message(length(f.boot), " runs\n", sep = "")
     
     f.q <- quantile(f.boot, probs = c(0.025, 0.975))
     f.p <- sum(f.boot > f)/length(f.boot)
@@ -383,7 +383,7 @@ fect.test <- function(
     ## bootstrapped F under H0
 #    f.boot <- rep(NA, nboots)
 
-#    cat("\rBootstrapping ...\n")
+#    message("\rBootstrapping ...\n")
 
 #    if (method == "ife") {
 #        one.nonpara <- function() {
@@ -604,12 +604,12 @@ fect.test <- function(
 #            f.boot[j] <- one.boot$f.boot
 #            ## report progress
 #            if (j%%100 == 0)  {
-#                cat(".")   
+#                message(".")   
 #            }  
 #        }  
 #    } 
     ## end of bootstrapping
-#    cat("\r")
+#    message("\r")
 
     
 #    f.q <- quantile(f.boot, probs = c(0.025, 0.975))

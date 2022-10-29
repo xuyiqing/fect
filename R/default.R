@@ -34,11 +34,8 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  X = NULL, # time-varying covariates
                  group = NULL, # cohort
                  na.rm = FALSE, # remove missing values
-                 balance.period = NULL, # the pre and post periods for balanced samples
-                 fill.missing = FALSE, # whether to balance missing observations
                  index, # c(unit, time) indicators
                  force = "two-way", # fixed effects demeaning
-                 cl = "unit", 
                  r = 0, # number of factors
                  lambda = NULL, # mc method: regularization parameter
                  nlambda = 10, ## mc method: regularization parameter
@@ -46,16 +43,16 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  k = 10, # times of CV
                  cv.prop = 0.1, ## proportion of CV counts
                  cv.treat = FALSE, ## cv targeting treated units
-                 cv.nobs = 1,  ## cv taking consecutive units
+                 cv.nobs = 3,  ## cv taking consecutive units
                  cv.donut = 0, ## cv mspe
+                 criterion = "mspe", # for ife model: mspe, pc or both
                  binary = FALSE, # probit model
                  QR = FALSE, # QR or SVD for binary probit 
                  method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
-                 criterion = "mspe", # for ife model: mspe, pc or both
-                 alpha = 0.05, # significance level
                  se = FALSE, # report uncertainties
                  vartype = "bootstrap", # bootstrap or jackknife
                  nboots = 200, # number of bootstraps
+                 alpha = 0.05, # significance level
                  parallel = TRUE, # parallel computing
                  cores = NULL, # number of cores
                  tol = 0.001, # tolerance level
@@ -70,6 +67,8 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  degree = 2,  # wald = FALSE, # fit test
                  sfe = NULL,
                  cfe = NULL,
+                 balance.period = NULL, # the pre and post periods for balanced samples
+                 fill.missing = FALSE, # whether to balance missing observations
                  placeboTest = FALSE, # placebo test
                  placebo.period = NULL, # placebo test period
                  carryoverTest = FALSE, # carry-over test
@@ -77,7 +76,6 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  carryover.rm = NULL,
                  loo = FALSE, # leave one period out placebo  
                  permute = FALSE, ## permutation test
-                 permu.dimension = 'time',
                  m = 2, ## block length
                  normalize = FALSE # accelerate option
                 ) {
@@ -93,11 +91,8 @@ fect.formula <- function(formula = NULL,
                          X = NULL, # time-varying covariates
                          group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
-                         balance.period = NULL, # the pre and post periods for balanced samples
-                         fill.missing = FALSE, # whether to balance missing observations
                          index, # c(unit, time) indicators
                          force = "two-way", # fixed effects demeaning
-                         cl = "unit", 
                          r = 0, # nubmer of factors
                          lambda = NULL, # mc method: regularization parameter
                          nlambda = 10, ## mc method: regularization parameter
@@ -107,14 +102,14 @@ fect.formula <- function(formula = NULL,
                          cv.treat = FALSE, 
                          cv.nobs = 3,
                          cv.donut = 0, ## cv mspe
+                         criterion = "mspe", # for ife model: mspe, pc or both
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
-                         criterion = "mspe", # for ife model: mspe, pc or both
-                         alpha = 0.05, # significance level
                          se = FALSE, # report uncertainties
                          vartype = "bootstrap", # bootstrap or jackknife
                          nboots = 200, # number of bootstraps
+                         alpha = 0.05, # significance level
                          parallel = TRUE, # parallel computing
                          cores = NULL, # number of cores
                          tol = 0.001, # tolerance level
@@ -129,6 +124,8 @@ fect.formula <- function(formula = NULL,
                          degree = 2,   # wald = FALSE,
                          sfe = NULL,
                          cfe = NULL,
+                         balance.period = NULL, # the pre and post periods for balanced samples
+                         fill.missing = FALSE, # whether to balance missing observations
                          placeboTest = FALSE, # placebo test
                          placebo.period = NULL, # placebo test period
                          carryoverTest = FALSE, # carry-over test
@@ -136,7 +133,6 @@ fect.formula <- function(formula = NULL,
                          carryover.rm = NULL,
                          loo = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
-                         permu.dimension = 'time',
                          m = 2, ## block length
                          normalize = FALSE
                         ) {
@@ -181,7 +177,6 @@ fect.formula <- function(formula = NULL,
                         fill.missing = fill.missing,
                         index = index, 
                         force = force, 
-                        cl = cl, 
                         r = r, 
                         lambda = lambda, 
                         nlambda = nlambda, 
@@ -191,14 +186,14 @@ fect.formula <- function(formula = NULL,
                         cv.treat = cv.treat, 
                         cv.nobs = cv.nobs, 
                         cv.donut = cv.donut,
+                        criterion = criterion, 
                         binary = binary, 
                         QR = QR, 
                         method = method, 
-                        criterion = criterion, 
-                        alpha = alpha, 
                         se = se, 
                         vartype = vartype,
                         nboots = nboots, 
+                        alpha = alpha, 
                         parallel = parallel, 
                         cores = cores, 
                         tol = tol, 
@@ -220,13 +215,11 @@ fect.formula <- function(formula = NULL,
                         carryover.rm = carryover.rm,
                         loo = loo,
                         permute = permute, 
-                        permu.dimension = permu.dimension,
                         m = m, 
                         normalize = normalize)
     
     out$call <- match.call()
     out$formula <- formula
-    #print(out)
     return(out)
 
 }
@@ -240,11 +233,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          X = NULL, # time-varying covariates
                          group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
-                         balance.period = NULL, # the pre and post periods for balanced samples
-                         fill.missing = FALSE, # whether to balance missing observations
                          index, # c(unit, time) indicators
                          force = "two-way", # fixed effects demeaning
-                         cl = "unit", 
                          r = 0, # nubmer of factors
                          lambda = NULL, ## mc method: regularization parameter
                          nlambda = 0, 
@@ -254,14 +244,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          cv.treat = TRUE, 
                          cv.nobs = 3,
                          cv.donut = 1, ## cv mspe
+                         criterion = "mspe", 
                          binary = FALSE, # probit model
                          QR = FALSE, # QR or SVD for binary probit 
                          method = "fe", # method: ife for interactive fe; mc for matrix completion
-                         criterion = "mspe", 
-                         alpha = 0.05, # significance level
                          se = FALSE, # report uncertainties
                          vartype = "bootstrap", # bootstrap or jackknife
                          nboots = 200, # number of bootstraps
+                         alpha = 0.05, # significance level
                          parallel = TRUE, # parallel computing
                          cores = NULL, # number of cores
                          tol = 0.001, # tolerance level
@@ -276,6 +266,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          degree = 2,  # wald = FALSE,
                          sfe = NULL,
                          cfe = NULL,
+                         balance.period = NULL, # the pre and post periods for balanced samples
+                         fill.missing = FALSE, # whether to balance missing observations
                          placeboTest = FALSE, # placebo test
                          placebo.period = NULL, # placebo test period
                          carryoverTest = FALSE, # carry-over test
@@ -283,7 +275,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          carryover.rm = NULL, 
                          loo = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
-                         permu.dimension = "time", 
                          m = 2, ## block length
                          normalize = FALSE
                         ) {  
@@ -292,7 +283,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## Checking Parameters
     ##-------------------------------## 
     placeboEquiv <- loo 
-
+    permu.dimension <- 'time'
+                         
     ## read data 
     if (is.data.frame(data) == FALSE || length(class(data)) > 1) {
         data <- as.data.frame(data)
@@ -407,9 +399,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
 
 
-    if (!criterion %in% c("mspe", "wmspe", "gmspe", "moment", "gmoment", "mad", "pc")) {
-        stop("\"criterion\" option misspecified; choose from c(\"mspe\", \"wmspe\", \"mad\", \"gmspe\",\"moment\",\"gmoment\", \"pc\").")
+    if (!criterion %in% c("mspe", "gmspe", "moment", "pc")) {
+        stop("\"criterion\" option misspecified; choose from c(\"mspe\", \"gmspe\",\"moment\", \"pc\").")
     }
+
+    #if (!criterion %in% c("mspe","pc")) {
+    #    stop("\"criterion\" option misspecified; choose from c(\"mspe\", \"pc\").")
+    #}
 
     if (method == "both" && criterion == "pc") {
         stop("\"ife\" and \"mc\" method cannot be compared; try using \"mspe\" as criteria.")
@@ -428,7 +424,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             }
         }
         if (CV == FALSE & is.null(lambda)) {
-            cat("No lambda is supplied. FEct is applied.")
+            message("No lambda is supplied. FEct is applied.")
             method <- "ife"
             r <- 0
         }
@@ -437,15 +433,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## leave one period out placebo 
     if (placeboEquiv == TRUE) {
         if(se!=TRUE){
-            cat("For leave one period out placebo test, automatically set \"se\" to TRUE.")
+            message("For leave one period out placebo test, automatically set \"se\" to TRUE.")
             se <- TRUE
         }
         if(placeboTest == TRUE){
-            cat("For leave one period out placebo test, automatically set \"placeboTest\" to FALSE.")
+            message("For leave one period out placebo test, automatically set \"placeboTest\" to FALSE.")
             placeboTest <- FALSE
         }
         if(carryoverTest == TRUE){
-            cat("For leave one period out placebo test, automatically set \"carryoverTest\" to FALSE.")
+            message("For leave one period out placebo test, automatically set \"carryoverTest\" to FALSE.")
             carryoverTest <- FALSE
         }
     }
@@ -485,7 +481,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     if (method %in% c("polynomial","cfe")) {
         if (permute == 1) {
-            cat("Cannot do permutation test.\n")
+            message("Cannot do permutation test.\n")
             permute <- 0
         }
     }
@@ -593,7 +589,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     if(method == 'cfe'){
         if(is.null(sfe) & is.null(cfe)){
-            cat("No additional sfe and cfe, use the \"fe\" estimator by default.\n")
+            message("No additional sfe and cfe, use the \"fe\" estimator by default.\n")
             r <- 0
             CV <- FALSE
             method <- "ife"
@@ -701,7 +697,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     Yname <- Y
     Dname <- D
     Xname <- X
-    clname <- cl
+    clname <- cl <- NULL
 
     #if (!is.null(clname)) {
     #    if (!clname %in% index) {
@@ -760,7 +756,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     hasCarryover <- 0
 
     if (!is.null(carryover.rm)) {
-        if (length(carryover.rm) == 1 & class(carryover.rm) == "numeric") {
+        if (length(carryover.rm) == 1 & class(carryover.rm)[1] == "numeric") {
             if (carryover.rm > 0) {
                 newT <- as.numeric(as.factor(data[, time]))
                 data <- data[order(data[, id], data[, time]),]
@@ -809,16 +805,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         TT <- length(unique(data[,time]))
         N <- length(unique(data[,id]))
         if(TT!=TT.old){
-            cat("Some periods are totally removed after drop missing values of the outcome or covariates.\n")
+            message("Some periods are totally removed after drop missing values of the outcome or covariates.\n")
         }
         if(N!=N.old){
-            cat("Some units are totally removed after drop missing values of the outcome or covariates.\n")
+            message("Some units are totally removed after drop missing values of the outcome or covariates.\n")
         }
         id.series <- unique(sort(data[,id])) ## unit id
         time.uni <- unique(sort(data[,time])) ## period
 
         #remove these dropped units or periods in data.full
-        #print(length(setdiff(data.full[,id],data[,id])))
         if(length(setdiff(data.full[,id],data[,id]))>0){
             rm.na.id <- setdiff(data.full[,id],data[,id])
             data.full <- data.full[which(!data.full[,id] %in% rm.na.id),]
@@ -867,7 +862,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         rawgroup <- rawgroup[!duplicated(rawgroup[, 1]),]
     }
 
-    ##cat("\nOK1\n")
+    ##message("\nOK1\n")
     
 
 
@@ -984,7 +979,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     
     ## each unit should have the same group index
 
-    ## cat("\nOK2\n")
+    ## message("\nOK2\n")
 
     ##treatment indicator: incorporates reversal treatments
     ## D==1 -> treatment
@@ -1037,7 +1032,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## rm.tr.id: relative location of treated units (within all treated units) 
     ## that will be removed 
     if (T0.min < min.T0) {
-        cat(paste0("For identification purposes, units whose number of untreated periods <",min.T0," are dropped automatically.\n"))
+        message(paste0("For identification purposes, units whose number of untreated periods <",min.T0," are dropped automatically.\n"))
     }
 
     rm.id <- sort(unique(c(which((TT - apply(I, 2, sum)) > max.missing), which(T0 < min.T0))))
@@ -1078,18 +1073,18 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
-    ## cat("\nOK1\n")  
+    ## message("\nOK1\n")  
 
     ## 2. check if some periods when all units are missing or treated
     I.use <- apply(II, 1, sum) 
     if (0%in%I.use) {
         for (i in 1:TT) {
             if (I.use[i] == 0) {
-                cat("\nThere are not any observations under control at ",time.uni[i],", drop that period.\n")
+                message("\nThere are not any observations under control at ",time.uni[i],", drop that period.\n")
             }
         }
         if (method %in% c("polynomial")) {
-            cat("\nThere are not any observations at some periods. Estimation results may not be reliable. Please use time fixed effects.\n")
+            message("\nThere are not any observations at some periods. Estimation results may not be reliable. Please use time fixed effects.\n")
         }
         TT <- TT - sum(I.use == 0)
         time.uni <- time.uni[-which(I.use == 0)]
@@ -1122,7 +1117,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
-    ## cat("\nOK2\n")  
+    ## message("\nOK2\n")  
 
     ## 3. relative period
     T.on <- matrix(NA, TT, (N - length(rm.id)))
@@ -1387,7 +1382,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if (is.null(seed) == FALSE) {
             registerDoRNG(seed)
         }
-        cat("Parallel computing ...\n")
+        message("Parallel computing ...\n")
     }
     
     ##-------------------------------##
@@ -1573,7 +1568,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             method <- "ife"
         }
 
-        cat("\nOut-of-Sample Test...\n")
+        message("\nOut-of-Sample Test...\n")
         #if (is.null(placebo.period)) {
         #    pre.term <- pre.term.min:0
         #} else {
@@ -1640,9 +1635,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             T0.2 <- apply(pII, 2, sum)
 
             if (sum(T0.2[which(apply(D, 2, sum) > 0)] >= min.T0) == 0) {
-                cat("\n")
-                cat(paste("All treated units have been removed for period ", kk, sep = ""))
-                cat("\n")
+                message("\n")
+                message(paste("All treated units have been removed for period ", kk, sep = ""))
+                message("\n")
                 jj <- jj - 1
             
             } else {
@@ -1651,9 +1646,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 if (kk == 0) {
                     te <- paste(te, "(one period before treatment)", sep = " ")
                 }
-                cat("\n")
-                cat(te)
-                cat("\n")
+                message("\n")
+                message(te)
+                message("\n")
 
                 rem.id.new <- rem.id
                 rm.id.2.pos <- sort(which(T0.2 < min.T0))
@@ -1761,7 +1756,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     ## permutation test 
     if (permute == TRUE) {
-        cat("Permuting under sharp null hypothesis ... ")
+        message("Permuting under sharp null hypothesis ... ")
 
         out.permute <- fect.permu(Y = Y, X = X, D = D, I = I, r.cv = out$r.cv,
                                   lambda.cv = out$lambda.cv, m = m, 
@@ -1784,7 +1779,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         #closeAllConnections()
     }
 
-    ## cat("\nOK4\n")
+    ## message("\nOK4\n")
 
        
     
@@ -1937,8 +1932,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 
     if (1 %in% rm.id) {
         output <- c(output,list(remove.id = remove.id))
-        ## cat("list of removed units:",remove.id)
-        ## cat("\n\n")
+        ## message("list of removed units:",remove.id)
+        ## message("\n\n")
     }    
     
     #if (se == TRUE) { 

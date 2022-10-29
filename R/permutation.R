@@ -124,7 +124,7 @@ fect.permu <- function(Y,
             att.avg.permu[j] <- permu
             ## report progress
             if (j%%100 == 0)  {
-                cat(".")   
+                message(".")   
             }  
         }  
     }
@@ -134,7 +134,7 @@ fect.permu <- function(Y,
         att.avg.permu <- att.avg.permu[-permu.rm]
     }
 
-    cat(length(att.avg.permu), " permutes\n", sep = "") 
+    message(length(att.avg.permu), " permutes\n", sep = "") 
 
     return(att.avg.permu)
 
@@ -209,86 +209,8 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
         stop("No valid observations under treatment.\n")
     }
 
-    if (method == "polynomial") {
-        ## reshape 
-        vy <- as.matrix(c(YY))
-        vx.fit <- vx <- NULL
-        if (p > 0) {
-            vx <- matrix(NA, N*TT, p)
-            for (i in 1:p) {
-                vx[, i] <- c(X[,, i])
-            }
-            vx.fit <- as.matrix(vx[oci,])
-        }
-        vindex <- cbind(rep(1:N, each = TT), rep(1:TT, N))  ## id time
-        if (degree > 1) {
-            for (i in 2:degree) {
-                vindex <- cbind(vindex, rep((1:TT)^i, N))
-            }
-        }
-
-        if (force == 1) {
-            sf <- 1
-        } else if (force == 2) {
-            sf <- 2
-        } else {
-            sf <- c(1,2)
-        }
-
-        cf <- list(c(1,2))
-
-        if (degree > 1) {
-            for (i in 2:degree) {
-                cf <- c(cf, list(c(1, i + 1)))
-            }
-        }
-
-        est.best <- fastplm(y = as.matrix(vy[oci]), 
-                        x = vx.fit, 
-                        ind = as.matrix(vindex[oci,]),
-                        sfe = sf, cfe = cf, PCA = TRUE,
-                        se = FALSE)
-
-        yfit <- predict(est.best, x = vx, ind = vindex)
-
-        Y.ct <- matrix(yfit, TT, N)
-
-        if (!is.null(norm.para)) {
-            Y.ct <- Y.ct * norm.para[1]
-        }
-    } 
-    else if (method == "bspline") {
-        
-        ## reshape 
-        vy <- as.matrix(c(YY))
-        vx.fit <- vx <- NULL
-        if (p > 0) {
-            vx <- matrix(NA, N*TT, p)
-            for (i in 1:p) {
-                vx[, i] <- c(X[,, i])
-            }
-            vx.fit <- as.matrix(vx[oci,])
-        }
-        vindex <- as.matrix(rep(1:N, each = TT))  ## id time
-        sp <- as.matrix(rep(1:TT), N)
-
-        sf <- 1
-        cf <- NULL
-
-        est.best <- fastplm(y = as.matrix(vy[oci]), 
-                            x = vx.fit, 
-                            ind = as.matrix(vindex[oci,]),
-                            sp = as.matrix(sp[oci,]),
-                            sfe = sf, cfe = cf, PCA = 0,
-                            degree = degree,
-                            se = FALSE)
-
-        yfit <- predict(est.best, x = vx, ind = vindex, sp = sp)
-        Y.ct <- matrix(yfit, TT, N)
-
-        if (!is.null(norm.para)) {
-            Y.ct <- Y.ct * norm.para[1]
-        }
+    if (method %in% c("polynomial","bspline")){
+        stop("Doesn't support in this version.")
     } 
     else {
         ## initial fit using fastplm

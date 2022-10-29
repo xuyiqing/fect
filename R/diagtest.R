@@ -69,7 +69,7 @@ diagtest <- function(
         nboots <- ncol(res_boot)
         if (length(pre.pos) == max.pre.periods) {
             pre.pos <- pre.pos[-1]
-            cat("Cannot use full pre-treatment periods in F-test. The first period is removed.\n")
+            message("Cannot use full pre-treatment periods in F-test. The first period is removed.\n")
         }
         if (length(pre.pos) > 1) {
             res_boot <- res_boot[pre.pos, ]
@@ -84,9 +84,9 @@ diagtest <- function(
         psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
 
         if ('try-error' %in% class(psi)) {
-            cat("\n")
-            cat("The estimated covariance matrix is irreversible.")
-            cat("\n")
+            message("\n")
+            message("The estimated covariance matrix is irreversible.")
+            message("\n")
             f.stat <- f.p <- f.equiv.p <- f.threshold <- NA            
         } 
         else {
@@ -137,7 +137,7 @@ diagtest <- function(
         pre.pos <- which(x$time %in% pre.periods)
         if (length(pre.pos) == max.pre.periods) {
             pre.pos <- pre.pos[-1]
-            cat("Cannot use full pre-treatment periods in the F test. The first period is removed.\n")
+            message("Cannot use full pre-treatment periods in the F test. The first period is removed.\n")
         }
 
         res_boot <- x$att.boot
@@ -158,9 +158,9 @@ diagtest <- function(
         psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
         
         if ('try-error' %in% class(psi)) {
-            cat("\n")
-            cat("The estimated covariance matrix is irreversible.")
-            cat("\n")
+            message("\n")
+            message("The estimated covariance matrix is irreversible.")
+            message("\n")
             f.stat <- f.p <- f.equiv.p <- f.threshold <- NA            
         } 
         else {

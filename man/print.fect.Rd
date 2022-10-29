@@ -14,23 +14,33 @@
     of switch-off treatment effects. e.g. \code{time.off.lim = c(-1,1)}.}
   \item{\dots}{other argv.}
 }
+\value{No return value.}
 \author{
-  Licheng Liu; Ye Wang; Yiqing Xu
+  Licheng Liu; Ye Wang; Yiqing Xu; Ziyi Liu
 }
 \references{  
-  Jushan Bai. 2009. "Panel Data Models with Interactive Fixed
-  Effects." Econometrica 77:1229--1279.
-
-  Yiqing Xu. 2017. "Generalized Synthetic Control Method: Causal Inference
-  with Interactive Fixed Effects Models." Political Analysis, Vol. 25, 
-  Iss. 1, January 2017, pp. 57-76. Available at: \url{https://doi.org/10.1017/pan.2016.2}.
-
-  Athey S, Bayati M, Doudchenko N, et al. Matrix completion methods for causal panel data models[J]. arXiv preprint arXiv:1710.10251, 2017.
-
+  Jushan Bai. 2009. "Panel Data Models with Interactive Fixed Effects." Econometrica.
+  
+  Yiqing Xu. 2017. "Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models." Political 
+  Analysis. 
+  
+  Athey, Susan, et al. 2021 "Matrix completion methods for causal panel data models." Journal of the American Statistical Association. 
+  
+  Licheng Liu, et al. 2022. "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional 
+  Data." American Journal of Political Science. 
+  
   For more details about the matrix completion method, see \url{https://github.com/susanathey/MCPanel}. 
 }
 \seealso{
   \code{\link{fect}} and \code{\link{plot.fect}}
+}
+\examples{
+library(fect)
+data(fect)
+out <- fect(Y ~ D + X1 + X2, data = simdata1, 
+            index = c("id","time"), force = "two-way",
+            CV = TRUE, r = c(0, 5), se = 0, parallel = FALSE) 
+print(out)
 }
 
 
