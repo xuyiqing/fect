@@ -22,22 +22,19 @@ knitr::opts_chunk$set(
 
 **R** package for implementing counterfactual estimators in panel fixed-effect settings. It is suitable for panel/TSCS analysis with binary treatments under (hypothetically) baseline randomization. It allows a treatment to switch on and off and limited carryover effects. It supports linear factor models---hence, a generalization of [**gsynth**](https://yiqingxu.org/packages/gsynth/index.html)---and the matrix completion method. 
 
-**Repo:** [GitHub](https://github.com/xuyiqing/fect) (0.4.1) 
+**Repo:** [GitHub](https://github.com/xuyiqing/fect) (1.0.0) 
 
 **Examples:** R code used in the [tutorial](https://yiqingxu.org/packages/fect/articles/tutorial.html) can be downloaded from [here](fect_examples.R).
 
-**Reference:** Licheng Liu, Ye Wang, Yiqing Xu (2021). [A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data](https://papers.ssrn.com/abstract=3555463). *American Journal of Political Science*, conditionally accepted.
-
+**Reference:** Licheng Liu, Ye Wang, Yiqing Xu (2021). [A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data](https://yiqingxu.org/papers/english/2022_fect/LWX2022.pdf). *American Journal of Political Science*, conditionally accepted.
 
 ## Installation
 
-<!---
 You can install **fect** directly from CRAN by typing the following command in the **R** console: 
 
 ```{r eval=FALSE}
-install.packages('fect', type = 'source')
+install.packages('fect')
 ```
---->
 
 You can install the development version of **fect** from GitHub by typing the following commands:
 ```{r eval=FALSE}

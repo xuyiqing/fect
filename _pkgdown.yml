@@ -22,7 +22,7 @@ navbar:
     - text: "Stata"
       href: https://yiqingxu.org/packages/fect/stata/fect_md.html
     - text: "Paper"
-      href: https://papers.ssrn.com/abstract=3555463
+      href: https://yiqingxu.org/papers/english/2022_fect/LWX2022.pdf
   right:
    - icon: fa-github
      href: https://github.com/xuyiqing/interflex
@@ -37,6 +37,8 @@ reference:
   - contents:
     - fect
     - interFE
+    - get.cohort
+    - att.cumu
   - title: S3 methods
   - contents:
     - print.fect
@@ -45,7 +47,16 @@ reference:
   - title: Datasets
   - contents:
     - simdata
+    - simdata1
     - turnout
+    - capacity
+  - title: Internal
+  - contents:
+    - fect-package
+    - fect-internal
+
+  
+  
 
 authors:
   Yiqing Xu:

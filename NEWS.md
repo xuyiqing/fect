@@ -1,3 +1,8 @@
+# fect 1.0.0
+
+* First CRAN version
+* Fixed bugs
+
 # fect 0.6.5
 
 * Replace fastplm with fixest for fixed effects estimation
