@@ -76,9 +76,9 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         beta0[which(is.na(beta0))] <- 0
     }
     est.fect <- NULL
-    if (boot == FALSE) {
-        est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
-    }
+    #if (boot == FALSE) {
+    #    est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+    #}
 
     ## reshape 
     vy <- as.matrix(c(YY))
@@ -117,7 +117,6 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         ind.name <- c("forceid","forcetime",names(ind.matrix))
         ind.index <- c(1:(2+length(names(ind.matrix))))
         colnames(vindex) <- names(ind.index) <- ind.name
-        
         if(p>0){
             data.reg <- cbind.data.frame(vy,vx,vindex)
             formula.reg <- paste0("vy~",paste(paste0("x.",c(1:p)),collapse="+"),"|")    
@@ -154,6 +153,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
                                                    fixef.rm = "none")))
         
         yfit <- suppressWarnings(predict(est.best, newdata = data.reg))
+        data.reg <- NULL
 
     }
     else if (method == "polynomial") {
@@ -192,6 +192,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
                                                    fixef.rm = "none")))
         
         yfit <- suppressWarnings(predict(est.best, newdata = data.reg))
+        data.reg <- NULL
     } 
 
 
@@ -624,7 +625,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         beta = beta,
         est = est.best,
         sigma2 = est.best$sigma2,
-        sigma2.fect = est.fect$sigma2,
+        sigma2.fect = NA,
         validX = validX,
         time = time.on,
         att = att.on,
@@ -671,6 +672,8 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         out <- c(out, list(group.att = group.att,
                            group.output = group.output))
     }
+
+
     return(out)
 } 
 
