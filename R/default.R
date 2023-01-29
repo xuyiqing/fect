@@ -32,6 +32,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  Y, # outcome
                  D, # treatment 
                  X = NULL, # time-varying covariates
+                 W = NULL, # weight
                  group = NULL, # cohort
                  na.rm = FALSE, # remove missing values
                  index, # c(unit, time) indicators
@@ -89,6 +90,7 @@ fect.formula <- function(formula = NULL,
                          Y, # outcome
                          D, # treatment 
                          X = NULL, # time-varying covariates
+                         W = NULL, # weights
                          group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
                          index, # c(unit, time) indicators
@@ -171,6 +173,7 @@ fect.formula <- function(formula = NULL,
                         Y = Yname,
                         D = Dname, 
                         X = Xname, 
+                        W = W,
                         group = group,
                         na.rm = na.rm, 
                         balance.period = balance.period,
@@ -231,6 +234,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          Y, # outcome
                          D, # treatment 
                          X = NULL, # time-varying covariates
+                         W = NULL, # weights
                          group = NULL, # cohort
                          na.rm = FALSE, # remove missing values
                          index, # c(unit, time) indicators
@@ -298,6 +302,21 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (se == 1) {
         if (! vartype %in% c("bootstrap", "jackknife", "parametric","wild")) {
             stop("\"vartype\" option misspecified.")
+        }
+    }
+
+    if(!is.null(W)){
+        if(length(W)!=1){
+            stop("\"W\" should have only one element.")
+        }
+        if(!W %in% colnames(data)){
+            stop("\"W\" is not in the dataset.")
+        }
+        if(is.numeric(data[,W])==FALSE){
+            stop("\"W\" should be numeric.")
+        }
+        if(sum(data[,W]<0)>0){
+            stop("\"W\" must be strictly positive.")
         }
     }
     
@@ -629,14 +648,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     if(method != 'cfe'){
         if (!is.null(group)) {
-            data <- data[,c(index, Y, D, X, group)]
+            data <- data[,c(index, Y, D, X, W, group)]
         } 
         else {
-            data <- data[,c(index, Y, D, X)] ## some variables may not be used
+            data <- data[,c(index, Y, D, X, W)] ## some variables may not be used
         }        
     }
     else{
-        all.var <- unique(c(index,sfe,unlist(cfe),Y,D,X,group))
+        all.var <- unique(c(index,sfe,unlist(cfe),Y,D,X,W,group))
         data <- data[,all.var]
     }
 
@@ -698,6 +717,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     Dname <- D
     Xname <- X
     clname <- cl <- NULL
+    Wname <- W
 
     #if (!is.null(clname)) {
     #    if (!clname %in% index) {
@@ -906,8 +926,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
 
         variable <- c(Yname, Dname, Xname)
-        if (!is.null(group)) {
+        
+        if(!is.null(group)) {
             variable <- c(Yname, Dname, Xname, group)
+        }
+
+        if(!is.null(W)){
+            variable <- c(variable, Wname)
+        
         }
         if(method == 'cfe'){
             variable <- unique(c(sfe,unlist(cfe),variable))
@@ -954,10 +980,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         data[is.nan(data)] <- 0
     }
 
-
-
-
-
     ## group indicator 
     G.old <- G <- NULL
     if (!is.null(group)) {
@@ -975,6 +997,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             G <- apply(G,2,function(vec){return(rep(max(vec),length(vec)))})
         }
         G.old <- G
+    }
+
+
+    if(!is.null(W)){
+        W <- matrix(data[, Wname], TT, N)
     }
     
     ## each unit should have the same group index
@@ -1066,6 +1093,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if (!is.null(group)) {
             G <- as.matrix(G[,-rm.id])
         }
+        if (!is.null(W)) {
+            W <- as.matrix(W[,-rm.id])
+        }
         if(method == "cfe"){
             for(ind.name in names(index.matrix)){
                 index.matrix[[ind.name]] <- as.matrix(index.matrix[[ind.name]][,-rm.id])
@@ -1097,6 +1127,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         if (!is.null(group)) {
             G <- G[-which(I.use == 0),]
+        }
+
+        if (!is.null(W)) {
+            W <- W[-which(I.use == 0),]
         }
 
         if(method == "cfe"){
@@ -1245,6 +1279,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             if (!is.null(group)) {
                 G <- as.matrix(G[,-rm.id.2.pos])
             }
+            if (!is.null(W)) {
+                W <- as.matrix(W[,-rm.id.2.pos])
+            }
             if(method == "cfe"){
                 for(ind.name in names(index.matrix)){
                     index.matrix[[ind.name]] <- as.matrix(index.matrix[[ind.name]][,-rm.id.2.pos])
@@ -1307,6 +1344,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             if (!is.null(group)) {
                 G <- as.matrix(G[,-rm.id.3.pos])
             }
+            if (!is.null(W)) {
+                W <- as.matrix(W[,-rm.id.3.pos])
+            }
             if(method == "cfe"){
                 for(ind.name in names(index.matrix)){
                     index.matrix[[ind.name]] <- as.matrix(index.matrix[[ind.name]][,-rm.id.3.pos])
@@ -1365,7 +1405,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if((se == TRUE | permute == TRUE) & parallel==FALSE){
         ## set seed
         if (is.null(seed) == FALSE) {
-            set.seed(seed)
+            set.seed(seed+1)
         } 
     }
     
@@ -1389,10 +1429,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## run main program
     ##-------------------------------## 
     if (se == FALSE) {
-
+        
         if (CV == TRUE) { 
             if (binary == FALSE) {
-                out <- fect.cv(Y = Y, D = D, X = X, I = I, II = II, 
+                out <- fect.cv(Y = Y, D = D, X = X, W = W,
+                               I = I, II = II, 
                                T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, 
                                T.on.balance = T.on.balance, 
                                balance.period = balance.period,
@@ -1411,7 +1452,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                group.level = g.level, group = G)
             } 
             else {
-                out <- fect.binary.cv(Y = Y, D = D, X = X,
+                out <- fect.binary.cv(Y = Y, D = D, X = X, 
                                       I = I, II = II, 
                                       T.on = T.on, T.off = T.off, 
                                       k = k, cv.prop = cv.prop,
@@ -1426,7 +1467,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         } 
         else { ## non-binary case
             if (method == "ife") {
-                out <- fect.fe(Y = Y, D = D, X = X, I = I, II = II,
+                out <- fect.fe(Y = Y, D = D, X = X, 
+                               W = W, I = I, II = II,
                                T.on = T.on, T.off = T.off, r.cv = r, T.on.carry = T.on.carry, 
                                T.on.balance = T.on.balance, 
                                balance.period = balance.period,
@@ -1441,22 +1483,24 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                group.level = g.level, group = G)
             }
             else if(method == "gsynth"){
-                out <- fect.gsynth(Y = Y, D = D, X = X, I = I, II = II,
-                               T.on = T.on, T.off = T.off, r = r, CV = 0, 
-                               T.on.balance = T.on.balance, 
-                               balance.period = balance.period,
-                               binary = binary, QR = QR,
-                               force = force, hasRevs = hasRevs, 
-                               tol = tol, boot = 0,
-                               norm.para = norm.para,
-                               placeboTest = placeboTest, 
-                               placebo.period = placebo.period,
-                               carryoverTest = carryoverTest,
-                               carryover.period = carryover.period,
-                               group.level = g.level, group = G)               
+                out <- fect.gsynth(Y = Y, D = D, X = X, 
+                                   W = W, I = I, II = II,
+                                   T.on = T.on, T.off = T.off, r = r, CV = 0, 
+                                   T.on.balance = T.on.balance, 
+                                   balance.period = balance.period,
+                                   binary = binary, QR = QR,
+                                   force = force, hasRevs = hasRevs, 
+                                   tol = tol, boot = 0,
+                                   norm.para = norm.para,
+                                   placeboTest = placeboTest, 
+                                   placebo.period = placebo.period,
+                                   carryoverTest = carryoverTest,
+                                   carryover.period = carryover.period,
+                                   group.level = g.level, group = G)               
             } 
             else if (method == "mc") {
-                out <- try(fect.mc(Y = Y, D = D, X = X, I = I, II = II,
+                out <- fect.mc(Y = Y, D = D, X = X, 
+                               W = W, I = I, II = II,
                                T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, 
                                T.on.balance = T.on.balance, 
                                balance.period = balance.period,
@@ -1468,11 +1512,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                placebo.period = placebo.period,
                                carryoverTest = carryoverTest,
                                carryover.period = carryover.period,
-                               group.level = g.level, group = G), silent = TRUE)
+                               group.level = g.level, group = G)
             } 
             else if (method %in% c("polynomial",  "cfe")) {
-                out <- fect.polynomial(Y = Y, D = D, X = X, I = I, 
-                                       II = II, T.on = T.on, T.on.carry = T.on.carry, 
+                out <- fect.polynomial(Y = Y, D = D, X = X, 
+                                       W = W, I = I, II = II, 
+                                       T.on = T.on, T.on.carry = T.on.carry, 
                                        T.on.balance = T.on.balance, 
                                        balance.period = balance.period,
                                        T.off = T.off, method = method,
@@ -1504,7 +1549,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     } 
     else { # SE == TRUE
         
-        out <- fect.boot(Y = Y, D = D, X = X, I = I, II = II,
+        out <- fect.boot(Y = Y, D = D, X = X, 
+                         W = W, I = I, II = II,
                          T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, cl = NULL,
                          T.on.balance = T.on.balance, balance.period = balance.period,
                          method = method, degree = degree,
@@ -1627,6 +1673,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             pT.on <- T.on
             pT.off <- T.off
             pG <- G
+            pW <- W
 
             pII[placebo.pos] <- 0 ## placebo treatment
 
@@ -1687,10 +1734,16 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                         ## rawgroup <- rawgroup[-rm.id.2.pos]
                         pG <- as.matrix(G[,-rm.id.2.pos])
                     }
+                    if (!is.null(W)) {
+                        ## group <- group[-rm.id.2.pos]
+                        ## rawgroup <- rawgroup[-rm.id.2.pos]
+                        pW <- as.matrix(W[,-rm.id.2.pos])
+                    }
                 }
 
           
-                p.out <- fect.boot(Y = pY, D = pD, X = pX, I = pI, II = pII,
+                p.out <- fect.boot(Y = pY, D = pD, X = pX, 
+                             W = pW, I = pI, II = pII,
                              T.on = pT.on, T.off = pT.off, cl = NULL,T.on.carry = T.on.carry, 
                              method = method, degree = degree,
                              knots = knots, criterion = criterion,
@@ -1906,6 +1959,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                      Y = Yname,
                      D = Dname,
                      X = Xname,
+                     W = Wname,
                      T.on = T.on,
                      G = G.old,
                      balance.period = balance.period,

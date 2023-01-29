@@ -4,6 +4,7 @@
 fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
                             X, # Explanatory variables:  (T*N*p) array
                             D, #  Indicator for treated unit (tr==1) 
+                            W,
                             I,
                             II, 
                             T.on, 
@@ -31,6 +32,8 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
                             time.off.seq = NULL,
                             time.on.carry.seq = NULL,
                             time.on.balance.seq = NULL,
+                            time.on.seq.W = NULL,
+                            time.off.seq.W = NULL,
                             group.level = NULL,
                             group = NULL,
                             time.on.seq.group = NULL,
@@ -70,15 +73,17 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
     ## observed Y0 indicator:
     oci <- which(c(II) == 1)
     initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+    data.ini <- NULL
+    invisible(gc(verbose = FALSE))
     Y0 <- initialOut$Y0
     beta0 <- initialOut$beta0
     if (p > 0 && sum(is.na(beta0)) > 0) {
         beta0[which(is.na(beta0))] <- 0
     }
     est.fect <- NULL
-    #if (boot == FALSE) {
-    #    est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
-    #}
+    if (boot == FALSE) {
+        est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+    }
 
     ## reshape 
     vy <- as.matrix(c(YY))
@@ -117,6 +122,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         ind.name <- c("forceid","forcetime",names(ind.matrix))
         ind.index <- c(1:(2+length(names(ind.matrix))))
         colnames(vindex) <- names(ind.index) <- ind.name
+        
         if(p>0){
             data.reg <- cbind.data.frame(vy,vx,vindex)
             formula.reg <- paste0("vy~",paste(paste0("x.",c(1:p)),collapse="+"),"|")    
@@ -154,7 +160,6 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         
         yfit <- suppressWarnings(predict(est.best, newdata = data.reg))
         data.reg <- NULL
-
     }
     else if (method == "polynomial") {
         vindex <- cbind(rep(1:N, each = TT), rep(1:TT, N))  ## id time
@@ -188,14 +193,14 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         }
         formula.reg <- as.formula(formula.reg)
         est.best <- suppressWarnings(invisible(feols(fml = formula.reg,
-                                                   data = data.reg[oci,],
-                                                   fixef.rm = "none")))
+                                                     data = data.reg[oci,],
+                                                     fixef.rm = "none")))
         
         yfit <- suppressWarnings(predict(est.best, newdata = data.reg))
         data.reg <- NULL
     } 
 
-
+    invisible(gc(verbose = FALSE))
     Y.ct <- matrix(yfit, TT, N)
     if (p > 0) {
         beta <- as.matrix(c(est.best$coefficients)[1:p])
@@ -233,7 +238,8 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         if( sum(na.pos) > 0 ) {
             beta[na.pos] <- NA
         }
-    } else {
+    } 
+    else {
         beta <- NA
     }
    
@@ -251,6 +257,12 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
     if(!is.null(balance.period)){
         complete.index2 <- which(!is.na(T.on.balance))
         att.avg.balance <- sum(eff[complete.index2] * D[complete.index2])/(sum(D[complete.index2]))
+    }
+
+    # weighted effect
+    att.avg.W <- NA
+    if(!is.null(W)){
+        att.avg.W <- sum(eff[complete.index] * D[complete.index] * W[complete.index])/(sum(D[complete.index] * W[complete.index]))
     }
 
 
@@ -315,6 +327,45 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         att.on <- att.on.med
         count.on <- count.on.med
         time.on <- time.on.seq
+    }
+
+    ## weighted treatment effect
+    if(!is.null(W)){
+        W.v <- c(W)
+        rm.pos.W <- which(is.na(W))
+        if (NA %in% eff.v | NA %in% t.on | NA %in% W.v) {
+            eff.v.use.W <- eff.v[-c(rm.pos1, rm.pos2, rm.pos.W)]
+            W.v.use <- W.v[-c(rm.pos1, rm.pos2, rm.pos.W)]
+            t.on.use.W <- t.on[-c(rm.pos1, rm.pos2, rm.pos.W)]
+            n.on.use.W <- n.on.use[-c(rm.pos1, rm.pos2, rm.pos.W)]
+        }
+        else{
+            eff.v.use.W <- eff.v.use1
+            t.on.use.W <- t.on.use
+            n.on.use.W <- n.on.use
+            W.v.use <- W.v
+        }
+        time.on.W <- sort(unique(t.on.use.W))
+        att.on.sum.W <- as.numeric(tapply(eff.v.use.W*W.v.use, t.on.use.W, sum)) ## NA already removed
+        W.on.sum <- as.numeric(tapply(W.v.use, t.on.use.W, sum))
+        att.on.W <- att.on.sum.W/W.on.sum
+        count.on.W <- as.numeric(table(t.on.use.W))
+
+        if (!is.null(time.on.seq.W)) {
+            att.on.sum.med.W <- W.on.sum.med <- count.on.med.W <- att.on.med.W <- rep(NA, length(time.on.seq.W))
+            att.on.sum.med.W[which(time.on.seq.W %in% time.on.W)] <- att.on.sum.W
+            att.on.med.W[which(time.on.seq.W %in% time.on.W)] <- att.on.W
+            count.on.med.W[which(time.on.seq.W %in% time.on.W)] <- count.on.W
+            W.on.sum.med[which(time.on.seq.W %in% time.on.W)] <- W.on.sum
+            att.on.sum.W <- att.on.sum.med.W
+            att.on.W <- att.on.med.W
+            count.on.W <- count.on.med.W
+            time.on.W <- time.on.seq.W
+            W.on.sum <- W.on.sum.med
+        }
+    }
+    else{
+        att.on.sum.med.W <- att.on.sum.W <- count.on.med.W <- att.on.med.W <- W.on.sum.med <- att.on.W <- count.on.W <- time.on.W <- W.on.sum <- NULL
     }
 
     ## 4.1 carryover effect 
@@ -387,15 +438,27 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         if (length(placebo.period) == 1) {
             placebo.pos <- which(time.on == placebo.period)
             att.placebo <- att.on[placebo.pos]
-        } else {
+        } 
+        else {
             placebo.pos <- which(time.on >= placebo.period[1] & time.on <= placebo.period[2])
             att.placebo <- sum(att.on[placebo.pos] * count.on[placebo.pos]) / sum(count.on[placebo.pos])
         }
+
+        if(!is.null(W)){
+            if (length(placebo.period) == 1) {
+                placebo.pos.W <- which(time.on.W == placebo.period)
+                att.placebo.W <- att.on.W[placebo.pos.W]
+            } 
+            else {
+                placebo.pos.W <- which(time.on.W >= placebo.period[1] & time.on.W <= placebo.period[2])
+                att.placebo.W <- sum(att.on.sum.W[placebo.pos.W]) / sum(W.on.sum[placebo.pos.W])
+            }
+        }
     }
 
-    eff.off.equiv <- off.sd <- eff.off <- NULL
 
     ## 6. switch-off effects
+    eff.off.equiv <- off.sd <- eff.off <- NULL
     if (hasRevs == 1) {    
         t.off <- c(T.off)
         rm.pos3 <- which(is.na(t.off))
@@ -431,6 +494,41 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
             count.off <- count.off.med
             time.off <- time.off.seq
         }
+
+        if(!is.null(W)){
+            if (NA %in% eff.v | NA %in% t.off | NA %in% W.v) {
+                eff.v.use2.W <- eff.v[-c(rm.pos1, rm.pos3, rm.pos.W)]
+                W.v.use2 <- W.v[-c(rm.pos1, rm.pos3, rm.pos.W)]
+                t.off.use.W <- t.off[-c(rm.pos1, rm.pos3, rm.pos.W)]
+            }
+            else{
+                eff.v.use2.W <- eff.v.use2
+                t.off.use.W <- t.off.use
+                W.v.use2 <- W.v
+            }
+
+            time.off.W <- sort(unique(t.off.use.W))
+            att.off.sum.W <- as.numeric(tapply(eff.v.use2.W*W.v.use2, t.off.use.W, sum)) 
+            W.off.sum <- as.numeric(tapply(W.v.use2, t.off.use.W, sum))
+            att.off.W <- att.off.sum.W/W.off.sum ## NA already removed
+            count.off.W <- as.numeric(table(t.off.use.W))
+
+            if (!is.null(time.off.seq.W)) {
+                att.off.sum.med.W <- W.off.sum.med <- count.off.med.W <- att.off.med.W <- rep(NA, length(time.off.seq.W))
+                att.off.sum.med.W[which(time.off.seq.W %in% time.off.W)] <- att.off.sum.W
+                att.off.med.W[which(time.off.seq.W %in% time.off.W)] <- att.off.W
+                count.off.med.W[which(time.off.seq.W %in% time.off.W)] <- count.off.W
+                W.off.sum.med[which(time.off.seq.W %in% time.off.W)] <- W.off.sum
+                att.off.sum.W <- att.off.sum.med.W
+                att.off.W <- att.off.med.W
+                count.off.W <- count.off.med.W
+                time.off.W <- time.off.seq.W
+                W.off.sum <- W.off.sum.med
+            }
+        }
+        else{
+            W.off.sum.med <- W.off.sum <- att.off.sum.W <- att.off.sum.med.W <- count.off.med.W <- att.off.med.W <- count.off.med.W <- att.off.W <- count.off.W <- time.off.W <- NULL
+        }
     }
 
     ## 7. carryover effects
@@ -438,9 +536,21 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         if (length(carryover.period) == 1) {
             carryover.pos <- which(time.off == carryover.period)
             att.carryover <- att.off[carryover.pos]
-        } else {
+        } 
+        else {
             carryover.pos <- which(time.off >= carryover.period[1] & time.off <= carryover.period[2])
             att.carryover <- sum(att.off[carryover.pos] * count.off[carryover.pos]) / sum(count.off[carryover.pos])
+        }
+
+        if(!is.null(W)){
+            if (length(carryover.period) == 1) {
+                carryover.pos.W <- which(time.off.W == carryover.period)
+                att.carryover.W <- att.off.W[carryover.pos.W]
+            } 
+            else {
+                carryover.pos.W <- which(time.off.W >= carryover.period[1] & time.off.W <= carryover.period[2])
+                att.carryover.W <- sum(att.off.sum.W[carryover.pos.W]) / sum(W.off.sum[carryover.pos.W])
+            }            
         }
     }
     
@@ -625,7 +735,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         beta = beta,
         est = est.best,
         sigma2 = est.best$sigma2,
-        sigma2.fect = NA,
+        sigma2.fect = est.fect$sigma2,
         validX = validX,
         time = time.on,
         att = att.on,
@@ -647,6 +757,30 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
                            eff.off = eff.off,
                            eff.off.equiv = eff.off.equiv,
                            off.sd = off.sd))
+    }
+
+    if(!is.null(W)){
+        out <- c(out, list(W = W,
+                           att.avg.W = att.avg.W,
+                           att.on.sum.W = att.on.sum.W,
+                           att.on.W = att.on.W,
+                           count.on.W = count.on.W,
+                           time.on.W = time.on.W,
+                           W.on.sum = W.on.sum))
+        if(hasRevs == 1){
+            out <- c(out, list(att.off.sum.W = att.off.sum.W,
+                               att.off.W = att.off.W,
+                               count.off.W = count.off.W,
+                               time.off.W = time.off.W,
+                               W.off.sum = W.off.sum))
+        }
+        if (!is.null(placebo.period) && placeboTest == 1) {
+            out <- c(out, list(att.placebo.W = att.placebo.W))
+        }
+
+        if (!is.null(carryover.period) && carryoverTest == 1) {
+            out <- c(out, list(att.carryover.W = att.carryover.W))
+        }
     }
 
     if (!is.null(T.on.carry)) {
@@ -672,8 +806,6 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
         out <- c(out, list(group.att = group.att,
                            group.output = group.output))
     }
-
-
     return(out)
 } 
 

@@ -4,6 +4,7 @@
 fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                     X, # Explanatory variables:  (T*N*p) array
                     D, 
+                    W,
                     I,
                     II, 
                     T.on, 
@@ -27,6 +28,8 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                     time.off.seq = NULL,
                     time.on.carry.seq = NULL,
                     time.on.balance.seq = NULL,
+                    time.on.seq.W = NULL,
+                    time.off.seq.W = NULL,
                     group.level = NULL,
                     group = NULL,
                     time.on.seq.group = NULL,
@@ -154,6 +157,12 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         att.avg.balance <- sum(eff[complete.index2] * D[complete.index2])/(sum(D[complete.index2]))
     }
 
+    # weighted effect
+    att.avg.W <- NA
+    if(!is.null(W)){
+        att.avg.W <- sum(eff[complete.index] * D[complete.index] * W[complete.index])/(sum(D[complete.index] * W[complete.index]))
+    }
+
     ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
     att.unit <- sapply(1:length(tr.pos), function(vec){return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))})
@@ -240,6 +249,46 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         time.on <- time.on.seq
     }
 
+    ## weighted treatment effect
+    
+    if(!is.null(W)){
+        W.v <- c(W)
+        rm.pos.W <- which(is.na(W))
+        if (NA %in% eff.v | NA %in% t.on | NA %in% W.v) {
+            eff.v.use.W <- eff.v[-c(rm.pos1, rm.pos2, rm.pos.W)]
+            W.v.use <- W.v[-c(rm.pos1, rm.pos2, rm.pos.W)]
+            t.on.use.W <- t.on[-c(rm.pos1, rm.pos2, rm.pos.W)]
+            n.on.use.W <- n.on.use[-c(rm.pos1, rm.pos2, rm.pos.W)]
+        }
+        else{
+            eff.v.use.W <- eff.v.use1
+            t.on.use.W <- t.on.use
+            n.on.use.W <- n.on.use
+            W.v.use <- W.v
+        }
+        time.on.W <- sort(unique(t.on.use.W))
+        att.on.sum.W <- as.numeric(tapply(eff.v.use.W*W.v.use, t.on.use.W, sum)) ## NA already removed
+        W.on.sum <- as.numeric(tapply(W.v.use, t.on.use.W, sum))
+        att.on.W <- att.on.sum.W/W.on.sum
+        count.on.W <- as.numeric(table(t.on.use.W))
+
+        if (!is.null(time.on.seq.W)) {
+            att.on.sum.med.W <- W.on.sum.med <- count.on.med.W <- att.on.med.W <- rep(NA, length(time.on.seq.W))
+            att.on.sum.med.W[which(time.on.seq.W %in% time.on.W)] <- att.on.sum.W
+            att.on.med.W[which(time.on.seq.W %in% time.on.W)] <- att.on.W
+            count.on.med.W[which(time.on.seq.W %in% time.on.W)] <- count.on.W
+            W.on.sum.med[which(time.on.seq.W %in% time.on.W)] <- W.on.sum
+            att.on.sum.W <- att.on.sum.med.W
+            att.on.W <- att.on.med.W
+            count.on.W <- count.on.med.W
+            time.on.W <- time.on.seq.W
+            W.on.sum <- W.on.sum.med
+        }
+    }
+    else{
+        att.on.sum.med.W <- att.on.sum.W <- count.on.med.W <- att.on.med.W <- W.on.sum.med <- att.on.W <- count.on.W <- time.on.W <- W.on.sum <- NULL
+    }
+
     ## 4.1 carryover effect 
     carry.att <- NULL 
     if (!is.null(T.on.carry)) {
@@ -310,9 +359,21 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         if (length(placebo.period) == 1) {
             placebo.pos <- which(time.on == placebo.period)
             att.placebo <- att.on[placebo.pos]
-        } else {
+        } 
+        else {
             placebo.pos <- which(time.on >= placebo.period[1] & time.on <= placebo.period[2])
             att.placebo <- sum(att.on[placebo.pos] * count.on[placebo.pos]) / sum(count.on[placebo.pos])
+        }
+
+        if(!is.null(W)){
+            if (length(placebo.period) == 1) {
+                placebo.pos.W <- which(time.on.W == placebo.period)
+                att.placebo.W <- att.on.W[placebo.pos.W]
+            } 
+            else {
+                placebo.pos.W <- which(time.on.W >= placebo.period[1] & time.on.W <= placebo.period[2])
+                att.placebo.W <- sum(att.on.sum.W[placebo.pos.W]) / sum(W.on.sum[placebo.pos.W])
+            }
         }
     }
 
@@ -355,6 +416,41 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
             count.off <- count.off.med
             time.off <- time.off.seq
         }
+
+        if(!is.null(W)){
+            if (NA %in% eff.v | NA %in% t.off | NA %in% W.v) {
+                eff.v.use2.W <- eff.v[-c(rm.pos1, rm.pos3, rm.pos.W)]
+                W.v.use2 <- W.v[-c(rm.pos1, rm.pos3, rm.pos.W)]
+                t.off.use.W <- t.off[-c(rm.pos1, rm.pos3, rm.pos.W)]
+            }
+            else{
+                eff.v.use2.W <- eff.v.use2
+                t.off.use.W <- t.off.use
+                W.v.use2 <- W.v
+            }
+
+            time.off.W <- sort(unique(t.off.use.W))
+            att.off.sum.W <- as.numeric(tapply(eff.v.use2.W*W.v.use2, t.off.use.W, sum)) 
+            W.off.sum <- as.numeric(tapply(W.v.use2, t.off.use.W, sum))
+            att.off.W <- att.off.sum.W/W.off.sum ## NA already removed
+            count.off.W <- as.numeric(table(t.off.use.W))
+
+            if (!is.null(time.off.seq.W)) {
+                att.off.sum.med.W <- W.off.sum.med <- count.off.med.W <- att.off.med.W <- rep(NA, length(time.off.seq.W))
+                att.off.sum.med.W[which(time.off.seq.W %in% time.off.W)] <- att.off.sum.W
+                att.off.med.W[which(time.off.seq.W %in% time.off.W)] <- att.off.W
+                count.off.med.W[which(time.off.seq.W %in% time.off.W)] <- count.off.W
+                W.off.sum.med[which(time.off.seq.W %in% time.off.W)] <- W.off.sum
+                att.off.sum.W <- att.off.sum.med.W
+                att.off.W <- att.off.med.W
+                count.off.W <- count.off.med.W
+                time.off.W <- time.off.seq.W
+                W.off.sum <- W.off.sum.med
+            }
+        }
+        else{
+            W.off.sum.med <- W.off.sum <- att.off.sum.W <- att.off.sum.med.W <- count.off.med.W <- att.off.med.W <- count.off.med.W <- att.off.W <- count.off.W <- time.off.W <- NULL
+        }
     }
 
     ## 7. carryover effects
@@ -362,9 +458,20 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         if (length(carryover.period) == 1) {
             carryover.pos <- which(time.off == carryover.period)
             att.carryover <- att.off[carryover.pos]
-        } else {
+        } 
+        else {
             carryover.pos <- which(time.off >= carryover.period[1] & time.off <= carryover.period[2])
             att.carryover <- sum(att.off[carryover.pos] * count.off[carryover.pos]) / sum(count.off[carryover.pos])
+        }
+        if(!is.null(W)){
+            if (length(carryover.period) == 1) {
+                carryover.pos.W <- which(time.off.W == carryover.period)
+                att.carryover.W <- att.off.W[carryover.pos.W]
+            } 
+            else {
+                carryover.pos.W <- which(time.off.W >= carryover.period[1] & time.off.W <= carryover.period[2])
+                att.carryover.W <- sum(att.off.sum.W[carryover.pos.W]) / sum(W.off.sum[carryover.pos.W])
+            }            
         }
     }
 
@@ -591,6 +698,30 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         if (!is.null(placebo.period) && placeboTest == 1) {
             out <- c(out, list(balance.att.placebo = balance.att.placebo))
         }    
+    }
+
+    if(!is.null(W)){
+        out <- c(out, list(W = W,
+                           att.avg.W = att.avg.W,
+                           att.on.sum.W = att.on.sum.W,
+                           att.on.W = att.on.W,
+                           count.on.W = count.on.W,
+                           time.on.W = time.on.W,
+                           W.on.sum = W.on.sum))
+        if(hasRevs == 1){
+            out <- c(out, list(att.off.sum.W = att.off.sum.W,
+                               att.off.W = att.off.W,
+                               count.off.W = count.off.W,
+                               time.off.W = time.off.W,
+                               W.off.sum = W.off.sum))
+        }
+        if (!is.null(placebo.period) && placeboTest == 1) {
+            out <- c(out, list(att.placebo.W = att.placebo.W))
+        }
+
+        if (!is.null(carryover.period) && carryoverTest == 1) {
+            out <- c(out, list(att.carryover.W = att.carryover.W))
+        }
     }
 
     #if (boot == FALSE) {

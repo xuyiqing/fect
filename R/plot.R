@@ -48,6 +48,7 @@ plot.fect <- function(x,
   start0 = FALSE,
   return.test = FALSE,
   balance = NULL,
+  weight = NULL,
   ...){
 
     group <- ATT5 <- ATT6 <- CI.lower.90 <- CI.lower6 <- CI.upper.90 <- CI.upper6 <- L1 <- eff <- NULL
@@ -74,6 +75,15 @@ plot.fect <- function(x,
         }
         else{
             balance <- FALSE
+        }
+    }
+
+    if(is.null(weight)){
+        if(!is.null(x$W)){
+            weight <- TRUE
+        }
+        else{
+            weight <- FALSE
         }
     }
 
@@ -816,6 +826,27 @@ plot.fect <- function(x,
         x$est.placebo <- x$est.balance.placebo
         x$obs.missing <- x$obs.missing.balance
         use.balance <- TRUE
+    }
+
+    use.weight <- FALSE
+    if(!is.null(x$W) & weight==TRUE){
+        x$att <- x$att.W
+        x$time <- x$time.on.W
+        x$count <- x$count.on.W
+        x$att.avg <- x$att.avg.W
+        x$est.att <- x$est.att.W
+        x$att.bound <- x$att.W.bound
+        x$att.boot <- x$att.W.boot
+        x$est.placebo <- x$est.placebo.W
+
+        x$att.off <- x$att.off.W
+        x$time.off <- x$time.off.W
+        x$count.off <- x$count.off.W
+        x$att.off.bound <- x$att.off.W.bound
+        x$est.att.off <- x$est.att.off.W
+        x$est.carryover <- x$est.carryover.W
+
+        use.weight <- TRUE
     }
 
 
