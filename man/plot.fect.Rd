@@ -20,7 +20,7 @@
             axis.adjust = FALSE, axis.lab = "both", axis.lab.gap = c(0, 0),
             start0 = FALSE,
             return.test = FALSE,
-            balance = NULL,\dots)
+            balance = NULL, weight = NULL, \dots)
 }
 \arguments{
   \item{x}{a \code{\link{fect}} object.}
@@ -92,6 +92,7 @@
   \item{start0}{a logical flag indicating whether to index the start of the treatment as period 0 rather than period 1. Default to FALSE.}  
   \item{return.test}{a logical flag indicating whether to return the results of statistical tests.}
   \item{balance}{a logical flag indicating whether to plot the dynamic treatment effects for the balance sample.}
+  \item{weight}{a logical flag indicating whether to plot the weighted dynamic treatment effects.}
   \item{\dots}{other argv.}
 }
 \details{

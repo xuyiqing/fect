@@ -3,7 +3,8 @@
 \title{Fixed Effects Counterfactual Estimators}
 \description{Implements counterfactual estimators in TSCS data analysis and statistical tools to test their identification 
 assumptions.}
-\usage{fect(formula = NULL, data, Y, D, X = NULL, group = NULL,
+\usage{fect(formula = NULL, data, Y, D, X = NULL, 
+            W = NULL, group = NULL,
             na.rm = FALSE, 
             index, force = "two-way", r = 0, lambda = NULL, nlambda = 10,
             CV = NULL, k = 10, cv.prop = 0.1, cv.treat = FALSE, 
@@ -28,6 +29,7 @@ assumptions.}
 \item{Y}{the outcome indicator.}
 \item{D}{the treatment indicator. The treatment should be binary (0 and 1).}
 \item{X}{time-varying covariates. Covariates that have perfect collinearity with specified fixed effects are dropped automatically.}
+\item{W}{the weight indicator. If specified, the program will calculate a weighted average and dynamic treatment effect.}
 \item{group}{the group indicator. If specified, the group-wise ATT will be estimated.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
 \item{index}{a two-element string vector specifying the unit and time indicators. Must be of length 2. Every observation should be uniquely defined by the pair of the unit and time indicator.}
@@ -131,6 +133,7 @@ assumptions.}
   \item{Y}{name of the outcome variable.}
   \item{D}{name of the treatment variable.}
   \item{X}{name of the time-varying control variables.}
+  \item{W}{name of the weight variable.}
   \item{index}{name of the unit and time indicators.}
   \item{force}{user specified \code{force} option.}
   \item{T}{the number of time periods.}
@@ -174,12 +177,15 @@ assumptions.}
   \item{pre.sd}{by period residual standard deviation for estimated pre-treatment 
     average treatment effects.}
   \item{att.avg}{average treatment effect on the treated.}
+  \item{att.avg.W}{weighted average treatment effect on the treated.}
   \item{att.avg.unit}{by unit average treatment effect on the treated.}
   \item{time}{term for switch-on treatment effect.}
   \item{count}{count of each term for switch-on treatment effect.}
   \item{att}{switch-on treatment effect.}
+  \item{att.on.W}{weighted switch-on treatment effect.}
   \item{time.off}{term for switch-off treatment effect.}
   \item{att.off}{switch-off treatment effect.}
+  \item{att.off.W}{weighted switch-off treatment effect.}
   \item{count.off}{count of each term for switch-off treatment effect.}
   \item{att.placebo}{average treatment effect for placebo period.}
   \item{att.carryover}{average treatment effect for carryover period.}
@@ -196,7 +202,9 @@ assumptions.}
   \item{est.att.avg}{inference for \code{att.avg}.}
   \item{est.att.avg.unit}{inference for \code{att.avg.unit}.}
   \item{est.att}{inference for \code{att.on}.}
+  \item{est.att.W}{inference for \code{att.on.W}.}
   \item{est.att.off}{inference for \code{att.off}.}
+  \item{est.att.off}{inference for \code{att.off.W}.}
   \item{est.placebo}{inference for \code{att.placebo}.}
   \item{est.carryover}{inference for \code{att.carryover}.}
   \item{est.eff.calendar}{inference for \code{eff.calendar}.}
@@ -204,6 +212,7 @@ assumptions.}
   \item{est.balance.att}{inference for \code{balance.att}.}
   \item{est.balance.avg}{inference for \code{balance.avg.att}.}
   \item{est.balance.placebo}{inference for \code{balance.att.placebo}.}
+  \item{est.avg.W}{inference for \code{att.avg.W}.}
   \item{est.beta}{inference for \code{beta}.}
   \item{est.group.att}{inference for \code{group.att}.}
   \item{est.group.output}{inference for \code{group.output}.}  
