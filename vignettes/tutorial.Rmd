@@ -163,11 +163,11 @@ plot(out.mc, main = "Estimated ATT (MC)")
 
 ### Balanced sample
 
-The package **fect** provides the option balance.period which allows the calculation of the average treatment effects only for units that exhibit complete data in specified pre- and post-treatment periods. For instance, if the option is set to `balance.period = c(-4,3)`, the program will calculate the average treatment effects for units that have at least four consecutive non-missing observations in the pre-treatment periods (-4, -3, -2, -1) and at least four consecutive non-missing observations in the post-treatment periods (0, 1, 2, 3).
+The package **fect** provides the option balance.period which allows the calculation of the average treatment effects only for units that exhibit complete data in specified pre- and post-treatment periods. For instance, if the option is set to `balance.period = c(-3,4)`, the program will calculate the average treatment effects for units that have at least four consecutive non-missing observations in the pre-treatment periods (-3, -2, -1, 0) and at least four consecutive non-missing observations in the post-treatment periods (1, 2, 3, 4).
 
 ```{r simdata_bal, eval=TRUE, cache = TRUE}
 out.bal <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
-  balance.period = c(-4, 4), force = "two-way", method = "ife", 
+  balance.period = c(-3, 4), force = "two-way", method = "ife", 
   CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
 ```
 
