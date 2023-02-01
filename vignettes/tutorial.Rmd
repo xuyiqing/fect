@@ -163,20 +163,41 @@ plot(out.mc, main = "Estimated ATT (MC)")
 
 ### Balanced sample
 
+The package **fect** provides the option balance.period which allows the calculation of the average treatment effects only for units that exhibit complete data in specified pre- and post-treatment periods. For instance, if the option is set to `balance.period = c(-4,3)`, the program will calculate the average treatment effects for units that have at least four consecutive non-missing observations in the pre-treatment periods (-4, -3, -2, -1) and at least four consecutive non-missing observations in the post-treatment periods (0, 1, 2, 3).
+
 ```{r simdata_bal, eval=TRUE, cache = TRUE}
 out.bal <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
   balance.period = c(-4, 4), force = "two-way", method = "ife", 
   CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
 ```
 
+We can then visualize the dynamic treatment effects using the inbuilt function **plot**. By default, it displays the dynamic treatment effects of the "balanced" sample.
 
 ```{r fig.width = 6, fig.height = 4.5}
 plot(out.bal, main = "Estimated ATT (Balanced Sample)")
 ```  
 
+
+### Weighted Treatment Effect
+
+The package offers the option `W` to calculate the weighted average treatment effects. The weighting variable does not affect the estimation of fixed effects or factors. Only the weighted average treatment effects or weighted dynamic treatment effects are obtained by aggregating the treatment effects using the weight `W`. 
+
+```{r simdata_w, eval=TRUE, cache = TRUE}
+simdata$Weight <- abs(rnorm(n = dim(simdata)[1]))
+out.w <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
+  force = "two-way", method = "ife", W = 'Weight',
+  CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
+```
+
+We can then visualize the weighted dynamic treatment effects using the inbuilt function **plot**, it by default shows the weighted dynamic treatment effects.
+
+```{r fig.width = 6, fig.height = 4.5}
+plot(out.w, main = "Estimated Weighted ATT")
+```  
+
 ## Heterogeneous treatment effects
 
-We provide several methods for researchers to explore heterogeneous treatment effects (HTE)。
+We provide several methods for researchers to explore heterogeneous treatment effects (HTE).
 
 ### Box plots
 
@@ -442,8 +463,9 @@ panelview(Y ~ D, data = simdata, index = c("id","time"), by.timing = TRUE,
   background = "white", main = "Simulated Data: Treatment Status")
 ```
 
-The function **get.cohort()** shipped in **fect** can generate a new variable "Cohort" based on the timing when treated units first get treated.
+The function **get.cohort()** shipped in the package **paneltools** can generate a new variable "Cohort" based on the timing when treated units first get treated.
 ```{r get_cohort}
+library(paneltools)
 simdata.cohort <- get.cohort(data = simdata,D = 'D',index = c("id","time"))
 print(table(simdata.cohort[,'Cohort']))
 ```
