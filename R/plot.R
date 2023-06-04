@@ -675,6 +675,10 @@ plot.fect <- function(x,
         maintext <- "ATT by Calendar Time"
         ytitle <- paste("Effect on",x$Y)
     }
+    else if (type=='box'){
+        maintext <- "Individual Treatment Effects"
+        ytitle <- paste("Effect on",x$Y)
+    }
 
     if (is.logical(legendOff) == FALSE & is.numeric(legendOff)==FALSE) {
         stop("\"legendOff\" is not a logical flag.")
@@ -2148,7 +2152,7 @@ plot.fect <- function(x,
             ylab <- NULL
         }
         if (is.null(main)==TRUE) {
-            main <- "Treatment Effects"
+            main <- maintext
         } else if (main == "") {
             main <- NULL
         }
@@ -2171,12 +2175,10 @@ plot.fect <- function(x,
         }
 
         ## title
-        if (is.null(main) == TRUE) {
-            p <- p + ggtitle(maintext)
-        } 
-        else if (main!=""){
+        if (!is.null(main)) {
             p <- p + ggtitle(main)
-        }
+        } 
+
 
         ## grid
         if (gridOff == TRUE) {
