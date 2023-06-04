@@ -2284,6 +2284,11 @@ plot.fect <- function(x,
                     label = max(data.count[,2]), size = cex.text * 0.7, hjust = 0.5)       
         }
 
+        ## ylim
+        if (is.null(ylim) == FALSE) {
+            p <- p + coord_cartesian(ylim = ylim)
+        }
+
         p <- p + theme(legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
          legend.position = legend.pos,
          legend.background = element_rect(fill="transparent",colour=NA),
