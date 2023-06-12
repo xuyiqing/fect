@@ -10,8 +10,8 @@ assumptions.}
             CV = NULL, k = 10, cv.prop = 0.1, cv.treat = FALSE, 
             cv.nobs = 3, cv.donut = 0, criterion = "mspe",
             binary = FALSE, QR = FALSE,
-            method = "fe",  
-            se = FALSE, vartype = "bootstrap", nboots = 200, alpha = 0.05,
+            method = "fe",  se = FALSE, vartype = "bootstrap", 
+            quantile.CI = FALSE, nboots = 200, alpha = 0.05, 
             parallel = TRUE, cores = NULL, tol = 0.001, seed = NULL, 
             min.T0 = NULL, max.missing = NULL, 
             proportion = 0.3, pre.periods = NULL, 
@@ -66,6 +66,8 @@ assumptions.}
 \item{vartype}{a string specifying the type of variance estimator. Choose 
   from \code{vartype = c("bootstrap", "jackknife", "parametric")}. Default value is 
   \code{"bootstrap"}.}
+\item{quantile.CI}{a logical flag indicating whether to use quantile 
+  confidence intervals when \code{vartype = "bootstrap"}. Default to FALSE.}
 \item{nboots}{an integer specifying the number of bootstrap
   runs. Ignored if \code{se = FALSE}.}
 \item{alpha}{significant level for hypothesis test and CIs. Default value is 

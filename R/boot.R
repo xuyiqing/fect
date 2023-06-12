@@ -41,7 +41,8 @@ fect.boot <- function(Y,
                       carryoverTest = FALSE,
                       carryover.period = NULL,
                       vartype = "bootstrap",
-                      nboots,
+                      quantile.CI = FALSE,
+                      nboots = 200,
                       parallel = TRUE,
                       cores = NULL,
                       group.level = NULL,
@@ -1610,25 +1611,44 @@ fect.boot <- function(Y,
     else {
 
         se.att <- apply(att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-        CI.att <- cbind(att - se.att * qnorm(1-alpha/2), att + se.att * qnorm(1-alpha/2)) # normal approximation
-        pvalue.att <- (1-pnorm(abs(att/se.att)))*2
+        if(quantile.CI == FALSE){
+            CI.att <- cbind(att - se.att * qnorm(1-alpha/2), att + se.att * qnorm(1-alpha/2)) # normal approximation
+            pvalue.att <- (1-pnorm(abs(att/se.att)))*2
+        }
+        else{
+            CI.att <- t(apply(att.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+            pvalue.att <- apply(att.boot, 1, get.pvalue)
+        }
+        
         est.att <- cbind(att, se.att, CI.att, pvalue.att, out$count)
         colnames(est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                   "p.value", "count")
         rownames(est.att) <- out$time
         
         # for equivalence test
-        att.bound <- cbind(att - se.att * qnorm(1-alpha), att + se.att * qnorm(1-alpha)) # one-sided
+        if(quantile.CI == FALSE){
+            att.bound <- cbind(att - se.att * qnorm(1-alpha), att + se.att * qnorm(1-alpha)) # one-sided
+        }
+        else{
+            att.bound <- t(apply(att.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+        }
         colnames(att.bound) <- c("CI.lower", "CI.upper")
         rownames(att.bound) <- out$time
 
 
         
         if (hasRevs == 1) {
-            CI.att.off <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
-            se.att.off <- apply(att.off.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-            pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
 
+            se.att.off <- apply(att.off.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+            if(quantile.CI == FALSE){
+                CI.att.off <- cbind(att.off - se.att.off * qnorm(1-alpha/2), att.off + se.att.off * qnorm(1-alpha/2))
+                pvalue.att.off <- (1-pnorm(abs(att.off/se.att.off)))*2
+            }
+            else{
+                CI.att.off <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE))) 
+                pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
+            } 
+            
             est.att.off <- cbind(att.off, se.att.off, CI.att.off, pvalue.att.off, out$count.off)
             colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
                                        "p.value", "count.off")
@@ -1636,17 +1656,30 @@ fect.boot <- function(Y,
             #T0.off.l <- sum(out$time.off > 0)
             #norm.att.off.sq <- (att.off/se.att.off)^2
             #T0.off.p <- 1 - pchisq(sum(norm.att.off.sq[(length(out$time.off) - T0.off.l + 1):length(out$time.off)]), df = T0.off.l)
-
-            att.off.bound <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+            if(quantile.CI == FALSE){
+                cbind(att.off - se.att.off * qnorm(1-alpha), att.off + se.att.off * qnorm(1-alpha))
+            }
+            else{
+                att.off.bound <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+            }
+            
             colnames(att.off.bound) <- c("CI.lower", "CI.upper")
             rownames(att.off.bound) <- out$time.off
         }
 
         if (!is.null(T.on.carry)) {
             se.carry.att <- apply(carry.att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-            CI.carry.att <- cbind(carry.att - se.carry.att * qnorm(1-alpha/2), 
-                                  carry.att + se.carry.att * qnorm(1-alpha/2)) # normal approximation
-            pvalue.carry.att <- (1-pnorm(abs(carry.att/se.carry.att)))*2
+            if(quantile.CI ==FALSE){
+                CI.carry.att <- cbind(carry.att - se.carry.att * qnorm(1-alpha/2), 
+                                      carry.att + se.carry.att * qnorm(1-alpha/2)) # normal approximation 
+                pvalue.carry.att <- (1-pnorm(abs(carry.att/se.carry.att)))*2               
+            }
+            else{
+                CI.carry.att <- t(apply(carry.att.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE))) 
+                pvalue.carry.att <- apply(carry.att.boot, 1, get.pvalue)
+            }
+
+            
             est.carry.att <- cbind(carry.att, se.carry.att, 
                              CI.carry.att, pvalue.carry.att)
 
@@ -1657,9 +1690,15 @@ fect.boot <- function(Y,
 
         if(!is.null(balance.period)){
             se.balance.att <- apply(balance.att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-            CI.balance.att <- cbind(balance.att - se.balance.att * qnorm(1-alpha/2), 
-                                    balance.att + se.balance.att * qnorm(1-alpha/2))
-            pvalue.balance.att <- (1-pnorm(abs(balance.att/se.balance.att)))*2
+            if(quantile.CI==FALSE){
+                CI.balance.att <- cbind(balance.att - se.balance.att * qnorm(1-alpha/2), 
+                                        balance.att + se.balance.att * qnorm(1-alpha/2))
+                pvalue.balance.att <- (1-pnorm(abs(balance.att/se.balance.att)))*2                
+            }
+            else{
+                CI.balance.att <- t(apply(balance.att.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE))) 
+                pvalue.balance.att <- apply(balance.att.boot, 1, get.pvalue)
+            }
 
             est.balance.att <- cbind(balance.att, se.balance.att, CI.balance.att, 
                                      pvalue.balance.att, out$balance.count)
@@ -1668,24 +1707,46 @@ fect.boot <- function(Y,
             rownames(est.balance.att) <- out$balance.time
             
             se.balance.avg.att <- sd(balance.avg.att.boot, na.rm=TRUE)
-            CI.balance.avg.att <- c(balance.avg.att - se.balance.avg.att  * qnorm(1-alpha/2), 
-                                    balance.avg.att + se.balance.avg.att  * qnorm(1-alpha/2))
-            p.balance.avg.att <- (1-pnorm(abs(balance.avg.att/se.balance.avg.att)))*2
+            if(quantile.CI ==FALSE){
+                CI.balance.avg.att <- c(balance.avg.att - se.balance.avg.att  * qnorm(1-alpha/2), 
+                                        balance.avg.att + se.balance.avg.att  * qnorm(1-alpha/2))
+                p.balance.avg.att <- (1-pnorm(abs(balance.avg.att/se.balance.avg.att)))*2
+            }
+            else{
+                CI.balance.avg.att <- quantile(balance.avg.att.boot,c(alpha/2, 1 - alpha/2), na.rm=TRUE)
+                p.balance.avg.att <- get.pvalue(balance.avg.att.boot)
+            }
+            
             est.balance.avg <- t(as.matrix(c(balance.avg.att, se.balance.avg.att, CI.balance.avg.att, p.balance.avg.att)))
             colnames(est.balance.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
-
-            balance.att.bound <- t(apply(balance.att.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+            if(quantile.CI ==FALSE){
+                balance.att.bound <-  c(balance.att - se.balance.att  * qnorm(1-alpha), 
+                                        balance.att + se.balance.att  * qnorm(1-alpha))
+            }
+            else{
+                balance.att.bound <- t(apply(balance.att.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+            }
+            
             colnames(balance.att.bound) <- c("CI.lower", "CI.upper")
             rownames(balance.att.bound) <- out$balance.time
 
             if (!is.null(placebo.period) & placeboTest == TRUE) {
                 balance.att.placebo <- out$balance.att.placebo        
                 balance.se.placebo <- sd(balance.att.placebo.boot, na.rm=TRUE)
-                balance.CI.placebo <- c(balance.att.placebo - balance.se.placebo * qnorm(1-alpha/2), 
-                                        balance.att.placebo + balance.se.placebo * qnorm(1-alpha/2))
-                balance.CI.placebo.bound <- c(balance.att.placebo - balance.se.placebo * qnorm(1-alpha), 
-                                              balance.att.placebo + balance.se.placebo * qnorm(1-alpha))
-                balance.pvalue.placebo <- (1-pnorm(abs(balance.att.placebo/balance.se.placebo)))*2
+                if(quantile.CI==FALSE){
+                    balance.CI.placebo <- c(balance.att.placebo - balance.se.placebo * qnorm(1-alpha/2), 
+                                            balance.att.placebo + balance.se.placebo * qnorm(1-alpha/2))
+                    balance.CI.placebo.bound <- c(balance.att.placebo - balance.se.placebo * qnorm(1-alpha), 
+                                                balance.att.placebo + balance.se.placebo * qnorm(1-alpha))
+                    balance.pvalue.placebo <- (1-pnorm(abs(balance.att.placebo/balance.se.placebo)))*2                    
+                }
+                else{
+                    balance.CI.placebo <- quantile(balance.att.placebo.boot,c(alpha/2, 1 - alpha/2), na.rm=TRUE)
+                    balance.CI.placebo.bound <- quantile(balance.att.placebo.boot,c(alpha, 1 - alpha), na.rm=TRUE)
+                    balance.pvalue.placebo <- get.pvalue(balance.att.placebo.boot)
+                }
+
+                
                 est.balance.placebo <- t(as.matrix(c(balance.att.placebo, 
                                             balance.se.placebo, 
                                             balance.CI.placebo, 
@@ -1700,35 +1761,62 @@ fect.boot <- function(Y,
         if (!is.null(W)){
             #att.avg.W.boot
             se.att.avg.W <- sd(att.avg.W.boot, na.rm=TRUE)
-            CI.att.avg.W <- c(att.avg.W - se.att.avg.W  * qnorm(1-alpha/2), 
-                              att.avg.W + se.att.avg.W  * qnorm(1-alpha/2))
-            p.att.avg.W <- (1-pnorm(abs(att.avg.W/se.att.avg.W)))*2
+            if(quantile.CI == FALSE){
+                CI.att.avg.W <- c(att.avg.W - se.att.avg.W  * qnorm(1-alpha/2), 
+                                  att.avg.W + se.att.avg.W  * qnorm(1-alpha/2))
+                p.att.avg.W <- (1-pnorm(abs(att.avg.W/se.att.avg.W)))*2                
+            }
+            else{
+                CI.att.avg.W <- quantile(att.avg.W.boot,c(alpha/2, 1 - alpha/2), na.rm=TRUE)
+                p.att.avg.W <- get.pvalue(att.avg.W.boot)
+            }
+            
             est.avg.W <- t(as.matrix(c(att.avg.W, se.att.avg.W, CI.att.avg.W, p.att.avg.W)))
             colnames(est.avg.W) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
 
             #att.on.W.boot
             se.att.W <- apply(att.on.W.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-            CI.att.W <- cbind(att.on.W - se.att.W * qnorm(1-alpha/2), 
-                              att.on.W + se.att.W * qnorm(1-alpha/2))
-            pvalue.att.W <- (1-pnorm(abs(att.on.W/se.att.W)))*2
+            if(quantile.CI == FALSE){
+                CI.att.W <- cbind(att.on.W - se.att.W * qnorm(1-alpha/2), 
+                                att.on.W + se.att.W * qnorm(1-alpha/2))
+                att.W.bound <- cbind(att.on.W - se.att.W * qnorm(1-alpha), 
+                                     att.on.W + se.att.W * qnorm(1-alpha))
+                pvalue.att.W <- (1-pnorm(abs(att.on.W/se.att.W)))*2                
+            }
+            else{
+                CI.att.W <- t(apply(att.on.W.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+                att.W.bound <- t(apply(att.on.W.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE))) 
+                pvalue.att.W <- apply(att.on.W.boot, 1, get.pvalue) 
+            }
+
             est.att.W <- cbind(att.on.W, se.att.W, CI.att.W, 
                                pvalue.att.W, count.on.W)
             colnames(est.att.W) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                            "p.value", "count")
             rownames(est.att.W) <- time.on.W
 
-            att.W.bound <- t(apply(att.on.W.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+            
             colnames(att.W.bound) <- c("CI.lower", "CI.upper")
             rownames(att.W.bound) <- time.on.W
             
             if (!is.null(placebo.period) & placeboTest == TRUE) {
                 # att.placebo.W.boot
                 se.placebo.W <- sd(att.placebo.W.boot, na.rm=TRUE)
-                CI.placebo.W <- c(att.placebo.W - se.placebo.W * qnorm(1-alpha/2), 
-                                  att.placebo.W + se.placebo.W * qnorm(1-alpha/2))
-                CI.placebo.bound.W <- c(att.placebo.W - se.placebo.W * qnorm(1-alpha), 
-                                        att.placebo.W + se.placebo.W * qnorm(1-alpha))
-                pvalue.placebo.w <- (1-pnorm(abs(att.placebo.W/se.placebo.W)))*2
+                if(quantile.CI == FALSE){
+                    CI.placebo.W <- c(att.placebo.W - se.placebo.W * qnorm(1-alpha/2), 
+                                      att.placebo.W + se.placebo.W * qnorm(1-alpha/2))
+                    CI.placebo.bound.W <- c(att.placebo.W - se.placebo.W * qnorm(1-alpha), 
+                                            att.placebo.W + se.placebo.W * qnorm(1-alpha))
+                    pvalue.placebo.w <- (1-pnorm(abs(att.placebo.W/se.placebo.W)))*2                    
+                }
+                else{
+                    CI.placebo.W <- quantile(att.placebo.W.boot,c(alpha/2,1-alpha/2), na.rm=TRUE)
+
+                    CI.placebo.bound.W <-quantile(att.placebo.W.boot,c(alpha,1-alpha), na.rm=TRUE)
+
+                    pvalue.placebo.w <- get.pvalue(att.placebo.W.boot)
+                }
+
                 est.placebo.W <- t(as.matrix(c(att.placebo.W, 
                                                se.placebo.W, 
                                                CI.placebo.W, 
@@ -1741,28 +1829,43 @@ fect.boot <- function(Y,
             if (hasRevs == 1) {
                 # att.off.W.boot
                 se.att.off.W <- apply(att.off.W.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-                CI.att.off.W <- cbind(att.off.W - se.att.off.W * qnorm(1-alpha/2), 
-                                      att.off.W + se.att.off.W * qnorm(1-alpha/2))
-                pvalue.att.off.W <- (1-pnorm(abs(att.off.W/se.att.off.W)))*2
+                if(quantile.CI == FALSE){
+                    CI.att.off.W <- cbind(att.off.W - se.att.off.W * qnorm(1-alpha/2), 
+                                          att.off.W + se.att.off.W * qnorm(1-alpha/2))
+                    att.off.W.bound <- cbind(att.off.W - se.att.off.W * qnorm(1-alpha), 
+                                          att.off.W + se.att.off.W * qnorm(1-alpha))
+                    pvalue.att.off.W <- (1-pnorm(abs(att.off.W/se.att.off.W)))*2                    
+                }
+                else{
+                    CI.att.off.W <- t(apply(att.off.W.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+                    att.off.W.bound <- t(apply(att.off.W.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE))) 
+                    pvalue.att.off.W <- apply(att.off.W.boot, 1, get.pvalue) 
+                }
+
                 est.att.off.W <- cbind(att.off.W, se.att.off.W, CI.att.off.W, 
                                        pvalue.att.off.W, count.off.W)
                 colnames(est.att.off.W) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                              "p.value", "count")
                 rownames(est.att.off.W) <- time.off.W
-
-                att.off.W.bound <- t(apply(att.off.W.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
                 colnames(att.off.W.bound) <- c("CI.lower", "CI.upper")
                 rownames(att.off.W.bound) <- time.off.W
-
 
                 if (!is.null(carryover.period) & carryoverTest == TRUE) {
                     # att.carryover.W.boot
                     se.carryover.W <- sd(att.carryover.W.boot, na.rm=TRUE)
-                    CI.carryover.W <- c(att.carryover.W - se.carryover.W * qnorm(1-alpha/2), 
-                                      att.carryover.W + se.carryover.W * qnorm(1-alpha/2))
-                    CI.carryover.bound.W <- c(att.carryover.W - se.carryover.W * qnorm(1-alpha), 
-                                              att.carryover.W + se.carryover.W * qnorm(1-alpha))
-                    pvalue.carryover.w <- (1-pnorm(abs(att.carryover.W/se.carryover.W)))*2
+                    if(quantile.CI == FALSE){
+                        CI.carryover.W <- c(att.carryover.W - se.carryover.W * qnorm(1-alpha/2), 
+                                        att.carryover.W + se.carryover.W * qnorm(1-alpha/2))
+                        CI.carryover.bound.W <- c(att.carryover.W - se.carryover.W * qnorm(1-alpha), 
+                                                att.carryover.W + se.carryover.W * qnorm(1-alpha))
+                        pvalue.carryover.w <- (1-pnorm(abs(att.carryover.W/se.carryover.W)))*2
+                    }
+                    else{
+                        CI.carryover.W <- quantile(att.carryover.W.boot,c(alpha/2,1-alpha/2), na.rm=TRUE)
+                        CI.carryover.bound.W <-quantile(att.carryover.W.boot,c(alpha,1-alpha), na.rm=TRUE)
+                        pvalue.carryover.w <- get.pvalue(att.carryover.W.boot)
+                    }
+
                     est.carryover.W <- t(as.matrix(c(att.carryover.W, 
                                                     se.carryover.W, 
                                                     CI.carryover.W, 
@@ -1778,35 +1881,68 @@ fect.boot <- function(Y,
 
         ## average (over time) ATT
         se.avg <- sd(att.avg.boot, na.rm=TRUE)
-        CI.avg <- c(att.avg - se.avg * qnorm(1-alpha/2), att.avg + se.avg * qnorm(1-alpha/2))
-        pvalue.avg <- (1-pnorm(abs(att.avg/se.avg)))*2
+        if(quantile.CI == FALSE){
+            CI.avg <- c(att.avg - se.avg * qnorm(1-alpha/2), att.avg + se.avg * qnorm(1-alpha/2))
+            pvalue.avg <- (1-pnorm(abs(att.avg/se.avg)))*2            
+        }
+        else{
+            CI.avg <- quantile(att.avg.boot,c(alpha/2,1-alpha/2), na.rm=TRUE)
+            pvalue.avg  <- get.pvalue(att.avg.boot)
+        }
+
         est.avg <- t(as.matrix(c(att.avg, se.avg, CI.avg, pvalue.avg)))
         colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
 
         se.avg.unit <- sd(att.avg.unit.boot, na.rm=TRUE)
-        CI.avg.unit <- c(att.avg.unit - se.avg.unit * qnorm(1-alpha/2), 
-                        att.avg.unit + se.avg.unit * qnorm(1-alpha/2))
-        pvalue.avg.unit <- (1-pnorm(abs(att.avg.unit/se.avg.unit)))*2
+        if(quantile.CI == FALSE){
+            CI.avg.unit <- c(att.avg.unit - se.avg.unit * qnorm(1-alpha/2), 
+                            att.avg.unit + se.avg.unit * qnorm(1-alpha/2))
+            pvalue.avg.unit <- (1-pnorm(abs(att.avg.unit/se.avg.unit)))*2            
+        }
+        else{
+            CI.avg.unit <- quantile(att.avg.unit.boot,c(alpha/2,1-alpha/2), na.rm=TRUE)
+            pvalue.avg.unit  <- get.pvalue(att.avg.unit.boot)
+        }
+
         est.avg.unit <- t(as.matrix(c(att.avg.unit, se.avg.unit, CI.avg.unit, pvalue.avg.unit)))
         colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper", "p.value")
         
+        
         se.eff.calendar <- apply(calendar.eff.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-        CI.eff.calendar <- cbind(calendar.eff - se.eff.calendar * qnorm(1-alpha/2), calendar.eff + se.eff.calendar * qnorm(1-alpha/2))
-        pvalue.eff.calendar <- (1-pnorm(abs(calendar.eff/se.eff.calendar)))*2
+        if(quantile.CI == FALSE){
+            CI.eff.calendar <- cbind(calendar.eff - se.eff.calendar * qnorm(1-alpha/2), calendar.eff + se.eff.calendar * qnorm(1-alpha/2))
+            pvalue.eff.calendar <- (1-pnorm(abs(calendar.eff/se.eff.calendar)))*2                    
+        }
+        else{
+            CI.eff.calendar <- t(apply(calendar.eff.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+            pvalue.eff.calendar <- apply(calendar.eff.boot, 1, get.pvalue) 
+        }
         est.eff.calendar <- cbind(calendar.eff, se.eff.calendar, CI.eff.calendar, pvalue.eff.calendar,calendar.N)
         colnames(est.eff.calendar) <- c("ATT-calendar", "S.E.", "CI.lower", "CI.upper","p.value", "count")
 
         se.eff.calendar.fit <- apply(calendar.eff.fit.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-        CI.eff.calendar.fit <- cbind(calendar.eff.fit - se.eff.calendar.fit * qnorm(1-alpha/2), calendar.eff.fit + se.eff.calendar.fit * qnorm(1-alpha/2))
-        pvalue.eff.calendar.fit <- (1-pnorm(abs(calendar.eff.fit/se.eff.calendar.fit)))*2
+        if(quantile.CI == FALSE){
+            CI.eff.calendar.fit <- cbind(calendar.eff.fit - se.eff.calendar.fit * qnorm(1-alpha/2), calendar.eff.fit + se.eff.calendar.fit * qnorm(1-alpha/2))
+            pvalue.eff.calendar.fit <- (1-pnorm(abs(calendar.eff.fit/se.eff.calendar.fit)))*2            
+        }
+        else{
+            CI.eff.calendar.fit <- t(apply(calendar.eff.fit.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+            pvalue.eff.calendar.fit <- apply(calendar.eff.fit.boot, 1, get.pvalue) 
+        }
         est.eff.calendar.fit <- cbind(calendar.eff.fit, se.eff.calendar.fit, CI.eff.calendar.fit, pvalue.eff.calendar.fit,calendar.N)
         colnames(est.eff.calendar.fit) <- c("ATT-calendar Fitted", "S.E.", "CI.lower", "CI.upper","p.value", "count")
 
         ## regression coefficents
         if (p > 0) {
             se.beta<-apply(beta.boot, 1, function(vec)sd(vec,na.rm=TRUE))
-            CI.beta<-cbind(c(beta) - se.beta * qnorm(1-alpha/2), c(beta) + se.beta * qnorm(1-alpha/2))
-            pvalue.beta <- (1-pnorm(abs(beta/se.beta)))*2
+            if(quantile.CI == FALSE){
+                CI.beta <- cbind(c(beta) - se.beta * qnorm(1-alpha/2), c(beta) + se.beta * qnorm(1-alpha/2))
+                pvalue.beta <- (1-pnorm(abs(beta/se.beta)))*2                
+            }
+            else{
+                CI.beta <- t(apply(beta.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+                pvalue.beta <- apply(beta.boot, 1, get.pvalue) 
+            }
             est.beta<-cbind(c(beta), se.beta, CI.beta, pvalue.beta)
             colnames(est.beta)<-c("Coef", "S.E.", "CI.lower", "CI.upper", "p.value")
 
@@ -1825,11 +1961,19 @@ fect.boot <- function(Y,
         if (!is.null(placebo.period) & placeboTest == TRUE) {
             att.placebo <- out$att.placebo        
             se.placebo <- sd(att.placebo.boot, na.rm=TRUE)
-            CI.placebo <- c(att.placebo - se.placebo * qnorm(1-alpha/2), 
-                            att.placebo + se.placebo * qnorm(1-alpha/2))
-            CI.placebo.bound <- c(att.placebo - se.placebo * qnorm(1-alpha), 
-                                  att.placebo + se.placebo * qnorm(1-alpha))
-            pvalue.placebo <- (1-pnorm(abs(att.placebo/se.placebo)))*2
+            if(quantile.CI == FALSE){
+                CI.placebo <- c(att.placebo - se.placebo * qnorm(1-alpha/2), 
+                                att.placebo + se.placebo * qnorm(1-alpha/2))
+                CI.placebo.bound <- c(att.placebo - se.placebo * qnorm(1-alpha), 
+                                    att.placebo + se.placebo * qnorm(1-alpha))
+                pvalue.placebo <- (1-pnorm(abs(att.placebo/se.placebo)))*2                
+            }
+            else{
+                CI.placebo <- quantile(att.placebo.boot,c(alpha/2,1-alpha/2), na.rm=TRUE)
+                CI.placebo.bound <- quantile(att.placebo.boot,c(alpha,1-alpha), na.rm=TRUE)
+                pvalue.placebo  <- get.pvalue(att.placebo.boot)
+            }
+
             est.placebo <- t(as.matrix(c(att.placebo, 
                                          se.placebo, 
                                          CI.placebo, 
@@ -1844,11 +1988,18 @@ fect.boot <- function(Y,
         if (!is.null(carryover.period) & carryoverTest == TRUE) {
             att.carryover <- out$att.carryover      
             se.carryover <- sd(att.carryover.boot, na.rm=TRUE)
-            CI.carryover <- c(att.carryover - se.carryover * qnorm(1-alpha/2), 
-                        att.carryover + se.carryover * qnorm(1-alpha/2))
-            CI.carryover.bound <- c(att.carryover - se.carryover * qnorm(1-alpha), 
+            if(quantile.CI == FALSE){
+                CI.carryover <- c(att.carryover - se.carryover * qnorm(1-alpha/2), 
+                                att.carryover + se.carryover * qnorm(1-alpha/2))
+                CI.carryover.bound <- c(att.carryover - se.carryover * qnorm(1-alpha), 
                                     att.carryover + se.carryover * qnorm(1-alpha))
-            pvalue.carryover <- (1-pnorm(abs(att.carryover/se.carryover)))*2
+                pvalue.carryover <- (1-pnorm(abs(att.carryover/se.carryover)))*2                
+            }
+            else{
+                CI.carryover <- quantile(att.carryover.boot,c(alpha/2,1-alpha/2), na.rm=TRUE)
+                CI.carryover.bound <- quantile(att.carryover.boot,c(alpha,1-alpha), na.rm=TRUE)
+                pvalue.carryover  <- get.pvalue(att.carryover.boot)
+            }
             est.carryover <- t(as.matrix(c(att.carryover, se.carryover, 
                                            CI.carryover, pvalue.carryover,
                                            CI.carryover.bound)))
@@ -1860,9 +2011,16 @@ fect.boot <- function(Y,
         ## group effect
         if (!is.null(group)) {
             se.group.att <- apply(group.att.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-            CI.group.att <- cbind(c(out$group.att) - se.group.att * qnorm(1-alpha/2), 
-                                c(out$group.att) + se.group.att * qnorm(1-alpha/2))
-            pvalue.group.att <- (1-pnorm(abs(out$group.att/se.group.att)))*2
+            if(quantile.CI == TRUE){
+                CI.group.att <- cbind(c(out$group.att) - se.group.att * qnorm(1-alpha/2), 
+                                      c(out$group.att) + se.group.att * qnorm(1-alpha/2))
+                pvalue.group.att <- (1-pnorm(abs(out$group.att/se.group.att)))*2                
+            }
+            else{
+                CI.group.att <- t(apply(group.att.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+                pvalue.group.att <- apply(group.att.boot, 1, get.pvalue) 
+            }
+
             est.group.att <- cbind(out$group.att, se.group.att, CI.group.att, pvalue.group.att)
             colnames(est.group.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value")
         
@@ -1874,20 +2032,26 @@ fect.boot <- function(Y,
                 subgroup.att.bound <- NULL
                 if(dim(subgroup.atts.boot)[1]>0){
                     subgroup.se.att <- apply(subgroup.atts.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-                    #subgroup.CI.att <- cbind(subgroup.atts - subgroup.se.att * qnorm(1-alpha/2), 
-                    #                        subgroup.atts + subgroup.se.att * qnorm(1-alpha/2)) # normal approximation
-                    subgroup.CI.att <- t(apply(subgroup.atts.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
-                    subgroup.pvalue.att <- (1-pnorm(abs(subgroup.atts/subgroup.se.att)))*2
+                    if(quantile.CI == FALSE){
+                        subgroup.CI.att <- cbind(subgroup.atts - subgroup.se.att * qnorm(1-alpha/2), 
+                                                 subgroup.atts + subgroup.se.att * qnorm(1-alpha/2))
+                        subgroup.pvalue.att <- (1-pnorm(abs(subgroup.atts/subgroup.se.att)))*2
+                        subgroup.att.bound <- cbind(subgroup.atts - subgroup.se.att * qnorm(1-alpha), 
+                                                subgroup.atts + subgroup.se.att * qnorm(1-alpha))
+                    }
+                    else{
+                        subgroup.CI.att <- t(apply(subgroup.atts.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+                        subgroup.pvalue.att <- apply(subgroup.atts.boot, 1, get.pvalue)    
+                        subgroup.att.bound <- t(apply(subgroup.atts.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))        
+                    }
                     subgroup.est.att <- cbind(subgroup.atts, subgroup.se.att , 
-                                            subgroup.CI.att, subgroup.pvalue.att, 
-                                            group.output.origin[[sub.name]]$count.on)
+                                              subgroup.CI.att, subgroup.pvalue.att, 
+                                              group.output.origin[[sub.name]]$count.on)
                     colnames(subgroup.est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                                     "p.value", "count")
                     rownames(subgroup.est.att) <- group.output.origin[[sub.name]]$time.on
                     
                     # for equivalence test
-                    subgroup.att.bound <- cbind(subgroup.atts - subgroup.se.att * qnorm(1-alpha), 
-                                                subgroup.atts + subgroup.se.att * qnorm(1-alpha)) # one-sided
                     colnames(subgroup.att.bound) <- c("CI.lower", "CI.upper")
                     rownames(subgroup.att.bound) <- group.output.origin[[sub.name]]$time.on
                 }
@@ -1899,10 +2063,21 @@ fect.boot <- function(Y,
                     subgroup.atts.off.boot <- group.atts.off.boot[[sub.name]]
 
                     if(dim(subgroup.atts.off.boot)[1]>0){
-                        subgroup.CI.att.off <- t(apply(subgroup.atts.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
-                        subgroup.se.att.off <- apply(subgroup.atts.off.boot, 1, function(vec) sd(vec, na.rm=TRUE))
-                        subgroup.pvalue.att.off <- apply(subgroup.atts.off.boot, 1, get.pvalue)
 
+                        subgroup.se.att.off <- apply(subgroup.atts.off.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+                        if(quantile.CI == FALSE){
+                            subgroup.CI.att.off <- cbind(subgroup.atts.off - subgroup.se.att.off * qnorm(1-alpha/2), 
+                                                         subgroup.atts.off + subgroup.se.att.off * qnorm(1-alpha/2))
+                            subgroup.pvalue.att.off <- apply(subgroup.atts.off.boot, 1, get.pvalue) 
+                            subgroup.att.off.bound <-  cbind(subgroup.atts.off - subgroup.se.att.off * qnorm(1-alpha), 
+                                                         subgroup.atts.off + subgroup.se.att.off * qnorm(1-alpha))
+                        }
+                        else{
+                            subgroup.CI.att.off <- t(apply(subgroup.atts.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+                            subgroup.pvalue.att.off <- apply(subgroup.atts.off.boot, 1, get.pvalue) 
+                            subgroup.att.off.bound <- t(apply(subgroup.atts.off.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
+                                                   
+                        }
                         subgroup.est.att.off <- cbind(subgroup.atts.off, 
                                                     subgroup.se.att.off, 
                                                     subgroup.CI.att.off, 
@@ -1912,7 +2087,6 @@ fect.boot <- function(Y,
                                                             "p.value", "count.off")
                         rownames(subgroup.est.att.off) <- group.output.origin[[sub.name]]$time.off
                         
-                        subgroup.att.off.bound <- t(apply(subgroup.atts.off.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
                         colnames(subgroup.att.off.bound) <- c("CI.lower", "CI.upper")
                         rownames(subgroup.att.off.bound) <- group.output.origin[[sub.name]]$time.off                         
                     }   
@@ -1924,11 +2098,19 @@ fect.boot <- function(Y,
                     subgroup.att.placebo <- group.output.origin[[sub.name]]$att.placebo
                     if(length(subgroup.att.placebo)>0){
                         subgroup.se.placebo <- sd(group.att.placebo.boot[[sub.name]], na.rm=TRUE)
-                        subgroup.CI.placebo <- c(subgroup.att.placebo - subgroup.se.placebo * qnorm(1-alpha/2), 
-                                                subgroup.att.placebo + subgroup.se.placebo * qnorm(1-alpha/2))
-                        subgroup.CI.placebo.bound <- c(subgroup.att.placebo - subgroup.se.placebo * qnorm(1-alpha), 
-                                                       subgroup.att.placebo + subgroup.se.placebo * qnorm(1-alpha))
-                        subgroup.pvalue.placebo <- (1-pnorm(abs(subgroup.att.placebo/subgroup.se.placebo)))*2
+                        if(quantile.CI == FALSE){
+                            subgroup.CI.placebo <- c(subgroup.att.placebo - subgroup.se.placebo * qnorm(1-alpha/2), 
+                                                    subgroup.att.placebo + subgroup.se.placebo * qnorm(1-alpha/2))
+                            subgroup.CI.placebo.bound <- c(subgroup.att.placebo - subgroup.se.placebo * qnorm(1-alpha), 
+                                                        subgroup.att.placebo + subgroup.se.placebo * qnorm(1-alpha))
+                            subgroup.pvalue.placebo <- (1-pnorm(abs(subgroup.att.placebo/subgroup.se.placebo)))*2                            
+                        }
+                        else{
+                            subgroup.CI.placebo <- quantile(group.att.placebo.boot[[sub.name]],c(alpha/2,1-alpha/2), na.rm=TRUE)
+                            subgroup.CI.placebo.bound <- quantile(group.att.placebo.boot[[sub.name]],c(alpha,1-alpha), na.rm=TRUE)
+                            subgroup.pvalue.placebo  <- get.pvalue(group.att.placebo.boot[[sub.name]])
+                        }
+
                         subgroup.est.placebo <- t(as.matrix(c(subgroup.att.placebo, 
                                                             subgroup.se.placebo, 
                                                             subgroup.CI.placebo, 
@@ -1946,12 +2128,19 @@ fect.boot <- function(Y,
                     subgroup.att.carryover <- group.output.origin[[sub.name]]$att.carryover        
                     if(length(subgroup.att.carryover)>0){
                         subgroup.se.carryover <- sd(group.att.carryover.boot[[sub.name]], na.rm=TRUE)
-                        subgroup.CI.carryover <- c(subgroup.att.carryover - subgroup.se.carryover * qnorm(1-alpha/2), 
-                                                   subgroup.att.carryover + subgroup.se.carryover * qnorm(1-alpha/2))
-                        subgroup.CI.carryover.bound <- c(subgroup.att.carryover - subgroup.se.carryover * qnorm(1-alpha), 
-                                                         subgroup.att.carryover + subgroup.se.carryover * qnorm(1-alpha))
-                        
-                        subgroup.pvalue.carryover <- (1-pnorm(abs(subgroup.att.carryover/subgroup.se.carryover)))*2
+                        if(quantile.CI == FALSE){
+                            subgroup.CI.carryover <- c(subgroup.att.carryover - subgroup.se.carryover * qnorm(1-alpha/2), 
+                                                    subgroup.att.carryover + subgroup.se.carryover * qnorm(1-alpha/2))
+                            subgroup.CI.carryover.bound <- c(subgroup.att.carryover - subgroup.se.carryover * qnorm(1-alpha), 
+                                                            subgroup.att.carryover + subgroup.se.carryover * qnorm(1-alpha))
+                            subgroup.pvalue.carryover <- (1-pnorm(abs(subgroup.att.carryover/subgroup.se.carryover)))*2
+                        }
+                        else{
+                            subgroup.CI.carryover <- quantile(group.att.carryover.boot[[sub.name]],c(alpha/2,1-alpha/2), na.rm=TRUE)
+                            subgroup.CI.carryover.bound <- quantile(group.att.carryover.boot[[sub.name]],c(alpha,1-alpha), na.rm=TRUE)
+                            subgroup.pvalue.carryover  <- get.pvalue(group.att.carryover.boot[[sub.name]])
+                        }
+
                         subgroup.est.carryover <- t(as.matrix(c(subgroup.att.carryover, 
                                                             subgroup.se.carryover, 
                                                             subgroup.CI.carryover, 

@@ -52,6 +52,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
                  se = FALSE, # report uncertainties
                  vartype = "bootstrap", # bootstrap or jackknife
+                 quantile.CI = FALSE,
                  nboots = 200, # number of bootstraps
                  alpha = 0.05, # significance level
                  parallel = TRUE, # parallel computing
@@ -110,6 +111,7 @@ fect.formula <- function(formula = NULL,
                          method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
                          se = FALSE, # report uncertainties
                          vartype = "bootstrap", # bootstrap or jackknife
+                         quantile.CI = FALSE,
                          nboots = 200, # number of bootstraps
                          alpha = 0.05, # significance level
                          parallel = TRUE, # parallel computing
@@ -195,6 +197,7 @@ fect.formula <- function(formula = NULL,
                         method = method, 
                         se = se, 
                         vartype = vartype,
+                        quantile.CI = quantile.CI,
                         nboots = nboots, 
                         alpha = alpha, 
                         parallel = parallel, 
@@ -254,6 +257,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          method = "fe", # method: ife for interactive fe; mc for matrix completion
                          se = FALSE, # report uncertainties
                          vartype = "bootstrap", # bootstrap or jackknife
+                         quantile.CI = FALSE,
                          nboots = 200, # number of bootstraps
                          alpha = 0.05, # significance level
                          parallel = TRUE, # parallel computing
@@ -538,6 +542,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## uncertainty estimates
     if (is.logical(se) == FALSE & !se%in%c(0, 1)) {
         stop("\"se\" is not a logical flag.")
+    } 
+
+    if (is.logical(quantile.CI) == FALSE & !quantile.CI%in%c(0, 1)) {
+        stop("\"quantile.CI\" is not a logical flag.")
     } 
 
     ## normalize
@@ -893,12 +901,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             if (sum(is.na(data[, Xname[i]])) > 0 & na.rm == TRUE) {
                 stop(paste("Missing values in variable \"", Xname[i],"\".", sep = ""))
             }
-
-            if (sum(tapply(data[, Xname[i]], data[, id], var), na.rm = TRUE) == 0) {
-                stop(paste("Variable \"",Xname[i], "\" is unit-invariant. Try to remove it.", sep = ""))
+            if(force %in% c(1,3)){
+                if (sum(tapply(data[, Xname[i]], data[, id], var), na.rm = TRUE) == 0) {
+                    stop(paste("Variable \"",Xname[i], "\" is unit-invariant. Try to remove it.", sep = ""))
+                }                
             }
-            if (sum(tapply(data[, Xname[i]], data[, time], var), na.rm = TRUE) == 0) {
-                stop(paste("Variable \"",Xname[i], "\" is time-invariant. Try to remove it.", sep = ""))
+            if(force %in% c(2,3)){
+                if (sum(tapply(data[, Xname[i]], data[, time], var), na.rm = TRUE) == 0) {
+                    stop(paste("Variable \"",Xname[i], "\" is time-invariant. Try to remove it.", sep = ""))
+                }                
             }
         }
     }
@@ -1569,6 +1580,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          carryoverTest = carryoverTest,
                          carryover.period = carryover.period,
                          vartype = vartype,
+                         quantile.CI = quantile.CI,
                          nboots = nboots, parallel = parallel,
                          cores = cores, group.level = g.level, group = G)
 
@@ -1760,6 +1772,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                              carryover.period = NULL,
                              vartype = vartype,
                              nboots = nboots, parallel = parallel,
+                             quantile.CI = quantile.CI,
                              cores = cores, group.level = g.level, group = pG, 
                              dis = FALSE)
 
