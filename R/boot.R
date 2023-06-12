@@ -1657,7 +1657,7 @@ fect.boot <- function(Y,
             #norm.att.off.sq <- (att.off/se.att.off)^2
             #T0.off.p <- 1 - pchisq(sum(norm.att.off.sq[(length(out$time.off) - T0.off.l + 1):length(out$time.off)]), df = T0.off.l)
             if(quantile.CI == FALSE){
-                cbind(att.off - se.att.off * qnorm(1-alpha), att.off + se.att.off * qnorm(1-alpha))
+                att.off.bound <- cbind(att.off - se.att.off * qnorm(1-alpha), att.off + se.att.off * qnorm(1-alpha))
             }
             else{
                 att.off.bound <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE)))
