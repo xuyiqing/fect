@@ -1720,7 +1720,7 @@ fect.boot <- function(Y,
             est.balance.avg <- t(as.matrix(c(balance.avg.att, se.balance.avg.att, CI.balance.avg.att, p.balance.avg.att)))
             colnames(est.balance.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
             if(quantile.CI ==FALSE){
-                balance.att.bound <-  c(balance.att - se.balance.att  * qnorm(1-alpha), 
+                balance.att.bound <-  cbind(balance.att - se.balance.att  * qnorm(1-alpha), 
                                         balance.att + se.balance.att  * qnorm(1-alpha))
             }
             else{
