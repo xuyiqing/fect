@@ -24,6 +24,27 @@ arma::mat E_adj (arma::mat E, arma::mat FE,
   return(EE) ;
 }
 
+/* Expectation Step :E if Iij==0, Eij=FEij with Weights */
+// [[Rcpp::export]]
+arma::mat wE_adj (arma::mat E, arma::mat FE, arma::mat W,
+                  arma::mat I) {
+  int T = E.n_rows ;
+  int N = E.n_cols ;
+  arma::mat EE = E ;
+  for (int i = 0; i < T; i++) {
+    for (int j = 0; j < N; j++) {
+      if (I(i, j) == 0) {
+        EE(i, j) = FE(i, j) ;
+      }
+      else{
+        EE(i, j) = (1-W(i,j))*FE(i, j) + W(i,j)*E(i, j) ;
+      }
+    }
+  }
+  return(EE) ;
+}
+
+
 /* reset FEij=0 if Iij==0 */
 arma::mat FE_adj (arma::mat FE, arma::mat I) {
   int T = FE.n_rows ;
@@ -301,6 +322,27 @@ arma::mat XXinv (arma::cube X) {
   return(inv(xx)) ;
 }
 
+/* weighted inverse*/
+/* X: T*N*p; W:T*N */
+// [[Rcpp::export]]
+arma::mat wXXinv (arma::cube X, arma::mat w) { 
+  int p = X.n_slices ;
+  arma::mat w_sr = pow(w,0.5) ;
+  arma::mat xx(p, p) ;
+  for (int k = 0; k < p; k++) {
+    for (int m = 0; m < p; m++) {
+      if (k > m) {
+        xx(k, m) = xx(m, k);
+      }
+      else {
+        xx(k, m) = trace(crossprod(w_sr%X.slice(k), w_sr%X.slice(m))) ;
+      }
+    }
+  }  
+  return(inv_sympd(xx)) ;
+}
+
+
 /* Obtain beta given interactive fe */
 // [[Rcpp::export]]
 arma::mat panel_beta (arma::cube X, arma::mat xxinv,
@@ -312,6 +354,20 @@ arma::mat panel_beta (arma::cube X, arma::mat xxinv,
   }
   return(xxinv * xy);
 }
+
+/* Obtain beta given interactive fe using weighted regression */
+// [[Rcpp::export]]
+arma::mat wpanel_beta (arma::cube X, arma::mat xwxinv, arma::mat w,
+                       arma::mat Y, arma::mat FE) {
+  int p = X.n_slices ; 
+  arma::mat xwy(p, 1, arma::fill::zeros) ;
+  arma::mat w_sr = pow(w,0.5) ;
+  for (int k = 0; k < p; k++) {
+    xwy(k) = trace(crossprod(w_sr%X.slice(k), w_sr%(Y - FE))) ;
+  }
+  return(xwxinv * xwy);
+}
+
 
 /* Obtain OLS panel estimate */
 // [[Rcpp::export]]

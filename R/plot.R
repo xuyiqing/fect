@@ -834,7 +834,7 @@ plot.fect <- function(x,
 
     use.weight <- FALSE
     if(!is.null(x$W) & weight==TRUE){
-        x$att <- x$att.W
+        x$att <- x$att.on.W
         x$time <- x$time.on.W
         x$count <- x$count.on.W
         x$att.avg <- x$att.avg.W
@@ -1245,7 +1245,7 @@ plot.fect <- function(x,
         ## data frame for main estimates
         if (switch.on == TRUE) {            
             ## switch-on effect
-            if (CI == FALSE) {             
+            if (CI == FALSE) {           
                 data <- cbind.data.frame(time, ATT = x$att, count = count.num)[show,]                
             } 
             else {

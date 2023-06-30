@@ -18,6 +18,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                     force, 
                     hasRevs = 1,
                     tol, # tolerance level
+                    max.iteration = 1000,
                     boot = FALSE, # bootstrapped sample
                     placeboTest = 0,
                     placebo.period = NULL,
@@ -78,8 +79,12 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     oci <- which(c(II) == 1)
 
     if (binary == FALSE) { 
+        if(!is.null(W)){
+            initialOut <- initialFit(data = data.ini, force = force, w = c(W), oci = oci)
+        }else{
+            initialOut <- initialFit(data = data.ini, force = force, w = NULL, oci = oci)
+        }
         
-        initialOut <- initialFit(data = data.ini, force = force, oci = oci)
         Y0 <- initialOut$Y0
         beta0 <- initialOut$beta0
         if (p > 0 && sum(is.na(beta0)) > 0) {
@@ -105,14 +110,22 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     
     validX <- 1 ## no multi-colinearity
     est.fect <- NULL
+
+    if(is.null(W)){
+        W.use <- as.matrix(0)
+    }else{
+        W.use <- W
+        W.use[which(II==0)] <- 0
+    }
+
     if (binary == FALSE) {
-        est.best <- inter_fe_ub(YY, Y0, X, II, beta0, r.cv, force = force, tol) 
+        est.best <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r.cv, force = force, tol, max.iteration) 
         if (boot == FALSE) {
             if (r.cv == 0) {
                 est.fect <- est.best
             } 
             else {
-                est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+                est.fect <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force = force, tol, max.iteration)
             }
         }
     } 

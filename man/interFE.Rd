@@ -2,9 +2,11 @@
 \alias{interFE}
 \title{Interactive Fixed Effects Models}
 \description{Estimating interactive fixed effect models.}
-\usage{interFE(formula = NULL, data, Y, X, index, r = 0, force = "none",
-         se = TRUE, nboots = 500, seed = NULL, 
-         tol = 1e-3, binary = FALSE, QR = FALSE, normalize = FALSE)
+\usage{interFE(formula = NULL, data, Y, X = NULL, W = NULL,
+         index, r = 0, force = "two-way",
+         se = FALSE, nboots = 500, seed = NULL, 
+         tol = 1e-3, max_iteration = 500, 
+         binary = FALSE, QR = FALSE, normalize = FALSE)
 }
 \arguments{
   \item{formula}{an object of class "formula": a symbolic description of the model to be fitted. }
@@ -12,12 +14,13 @@
     is not required).}
   \item{Y}{outcome.}
   \item{X}{time-varying covariates.}
+  \item{W}{weights.}
   \item{index}{a two-element string vector specifying the unit (group)
     and time indicators. Must be of length 2.}
   \item{r}{an integer specifying the number of factors.}
   \item{force}{a string indicating whether unit or time fixed effects will be
     imposed. Must be one of the following,
-    "none", "unit", "time", or "two-way". The default is "unit".}
+    "none", "unit", "time", or "two-way". The default is "two-way".}
   \item{se}{a logical flag indicating whether uncertainty estimates will
     be produced via bootstrapping.}
   \item{nboots}{an integer specifying the number of bootstrap
@@ -25,6 +28,7 @@
   \item{seed}{an integer that sets the seed in random number
     generation. Ignored if  \code{se = FALSE} and \code{r} is specified.}
   \item{tol}{a numeric value that specifies tolerate level.}
+  \item{max_iteration}{the maximal number of iterations for the EM algorithm.}
   \item{binary}{a logical flag indicating whether a probit link function will be 
     used.}
   \item{QR}{a logical flag indicating whether QR decomposition will be used for 

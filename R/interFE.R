@@ -7,14 +7,16 @@
 interFE <- function(formula=NULL,
                     data, # a data frame
                     Y, # outcome variable
-                    X, # covariates
+                    X = NULL, # covariates
+                    W = NULL, # weights
                     index, # id and time indicators
                     r = 0, # number of factors
-                    force = "none", # additived fixed effects
-                    se = TRUE, # standard error
+                    force = "two-way", # additived fixed effects
+                    se = FALSE, # standard error
                     nboots = 500, # number of bootstrap runs
                     seed = NULL,
                     tol = 1e-3,
+                    max_iteration = 500,
                     binary = FALSE,
                     QR = FALSE,
                     normalize = FALSE) {
@@ -24,14 +26,16 @@ interFE <- function(formula=NULL,
 ## formula method
 interFE.formula <- function(formula=NULL, data, # a data frame
                             Y, # outcome variable
-                            X, # covariates
+                            X = NULL, # covariates
+                            W = NULL, # weights
                             index, # id and time indicators
                             r = 0, # number of factors
-                            force = "none", # additived fixed effects
-                            se = TRUE, # standard error
+                            force = "two-way", # additived fixed effects
+                            se = 0, # standard error
                             nboots = 500, # number of bootstrap runs
                             seed = NULL,
                             tol = 1e-3,
+                            max_iteration = 500,
                             binary = FALSE,
                             QR = FALSE,
                             normalize = FALSE) {
@@ -39,6 +43,7 @@ interFE.formula <- function(formula=NULL, data, # a data frame
     varnames <- all.vars(formula)
     Yname <- varnames[1]
     Xname <- varnames[2:length(varnames)]
+
 
     ## check binary outcome
     if (binary == TRUE) {
@@ -51,9 +56,10 @@ interFE.formula <- function(formula=NULL, data, # a data frame
             }
         } 
     }
-    
+
+
     ## run the model
-    out <- interFE.default(formula=NULL, data = data, Y = Yname, X = Xname, 
+    out <- interFE.default(formula=NULL, data = data, Y = Yname, X = Xname, W,
                            index, # id and time indicators
                            r, # number of factors
                            force, # additived fixed effects
@@ -61,6 +67,7 @@ interFE.formula <- function(formula=NULL, data, # a data frame
                            nboots, # number of bootstrap runs
                            seed,
                            tol,
+                           max_iteration,
                            binary,
                            QR,
                            normalize)
@@ -85,17 +92,19 @@ print.interFE <- function(x,
 
 interFE.default <- function(formula=NULL, data, # a data frame
                             Y, # outcome variable
-                            X, # covariates
+                            X = NULL, # covariates
+                            W = NULL,
                             index, # id and time indicators
                             r = 0, # number of factors
-                            force = "none", # additived fixed effects
-                            se = TRUE, # standard error
+                            force = "two-way", # additived fixed effects
+                            se = 0, # standard error
                             nboots = 500, # number of bootstrap runs
                             seed = NULL,
-                            tol = 1e-3,
+                            tol = 1e-5,
+                            max_iteration = 500,
                             binary = FALSE,
                             QR = FALSE,
-                            normalize
+                            normalize = FALSE
                             ){ 
     
     ##-------------------------------#
@@ -126,6 +135,13 @@ interFE.default <- function(formula=NULL, data, # a data frame
     ## store variable names
     Yname <- Y
     Xname <- X
+    Wname <- W
+
+
+    if(!is.null(W)){
+        data <- data[which(data[,Wname]>0),]
+    }
+
     id <- index[1]
     time <- index[2] 
 
@@ -133,11 +149,10 @@ interFE.default <- function(formula=NULL, data, # a data frame
     ## sort data
     data <- data[order(data[,id], data[,time]), ]
 
-
     ## dimensions
     T <- length(unique(data[,time]))
     N <- length(unique(data[,id]))
-    p<-length(Xname)
+    p <- length(Xname)
 
     ## normalize
     if (binary == TRUE) {
@@ -194,7 +209,7 @@ interFE.default <- function(formula=NULL, data, # a data frame
             ob.indicator[sub.start:sub.end] <- ob.indicator[sub.start:sub.end] + i * T
         }
 
-        variable <- c(Yname, Xname)
+        variable <- c(Yname, Xname, Wname)
 
         data_I <- matrix(0, N * T, 1)
         data_I[ob.indicator, 1] <- 1
@@ -206,72 +221,28 @@ interFE.default <- function(formula=NULL, data, # a data frame
     I <- matrix(1,T,N)
     Y.ind <- matrix(data[,Yname],T,N)
     I[is.nan(Y.ind)] <- 0
-
+    
     if (0%in%I) {
         data[is.nan(data)] <- 0
     }
     
     ## parse data
     Y <- matrix(data[,Yname],T,N)
+    if(!is.null(Wname)){
+        W <- matrix(data[,Wname],T,N)
+        W[which(I==0)] <- 0
+        use_weight <- 1
+    }else{
+        use_weight <- 0
+    }
     
     ## time-varying covariates
     X <- array(0, dim = c(T, N, p))
-    #xp <- rep(0, p) ## label invariant x
-    #x.pos <- 0
-
     if (p > 0) {
-        #x.pos <- 1:p
         for (i in 1:p) {
             X[,,i] <- matrix(data[, Xname[i]], T, N)
-            #if (force %in% c(1,3)) {
-            #    if (!0%in%I) {
-            #        tot.var.unit <- sum(apply(X[, , i], 2, var))
-            #    } else {
-            #        Xi <- X[,,i]
-            #        Xi[which(I == 0)] <- NA
-            #        tot.var.unit <- sum(apply(Xi, 2, var, na.rm = TRUE))
-            #    }
-            #    if(!is.na(tot.var.unit)) {
-            #        if (tot.var.unit == 0) {
-                        ## time invariant covar can be removed
-            #            xp[i] <- 1
-            #            message(paste("Variable \"", Xname[i],"\" is time-invariant.\n", sep = ""))   
-            #        }
-            #    }
-            #}
-            #if (force %in% c(2, 3)) {
-            #    if (!0%in%I) {
-            #        tot.var.time <- sum(apply(X[, , i], 1, var))
-            #    } else {
-            #        Xi <- X[,,i]
-            #        Xi[which(I == 0)] <- NA
-            #        tot.var.time <- sum(apply(Xi, 1, var, na.rm = TRUE))
-            #    } 
-            #    if (!is.na(tot.var.time)) {
-            #        if (tot.var.time == 0) {
-                        ## can be removed in inter_fe
-            #            xp[i] <- 1
-            #            message(paste("Variable \"", Xname[i],"\" has no cross-sectional variation.\n", sep = ""))
-            #        }
-            #    }
-            #} 
         } 
     }
-
-    #if (sum(xp) > 0) {
-    #    if (sum(xp) == p) {
-    #        X <- array(0, dim = c(T, N, 0))
-    #        p <- 0
-    #    } else {
-    #        x.pos <- which(xp == 0)
-    #        Xsub <- array(0, dim = c(T, N, length(x.pos)))
-    #        for (i in 1:length(x.pos)) {
-    #            Xsub[,,i] <- X[,,x.pos[i]] 
-    #        }
-    #        X <- Xsub
-    #        p <- length(x.pos)
-    #    }
-    #} 
   
     ##-------------------------------#
     ## Estimation
@@ -283,7 +254,7 @@ interFE.default <- function(formula=NULL, data, # a data frame
         beta0 <- as.matrix(rep(0, p))
     }
 
-    if (0 %in% I || binary == TRUE) {
+    if (0 %in% I || use_weight) {
         data.ini <- matrix(NA, (T*N), (2 + 1 + p))
         data.ini[, 2] <- rep(1:N, each = T)         ## unit fe
         data.ini[, 3] <- rep(1:T, N)                ## time fe
@@ -295,7 +266,12 @@ interFE.default <- function(formula=NULL, data, # a data frame
         }
 
         if (binary == FALSE) {
-            initialOut <- initialFit(data.ini, force, which(c(I) == 1))
+            if(use_weight){
+                initialOut <- initialFit(data.ini, force, w = c(W), which(c(I) == 1))
+            }else{
+                initialOut <- initialFit(data.ini, force, NULL, which(c(I) == 1))
+            }
+            
             Y0 <- initialOut$Y0
             if (p > 0) {
                 beta0 <- initialOut$beta0
@@ -313,10 +289,13 @@ interFE.default <- function(formula=NULL, data, # a data frame
 
     ## estimates
     if (binary == FALSE) {
-        if (!0%in%I) {
-            out<-inter_fe(Y = Y, X = X, r = r, beta0 = beta0, force = force)
+        if ((!0%in%I) & (!use_weight)) {
+            out <- inter_fe(Y = Y, X = X, r = r, beta0 = beta0, force = force, max_iter = max_iteration, tol = tol)
         } else {
-            out<-inter_fe_ub(Y = Y, Y0 = Y0, X = X, I = I, beta0 = beta0, r = r, force = force)
+            if(!use_weight){
+                W <- as.matrix(0)
+            }
+            out <- inter_fe_ub(Y = Y, Y0 = Y0, X = X, I = I, W = W, beta0 = beta0, r = r, force = force, max_iter = max_iteration, tol = tol)
         }
     } else {
         if (QR == FALSE) {
@@ -336,12 +315,14 @@ interFE.default <- function(formula=NULL, data, # a data frame
     
     
     if (is.null(norm.para)) {
-        beta<-as.matrix(out$beta)
-        mu <- out$mu
-        if (!0 %in% I) {
-            beta0 <- beta
-            beta0[is.nan(beta0)] <- 0
+        if(p > 0){
+            beta<-as.matrix(out$beta)
+            if (!0 %in% I) {
+                beta0 <- beta
+                beta0[is.nan(beta0)] <- 0
+            }            
         }
+        mu <- out$mu
     } else {
         mu <- out$mu*norm.para[1]
         if (p>0) {
@@ -382,20 +363,28 @@ interFE.default <- function(formula=NULL, data, # a data frame
         ## to store results
         est.boot <- matrix(NA,nboots,(p+1))
         message("Bootstraping...\n")
+        pb <- txtProgressBar(min = 0, max = nboots, initial = 0) 
         for (i in 1:nboots) {
             smp <- sample(1:N, N , replace=TRUE)
             Y.boot <- Y[,smp]
             X.boot<-X[,smp,,drop=FALSE]
             I.boot <- I[,smp]
+            W.boot <- NULL
+            if(use_weight){
+                W.boot <- W[,smp]
+            }else{W.boot <- as.matrix(0)}
 
             if (binary == FALSE) {
-                if (!0%in%I) {
-                    inter.out <- try(inter_fe(Y=Y.boot, X=X.boot, r=r,
-                                          force=force, beta0 = beta0), silent = TRUE)
+                if ((!0%in%I) & (!use_weight)) {
+                    inter.out <- try(inter_fe(Y=Y.boot, X=X.boot, r=r, tol = tol,
+                                              force=force, beta0 = beta0, max_iter = max_iteration), silent = TRUE)
                 } else {
+                    if(!use_weight){
+                        W.boot <- as.matrix(0)
+                    }
                     Y0.boot <- Y0[,smp]
-                    inter.out <- try(inter_fe_ub(Y=Y.boot, Y0=Y0.boot, X=X.boot, I=I.boot, 
-                                             beta0 = beta0, r=r, force=force), silent = TRUE)
+                    inter.out <- try(inter_fe_ub(Y=Y.boot, Y0=Y0.boot, X=X.boot, I=I.boot, W=W.boot, tol = tol,
+                                                 beta0 = beta0, r=r, force=force, max_iter = max_iteration), silent = TRUE)
                 }
             } else {
 
@@ -448,9 +437,9 @@ interFE.default <- function(formula=NULL, data, # a data frame
                 }
             }
             
-            if (i%%100==0) {message(".")}
+            setTxtProgressBar(pb,i)
         }
-        message("\r")
+        close(pb)
         ## T*2: lower,upper
         CI<-t(apply(est.boot,2,function(vec)
             quantile(vec,c(0.025,0.975),na.rm=TRUE)))
@@ -458,10 +447,16 @@ interFE.default <- function(formula=NULL, data, # a data frame
         pvalue <- apply(est.boot, 2, get.pvalue)
          
         ## estimate table
-        est.table<-cbind(c(beta,mu), SE, CI, pvalue)
+        if(p>0){
+            est.table<-cbind(c(beta,mu), SE, CI, pvalue)
+        }else{est.table<-cbind(c(mu), SE, CI, pvalue)}
+        
         colnames(est.table) <- c("Coef","S.E.","CI.lower","CI.upper", "p.value")
     } else {
-        est.table <- as.matrix(c(beta,mu))
+        if(p>0){
+            est.table <- as.matrix(c(beta,mu))            
+        }else{est.table <- as.matrix(c(mu))}
+
     }
     rownames(est.table) <- c(Xname,"_const")
     

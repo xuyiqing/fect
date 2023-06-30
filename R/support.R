@@ -89,6 +89,7 @@ get_term <- function(d,
 
 initialFit <- function(data, ## long form data 
                        force,
+                       w = NULL,
                        oci ) { ## indicator
 
     N <- length(unique(data[,2]))
@@ -101,7 +102,18 @@ initialFit <- function(data, ## long form data
         x.sub <- as.matrix(x[oci,])
     }
     y <- as.matrix(data[,1])
+    y.sub <- as.matrix(y[oci,])
     beta0 <- matrix(0, 1, 1)
+
+    if(!is.null(w)){
+        use_weight <- 1
+        w <- as.matrix(w)
+        w.sub <- as.matrix(w[oci,])
+    }else{
+        use_weight <- 0
+    }
+
+
 
     ind <- NULL
     if(force == 0){
@@ -117,12 +129,24 @@ initialFit <- function(data, ## long form data
 
     if (force == 0) {
         if (p == 0) {
-            mu <- mean(c(y)[oci])
-            Y0 <- matrix(mu, T, N)
+            if(use_weight == 1){
+                mu <- sum(y.sub*w.sub)/sum(w.sub)
+                Y0 <- matrix(mu, T, N)
+            }
+            else{
+                mu <- mean(c(y)[oci])
+                Y0 <- matrix(mu, T, N)                
+            }
             ## res <- as.matrix(c(y) - mu)
         } 
         else {
-            lm.fit <- lm(as.matrix(c(y)[oci])~x.sub)
+            if(use_weight == 1){
+                lm.fit <- lm(as.matrix(c(y)[oci])~x.sub, weights = w.sub)                
+            }
+            else{
+                lm.fit <- lm(as.matrix(c(y)[oci])~x.sub) 
+            }
+
             coef <- lm.fit$coefficients
             mu <- coef[1]
             beta0 <- as.matrix(coef[2:length(coef)])
@@ -149,10 +173,16 @@ initialFit <- function(data, ## long form data
         }
         formula.reg <- as.formula(formula.reg)
 
+        if(use_weight == 1){
+            lm.fit <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                    data = data.reg[oci,], weights = w.sub,
+                                                    fixef.rm = "none")))  
+        }else{
+            lm.fit <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                    data = data.reg[oci,],
+                                                    fixef.rm = "none")))            
+        }
 
-        lm.fit <- suppressWarnings(invisible(feols(fml = formula.reg,
-                                                   data = data.reg[oci,],
-                                                   fixef.rm = "none")))
         
         y0 <- suppressWarnings(predict(lm.fit, newdata = data.reg))
         #lm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub, 

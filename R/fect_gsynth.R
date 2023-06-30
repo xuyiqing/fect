@@ -18,6 +18,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
                         force, 
                         hasRevs = 1,
                         tol, # tolerance level
+                        max.iteration = 1000,
                         boot = FALSE, # bootstrapped sample
                         placeboTest = 0,
                         placebo.period = NULL,
@@ -147,9 +148,9 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
             r.cv <- 0
             message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
             if (!0%in%I.co) {
-                est.co.best <- inter_fe(Y.co, X.co, 0, force = force, beta0 = beta0, tol) 
+                est.co.best <- inter_fe(Y.co, X.co, 0, force = force, beta0 = beta0, tol, max.iteration) 
             } else {
-                est.co.best <- inter_fe_ub(Y.co, Y0.co, X.co, I.co, beta0, 0, force = force, tol)
+                est.co.best <- inter_fe_ub(Y.co, Y0.co, X.co, I.co, beta0, 0, force = force, tol, max.iteration)
             }
 
         } 
@@ -167,11 +168,11 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
                 r <- CV.out[i, "r"]
                 if (!0%in%I.co) {
                     est.co <- inter_fe(Y = Y.co, X = X.co, r,
-                                       force = force, beta0 = beta0, tol)
+                                       force = force, beta0 = beta0, tol, max.iteration)
                 } 
                 else {
                     est.co <- inter_fe_ub(Y = Y.co, Y0 = Y0.co, X = X.co, I = I.co, 
-                                          beta0, r, force = force, tol)
+                                          beta0, r, force = force, tol, max.iteration)
                 }       
    
                 if (p > 0) {
@@ -340,13 +341,13 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     est.co.fect <- NULL
-    est.co.best <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, beta0, r.cv, force = force, tol) 
+    est.co.best <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, beta0, r.cv, force = force, tol, max.iteration) 
     if (boot == FALSE) {
         if (r.cv == 0) {
             est.co.fect <- est.co.best
         } 
         else {
-            est.co.fect <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, beta0, 0, force = force, tol)
+            est.co.fect <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, beta0, 0, force = force, tol, max.iteration)
         }
     }
     validX <- est.co.best$validX

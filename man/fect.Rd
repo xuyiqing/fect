@@ -12,7 +12,8 @@ assumptions.}
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap", 
             quantile.CI = FALSE, nboots = 200, alpha = 0.05, 
-            parallel = TRUE, cores = NULL, tol = 0.001, seed = NULL, 
+            parallel = TRUE, cores = NULL, tol = 0.001, 
+            max.iteration = 1000, seed = NULL, 
             min.T0 = NULL, max.missing = NULL, 
             proportion = 0.3, pre.periods = NULL, 
             f.threshold = 0.5, tost.threshold = NULL,
@@ -29,7 +30,7 @@ assumptions.}
 \item{Y}{the outcome indicator.}
 \item{D}{the treatment indicator. The treatment should be binary (0 and 1).}
 \item{X}{time-varying covariates. Covariates that have perfect collinearity with specified fixed effects are dropped automatically.}
-\item{W}{the weight indicator. If specified, the program will calculate a weighted average and dynamic treatment effect.}
+\item{W}{the weight indicator. If specified, the program will fit the data with a weighted outcome model and calculate weighted average and dynamic treatment effect.}
 \item{group}{the group indicator. If specified, the group-wise ATT will be estimated.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
 \item{index}{a two-element string vector specifying the unit and time indicators. Must be of length 2. Every observation should be uniquely defined by the pair of the unit and time indicator.}
@@ -80,6 +81,7 @@ assumptions.}
   maximum number of logical cores of your computer (warning: this
   could prevent you from multi-tasking on your computer).}
 \item{tol}{a positive number indicating the tolerance level.}
+\item{max.iteration}{The maximal number of iterations for the EM algorithm.}
 \item{seed}{an integer that sets the seed in random number
   generation. Ignored if \code{se = FALSE} and \code{r} is specified.}
 \item{min.T0}{an integer specifying the minimum value of observed periods 

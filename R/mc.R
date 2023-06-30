@@ -17,6 +17,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
                     hasF = 1,
                     hasRevs = 1, 
                     tol, # tolerance level
+                    max.iteration = 1000,
                     boot = FALSE, # bootstrapped sample
                     norm.para = NULL,
                     placeboTest = 0,
@@ -62,9 +63,20 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
+    if(is.null(W)){
+        W.use <- as.matrix(0)
+    }else{
+        W.use <- W
+        W.use[which(II==0)] <- 0
+    }
+
     ## observed Y0 indicator:
     oci <- which(c(II) == 1)
-    initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+    if(!is.null(W)){
+            initialOut <- initialFit(data = data.ini, force = force, w = c(W), oci = oci)
+    }else{
+        initialOut <- initialFit(data = data.ini, force = force, w = NULL, oci = oci)
+    }
     Y0 <- initialOut$Y0
     beta0 <- initialOut$beta0
     if (p > 0 && sum(is.na(beta0)) > 0) {
@@ -86,12 +98,12 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
 
     validX <- 1 ## no multi-colinearity
     ## matrix completion
-    est.best <- inter_fe_mc(YY, Y0, X, II, beta0, hasF, lambda.cv, force, tol) 
+    est.best <- inter_fe_mc(YY, Y0, X, II, W.use,  beta0, hasF, lambda.cv, force, tol, max.iteration) 
     validX <- est.best$validX
     validF <- est.best$validF
     est.fect <- NULL
     if (boot == FALSE) {
-        est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+        est.fect <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force = force, tol, max.iteration)
     }
     
         ##------------------------------##

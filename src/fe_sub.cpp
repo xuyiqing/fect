@@ -48,6 +48,52 @@ List Y_demean (arma::mat Y, int force) {
   return(result) ;
 }
 
+/* Weighted Demean Outcome Matrix*/
+/* return fixed effects */
+// [[Rcpp::export]]
+List Y_wdemean (arma::mat Y, arma::mat W, int force) {
+  int T = Y.n_rows ;
+  int N = Y.n_cols ;
+  double mu_Y = 0 ;
+  arma::mat alpha_Y(N, 1, arma::fill::zeros) ; 
+  arma::mat xi_Y(T, 1, arma::fill::zeros) ;
+  arma::mat YY = Y ;
+  
+  mu_Y  =  accu(YY%W)/accu(W) ;
+  if (force == 0) {
+    YY = YY - mu_Y ;
+  } 
+  
+  /* unit fixed effects */
+  if (force == 1) {
+    alpha_Y  =  (sum(YY%W, 0)/sum(W, 0)).t() ; // colMeans, (N * 1) matrix
+    YY  =  YY - repmat(alpha_Y.t(), T, 1) ; // (T * N) matrix  
+  }
+  
+  /* time fixed effects  */
+  if ( force == 2) {
+    xi_Y  =  (sum(YY%W, 1)/sum(W, 1)) ; //rowMeans, (N * 1) matrix
+    YY  =  YY - repmat(xi_Y, 1, N);  
+  }
+  
+  if (force == 3) {
+    alpha_Y  =  (sum(YY%W, 0)/sum(W, 0)).t() ;
+    xi_Y  =  (sum(YY%W, 1)/sum(W, 1)) ;
+    YY  =  YY - repmat(alpha_Y.t(), T, 1) - repmat(xi_Y, 1, N) + mu_Y ;
+  }
+  
+  List result ;
+  result["mu_Y"] = mu_Y ;
+  result["YY"] = YY ;
+  if (force==1 || force==3) {
+    result["alpha_Y"] = alpha_Y ;
+  }
+  if (force==2 || force==3) {
+    result["xi_Y"] = xi_Y ;  
+  }
+  return(result) ;
+}
+
 /* estimate additive fe for unbalanced panel, without covariates */
 // [[Rcpp::export]]
 List fe_add (arma::mat alpha_Y,
@@ -102,21 +148,20 @@ List panel_factor (arma::mat E, int r) {
   arma::mat VNT(r, r, arma::fill::zeros) ;
   arma::mat U ;
   arma::vec s ;
-  arma::mat V ; 
   if (T < N) { 
     arma::mat EE = E * E.t() /(N * T) ;
-    arma::svd( U, s, V, EE) ;
-    factor = U.head_cols(r) * sqrt(double(T)) ;
+    arma::eig_sym(s, U, EE) ;
+    factor = U.tail_cols(r) * sqrt(double(T)) ;
     lambda = E.t() * factor/T ;
-    VNT = diagmat(s.head_rows(r)) ;
+    VNT = diagmat(s.tail_rows(r)) ;
   } 
   else {
     arma::mat EE = E.t() * E / (N * T) ;
-    svd(U, s, V, EE) ;
-    lambda = U.head_cols(r) * sqrt(double(N)) ;
+    arma::eig_sym(s, U, EE) ;
+    lambda = U.tail_cols(r) * sqrt(double(N)) ;
     factor = E * lambda / N ;
-    VNT = diagmat(s.head_rows(r)) ;
-  }
+    VNT = diagmat(s.tail_rows(r)) ;
+  } 
   FE = factor * lambda.t() ;
   List result ;
   result["lambda"] = lambda ;
@@ -124,7 +169,6 @@ List panel_factor (arma::mat E, int r) {
   result["VNT"] = VNT ;
   result["FE"] = FE ;
   return(result) ;
-  
 }
 
 /* Obtain interactive fe directly */

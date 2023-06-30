@@ -58,6 +58,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  parallel = TRUE, # parallel computing
                  cores = NULL, # number of cores
                  tol = 0.001, # tolerance level
+                 max.iteration = 1000,
                  seed = NULL, # set seed
                  min.T0 = NULL, # minimum T0
                  max.missing = NULL, # maximum missing
@@ -117,6 +118,7 @@ fect.formula <- function(formula = NULL,
                          parallel = TRUE, # parallel computing
                          cores = NULL, # number of cores
                          tol = 0.001, # tolerance level
+                         max.iteration = 1000,
                          seed = NULL, # set seed
                          min.T0 = NULL,
                          max.missing = NULL,
@@ -203,6 +205,7 @@ fect.formula <- function(formula = NULL,
                         parallel = parallel, 
                         cores = cores, 
                         tol = tol, 
+                        max.iteration = max.iteration,
                         seed = seed, 
                         min.T0 = min.T0,
                         max.missing = max.missing, 
@@ -263,6 +266,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          parallel = TRUE, # parallel computing
                          cores = NULL, # number of cores
                          tol = 0.001, # tolerance level
+                         max.iteration = 1000,
                          seed = NULL, # set seed
                          min.T0 = NULL,
                          max.missing = NULL,
@@ -321,6 +325,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
         if(sum(data[,W]<0)>0){
             stop("\"W\" must be strictly positive.")
+        }
+        if(0 %in% data[,W]){
+            data <- data[which(data[,W]>0),]
         }
     }
     
@@ -1459,7 +1466,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                proportion = proportion, 
                                nlambda = nlambda, lambda = lambda,
                                force = force, hasRevs = hasRevs, 
-                               tol = tol, norm.para = norm.para, 
+                               tol = tol, max.iteration = max.iteration, norm.para = norm.para, 
                                group.level = g.level, group = G)
             } 
             else {
@@ -1485,7 +1492,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                balance.period = balance.period,
                                binary = binary, QR = QR,
                                force = force, hasRevs = hasRevs, 
-                               tol = tol, boot = 0,
+                               tol = tol , max.iteration = max.iteration,  boot = 0,
                                norm.para = norm.para,
                                placeboTest = placeboTest, 
                                placebo.period = placebo.period,
@@ -1501,7 +1508,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                    balance.period = balance.period,
                                    binary = binary, QR = QR,
                                    force = force, hasRevs = hasRevs, 
-                                   tol = tol, boot = 0,
+                                   tol = tol , max.iteration = max.iteration, boot = 0,
                                    norm.para = norm.para,
                                    placeboTest = placeboTest, 
                                    placebo.period = placebo.period,
@@ -1517,7 +1524,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                balance.period = balance.period,
                                lambda.cv = lambda,
                                force = force, hasRevs = hasRevs, 
-                               tol = tol, boot = 0,
+                               tol = tol , max.iteration = max.iteration, boot = 0,
                                norm.para = norm.para,
                                placeboTest = placeboTest, 
                                placebo.period = placebo.period,
@@ -1536,7 +1543,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                        sfe = sfe, cfe = cfe,
                                        ind.matrix = index.matrix,
                                        knots = knots, force = force, 
-                                       hasRevs = hasRevs, tol = tol, boot = 0, 
+                                       hasRevs = hasRevs, tol = tol , max.iteration = max.iteration, boot = 0, 
                                        placeboTest = placeboTest,
                                        placebo.period = placebo.period, 
                                        carryoverTest = carryoverTest,
@@ -1574,7 +1581,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          nlambda = nlambda, lambda = lambda,
                          alpha = alpha, binary = binary, QR = QR,
                          force = force, hasRevs = hasRevs,
-                         tol = tol, norm.para = norm.para,
+                         tol = tol , max.iteration = max.iteration, norm.para = norm.para,
                          placeboTest = placeboTest, 
                          placebo.period = placebo.period,
                          carryoverTest = carryoverTest,
@@ -1765,7 +1772,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                              nlambda = nlambda, lambda = lambda.cv,
                              alpha = alpha, binary = binary, QR = QR,
                              force = force, hasRevs = 0,
-                             tol = tol, norm.para = norm.para,
+                             tol = tol , max.iteration = max.iteration, norm.para = norm.para,
                              placeboTest = 0, 
                              placebo.period = NULL,
                              carryoverTest = 0,

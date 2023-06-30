@@ -35,6 +35,7 @@ fect.boot <- function(Y,
                       force,                      
                       hasRevs = 1,
                       tol,
+                      max.iteration = 1000,
                       norm.para,
                       placebo.period = NULL,
                       placeboTest = FALSE,
@@ -58,6 +59,16 @@ fect.boot <- function(Y,
     } else {
         p <- 0
     }
+
+    if(is.null(W)){
+        W.use <- as.matrix(0)
+        use_weight <- 0
+    }else{
+        W.use <- W
+        W.use[which(II==0)] <- 0
+        use_weight <- 1
+    }
+
 
 
     if (hasRevs == 1) {
@@ -94,7 +105,7 @@ fect.boot <- function(Y,
                            balance.period = balance.period,
                            r = r, binary = binary, QR = QR,
                            force = force, hasRevs = hasRevs, 
-                           tol = tol, boot = 0,
+                           tol = tol, max.iteration = max.iteration, boot = 0,
                            norm.para = norm.para, 
                            placebo.period = placebo.period,
                            placeboTest = placeboTest,
@@ -110,7 +121,7 @@ fect.boot <- function(Y,
                            balance.period = balance.period,
                            r.cv = r, binary = binary, QR = QR,
                            force = force, hasRevs = hasRevs, 
-                           tol = tol, boot = 0,
+                           tol = tol, max.iteration = max.iteration, boot = 0,
                            norm.para = norm.para, 
                            placebo.period = placebo.period,
                            placeboTest = placeboTest,
@@ -124,7 +135,7 @@ fect.boot <- function(Y,
                            T.on.balance = T.on.balance,
                            balance.period = balance.period,
                            lambda.cv = lambda, force = force, hasRevs = hasRevs, 
-                           tol = tol, boot = 0,
+                           tol = tol, max.iteration = max.iteration, boot = 0,
                            norm.para = norm.para,
                            placebo.period = placebo.period,
                            placeboTest = placeboTest,
@@ -146,7 +157,7 @@ fect.boot <- function(Y,
                                    sfe = sfe, cfe = cfe,
                                    ind.matrix = ind.matrix,
                                    hasRevs = hasRevs,
-                                   tol = tol, boot = 0, 
+                                   tol = tol, max.iteration = max.iteration, boot = 0, 
                                    placeboTest = placeboTest,
                                    placebo.period = placebo.period, 
                                    carryover.period = carryover.period,
@@ -172,7 +183,7 @@ fect.boot <- function(Y,
                        k = k, r = r, r.end = r.end, 
                        nlambda = nlambda, lambda = lambda, 
                        force = force, hasRevs = hasRevs, 
-                       tol = tol, norm.para = norm.para,
+                       tol = tol, max.iteration = max.iteration, norm.para = norm.para,
                        group.level = group.level, group = group,
                        cv.prop = cv.prop, cv.treat = cv.treat, 
                        cv.nobs = cv.nobs)
@@ -404,7 +415,7 @@ fect.boot <- function(Y,
                                     balance.period = balance.period,
                                     r.cv = out$r.cv, binary = binary,
                                     QR = QR, force = force,
-                                    hasRevs = hasRevs, tol = tol, boot = 1,
+                                    hasRevs = hasRevs, tol = tol, max.iteration = max.iteration, boot = 1,
                                     norm.para = norm.para,
                                     calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, 
@@ -500,7 +511,7 @@ fect.boot <- function(Y,
                                      I = I.id.pseudo, II = II.id.pseudo,
                                      T.on = T.on.pseudo, hasRevs = hasRevs,
                                      force = force, r = out$r.cv, CV = 0,
-                                     tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
+                                     tol = tol, max.iteration = max.iteration, norm.para = norm.para, boot = 1), silent = TRUE)
    
             if ('try-error' %in% class(synth.out)) {
                 return(matrix(NA, TT, Ntr))
@@ -633,7 +644,7 @@ fect.boot <- function(Y,
                                          time.on.seq.group = group.time.on,
                                          time.off.seq.group = group.time.off,
                                          time.on.balance.seq = balance.time,
-                                         norm.para = norm.para,tol = tol,
+                                         norm.para = norm.para,tol = tol, max.iteration = max.iteration,
                                          group.level = group.level, group = group), silent = TRUE)
 
             if ('try-error' %in% class(synth.out)) {
@@ -701,7 +712,7 @@ fect.boot <- function(Y,
                             balance.period = balance.period,
                             r.cv = out$r.cv, binary = binary, QR = QR,
                             force = force, hasRevs = hasRevs, 
-                            tol = tol, boot = 1,
+                            tol = tol, max.iteration = max.iteration, boot = 1,
                             norm.para = norm.para, 
                             placebo.period = placebo.period,
                             placeboTest = placeboTest,
@@ -727,7 +738,7 @@ fect.boot <- function(Y,
                             T.on.balance = T.on.balance,
                             balance.period = balance.period,
                             lambda.cv = out$lambda.cv, force = force, hasRevs = hasRevs, 
-                            tol = tol, boot = 1,
+                            tol = tol, max.iteration = max.iteration, boot = 1,
                             norm.para = norm.para,
                             placebo.period = placebo.period,
                             placeboTest = placeboTest,
@@ -757,7 +768,7 @@ fect.boot <- function(Y,
                                     sfe = sfe, cfe = cfe,
                                     ind.matrix = ind.matrix, 
                                     hasRevs = hasRevs,
-                                    tol = tol, boot = 1, 
+                                    tol = tol, max.iteration = max.iteration, boot = 1, 
                                     placeboTest = placeboTest,
                                     placebo.period = placebo.period, 
                                     carryover.period = carryover.period,
@@ -932,7 +943,7 @@ fect.boot <- function(Y,
                                     balance.period = balance.period,
                                     r = out$r.cv, binary = binary,
                                     QR = QR, force = force,
-                                    hasRevs = hasRevs, tol = tol, boot = 1,
+                                    hasRevs = hasRevs, tol = tol, max.iteration = max.iteration, boot = 1,
                                     norm.para = norm.para,
                                     calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, 
@@ -958,7 +969,7 @@ fect.boot <- function(Y,
                                     balance.period = balance.period,
                                     r.cv = out$r.cv, binary = binary,
                                     QR = QR, force = force,
-                                    hasRevs = hasRevs, tol = tol, boot = 1,
+                                    hasRevs = hasRevs, tol = tol, max.iteration = max.iteration, boot = 1,
                                     norm.para = norm.para,
                                     calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, 
@@ -984,7 +995,7 @@ fect.boot <- function(Y,
                                     balance.period = balance.period,
                                     lambda.cv = out$lambda.cv, force = force, 
                                     hasF = out$validF, hasRevs = hasRevs, 
-                                    tol = tol, boot = 1,
+                                    tol = tol, max.iteration = max.iteration, boot = 1,
                                     norm.para = norm.para,
                                     calendar.enp.seq = target.enp,
                                     time.on.seq = time.on, 
@@ -1016,7 +1027,7 @@ fect.boot <- function(Y,
                                                     ind.matrix = ind.matrix.boot,
                                                     knots = knots,
                                                     force = force, hasRevs = hasRevs,
-                                                    tol = tol,boot = 1,
+                                                    tol = tol, max.iteration = max.iteration, boot = 1,
                                                     norm.para = norm.para, 
                                                     time.on.seq = time.on, 
                                                     calendar.enp.seq = target.enp,
@@ -1161,6 +1172,11 @@ fect.boot <- function(Y,
         } 
     } 
     else {
+        pb <- txtProgressBar(min = 0,      
+                             max = nboots, 
+                             style = 3,    
+                             width = 50,   
+                             char = "=")
         for (j in 1:nboots) { 
             boot <- one.nonpara(boot.seq[j]) 
             att.avg.boot[,j] <- boot$att.avg
@@ -1243,11 +1259,9 @@ fect.boot <- function(Y,
                     }
                 }   
             }
-            ## report progress
-            if (j%%100 == 0)  {
-                message(".")   
-            }  
-        }  
+            setTxtProgressBar(pb, j) 
+        }
+        close(pb)  
     } 
     ## end of bootstrapping
 

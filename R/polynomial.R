@@ -21,6 +21,7 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
                             force, 
                             hasRevs = 1,
                             tol, # tolerance level
+                            max.iteration = 1000, 
                             boot = FALSE, # bootstrapped sample
                             placeboTest = 0,
                             placebo.period = NULL,
@@ -72,7 +73,11 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
     }
     ## observed Y0 indicator:
     oci <- which(c(II) == 1)
-    initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+    if(!is.null(W)){
+        initialOut <- initialFit(data = data.ini, force = force, w = c(W), oci = oci)
+    }else{
+        initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+    }
     data.ini <- NULL
     invisible(gc(verbose = FALSE))
     Y0 <- initialOut$Y0
@@ -80,9 +85,19 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
     if (p > 0 && sum(is.na(beta0)) > 0) {
         beta0[which(is.na(beta0))] <- 0
     }
+
+    if(is.null(W)){
+        W.use <- as.matrix(0)
+        use_weight <- 0
+    }else{
+        W.use <- W
+        use_weight <- 1
+    }
+
+
     est.fect <- NULL
     if (boot == FALSE) {
-        est.fect <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+        est.fect <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force = force, tol, max.iteration)
     }
 
     ## reshape 
@@ -154,9 +169,17 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
             }
         }
         formula.reg <- as.formula(formula.reg)
-        est.best <- suppressWarnings(invisible(feols(fml = formula.reg,
-                                                   data = data.reg[oci,],
-                                                   fixef.rm = "none")))
+        if(use_weight == 0){
+            est.best <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                        data = data.reg[oci,],
+                                                        fixef.rm = "none")))            
+        }else{
+            est.best <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                         data = data.reg[oci,],
+                                                         weights = c(W.use)[oci],
+                                                         fixef.rm = "none")))               
+        }
+
         
         yfit <- suppressWarnings(predict(est.best, newdata = data.reg))
         data.reg <- NULL
@@ -192,9 +215,17 @@ fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
             formula.reg <- paste0(formula.reg,paste0("+forceid","[",paste0("forcetime.",i),"]"))
         }
         formula.reg <- as.formula(formula.reg)
-        est.best <- suppressWarnings(invisible(feols(fml = formula.reg,
-                                                     data = data.reg[oci,],
-                                                     fixef.rm = "none")))
+        if(use_weight == 0){
+            est.best <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                        data = data.reg[oci,],
+                                                        fixef.rm = "none")))            
+        }else{
+            est.best <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                         data = data.reg[oci,],
+                                                         weights = c(W.use)[oci],
+                                                         fixef.rm = "none")))                 
+        }
+
         
         yfit <- suppressWarnings(predict(est.best, newdata = data.reg))
         data.reg <- NULL
