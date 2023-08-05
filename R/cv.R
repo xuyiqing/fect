@@ -642,6 +642,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 Y.lambda <- YY - Y0
                 ## Y.lambda[which(II == 0)] <- Y0[which(II == 0)]
                 Y.lambda[which(II == 0)] <- 0
+                if(use_weight){
+                    Y.lambda <- Y.lambda*W
+                }
                 eigen.all <- svd( Y.lambda / (TT * N) )$d
                 lambda.max <- log10(max(eigen.all))
                 lambda <- rep(NA, nlambda)
@@ -654,6 +657,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             else {
                 Y.lambda <- YY - Y0
                 Y.lambda[which(II == 0)] <- 0
+                if(use_weight){
+                    Y.lambda <- Y.lambda*W
+                }
                 eigen.all <- svd( Y.lambda / (TT * N) )$d
             }
 

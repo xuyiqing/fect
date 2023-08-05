@@ -1931,7 +1931,9 @@ plot.fect <- function(x,
                     label = max.count, size = cex.text * 0.8, hjust = 0.5)                
         }
 
-        if(dim(data)[1]>4){
+        T.post.length <- length(data[which(data[,'time']>0),'time'])
+        T.pre.length <- length(data[which(data[,'time']<=0),'time'])
+        if(T.pre.length>5 & T.post.length>5){
             p <- p + scale_x_continuous(labels=scaleFUN)
         }
         else{
@@ -2101,7 +2103,7 @@ plot.fect <- function(x,
             p <- p + coord_cartesian(ylim = ylim)
         }
 
-        if(length(TTT)<=4){
+        if(length(TTT)<=10){
             p <- p + scale_x_continuous(breaks=TTT)
         }
         else{

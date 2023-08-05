@@ -507,7 +507,7 @@ fect.boot <- function(Y,
             #                             force = force, r = out$r.cv, CV = 0,
             #                             tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
 
-            synth.out <- try(fect.gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
+            synth.out <- try(fect.gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo, W = NULL,
                                      I = I.id.pseudo, II = II.id.pseudo,
                                      T.on = T.on.pseudo, hasRevs = hasRevs,
                                      force = force, r = out$r.cv, CV = 0,
@@ -554,7 +554,7 @@ fect.boot <- function(Y,
             }
         }
 
-
+        
 
         if (0%in%I) {
             ## calculate vcov of ep_tr
@@ -624,7 +624,7 @@ fect.boot <- function(Y,
             II.boot <- out$II[,id.boot]
             W.boot <- NULL
             if(!is.null(W)){
-                W.boot <- out$W[,id.boot] 
+                W.boot <- NULL
             }
             synth.out <- try(fect.gsynth(Y = Y.boot, X = X.boot, D = D.boot, W = W.boot,
                                          I = I.boot, II = II.boot,T.on = T.on[,id.boot], 

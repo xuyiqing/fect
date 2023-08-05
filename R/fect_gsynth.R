@@ -91,6 +91,12 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
+    if(is.null(W)){
+        W.use <- as.matrix(0)
+    }else{
+        stop("Gsynth doesn't suppoort weighted outcome model in this version.\n")
+    }
+
     if (!0%in%I.tr) {
         ## a (TT*Ntr) matrix, time dimension: before treatment
         pre <- as.matrix(D[,tr] == 0 & II[,tr] == 1)
@@ -150,7 +156,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
             if (!0%in%I.co) {
                 est.co.best <- inter_fe(Y.co, X.co, 0, force = force, beta0 = beta0, tol, max.iteration) 
             } else {
-                est.co.best <- inter_fe_ub(Y.co, Y0.co, X.co, I.co, beta0, 0, force = force, tol, max.iteration)
+                est.co.best <- inter_fe_ub(Y.co, Y0.co, X.co, I.co, W = W.use, beta0, 0, force = force, tol, max.iteration)
             }
 
         } 
@@ -171,7 +177,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
                                        force = force, beta0 = beta0, tol, max.iteration)
                 } 
                 else {
-                    est.co <- inter_fe_ub(Y = Y.co, Y0 = Y0.co, X = X.co, I = I.co, 
+                    est.co <- inter_fe_ub(Y = Y.co, Y0 = Y0.co, X = X.co, I = I.co, W = W.use,
                                           beta0, r, force = force, tol, max.iteration)
                 }       
    
@@ -341,13 +347,13 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     est.co.fect <- NULL
-    est.co.best <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, beta0, r.cv, force = force, tol, max.iteration) 
+    est.co.best <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W = W.use, beta0, r.cv, force = force, tol, max.iteration) 
     if (boot == FALSE) {
         if (r.cv == 0) {
             est.co.fect <- est.co.best
         } 
         else {
-            est.co.fect <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, beta0, 0, force = force, tol, max.iteration)
+            est.co.fect <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W = W.use, beta0, 0, force = force, tol, max.iteration)
         }
     }
     validX <- est.co.best$validX
