@@ -148,19 +148,30 @@ List panel_factor (arma::mat E, int r) {
   arma::mat VNT(r, r, arma::fill::zeros) ;
   arma::mat U ;
   arma::vec s ;
+  arma::mat V ;
   if (T < N) { 
-    arma::mat EE = E * E.t() /(N * T) ;
+    /*arma::mat EE = E * E.t() /(N * T) ;
     arma::eig_sym(s, U, EE) ;
     factor = U.tail_cols(r) * sqrt(double(T)) ;
     lambda = E.t() * factor/T ;
-    VNT = diagmat(s.tail_rows(r)) ;
+    VNT = diagmat(s.tail_rows(r)) ;*/
+    arma::mat EE = E * E.t() /(N * T) ;
+    arma::svd( U, s, V, EE) ;
+    factor = U.head_cols(r) * sqrt(double(T)) ;
+    lambda = E.t() * factor/T ;
+    VNT = diagmat(s.head_rows(r)) ;
   } 
   else {
-    arma::mat EE = E.t() * E / (N * T) ;
+    /*arma::mat EE = E.t() * E / (N * T) ;
     arma::eig_sym(s, U, EE) ;
     lambda = U.tail_cols(r) * sqrt(double(N)) ;
     factor = E * lambda / N ;
-    VNT = diagmat(s.tail_rows(r)) ;
+    VNT = diagmat(s.tail_rows(r)) ;*/
+    arma::mat EE = E.t() * E / (N * T) ;
+    svd(U, s, V, EE) ;
+    lambda = U.head_cols(r) * sqrt(double(N)) ;
+    factor = E * lambda / N ;
+    VNT = diagmat(s.head_rows(r)) ;
   } 
   FE = factor * lambda.t() ;
   List result ;

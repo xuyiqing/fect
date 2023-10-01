@@ -257,7 +257,7 @@ List fe_ad_inter_iter (arma::mat Y,
   int stop_burnin = 0;
   while (dif > tolerate && niter <= max_iter) {
     if(use_weight == 1){
-      YY =  wE_adj (Y, fit, W, I) ; // e step: expeactation      
+      YY =  wE_adj (Y, fit, W, I) ; // e step: expectation      
     }else{
       YY =  E_adj (Y, fit, I) ;
     }

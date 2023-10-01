@@ -193,6 +193,7 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
 
     ## 2. rmse for treated units' observations under control
     tr <- which(apply(D, 2, sum) > 0)
+    co <- which(apply(D, 2, sum) == 0)
     tr.co <- which((as.matrix(1 - D[,tr]) * as.matrix(II[,tr])) == 1)
     eff.tr <- as.matrix(eff[,tr])
     v.eff.tr <- eff.tr[tr.co]
@@ -665,6 +666,8 @@ fect.mc <- function(Y, # Outcome variable, (T*N) matrix
         force = force,
         T = TT,
         N = N,
+        tr = tr,
+        co = co,
         p = p,
         lambda.cv = lambda.cv, 
         lambda.norm = lambda.norm,

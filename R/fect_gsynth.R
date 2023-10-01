@@ -112,25 +112,29 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
     time.pre <- split(rep(time, Ntr)[which(pre.v == 1)], id.tr.pre.v) ## a list of pre-treatment periods
     sameT0 <- length(unique(T0)) == 1
 
+    beta0 <- matrix(0, p, 1)
     # initial fit using Y.co
-    data.ini <- matrix(NA, Nco*TT, (p+3))
-    data.ini[,1] <- c(Y.co)
-    data.ini[,2] <- rep(1:Nco, each = TT)
-    data.ini[,3] <- rep(1:TT, Nco)
-    if (p > 0) {
-        for (i in 1:p) {
-            data.ini[, (3 + i)] <- c(X.co[, , i])
+    if (0 %in% I.co) {
+        data.ini <- matrix(NA, Nco*TT, (p+3))
+        data.ini[,1] <- c(Y.co)
+        data.ini[,2] <- rep(1:Nco, each = TT)
+        data.ini[,3] <- rep(1:TT, Nco)
+        if (p > 0) {
+            for (i in 1:p) {
+                data.ini[, (3 + i)] <- c(X.co[, , i])
+            }
         }
+        ## observed Y0 indicator:
+        initialOut <- Y0.co <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
+        oci <- which(c(II.co) == 1)
+        initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+        Y0.co <- initialOut$Y0
+        beta0 <- initialOut$beta0
+        if (p > 0 && sum(is.na(beta0)) > 0) {
+            beta0[which(is.na(beta0))] <- 0
+        }        
     }
-    ## observed Y0 indicator:
-    initialOut <- Y0.co <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
-    oci <- which(c(II.co) == 1)
-    initialOut <- initialFit(data = data.ini, force = force, oci = oci)
-    Y0.co <- initialOut$Y0
-    beta0 <- initialOut$beta0
-    if (p > 0 && sum(is.na(beta0)) > 0) {
-        beta0[which(is.na(beta0))] <- 0
-    }
+    
 
     validX <- 1 ## no multi-colinearity
 
@@ -167,7 +171,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
             CV.out <- matrix(NA, (r.max - r.old + 1), 5)
             colnames(CV.out) <- c("r", "sigma2", "IC", "PC", "MSPE")
             CV.out[,"r"] <- c(r.old:r.max)
-            CV.out[,"MSPE"] <- CV.out[,"PC"] <- 1e20
+            CV.out[,"MSPE"] <- CV.out[,"PC"] <- 1e10
             r.pc <- est.co.pc.best <- NULL
         
             for (i in 1:dim(CV.out)[1]) { 
@@ -347,13 +351,26 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     est.co.fect <- NULL
-    est.co.best <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W = W.use, beta0, r.cv, force = force, tol, max.iteration) 
+    
+    if(!0 %in% I.co){
+        est.co.best <- inter_fe(Y.co, X.co, r.cv,
+                                force = force, beta0 = beta0, tol, max.iteration)
+    }else{
+        est.co.best <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W = W.use, beta0, r.cv, force = force, tol, max.iteration) 
+    }
+
     if (boot == FALSE) {
         if (r.cv == 0) {
             est.co.fect <- est.co.best
         } 
         else {
-            est.co.fect <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W = W.use, beta0, 0, force = force, tol, max.iteration)
+            if(!0%in%I.co){
+                est.co.fect <- inter_fe(Y.co, X.co, 0,
+                                        force = force, beta0 = beta0, tol, max.iteration)  
+            }else{
+                est.co.fect <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W = W.use, beta0, 0, force = force, tol, max.iteration) 
+            }
+
         }
     }
     validX <- est.co.best$validX
@@ -528,6 +545,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
             inv.tr <- try(
                         ginv(t(as.matrix(lambda.tr))), silent = TRUE
                 )
+            
             if (!'try-error' %in% class(inv.tr)) {
                 wgt.implied <- t(inv.tr%*%t(as.matrix(est.co.best$lambda)))
             }
@@ -548,14 +566,15 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
 
     ## counterfactuals for treated units
     Y.ct.tr <- as.matrix(Y.tr - eff)
-    Y.ct.co <- est.co.best$fit
+    Y.ct.co <- Y.co - est.co.best$residuals
+    #print(Y.ct.co)
     Y.ct <- Y
     Y.ct[,tr] <- Y.ct.tr
     Y.ct[,co] <- Y.ct.co
 
     if(boot==FALSE){
         Y.ct.tr.r0 <- as.matrix(Y.tr - eff.r0)
-        Y.ct.co.r0 <- est.co.fect$fit
+        Y.ct.co.r0 <- Y.co - est.co.fect$residuals
         Y.ct.r0 <- Y
         Y.ct.r0[,tr] <- Y.ct.tr.r0
         Y.ct.r0[,co] <- Y.ct.co.r0

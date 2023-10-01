@@ -1366,7 +1366,7 @@ fect.boot <- function(Y,
     ## ATT estimates
     if (vartype == "jackknife") {
         
-        att.j <- jackknifed(att, att.boot, alpha)
+        att.j <- jackknifed(att, att.boot, alpha, quantile.CI = quantile.CI)
         est.att <- cbind(att, att.j$se, att.j$CI.l, att.j$CI.u, att.j$P, out$count)
         colnames(est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                   "p.value", "count")
@@ -1376,16 +1376,16 @@ fect.boot <- function(Y,
         colnames(att.bound) <- c("CI.lower", "CI.upper")
         rownames(att.bound) <- out$time
 
-        eff.calendar.j <- jackknifed(calendar.eff, calendar.eff.boot, alpha)
+        eff.calendar.j <- jackknifed(calendar.eff, calendar.eff.boot, alpha, quantile.CI = quantile.CI)
         est.eff.calendar <- cbind(calendar.eff, eff.calendar.j$se, eff.calendar.j$CI.l, eff.calendar.j$CI.u, eff.calendar.j$P, calendar.N)
         colnames(est.eff.calendar) <- c("ATT-calendar", "S.E.", "CI.lower", "CI.upper","p.value", "count")
 
-        eff.calendar.fit.j <- jackknifed(calendar.eff.fit, calendar.eff.fit.boot, alpha)
+        eff.calendar.fit.j <- jackknifed(calendar.eff.fit, calendar.eff.fit.boot, alpha, quantile.CI = quantile.CI)
         est.eff.calendar.fit <- cbind(calendar.eff.fit, eff.calendar.fit.j$se, eff.calendar.fit.j$CI.l, eff.calendar.fit.j$CI.u, eff.calendar.fit.j$P, calendar.N)
         colnames(est.eff.calendar.fit) <- c("ATT-calendar Fitted", "S.E.", "CI.lower", "CI.upper","p.value", "count")
 
         if (hasRevs == 1) {
-            att.off.j <- jackknifed(att.off, att.off.boot, alpha)
+            att.off.j <- jackknifed(att.off, att.off.boot, alpha, quantile.CI = quantile.CI)
             est.att.off <- cbind(att.off, att.off.j$se, att.off.j$CI.l, att.off.j$CI.u, att.off.j$P, out$count.off)
             colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
                                       "p.value", "count")
@@ -1397,7 +1397,7 @@ fect.boot <- function(Y,
         }
 
         if (!is.null(T.on.carry)) {
-            carry.att.j <- jackknifed(carry.att, carry.att.boot, alpha)
+            carry.att.j <- jackknifed(carry.att, carry.att.boot, alpha, quantile.CI = quantile.CI)
             est.carry.att <- cbind(carry.att, carry.att.j$se, 
                              carry.att.j$CI.l, carry.att.j$CI.u, carry.att.j$P)
 
@@ -1407,13 +1407,13 @@ fect.boot <- function(Y,
         }
 
         if(!is.null(balance.period)){
-            balance.att.j <- jackknifed(balance.att, balance.att.boot, alpha)
+            balance.att.j <- jackknifed(balance.att, balance.att.boot, alpha, quantile.CI = quantile.CI)
             est.balance.att <- cbind(balance.att, balance.att.j$se, balance.att.j$CI.l, balance.att.j$CI.u, balance.att.j$P, out$balance.count)
             colnames(est.balance.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                            "p.value", "count")
             rownames(est.balance.att) <- out$balance.time
             
-            balance.avg.att.j <- jackknifed(balance.avg.att, balance.avg.att.boot, alpha)
+            balance.avg.att.j <- jackknifed(balance.avg.att, balance.avg.att.boot, alpha, quantile.CI = quantile.CI)
             est.balance.avg <- t(as.matrix(c(balance.avg.att, balance.avg.att.j$se, balance.avg.att.j$CI.l, balance.avg.att.j$CI.u, balance.avg.att.j$P)))
             colnames(est.balance.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
 
@@ -1422,18 +1422,18 @@ fect.boot <- function(Y,
             rownames(balance.att.bound) <- out$balance.time
 
             if (!is.null(placebo.period) & placeboTest == TRUE) {
-                balance.att.placebo.j <- jackknifed(balance.att.placebo, balance.att.placebo.boot, alpha)
+                balance.att.placebo.j <- jackknifed(balance.att.placebo, balance.att.placebo.boot, alpha, quantile.CI = quantile.CI)
                 est.balance.placebo <- t(as.matrix(c(balance.att.placebo, balance.att.placebo.j$se, balance.att.placebo.j$CI.l, balance.att.placebo.j$CI.u, balance.att.placebo.j$P)))
                 colnames(est.balance.placebo) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
             } 
         }
 
         if (!is.null(W)){
-            att.avg.W.j <- jackknifed(att.avg.W, att.avg.W.boot, alpha)
+            att.avg.W.j <- jackknifed(att.avg.W, att.avg.W.boot, alpha, quantile.CI = quantile.CI)
             est.avg.W <- t(as.matrix(c(att.avg.W, att.avg.W.j$se, att.avg.W.j$CI.l, att.avg.W.j$CI.u, att.avg.W.j$P)))
             colnames(est.avg.W) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
 
-            att.on.W.j <- jackknifed(att.on.W, att.on.W.boot, alpha)
+            att.on.W.j <- jackknifed(att.on.W, att.on.W.boot, alpha, quantile.CI = quantile.CI)
             est.att.W <- cbind(att.on.W, att.on.W.j$se, att.on.W.j$CI.l, att.on.W.j$CI.u, att.on.W.j$P, count.on.W)
             colnames(est.att.W) <- c("ATT", "S.E.", "CI.lower", "CI.upper","p.value", "count")
             rownames(est.att.W) <- time.on.W
@@ -1443,12 +1443,12 @@ fect.boot <- function(Y,
             rownames(att.W.bound) <- time.on.W
 
             if (!is.null(placebo.period) & placeboTest == TRUE) {
-                att.placebo.W.j <- jackknifed(att.placebo.W, att.placebo.W.boot, alpha)
+                att.placebo.W.j <- jackknifed(att.placebo.W, att.placebo.W.boot, alpha, quantile.CI = quantile.CI)
                 est.placebo.W <- t(as.matrix(c(att.placebo.W, att.placebo.W.j$se, att.placebo.W.j$CI.l, att.placebo.W.j$CI.u, att.placebo.W.j$P)))
                 colnames(est.placebo.W) <- c("ATT.placebo", "S.E.", "CI.lower", "CI.upper", "p.value")
             }
             if (hasRevs == 1) {
-                att.off.W.j <- jackknifed(att.off.W, att.off.W.boot, alpha)
+                att.off.W.j <- jackknifed(att.off.W, att.off.W.boot, alpha, quantile.CI = quantile.CI)
                 est.att.off.W <- cbind(att.off.W, att.off.W.j$se, att.off.W.j$CI.l, att.off.W.j$CI.u, att.off.W.j$P, count.off.W)
                 colnames(est.att.off.W) <- c("ATT", "S.E.", "CI.lower", "CI.upper","p.value", "count")
                 rownames(est.att.off.W) <- time.off.W
@@ -1458,7 +1458,7 @@ fect.boot <- function(Y,
                 rownames(att.off.W.bound) <- out$time.off
 
                 if (!is.null(carryover.period) & carryoverTest == TRUE) {
-                    att.carryover.W.j <- jackknifed(att.carryover.W, att.carryover.W.boot, alpha)
+                    att.carryover.W.j <- jackknifed(att.carryover.W, att.carryover.W.boot, alpha, quantile.CI = quantile.CI)
                     est.carryover.W <- t(as.matrix(c(att.carryover.W, att.carryover.W.j$se, att.carryover.W.j$CI.l, att.carryover.W.j$CI.u, att.carryover.W.j$P)))
                     colnames(est.carryover.W) <- c("ATT.carryover", "S.E.", "CI.lower", "CI.upper", "p.value")
                 }
@@ -1466,22 +1466,22 @@ fect.boot <- function(Y,
         }
 
         ## average (over time) ATT
-        att.avg.j <- jackknifed(att.avg, att.avg.boot, alpha)
+        att.avg.j <- jackknifed(att.avg, att.avg.boot, alpha, quantile.CI = quantile.CI)
         est.avg <- t(as.matrix(c(att.avg, att.avg.j$se, att.avg.j$CI.l, att.avg.j$CI.u, att.avg.j$P)))
         colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
 
-        att.avg.unit.j <- jackknifed(att.avg.unit, att.avg.unit.boot, alpha)
+        att.avg.unit.j <- jackknifed(att.avg.unit, att.avg.unit.boot, alpha, quantile.CI = quantile.CI)
         est.avg.unit <- t(as.matrix(c(att.avg.unit, att.avg.unit.j$se, att.avg.unit.j$CI.l, att.avg.unit.j$CI.u, att.avg.unit.j$P)))
         colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper", "p.value")
 
         ## regression coefficents
         if (p > 0) {
-            beta.j <- jackknifed(beta, beta.boot, alpha)
+            beta.j <- jackknifed(beta, beta.boot, alpha, quantile.CI = quantile.CI)
             est.beta <- cbind(beta, beta.j$se, beta.j$CI.l, beta.j$CI.u, beta.j$P)
             colnames(est.beta)<-c("beta", "S.E.", "CI.lower", "CI.upper", "p.value")
 
             if (binary == TRUE) {
-                marginal.j <- jackknifed(out$marginal, marginal.boot, alpha)
+                marginal.j <- jackknifed(out$marginal, marginal.boot, alpha, quantile.CI = quantile.CI)
                 est.marginal <- cbind(out$marginal, marginal.j$se, marginal.j$CI.l, marginal.j$CI.u, marginal.j$P)
                 colnames(est.marginal)<-c("marginal", "S.E.", "CI.lower", "CI.upper", "p.value")
             }
@@ -1490,7 +1490,7 @@ fect.boot <- function(Y,
         ## placebo test
         if (!is.null(placebo.period) & placeboTest == TRUE) {
             att.placebo <- out$att.placebo
-            att.placebo.j <- jackknifed(att.placebo, att.placebo.boot, alpha)
+            att.placebo.j <- jackknifed(att.placebo, att.placebo.boot, alpha, quantile.CI = quantile.CI)
             att.placebo.bound <- c(att.placebo + qnorm(alpha)*att.placebo.j$se, 
                                    att.placebo + qnorm(1 - alpha)*att.placebo.j$se)
             est.placebo <- t(as.matrix(c(att.placebo, att.placebo.j$se, 
@@ -1505,7 +1505,7 @@ fect.boot <- function(Y,
         ## carryover test
         if (!is.null(carryover.period) & carryoverTest == TRUE) {
             att.carryover <- out$att.carryover
-            att.carryover.j <- jackknifed(att.carryover, att.carryover.boot, alpha)
+            att.carryover.j <- jackknifed(att.carryover, att.carryover.boot, alpha, quantile.CI = quantile.CI)
             att.carryover.bound <- c(att.carryover + qnorm(alpha)*att.carryover.j$se, 
                                    att.carryover + qnorm(1 - alpha)*att.carryover.j$se)
             
@@ -1521,7 +1521,7 @@ fect.boot <- function(Y,
         ## cohort effect
         est.group.out <- NULL
         if (!is.null(group)) {
-            group.att.j <- jackknifed(group.att, group.att.boot, alpha)
+            group.att.j <- jackknifed(group.att, group.att.boot, alpha, quantile.CI = quantile.CI)
             est.group.att <- cbind(group.att, group.att.j$se, group.att.j$CI.l, group.att.j$CI.u, group.att.j$P)
             colnames(est.group.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                          "p.value")
@@ -1534,7 +1534,7 @@ fect.boot <- function(Y,
                 subgroup.att.bound <- NULL
                 
                 if(dim(subgroup.atts.boot)[1]>0){
-                    subgroup.att.j <- jackknifed(subgroup.atts, subgroup.atts.boot, alpha)
+                    subgroup.att.j <- jackknifed(subgroup.atts, subgroup.atts.boot, alpha, quantile.CI = quantile.CI)
                     subgroup.est.att <- cbind(subgroup.atts, subgroup.att.j$se, subgroup.att.j$CI.l, 
                                             subgroup.att.j$CI.u, subgroup.att.j$P, 
                                             group.output.origin[[sub.name]]$count.on)
@@ -1554,7 +1554,7 @@ fect.boot <- function(Y,
                     subgroup.atts.off <- group.output.origin[[sub.name]]$att.off
                     subgroup.atts.off.boot <- group.atts.off.boot[[sub.name]]
                     if(dim(subgroup.atts.off.boot)[1]>0){
-                        subgroup.att.off.j <- jackknifed(subgroup.atts.off, subgroup.atts.off.boot, alpha)
+                        subgroup.att.off.j <- jackknifed(subgroup.atts.off, subgroup.atts.off.boot, alpha, quantile.CI = quantile.CI)
                         subgroup.est.att.off <- cbind(subgroup.atts.off, subgroup.att.off.j$se, subgroup.att.off.j$CI.l, 
                                                 subgroup.att.off.j$CI.u, subgroup.att.off.j$P, 
                                                 group.output.origin[[sub.name]]$count.off)
@@ -1573,7 +1573,7 @@ fect.boot <- function(Y,
                 if(placeboTest){
                     subgroup.att.placebo <- group.output.origin[[sub.name]]$att.placebo
                     if(length(subgroup.att.placebo)>0){
-                        subgroup.att.placebo.j <- jackknifed(subgroup.att.placebo, group.att.placebo.boot[[sub.name]], alpha)
+                        subgroup.att.placebo.j <- jackknifed(subgroup.att.placebo, group.att.placebo.boot[[sub.name]], alpha, quantile.CI = quantile.CI)
                         att.placebo.bound <- c(subgroup.att.placebo + qnorm(alpha)*subgroup.att.placebo.j$se, 
                                                subgroup.att.placebo + qnorm(1 - alpha)*subgroup.att.placebo.j$se)
             
@@ -1594,7 +1594,7 @@ fect.boot <- function(Y,
                 if(carryoverTest){
                     subgroup.att.carryover <- group.output.origin[[sub.name]]$att.carryover
                     if(length(subgroup.att.carryover)>0){
-                        subgroup.att.carryover.j <- jackknifed(subgroup.att.carryover, group.att.carryover.boot[[sub.name]], alpha)
+                        subgroup.att.carryover.j <- jackknifed(subgroup.att.carryover, group.att.carryover.boot[[sub.name]], alpha, quantile.CI = quantile.CI)
                         att.carryover.bound <- c(subgroup.att.carryover + qnorm(alpha)*subgroup.att.carryover.j$se, 
                                                  subgroup.att.carryover + qnorm(1 - alpha)*subgroup.att.carryover.j$se)
                                     
@@ -2259,7 +2259,8 @@ fect.boot <- function(Y,
 ## jackknife se
 jackknifed <- function(x,  ## ols estimates
                        y,
-                       alpha) { ## sub-sample ols estimates) 
+                       alpha,
+                       quantile.CI = FALSE) { ## sub-sample ols estimates) 
 
     p <- length(x)
     N <- dim(y)[2]  ## sample size
@@ -2271,9 +2272,16 @@ jackknifed <- function(x,  ## ols estimates
     vn <- N - apply(is.na(y), 1, sum) 
 
     Ysd <- sqrt(Yvar/vn)  ## jackknife se
+    
+    if(quantile.CI == FALSE){
+        CI.l <- Ysd * qnorm(alpha/2) + c(x)
+        CI.u <- Ysd * qnorm(1 - alpha/2) + c(x)        
+    }else{
+        CI <- t(apply(y, 1, function(vec) quantile(vec,c(0.05/2, 1 - 0.05/2), na.rm=TRUE)))
+        CI.l <- CI[,1]
+        CI.u <- CI[,2]
+    }
 
-    CI.l <- Ysd * qnorm(alpha/2) + c(x)
-    CI.u <- Ysd * qnorm(1 - alpha/2) + c(x)
 
     ## wald test
     P <- NULL

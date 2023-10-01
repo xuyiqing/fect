@@ -35,7 +35,12 @@ List inter_fe (arma::mat Y,
   arma::mat xi_X(T, p) ;
   double sigma2 ;
   double IC ;
-  //arma::mat FE(T, N, arma::fill::zeros) ;
+  /*
+  arma::mat FE(T, N, arma::fill::zeros) ;
+  arma::mat fit(T, N, arma::fill::zeros) ;
+  arma::mat FE_add_use(T, N, arma::fill::zeros) ;
+  arma::mat FE_inter_use(T, N, arma::fill::zeros) ;
+  arma::mat covar_fit(T, N, arma::fill::zeros) ;*/
   arma::mat invXX ;
 
   /* duplicate data */
@@ -147,7 +152,20 @@ List inter_fe (arma::mat Y,
     } 
     if (force == 2 || force == 3) {
       xi =  xi_Y;
-    }    
+    }
+    /*
+    if(r==0){
+      List Y_fe_ad ;
+      Y_fe_ad = fe_add(alpha_Y, xi_Y, mu_Y, T, N, force) ; 
+      fit = as<arma::mat>(Y_fe_ad["FE_ad"]) ;       
+    }
+    else if(r>0){
+      List E_fe_ad;
+      E_fe_ad = fe_add(alpha_Y, xi_Y, mu_Y,T, N, force) ;
+      FE_add_use = as<arma::mat>(E_fe_ad["FE_ad"])
+      FE_inter_use = factor * lambda.t()
+      fit = FE_add_use + FE_inter_use
+    }*/
   } else { // with valid covariates
     
     mu  =  mu_Y - crossprod(mu_X, beta)(0,0) ;
@@ -157,9 +175,31 @@ List inter_fe (arma::mat Y,
     } 
     if (force == 2 || force == 3) {
       xi  =  xi_Y - xi_X * beta  ;
-    }  
+    }
+    /*
+    if(r==0){
+      for (int i = 0; i < p; i++) {
+        covar_fit = covar_fit + XX.slice(i) * beta(i) ;
+      }
+      List Y_fe_ad ;
+      Y_fe_ad = fe_add(alpha, xi, mu, T, N, force) ; 
+      fit = as<arma::mat>(Y_fe_ad["FE_ad"]) + covar_fit ; 
+    }
+    else if(r>0){
+      for (int i = 0; i < p; i++) {
+        covar_fit = covar_fit + XX.slice(i) * beta(i) ;
+      }
+      List E_fe_ad;
+      E_fe_ad = fe_add(alpha, xi, mu,T, N, force) ;
+      FE_add_use = as<arma::mat>(E_fe_ad["FE_ad"])
+      FE_inter_use = factor * lambda.t()
+      fit = FE_add_use + FE_inter_use
+    }*/
+
+
   }
-  
+
+
   /* sigma2 and IC */
    
   // number of estimated parameters  
