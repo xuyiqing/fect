@@ -25,7 +25,7 @@ navbar:
       href: https://yiqingxu.org/papers/english/2022_fect/LWX2022.pdf
   right:
    - icon: fa-github
-     href: https://github.com/xuyiqing/interflex
+     href: https://github.com/xuyiqing/fect
 
 footer:
   structure:
