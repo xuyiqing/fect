@@ -1615,6 +1615,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     max.count <- max(out$count)
     
     max.pre.periods <- out$time[which(out$count >= max.count * proportion & out$time <= 0)]
+    all.pre.periods <- out$time[which(out$time <= 0)]
     if (is.null(pre.periods) == TRUE) {        
         pre.periods <- max.pre.periods     
     } 
@@ -1625,7 +1626,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     N_bar <- max(out$count[which(out$time %in% pre.periods)])
       
     if (placeboEquiv == TRUE) {
-
+        pre.term <- all.pre.periods
         r.cv <- out$r.cv 
         lambda.cv <- out$lambda.cv 
         method <- out$method
@@ -2032,7 +2033,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     # classic equivalence test, placeboTest, and carryoverTest
     # this can also be used in placeboTest
     
-    # this is the classic equivalence test
+    # classic equivalence test
     if(loo==TRUE){
         output$loo <- FALSE
     }
@@ -2048,7 +2049,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
 
-    # this is the loo equivalence test
+    # loo equivalence test
     if(loo==TRUE){
         output$loo <- TRUE
     }

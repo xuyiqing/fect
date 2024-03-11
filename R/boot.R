@@ -1371,6 +1371,7 @@ fect.boot <- function(Y,
         colnames(est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                   "p.value", "count")
         rownames(est.att) <- out$time
+        vcov.att <- att.j$vcov
 
         att.bound <- cbind(att + qnorm(alpha)*att.j$se, att + qnorm(1 - alpha)*att.j$se)
         colnames(att.bound) <- c("CI.lower", "CI.upper")
@@ -1390,6 +1391,7 @@ fect.boot <- function(Y,
             colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
                                       "p.value", "count")
             rownames(est.att.off) <- out$time.off
+            vcov.att.off <- att.off.j$vcov
 
             att.off.bound <- cbind(att.off + qnorm(alpha)*att.off.j$se, att.off + qnorm(1 - alpha)*att.off.j$se)
             colnames(att.off.bound) <- c("CI.lower", "CI.upper")
@@ -1412,7 +1414,9 @@ fect.boot <- function(Y,
             colnames(est.balance.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                            "p.value", "count")
             rownames(est.balance.att) <- out$balance.time
-            
+            vcov.balance.att <- balance.att.j$vcov
+
+
             balance.avg.att.j <- jackknifed(balance.avg.att, balance.avg.att.boot, alpha, quantile.CI = quantile.CI)
             est.balance.avg <- t(as.matrix(c(balance.avg.att, balance.avg.att.j$se, balance.avg.att.j$CI.l, balance.avg.att.j$CI.u, balance.avg.att.j$P)))
             colnames(est.balance.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
@@ -1438,6 +1442,8 @@ fect.boot <- function(Y,
             colnames(est.att.W) <- c("ATT", "S.E.", "CI.lower", "CI.upper","p.value", "count")
             rownames(est.att.W) <- time.on.W
 
+            vcov.att.W <- att.on.W.j$vcov
+
             att.W.bound <- cbind(att.on.W + qnorm(alpha)*att.on.W.j$se, att.on.W + qnorm(1 - alpha)*att.on.W.j$se)
             colnames(att.W.bound) <- c("CI.lower", "CI.upper")
             rownames(att.W.bound) <- time.on.W
@@ -1452,7 +1458,7 @@ fect.boot <- function(Y,
                 est.att.off.W <- cbind(att.off.W, att.off.W.j$se, att.off.W.j$CI.l, att.off.W.j$CI.u, att.off.W.j$P, count.off.W)
                 colnames(est.att.off.W) <- c("ATT", "S.E.", "CI.lower", "CI.upper","p.value", "count")
                 rownames(est.att.off.W) <- time.off.W
-
+                vcov.att.off.W <- att.off.W.j$vcov
                 att.off.W.bound <- cbind(att.off.W + qnorm(alpha)*att.off.W.j$se, att.off.W + qnorm(1 - alpha)*att.off.W.j$se)
                 colnames(att.off.W.bound) <- c("CI.lower", "CI.upper")
                 rownames(att.off.W.bound) <- out$time.off
@@ -1633,6 +1639,8 @@ fect.boot <- function(Y,
             CI.att <- t(apply(att.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
             pvalue.att <- apply(att.boot, 1, get.pvalue)
         }
+
+        vcov.att <- cov(t(att.boot), use = "pairwise.complete.obs")
         
         est.att <- cbind(att, se.att, CI.att, pvalue.att, out$count)
         colnames(est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
@@ -1662,6 +1670,8 @@ fect.boot <- function(Y,
                 CI.att.off <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE))) 
                 pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
             } 
+
+            vcov.att.off <- cov(t(att.off.boot), use = "pairwise.complete.obs")
             
             est.att.off <- cbind(att.off, se.att.off, CI.att.off, pvalue.att.off, out$count.off)
             colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
@@ -1693,7 +1703,7 @@ fect.boot <- function(Y,
                 pvalue.carry.att <- apply(carry.att.boot, 1, get.pvalue)
             }
 
-            
+
             est.carry.att <- cbind(carry.att, se.carry.att, 
                              CI.carry.att, pvalue.carry.att)
 
@@ -1713,6 +1723,8 @@ fect.boot <- function(Y,
                 CI.balance.att <- t(apply(balance.att.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE))) 
                 pvalue.balance.att <- apply(balance.att.boot, 1, get.pvalue)
             }
+
+            vcov.balance.att <- cov(t(balance.att.boot), use = "pairwise.complete.obs")
 
             est.balance.att <- cbind(balance.att, se.balance.att, CI.balance.att, 
                                      pvalue.balance.att, out$balance.count)
@@ -1803,6 +1815,8 @@ fect.boot <- function(Y,
                 pvalue.att.W <- apply(att.on.W.boot, 1, get.pvalue) 
             }
 
+            vcov.att.W <- cov(t(att.on.W.boot), use = "pairwise.complete.obs")
+
             est.att.W <- cbind(att.on.W, se.att.W, CI.att.W, 
                                pvalue.att.W, count.on.W)
             colnames(est.att.W) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
@@ -1855,6 +1869,8 @@ fect.boot <- function(Y,
                     att.off.W.bound <- t(apply(att.off.W.boot, 1, function(vec) quantile(vec,c(alpha, 1 - alpha), na.rm=TRUE))) 
                     pvalue.att.off.W <- apply(att.off.W.boot, 1, get.pvalue) 
                 }
+
+                vcov.att.off.W <- cov(t(att.off.W.boot), use = "pairwise.complete.obs")
 
                 est.att.off.W <- cbind(att.off.W, se.att.off.W, CI.att.off.W, 
                                        pvalue.att.off.W, count.off.W)
@@ -2188,6 +2204,7 @@ fect.boot <- function(Y,
                  est.att = est.att,
                  att.bound = att.bound,
                  att.boot = att.boot,
+                 att.vcov = vcov.att,
                  att.count.boot = att.count.boot)
 
     if (p>0) {
@@ -2200,6 +2217,7 @@ fect.boot <- function(Y,
     if (hasRevs == 1) {
         result<-c(result,list(est.att.off = est.att.off, 
                               att.off.boot = att.off.boot, 
+                              att.off.vcov = vcov.att.off,
                               att.off.bound = att.off.bound,
                               att.off.count.boot = att.off.count.boot))
     }
@@ -2212,6 +2230,7 @@ fect.boot <- function(Y,
         result <- c(result, list(est.balance.att = est.balance.att))
         result <- c(result,list(est.balance.avg = est.balance.avg))
         result <- c(result,list(balance.att.bound = balance.att.bound,
+                                balance.att.vcov = vcov.balance.att,
                                 balance.att.boot = balance.att.boot,
                                 balance.count.boot = balance.count.boot))
         if (!is.null(placebo.period) & placeboTest == TRUE) {
@@ -2223,12 +2242,12 @@ fect.boot <- function(Y,
             result <- c(result, list(est.avg.W = est.avg.W))
             result <- c(result,list(est.att.W = est.att.W))
             result <- c(result, list(att.W.bound = att.W.bound))
-            result <- c(result, list(att.W.boot = att.on.W.boot))
+            result <- c(result, list(att.W.boot = att.on.W.boot, att.W.vcov = vcov.att.W))
             if (!is.null(placebo.period) & placeboTest == TRUE) {
                 result <- c(result,list(est.placebo.W = est.placebo.W))
             }
             if (hasRevs == 1) {
-                result <- c(result,list(est.att.off.W = est.att.off.W, att.off.W.bound = att.off.W.bound))
+                result <- c(result,list(est.att.off.W = est.att.off.W, att.off.W.bound = att.off.W.bound, att.off.W.vcov = vcov.att.off.W))
                 if (!is.null(carryover.period) & carryoverTest == TRUE) {
                     result <- c(result,list(est.carryover.W = est.carryover.W))
                 }
@@ -2273,6 +2292,8 @@ jackknifed <- function(x,  ## ols estimates
 
     Ysd <- sqrt(Yvar/vn)  ## jackknife se
     
+    vcov_matrix <- 1 / vn * cov(t(Y), use = "pairwise.complete.obs")
+
     if(quantile.CI == FALSE){
         CI.l <- Ysd * qnorm(alpha/2) + c(x)
         CI.u <- Ysd * qnorm(1 - alpha/2) + c(x)        
@@ -2292,7 +2313,7 @@ jackknifed <- function(x,  ## ols estimates
 
     ## P <- 2 * min(1 - pnorm(c(x)/Ysd), pnorm(c(x)/Ysd))
 
-    out <- list(se = Ysd, CI.l = CI.l, CI.u = CI.u, P = P)
+    out <- list(se = Ysd, CI.l = CI.l, CI.u = CI.u, P = P, vcov = vcov_matrix)
 
     return(out)
     
