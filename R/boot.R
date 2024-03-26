@@ -289,7 +289,7 @@ fect.boot <- function(Y,
     if (is.null(cl)) {
         cl.unique <- NULL
     } else {
-        cl.unique <- unique(cl)
+        cl.unique <- unique(c(cl))
     }
 
     if (vartype == "jackknife") {
@@ -876,13 +876,16 @@ fect.boot <- function(Y,
                     }
                 } 
                 else {
+                    cl.id <- c(apply(cl,2,mean))
                     cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
                     cl.boot.uni <- unique(cl.boot)
                     cl.boot.count <- as.numeric(table(cl.boot))
                     boot.id <- c()
                     for (kk in 1:length(cl.boot.uni)) {
-                        boot.id <- c(boot.id, rep(which(cl == cl.boot.uni[kk]), cl.boot.count[kk]))
+                        boot.id <- c(boot.id, rep(which(cl.id == cl.boot.uni[kk]), cl.boot.count[kk]))
                     }
+                    
+
                 }
 
                 boot.group <- group[, boot.id]

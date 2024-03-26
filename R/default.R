@@ -52,6 +52,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
                  se = FALSE, # report uncertainties
                  vartype = "bootstrap", # bootstrap or jackknife
+                 cl = NULL,
                  quantile.CI = FALSE,
                  nboots = 200, # number of bootstraps
                  alpha = 0.05, # significance level
@@ -112,6 +113,7 @@ fect.formula <- function(formula = NULL,
                          method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
                          se = FALSE, # report uncertainties
                          vartype = "bootstrap", # bootstrap or jackknife
+                         cl = NULL,
                          quantile.CI = FALSE,
                          nboots = 200, # number of bootstraps
                          alpha = 0.05, # significance level
@@ -199,6 +201,7 @@ fect.formula <- function(formula = NULL,
                         method = method, 
                         se = se, 
                         vartype = vartype,
+                        cl = cl,
                         quantile.CI = quantile.CI,
                         nboots = nboots, 
                         alpha = alpha, 
@@ -260,6 +263,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          method = "fe", # method: ife for interactive fe; mc for matrix completion
                          se = FALSE, # report uncertainties
                          vartype = "bootstrap", # bootstrap or jackknife
+                         cl = NULL,
                          quantile.CI = FALSE,
                          nboots = 200, # number of bootstraps
                          alpha = 0.05, # significance level
@@ -621,6 +625,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         } 
     } 
 
+    if (!is.null(cl)) {
+        if (! cl %in% names(data)) {
+            stop("\"cl\" misspecified.\n")
+        }
+    } 
+
     if(method == 'cfe'){
         if(is.null(sfe) & is.null(cfe)){
             message("No additional sfe and cfe, use the \"fe\" estimator by default.\n")
@@ -663,14 +673,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     if(method != 'cfe'){
         if (!is.null(group)) {
-            data <- data[,c(index, Y, D, X, W, group)]
+            data <- data[,unique(c(index, Y, D, X, W, group,cl))]
         } 
         else {
-            data <- data[,c(index, Y, D, X, W)] ## some variables may not be used
+            data <- data[,unique(c(index, Y, D, X, W, cl))] ## some variables may not be used
         }        
     }
     else{
-        all.var <- unique(c(index,sfe,unlist(cfe),Y,D,X,W,group))
+        all.var <- unique(c(index,sfe,unlist(cfe),Y,D,X,W,group,cl))
         data <- data[,all.var]
     }
 
@@ -731,14 +741,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     Yname <- Y
     Dname <- D
     Xname <- X
-    clname <- cl <- NULL
+    clname <- cl 
     Wname <- W
 
-    #if (!is.null(clname)) {
-    #    if (!clname %in% index) {
-    #        data[, clname] <- as.numeric(as.factor(data[, clname]))
-    #    }
-    #}
+    if (!is.null(clname)) {
+        if (!clname %in% index) {
+            data[, clname] <- as.numeric(as.factor(data[, clname]))
+        }
+    }
 
     ## normalize
     norm.para <- NULL
@@ -951,10 +961,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         if(!is.null(W)){
             variable <- c(variable, Wname)
-        
         }
+
         if(method == 'cfe'){
             variable <- unique(c(sfe,unlist(cfe),variable))
+        }
+
+        if(!is.null(cl)){
+            variable <- unique(c(variable,cl))
         }
 
         data_I <- matrix(0, N * TT, 1)
@@ -962,6 +976,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         data_ub <- as.matrix(data[, variable])
         data <- data_ub_adj(data_I, data_ub)
         colnames(data) <- variable
+
         ## data is a TT*N matrix filled with observed pairs (Y/X, D).
 
         ## if these exists observations whose Y/X is missing but D is observed.
@@ -983,6 +998,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             ## replace D in data with D in data.full
             data[,Dname] <- data.D.full[,Dname]
         }
+
     }
 
     ## indicator matrix: index matrix that indicates if data is observed 
@@ -1017,9 +1033,16 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         G.old <- G
     }
 
-
     if(!is.null(W)){
         W <- matrix(data[, Wname], TT, N)
+    }
+
+    if(!is.null(cl)){
+        cl <- matrix(data[, clname], TT, N)
+        # for each column, replace 0 with the mean of non-zero values
+        cl <- apply(cl, 2, function(column) {
+                                    column[column == 0] <- mean(column[column != 0])
+                                    return(column)})
     }
     
     ## each unit should have the same group index
@@ -1111,6 +1134,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if (!is.null(group)) {
             G <- as.matrix(G[,-rm.id])
         }
+        if (!is.null(cl)) {
+            cl <- as.matrix(cl[,-rm.id])
+        }
         if (!is.null(W)) {
             W <- as.matrix(W[,-rm.id])
         }
@@ -1149,6 +1175,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         if (!is.null(W)) {
             W <- W[-which(I.use == 0),]
+        }
+
+        if (!is.null(cl)) {
+            cl <- cl[-which(I.use == 0),]
         }
 
         if(method == "cfe"){
@@ -1300,6 +1330,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             if (!is.null(W)) {
                 W <- as.matrix(W[,-rm.id.2.pos])
             }
+            if (!is.null(cl)) {
+                cl <- as.matrix(cl[,-rm.id.2.pos])
+            }
+            
             if(method == "cfe"){
                 for(ind.name in names(index.matrix)){
                     index.matrix[[ind.name]] <- as.matrix(index.matrix[[ind.name]][,-rm.id.2.pos])
@@ -1364,6 +1398,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             }
             if (!is.null(W)) {
                 W <- as.matrix(W[,-rm.id.3.pos])
+            }
+            if (!is.null(cl)) {
+                cl <- as.matrix(cl[,-rm.id.3.pos])
             }
             if(method == "cfe"){
                 for(ind.name in names(index.matrix)){
@@ -1569,7 +1606,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         
         out <- fect.boot(Y = Y, D = D, X = X, 
                          W = W, I = I, II = II,
-                         T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, cl = NULL,
+                         T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, cl = cl,
                          T.on.balance = T.on.balance, balance.period = balance.period,
                          method = method, degree = degree,
                          sfe = sfe, cfe = cfe,
@@ -1743,9 +1780,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                     pI <- as.matrix(I[,-rm.id.2.pos]) ## after removing
                     pII <- as.matrix(II[,-rm.id.2.pos])
                     pT.on <- as.matrix(T.on[,-rm.id.2.pos])
-                    #if (!is.null(cl)) {
-                    #    cl <- cl[-rm.id.2.pos]
-                    #}
+                    if (!is.null(cl)) {
+                        p.cl <- cl[-rm.id.2.pos]
+                    }
                     if(hasRevs){
                         pT.off <- as.matrix(T.off[,-rm.id.2.pos])
                     }
@@ -1764,7 +1801,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
           
                 p.out <- fect.boot(Y = pY, D = pD, X = pX, 
                              W = pW, I = pI, II = pII,
-                             T.on = pT.on, T.off = pT.off, cl = NULL,T.on.carry = T.on.carry, 
+                             T.on = pT.on, T.off = pT.off, cl = p.cl,T.on.carry = T.on.carry, 
                              method = method, degree = degree,
                              knots = knots, criterion = criterion,
                              CV = 0, k = k, cv.prop = cv.prop,

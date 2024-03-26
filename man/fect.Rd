@@ -10,7 +10,7 @@ assumptions.}
             CV = NULL, k = 10, cv.prop = 0.1, cv.treat = FALSE, 
             cv.nobs = 3, cv.donut = 0, criterion = "mspe",
             binary = FALSE, QR = FALSE,
-            method = "fe",  se = FALSE, vartype = "bootstrap", 
+            method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
             quantile.CI = FALSE, nboots = 200, alpha = 0.05, 
             parallel = TRUE, cores = NULL, tol = 0.001, 
             max.iteration = 1000, seed = NULL, 
@@ -67,6 +67,7 @@ assumptions.}
 \item{vartype}{a string specifying the type of variance estimator. Choose 
   from \code{vartype = c("bootstrap", "jackknife", "parametric")}. Default value is 
   \code{"bootstrap"}.}
+\item{cl}{a string specifying the cluster of cluster bootstrapping}
 \item{quantile.CI}{a logical flag indicating whether to use quantile 
   confidence intervals when \code{vartype = "bootstrap"}. Default to FALSE.}
 \item{nboots}{an integer specifying the number of bootstrap
