@@ -797,45 +797,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
-    # recode treatment status for osbervations exposed to carryover effects 
-    hasCarryover <- 0
 
-    if (!is.null(carryover.rm)) {
-        if (length(carryover.rm) == 1 & class(carryover.rm)[1] == "numeric") {
-            if (carryover.rm > 0) {
-                newT <- as.numeric(as.factor(data[, time]))
-                data <- data[order(data[, id], data[, time]),]
-                tempID <- unique(data[, id])
-                for (i in tempID) {
-                    subpos <- which(data[, id] == i)
-                    subtime <- newT[subpos]
-                    subd <- data[subpos, Dname]
-                    if (sum(subd) >= 1) {
-                        tr.time <- subtime[which(subd == 1)]
-                        cr.time <- c() # carryover period
-                        for (k in 1:carryover.rm) {
-                          cr.time <- c(cr.time, tr.time + k)
-                        }
-                        # note: if a period has both treatment effect and carryover effect, 
-                        # regard carryover effect as 0
-                        cr.time <- unique(cr.time)
-                        cr.time <- setdiff(cr.time, tr.time) 
-
-                        cr.pos <- subpos[which(subtime %in% cr.time)]
-                        
-                        if (length(cr.pos) > 0) {
-                          data[cr.pos, Dname] <- 2
-                        }
-                        
-                    }
-                }
-
-            }
-        }
-    }
-    if (2 %in% data[, Dname]) {
-        hasCarryover <- 1
-    }
 
 
 
@@ -943,6 +905,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (dim(data)[1] < TT*N) {
         
         data[,time] <- as.numeric(as.factor(data[,time]))
+        data[,id] <- as.numeric(as.factor(data[,id]))
 
         ob.indicator <- data[,time]
         id.indicator <- table(data[, id])
@@ -953,7 +916,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             ob.indicator[sub.start:sub.end] <- ob.indicator[sub.start:sub.end] + i * TT
         }
 
-        variable <- c(Yname, Dname, Xname)
+        variable <- c(Yname, Dname, Xname, id, time)
         
         if(!is.null(group)) {
             variable <- c(Yname, Dname, Xname, group)
@@ -976,7 +939,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         data_ub <- as.matrix(data[, variable])
         data <- data_ub_adj(data_I, data_ub)
         colnames(data) <- variable
-
+   
         ## data is a TT*N matrix filled with observed pairs (Y/X, D).
 
         ## if these exists observations whose Y/X is missing but D is observed.
@@ -998,7 +961,46 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             ## replace D in data with D in data.full
             data[,Dname] <- data.D.full[,Dname]
         }
+    }
 
+    # recode treatment status for osbervations exposed to carryover effects 
+    hasCarryover <- 0
+
+    if (!is.null(carryover.rm)) {
+        if (length(carryover.rm) == 1 & class(carryover.rm)[1] == "numeric") {
+            if (carryover.rm > 0) {
+                newT <- c(1:TT)
+                data <- data[order(data[, id], data[, time]),]
+                tempID <- unique(data[, id])
+                for (i in tempID) {
+                    subpos <- which(data[, id] == i)
+                    subtime <- newT[subpos]
+                    subd <- data[subpos, Dname]
+                    if (sum(subd) >= 1) {
+                        tr.time <- subtime[which(subd == 1)]
+                        cr.time <- c() # carryover period
+                        for (k in 1:carryover.rm) {
+                          cr.time <- c(cr.time, tr.time + k)
+                        }
+                        # note: if a period has both treatment effect and carryover effect, 
+                        # regard carryover effect as 0
+                        cr.time <- unique(cr.time)
+                        cr.time <- setdiff(cr.time, tr.time) 
+
+                        cr.pos <- subpos[which(subtime %in% cr.time)]
+                        
+                        if (length(cr.pos) > 0) {
+                          data[cr.pos, Dname] <- 2
+                        }
+                        
+                    }
+                }
+
+            }
+        }
+    }
+    if (2 %in% data[, Dname]) {
+        hasCarryover <- 1
     }
 
     ## indicator matrix: index matrix that indicates if data is observed 
@@ -1216,6 +1218,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         D1[which(D1 == 2)] <- 0 
         D2[which(D2 == 1)] <- 0
         D2[which(D2 == 2)] <- 1 
+
         T.on.carry <- matrix(NA, TT, (N - length(rm.id)))
         
         for (i in 1:(N - length(rm.id))) {
@@ -1224,7 +1227,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
         T.on[which(D == 2)] <- NA ## remove carryover effect 
         T.on.carry[which(T.on.carry <= 0)] <- NA ## only keep carryover effect 
-
     }
     rm(D1, D2)
     calendar.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
