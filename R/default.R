@@ -919,7 +919,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         variable <- c(Yname, Dname, Xname, id, time)
         
         if(!is.null(group)) {
-            variable <- c(Yname, Dname, Xname, group)
+            variable <- c(variable, group)
         }
 
         if(!is.null(W)){
@@ -969,6 +969,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (!is.null(carryover.rm)) {
         if (length(carryover.rm) == 1 & class(carryover.rm)[1] == "numeric") {
             if (carryover.rm > 0) {
+                #print(colnames(data))
                 newT <- c(1:TT)
                 data <- data[order(data[, id], data[, time]),]
                 tempID <- unique(data[, id])
