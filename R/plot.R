@@ -1,11 +1,11 @@
 ## new plot
 # x: a fect object
-# type of the plot; axes limits; axes labels;
+# type of the plot; axes limits; axes labels; 
 # main: whether to show the title;
 # id: plot a part of units
 
-plot.fect <- function(x,
-  type = NULL, # gap, equiv, status, exit, factors, loadings, calendar, counterfactual,HTE
+plot.fect <- function(x,  
+  type = NULL, # gap, equiv, status, exit, factors, loadings, calendar, counterfactual
   loo = FALSE,
   highlight = NULL, ## for carryover test and placebo test
   plot.ci = NULL, ## "0.9", "0.95", "none"
@@ -23,9 +23,9 @@ plot.fect <- function(x,
   stats.labs = NULL,
   raw = "none",    ## "none", "band", "all"
   main = NULL,
-  xlim = NULL,
+  xlim = NULL, 
   ylim = NULL,
-  xlab = NULL,
+  xlab = NULL, 
   ylab = NULL,
   gridOff = FALSE,
   legendOff = FALSE,
@@ -40,7 +40,7 @@ plot.fect <- function(x,
   cex.main = NULL,
   cex.main.sub = NULL,
   cex.axis = NULL,
-  cex.lab = NULL,
+  cex.lab = NULL, 
   cex.legend = NULL,
   cex.text = NULL,
   axis.adjust = FALSE,
@@ -96,7 +96,7 @@ plot.fect <- function(x,
         stop("No leave one out results for pre-treatment periods.")
     }
     else if(loo == TRUE && pequiv == TRUE){
-        loo <- 1
+        loo <- 1 
     }
     else{
         loo <- 0
@@ -118,16 +118,16 @@ plot.fect <- function(x,
         if(!show.group%in%all.group.name){
             message("The specified group does not exist or its treatment effects cannot be estimated.\n")
             return(0)
-        }
+        } 
     }
 
     # check the key option type
     if(!is.null(type)){
         if(type=="ct"){
-            type <- "counterfactual"
+            type <- "counterfactual" 
         }
-        if (!type %in% c("status", "gap","equiv","exit","factors","loadings","calendar","box","counterfactual","HTE")) {
-            stop("\"type\" option misspecified. Must be one of followings:\"status\",\"gap\",\"equiv\",\"exit\",\"calendar\",\"box\",\"counterfactual\",\"HTE\".")
+        if (!type %in% c("status", "gap","equiv","exit","factors","loadings","calendar","box","counterfactual")) {
+            stop("\"type\" option misspecified. Must be one of followings:\"status\",\"gap\",\"equiv\",\"exit\",\"calendar\",\"box\",\"counterfactual\".")
         }
         if (type == "exit" && is.null(x$att.off)) {
             stop("No exiting treatment effect to be plotted.")
@@ -156,20 +156,20 @@ plot.fect <- function(x,
                 stop("Can't Visualize the Loadings.\n")
             }
             if (x$r.cv==0) {
-                stop("No factors are included in the model.\n")
-            }
+                stop("No factors are included in the model.\n") 
+            } 
             else {
                 ## number of loadings to be plotted
                 if (is.null(nfactors)==TRUE) {
-                    nfactors<-min(x$r.cv,4)
-                }
+                    nfactors<-min(x$r.cv,4) 
+                } 
                 else if (nfactors>x$r.cv) {
                     message("Too many factors specified. ")
-                    nfactors<-min(x$r.cv,4)
+                    nfactors<-min(x$r.cv,4) 
                 }
                 if (nfactors == 1) {
                     message("Loadings for the first factor are shown...\n")
-                }
+                } 
                 else if (nfactors < x$r.cv) {
                     message(paste("Loadings for the first",nfactors,"factors are shown...\n"))
                 }
@@ -177,7 +177,7 @@ plot.fect <- function(x,
                 ## title
                 if (is.null(main) == TRUE) {
                     main <- "Factor Loadings"
-                }
+                } 
                 else if (main=="") {
                     main <- NULL
                 }
@@ -205,13 +205,13 @@ plot.fect <- function(x,
                                          "id"=c(x$tr, x$co),
                                          "group"=as.factor(c(rep("Treated",x$Ntr),
                                          rep("Control",x$Nco))))
-
+                
                 if (nfactors == 1) {
                     p <- ggplot(data, aes(x=group, y=L1, fill = group)) +
                     geom_boxplot(alpha = 0.7) +
                     coord_flip() + guides(fill=FALSE) +
-                    xlab("") + ylab("Factor Loading")
-                }
+                    xlab("") + ylab("Factor Loading")  
+                } 
                 else {
                     if (x$Ntr >= 5) {
                         my_dens <- function(data, mapping, ...) {
@@ -224,7 +224,7 @@ plot.fect <- function(x,
                         diag = list(continuous = my_dens),
                         title = main) +
                         theme(plot.title = element_text(hjust = 0.5))
-                    }
+                    } 
                     else if(x$Ntr > 1) {
                         my_dens <- function(data, mapping, ...) {
                         ggplot(data = data, mapping = mapping) +
@@ -245,7 +245,7 @@ plot.fect <- function(x,
                         columns = 1:nfactors, upper = 'blank',
                         columnLabels = Llabel[1:nfactors],
                         diag = list(continuous = my_dens),
-                        title = main)
+                        title = main)                     
                     }
                 }
                 #suppressWarnings(print(p))
@@ -255,7 +255,7 @@ plot.fect <- function(x,
         if(type == "factors"){
             if (theme.bw == TRUE) {
                 line.color <- "#AAAAAA70"
-            }
+            } 
             else {
                 line.color <- "white"
             }
@@ -263,7 +263,7 @@ plot.fect <- function(x,
                 angle <- 45
                 x.v <- 1
                 x.h <- 1
-            }
+            } 
             else {
                 angle <- 0
                 x.v <- 0
@@ -278,7 +278,7 @@ plot.fect <- function(x,
                 stop("Can't Visualize the Loadings.\n")
             }
             if (x$r.cv==0) {
-                stop("No factors are included in the model.\n")
+                stop("No factors are included in the model.\n") 
             }
 
             time <- x$rawtime
@@ -287,7 +287,7 @@ plot.fect <- function(x,
             }
             if (length(xlim) != 0) {
                 show <- which(time>=xlim[1]& time<=xlim[2])
-            }
+            } 
             else {
                 show <- 1:length(time)
             }
@@ -302,7 +302,7 @@ plot.fect <- function(x,
 
             if (x$r.cv==0) {
                 message("No factors included in the model.\n")
-            }
+            } 
             else {
                 ## axes labels
                 if (is.null(xlab)==TRUE) {
@@ -323,7 +323,7 @@ plot.fect <- function(x,
                 }
                 ## prepare data
                 L.co <- x$lambda.co
-
+                
                 if(x$force %in% c(2:3) & include.FE == TRUE){
                     L.co <- cbind(rep(1,dim(L.co)[1]),L.co)
                     r.use <- c(0:(r-1))
@@ -336,7 +336,7 @@ plot.fect <- function(x,
                                         "factor" = c(F.hat[show,])*rep(norm,each=nT),
                                         "group" = as.factor(c(rep(r.use,each=nT))))
                 ## theme
-                p <- ggplot(data)
+                p <- ggplot(data) 
                 if (theme.bw == TRUE) {
                     p <- p + theme_bw()
                 }
@@ -347,7 +347,7 @@ plot.fect <- function(x,
                         plot.title = element_text(size=20,
                                                     hjust = 0.5,
                                                     face="bold",
-                                                    margin = margin(10, 0, 10, 0)))
+                                                    margin = margin(10, 0, 10, 0)))  
                 ## main plot
                 p <- p + geom_line(aes(time, factor,
                                     colour = group,
@@ -356,20 +356,20 @@ plot.fect <- function(x,
 
                 brew.colors <- c("black","steelblue","#8DD3C7","#FFFFB3","#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5","#D9D9D9")
                 set.colors = brew.colors[1:r]
-                p <- p + scale_colour_manual(values =set.colors)
+                p <- p + scale_colour_manual(values =set.colors) 
 
                 ## legend
-                p <- p + guides(colour = guide_legend(title="Factor(s)", ncol=4))
+                p <- p + guides(colour = guide_legend(title="Factor(s)", ncol=4)) 
 
                 if (!is.numeric(time.label)) {
-                    p <- p +
+                    p <- p + 
                         scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
                 }
-
+            
                 ## ylim
                 if (is.null(ylim) == FALSE) {
                     p <- p + coord_cartesian(ylim = ylim)
-                }
+                }            
                 #suppressWarnings(print(p))
                 return(p)
             }
@@ -381,8 +381,8 @@ plot.fect <- function(x,
     if(!is.null(show.group)){
         if(is.null(x$group.output[[show.group]]$att.on) & type!='status'){
             stop(paste0(show.group, " doesn't contain treated units. Can't plot.\n"))
-        }
-    }
+        }        
+    }        
 
     if(type=='status' && !is.null(show.group)){
         if(!is.null(id)){
@@ -411,14 +411,14 @@ plot.fect <- function(x,
         if(plot.ci == "0.95" && type=="equiv"){
             warning("95% CI in equivalence test plots.\n")
         }
-    }
+    } 
     else { # default settings for plot.ci
         if(is.null(x$est.att)){
             plot.ci <- "none"
         }
         else if(type=='equiv'){
             plot.ci <- "0.9"
-        }
+        } 
         else { #gap plot or exiting plot
             plot.ci <- "0.95"
         }
@@ -430,7 +430,7 @@ plot.fect <- function(x,
     if(plot.ci == "0.9"){
         plot.ci <- "90"
     }
-
+    
     if(type=='equiv' && plot.ci=='none'){
         stop("No uncertainty estimates. Can't perform equivalence tests.\n")
     }
@@ -476,7 +476,7 @@ plot.fect <- function(x,
         }
         else{
             plot.ci.point <- plot.ci
-        }
+        }   
         plot.ci <- "both"
     }
 
@@ -491,7 +491,7 @@ plot.fect <- function(x,
     if (is.null(bound) == FALSE) {
         if (!bound %in% c("none", "min", "equiv", "both")) {
             stop("\"bound\" option misspecified.")
-        }
+        } 
     }
     else{ # default settings for bound
         if(type=="equiv"){
@@ -524,17 +524,17 @@ plot.fect <- function(x,
     if (is.null(xlab)==FALSE) {
         if (is.character(xlab) == FALSE) {
             stop("\"xlab\" is not a string.")
-        }
+        } 
         else {
             xlab <- xlab[1]
-        }
+        }   
     }
     if (is.null(ylab)==FALSE) {
         if (is.character(ylab) == FALSE) {
             stop("\"ylab\" is not a string.")
         } else {
             ylab <- ylab[1]
-        }
+        }   
     }
 
     if (!is.null(stats)) {
@@ -543,21 +543,21 @@ plot.fect <- function(x,
                 if (!stats[i] %in% c("none", "F.p", "F.equiv.p", "F.stat","equiv.p")) {
                     stop ("Choose \"stats\" from c(\"none\", \"F.stat\", \"F.p\", \"F.equiv.p\", \"equiv.p\").")
                 }
-            }
-        }
+            }    
+        } 
         else if(placeboTest) {
             for (i in 1:length(stats)) {
                  if (!stats[i] %in% c("none", "placebo.p", "equiv.p")) {
                     stop ("Choose \"stats\" from c(\"none\", \"placebo.p\", \"equiv.p\").")
                 }
-            }
+            }          
         }
         else if(carryoverTest){ # carry over test
             for (i in 1:length(stats)) {
                  if (!stats[i] %in% c("none", "carryover.p", "equiv.p")) {
                     stop ("Choose \"stats\" from c(\"none\", \"carryover.p\", \"equiv.p\").")
                 }
-            }
+            }  
         }
         if ("none" %in% stats) {
             stats <- "none"
@@ -570,8 +570,8 @@ plot.fect <- function(x,
             }
             else {
                 stats <- c("none")
-            }
-        }
+            }             
+        } 
         else if(type == 'equiv') {
             stats <- c("F.p","equiv.p")
             if (placeboTest == TRUE) {
@@ -593,19 +593,16 @@ plot.fect <- function(x,
     if(type=='calendar'){
         stats <- "none"
     }
-    if(type=='HTE'){
-      stats <- "none"
-    }
 
     # names for all statistics
     if (!("none" %in% stats)) {
         if (is.null(stats.labs)==FALSE) {
             if (length(stats.labs)!=length(stats)) {
                 stop("\"stats.lab\" should have the same length as \"stats\".")
-            }
-        }
+            }               
+        } 
         else {
-            stats.labs <- rep(NA, length(stats))
+            stats.labs <- rep(NA, length(stats)) 
             for (i in 1:length(stats)) {
                 if (stats[i] == "F.p") {
                     stats.labs[i] <- "F test p-value"
@@ -651,21 +648,21 @@ plot.fect <- function(x,
         if (is.null(x$est.att)) {
             stop("No uncertainty estimates.\n")
         }
-
+        
         # classic equivalence test
         if (length(xlim)==0) {
             xlim <- c(-1e5, 0)
-        }
+        } 
         else {
             if (xlim[2]>0) {
                 xlim[2] <- 0
             }
         }
-        if (loo==0) {
-            maintext <- "Equivalence Test"
+        if (loo==0) { 
+            maintext <- "Equivalence Test" 
             #ytitle <- paste("Residual Average of",x$Y)
-            ytitle <- paste("Effect on",x$Y)
-        }
+            ytitle <- paste("Effect on",x$Y)        
+        } 
         else {
             # loo equivalence test
             maintext <- "Leave-one-out Equivalence Test"
@@ -687,10 +684,6 @@ plot.fect <- function(x,
         maintext <- "Individual Treatment Effects"
         ytitle <- paste("Effect on",x$Y)
     }
-    else if (type == 'HTE'){
-      maintext <- "ATT by HTE Variable"
-      ytitle <- paste("Effect on",x$y)
-    }
 
     if (is.logical(legendOff) == FALSE & is.numeric(legendOff)==FALSE) {
         stop("\"legendOff\" is not a logical flag.")
@@ -704,7 +697,7 @@ plot.fect <- function(x,
             stop("\"main\" is not a string.")
         } else {
             main <- main[1]
-        }
+        }   
     }
     if (axis.adjust == TRUE) {
         angle <- 45
@@ -867,24 +860,24 @@ plot.fect <- function(x,
 
 
     if (!is.null(x$est.att)) { # have uncertainty estimation
-        est.att <- x$est.att
+        est.att <- x$est.att 
         est.bound <- x$att.bound
-
-        colnames(est.bound) <- c("CI.lower.90", "CI.upper.90") ## 90% ci
+        
+        colnames(est.bound) <- c("CI.lower.90", "CI.upper.90") ## 90% ci 
         est.att <- cbind(est.att, est.bound)
         pre.est.att <- pre.att.bound <- NULL
-        if (loo==1) { ## replace pre-treatment period with loo results
+        if (loo==1) { ## replace pre-treatment period with loo results 
             pre.est.att <- x$pre.est.att
-            pre.att.bound <- x$pre.att.bound
+            pre.att.bound <- x$pre.att.bound 
             colnames(pre.att.bound) <- c("CI.lower.90", "CI.upper.90") ## 90% ci
             pre.est.att <- cbind(pre.est.att, pre.att.bound)
-            t0 <- t1 <- NULL
+            t0 <- t1 <- NULL 
             t.s <- t.e <- NULL
             t0 <- rownames(pre.est.att)
             t1 <- rownames(est.att)
             t.s <- which(t1 == t0[1])
             t.e <- which(t1 == t0[length(t0)])
-            est.att[t.s:t.e ,] <- pre.est.att
+            est.att[t.s:t.e ,] <- pre.est.att 
         }
     }
 
@@ -893,7 +886,7 @@ plot.fect <- function(x,
     if(!is.null(x$est.att.off)){
         est.att.off <- x$est.att.off
         est.bound.off <- x$att.off.bound
-        colnames(est.bound.off) <- c("CI.lower.90", "CI.upper.90") ## 90% ci
+        colnames(est.bound.off) <- c("CI.lower.90", "CI.upper.90") ## 90% ci 
         est.att.off <- cbind(est.att.off, est.bound.off)
     }
 
@@ -908,17 +901,17 @@ plot.fect <- function(x,
       }
 
       scaleFUN <- function(x) sprintf("%.f", x) ## integer value at x axis
-
+      
       if (! raw %in% c("none","band","all")) {
         cat("\"raw\" option misspecifed. Reset to \"none\".")
-        raw <- "none"
+        raw <- "none" 
       }
       if (is.null(id)==FALSE) {
         if (length(id)>1) {
-          stop("More than 1 element in \"id\".")
+          stop("More than 1 element in \"id\".") 
         }
       }
-
+      
       if (axis.adjust==TRUE) {
         angle <- 45
         x.v <- 1
@@ -941,14 +934,14 @@ plot.fect <- function(x,
       Y.ct <- x$Y.ct
       D <- x$D.dat
       rawid <- x$id
-
+      
       # time name
       time <- x$rawtime
       TT <- dim(Y)[1]
       if (!is.numeric(time[1])) {
         time <- 1:TT
       }
-
+      
       #names(tr) <- id
       #names(co) <- id
       names(I) <- rawid
@@ -965,7 +958,7 @@ plot.fect <- function(x,
       row.names(D) <- time
       #I.tr <- x$I.tr
       I.tr <-as.matrix(I[,tr])
-      II.tr <- as.matrix(II[,tr])
+      II.tr <- as.matrix(II[,tr]) 
       #D.tr <- x$D.tr
       D.tr <-as.matrix(D[,tr])
       #Y.tr <- x$Y.tr
@@ -974,7 +967,7 @@ plot.fect <- function(x,
       Y.co <-Y[,co]
       #Y.ct <- x$Y.ct
       Y.ct <-as.matrix(Y.ct[,tr])
-
+      
       ## 3. unbalanced output?
       # Y.ct.full <- Y.ct
       # res.full <- Y - Y.ct
@@ -983,65 +976,65 @@ plot.fect <- function(x,
       #   Y.ct[which(I == 0)] <- NA
       # }
       # if (binary == FALSE) {
-      #   res.full[which(II == 0)] <- NA
+      #   res.full[which(II == 0)] <- NA 
       # }
-
+      
       ###### tb <- x$est.att
       #Yb <- x$Y.bar[,1:2] ## treated average and counterfactual average
       Yb <- cbind(apply(Y.tr,1,mean),apply(Y.ct,1,mean))
       #tr <- x$tr
       #pre <- x$pre
       #post <- x$post
-
-
+      
+      
       if (!0%in%I.tr) {
         ## a (TT*Ntr) matrix, time dimension: before treatment
         pre <- as.matrix(D.tr == 0 & II.tr == 1)
         post <- as.matrix(!(D.tr == 0 & II.tr == 1))
-      }
+      } 
       else {
         pre <- as.matrix(D.tr == 0 & I.tr == 1 & II.tr == 1)
         post <- as.matrix(!(D.tr == 0 & I.tr == 1 & II.tr == 1))
-      }
-
+      }  
+      
       Ntr <- x$Ntr
       Nco <- x$Nco
-      N <- x$N
-
+      N <- x$N 
+      
       # Generate out.gsynth.tr/co
       tr <- 1:N %in% tr
       names(tr) <- x$id
       co <- 1:N %in% co
       names(co) <- x$id
-
+      
       # I.tr <- x$I.tr
       #TT <- x$T
       TT <- x$T
       #T0 <- x$T0 ## notice
-      T0 <- apply(pre, 2, sum)
+      T0 <- apply(pre, 2, sum) 
       sameT0 <- length(unique(T0)) == 1
       #p <- x$p
       p <- x$p
       ## m <- x$m
-
+      
       ## time.label <- x$time
       ## T.b <- 1:TT
-
+      
       #if (is.null(id)==TRUE) {
       #id <- id.tr
       #}
-
-
+      
+      
       ## parameters
       line.width <- c(1.2,0.5)
-
+      
       ## color of axes
       if (theme.bw == TRUE) {
         line.color <- "#AAAAAA70"
       } else {
         line.color <- "white"
       }
-
+      
       ## shade in the post-treatment period
       if (is.null(shade.post) == TRUE) {
         if (type %in% c("counterfactual","ct")) {
@@ -1052,7 +1045,7 @@ plot.fect <- function(x,
           stop("Wrong type for option \"shade.post\"")
         }
       }
-
+      
       id.tr <- rawid[tr]
       id.co <- rawid[co]
       ## type of plots
@@ -1061,24 +1054,24 @@ plot.fect <- function(x,
       } else {
         time.bf <- time[unique(T0)]
       }
-
+      
       ## periods to show
       if (length(xlim) != 0) {
         show <- which(time>=xlim[1]& time<=xlim[2])
       } else {
         show <- 1:length(time)
-      }
-
-
+      }     
+      
+      
       nT <- length(show)
       time.label <- time[show]
-
+      
       ## if (axis.adjust==FALSE) {
       ##     n.period <- length(show)
       ## } else {
       ##     n.period <- length(show) ## min(length(show),20)
       ## }
-
+      
       ## if (axis.adjust==TRUE) {
       ##     n.period <- n.period - 1
       ##     T.n <- (nT-1)%/%n.period
@@ -1095,8 +1088,8 @@ plot.fect <- function(x,
       ## } else {
       T.b <- 1:length(show)
       ## }
-
-
+      
+      
       ## legend on/off
       if (legendOff == TRUE) {
         legend.pos <- "none"
@@ -1105,18 +1098,18 @@ plot.fect <- function(x,
       }
 
       ####################################
-
+      
       ############  START  ###############
 
-      if (length(id) == 1|length(id.tr) == 1|sameT0==TRUE) {
-        if (length(id) == 1) {
+      if (length(id) == 1|length(id.tr) == 1|sameT0==TRUE) { 
+        if (length(id) == 1) { 
           if(!id[1]%in%id.tr){
             ## error
             stop(paste(id,"not in the treatment group"))
           }
-        }
+        } 
          ## one treated unit case
-
+          
           ## axes labels
           if (is.null(xlab)==TRUE) {
             xlab <- x$index[2]
@@ -1128,25 +1121,25 @@ plot.fect <- function(x,
           } else if (ylab == "") {
             ylab <- NULL
           }
-
+          
           ###############
           # If single treated unit case
           if (length(id) == 1 | length(id.tr) == 1) { ## one treated unit
-
+            
             if (is.null(id) == TRUE) {
               id <- id.tr
             }
-            maintext <- paste("Treated and Counterfactual (",id,")",sep="")
+            maintext <- paste("Treated and Counterfactual (",id,")",sep="") 
             tr.info <- Y.tr[,which(id==id.tr)]
-            ct.info <- Y.ct[,which(id==id.tr)]
-            if (raw == "none") {
+            ct.info <- Y.ct[,which(id==id.tr)] 
+            if (raw == "none") { 
               data <- cbind.data.frame("time" = rep(time[show],2),
                                        "outcome" = c(tr.info[show],
                                                      ct.info[show]),
                                        "type" = c(rep("tr",nT),
                                                   rep("ct",nT)))
               ## theme
-              p <- ggplot(data)
+              p <- ggplot(data) 
               if (theme.bw == TRUE) {
                 p <- p + theme_bw()
               }
@@ -1157,16 +1150,16 @@ plot.fect <- function(x,
                       plot.title = element_text(size=20,
                                                 hjust = 0.5,
                                                 face="bold",
-                                                margin = margin(10, 0, 10, 0)))
+                                                margin = margin(10, 0, 10, 0))) 
               if (shade.post == TRUE) {
-                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3)
-              }
-
+                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3) 
+              }        
+              
               ## main
               p <- p + geom_line(aes(time, outcome,
                                      colour = type,
                                      size = type,
-                                     linetype = type))
+                                     linetype = type)) 
               ## legend
               set.limits = c("tr","ct")
               set.labels = c("Treated", "Estimated Y(0)")
@@ -1185,31 +1178,31 @@ plot.fect <- function(x,
                 guides(linetype = guide_legend(title=NULL, ncol=2),
                        colour = guide_legend(title=NULL, ncol=2),
                        size = guide_legend(title=NULL, ncol=2))
-
+              
               if (!is.numeric(time.label)) {
-                p <- p +
+                p <- p + 
                   scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
               } else {
                 p <- p + scale_x_continuous(labels=scaleFUN)
               }
-
-
-            }
+              
+              
+            } 
             else if  (raw == "band") {
-
-              Y.co.90 <- t(apply(Y.co, 1, quantile, prob=c(0.05,0.95), na.rm = TRUE))
+              
+              Y.co.90 <- t(apply(Y.co, 1, quantile, prob=c(0.05,0.95), na.rm = TRUE)) 
               data <- cbind.data.frame("time" = rep(time[show],2),
                                        "outcome" = c(tr.info[show],
                                                      ct.info[show]),
                                        "type" = c(rep("tr",nT),
                                                   rep("ct",nT)))
-
+              
               data.band <- cbind.data.frame(time, Y.co.90)[show,]
               colnames(data.band) <- c("time","co5","co95")
-
-
-              ## theme
-              p <- ggplot(data)
+              
+              
+              ## theme 
+              p <- ggplot(data) 
               if (theme.bw == TRUE) {
                 p <- p + theme_bw()
               }
@@ -1222,30 +1215,30 @@ plot.fect <- function(x,
                                                 face="bold",
                                                 margin = margin(10, 0, 10, 0)))
               if (shade.post == TRUE) {
-                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3)
-              }
-
+                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3) 
+              }      
+              
               ## main
               p <- p + geom_line(aes(time, outcome,
                                      colour = type,
                                      size = type,
                                      linetype = type))
-
+              
               ## band
               p <- p + geom_ribbon(data = data.band,
                                    aes(ymin = co5, ymax = co95, x=time),
                                    alpha = 0.15, fill = "steelblue")
-
+              
               set.limits <- c("tr","co.band","ct")
               set.labels <- c("Treated", "Controls (5-95% Quantiles)",
                              "Estimated Y(0)")
               set.colors <- c("black","#4682B480","steelblue")
               set.linetypes <- c("solid","solid","longdash")
               set.linewidth <- c(line.width[1],4,line.width[1])
-
+              
               p <- p + scale_colour_manual(limits = set.limits,
                                            labels = set.labels,
-                                           values =set.colors) +
+                                           values =set.colors) +                     
                 scale_linetype_manual(limits = set.limits,
                                       labels = set.labels,
                                       values = set.linetypes) +
@@ -1254,18 +1247,18 @@ plot.fect <- function(x,
                                   values = set.linewidth) +
                 guides(linetype = guide_legend(title=NULL, ncol=3),
                        colour = guide_legend(title=NULL, ncol=3),
-                       size = guide_legend(title=NULL, ncol=3))
-
+                       size = guide_legend(title=NULL, ncol=3)) 
+              
               if (!is.numeric(time.label)) {
-                p <- p +
+                p <- p + 
                   scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
               } else {
                 p <- p + scale_x_continuous(labels=scaleFUN)
               }
-
-            }
+              
+            } 
             else if (raw == "all") { ## plot all the raw data
-
+              
               data <- cbind.data.frame("time" = rep(time[show],(2 + Nco)),
                                        "outcome" = c(tr.info[show],
                                                      ct.info[show],
@@ -1276,9 +1269,9 @@ plot.fect <- function(x,
                                        "id" = c(rep("tr",nT),
                                                 rep("ct",nT),
                                                 rep(c(id.co), each = nT)))
-
+              
               ## theme
-              p <- ggplot(data)
+              p <- ggplot(data) 
               if (theme.bw == TRUE) {
                 p <- p + theme_bw()
               }
@@ -1291,22 +1284,22 @@ plot.fect <- function(x,
                                                 face="bold",
                                                 margin = margin(10, 0, 10, 0)))
               if (shade.post == TRUE) {
-                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3)
-              }
+                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3) 
+              }  
               ## main
               p <- p + geom_line(aes(time, outcome,
                                      colour = type,
                                      size = type,
                                      linetype = type,
                                      group = id))
-
+              
               ## legend
               set.limits = c("tr","raw.co","ct")
               set.labels = c("Treated","Controls","Estimated Y(0)")
               set.colors = c("black","#4682B420","steelblue")
               set.linetypes = c("solid","solid","longdash")
               set.linewidth = c(line.width[1],line.width[2],line.width[1])
-
+              
               p <- p + scale_colour_manual(limits = set.limits,
                                            labels = set.labels,
                                            values =set.colors) +
@@ -1318,18 +1311,18 @@ plot.fect <- function(x,
                                   values = set.linewidth) +
                 guides(linetype = guide_legend(title=NULL, ncol=3),
                        colour = guide_legend(title=NULL, ncol=3),
-                       size = guide_legend(title=NULL, ncol=3))
-
+                       size = guide_legend(title=NULL, ncol=3)) 
+              
               if (!is.numeric(time.label)) {
-                p <- p +
+                p <- p + 
                   scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
               } else {
                 p <- p + scale_x_continuous(labels=scaleFUN)
-              }
-
-            }
-
-          }
+              }                       
+              
+            } 
+            
+          } 
           else { # begin multiple treated unit case
             maintext <- "Treated and Counterfactual Averages"
             if (raw == "none") {
@@ -1337,9 +1330,9 @@ plot.fect <- function(x,
                                        "outcome" = c(Yb[show,1],
                                                      Yb[show,2]),
                                        "type" = c(rep("tr",nT),
-                                                  rep("co",nT)))
+                                                  rep("co",nT))) 
               ## theme
-              p <- ggplot(data)
+              p <- ggplot(data) 
               if (theme.bw == TRUE) {
                 p <- p + theme_bw()
               }
@@ -1352,14 +1345,14 @@ plot.fect <- function(x,
                                                 face="bold",
                                                 margin = margin(10, 0, 10, 0)))
               if (shade.post == TRUE) {
-                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3)
-              }
+                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3) 
+              }      
               ## main
               p <- p + geom_line(aes(time, outcome,
                                      colour = type,
                                      size = type,
                                      linetype = type))
-
+              
               ## legend
               set.limits = c("tr","co")
               set.labels = c("Treated Average",
@@ -1378,31 +1371,31 @@ plot.fect <- function(x,
                                   values = set.linewidth) +
                 guides(linetype = guide_legend(title=NULL, ncol=2),
                        colour = guide_legend(title=NULL, ncol=2),
-                       size = guide_legend(title=NULL, ncol=2))
-
+                       size = guide_legend(title=NULL, ncol=2)) 
+              
               if (!is.numeric(time.label)) {
-                p <- p +
+                p <- p + 
                   scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
               } else {
                 p <- p + scale_x_continuous(labels=scaleFUN)
               }
-
+              
             } else if  (raw == "band") {
-
+              
               Y.tr.90 <- t(apply(Y.tr, 1, quantile, prob=c(0.05,0.95),na.rm=TRUE))
               Y.co.90 <- t(apply(Y.co, 1, quantile, prob=c(0.05,0.95),na.rm=TRUE))
-
+              
               data <- cbind.data.frame("time" = rep(time[show],2),
                                        "outcome" = c(Yb[show,1],
                                                      Yb[show,2]),
                                        "type" = c(rep("tr",nT),
                                                   rep("co",nT)))
-
+              
               data.band <- cbind.data.frame(time, Y.tr.90, Y.co.90)[show,]
               colnames(data.band) <- c("time","tr5","tr95","co5","co95")
-
-              ## theme
-              p <- ggplot(data)
+              
+              ## theme 
+              p <- ggplot(data) 
               if (theme.bw == TRUE) {
                 p <- p + theme_bw()
               }
@@ -1415,8 +1408,8 @@ plot.fect <- function(x,
                                                 face="bold",
                                                 margin = margin(10, 0, 10, 0)))
               if (shade.post == TRUE) {
-                p <- p + annotate("rect", xmin= time.bf, xmax= Inf, ymin=-Inf, ymax=Inf, alpha = .3)
-              }
+                p <- p + annotate("rect", xmin= time.bf, xmax= Inf, ymin=-Inf, ymax=Inf, alpha = .3) 
+              }      
               ## main
               p <- p + geom_line(aes(time, outcome,
                                      colour = type,
@@ -1429,7 +1422,7 @@ plot.fect <- function(x,
                 geom_ribbon(data = data.band,
                             aes(ymin = co5, ymax = co95, x=time),
                             alpha = 0.15, fill = "steelblue")
-
+              
               set.limits = c("tr","co","tr.band","co.band")
               set.labels = c("Treated Average",
                              "Estimated Y(0) Average",
@@ -1438,7 +1431,7 @@ plot.fect <- function(x,
               set.colors = c("black","steelblue","#77777750","#4682B480")
               set.linetypes = c("solid","longdash","solid","solid")
               set.linewidth = c(rep(line.width[1],2),4,4)
-
+              
               p <- p + scale_colour_manual(limits = set.limits,
                                            labels = set.labels,
                                            values =set.colors) +
@@ -1450,17 +1443,17 @@ plot.fect <- function(x,
                                   values = set.linewidth) +
                 guides(linetype = guide_legend(title=NULL, ncol=2),
                        colour = guide_legend(title=NULL, ncol=2),
-                       size = guide_legend(title=NULL, ncol=2))
-
+                       size = guide_legend(title=NULL, ncol=2)) 
+              
               if (!is.numeric(time.label)) {
-                p <- p +
+                p <- p + 
                   scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
               } else {
                 p <- p + scale_x_continuous(labels=scaleFUN)
               }
-
+              
             } else if (raw == "all") { ## plot all the raw data
-
+              
               data <- cbind.data.frame("time" = rep(time[show],(2 + N)),
                                        "outcome" = c(Yb[show,1],
                                                      Yb[show,2],
@@ -1473,9 +1466,9 @@ plot.fect <- function(x,
                                        "id" = c(rep("tr",nT),
                                                 rep("co",nT),
                                                 rep(c(id.tr,id.co),
-                                                    each = nT)))
+                                                    each = nT))) 
               ## theme
-              p <- ggplot(data)
+              p <- ggplot(data) 
               if (theme.bw == TRUE) {
                 p <- p + theme_bw()
               }
@@ -1486,10 +1479,10 @@ plot.fect <- function(x,
                       plot.title = element_text(size=20,
                                                 hjust = 0.5,
                                                 face="bold",
-                                                margin = margin(10, 0, 10, 0)))
+                                                margin = margin(10, 0, 10, 0))) 
               if (shade.post == TRUE) {
-                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3)
-              }
+                p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3) 
+              }      
               ## main
               p <- p + geom_line(aes(time, outcome,
                                      colour = type,
@@ -1505,7 +1498,7 @@ plot.fect <- function(x,
               set.colors = c("black","steelblue","#77777750","#4682B420")
               set.linetypes = c("solid","longdash","solid","solid")
               set.linewidth = rep(line.width,each=2)
-
+              
               p <- p + scale_colour_manual(limits = set.limits,
                                            labels = set.labels,
                                            values =set.colors) +
@@ -1517,31 +1510,31 @@ plot.fect <- function(x,
                                   values = set.linewidth) +
                 guides(linetype = guide_legend(title=NULL, ncol=2),
                        colour = guide_legend(title=NULL, ncol=2),
-                       size = guide_legend(title=NULL, ncol=2))
-
+                       size = guide_legend(title=NULL, ncol=2)) 
+              
               if (!is.numeric(time.label)) {
-                p <- p +
+                p <- p + 
                   scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
               } else {
                 p <- p + scale_x_continuous(labels=scaleFUN)
               }
             }
-
+            
           } # end multiple treated unit case
-
+          
           ## title
           if (is.null(main) == TRUE) {
             p <- p + ggtitle(maintext)
           } else if (main!="") {
             p <- p + ggtitle(main)
           }
-
+          
           ## ylim
           if (is.null(ylim) == FALSE) {
             p <- p + coord_cartesian(ylim = ylim)
-          }
-
-      }
+          }                
+        
+      } 
       else {
         maintext <- "Treated and Counterfactual Averages"
         ## axes labels
@@ -1555,9 +1548,9 @@ plot.fect <- function(x,
         } else if (ylab == "") {
           ylab <- NULL
         }
-
+        
         ct.adjsut <- function (Y.tr,
-                               Y.ct,
+                               Y.ct, 
                                T0) {
           T <- dim(Y.tr)[1]
           N <- dim(Y.tr)[2]
@@ -1578,16 +1571,16 @@ plot.fect <- function(x,
                       Y.tr.aug=Y.tr.aug,
                       Y.ct.aug=Y.ct.aug,
                       Yb=Yb))
-
-        }
+          
+        }        
         xx <- ct.adjsut(Y.tr, Y.ct, T0)
-
+        
         time <- xx$timeline
         Yb <- xx$Yb
         Y.tr.aug <- xx$Y.tr.aug
         ## Y.ct.aug <- xx$Y.ct.aug
         time.bf <- 0 ## before treatment
-
+        
         if (!is.null(xlim)) {
           show <- which(time>=xlim[1]& time<=xlim[2])
         } else {
@@ -1599,9 +1592,9 @@ plot.fect <- function(x,
                                    "outcome" = c(Yb[show,1],
                                                  Yb[show,2]),
                                    "type" = c(rep("tr",nT),
-                                              rep("co",nT)))
+                                              rep("co",nT))) 
           ## theme
-          p <- ggplot(data)
+          p <- ggplot(data) 
           if (theme.bw == TRUE) {
             p <- p + theme_bw()
           }
@@ -1614,14 +1607,14 @@ plot.fect <- function(x,
                                             face="bold",
                                             margin = margin(10, 0, 10, 0)))
           if (shade.post == TRUE) {
-            p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3)
-          }
+            p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3) 
+          }      
           ## main
           p <- p + geom_line(aes(time, outcome,
                                  colour = type,
                                  size = type,
                                  linetype = type))
-
+          
           ## legend
           set.limits = c("tr","co")
           set.labels = c("Treated Average",
@@ -1640,31 +1633,31 @@ plot.fect <- function(x,
                               values = set.linewidth) +
             guides(linetype = guide_legend(title=NULL, ncol=2),
                    colour = guide_legend(title=NULL, ncol=2),
-                   size = guide_legend(title=NULL, ncol=2))
-
+                   size = guide_legend(title=NULL, ncol=2)) 
+          
           if (!is.numeric(time.label)) {
-            p <- p +
+            p <- p + 
               scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
           } else {
             p <- p + scale_x_continuous(labels=scaleFUN)
           }
-
+          
         } else if  (raw == "band") {
-
+          
           Y.tr.90 <- t(apply(Y.tr.aug, 1, quantile, prob=c(0.05,0.95),na.rm=TRUE))
           ## Y.co.90 <- t(apply(Y.co, 1, quantile, prob=c(0.05,0.95),na.rm=TRUE))
-
+          
           data <- cbind.data.frame("time" = rep(time[show],2),
                                    "outcome" = c(Yb[show,1],
                                                  Yb[show,2]),
                                    "type" = c(rep("tr",nT),
                                               rep("co",nT)))
-
+          
           data.band <- cbind.data.frame(time, Y.tr.90)[show,]
           colnames(data.band) <- c("time","tr5","tr95")
-
+          
           ## theme
-          p <- ggplot(data)
+          p <- ggplot(data) 
           if (theme.bw == TRUE) {
             p <- p + theme_bw()
           }
@@ -1677,8 +1670,8 @@ plot.fect <- function(x,
                                             face="bold",
                                             margin = margin(10, 0, 10, 0)))
           if (shade.post == TRUE) {
-            p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3)
-          }
+            p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3) 
+          }      
           ## main
           p <- p + geom_line(aes(time, outcome,
                                  colour = type,
@@ -1688,7 +1681,7 @@ plot.fect <- function(x,
           p <- p + geom_ribbon(data = data.band,
                                aes(ymin = tr5, ymax = tr95, x=time),
                                alpha = 0.15, fill = "red")
-
+          
           set.limits = c("tr","co","tr.band")
           set.labels = c("Treated Average",
                          "Estimated Y(0) Average",
@@ -1696,7 +1689,7 @@ plot.fect <- function(x,
           set.colors = c("black","steelblue","#77777750")
           set.linetypes = c("solid","longdash","solid")
           set.linewidth = c(rep(line.width[1],2),4)
-
+          
           p <- p + scale_colour_manual(limits = set.limits,
                                        labels = set.labels,
                                        values =set.colors) +
@@ -1709,16 +1702,16 @@ plot.fect <- function(x,
             guides(linetype = guide_legend(title=NULL, ncol=2),
                    colour = guide_legend(title=NULL, ncol=2),
                    size = guide_legend(title=NULL, ncol=2))
-
+          
           if (!is.numeric(time.label)) {
-            p <- p +
+            p <- p + 
               scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
           } else {
             p <- p + scale_x_continuous(labels=scaleFUN)
-          }
-
+          } 
+          
         } else if (raw == "all") { ## plot all the raw data
-
+          
           data <- cbind.data.frame("time" = rep(time[show],(2 + Ntr)),
                                    "outcome" = c(Yb[show,1],
                                                  Yb[show,2],
@@ -1729,9 +1722,9 @@ plot.fect <- function(x,
                                    "id" = c(rep("tr",nT),
                                             rep("co",nT),
                                             rep(c(id.tr),
-                                                each = nT)))
+                                                each = nT))) 
           ## theme
-          p <- ggplot(data)
+          p <- ggplot(data) 
           if (theme.bw == TRUE) {
             p <- p + theme_bw()
           }
@@ -1742,10 +1735,10 @@ plot.fect <- function(x,
                   plot.title = element_text(size=20,
                                             hjust = 0.5,
                                             face="bold",
-                                            margin = margin(10, 0, 10, 0)))
+                                            margin = margin(10, 0, 10, 0))) 
           if (shade.post == TRUE) {
-            p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3)
-          }
+            p <- p + annotate("rect", xmin= time.bf, xmax= Inf,ymin=-Inf, ymax=Inf, alpha = .3) 
+          }      
           ## main
           p <- p + geom_line(aes(time, outcome,
                                  colour = type,
@@ -1760,7 +1753,7 @@ plot.fect <- function(x,
           set.colors = c("black","steelblue","#77777750")
           set.linetypes = c("solid","longdash","solid")
           set.linewidth = c(rep(line.width[1],2),line.width[2])
-
+          
           p <- p + scale_colour_manual(limits = set.limits,
                                        labels = set.labels,
                                        values =set.colors) +
@@ -1772,29 +1765,29 @@ plot.fect <- function(x,
                               values = set.linewidth) +
             guides(linetype = guide_legend(title=NULL, ncol=2),
                    colour = guide_legend(title=NULL, ncol=2),
-                   size = guide_legend(title=NULL, ncol=2))
-
+                   size = guide_legend(title=NULL, ncol=2)) 
+          
           if (!is.numeric(time.label)) {
-            p <- p +
+            p <- p + 
               scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
           } else {
             p <- p + scale_x_continuous(labels=scaleFUN)
           }
         }
-
+        
         ## title
         if (is.null(main) == TRUE) {
           p <- p + ggtitle(maintext)
         } else if (main!="") {
           p <- p + ggtitle(main)
         }
-
+        
         ## ylim
         if (is.null(ylim) == FALSE) {
           p <- p + coord_cartesian(ylim = ylim)
-        }
+        }            
       }
-      return(p)
+      return(p)     
     }
 
 
@@ -1866,28 +1859,28 @@ plot.fect <- function(x,
         }
     }
 
-    ## periods to show
+    ## periods to show 
     time.end <- length(time)
-    show.time <- 1:time.end
+    show.time <- 1:time.end    
     if (length(xlim) != 0) {
         show.time <- which(time >= xlim[1] & time <= xlim[2])
     }
     if (type %in% c("gap","equiv","exit")) {
         if (is.null(proportion) == TRUE) {
             show.count <- 1:time.end
-        }
-        else {
+        } 
+        else {    
             show.count <- which(count.num >= max.count * proportion)
         }
         # which periods to be shown
-        show <- intersect(show.count, show.time)
+        show <- intersect(show.count, show.time) 
 
         # maximum number of cases to be shown
         max.count <- max(count.num[show])
-
+        
         # where on x-axis to show the number
         max.count.pos <- time[intersect(show,which(count.num == max.count))]
-
+        
         if (length(max.count.pos)>1) {
             if (best.pos %in% max.count.pos) {
                 max.count.pos <- best.pos
@@ -1897,19 +1890,19 @@ plot.fect <- function(x,
                 max.count.pos <- max.count.pos[1]
             }
         }
-    }
+    } 
     else {
         show <- show.time
     }
 
     if (length(show) < 2 & type %in% c("gap","equiv","exit")) {
         stop("Cannot plot.\n")
-    }
-
+    }    
+    
     nT <- length(show)
     time.label <- tname[show]
     T.b <- 1:length(show)
-
+ 
     ## legend on/off
     if (legendOff == TRUE) {
         legend.pos <- "none"
@@ -1939,14 +1932,14 @@ plot.fect <- function(x,
         else{
             switch.on <- TRUE
         }
-
+        
         ## axes labels
         if (is.null(xlab) == TRUE) {
             if (switch.on == TRUE) {
                 xlab <- paste("Time since the Treatment Began")
             } else {
                 xlab <- paste("Time Relative to Exiting the Treatment")
-            }
+            }            
         } else if (xlab == "") {
             xlab <- NULL
         }
@@ -2003,7 +1996,7 @@ plot.fect <- function(x,
             max.pre.periods <- x$time[which(x$count >= max.count.test * proportion & x$time <= 0)]
             pre.periods <- intersect(pre.periods[1]:pre.periods[length(pre.periods)], max.pre.periods)
         }
-
+        
         if(length(pre.periods) != length(x$pre.periods)){
             change.pre.periods <- 1
         }
@@ -2033,7 +2026,7 @@ plot.fect <- function(x,
                 }
                 att.sub <- as.matrix(est.att[show, c("CI.lower.90", "CI.upper.90")])
                 minBound <- max(abs(att.sub[time0, c("CI.lower.90", "CI.upper.90")]), na.rm = TRUE)
-            }
+            } 
             else {
                 if (sum(time[show] > 0) == 0) {
                     message("No non-treatment periods are to be plotted.\n")
@@ -2055,20 +2048,20 @@ plot.fect <- function(x,
             } else {
                 bound.time <- bound.time[which(bound.time >= 1)]
             }
-
+            
             ## add legend for 95\% CI
             set.limits <- "ci"
             if (is.null(legend.labs)==TRUE) {
                 if (plot.ci == "90") {
-                    set.labels <- "Residual Average (w/ 90% CI)"
-                }
+                    set.labels <- "Residual Average (w/ 90% CI)" 
+                } 
                 else if(plot.ci == "95") {
-                    set.labels <- "ATT (w/ 95% CI)"
+                    set.labels <- "ATT (w/ 95% CI)" 
                 }
                 else{
                     set.labels <- "ATT"
-                }
-            }
+                }                      
+            } 
             else {
                 set.labels <- legend.labs
             }
@@ -2095,7 +2088,7 @@ plot.fect <- function(x,
                 set.colors <- c(set.colors, "red")
                 set.linetypes <- c(set.linetypes, "dashed")
                 set.size <- c(set.size, 0.7)
-            }
+            } 
             else if (bound.old == "min") {
                 data2 <- cbind.data.frame(c(rep(minbound, each = length(bound.time))))
                 names(data2) <- "bound"
@@ -2137,13 +2130,13 @@ plot.fect <- function(x,
             } else {
                 CI <- TRUE
             }
-        }
+        } 
         else if (switch.on == FALSE) {
             if (is.null(x$est.att.off)==TRUE) {
                 CI <- FALSE
             } else {
                 CI <- TRUE
-            }
+            }           
         }
 
         if(plot.ci=="none"){
@@ -2151,11 +2144,11 @@ plot.fect <- function(x,
         }
 
         ## data frame for main estimates
-        if (switch.on == TRUE) {
+        if (switch.on == TRUE) {            
             ## switch-on effect
-            if (CI == FALSE) {
-                data <- cbind.data.frame(time, ATT = x$att, count = count.num)[show,]
-            }
+            if (CI == FALSE) {           
+                data <- cbind.data.frame(time, ATT = x$att, count = count.num)[show,]                
+            } 
             else {
                 tb <- est.att
                 data <- cbind.data.frame(time, tb)[show,]
@@ -2170,7 +2163,7 @@ plot.fect <- function(x,
                             ci.name <- c("CI.lower.90", "CI.upper.90")
                         }
                         data[,"CI.lower4"] <- data[,"CI.lower3"] <- data[,"CI.lower2"] <- data[,ci.name[1]]
-                        data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]
+                        data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]                    
                         pos1 <- intersect(which(data[,"time"] >= (placebo.period[1] + 1)), which(data[,"time"] <= (placebo.period[2] - 1)))
                         pos2 <- c(which(data[,"time"] <= (placebo.period[1] - 1)), which(data[,"time"] >= (placebo.period[2] + 1)))
                         pos3 <- intersect(which(data[,"time"] >= (placebo.period[1])), which(data[,"time"] <= (placebo.period[2] - 1)))
@@ -2185,8 +2178,8 @@ plot.fect <- function(x,
         }
         else{
             ## exit treatment plot
-            if (CI == FALSE) {
-                data <- cbind.data.frame(time, ATT = x$att.off, count = count.num)[show,]
+            if (CI == FALSE) {               
+                data <- cbind.data.frame(time, ATT = x$att.off, count = count.num)[show,]                
             }
             else {
                 tb <- est.att.off
@@ -2204,7 +2197,7 @@ plot.fect <- function(x,
                         }
                         if (is.null(x$est.carry.att)) {
                             data[,"CI.lower4"] <- data[,"CI.lower3"] <- data[,"CI.lower2"] <- data[,ci.name[1]]
-                            data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]
+                            data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]                    
                             pos1 <- intersect(which(data[,"time"] >= (carryover.period[1] + 1)), which(data[,"time"] <= (carryover.period[2] - 1)))
                             pos2 <- c(which(data[,"time"] <= (carryover.period[1] - 1)), which(data[,"time"] >= (carryover.period[2] + 1)))
                             pos3 <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[2] - 1)))
@@ -2213,15 +2206,15 @@ plot.fect <- function(x,
                             data[pos2, c("ATT2","CI.lower2","CI.upper2")] <- NA
                             data[pos3, c("ATT3","CI.lower3","CI.upper3")] <- NA
                             data[pos4, c("ATT4","CI.lower4","CI.upper4")] <- NA
-                        }
+                        } 
                         else {
                             data[,"CI.lower6"] <- data[,"CI.lower5"] <- data[,"CI.lower4"] <- data[,"CI.lower3"] <- data[,"CI.lower2"] <- data[,ci.name[1]]
-                            data[,"CI.upper6"] <- data[,"CI.upper5"] <- data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]
-
+                            data[,"CI.upper6"] <- data[,"CI.upper5"] <- data[,"CI.upper4"] <- data[,"CI.upper3"] <- data[,"CI.upper2"] <- data[,ci.name[2]]                    
+                            
                             pos1 <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[2])))
                             pos2 <- c(which(data[,"time"] <= min(-dim(x$est.carry.att)[1] -1 , -2)), which(data[,"time"] >= (carryover.period[2]) + 1))
                             pos5 <- intersect(which(data[,"time"] >= min(-dim(x$est.carry.att)[1], -1)), which(data[,"time"] <= -1))
-
+                            
                             pos3 <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[2] - 1)))
                             pos4 <- c(which(data[,"time"] <= min(-dim(x$est.carry.att)[1]-1, -3)), which(data[,"time"] >= (carryover.period[2] + 1)))
                             pos6 <- intersect(which(data[,"time"] >= min(-dim(x$est.carry.att)[1] + 1, -1)), which(data[,"time"] <=  -1))
@@ -2232,11 +2225,11 @@ plot.fect <- function(x,
                             data[unique(c(pos4, pos6)), c("ATT4","CI.lower4","CI.upper4")] <- NA
                             data[unique(c(pos1, pos2)), c("ATT5","CI.lower5","CI.upper5")] <- NA
                             data[unique(c(pos3, pos4)), c("ATT6","CI.lower6","CI.upper6")] <- NA
-
+                            
                         }
                     }
                 }
-            }
+            } 
         }
 
 
@@ -2249,16 +2242,16 @@ plot.fect <- function(x,
                 } else {
                     rect.length <- (max(data[,"ATT"], na.rm = TRUE) - min(data[,"ATT"], na.rm = TRUE))/2
                     rect.min <- min(data[,"ATT"], na.rm = TRUE) - rect.length
-                }
-        }
+                } 
+        } 
         else {
                 if (length(ylim) != 0) {
                     rect.length <- (ylim[2] - ylim[1]) / 5
                     rect.min <- ylim[1]
                 } else {
                     rect.length <- (max(data[,"CI.upper"], na.rm = TRUE) - min(data[,"CI.lower"], na.rm = TRUE))/2
-                    rect.min <- min(data[,"CI.lower"], na.rm = TRUE) - rect.length
-                }
+                    rect.min <- min(data[,"CI.lower"], na.rm = TRUE) - rect.length 
+                }  
         }
 
         ## plotting
@@ -2275,23 +2268,23 @@ plot.fect <- function(x,
             }
         }
 
-
+        
             # plot bound
             if (bound.old == "none") {
-                p <- ggplot(data)
-            }
+                p <- ggplot(data)             
+            } 
             else { ## with bounds
-                p <- ggplot(data2)
-                p <- p + geom_line(aes(time, bound, colour = type, linetype = type, size = type, group = id))
+                p <- ggplot(data2) 
+                p <- p + geom_line(aes(time, bound, colour = type, linetype = type, size = type, group = id)) 
                 ## legends for bounds
                 if (is.null(legend.nrow) == TRUE) {
-                    legend.nrow <- ifelse(length(set.limits) <= 3, 1, 2)
-                }
+                    legend.nrow <- ifelse(length(set.limits) <= 3, 1, 2)    
+                } 
                 p <- p + scale_colour_manual(limits = set.limits, labels = set.labels, values =set.colors) +
-                    scale_size_manual(limits = set.limits, labels = set.labels, values = set.size) +
+                    scale_size_manual(limits = set.limits, labels = set.labels, values = set.size) +  
                     scale_linetype_manual(limits = set.limits, labels = set.labels, values = set.linetypes) +
                     guides(linetype = guide_legend(title=NULL, nrow=legend.nrow), colour = guide_legend(title=NULL, nrow=legend.nrow),
-                    size = guide_legend(title=NULL, nrow=legend.nrow))
+                    size = guide_legend(title=NULL, nrow=legend.nrow)) 
 
                 if (effect.bound.ratio == TRUE) {
                     if (is.null(stats.pos)) {
@@ -2299,19 +2292,19 @@ plot.fect <- function(x,
                         stats.pos[2] <- ifelse(is.null(ylim), max(data[,"CI.upper"], na.rm = 1), ylim[1])
                     }
                     p.label <- paste("ATT / Min. Range = ", sprintf("%.3f",x$att.avg / minBound), sep="")
-                    p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2],
-                        label = p.label, size = cex.text, hjust = 0)
+                    p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
+                        label = p.label, size = cex.text, hjust = 0)                
                 }
-            }
+            } 
 
 
 
-        ## xlab and ylab
-        p <- p + xlab(xlab) +  ylab(ylab)
+        ## xlab and ylab 
+        p <- p + xlab(xlab) +  ylab(ylab) 
 
         ## theme
         if (theme.bw == TRUE) {
-            p <- p + theme_bw()
+            p <- p + theme_bw() 
         }
 
         ## grid
@@ -2326,34 +2319,34 @@ plot.fect <- function(x,
             if (plot.ci == "both") {
                 lwidth <- lwidth * 0.5
             }
-
+        
             if (length(xlim)!=0) {
                 if ((xlim[2]>=1 & switch.on == TRUE) | (xlim[1]<=0 & switch.on == FALSE)) {
                     if(start0 == FALSE){
-                        if(plot.ci == 'both'){
+                        if(plot.ci == 'both'){                                
                                 p <- p + geom_vline(xintercept = 0.5, colour=lcolor,size = lwidth)
                             }
-                            else{
-                                p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)
+                            else{                                
+                                p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)                             
                             }
                         }
                         else{
-                            if(plot.ci == 'both'){
+                            if(plot.ci == 'both'){                                
                                 p <- p + geom_vline(xintercept = -0.5, colour=lcolor,size = lwidth)
                             }
                             else{
-                                p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)
+                                p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)                             
                             }
                         }
                 }
-            }
+            } 
             else {
                     if(start0 == FALSE){
                         if(plot.ci == 'both'){
                             p <- p + geom_vline(xintercept = 0.5, colour=lcolor,size = lwidth)
                         }
                         else{
-                            p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)
+                            p <- p + geom_vline(xintercept = 0, colour=lcolor,size = lwidth)                             
                         }
                     }
                     else{
@@ -2361,11 +2354,11 @@ plot.fect <- function(x,
                             p <- p + geom_vline(xintercept = -0.5, colour=lcolor,size = lwidth)
                         }
                         else{
-                            p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)
+                            p <- p + geom_vline(xintercept = -1, colour=lcolor,size = lwidth)                             
                         }
                     }
-            }
-
+            }            
+        
 
 
         ## legend and axes
@@ -2381,7 +2374,7 @@ plot.fect <- function(x,
          plot.title = element_text(size = cex.main, hjust = 0.5, face="bold", margin = margin(10, 0, 10, 0)))
 
         ## add ATT point estimates
-        classic <- 0
+        classic <- 0 
         if(highlight==FALSE){
             classic <- 1
         }
@@ -2407,13 +2400,13 @@ plot.fect <- function(x,
                 ## CIs
                 if (CI == TRUE) {
                     if (plot.ci == "95") {
-                        p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)
-                    }
+                        p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower, ymax=CI.upper),alpha=0.2)                
+                    } 
                     else {
-                        p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower.90, ymax=CI.upper.90),alpha=0.2)
-                    }
+                        p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower.90, ymax=CI.upper.90),alpha=0.2)                
+                    } 
                 }
-            }
+            } 
             else if(plot.ci == 'both') {
                 if(CI==TRUE){
                     if(plot.ci.point %in% c("both","95")){
@@ -2421,14 +2414,14 @@ plot.fect <- function(x,
                     }
                     if(plot.ci.point %in% c("both","90")){
                         p <- p + geom_pointrange(data = data, aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
-                    }
+                    }                    
                 }
                 else{
-                    p <- p + geom_point(data = data, aes(x = time, y = ATT), size=1.2)
+                    p <- p + geom_point(data = data, aes(x = time, y = ATT), size=1.2)                    
                 }
 
             }
-        }
+        } 
         else if(classic==0 && switch.on==TRUE) {
             ## point estimates
             ## placebo tests
@@ -2447,7 +2440,7 @@ plot.fect <- function(x,
                 ## CIs
                 p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2, na.rm = FALSE)
                 p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "#0000FF", na.rm = FALSE)
-            }
+            } 
             else if(plot.ci == "both") {
                 pos.ci <- intersect(which(data[,"time"] >= (placebo.period[1])), which(data[,"time"] <= (placebo.period[length(placebo.period)])))
                 pos.ci2 <- setdiff(1:dim(data)[1], pos.ci)
@@ -2459,11 +2452,11 @@ plot.fect <- function(x,
                     if(plot.ci.point %in% c("both","90")){
                         p <- p + geom_pointrange(data = data[pos.ci,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6, color="blue", fill="blue",fatten = 2)
                         p <- p + geom_pointrange(data = data[pos.ci2,], aes(x = time, y = ATT, ymin=CI.lower.90, ymax=CI.upper.90), lwd=0.6,fatten = 2)
-                    }
+                    }                    
                 }
                 else{
                     p <- p + geom_point(data = data[pos.ci,], aes(x = time, y = ATT), lwd=0.6, color="blue", fill="blue",size=1.2)
-                    p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6,size=1.2)
+                    p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6,size=1.2)                    
                 }
             }
         }
@@ -2487,7 +2480,7 @@ plot.fect <- function(x,
                         ## CIs
                         p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower3, ymax=CI.upper3),alpha=0.2,na.rm = FALSE)
                         p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "pink",na.rm = FALSE)
-                    }
+                    } 
                     else {
                         data[,'time'] <- length(x$carry.att) + data[,'time']
                         if(vis == "none"){
@@ -2509,8 +2502,8 @@ plot.fect <- function(x,
                         p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower4, ymax=CI.upper4),alpha=0.2, fill = "pink",na.rm = FALSE)
                         p <- p + geom_ribbon(data = data, aes(x = time, ymin=CI.lower6, ymax=CI.upper6),alpha=0.2, fill = "blue",na.rm = FALSE)
                     }
-                }
-            }
+                } 
+            } 
             else if(plot.ci == "both") {
                 if (is.null(x$est.carry.att)) {
                     pos.ci <- intersect(which(data[,"time"] >= (carryover.period[1])), which(data[,"time"] <= (carryover.period[length(carryover.period)])))
@@ -2527,8 +2520,8 @@ plot.fect <- function(x,
                     }
                     else{
                         p <- p + geom_point(data = data[pos.ci,], aes(x = time, y = ATT), lwd=0.6, color="red", fill="red",size=1.2)
-                        p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6,size=1.2)
-                    }
+                        p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6,size=1.2)                    
+                    }                    
                 }
                 else{
                     T.carry <- -dim(x$est.carry.att)[1] + 1
@@ -2551,9 +2544,9 @@ plot.fect <- function(x,
                     else{
                         p <- p + geom_point(data = data[pos.ci,], aes(x = time, y = ATT), lwd=0.6, color="red", fill="red",size=1.2)
                         p <- p + geom_point(data = data[pos.ci2,], aes(x = time, y = ATT), lwd=0.6, color="blue", fill="red",size=1.2)
-                        p <- p + geom_point(data = data[pos.ci3,], aes(x = time, y = ATT), lwd=0.6, size=1.2)
+                        p <- p + geom_point(data = data[pos.ci3,], aes(x = time, y = ATT), lwd=0.6, size=1.2)                       
                     }
-
+  
                 }
 
             }
@@ -2569,18 +2562,18 @@ plot.fect <- function(x,
         else{
             loo.equiv <- 0
         }
-
-        if (type %in% c('equiv','gap') && loo.equiv == 0) {
+        
+        if (type %in% c('equiv','gap') && loo.equiv == 0) { 
             for (i in 1:length(stats)) {
                 if ("F.p" %in% stats[i]) {
                     if (change.proportion | change.pre.periods | !is.null(show.group) | use.balance) {
                         x$loo <- FALSE
-                        test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              f.threshold = f.threshold)
                         f.p <- test.out$f.p
-                    }
+                    } 
                     else {
                         f.p <- x$test.out$f.p
                     }
@@ -2591,12 +2584,12 @@ plot.fect <- function(x,
                 if ("F.stat" %in% stats[i]) {
                     if (change.proportion | change.pre.periods | !is.null(show.group) | use.balance) {
                         x$loo <- FALSE
-                        test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              f.threshold = f.threshold)
                         f.stat <- test.out$f.stat
-                    }
+                    } 
                     else {
                         f.stat <- x$test.out$f.stat
                     }
@@ -2609,12 +2602,12 @@ plot.fect <- function(x,
                     if (change.f.threshold | change.proportion | change.pre.periods | !is.null(show.group)|use.balance) {
                         x$loo <- FALSE
                         # some problems here, should change to change.f.threshold; change.proportion; change.pre.periods
-                        test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              f.threshold = f.threshold)
                         f.equiv.p <- test.out$f.equiv.p
-                    }
+                    } 
                     else {
                         f.equiv.p <- x$test.out$f.equiv.p
                     }
@@ -2626,12 +2619,12 @@ plot.fect <- function(x,
                     # calculate new p value (ziyi: re-add this)
                     if (change.tost.threshold | change.proportion | change.pre.periods | !is.null(show.group)|use.balance) {
                         x$loo <- FALSE
-                        test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              tost.threshold = tost.threshold)
                         tost.equiv.p <- test.out$tost.equiv.p
-                    }
+                    } 
                     else {
                         tost.equiv.p <- x$test.out$tost.equiv.p
                     }
@@ -2641,12 +2634,12 @@ plot.fect <- function(x,
                 }
                 if ("placebo.p" %in% stats[i]) {
                     if (change.tost.threshold | change.proportion | change.pre.periods | !is.null(show.group)) {
-                        test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              tost.threshold = tost.threshold)
                         placebo.p <- test.out$placebo.p
-                    }
+                    } 
                     else {
                         placebo.p <- x$test.out$placebo.p
                     }
@@ -2660,25 +2653,25 @@ plot.fect <- function(x,
                     if (change.tost.threshold | change.proportion | change.pre.periods | !is.null(show.group)) {
                         test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, tost.threshold = tost.threshold)
                         placebo.equiv.p <- test.out$placebo.equiv.p
-                    }
+                    } 
                     else {
                         placebo.equiv.p <- x$test.out$placebo.equiv.p
                     }
                     p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f", placebo.equiv.p))
                     p.label <- paste0(p.label, p.label1, "\n")
-                }
-            }
+                } 
+            } 
         }
         else if(type %in% c('equiv','gap') && loo.equiv == 1){ #loo
             for (i in 1:length(stats)) {
                 if ("F.p" %in% stats[i]) {
                     if (change.proportion | change.pre.periods | !is.null(show.group)) {
-                        test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              f.threshold = f.threshold)
                         f.p <- test.out$f.p
-                    }
+                    } 
                     else {
                         f.p <- x$test.out$f.p
                     }
@@ -2688,12 +2681,12 @@ plot.fect <- function(x,
                 }
                 if ("F.stat" %in% stats[i]) {
                     if (change.proportion | change.pre.periods | !is.null(show.group)) {
-                        test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              f.threshold = f.threshold)
                         f.stat <- test.out$f.stat
-                    }
+                    } 
                     else {
                         f.stat <- x$test.out$f.stat
                     }
@@ -2704,12 +2697,12 @@ plot.fect <- function(x,
                 if ("F.equiv.p" %in% stats[i]) {
                     # calculate new p value (ziyi: re-add this)
                     if (change.f.threshold | change.proportion | change.pre.periods | !is.null(show.group)) {
-                        loo.test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        loo.test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              f.threshold = f.threshold)
                         f.equiv.p <- loo.test.out$f.equiv.p
-                    }
+                    } 
                     else {
                         f.equiv.p <- x$loo.test.out$f.equiv.p
                     }
@@ -2720,12 +2713,12 @@ plot.fect <- function(x,
                 if ("equiv.p" %in% stats[i]) {
                     # calculate new p value (ziyi: re-add this)
                     if (change.tost.threshold | change.proportion | change.pre.periods | !is.null(show.group)) {
-                        loo.test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        loo.test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              tost.threshold = tost.threshold)
                         tost.equiv.p <- loo.test.out$tost.equiv.p
-                    }
+                    } 
                     else {
                         tost.equiv.p <- x$loo.test.out$tost.equiv.p
                     }
@@ -2734,18 +2727,18 @@ plot.fect <- function(x,
                     p.label <- paste0(p.label, p.label1, "\n")
                 }
             }
-        }
-        else if(type=='gap' && placeboTest==TRUE){
+        } 
+        else if(type=='gap' && placeboTest==TRUE){               
             ## stats
             for (i in 1:length(stats)) {
                 if ("placebo.p" %in% stats[i]) {
                     if (change.tost.threshold | change.proportion | change.pre.periods | !is.null(show.group)) {
-                        test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              tost.threshold = tost.threshold)
                         placebo.p <- test.out$placebo.p
-                    }
+                    } 
                     else {
                         placebo.p <- x$test.out$placebo.p
                     }
@@ -2759,26 +2752,26 @@ plot.fect <- function(x,
                     if (change.tost.threshold | change.proportion | change.pre.periods | !is.null(show.group)) {
                         test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, tost.threshold = tost.threshold)
                         placebo.equiv.p <- test.out$placebo.equiv.p
-                    }
+                    } 
                     else {
                         placebo.equiv.p <- x$test.out$placebo.equiv.p
                     }
                     p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f", placebo.equiv.p))
                     p.label <- paste0(p.label, p.label1, "\n")
-                }
-            }
+                }                
+            } 
         }
         else if(type=='exit' && carryoverTest==TRUE){
             ## stats
             for (i in 1:length(stats)) {
                 if ("carryover.p" %in% stats[i]) {
                     if (change.tost.threshold | change.proportion | change.pre.periods | !is.null(show.group)) {
-                        test.out <- diagtest(x,
-                                             proportion = proportion,
-                                             pre.periods = pre.periods,
+                        test.out <- diagtest(x, 
+                                             proportion = proportion, 
+                                             pre.periods = pre.periods, 
                                              tost.threshold = tost.threshold)
                         carryover.p <- test.out$carryover.p
-                    }
+                    } 
                     else {
                         carryover.p <- x$test.out$carryover.p
                     }
@@ -2792,16 +2785,16 @@ plot.fect <- function(x,
                     if (change.tost.threshold | change.proportion | change.pre.periods| !is.null(show.group)) {
                         test.out <- diagtest(x, proportion = proportion, pre.periods = pre.periods, tost.threshold = tost.threshold)
                         carryover.equiv.p <- test.out$carryover.equiv.p
-                    }
+                    } 
                     else {
                         carryover.equiv.p <- x$test.out$carryover.equiv.p
                     }
                     p.label1 <- paste0(stats.labs[i],": ", sprintf("%.3f", carryover.equiv.p))
                     p.label <- paste0(p.label, p.label1, "\n")
-                }
-            }
+                }                
+            } 
         }
-
+        
 
 
 
@@ -2809,21 +2802,21 @@ plot.fect <- function(x,
         ##hpos <- ifelse(switch.on == TRUE, 0, 1)
         hpos <- 0
         if ("none" %in% stats == FALSE) {
-            if (is.null(stats.pos)) {
+            if (is.null(stats.pos)) {                
                 if (switch.on == TRUE) {
                     stats.pos[1] <- min(data[,"time"], na.rm = 1)
-                }
+                } 
                 else {
                     stats.pos[1] <- min(data[,"time"], na.rm = 1)
                 }
                 ci.top <- max(data[,"CI.upper"], na.rm = 1)
-                stats.pos[2] <- ifelse(is.null(ylim), ci.top, ylim[2])
+                stats.pos[2] <- ifelse(is.null(ylim), ci.top, ylim[2]) 
             }
             if (!is.null(p.label)) {
-                p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2],
+                p <- p + annotate("text", x = stats.pos[1], y = stats.pos[2], 
                               label = p.label, size = cex.text, hjust = hpos, vjust = "top")
-            }
-        }
+            }            
+        }    
 
         ## histogram
         if (count == TRUE) {
@@ -2832,11 +2825,11 @@ plot.fect <- function(x,
             data[,"ymin"] <- rep(rect.min, dim(data)[1])
             data[,"ymax"] <- rect.min + (data[,"count"]/max.count) * 0.8 * rect.length
             xx <- range(data$time)
-            p <- p + geom_rect(data = data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+            p <- p + geom_rect(data = data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
                     fill = "grey70", colour = "grey69", alpha = 0.4, size = 0.2)
-            p <- p + annotate("text", x = max.count.pos - 0.02 * (xx[2]-xx[1]),
-                    y = max(data$ymax) + 0.2 * rect.length,
-                    label = max.count, size = cex.text * 0.8, hjust = 0.5)
+            p <- p + annotate("text", x = max.count.pos - 0.02 * (xx[2]-xx[1]), 
+                    y = max(data$ymax) + 0.2 * rect.length, 
+                    label = max.count, size = cex.text * 0.8, hjust = 0.5)                
         }
 
         T.post.length <- length(data[which(data[,'time']>0),'time'])
@@ -2848,7 +2841,7 @@ plot.fect <- function(x,
             p <- p + scale_x_continuous(breaks=c(data[,'time']))
         }
 
-
+            
         ## title
         if (is.null(main) == TRUE) {
             p <- p + ggtitle(maintext)
@@ -2863,7 +2856,7 @@ plot.fect <- function(x,
 
         ##xlim
 
-
+        
     }
 
     if(type == "calendar"){
@@ -2871,7 +2864,7 @@ plot.fect <- function(x,
         CI <- NULL
         if (is.null(x$est.eff.calendar)==TRUE) {
             CI <- FALSE
-        }
+        } 
         else {
             CI <- TRUE
         }
@@ -2880,15 +2873,15 @@ plot.fect <- function(x,
         }
         ## axes labels
         if (is.null(xlab) == TRUE) {
-            xlab <- "Calendar Time"
-        }
+            xlab <- "Calendar Time"         
+        } 
         else if (xlab == "") {
             xlab <- NULL
         }
 
         if (is.null(ylab) == TRUE) {
             ylab <- ytitle
-        }
+        } 
         else if (ylab == "") {
             ylab <- NULL
         }
@@ -2922,7 +2915,7 @@ plot.fect <- function(x,
                     d2 <- data.2 <- t(d2)
                     rownames(d2) <- rownames(data.2) <- rownames(x$eff.calendar.fit)[which(!is.na(x$est.eff.calendar.fit[,1]))]
                 }
-        }
+        } 
         else {
                 if(is.null(x$est.eff.calendar)){
                     stop("Uncertainty estimates not available.\n")
@@ -2937,22 +2930,22 @@ plot.fect <- function(x,
                     d2 <- data.2 <- t(d2)
                     rownames(d2) <- rownames(data.2) <- rownames(x$est.eff.calendar.fit)[which(!is.na(x$est.eff.calendar.fit[,1]))]
                 }
-
+                
                 if (length(ylim) != 0) {
                     rect.length <- (ylim[2] - ylim[1]) / 5
                     rect.min <- ylim[1]
                 } else {
                     rect.length <- (max(c(data.1[,4],data.2[,4]), na.rm = TRUE) - min(c(data.1[,3],data.2[,3]), na.rm = TRUE))/2
-                    rect.min <- min(c(data.1[,3],data.2[,3]), na.rm = TRUE) - rect.length
-                }
+                    rect.min <- min(c(data.1[,3],data.2[,3]), na.rm = TRUE) - rect.length 
+                }  
         }
         p <- ggplot()
-        ## xlab and ylab
+        ## xlab and ylab 
         p <- p + xlab(xlab) +  ylab(ylab)
 
         ## theme
         if (theme.bw == TRUE) {
-            p <- p + theme_bw()
+            p <- p + theme_bw() 
         }
 
         ## grid
@@ -2994,9 +2987,9 @@ plot.fect <- function(x,
                                                 ymax=ymax)
                 max.count.pos <- mean(TTT[which.max(d1[,'count'])])
                 p <- p + geom_rect(aes(xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax),data=data.toplot,fill='gray50',alpha=0.3,size=0.3,color='black')
-                p <- p + annotate("text", x = max.count.pos - 0.02 * T.gap,
-                    y = max(data.toplot$ymax) + 0.2 * rect.length,
-                    label = max(x$N.calendar), size = cex.text * 0.8, hjust = 0.5)
+                p <- p + annotate("text", x = max.count.pos - 0.02 * T.gap, 
+                    y = max(data.toplot$ymax) + 0.2 * rect.length, 
+                    label = max(x$N.calendar), size = cex.text * 0.8, hjust = 0.5)                  
         }
 
         ## title
@@ -3028,7 +3021,7 @@ plot.fect <- function(x,
         #                 break
         #             }
         #         }
-        #     }
+        #     }            
         # }
         ## xlim
         if (is.null(xlim) == FALSE) {
@@ -3049,181 +3042,6 @@ plot.fect <- function(x,
          plot.title = element_text(size = cex.main, hjust = 0.5, face="bold", margin = margin(10, 0, 10, 0)))
 
     }
-
-    # if(type == "HTE"){
-    #     CI <- NULL  #decide if we need plot uncertainties
-    #     for(i in 1:length(x)){
-    #       if ("est.avg" %in% names(x[[i]])){
-    #         if(! is.null(x[[i]]$est.avg)){
-    #         CI <- TRUE
-    #         }
-    #       }
-    #     }
-    #     if (is.null(CI)) {
-    #         CI <- FALSE
-    #     }
-    #     if(plot.ci=="none"){
-    #         CI <- FALSE
-    #     }
-    #     ## axes labels
-    #     if (is.null(xlab) == TRUE) {
-    #         xlab <- "HTE variable"
-    #     }
-    #     else if (xlab == "") {
-    #         xlab <- NULL
-    #     }
-    #
-    #     if (is.null(ylab) == TRUE) {
-    #         ylab <- ytitle
-    #     }
-    #     else if (ylab == "") {
-    #         ylab <- NULL
-    #     }
-    #
-    #     ## y=0 line type
-    #     lcolor <- "white"
-    #     lwidth <- 2
-    #     if (theme.bw == TRUE) {
-    #         lcolor <- "#AAAAAA70"
-    #         lwidth <- 1.5
-    #     }
-    #
-    #     if (CI == FALSE) {
-    #       message("Uncertainty estimates not available.\n")
-    #       YVAR = rep(NA,length(x))
-    #       XVAR = rep(NA,length(x))
-    #       for (i in 1:length(x)){
-    #         YVAR[i] = x[[i]]$att.avg
-    #         XVAR[i] = x[[i]]$ValHTE
-    #       }
-    #
-    #               if (length(ylim) != 0) {
-    #                 rect.length <- (ylim[2] - ylim[1]) / 5
-    #                 rect.min <- ylim[1]
-    #               } else {
-    #                 rect.length <- (max(c(YVAR), na.rm = TRUE) - min(c(YVAR), na.rm = TRUE))/2
-    #                 rect.min <- min(c(YVAR), na.rm = TRUE) - rect.length
-    #               }
-    #             }
-    #     }
-    #     else {
-    #         YVAR = rep(NA,length(x))
-    #         XVAR = rep(NA,length(x))
-    #         for (i in 1:length(x)){
-    #         YVAR[i] = x[[i]]$est.avg[1]
-    #         YMIN[i] = x[[i]]$est.avg[3]
-    #         YMAX[i] = x[[i]]$est.avg[4]
-    #         XVAR[i] = x[[i]]$ValHTE
-    #       }
-    #
-    #               if (length(ylim) != 0) {
-    #                 rect.length <- (ylim[2] - ylim[1]) / 5
-    #                 rect.min <- ylim[1]
-    #               } else {
-    #                 rect.length <- (max(c(YMAX), na.rm = TRUE) - min(c(YMIN), na.rm = TRUE))/2
-    #                 rect.min <- min(c(YMIN), na.rm = TRUE) - rect.length
-    #               }
-    #             }
-    #
-    #     p <- ggplot()
-    #     ## xlab and ylab
-    #     p <- p + xlab(xlab) +  ylab(ylab)
-    #
-    #     ## theme
-    #     if (theme.bw == TRUE) {
-    #         p <- p + theme_bw()
-    #     }
-    #
-    #     ## grid
-    #     if (gridOff == TRUE) {
-    #         p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
-    #     }
-    #
-    #     # horizontal 0 line
-    #     p <- p + geom_hline(yintercept = 0, colour = lcolor,size = lwidth)
-    #
-    #
-    #     if(CI==FALSE){
-    #         p <- p + geom_point(aes(x=XVAR,y=YVAR,color='gray50',fill='gray50',alpha=1,size=1.2))
-    #     } else {
-    #         p <- p + geom_pointrange(aes(x=XVAR,y=YVAR,ymin=YMIN,ymax=YMAX,color='gray50',fill='gray50',alpha=1,size=0.6))
-    #     }
-    #
-    #     if(count==TRUE){
-    #       for (i in 1:length(x)){
-    #         COUNT[i] = x[[i]]$NHTE
-    #       }
-    #             T.start <- c()
-    #             T.end <- c()
-    #             ymin <- c()
-    #             ymax <- c()
-    #             T.gap <- (max(XVAR)-min(XVAR))/length(XVAR)
-    #             for(i in c(1:length(XVAR))){
-    #                 T.start <- c(T.start,XVAR[i]-0.25*T.gap)
-    #                 T.end <- c(T.end,XVAR[i]+0.25*T.gap)
-    #                 ymin <- c(ymin, rect.min)
-    #                 ymax <- c(ymax, rect.min+rect.length*COUNT[i]/max(COUNT))
-    #             }
-    #             data.toplot <- cbind.data.frame(xmin=T.start,
-    #                                             xmax=T.end,
-    #                                             ymin=ymin,
-    #                                             ymax=ymax)
-    #             max.count.pos <- mean(XVAR[which.max(COUNT)])
-    #             p <- p + geom_rect(aes(xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax),data=data.toplot,fill='gray50',alpha=0.3,size=0.3,color='black')
-    #             p <- p + annotate("text", x = max.count.pos - 0.02 * T.gap,
-    #                 y = max(data.toplot$ymax) + 0.2 * rect.length,
-    #                 label = max(COUNT), size = cex.text * 0.8, hjust = 0.5)
-    #     }
-    #
-    #     ## title
-    #     if (is.null(main) == TRUE) {
-    #         p <- p + ggtitle(maintext)
-    #     } else if (main!=""){
-    #         p <- p + ggtitle(main)
-    #     }
-    #
-    #     ## ylim
-    #     if (is.null(ylim) == FALSE) {
-    #         p <- p + coord_cartesian(ylim = ylim)
-    #     }
-    #
-    #     if(length(XVAR)<=10){
-    #         p <- p + scale_x_continuous(breaks=XVAR)
-    #     } else{
-    #         p <- p + scale_x_continuous(labels=scaleFUN)
-    #     }
-    #
-    #     # ## xlim
-    #     # if(is.null(xlim)){
-    #     #     if(is.na(d1[1,1])){
-    #     #         ## drop all periods before first non-missing
-    #     #         for(j in c(2:dim(d1)[1])){
-    #     #             if(!is.na(d1[j,1])){
-    #     #                 xlim <- c(XVAR[j],max(XVAR))
-    #     #                 break
-    #     #             }
-    #     #         }
-    #     #     }
-    #     # }
-    #     ## xlim
-    #     if (is.null(xlim) == FALSE) {
-    #         p <- p + coord_cartesian(xlim = xlim)
-    #     }
-    #
-    #     p <- p + geom_hline(yintercept = x$att.avg,color='red',size=0.8,linetype='dashed')
-    #
-    #     p <- p + theme(legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
-    #      legend.position = legend.pos,
-    #      legend.background = element_rect(fill="transparent",colour=NA),
-    #      axis.title=element_text(size=cex.lab),
-    #      axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
-    #      axis.title.y = element_text(margin = margin(t = 0, r = 0, b = 0, l = 0)),
-    #      axis.text = element_text(color="black", size=cex.axis),
-    #      axis.text.x = element_text(size = cex.axis, angle = angle, hjust=x.h, vjust=x.v),
-    #      axis.text.y = element_text(size = cex.axis),
-    #      plot.title = element_text(size = cex.main, hjust = 0.5, face="bold", margin = margin(10, 0, 10, 0)))
-    #
-
 
     if(type == "box"){
         if (is.null(xlab)==TRUE) {
@@ -3251,18 +3069,18 @@ plot.fect <- function(x,
         }
 
         p <- ggplot()
-        ## xlab and ylab
-        p <- p + xlab(xlab) +  ylab(ylab)
+        ## xlab and ylab 
+        p <- p + xlab(xlab) +  ylab(ylab) 
 
         ## theme
         if (theme.bw == TRUE) {
-            p <- p + theme_bw()
+            p <- p + theme_bw() 
         }
 
         ## title
         if (!is.null(main)) {
             p <- p + ggtitle(main)
-        }
+        } 
 
 
         ## grid
@@ -3292,7 +3110,7 @@ plot.fect <- function(x,
             data.count <- data.count[which(data.count[,'time']>=min(xlim) & data.count[,'time']<=max(xlim)),]
             data.toplot <- data.toplot[which(data.toplot[,'time']>=min(xlim) & data.toplot[,'time']<=max(xlim)),]
         }
-
+        
 
         data.use <- merge(data.toplot,data.count,by = "time")
         #print(data.use)
@@ -3300,7 +3118,7 @@ plot.fect <- function(x,
         if (length(ylim) != 0) {
             rect.length <- (ylim[2] - ylim[1]) / 5
             rect.min <- ylim[1]
-        }
+        } 
         else {
             rect.length <- (max(data.use[,'eff'], na.rm = TRUE) - min(data.use[,'eff'], na.rm = TRUE))/3
             rect.min <- min(data.use[,'eff'], na.rm = TRUE) - rect.length
@@ -3330,12 +3148,12 @@ plot.fect <- function(x,
         data.post.1$time <- factor(data.post.1$time,levels=levels)
         data.post.2$time <- factor(data.post.2$time,levels=levels)
 
-        p <- p + geom_boxplot(aes(x=time,y=eff),position="dodge", alpha=0.5,
+        p <- p + geom_boxplot(aes(x=time,y=eff),position="dodge", alpha=0.5, 
                         data = data.pre.1,fill='skyblue',
                         outlier.fill='skyblue',outlier.size = 1.25,
                         outlier.color='skyblue',
                         outlier.alpha = 0.5)
-        p <- p + geom_boxplot(aes(x=time,y=eff),position="dodge", alpha=0.5,
+        p <- p + geom_boxplot(aes(x=time,y=eff),position="dodge", alpha=0.5, 
                             data = data.post.1,fill='pink',outlier.fill = 'pink',
                             outlier.size = 1.25,outlier.color = 'pink',
                             outlier.alpha = 0.5)
@@ -3345,7 +3163,7 @@ plot.fect <- function(x,
         p <- p + geom_point(aes(x=time,y=eff),data = data.pre.2,
                             color="skyblue", size=1.25, alpha=0.8)
         p <- p + scale_x_discrete(limits =levels)
-
+        
         if(count==TRUE){
                 T.start <- c()
                 T.end <- c()
@@ -3353,8 +3171,8 @@ plot.fect <- function(x,
                 ymax <- c()
                 T.gap <- 1
                 for(i in c(1:dim(data.count)[1])){
-                    T.start <- c(T.start,data.count[i,1]-0.25*T.gap- min(data.count[,1]) + 1)
-                    T.end <- c(T.end,data.count[i,1]+0.25*T.gap- min(data.count[,1])+1)
+                    T.start <- c(T.start,data.count[i,1]-0.25*T.gap- min(data.count[,1]) + 1) 
+                    T.end <- c(T.end,data.count[i,1]+0.25*T.gap- min(data.count[,1])+1) 
                     ymin <- c(ymin, rect.min)
                     ymax <- c(ymax, rect.min+rect.length*data.count[i,2]/max(data.count[,2]))
                 }
@@ -3364,9 +3182,9 @@ plot.fect <- function(x,
                                                 ymax=ymax)
                 max.count.pos <- data.count[which.max(data.count[,2]),1][1]- min(data.count[,1])+1
                 p <- p + geom_rect(aes(xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax),data=data.toplot,fill='gray50',alpha=0.3,size=0.3,color='black')
-                p <- p + annotate("text", x = max.count.pos - 0.02 * T.gap,
-                    y = max(data.toplot$ymax) + 0.1 * rect.length,
-                    label = max(data.count[,2]), size = cex.text * 0.7, hjust = 0.5)
+                p <- p + annotate("text", x = max.count.pos - 0.02 * T.gap, 
+                    y = max(data.toplot$ymax) + 0.1 * rect.length, 
+                    label = max(data.count[,2]), size = cex.text * 0.7, hjust = 0.5)       
         }
 
         ## ylim
@@ -3466,7 +3284,7 @@ plot.fect <- function(x,
             breaks <- c(breaks,8)
             label <- c(label,"Balanced Sample: Pre")
         }
-
+        
         TT <- dim(m)[1]
         N <- dim(m)[2]
         units <- rep(rev(1:N), each = TT)
@@ -3490,7 +3308,7 @@ plot.fect <- function(x,
         if (axis.lab == "both") {
             if (length(axis.lab.gap)==2) {
                 x.gap <- axis.lab.gap[1]
-                y.gap <- axis.lab.gap[2]
+                y.gap <- axis.lab.gap[2] 
             } else {
                 x.gap <- y.gap <- axis.lab.gap[1]
             }
@@ -3505,20 +3323,20 @@ plot.fect <- function(x,
             N.b <- seq(from = N, to = 1, by = -(y.gap + 1))
         }
         id <- rev(id)
-
+        
         p <- ggplot(data, aes(x = period, y = units,
-                              fill = res), position = "identity")
-
+                              fill = res), position = "identity") 
+        
         if (gridOff == FALSE) {
-            p <- p + geom_tile(colour="gray90", size=0.05, stat="identity")
+            p <- p + geom_tile(colour="gray90", size=0.05, stat="identity") 
         } else {
             p <- p + geom_tile(stat="identity")
         }
-
+        
         p <- p +
-            labs(x = xlab, y = ylab,
+            labs(x = xlab, y = ylab,  
                 title=main) +
-            theme_bw() +
+            theme_bw() + 
             scale_fill_manual(NA, breaks = breaks, values = col, labels=label)
 
         #if(4%in%all) {
@@ -3553,7 +3371,7 @@ plot.fect <- function(x,
         }
         else if (axis.lab == "unit") {
             p <- p + scale_x_continuous(expand = c(0, 0), breaks = T.b, labels = NULL) +
-            scale_y_continuous(expand = c(0, 0), breaks = N.b, labels = id[N.b])
+            scale_y_continuous(expand = c(0, 0), breaks = N.b, labels = id[N.b])            
         }
         else if (axis.lab == "time") {
             p <- p + scale_x_continuous(expand = c(0, 0), breaks = T.b, labels = time.label[T.b]) +
@@ -3563,7 +3381,7 @@ plot.fect <- function(x,
             p <- p + scale_x_continuous(expand = c(0, 0), breaks = 1:length(show), labels = NULL) +
             scale_y_continuous(expand = c(0, 0), breaks = 1:N, labels = NULL)
         }
-
+        
         if(length(all)>=3) {
             p <- p + guides(fill=guide_legend(nrow=2,byrow=TRUE))
         }
@@ -3571,8 +3389,9 @@ plot.fect <- function(x,
 
     #suppressWarnings(print(p))
     if(return.test==TRUE){
-        return(list(p=p,test.out=test.out))
-    } else {
+        return(list(p=p,test.out=test.out))        
+    }
+    else{
         return(p)
     }
 
