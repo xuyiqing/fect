@@ -3,40 +3,46 @@
 ###################################################################
 fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     X, # Explanatory variables:  (T*N*p) array
-                    D, #  Indicator for treated unit (tr==1) 
+                    D, #  Indicator for treated unit (tr==1)
                     W,
                     I,
-                    II, 
-                    T.on, 
-                    T.off = NULL, 
-                    T.on.carry = NULL, 
+                    II,
+                    T.on,
+                    T.off = NULL,
+                    T.on.carry = NULL,
                     T.on.balance = NULL,
                     balance.period = NULL,
                     method = "ife",
-                    criterion = "mspe",  
+                    criterion = "mspe",
                     k = 5, # CV time
                     cv.prop = 0.1,
-                    cv.treat = TRUE, 
+                    cv.treat = TRUE,
                     cv.nobs = 3,
                     cv.donut = 1,
                     min.T0 = 5,
                     r = 0, # initial number of factors considered if CV==1
                     r.end,
                     proportion = 0,
-                    nlambda = 10, 
+                    nlambda = 10,
                     lambda = NULL,
-                    force, 
+                    force,
                     hasRevs = 1,
+                    time.on.seq = NULL,
                     tol, # tolerance level
                     max.iteration = 1000,
                     norm.para = NULL,
                     group.level = NULL,
-                    group = NULL
-                    ) {  
-    
+                    group = NULL,
+                    HTEid = NULL,
+                    DataType = "discrete",
+                    Nbins = NULL,
+                    HTE.enp.seq = NULL,
+                    HTEbootVal = NULL
+                    ) {
+
     ##-------------------------------##
     ## Parsing data
-    ##-------------------------------##  
+    ##-------------------------------##
     placebo.pos <- na.pos <- NULL
 
     ## unit id and time
@@ -45,7 +51,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     if (is.null(X) == FALSE) {
         p <- dim(X)[3]
     } else {
-        p <- 0 
+        p <- 0
         X <- array(0, dim = c(1, 1, 0))
     }
 
@@ -60,10 +66,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
     ## replicate data
     YY <- Y
-    YY[which(II == 0)] <- 0 ## reset to 0 
+    YY[which(II == 0)] <- 0 ## reset to 0
     if(use_weight){
         WW <- W
-        WW[which(II == 0)] <- 0 ## reset to 0         
+        WW[which(II == 0)] <- 0 ## reset to 0
     }
     t.on <- c(T.on)
     T0.min <- min(apply(II, 2, sum))
@@ -89,14 +95,14 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     ## observed Y0 indicator:
     oci <- which(c(II) == 1)
     if(use_weight == 1){
-        initialOut <- initialFit(data = data.ini, 
-                                force = force, 
+        initialOut <- initialFit(data = data.ini,
+                                force = force,
                                 w = c(W),
-                                oci = oci)   
+                                oci = oci)
     }else{
-        initialOut <- initialFit(data = data.ini, 
-                                force = force, 
-                                oci = oci)        
+        initialOut <- initialFit(data = data.ini,
+                                force = force,
+                                oci = oci)
     }
 
     Y0 <- initialOut$Y0
@@ -117,7 +123,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             message("Factor number should not be greater than ", T0.min-1, "\n", sep = "")
         }
         r.end <- T0.min-1
-    } 
+    }
     else {
         if (obs.con) {
             if (method %in% c("both", "ife", "gsynth")) {
@@ -129,29 +135,29 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         ##-------------------------------##
     ## ----------- Main Algorithm ----------- ##
         ##-------------------------------##
-    
-    validX <- 1 ## no multi-colinearity 
+
+    validX <- 1 ## no multi-colinearity
     CV.out.ife <- CV.out.mc <- NULL
-    
+
     ##----------------------------------------------------##
     ##         Cross-validation of r and lambda           ##
     ##----------------------------------------------------##
-    
+
     r.max <- min(TT, r.end)
     r.cv <- 0 ## initial value
-    
+
     if(method %in% c("ife", "both", "gsynth") && FALSE){
         r.cv <- 0
-        est.best <- inter_fe_ub(YY, Y0, 
-                                X, II, W.use, beta0, 
-                                0, force = force, 
+        est.best <- inter_fe_ub(YY, Y0,
+                                X, II, W.use, beta0,
+                                0, force = force,
                                 tol, max.iteration)
         message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
     }
     else {
 
-        r.old <- r ## save the minimal number of factors 
-        message("Cross-validating ...","\n") 
+        r.old <- r ## save the minimal number of factors
+        message("Cross-validating ...","\n")
         if(criterion=='mspe'){
             message("Criterion: Mean Squared Prediction Error\n")
         }
@@ -181,21 +187,21 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if(method == "gsynth"){
             message("Interactive fixed effects model...\n")
             out <- fect.gsynth(Y = Y, D = D, X = X, W = W, I = I, II = II,
-                               T.on = T.on, T.off = T.off,  
-                               T.on.balance = T.on.balance, 
-                               balance.period = balance.period, 
+                               T.on = T.on, T.off = T.off,
+                               T.on.balance = T.on.balance,
+                               balance.period = balance.period,
                                r = r, r.end = r.end, CV = TRUE,
-                               force = force, hasRevs = hasRevs, 
+                               force = force, hasRevs = hasRevs,
                                tol = tol, boot = 0,
                                norm.para = norm.para,
                                group.level = group.level, group = group)
-            return(out)    
+            return(out)
         }
 
         ## ----- ##
         ## ------------- initialize ------------ ##
         ## ----- ##
-        
+
         cv.pos <- which(t.on<=0)
         t.on.cv <- t.on[cv.pos]
         count.on.cv <- as.numeric(table(t.on.cv))
@@ -208,18 +214,18 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         #rmCV <- matrix(NA, rm.count, k) ## removed indicator
         ociCV <- list()
         rmCV <- list()
-        estCV <- NULL ## used for mspe 
+        estCV <- NULL ## used for mspe
         if(use_weight==1){
             W.rmCV <- list()
         }
 
         Y0CV <- array(NA, dim = c(TT, N, k)) ## store initial Y0
         if (p > 0) {
-           beta0CV <- array(NA, dim = c(p, 1, k)) 
+           beta0CV <- array(NA, dim = c(p, 1, k))
         } else {
             beta0CV <- array(0, dim = c(1, 0, k)) ## store initial beta0
         }
-        
+
         ## cv.id.all <- c()
         flag <- 0
         for (i in 1:k) {
@@ -227,10 +233,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             repeat{
                 cv.n <- cv.n + 1
                 #cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
-                get.cv <- cv.sample(II, D, 
-                                    count = rm.count, 
-                                    cv.count = cv.nobs, 
-                                    cv.treat = cv.treat, 
+                get.cv <- cv.sample(II, D,
+                                    count = rm.count,
+                                    cv.count = cv.nobs,
+                                    cv.treat = cv.treat,
                                     cv.donut = cv.donut)
                 cv.id <- get.cv$cv.id
                 ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
@@ -239,7 +245,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 II.cv.valid[cv.id] <- -1
                 ## ziyi: if certain rows or columns doesn't satisfy con1 or con2,
                 ## replace the row or column of II.cv using the corresponding rows or columns in II
-                
+
                 con1 <- sum(apply(II.cv, 1, sum) >= 1) == TT
                 con2 <- sum(apply(II.cv, 2, sum) >= min.T0) == N
 
@@ -269,9 +275,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             ocicv <- setdiff(oci, cv.id)
             ociCV[[i]] <- ocicv
             if(use_weight){
-                W.estCV <- list() 
+                W.estCV <- list()
             }
-            
+
             if(cv.n<200){
                 estCV <- c(estCV, list(get.cv$est.id))
             }
@@ -282,18 +288,18 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             }
 
             if(use_weight == 0){
-                initialOutCv <- initialFit(data = data.ini, 
-                                           force = force, 
+                initialOutCv <- initialFit(data = data.ini,
+                                           force = force,
                                            oci = ocicv)
             }else{
-                initialOutCv <- initialFit(data = data.ini, 
-                                           force = force, 
+                initialOutCv <- initialFit(data = data.ini,
+                                           force = force,
                                            w = c(W),
-                                           oci = ocicv)                
+                                           oci = ocicv)
             }
 
             Y0CV[,,i] <- initialOutCv$Y0
-            
+
             if (p > 0) {
                 beta0cv <- initialOutCv$beta0
                 if (sum(is.na(beta0cv)) > 0) {
@@ -306,7 +312,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if(flag == 1){
             message("Some units have too few pre-treatment observations. Remove them automatically in Cross-Validation.\n")
         }
-    
+
         ## get count matrix
         if(use_weight == 0){
             count.T.cv <- count.T.cv.old <- table(T.on)
@@ -321,7 +327,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             count.T.cv[cv.drop.index] <- 0 # set weights to 0 for the periods when the number of treated observations is less than proportion
         }
         if(use_weight==1){
-            count.T.cv <- count.T.cv.old <- aggregate(c(W), by=list(relative = c(T.on)), FUN=sum) 
+            count.T.cv <- count.T.cv.old <- aggregate(c(W), by=list(relative = c(T.on)), FUN=sum)
             count.T.cv.old <- count.T.cv <- count.T.cv[which(count.T.cv[,'relative']<=0),]
             cv.prop.cut <- max(count.T.cv.old[,2])*proportion
             cv.drop.index <- which(count.T.cv.old[,2]<=cv.prop.cut)
@@ -337,30 +343,30 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         ##  --------------------------------------------- ##
 ##  ---------------- cross validation for ife model ------------------  ##
         ##  --------------------------------------------- ##
-        
+
         if (method %in% c("ife", "both")) {
-            
+
             message("Interactive fixed effects model...\n")
-            
+
             r.pc <- est.pc.best <- MSPE.best <- WMSPE.best <- MSPE.pc.best <- NULL
             gmoment.best <- moment.best <- MAD.best <- GMSPE.best <- WGMSPE.best <- NULL
-            
+
             if (criterion == "PC") {
                 CV.out.ife <- matrix(NA, (r.max - r.old + 1), 6)
                 colnames(CV.out.ife) <- c("r", "sigma2", "IC", "PC", "MSPTATT", "MSE")
-            } 
+            }
             else {
                 CV.out.ife <- matrix(NA, (r.max - r.old + 1), 13)
-                colnames(CV.out.ife) <- c("r", "sigma2", "IC", "PC", 
+                colnames(CV.out.ife) <- c("r", "sigma2", "IC", "PC",
                                           "MSPE","WMSPE","GMSPE","WGMSPE", "MAD", "Moment", "GMoment", "MSPTATT", "MSE")
             }
-            
+
             CV.out.ife[,"r"] <- c(r.old:r.max)
             CV.out.ife[,"PC"] <- CV.out.ife[,"GMoment"] <- CV.out.ife[,"Moment"] <- CV.out.ife[,"MAD"] <- CV.out.ife[,"MSPE"] <- CV.out.ife[,"WMSPE"] <- CV.out.ife[,"GMSPE"] <- CV.out.ife[,"WGMSPE"] <- 1e20
 
-            for (i in 1:dim(CV.out.ife)[1]) { ## cross-validation loop starts 
-                ## inter FE based on control, before & after 
-                r <- CV.out.ife[i, "r"]  
+            for (i in 1:dim(CV.out.ife)[1]) { ## cross-validation loop starts
+                ## inter FE based on control, before & after
+                r <- CV.out.ife[i, "r"]
                 ## k <- 5
                 if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment")) {
                     SSE <- 0
@@ -380,33 +386,33 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                             W.use2 <- W.use
                             W.use2[rmCV[[ii]]] <- 0
                         }else{W.use2 <- as.matrix(0)}
-                        est.cv.fit <- inter_fe_ub(YY.cv, as.matrix(Y0CV[,,ii]), X, II.cv, 
-                                                  W.use2, as.matrix(beta0CV[,,ii]), 
+                        est.cv.fit <- inter_fe_ub(YY.cv, as.matrix(Y0CV[,,ii]), X, II.cv,
+                                                  W.use2, as.matrix(beta0CV[,,ii]),
                                                   r, force, tol, max.iteration)$fit
                         index.cv <- as.character(T.on[estCV[[ii]]])
                         index.cv[which(is.na(index.cv))] <- "Control"
                         weight.cv <- count.T.cv[index.cv]
                         names(weight.cv) <- NULL
                         if(use_weight == 0){
-                            SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) 
+                            SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                             WSSE <- WSSE + sum(weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                             GSSE <- GSSE + sum(log((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2))
                             ll <- weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2
-                            ll <- ll[which(ll>0)] 
+                            ll <- ll[which(ll>0)]
                             WGSSE <- WGSSE + sum(log(ll))
                             ll.length <- ll.length + length(ll)
-                            MAD.list <- c(MAD.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)                            
+                            MAD.list <- c(MAD.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                         }else{
                             W.estCV[[ii]] <- WW[estCV[[ii]]]
                             #print(WW[estCV[[ii]]])
-                            SSE <- SSE + sum(WW[estCV[[ii]]]*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) 
+                            SSE <- SSE + sum(WW[estCV[[ii]]]*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                             WSSE <- WSSE + sum(WW[estCV[[ii]]]*weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                             GSSE <- GSSE + sum(WW[estCV[[ii]]]*log((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2))
                             ll <- WW[estCV[[ii]]]*weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2
-                            ll <- ll[which(ll>0)] 
+                            ll <- ll[which(ll>0)]
                             WGSSE <- WGSSE + sum(log(ll))
                             ll.length <- ll.length + length(ll)
-                            MAD.list <- c(MAD.list,WW[estCV[[ii]]]*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)                          
+                            MAD.list <- c(MAD.list,WW[estCV[[ii]]]*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                         }
                         # moment conditions
                         moment.list <- c(moment.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]]))
@@ -424,7 +430,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         WMSPE <- WSSE/(length(unlist(estCV)))
                         GMSPE <- exp(GSSE/(length(unlist(estCV))))
                         WGMSPE <- exp(WGSSE/ll.length)
-                        MAD <- median(abs(MAD.list-median(MAD.list)))                       
+                        MAD <- median(abs(MAD.list-median(MAD.list)))
                     }else{
                         MSPE <- SSE/(sum(unlist(W.estCV)))
                         WMSPE <- WSSE/(sum(unlist(W.estCV)))
@@ -445,21 +451,21 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     names(weight.cv) <- NULL
                     names(weight.cv.g) <- NULL
                     moment <- sum(weight.cv*resid.mean)/sum(weight.cv)
-                    gmoment <- sum(weight.cv.g*resid.g.mean)/sum(weight.cv) 
-                     
+                    gmoment <- sum(weight.cv.g*resid.g.mean)/sum(weight.cv)
+
                 }
 
-                est.cv <- inter_fe_ub(YY, 
-                                      Y0, 
-                                      X, 
+                est.cv <- inter_fe_ub(YY,
+                                      Y0,
+                                      X,
                                       II,
-                                      W.use, 
-                                      beta0, 
-                                      r, 
-                                      force, 
+                                      W.use,
+                                      beta0,
+                                      r,
+                                      force,
                                       tol,
                                       max.iteration) ## overall
-                sigma2 <- est.cv$sigma2 
+                sigma2 <- est.cv$sigma2
                 IC <- est.cv$IC
                 PC <- est.cv$PC
 
@@ -487,7 +493,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.ife[,"MSPE"]) - MSPE) > 0.01*min(CV.out.ife[,"MSPE"])) {
                         ## at least 1% improvement for MPSE
                         MSPE.best <- MSPE
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         r.cv <- r
                     } else {
                         if (r == r.cv + 1) message("*")
@@ -497,9 +503,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.ife[,"WMSPE"]) - WMSPE) > 0.01*min(CV.out.ife[,"WMSPE"])) {
                         ## at least 1% improvement for MPSE
                         WMSPE.best <- WMSPE
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         r.cv <- r
-                    } 
+                    }
                     else {
                         if (r == r.cv + 1) message("*")
                     }
@@ -508,9 +514,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.ife[,"GMSPE"]) - GMSPE) > 0.01*min(CV.out.ife[,"GMSPE"])) {
                         ## at least 1% improvement for MPSE
                         GMSPE.best <- GMSPE
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         r.cv <- r
-                    } 
+                    }
                     else {
                         if (r == r.cv + 1) message("*")
                     }
@@ -519,9 +525,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.ife[,"WGMSPE"]) - WGMSPE) > 0.01*min(CV.out.ife[,"WGMSPE"])) {
                         ## at least 1% improvement for MPSE
                         WGMSPE.best <- WGMSPE
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         r.cv <- r
-                    } 
+                    }
                     else {
                         if (r == r.cv + 1) message("*")
                     }
@@ -529,9 +535,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 else if(criterion == 'mad'){
                     if ((min(CV.out.ife[,"MAD"]) - MAD) > 0.01*min(CV.out.ife[,"MAD"])) {
                         MAD.best <- MAD
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         r.cv <- r
-                    } 
+                    }
                     else {
                         if (r == r.cv + 1) message("*")
                     }
@@ -539,9 +545,9 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 else if(criterion == 'moment'){
                     if ((min(CV.out.ife[,"Moment"]) - moment) > 0.01*min(CV.out.ife[,"Moment"])) {
                         moment.best <- moment
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         r.cv <- r
-                    } 
+                    }
                     else {
                         if (r == r.cv + 1) message("*")
                     }
@@ -549,16 +555,16 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 else if(criterion == 'gmoment'){
                     if ((min(CV.out.ife[,"GMoment"]) - gmoment) > 0.01*min(CV.out.ife[,"GMoment"])) {
                         gmoment.best <- gmoment
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         r.cv <- r
-                    } 
+                    }
                     else {
                         if (r == r.cv + 1) message("*")
                     }
                 }
                 else if(criterion == "pc"){
                     if (PC < min(CV.out.ife[,"PC"])) {
-                        est.pc.best <- est.cv  
+                        est.pc.best <- est.cv
                         r.pc <- r
                     }
                 }
@@ -568,7 +574,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 } else {
                     CV.out.ife[i, 2:6] <- c(sigma2, IC, PC, MSPTATT, MSE)
                 }
-                
+
                 if (criterion == "pc") {
                     message("\n r = ",r, "; sigma2 = ",
                         sprintf("%.5f",sigma2), "; IC = ",
@@ -593,16 +599,16 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         sprintf("%.5f",PC), "; MSPE = ",
                         sprintf("%.5f",MSPE))
                 }
-            } ## end of while: search for r_star over  
+            } ## end of while: search for r_star over
 
             #MSPE.best <- min(CV.out[,"MSPE"])
             #PC.best <- min(CV.out[,"PC"])
 
-            ## compare 
+            ## compare
             if (criterion == "both") {
                 if (r.cv > r.pc) {
                     message("\n\n Factor number selected via cross validation may be larger than the true number. Using the PC criterion.\n\n ")
-                    r.cv <- r.pc 
+                    r.cv <- r.pc
                     est.best <- est.pc.best
                     MSPE.best <- MSPE.pc.best
                 }
@@ -610,7 +616,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 MSPE.best.ife <- MSPE.best
             }
             else if (criterion == "pc") {
-                est.best.ife <- est.pc.best  
+                est.best.ife <- est.pc.best
                 r.cv <- r.pc
             }
             else {
@@ -623,10 +629,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 moment.best.ife <- moment.best
                 gmoment.best.ife <- gmoment.best
             }
-            
+
             if (r > (TT-1)) {message(" (r hits maximum)")}
             message("\n\n r* = ",r.cv, sep="")
-            message("\n\n") 
+            message("\n\n")
         }
 
         ##  ------------------------------------- ##
@@ -637,8 +643,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             eigen.all <- NULL
             if (is.null(lambda) || length(lambda) == 1) {
                 ## create the hyper-parameter sequence
-                ## biggest candidate lambda 
-                ## Y.lambda <- YY 
+                ## biggest candidate lambda
+                ## Y.lambda <- YY
                 Y.lambda <- YY - Y0
                 ## Y.lambda[which(II == 0)] <- Y0[which(II == 0)]
                 Y.lambda[which(II == 0)] <- 0
@@ -653,7 +659,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     lambda[i] <- 10^(lambda.max - (i - 1) * lambda.by)
                 }
                 lambda[nlambda] <- 0
-            } 
+            }
             else {
                 Y.lambda <- YY - Y0
                 Y.lambda[which(II == 0)] <- 0
@@ -672,7 +678,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
             break_count <- 0
             break_check <- 0
-            for (i in 1:length(lambda)) {    
+            for (i in 1:length(lambda)) {
                 ## k <- 5
                 SSE <- 0
                 WSSE <- 0
@@ -692,32 +698,32 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         W.use2 <- W.use
                         W.use2[rmCV[[ii]]] <- 0
                     }else{W.use2 <- as.matrix(0)}
-                    est.cv.fit <- inter_fe_mc(YY.cv, as.matrix(Y0CV[,,ii]), 
-                                              X, II.cv, W.use2, as.matrix(beta0CV[,,ii]), 
+                    est.cv.fit <- inter_fe_mc(YY.cv, as.matrix(Y0CV[,,ii]),
+                                              X, II.cv, W.use2, as.matrix(beta0CV[,,ii]),
                                               1, lambda[i], force, tol, max.iteration)$fit
                     index.cv <- as.character(T.on[estCV[[ii]]])
                     index.cv[which(is.na(index.cv))] <- "Control"
                     weight.cv <- count.T.cv[index.cv]
                     names(weight.cv) <- NULL
                     if(use_weight == 0){
-                        SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) 
+                        SSE <- SSE + sum((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                         WSSE <- WSSE + sum(weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                         GSSE <- GSSE + sum(log((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2))
                         ll <- weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2
-                        ll <- ll[which(ll>0)] 
+                        ll <- ll[which(ll>0)]
                         WGSSE <- WGSSE + sum(log(ll))
                         ll.length <- ll.length + length(ll)
-                        MAD.list <- c(MAD.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)                            
+                        MAD.list <- c(MAD.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                     }else{
                         W.estCV[[ii]] <- WW[estCV[[ii]]]
-                        SSE <- SSE + sum(WW[estCV[[ii]]]*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2) 
+                        SSE <- SSE + sum(WW[estCV[[ii]]]*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                         WSSE <- WSSE + sum(WW[estCV[[ii]]]*weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                         GSSE <- GSSE + sum(WW[estCV[[ii]]]*log((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2))
                         ll <- WW[estCV[[ii]]]*weight.cv*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2
-                        ll <- ll[which(ll>0)] 
+                        ll <- ll[which(ll>0)]
                         WGSSE <- WGSSE + sum(log(ll))
                         ll.length <- ll.length + length(ll)
-                        MAD.list <- c(MAD.list,WW[estCV[[ii]]]*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)                          
+                        MAD.list <- c(MAD.list,WW[estCV[[ii]]]*(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]])^2)
                     }
                     # moment conditions
                     moment.list <- c(moment.list,(YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]]))
@@ -728,7 +734,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     WMSPE <- WSSE/(length(unlist(estCV)))
                     GMSPE <- exp(GSSE/(length(unlist(estCV))))
                     WGMSPE <- exp(WGSSE/ll.length)
-                    MAD <- median(abs(MAD.list-median(MAD.list)))                       
+                    MAD <- median(abs(MAD.list-median(MAD.list)))
                 }else{
                     MSPE <- SSE/(sum(unlist(W.estCV)))
                     WMSPE <- WSSE/(sum(unlist(W.estCV)))
@@ -736,7 +742,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     WGMSPE <- exp(WGSSE/ll.length)
                     MAD <- median(abs(MAD.list-median(MAD.list)))
                 }
-                    
+
                 # moment
                 resid.mean <- tapply(moment.list,index.moment.list, mean)
                 resid.mean <- abs(resid.mean)
@@ -752,13 +758,13 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 moment <- sum(weight.cv*resid.mean)/sum(weight.cv)
                 gmoment <- sum(weight.cv.g*resid.g.mean)/sum(weight.cv)
 
-                est.cv <- inter_fe_mc(YY, Y0, X, II, W.use, beta0, 
-                                      1, lambda[i], 
+                est.cv <- inter_fe_mc(YY, Y0, X, II, W.use, beta0,
+                                      1, lambda[i],
                                       force, tol, max.iteration) ## overall
 
                 eff.v.cv <- c(Y - est.cv$fit)[cv.pos]
                 meff <- as.numeric(tapply(eff.v.cv, t.on.cv, mean))
-                MSPTATT <- sum(meff^2*count.on.cv)/sum(count.on.cv) 
+                MSPTATT <- sum(meff^2*count.on.cv)/sum(count.on.cv)
                 MSE <- sum(eff.v.cv^2)/length(eff.v.cv)
 
                 if(!is.null(norm.para)) {
@@ -775,7 +781,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.mc[,"MSPE"]) - MSPE) > 0.01*min(CV.out.mc[,"MSPE"])) {
                         ## at least 1% improvement for MPSE
                         MSPE.best <- MSPE
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         lambda.cv <- lambda[i]
                         break_count <- 0
                         break_check <- 0
@@ -784,8 +790,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                             if (lambda.cv == lambda[i-1]){
                                 message("*")
                                 break_check <- 1
-                                break_count <- 0  
-                            } 
+                                break_count <- 0
+                            }
                         }
                     }
                 }
@@ -793,17 +799,17 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.mc[,"WMSPE"]) - WMSPE) > 0.01*min(CV.out.mc[,"WMSPE"])) {
                         ## at least 1% improvement for MPSE
                         WMSPE.best <- WMSPE
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         lambda.cv <- lambda[i]
                         break_check <- 0
                         break_count <- 0
-                    } 
+                    }
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
                                 message("*")
                                 break_check <- 1
-                                break_count <- 0  
+                                break_count <- 0
                             }
                         }
                     }
@@ -812,17 +818,17 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.mc[,"GMSPE"]) - GMSPE) > 0.01*min(CV.out.mc[,"GMSPE"])) {
                         ## at least 1% improvement for MPSE
                         GMSPE.best <- GMSPE
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         lambda.cv <- lambda[i]
                         break_check <- 0
                         break_count <- 0
-                    } 
+                    }
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
                                 message("*")
                                 break_check <- 1
-                                break_count <- 0  
+                                break_count <- 0
                             }
                         }
                     }
@@ -831,17 +837,17 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.mc[,"WGMSPE"]) - WGMSPE) > 0.01*min(CV.out.mc[,"WGMSPE"])) {
                         ## at least 1% improvement for MPSE
                         WGMSPE.best <- WGMSPE
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         lambda.cv <- lambda[i]
                         break_check <- 0
                         break_count <- 0
-                    } 
+                    }
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
                                 message("*")
                                 break_check <- 1
-                                break_count <- 0  
+                                break_count <- 0
                             }
                         }
                     }
@@ -850,17 +856,17 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.mc[,"MAD"]) - MAD) > 0.01*min(CV.out.mc[,"MAD"])) {
                         ## at least 1% improvement for MPSE
                         MAD.best <- MAD
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         lambda.cv <- lambda[i]
                         break_check <- 0
                         break_count <- 0
-                    } 
+                    }
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
                                 message("*")
                                 break_check <- 1
-                                break_count <- 0  
+                                break_count <- 0
                             }
                         }
                     }
@@ -869,17 +875,17 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.mc[,"Moment"]) - moment) > 0.01*min(CV.out.mc[,"Moment"])) {
                         ## at least 1% improvement for MPSE
                         moment.best <- moment
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         lambda.cv <- lambda[i]
                         break_check <- 0
                         break_count <- 0
-                    } 
+                    }
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
                                 message("*")
                                 break_check <- 1
-                                break_count <- 0  
+                                break_count <- 0
                             }
                         }
                     }
@@ -888,17 +894,17 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     if ((min(CV.out.mc[,"GMoment"]) - gmoment) > 0.01*min(CV.out.mc[,"GMoment"])) {
                         ## at least 1% improvement for MPSE
                         gmoment.best <- gmoment
-                        est.best <- est.cv  
+                        est.best <- est.cv
                         lambda.cv <- lambda[i]
                         break_check <- 0
                         break_count <- 0
-                    } 
+                    }
                     else {
                         if (i > 1) {
                             if (lambda.cv == lambda[i-1]){
                                 message("*")
                                 break_check <- 1
-                                break_count <- 0  
+                                break_count <- 0
                             }
                         }
                     }
@@ -912,13 +918,13 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 message("\n lambda.norm = ",
                 sprintf("%.5f",lambda[i]/max(eigen.all)),"; MSPE = ",
                 sprintf("%.5f",MSPE),   "; MSPTATT = ",
-                sprintf("%.5f",MSPTATT), "; MSE = ", 
+                sprintf("%.5f",MSPTATT), "; MSE = ",
                 sprintf("%.5f",MSE), sep="")
                 if(break_count == 3){
                     break
                 }
             }
-            est.best.mc <- est.best 
+            est.best.mc <- est.best
             MSPE.best.mc <- MSPE.best
             WMSPE.best.mc <- WMSPE.best
             GMSPE.best.mc <- GMSPE.best
@@ -929,13 +935,13 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             message("\n\n lambda.norm* = ",lambda.cv/max(eigen.all), sep="")
             message("\n\n")
         }
-    }    ## End of Cross-Validation 
+    }    ## End of Cross-Validation
 
 
     if (method == "ife") {
         est.best <- est.best.ife
         validF <- ifelse(r.cv > 0, 1, 0)
-    } 
+    }
     else if (method == "mc") {
         est.best <- est.best.mc
         validF <- est.best$validF
@@ -944,7 +950,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if(criterion == 'mspe'){
             if (MSPE.best.ife <= MSPE.best.mc) {
                 est.best <- est.best.ife
-                validF <- ifelse(r.cv > 0, 1, 0) 
+                validF <- ifelse(r.cv > 0, 1, 0)
                 method <- "ife"
             } else {
                 est.best <- est.best.mc
@@ -955,7 +961,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if(criterion == 'wmspe'){
             if (WMSPE.best.ife <= WMSPE.best.mc) {
                 est.best <- est.best.ife
-                validF <- ifelse(r.cv > 0, 1, 0) 
+                validF <- ifelse(r.cv > 0, 1, 0)
                 method <- "ife"
             } else {
                 est.best <- est.best.mc
@@ -966,7 +972,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if(criterion == 'gmspe'){
             if (GMSPE.best.ife <= GMSPE.best.mc) {
                 est.best <- est.best.ife
-                validF <- ifelse(r.cv > 0, 1, 0) 
+                validF <- ifelse(r.cv > 0, 1, 0)
                 method <- "ife"
             } else {
                 est.best <- est.best.mc
@@ -977,7 +983,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if(criterion == 'wgmspe'){
             if (WGMSPE.best.ife <= WGMSPE.best.mc) {
                 est.best <- est.best.ife
-                validF <- ifelse(r.cv > 0, 1, 0) 
+                validF <- ifelse(r.cv > 0, 1, 0)
                 method <- "ife"
             } else {
                 est.best <- est.best.mc
@@ -988,7 +994,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if(criterion == 'mad'){
             if (MAD.best.ife <= MAD.best.mc) {
                 est.best <- est.best.ife
-                validF <- ifelse(r.cv > 0, 1, 0) 
+                validF <- ifelse(r.cv > 0, 1, 0)
                 method <- "ife"
             } else {
                 est.best <- est.best.mc
@@ -999,7 +1005,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if(criterion == 'moment'){
             if (moment.best.ife <= moment.best.mc) {
                 est.best <- est.best.ife
-                validF <- ifelse(r.cv > 0, 1, 0) 
+                validF <- ifelse(r.cv > 0, 1, 0)
                 method <- "ife"
             } else {
                 est.best <- est.best.mc
@@ -1010,7 +1016,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         if(criterion == 'gmoment'){
             if (gmoment.best.ife <= gmoment.best.mc) {
                 est.best <- est.best.ife
-                validF <- ifelse(r.cv > 0, 1, 0) 
+                validF <- ifelse(r.cv > 0, 1, 0)
                 method <- "ife"
             } else {
                 est.best <- est.best.mc
@@ -1020,37 +1026,37 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         }
         message("\n\n Recommended method through cross-validation: ", method, sep = "")
         message("\n\n")
-    }    
-    validX <- est.best$validX 
+    }
+    validX <- est.best$validX
 
         ##------------------------------##
     ## ----------- Summarize -------------- ##
-        ##------------------------------## 
+        ##------------------------------##
 
     ## 00. run a fect to obtain residuals
     if (method == "ife") {
         if (r.cv == 0) {
             est.fect <- est.best
-        } 
+        }
         else {
             est.fect <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force = force, tol, max.iteration)
         }
-    } 
+    }
     else {
         est.fect <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force = force, tol, max.iteration)
     }
-           
+
 
     ##-------------------------------##
     ##   ATT and Counterfactuals     ##
     ##-------------------------------##
 
-    ## we first adjustment for normalization 
+    ## we first adjustment for normalization
     if (!is.null(norm.para)) {
 
         Y <- Y * norm.para[1]
         if (method == "ife") {
-            ## variance of the error term 
+            ## variance of the error term
             sigma2 <- est.best$sigma2 * (norm.para[1]^2)
             IC <- est.best$IC - log(est.best$sigma2) + log(sigma2)
             PC <- est.best$PC * (norm.para[1]^2)
@@ -1060,22 +1066,22 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         }
 
         ## output of estimates
-        est.best$mu <- est.best$mu * norm.para[1] 
+        est.best$mu <- est.best$mu * norm.para[1]
         if (method == "ife" && r.cv > 0) {
             est.best$lambda <- est.best$lambda * norm.para[1]
             est.best$VNT <- est.best$VNT * norm.para[1]
         }
         if (force%in%c(1, 3)) {
-            est.best$alpha <- est.best$alpha * norm.para[1] 
+            est.best$alpha <- est.best$alpha * norm.para[1]
         }
         if (force%in%c(2,3)) {
-            est.best$xi <- est.best$xi * norm.para[1] 
+            est.best$xi <- est.best$xi * norm.para[1]
         }
         #if (p>0) {
         #    est.best$beta <- est.best$beta * norm.para[1]
         #}
-        est.best$residuals <- est.best$residuals * norm.para[1] 
-        est.best$fit <- est.best$fit * norm.para[1] 
+        est.best$residuals <- est.best$residuals * norm.para[1]
+        est.best$fit <- est.best$fit * norm.para[1]
         est.fect$fit <- est.fect$fit * norm.para[1]
         est.fect$sigma2 <- est.fect$sigma2 * norm.para[1]
     }
@@ -1083,7 +1089,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     ## 0. revelant parameters
     sigma2 <- IC <- PC <- NULL
     if (method == "ife") {
-        sigma2 <- est.best$sigma2   
+        sigma2 <- est.best$sigma2
         IC <- est.best$IC
         PC <- est.best$PC
     }
@@ -1097,11 +1103,11 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     } else {
         beta <- NA
     }
-   
+
     ## 1. estimated att and counterfactuals
     Y.ct.equiv <- Y.ct <- NULL
     Y.ct <- est.best$fit
-    eff <- Y - Y.ct   
+    eff <- Y - Y.ct
     missing.index <- which(is.na(eff))
     if(length(missing.index)>0){
         I[missing.index] <- 0
@@ -1109,7 +1115,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
     if (0 %in% I) {
         eff[which(I == 0)] <- NA
-    } 
+    }
     complete.index <- which(!is.na(eff))
     att.avg <- sum(eff[complete.index] * D[complete.index])/(sum(D[complete.index]))
 
@@ -1149,8 +1155,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
     est.best$residuals[which(II == 0)] <- NA
     if (method == "mc") {
-        est.best$sigma2 <- mean(c(est.best$residuals[which(II == 1)])^2) ## mean squared error of residuals    
-    }    
+        est.best$sigma2 <- mean(c(est.best$residuals[which(II == 1)])^2) ## mean squared error of residuals
+    }
 
     ## 4. dynamic effects
     t.on <- c(T.on)
@@ -1210,16 +1216,16 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         att.on.sum.W <- att.on.W <- count.on.W <- time.on.W <- W.on.sum <- NULL
     }
 
-    ## 4.2 balance effect 
-    balance.att <- NULL 
+    ## 4.2 balance effect
+    balance.att <- NULL
     if (!is.null(balance.period)) {
         t.on.balance <- c(T.on.balance)
-        rm.pos4 <- which(is.na(t.on.balance)) 
+        rm.pos4 <- which(is.na(t.on.balance))
         t.on.balance.use <- t.on.balance
 
         if (NA %in% eff.v | NA %in% t.on.balance) {
             eff.v.use3  <- eff.v[-c(rm.pos1, rm.pos4)]
-            t.on.balance.use <- t.on.balance[-c(rm.pos1, rm.pos4)]        
+            t.on.balance.use <- t.on.balance[-c(rm.pos1, rm.pos4)]
         }
 
         balance.time <- sort(unique(t.on.balance.use))
@@ -1228,17 +1234,17 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
 
 
-    
-    ## 5 carryover effect 
-    carry.att <- NULL 
+
+    ## 5 carryover effect
+    carry.att <- NULL
     if (!is.null(T.on.carry)) {
         t.on.carry <- c(T.on.carry)
-        rm.pos4 <- which(is.na(t.on.carry)) 
+        rm.pos4 <- which(is.na(t.on.carry))
         t.on.carry.use <- t.on.carry
 
         if (NA %in% eff.v | NA %in% t.on.carry) {
             eff.v.use3  <- eff.v[-c(rm.pos1, rm.pos4)]
-            t.on.carry.use <- t.on.carry[-c(rm.pos1, rm.pos4)]        
+            t.on.carry.use <- t.on.carry[-c(rm.pos1, rm.pos4)]
         }
 
         carry.time <- sort(unique(t.on.carry.use))
@@ -1248,7 +1254,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         #    carry.att.med <- rep(NA, length(time.on.carry.seq))
         #    carry.att.med[which(time.on.carry.seq %in% carry.time)] <- carry.att
         #    carry.att <- carry.att.med
-            
+
         #}
     }
 
@@ -1256,7 +1262,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
 
     ## 6. switch-off effects
     eff.off <- eff.equiv <- off.sd <- NULL
-    if (hasRevs == 1) {    
+    if (hasRevs == 1) {
         t.off <- c(T.off)
         rm.pos3 <- which(is.na(t.off))
         eff.v.use2 <- eff.v
@@ -1295,7 +1301,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             }
 
             time.off.W <- sort(unique(t.off.use.W))
-            att.off.sum.W <- as.numeric(tapply(eff.v.use2.W*W.v.use2, t.off.use.W, sum)) 
+            att.off.sum.W <- as.numeric(tapply(eff.v.use2.W*W.v.use2, t.off.use.W, sum))
             W.off.sum <- as.numeric(tapply(W.v.use2, t.off.use.W, sum))
             att.off.W <- att.off.sum.W/W.off.sum ## NA already removed
             count.off.W <- as.numeric(table(t.off.use.W))
@@ -1313,7 +1319,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     T.calendar <- c(1:TT)
     if(sum(!is.na(eff.calendar))>1){
         #loess fit
-        loess.fit <- suppressWarnings(try(loess(eff.calendar~T.calendar,weights = N.calendar),silent=TRUE))       
+        loess.fit <- suppressWarnings(try(loess(eff.calendar~T.calendar,weights = N.calendar),silent=TRUE))
         if('try-error' %in% class(loess.fit)){
             eff.calendar.fit <- eff.calendar
             calendar.enp <- NULL
@@ -1321,13 +1327,256 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         else{
             eff.calendar.fit <- eff.calendar
             eff.calendar.fit[which(!is.na(eff.calendar))] <- loess.fit$fit
-            calendar.enp <- loess.fit$enp              
+            calendar.enp <- loess.fit$enp
         }
     }
     else{
         eff.calendar.fit <- eff.calendar
         calendar.enp <- NULL
     }
+
+    ## 10. loess HTE by any variable
+    D.missing <- D
+    D.missing[which(D == 0)] <- NA
+    # if ((length(HTEid) != 1 | length(HTEid) == 0){
+    #     stop("not 1 variable for HTE")
+    # }
+    #generate variables for dynamic effects
+    att.on.HTE = list()
+    time.on.HTE = list()
+    count.on.HTE = list()
+
+
+    if(length(HTEid) == 1){
+      HTEvalue = X[,,HTEid]
+      if(DataType == "discrete"){    #代表离散型变量
+        HTEuni = unique(as.vector(HTEvalue))
+        # if(length(HTEbootVal) > 0){
+        #   HTEuni = HTEbootVal
+        # }
+        HTEuni <- sort(HTEuni)
+        avg.HTE <- rep(NA,length(HTEuni))
+        N.HTE = rep(0,length(HTEuni))
+        Ntr.HTE = rep(0,length(HTEuni))
+        Val.HTE = HTEuni
+        for(i in c(1:length(HTEuni))){
+          INDEX <- D.missing
+          INDEX[which(HTEvalue != HTEuni[i])] <- NA
+          avg.HTE[i] = mean(INDEX * eff, na.rm = TRUE)
+          Ntr.HTE[i] = length(INDEX) - length(which(is.na(INDEX)))
+          N.HTE[i] =  length(which(HTEvalue == HTEuni[i]))
+
+          #dynamic effects result storage
+          temp.index <- which(HTEvalue == HTEuni[i])
+          temp.t.on = c(T.on[temp.index])
+          temp.eff.v = c(eff[temp.index])
+          temp.n.on = c(n.on.use[temp.index])
+
+          rm.pos1 <- which(is.na(temp.eff.v))
+          rm.pos2 <- which(is.na(temp.t.on))
+
+          temp.eff.v.use1 <- temp.eff.v
+          temp.t.on.use <- temp.t.on
+          temp.n.on.use <- rep(1:N, each = TT)
+          if (NA %in% eff.v | NA %in% t.on) {
+            temp.eff.v.use1 <- temp.eff.v[-c(rm.pos1, rm.pos2)]
+            temp.t.on.use <- temp.t.on[-c(rm.pos1, rm.pos2)]
+            temp.n.on.use <- temp.n.on[-c(rm.pos1, rm.pos2)]
+            # if (binary == FALSE && boot == FALSE) {
+            #   eff.equiv.v <- eff.equiv.v[-c(rm.pos1, rm.pos2)]
+            # }
+          }
+
+          temp.time.on <- sort(unique(temp.t.on.use))
+          temp.att.on <- as.numeric(tapply(temp.eff.v.use1, temp.t.on.use, mean)) ## NA already removed
+          temp.count.on <- as.numeric(table(temp.t.on.use))
+
+          if (!is.null(time.on.seq)) {
+            temp.count.on.med <- temp.att.on.med <- rep(NA, length(time.on.seq))
+            temp.att.on.med[which(time.on.seq %in% temp.time.on)] <- temp.att.on
+            temp.count.on.med[which(time.on.seq %in% temp.time.on)] <- temp.count.on
+            temp.att.on <- temp.att.on.med
+            temp.count.on <- temp.count.on.med
+            temp.time.on <- time.on.seq
+          }
+
+          att.on.HTE[[i]] = temp.att.on
+          time.on.HTE[[i]] = temp.time.on
+          count.on.HTE[[i]] = temp.count.on
+
+        }
+        avg.HTE.fit <- NULL
+        HTE.enp <- NULL
+        # eff.HTE <- eff.HTE[which(N.HTE > 0)]    #先把不存在treat对应值的情况删掉
+        # Val.HTE <- Val.HTE[which(N.HTE > 0)]
+        # N.HTE <- N.HTE[which(N.HTE > 0)]
+        # N.HTE <- N.HTE[which(!is.na(eff.HTE))]  #再删掉eff为na的情况
+        # Val.HTE <- Val.HTE[which(!is.na(eff.HTE))]
+        # eff.HTE <- eff.HTE[which(!is.na(eff.HTE))]
+        # eff.HTE.fit <- eff.HTE
+        # HTE.enp <- NULL
+      }
+      if(DataType == "continuous"){   #代表连续型变量
+        nbins = Nbins
+        avg.HTE <- rep(NA,nbins)
+        N.HTE = rep(0,nbins)
+        Ntr.HTE = rep(0,nbins)
+        Val.HTE = rep(NA,nbins)
+        quan = 1/nbins
+        HTEquantile = quantile(HTEvalue,seq(quan,1,quan))
+
+        for(i in c(1:nbins)){
+          INDEX <- D.missing
+          if (i == 1){
+            INDEX[which((HTEvalue >= HTEquantile[i]))] <- NA
+            temp.index <- which(HTEvalue < HTEquantile[i])
+          }
+          else if (i == nbins){
+            INDEX[which((HTEvalue < HTEquantile[i - 1]))] <- NA
+            temp.index <- which(HTEvalue >= HTEquantile[i - 1])
+          }
+          else {
+            INDEX[which((HTEvalue < HTEquantile[i - 1]) | HTEvalue >= HTEquantile[i])] <- NA
+            temp.index <- which((HTEvalue >= HTEquantile[i - 1]) & (HTEvalue < HTEquantile[i]))
+          }
+          avg.HTE[i] = mean(INDEX * eff, na.rm = TRUE)
+          Ntr.HTE[i] = length(INDEX) - length(which(is.na(INDEX)))
+          N.HTE[i] = length(temp.index)
+          Val.HTE[i] = Val.HTE[i] = quan * i
+
+          temp.t.on = c(T.on[temp.index])
+          temp.eff.v = c(eff[temp.index])
+
+          rm.pos1 <- which(is.na(temp.eff.v))
+          rm.pos2 <- which(is.na(temp.t.on))
+
+          temp.eff.v.use1 <- temp.eff.v
+          temp.t.on.use <- temp.t.on
+          temp.n.on.use <- rep(1:N, each = TT)
+          if (NA %in% eff.v | NA %in% t.on) {
+            temp.eff.v.use1 <- temp.eff.v[-c(rm.pos1, rm.pos2)]
+            temp.t.on.use <- temp.t.on[-c(rm.pos1, rm.pos2)]
+            temp.n.on.use <- temp.n.on.use[-c(rm.pos1, rm.pos2)]
+            # if (binary == FALSE && boot == FALSE) {
+            #   eff.equiv.v <- eff.equiv.v[-c(rm.pos1, rm.pos2)]
+            # }
+          }
+
+          temp.time.on <- sort(unique(temp.t.on.use))
+          temp.att.on <- as.numeric(tapply(temp.eff.v.use1, temp.t.on.use, mean)) ## NA already removed
+          temp.count.on <- as.numeric(table(temp.t.on.use))
+
+          if (!is.null(time.on.seq)) {
+            temp.count.on.med <- temp.att.on.med <- rep(NA, length(time.on.seq))
+            temp.att.on.med[which(time.on.seq %in% temp.time.on)] <- temp.att.on
+            temp.count.on.med[which(time.on.seq %in% temp.time.on)] <- temp.count.on
+            temp.att.on <- temp.att.on.med
+            temp.count.on <- temp.count.on.med
+            temp.time.on <- time.on.seq
+          }
+
+          att.on.HTE[[i]] = temp.att.on
+          time.on.HTE[[i]] = temp.time.on
+          count.on.HTE[[i]] = temp.count.on
+        }
+        # eff.HTE <- eff.HTE[which(N.HTE > 0)]    #把不存在treat对应值的情况删掉
+        # Val.HTE <- Val.HTE[which(N.HTE > 0)]
+        # N.HTE <- N.HTE[which(N.HTE > 0)]
+        #loess fit
+        #     if(!is.null(HTE.enp.seq)){
+        #         if(length(HTE.enp.seq)==1 & is.na(HTE.enp.seq)){
+        #             HTE.enp.seq <- NULL
+        #             }
+        #         }
+        #     if(is.null(HTE.enp.seq)){
+        #         loess.fit <- suppressWarnings(try(loess(eff.HTE~Val.HTE,weights = N.HTE),silent=TRUE))
+        #         }
+        #     else{
+        #         loess.fit <- suppressWarnings(try(loess(eff.HTE~Val.HTE,weights = N.HTE,enp.target=HTE.enp.seq),silent=TRUE))
+        #         }
+        #     if('try-error' %in% class(loess.fit)){
+        #         eff.HTE.fit <- eff.HTE
+        #         HTE.enp <- NULL
+        #         }
+        #     else{
+        #         eff.HTE.fit <- eff.HTE
+        #         eff.HTE.fit[which(!is.na(eff.HTE))] <- loess.fit$fit
+        #         HTE.enp <- loess.fit$enp
+        #         }
+        #     if(is.null(eff.HTE.fit)){
+        #         eff.HTE.fit <- eff.HTE
+        #         calendar.enp <- NULL
+        #     }
+        # }
+
+
+
+        HTEX <- HTEvalue[which(D == 1)]
+        HTEY <- eff[which(D == 1)]
+
+        avg.HTE.fit = NULL
+
+        # if(DataType == "discrete"){
+        #   bootVal = HTEuni
+        #   HTEX <- as.factor(HTEX)
+        # }
+        # if(DataType == "continuous"){
+        #   bootVal = c(HTEmin,HTEmax)
+        # }
+        #regression for HTE estimate
+        #data_reg <- data.frame(HTEX,HTEY)
+        #REGout <- lm(HTEY ~ HTEX, data = data_reg)
+        #HTEcoef <- as.vector(REGout$coefficients[2])
+        #print(HTEcoef)
+      }
+    }
+    else{
+      avg.HTE = NULL
+      Val.HTE = NULL
+      N.HTE = NULL
+      Ntr.HTE = NULL
+      avg.HTE.fit = NULL
+      HTE.enp = NULL
+      bootVal = NULL
+      #HTEcoef = NULL
+      att.on.HTE = NULL
+      time.on.HTE = NULL
+      count.on.HTE = NULL
+    }
+    ##10.a dynamic effect by different groups
+    # if(DataType != 0){
+    #   stop("not seperate groups")
+    # }
+    # if(length(HTEuni) > 100){
+    #   stop("too many groups")
+    # }
+    # att.HTE.on <- list()
+    # time.HTE.on <- list()
+    # count.HTE.on <- list
+    # for(j in c(1:length(HTEuni))){
+    #   INDEX.temp <- which(HTEvalue == HTEuni[j])
+    #   t.on.temp <- c(T.on[INDEX.temp])
+    #   eff.v.temp <-c(eff[INDEX.temp])
+    #   rm.pos1 <- which(is.na(eff.v.temp))
+    #   rm.pos2 <- which(is.na(t.on.temp))
+    #
+    #   eff.v.use1.temp <- eff.v.temp
+    #   t.on.use.temp <- t.on.temp
+    #   n.on.use.temp <- rep(1:N, each = TT)
+    #   if (NA %in% eff.v.temp | NA %in% t.on.temp) {
+    #     eff.v.use1.temp <- eff.v.temp[-c(rm.pos1, rm.pos2)]
+    #     t.on.use.temp <- t.on.temp[-c(rm.pos1, rm.pos2)]
+    #     n.on.use.temp <- n.on.use.temp[-c(rm.pos1, rm.pos2)]
+    #   }
+    #
+    #   time.on.temp <- sort(unique(t.on.use.temp))
+    #   att.on.temp <- as.numeric(tapply(eff.v.use1.temp, t.on.use.temp, mean)) ## NA already removed
+    #   count.on.temp <- as.numeric(table(t.on.use.temp))
+    #
+    #   time.HTE.on[[j]] <- time.on.temp
+    #   att.HTE.on[[j]] <- att.on.temp
+    #   count.HTE.on[[j]] <- count.on.temp
+    # }
 
     ## 7. cohort effects
     if (!is.null(group)) {
@@ -1353,7 +1602,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             t.on.sub <- c(T.on[which(group==sub.group)])
             eff.v.sub <- c(eff[which(group==sub.group)]) ## a vector
             rm.pos1.sub <- which(is.na(eff.v.sub))
-            rm.pos2.sub <- which(is.na(t.on.sub)) 
+            rm.pos2.sub <- which(is.na(t.on.sub))
             eff.v.use1.sub <- eff.v.sub
             t.on.use.sub <- t.on.sub
             if (NA %in% eff.v.sub | NA %in% t.on.sub) {
@@ -1362,21 +1611,21 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             }
             if(length(t.on.use.sub)>0){
                 time.on.sub <- sort(unique(t.on.use.sub))
-                att.on.sub <- as.numeric(tapply(eff.v.use1.sub, 
-                                            t.on.use.sub, 
+                att.on.sub <- as.numeric(tapply(eff.v.use1.sub,
+                                            t.on.use.sub,
                                             mean)) ## NA already removed
                 count.on.sub <- as.numeric(table(t.on.use.sub))
             }else{
                 time.on.sub <- att.on.sub <- count.on.sub <- NULL
             }
-            
+
             suboutput <- list(att.on=att.on.sub,
                               time.on=time.on.sub,
                               count.on=count.on.sub)
 
 
             ## T.off
-            if (hasRevs == 1) {    
+            if (hasRevs == 1) {
                 t.off.sub <- c(T.off[which(group==sub.group)])
                 rm.pos3.sub <- which(is.na(t.off.sub))
                 eff.v.use2.sub <- eff.v.sub
@@ -1402,15 +1651,15 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
-    
+
 
     ##-------------------------------##
-    ##           Storage 
-    ##-------------------------------##  
+    ##           Storage
+    ##-------------------------------##
 
     ##control group residuals
     out<-list(
-        ## main results 
+        ## main results
         sigma2 = est.best$sigma2,
         sigma2.fect = est.fect$sigma2,
         T.on = T.on,
@@ -1424,7 +1673,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         N = N,
         Ntr = Ntr,
         Nco = Nco,
-        p = p, 
+        p = p,
         D = D,
         Y = Y,
         X = X,
@@ -1435,10 +1684,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         est = est.best,
         method = method,
         mu = est.best$mu,
-        beta = beta, 
+        beta = beta,
         validX = validX,
         validF = validF,
-        niter = est.best$niter, 
+        niter = est.best$niter,
         time = time.on,
         att = att.on,
         count = count.on,
@@ -1448,14 +1697,31 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         calendar.enp = calendar.enp,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
+        avg.HTE = avg.HTE,
+        Val.HTE = Val.HTE,
+        N.HTE = N.HTE,
+        Ntr.HTE = Ntr.HTE,
+        #avg.HTE.fit = avg.HTE.fit,
+        #HTE.enp = HTE.enp,
+        #bootVal = bootVal,
+        #HTEcoef = HTEcoef,
         pre.sd = pre.sd,
         rmse = rmse,
         rmCV = rmCV,
         estCV = estCV,
-        res = est.best$res)
+        res = est.best$res,
+        # time.HTE = time.HTE.on,
+        # att.HTE = att.HTE.on,
+        # count.HTE = count.HTE.on
+        att.HTE = att.on.HTE,
+        time.HTE = time.on.HTE,
+        count.HTE = count.on.HTE,
+        DataType = DataType,
+        Nbins = Nbins
+    )
 
     if (hasRevs == 1) {
-        out <- c(out, list(time.off = time.off, 
+        out <- c(out, list(time.off = time.off,
                            att.off = att.off,
                            count.off = count.off,
                            eff.off = eff.off,
@@ -1485,7 +1751,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     if(!is.null(balance.period)){
-        out <- c(out, list(balance.att = balance.att, balance.time = balance.time,balance.count = balance.count,balance.avg.att = att.avg.balance))        
+        out <- c(out, list(balance.att = balance.att, balance.time = balance.time,balance.count = balance.count,balance.avg.att = att.avg.balance))
     }
 
     if (force == 1) {
@@ -1506,13 +1772,13 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             out <- c(out, list(factor = as.matrix(est.best$factor),
                                lambda = as.matrix(est.best$lambda),
                                lambda.tr = as.matrix(est.best$lambda[tr,]),
-                               lambda.co = as.matrix(est.best$lambda[co,]))) 
+                               lambda.co = as.matrix(est.best$lambda[co,])))
         }
     }
 
     if (method == "mc") {
         out <- c(out, list(lambda.cv = lambda.cv, lambda.seq = lambda,
-                           lambda.norm = lambda.cv / max(eigen.all), 
+                           lambda.norm = lambda.cv / max(eigen.all),
                            eigen.all = eigen.all))
     }
 
@@ -1529,7 +1795,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
         out <- c(out, list(group.att = group.att,
                            group.output = group.output))
     }
- 
+
     return(out)
 } ## cross-validation function ends
 

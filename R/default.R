@@ -1,4 +1,4 @@
-## Causal inference using counterfactual estimators 
+## Causal inference using counterfactual estimators
 ## (fect: fixed effects counterfactuals)
 ## Version 0.7.0
 ## Author: Licheng Liu (Tsinghua), Ye Wang(NYU), Yiqing Xu(Stanford), Ziyi Liu(Uchicago)
@@ -11,7 +11,7 @@
 ## DEPENDENT FUNCTIONS
 ## fect.fe() ## interactive fixed effects model
 ## fect.mc() ## matrix completion
-## fect.boot() ## bootstrap 
+## fect.boot() ## bootstrap
 
 ## fitness test
 ## fect.test ## wild bootstrap
@@ -30,7 +30,7 @@
 ## generic function
 fect <- function(formula = NULL, data, # a data frame (long-form)
                  Y, # outcome
-                 D, # treatment 
+                 D, # treatment
                  X = NULL, # time-varying covariates
                  W = NULL, # weight
                  group = NULL, # cohort
@@ -48,11 +48,10 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  cv.donut = 0, ## cv mspe
                  criterion = "mspe", # for ife model: mspe, pc or both
                  binary = FALSE, # probit model
-                 QR = FALSE, # QR or SVD for binary probit 
+                 QR = FALSE, # QR or SVD for binary probit
                  method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
                  se = FALSE, # report uncertainties
                  vartype = "bootstrap", # bootstrap or jackknife
-                 cl = NULL,
                  quantile.CI = FALSE,
                  nboots = 200, # number of bootstraps
                  alpha = 0.05, # significance level
@@ -78,10 +77,14 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  carryoverTest = FALSE, # carry-over test
                  carryover.period = NULL, # carry-over period
                  carryover.rm = NULL,
-                 loo = FALSE, # leave one period out placebo  
+                 loo = FALSE, # leave one period out placebo
                  permute = FALSE, ## permutation test
                  m = 2, ## block length
-                 normalize = FALSE # accelerate option
+                 normalize = FALSE, # accelerate option
+                 Moderator = NULL, #the variable needs heterogeneity estimation
+                 DataType = "discrete", #data type of moderator
+                 Nbins = NULL, #number of bins
+                 HTE.enp.seq = NULL #parameter used in loess fit estimation
                 ) {
     UseMethod("fect")
 }
@@ -91,7 +94,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
 fect.formula <- function(formula = NULL,
                          data, # a data frame (long-form)
                          Y, # outcome
-                         D, # treatment 
+                         D, # treatment
                          X = NULL, # time-varying covariates
                          W = NULL, # weights
                          group = NULL, # cohort
@@ -104,16 +107,15 @@ fect.formula <- function(formula = NULL,
                          CV = NULL, # cross-validation
                          k = 10, # times of CV
                          cv.prop = 0.1, ## proportion of CV counts
-                         cv.treat = FALSE, 
+                         cv.treat = FALSE,
                          cv.nobs = 3,
                          cv.donut = 0, ## cv mspe
                          criterion = "mspe", # for ife model: mspe, pc or both
                          binary = FALSE, # probit model
-                         QR = FALSE, # QR or SVD for binary probit 
+                         QR = FALSE, # QR or SVD for binary probit
                          method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
                          se = FALSE, # report uncertainties
                          vartype = "bootstrap", # bootstrap or jackknife
-                         cl = NULL,
                          quantile.CI = FALSE,
                          nboots = 200, # number of bootstraps
                          alpha = 0.05, # significance level
@@ -127,7 +129,7 @@ fect.formula <- function(formula = NULL,
                          proportion = 0.3,
                          pre.periods = NULL,
                          f.threshold = 0.5, # equiv
-                         tost.threshold = NULL, 
+                         tost.threshold = NULL,
                          knots = NULL,
                          degree = 2,   # wald = FALSE,
                          sfe = NULL,
@@ -142,7 +144,11 @@ fect.formula <- function(formula = NULL,
                          loo = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
-                         normalize = FALSE
+                         normalize = FALSE,
+                         Moderator = NULL, #the variable needs heterogeneity estimation
+                         DataType = "discrete", #the data type of moderator, "discrete" or "continuous"
+                         Nbins = NULL, #number of bins if the moderator is continuous
+                         HTE.enp.seq = NULL #parameter used in loess fit estimation
                         ) {
     ## parsing
     varnames <- all.vars(formula)
@@ -153,6 +159,7 @@ fect.formula <- function(formula = NULL,
     } else {
         Xname <- NULL
     }
+
 
     namesData <- colnames(data)
     for (i in 1:length(varnames)) {
@@ -170,66 +177,70 @@ fect.formula <- function(formula = NULL,
             if (sum(unique_y == c(0,1)) != 2) {
                 stop("Outcome should only contain 0 and 1.")
             }
-        } 
+        }
     }
 
     ## run the model
-    out <- fect.default(formula = NULL, 
-                        data = data, 
+    out <- fect.default(formula = NULL,
+                        data = data,
                         Y = Yname,
-                        D = Dname, 
-                        X = Xname, 
+                        D = Dname,
+                        X = Xname,
                         W = W,
                         group = group,
-                        na.rm = na.rm, 
+                        na.rm = na.rm,
                         balance.period = balance.period,
                         fill.missing = fill.missing,
-                        index = index, 
-                        force = force, 
-                        r = r, 
-                        lambda = lambda, 
-                        nlambda = nlambda, 
-                        CV =CV, 
-                        k = k, 
-                        cv.prop = cv.prop, 
-                        cv.treat = cv.treat, 
-                        cv.nobs = cv.nobs, 
+                        index = index,
+                        force = force,
+                        r = r,
+                        lambda = lambda,
+                        nlambda = nlambda,
+                        CV =CV,
+                        k = k,
+                        cv.prop = cv.prop,
+                        cv.treat = cv.treat,
+                        cv.nobs = cv.nobs,
                         cv.donut = cv.donut,
-                        criterion = criterion, 
-                        binary = binary, 
-                        QR = QR, 
-                        method = method, 
-                        se = se, 
+                        criterion = criterion,
+                        binary = binary,
+                        QR = QR,
+                        method = method,
+                        se = se,
                         vartype = vartype,
-                        cl = cl,
                         quantile.CI = quantile.CI,
-                        nboots = nboots, 
-                        alpha = alpha, 
-                        parallel = parallel, 
-                        cores = cores, 
-                        tol = tol, 
+                        nboots = nboots,
+                        alpha = alpha,
+                        parallel = parallel,
+                        cores = cores,
+                        tol = tol,
                         max.iteration = max.iteration,
-                        seed = seed, 
+                        seed = seed,
                         min.T0 = min.T0,
-                        max.missing = max.missing, 
-                        proportion = proportion, 
-                        pre.periods = pre.periods, 
-                        f.threshold = f.threshold, 
+                        max.missing = max.missing,
+                        proportion = proportion,
+                        pre.periods = pre.periods,
+                        f.threshold = f.threshold,
                         tost.threshold = tost.threshold,
-                        knots = knots, 
-                        degree = degree, 
+                        knots = knots,
+                        degree = degree,
                         sfe = sfe,
                         cfe = cfe,
-                        placebo.period = placebo.period, 
-                        placeboTest = placeboTest, 
-                        carryoverTest = carryoverTest, 
+                        placebo.period = placebo.period,
+                        placeboTest = placeboTest,
+                        carryoverTest = carryoverTest,
                         carryover.period = carryover.period,
                         carryover.rm = carryover.rm,
                         loo = loo,
-                        permute = permute, 
-                        m = m, 
-                        normalize = normalize)
-    
+                        permute = permute,
+                        m = m,
+                        normalize = normalize,
+                        Moderator = Moderator,
+                        DataType = DataType,
+                        Nbins = Nbins,
+                        HTE.enp.seq = HTE.enp.seq
+                        )
+
     out$call <- match.call()
     out$formula <- formula
     return(out)
@@ -241,7 +252,7 @@ fect.formula <- function(formula = NULL,
 
 fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          Y, # outcome
-                         D, # treatment 
+                         D, # treatment
                          X = NULL, # time-varying covariates
                          W = NULL, # weights
                          group = NULL, # cohort
@@ -250,20 +261,19 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          force = "two-way", # fixed effects demeaning
                          r = 0, # nubmer of factors
                          lambda = NULL, ## mc method: regularization parameter
-                         nlambda = 0, 
+                         nlambda = 0,
                          CV = NULL, # cross-validation
                          k = 10, # times of CV
                          cv.prop = 0.1,
-                         cv.treat = TRUE, 
+                         cv.treat = TRUE,
                          cv.nobs = 3,
                          cv.donut = 1, ## cv mspe
-                         criterion = "mspe", 
+                         criterion = "mspe",
                          binary = FALSE, # probit model
-                         QR = FALSE, # QR or SVD for binary probit 
+                         QR = FALSE, # QR or SVD for binary probit
                          method = "fe", # method: ife for interactive fe; mc for matrix completion
                          se = FALSE, # report uncertainties
                          vartype = "bootstrap", # bootstrap or jackknife
-                         cl = NULL,
                          quantile.CI = FALSE,
                          nboots = 200, # number of bootstraps
                          alpha = 0.05, # significance level
@@ -277,7 +287,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          proportion = 0.3,
                          pre.periods = NULL,
                          f.threshold = 0.5, # equiv
-                         tost.threshold = NULL, 
+                         tost.threshold = NULL,
                          knots = NULL,
                          degree = 2,  # wald = FALSE,
                          sfe = NULL,
@@ -288,20 +298,24 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          placebo.period = NULL, # placebo test period
                          carryoverTest = FALSE, # carry-over test
                          carryover.period = NULL, # carry-over period
-                         carryover.rm = NULL, 
+                         carryover.rm = NULL,
                          loo = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
-                         normalize = FALSE
-                        ) {  
-    
+                         normalize = FALSE,
+                         Moderator = NULL, #the variable needs heterogeneity estimation
+                         DataType = "discrete", #data type of moderator
+                         Nbins = NULL, #number of bins
+                         HTE.enp.seq = NULL #parameter used in loess fit estimation
+                        ) {
+
     ##-------------------------------##
     ## Checking Parameters
-    ##-------------------------------## 
-    placeboEquiv <- loo 
+    ##-------------------------------##
+    placeboEquiv <- loo
     permu.dimension <- 'time'
-                         
-    ## read data 
+
+    ## read data
     if (is.data.frame(data) == FALSE || length(class(data)) > 1) {
         data <- as.data.frame(data)
         ## warning("Not a data frame.")
@@ -334,7 +348,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             data <- data[which(data[,W]>0),]
         }
     }
-    
+
     ## check duplicated observations
     unique_label <- unique(paste(data[,index[1]],"_",data[,index[2]],sep=""))
     if (length(unique_label)!= dim(data)[1]) {
@@ -348,13 +362,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         force <- 1
     } else if (force == "time") { # force = 2 "time": time fixed-effect
         force <- 2
-    } else if (force == "two-way") { # force = 3 "two-way": two-way fixed-effect 
+    } else if (force == "two-way") { # force = 3 "two-way": two-way fixed-effect
         force <- 3
     }
-    
+
     if (!force %in% c(0, 1, 2, 3)) {
         stop("\"force\" option misspecified; choose from c(\"none\", \"unit\", \"time\", \"two-way\").")
-    } 
+    }
 
     ## binary
     if (binary == 1) {
@@ -390,7 +404,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             r <- 0
             CV <- FALSE
             method <- "ife"
-        } 
+        }
         else if (method %in% c("polynomial","cfe")) {
             CV <- FALSE
         }
@@ -415,14 +429,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             else if(length(lambda)>1 | is.null(lambda)){
                 CV <- TRUE
             }
-        }        
+        }
     }
     else{
         if (method == "fe") {
             r <- 0
             CV <- FALSE
             method <- "ife"
-        } 
+        }
         else if (method %in% c("polynomial","cfe")) {
             CV <- FALSE
         }
@@ -454,7 +468,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (method %in% c("mc", "both")) {
         if (!is.null(lambda)) {
             if (sum(lambda < 0) > 0) {
-                stop("\"lambda\" option misspecified. It must be non-negative.")    
+                stop("\"lambda\" option misspecified. It must be non-negative.")
             }
         }
         if (CV == FALSE & is.null(lambda)) {
@@ -462,9 +476,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             method <- "ife"
             r <- 0
         }
-    } 
+    }
 
-    ## leave one period out placebo 
+    ## leave one period out placebo
     if (placeboEquiv == TRUE) {
         if(se!=TRUE){
             message("For leave one period out placebo test, automatically set \"se\" to TRUE.")
@@ -485,9 +499,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     ## CV
-    
+
     if (CV == TRUE) {
-        
+
         if (placeboTest == TRUE) {
             stop("Placebo test cannot be performed while doing cross-validation.")
         }
@@ -500,13 +514,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             if (length(r) == 2 & r[1] > r[2]) {
                 stop("\"r\" option misspecified. The first element should be smaller than the second element in r().\n")
             }
-        } 
+        }
         if (method %in% c("mc", "both")) {
             if (nlambda <= 0) {
                 stop("\"nlambda\" option misspecified.\n")
             }
         }
-    } 
+    }
     else {
         if (! method %in% c("gsynth","ife", "mc", "polynomial","cfe")) {
             stop("\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"polynomial\").")
@@ -539,30 +553,30 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (length(r) == 1) {
         #if (r>=5) {
         #    r.end <- r
-        #} 
+        #}
         #else {
         #    r.end <- 5
         #}
         r.end <- r
-    } 
+    }
     else {
         r.end <- max(r)
         r <- min(r)
     }
-    
+
     ## uncertainty estimates
     if (is.logical(se) == FALSE & !se%in%c(0, 1)) {
         stop("\"se\" is not a logical flag.")
-    } 
+    }
 
     if (is.logical(quantile.CI) == FALSE & !quantile.CI%in%c(0, 1)) {
         stop("\"quantile.CI\" is not a logical flag.")
-    } 
+    }
 
     ## normalize
     if (is.logical(normalize) == FALSE & !normalize%in%c(0, 1)) {
         stop("\"normalize\" is not a logical flag.")
-    } 
+    }
 
     ## nboots
     if (se == TRUE & nboots <= 0) {
@@ -576,7 +590,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 stop("\"cores\" option misspecified. Try, for example, cores = 2.")
             }
         }
-    } 
+    }
 
     ## tol
     if (tol <= 0) {
@@ -612,24 +626,18 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             stop("\"group\" should not be used with \"balance.period\".\n")
         }
         if(!is.null(carryover.rm)){
-            stop("\"balance.period\" should not be used with \"carryover.rm\".\n")            
+            stop("\"balance.period\" should not be used with \"carryover.rm\".\n")
         }
         balance.periods <- c(balance.period[1]:balance.period[2])
         # treat the units with history balance.periods as a certain group
     }
 
-    # cohort 
+    # cohort
     if (!is.null(group)) {
         if (! group %in% names(data)) {
             stop("\"group\" misspecified.\n")
-        } 
-    } 
-
-    if (!is.null(cl)) {
-        if (! cl %in% names(data)) {
-            stop("\"cl\" misspecified.\n")
         }
-    } 
+    }
 
     if(method == 'cfe'){
         if(is.null(sfe) & is.null(cfe)){
@@ -648,8 +656,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 }
                 if(sub.sfe %in% index){
                     stop("\"sfe\" only contains additional fixed effects.\n")
-                }    
-            }            
+                }
+            }
         }
 
         if(!is.null(cfe)){
@@ -666,28 +674,28 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 if(sub.cfe[1] == index[1] & sub.cfe[2] %in% X){
                     stop(paste0("Should remove ",sub.cfe[2]," from X.\n"))
                 }
-            }            
+            }
         }
 
     }
 
     if(method != 'cfe'){
         if (!is.null(group)) {
-            data <- data[,unique(c(index, Y, D, X, W, group,cl))]
-        } 
+            data <- data[,c(index, Y, D, X, W, group)]
+        }
         else {
-            data <- data[,unique(c(index, Y, D, X, W, cl))] ## some variables may not be used
-        }        
+            data <- data[,c(index, Y, D, X, W)] ## some variables may not be used
+        }
     }
     else{
-        all.var <- unique(c(index,sfe,unlist(cfe),Y,D,X,W,group,cl))
+        all.var <- unique(c(index,sfe,unlist(cfe),Y,D,X,W,group))
         data <- data[,all.var]
     }
 
-    
+
     if (na.rm == TRUE) {
         data <- na.omit(data)
-    } 
+    }
     else{
         if(sum(is.na(data[,D]))>=1 | sum(is.na(data[,index[1]]))>=1  | sum(is.na(data[,index[2]]))>=1){
             stop("\"D\" or \"index\" should not have missing values when setting \"na.rm\" to FALSE.")
@@ -698,7 +706,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                     if(sum(is.na(data[,sub.sfe]))>=1){
                         stop("Variables in \"sfe\" should not have missing values when setting \"na.rm\" to FALSE.")
                     }
-                }                
+                }
             }
         }
     }
@@ -734,21 +742,23 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     ##-------------------------------##
     ## Parsing raw data
-    ##-------------------------------##  
+    ##-------------------------------##
 
     ## store data and variable names
     data.old <- data
     Yname <- Y
     Dname <- D
     Xname <- X
-    clname <- cl 
+    clname <- cl <- NULL
     Wname <- W
 
-    if (!is.null(clname)) {
-        if (!clname %in% index) {
-            data[, clname] <- as.numeric(as.factor(data[, clname]))
-        }
-    }
+    #if (!is.null(clname)) {
+    #    if (!clname %in% index) {
+    #        data[, clname] <- as.numeric(as.factor(data[, clname]))
+    #    }
+    #}
+    ##calculate HTEid
+    HTEid = which(Xname == Moderator)
 
     ## normalize
     norm.para <- NULL
@@ -762,7 +772,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (! class(data[, Dname]) %in% c("numeric", "integer")) {
         ## data[, Dname] <- as.numeric(as.character(data[, Dname]))
         stop("Treatment indicator should be a numeric value.")
-    } 
+    }
 
     ## check missingness
     #if (sum(is.na(data[, Yname])) > 0 & na.rm == TRUE) {
@@ -777,12 +787,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     if (class(data[, index[1]])[1] == "factor") {
         data[, index[1]] <- as.character(data[, index[1]])
-    } 
+    }
 
     if (class(data[, index[2]])[1] == "factor") {
         data[, index[2]] <- as.character(data[, index[2]])
-    } 
-    
+    }
+
     id <- index[1]
     time <- index[2]
     TT.old <- TT <- length(unique(data[,time]))
@@ -797,7 +807,45 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
+    # recode treatment status for osbervations exposed to carryover effects
+    hasCarryover <- 0
 
+    if (!is.null(carryover.rm)) {
+        if (length(carryover.rm) == 1 & class(carryover.rm)[1] == "numeric") {
+            if (carryover.rm > 0) {
+                newT <- as.numeric(as.factor(data[, time]))
+                data <- data[order(data[, id], data[, time]),]
+                tempID <- unique(data[, id])
+                for (i in tempID) {
+                    subpos <- which(data[, id] == i)
+                    subtime <- newT[subpos]
+                    subd <- data[subpos, Dname]
+                    if (sum(subd) >= 1) {
+                        tr.time <- subtime[which(subd == 1)]
+                        cr.time <- c() # carryover period
+                        for (k in 1:carryover.rm) {
+                          cr.time <- c(cr.time, tr.time + k)
+                        }
+                        # note: if a period has both treatment effect and carryover effect,
+                        # regard carryover effect as 0
+                        cr.time <- unique(cr.time)
+                        cr.time <- setdiff(cr.time, tr.time)
+
+                        cr.pos <- subpos[which(subtime %in% cr.time)]
+
+                        if (length(cr.pos) > 0) {
+                          data[cr.pos, Dname] <- 2
+                        }
+
+                    }
+                }
+
+            }
+        }
+    }
+    if (2 %in% data[, Dname]) {
+        hasCarryover <- 1
+    }
 
 
 
@@ -835,7 +883,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
         else{
             rm.na.time <- NULL
-        }        
+        }
         # here the size of data.full should be smaller than TT*N, larger than length(data)
     }
 
@@ -850,14 +898,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if(!is.null(sfe)){
             for(sub.sfe in sfe){
                 data[,sub.sfe] <- as.numeric(as.factor(data[,sub.sfe]))
-            }        
+            }
         }
 
         if(!is.null(cfe)){
             for(sub.cfe in cfe){
                 data[,sub.cfe[1]] <- as.numeric(as.factor(data[,sub.cfe[1]]))
-            }        
-        }        
+            }
+        }
     }
 
     ## gen group matrix
@@ -870,7 +918,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
 
     ##message("\nOK1\n")
-    
+
 
 
 
@@ -883,55 +931,50 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             if(force %in% c(1,3)){
                 if (sum(tapply(data[, Xname[i]], data[, id], var), na.rm = TRUE) == 0) {
                     stop(paste("Variable \"",Xname[i], "\" is unit-invariant. Try to remove it.", sep = ""))
-                }                
+                }
             }
             if(force %in% c(2,3)){
                 if (sum(tapply(data[, Xname[i]], data[, time], var), na.rm = TRUE) == 0) {
                     stop(paste("Variable \"",Xname[i], "\" is time-invariant. Try to remove it.", sep = ""))
-                }                
+                }
             }
         }
     }
 
-    ## check index 
+    ## check index
     if (sum(is.na(data[, id])) > 0) {
         stop(paste("Missing values in variable \"", id,"\".", sep = ""))
     }
     if (sum(is.na(data[, time])) > 0) {
         stop(paste("Missing values in variable \"", time,"\".", sep = ""))
-    } 
+    }
 
     ## check balanced panel and fill unbalanced panel
     if (dim(data)[1] < TT*N) {
-        
+
         data[,time] <- as.numeric(as.factor(data[,time]))
-        data[,id] <- as.numeric(as.factor(data[,id]))
 
         ob.indicator <- data[,time]
         id.indicator <- table(data[, id])
         sub.start <- 1
-        for (i in 1:(N - 1)) { 
-            sub.start <- sub.start + id.indicator[i] 
-            sub.end <- sub.start + id.indicator[i+1] - 1 
+        for (i in 1:(N - 1)) {
+            sub.start <- sub.start + id.indicator[i]
+            sub.end <- sub.start + id.indicator[i+1] - 1
             ob.indicator[sub.start:sub.end] <- ob.indicator[sub.start:sub.end] + i * TT
         }
 
-        variable <- c(Yname, Dname, Xname, id, time)
-        
+        variable <- c(Yname, Dname, Xname)
+
         if(!is.null(group)) {
-            variable <- c(variable, group)
+            variable <- c(Yname, Dname, Xname, group)
         }
 
         if(!is.null(W)){
             variable <- c(variable, Wname)
-        }
 
+        }
         if(method == 'cfe'){
             variable <- unique(c(sfe,unlist(cfe),variable))
-        }
-
-        if(!is.null(cl)){
-            variable <- unique(c(variable,cl))
         }
 
         data_I <- matrix(0, N * TT, 1)
@@ -939,7 +982,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         data_ub <- as.matrix(data[, variable])
         data <- data_ub_adj(data_I, data_ub)
         colnames(data) <- variable
-   
         ## data is a TT*N matrix filled with observed pairs (Y/X, D).
 
         ## if these exists observations whose Y/X is missing but D is observed.
@@ -948,9 +990,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             ob.indicator.full <- data.full[,time]
             id.indicator.full <- table(data.full[, id])
             sub.start <- 1
-            for (i in 1:(N - 1)) { 
-                sub.start <- sub.start + id.indicator.full[i] 
-                sub.end <- sub.start + id.indicator.full[i+1] - 1 
+            for (i in 1:(N - 1)) {
+                sub.start <- sub.start + id.indicator.full[i]
+                sub.end <- sub.start + id.indicator.full[i+1] - 1
                 ob.indicator.full[sub.start:sub.end] <- ob.indicator.full[sub.start:sub.end] + i * TT
             }
             data_I.full <- matrix(0, N * TT, 1)
@@ -963,61 +1005,20 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
-    # recode treatment status for osbervations exposed to carryover effects 
-    hasCarryover <- 0
-
-    if (!is.null(carryover.rm)) {
-        if (length(carryover.rm) == 1 & class(carryover.rm)[1] == "numeric") {
-            if (carryover.rm > 0) {
-                #print(colnames(data))
-                newT <- c(1:TT)
-                data <- data[order(data[, id], data[, time]),]
-                tempID <- unique(data[, id])
-                for (i in tempID) {
-                    subpos <- which(data[, id] == i)
-                    subtime <- newT[subpos]
-                    subd <- data[subpos, Dname]
-                    if (sum(subd) >= 1) {
-                        tr.time <- subtime[which(subd == 1)]
-                        cr.time <- c() # carryover period
-                        for (k in 1:carryover.rm) {
-                          cr.time <- c(cr.time, tr.time + k)
-                        }
-                        # note: if a period has both treatment effect and carryover effect, 
-                        # regard carryover effect as 0
-                        cr.time <- unique(cr.time)
-                        cr.time <- setdiff(cr.time, tr.time) 
-
-                        cr.pos <- subpos[which(subtime %in% cr.time)]
-                        
-                        if (length(cr.pos) > 0) {
-                          data[cr.pos, Dname] <- 2
-                        }
-                        
-                    }
-                }
-
-            }
-        }
-    }
-    if (2 %in% data[, Dname]) {
-        hasCarryover <- 1
-    }
-
-    ## indicator matrix: index matrix that indicates if data is observed 
+    ## indicator matrix: index matrix that indicates if data is observed
     I.D <- I <- matrix(1, TT, N)
     Y.ind <- matrix(data[, Yname], TT, N)
     D.ind <- matrix(data[, Dname],TT,N)
     I[is.nan(Y.ind)] <- 0
     I.D[is.nan(D.ind)] <- 0
-    ## I has more zeros than I.D 
+    ## I has more zeros than I.D
     ## I.D is used in the function get_term
 
     if (0%in%I) {
         data[is.nan(data)] <- 0
     }
 
-    ## group indicator 
+    ## group indicator
     G.old <- G <- NULL
     if (!is.null(group)) {
         G <- matrix(data[, group], TT, N)
@@ -1036,18 +1037,11 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         G.old <- G
     }
 
+
     if(!is.null(W)){
         W <- matrix(data[, Wname], TT, N)
     }
 
-    if(!is.null(cl)){
-        cl <- matrix(data[, clname], TT, N)
-        # for each column, replace 0 with the mean of non-zero values
-        cl <- apply(cl, 2, function(column) {
-                                    column[column == 0] <- mean(column[column != 0])
-                                    return(column)})
-    }
-    
     ## each unit should have the same group index
 
     ## message("\nOK2\n")
@@ -1062,7 +1056,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (p > 0) {
         for (i in 1:p) {
             X[,,i] <- matrix(data[, Xname[i]], TT, N)
-        } 
+        }
     }
 
     index.matrix <- list()
@@ -1072,7 +1066,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 data[,sub.sfe] <- as.numeric(as.factor(data[,sub.sfe]))
                 sub.sfe.matrix <- matrix(data[,sub.sfe], TT, N)
                 index.matrix[[sub.sfe]] <- sub.sfe.matrix
-            }        
+            }
         }
 
         if(!is.null(cfe)){
@@ -1081,8 +1075,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 index.matrix[[sub.cfe[1]]] <- sub.cfe.matrix
                 sub.cfe.matrix <- matrix(data[,sub.cfe[2]], TT, N)
                 index.matrix[[sub.cfe[2]]] <- sub.cfe.matrix
-            }        
-        }        
+            }
+        }
     }
 
 
@@ -1097,18 +1091,18 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     if (sum(T0[which(apply(D, 2, sum) > 0)] >= min.T0) == 0) {
         stop ("All treated units have been removed. Please specify a smaller min.T0.\n")
-    }   
-    ## T0.min : minimum T0  
+    }
+    ## T0.min : minimum T0
     ## min.T0: manually set
-    ## rm.tr.id: relative location of treated units (within all treated units) 
-    ## that will be removed 
+    ## rm.tr.id: relative location of treated units (within all treated units)
+    ## that will be removed
     if (T0.min < min.T0) {
         message(paste0("For identification purposes, units whose number of untreated periods <",min.T0," are dropped automatically.\n"))
     }
 
     rm.id <- sort(unique(c(which((TT - apply(I, 2, sum)) > max.missing), which(T0 < min.T0))))
     ## rm.id <- which(T0 < min.T0) ## removed id
-    ## rem.id <- which(T0 >= min.T0) ## remaining id  
+    ## rem.id <- which(T0 >= min.T0) ## remaining id
     rem.id <- setdiff(1:N, rm.id)
 
     if (length(rm.id) == N) {
@@ -1123,7 +1117,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 subX <- X.old[, , i]
                 X[, , i] <- as.matrix(subX[, -rm.id])
             }
-        } 
+        }
         else {
             X <- array(0,dim = c(TT, (N - length(rm.id)), 0))
         }
@@ -1137,9 +1131,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if (!is.null(group)) {
             G <- as.matrix(G[,-rm.id])
         }
-        if (!is.null(cl)) {
-            cl <- as.matrix(cl[,-rm.id])
-        }
         if (!is.null(W)) {
             W <- as.matrix(W[,-rm.id])
         }
@@ -1150,10 +1141,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
-    ## message("\nOK1\n")  
+    ## message("\nOK1\n")
 
     ## 2. check if some periods when all units are missing or treated
-    I.use <- apply(II, 1, sum) 
+    I.use <- apply(II, 1, sum)
     if (0%in%I.use) {
         for (i in 1:TT) {
             if (I.use[i] == 0) {
@@ -1165,10 +1156,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
         TT <- TT - sum(I.use == 0)
         time.uni <- time.uni[-which(I.use == 0)]
-        
+
         I <- I[-which(I.use == 0),] ## remove that period
         I.D <- I.D[-which(I.use == 0),]
-        II <- II[-which(I.use == 0),] ## remove that period        
+        II <- II[-which(I.use == 0),] ## remove that period
         D <- D[-which(I.use == 0),] ## remove that period
         Y <- Y[-which(I.use == 0),] ## remove that period
 
@@ -1178,10 +1169,6 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         if (!is.null(W)) {
             W <- W[-which(I.use == 0),]
-        }
-
-        if (!is.null(cl)) {
-            cl <- cl[-which(I.use == 0),]
         }
 
         if(method == "cfe"){
@@ -1202,7 +1189,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
-    ## message("\nOK2\n")  
+    ## message("\nOK2\n")
 
     ## 3. relative period
     T.on <- matrix(NA, TT, (N - length(rm.id)))
@@ -1212,27 +1199,27 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         for (i in 1:(N - length(rm.id))) {
             T.on[, i] <-  get_term(D[, i], I.D[, i], type = "on")
         }
-    } 
+    }
     else {
-        # separate T.on and T.on.carry 
-        D1 <- D2 <- D 
-        D1[which(D1 == 2)] <- 0 
+        # separate T.on and T.on.carry
+        D1 <- D2 <- D
+        D1[which(D1 == 2)] <- 0
         D2[which(D2 == 1)] <- 0
-        D2[which(D2 == 2)] <- 1 
-
+        D2[which(D2 == 2)] <- 1
         T.on.carry <- matrix(NA, TT, (N - length(rm.id)))
-        
+
         for (i in 1:(N - length(rm.id))) {
             T.on[, i] <-  get_term(D1[, i], I.D[, i], type = "on")
             T.on.carry[, i] <-  get_term(D2[, i], I.D[, i], type = "on")
         }
-        T.on[which(D == 2)] <- NA ## remove carryover effect 
-        T.on.carry[which(T.on.carry <= 0)] <- NA ## only keep carryover effect 
+        T.on[which(D == 2)] <- NA ## remove carryover effect
+        T.on.carry[which(T.on.carry <= 0)] <- NA ## only keep carryover effect
+
     }
     rm(D1, D2)
     calendar.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
 
-    ##3.1 balance samples     
+    ##3.1 balance samples
     ## for balance group, add group indicator
     T.on.balance <- matrix(NA, TT, (N - length(rm.id)))
     if(!is.null(balance.period)){
@@ -1244,13 +1231,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if(fill.missing == TRUE){
             T.on.balance <- apply(T.on,2,function(x) v_replace(balance.periods,x))
         }
-        if(sum(!is.na(T.on.balance))==0){ 
+        if(sum(!is.na(T.on.balance))==0){
             stop("No Balanced Sample Found.\n")
         }
     }
-    
+
     ## 4. check reversals
-    D1 <- D 
+    D1 <- D
     if (hasCarryover == 1) {
         D1[which(D == 2)] <- 1
     }
@@ -1269,7 +1256,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     ## 5. switch-off periods
     T.off <- NULL
     if (hasRevs == 1) {
-        T.off <- matrix(NA, TT, (N - length(rm.id))) 
+        T.off <- matrix(NA, TT, (N - length(rm.id)))
         for (i in 1:(N - length(rm.id))) {
             T.off[, i] <-  get_term(D1[,i], I.D[,i], type = "off")
         }
@@ -1292,10 +1279,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         if (sum(T0.2[which(apply(D, 2, sum) > 0)] >= min.T0) == 0) {
             stop ("All treated units have been removed in placebo test.\n")
-        } 
+        }
 
         rm.id.2.pos <- sort(which(T0.2 < min.T0))
-        rm.id.2 <- rem.id[rm.id.2.pos] 
+        rm.id.2 <- rem.id[rm.id.2.pos]
         rem.id.2 <- setdiff(rem.id, rm.id.2)
 
         rem.id <- rem.id.2
@@ -1325,7 +1312,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 T.on.carry <- as.matrix(T.on.carry[, -rm.id.2.pos])
             }
             if(hasRevs){
-                T.off <- as.matrix(T.off[,-rm.id.2.pos])                
+                T.off <- as.matrix(T.off[,-rm.id.2.pos])
             }
             if (!is.null(group)) {
                 G <- as.matrix(G[,-rm.id.2.pos])
@@ -1333,19 +1320,15 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             if (!is.null(W)) {
                 W <- as.matrix(W[,-rm.id.2.pos])
             }
-            if (!is.null(cl)) {
-                cl <- as.matrix(cl[,-rm.id.2.pos])
-            }
-            
             if(method == "cfe"){
                 for(ind.name in names(index.matrix)){
                     index.matrix[[ind.name]] <- as.matrix(index.matrix[[ind.name]][,-rm.id.2.pos])
                 }
             }
-        }  
+        }
     }
 
-    ## 7. Carryover Test 
+    ## 7. Carryover Test
     ## testcarryover.period = c(1,3)
     if(hasRevs == 1 & carryoverTest==TRUE & is.null(carryover.period)==FALSE){
         II.origin <- II
@@ -1361,10 +1344,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         if (sum(T0.3[which(apply(D, 2, sum) > 0)] >= min.T0) == 0) {
             stop ("All treated units have been removed in carryover test.\n")
-        } 
+        }
 
         rm.id.3.pos <- sort(which(T0.3 < min.T0))
-        rm.id.3 <- rem.id[rm.id.3.pos] 
+        rm.id.3 <- rem.id[rm.id.3.pos]
         rem.id.3 <- setdiff(rem.id, rm.id.3)
 
         rem.id <- rem.id.3
@@ -1394,16 +1377,13 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 T.on.carry <- as.matrix(T.on.carry[, -rm.id.3.pos])
             }
             if(hasRevs){
-                T.off <- as.matrix(T.off[,-rm.id.3.pos])                
+                T.off <- as.matrix(T.off[,-rm.id.3.pos])
             }
             if (!is.null(group)) {
                 G <- as.matrix(G[,-rm.id.3.pos])
             }
             if (!is.null(W)) {
                 W <- as.matrix(W[,-rm.id.3.pos])
-            }
-            if (!is.null(cl)) {
-                cl <- as.matrix(cl[,-rm.id.3.pos])
             }
             if(method == "cfe"){
                 for(ind.name in names(index.matrix)){
@@ -1413,21 +1393,21 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
     }
 
-    ## recover treatment indicators 
+    ## recover treatment indicators
     D.pos <- NULL
-    ##DD <- D 
+    ##DD <- D
     if (hasCarryover) {
-        D.pos <- which(D == 2) 
+        D.pos <- which(D == 2)
         if (length(D.pos) > 0) {
-            D[D.pos] <- 0 
-        } 
+            D[D.pos] <- 0
+        }
     }
 
-    ## 8. Finally, check enough observations 
+    ## 8. Finally, check enough observations
     if (min(apply(II, 1, sum)) == 0) {
         if (placeboTest == 1) {
             stop("Some periods do not have any observations. Please set a smaller range for placebo period.")
-        } 
+        }
         else if(carryoverTest == 1) {
             stop("Some periods do not have any observations. Please set a smaller range for carryover period.")
         }
@@ -1439,7 +1419,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (min(apply(II, 2, sum)) == 0) {
        if (placeboTest == 1) {
             stop("Some units do not have any observations. Please set a smaller range for placebo period.")
-        } 
+        }
         else if(carryoverTest == 1) {
             stop("Some units do not have any observations. Please set a smaller range for carryover period.")
         }
@@ -1464,9 +1444,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         ## set seed
         if (is.null(seed) == FALSE) {
             set.seed(seed+1)
-        } 
+        }
     }
-    
+
     if ((se == TRUE | permute == TRUE) & parallel==TRUE) {
         ## set seed
         if (is.null(seed) == FALSE) {
@@ -1482,110 +1462,112 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
         message("Parallel computing ...\n")
     }
-    
+
     ##-------------------------------##
     ## run main program
-    ##-------------------------------## 
+    ##-------------------------------##
     if (se == FALSE) {
-        
-        if (CV == TRUE) { 
+
+        if (CV == TRUE) {
             if (binary == FALSE) {
                 out <- fect.cv(Y = Y, D = D, X = X, W = W,
-                               I = I, II = II, 
-                               T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, 
-                               T.on.balance = T.on.balance, 
+                               I = I, II = II,
+                               T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
+                               T.on.balance = T.on.balance,
                                balance.period = balance.period,
                                method = method,
                                criterion = criterion,
                                k = k, cv.prop = cv.prop,
                                cv.treat = cv.treat,
-                               cv.nobs = cv.nobs, 
+                               cv.nobs = cv.nobs,
                                cv.donut = cv.donut,
                                min.T0 = min.T0,
                                r = r, r.end = r.end,
-                               proportion = proportion, 
+                               proportion = proportion,
                                nlambda = nlambda, lambda = lambda,
-                               force = force, hasRevs = hasRevs, 
-                               tol = tol, max.iteration = max.iteration, norm.para = norm.para, 
-                               group.level = g.level, group = G)
-            } 
+                               force = force, hasRevs = hasRevs,
+                               tol = tol, max.iteration = max.iteration, norm.para = norm.para,
+                               group.level = g.level, group = G,
+                               HTEid = HTEid, DataType = DataType, Nbins = Nbins, HTE.enp.seq = HTE.enp.seq)
+            }
             else {
-                out <- fect.binary.cv(Y = Y, D = D, X = X, 
-                                      I = I, II = II, 
-                                      T.on = T.on, T.off = T.off, 
+                out <- fect.binary.cv(Y = Y, D = D, X = X,
+                                      I = I, II = II,
+                                      T.on = T.on, T.off = T.off,
                                       k = k, cv.prop = cv.prop,
-                                      cv.treat = cv.treat, 
+                                      cv.treat = cv.treat,
                                       cv.nobs = cv.nobs,
-                                      r = r, r.end = r.end, 
-                                      QR = QR, force = force, 
+                                      r = r, r.end = r.end,
+                                      QR = QR, force = force,
                                       hasRevs = hasRevs, tol = tol,
                                       group.level = g.level, group = G)
             }
-            
-        } 
+
+        }
         else { ## non-binary case
             if (method == "ife") {
-                out <- fect.fe(Y = Y, D = D, X = X, 
+                out <- fect.fe(Y = Y, D = D, X = X,
                                W = W, I = I, II = II,
-                               T.on = T.on, T.off = T.off, r.cv = r, T.on.carry = T.on.carry, 
-                               T.on.balance = T.on.balance, 
+                               T.on = T.on, T.off = T.off, r.cv = r, T.on.carry = T.on.carry,
+                               T.on.balance = T.on.balance,
                                balance.period = balance.period,
                                binary = binary, QR = QR,
-                               force = force, hasRevs = hasRevs, 
+                               force = force, hasRevs = hasRevs,
                                tol = tol , max.iteration = max.iteration,  boot = 0,
                                norm.para = norm.para,
-                               placeboTest = placeboTest, 
+                               placeboTest = placeboTest,
+                               placebo.period = placebo.period,
+                               carryoverTest = carryoverTest,
+                               carryover.period = carryover.period,
+                               group.level = g.level, group = G,
+                               HTEid = HTEid, DataType = DataType, Nbins = Nbins, HTE.enp.seq = HTE.enp.seq)
+            }
+            else if(method == "gsynth"){
+                out <- fect.gsynth(Y = Y, D = D, X = X,
+                                   W = W, I = I, II = II,
+                                   T.on = T.on, T.off = T.off, r = r, CV = 0,
+                                   T.on.balance = T.on.balance,
+                                   balance.period = balance.period,
+                                   binary = binary, QR = QR,
+                                   force = force, hasRevs = hasRevs,
+                                   tol = tol , max.iteration = max.iteration, boot = 0,
+                                   norm.para = norm.para,
+                                   placeboTest = placeboTest,
+                                   placebo.period = placebo.period,
+                                   carryoverTest = carryoverTest,
+                                   carryover.period = carryover.period,
+                                   group.level = g.level, group = G)
+            }
+            else if (method == "mc") {
+                out <- fect.mc(Y = Y, D = D, X = X,
+                               W = W, I = I, II = II,
+                               T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
+                               T.on.balance = T.on.balance,
+                               balance.period = balance.period,
+                               lambda.cv = lambda,
+                               force = force, hasRevs = hasRevs,
+                               tol = tol , max.iteration = max.iteration, boot = 0,
+                               norm.para = norm.para,
+                               placeboTest = placeboTest,
                                placebo.period = placebo.period,
                                carryoverTest = carryoverTest,
                                carryover.period = carryover.period,
                                group.level = g.level, group = G)
             }
-            else if(method == "gsynth"){
-                out <- fect.gsynth(Y = Y, D = D, X = X, 
-                                   W = W, I = I, II = II,
-                                   T.on = T.on, T.off = T.off, r = r, CV = 0, 
-                                   T.on.balance = T.on.balance, 
-                                   balance.period = balance.period,
-                                   binary = binary, QR = QR,
-                                   force = force, hasRevs = hasRevs, 
-                                   tol = tol , max.iteration = max.iteration, boot = 0,
-                                   norm.para = norm.para,
-                                   placeboTest = placeboTest, 
-                                   placebo.period = placebo.period,
-                                   carryoverTest = carryoverTest,
-                                   carryover.period = carryover.period,
-                                   group.level = g.level, group = G)               
-            } 
-            else if (method == "mc") {
-                out <- fect.mc(Y = Y, D = D, X = X, 
-                               W = W, I = I, II = II,
-                               T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, 
-                               T.on.balance = T.on.balance, 
-                               balance.period = balance.period,
-                               lambda.cv = lambda,
-                               force = force, hasRevs = hasRevs, 
-                               tol = tol , max.iteration = max.iteration, boot = 0,
-                               norm.para = norm.para,
-                               placeboTest = placeboTest, 
-                               placebo.period = placebo.period,
-                               carryoverTest = carryoverTest,
-                               carryover.period = carryover.period,
-                               group.level = g.level, group = G)
-            } 
             else if (method %in% c("polynomial",  "cfe")) {
-                out <- fect.polynomial(Y = Y, D = D, X = X, 
-                                       W = W, I = I, II = II, 
-                                       T.on = T.on, T.on.carry = T.on.carry, 
-                                       T.on.balance = T.on.balance, 
+                out <- fect.polynomial(Y = Y, D = D, X = X,
+                                       W = W, I = I, II = II,
+                                       T.on = T.on, T.on.carry = T.on.carry,
+                                       T.on.balance = T.on.balance,
                                        balance.period = balance.period,
                                        T.off = T.off, method = method,
                                        degree = degree,
                                        sfe = sfe, cfe = cfe,
                                        ind.matrix = index.matrix,
-                                       knots = knots, force = force, 
-                                       hasRevs = hasRevs, tol = tol , max.iteration = max.iteration, boot = 0, 
+                                       knots = knots, force = force,
+                                       hasRevs = hasRevs, tol = tol , max.iteration = max.iteration, boot = 0,
                                        placeboTest = placeboTest,
-                                       placebo.period = placebo.period, 
+                                       placebo.period = placebo.period,
                                        carryoverTest = carryoverTest,
                                        carryover.period = carryover.period,
                                        norm.para = norm.para,
@@ -1602,14 +1584,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 I <- out$I
                 II <- out$II
             }
-                
+
         }
-    } 
+    }
     else { # SE == TRUE
-        
-        out <- fect.boot(Y = Y, D = D, X = X, 
+
+        out <- fect.boot(Y = Y, D = D, X = X,
                          W = W, I = I, II = II,
-                         T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, cl = cl,
+                         T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, cl = NULL,
                          T.on.balance = T.on.balance, balance.period = balance.period,
                          method = method, degree = degree,
                          sfe = sfe, cfe = cfe,
@@ -1617,25 +1599,26 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          knots = knots, criterion = criterion,
                          CV = CV, k = k, cv.prop = cv.prop,
                          cv.treat = cv.treat, cv.nobs = cv.nobs,
-                         r = r, r.end = r.end, 
+                         r = r, r.end = r.end,
                          nlambda = nlambda, lambda = lambda,
                          alpha = alpha, binary = binary, QR = QR,
                          force = force, hasRevs = hasRevs,
                          tol = tol , max.iteration = max.iteration, norm.para = norm.para,
-                         placeboTest = placeboTest, 
+                         placeboTest = placeboTest,
                          placebo.period = placebo.period,
                          carryoverTest = carryoverTest,
                          carryover.period = carryover.period,
                          vartype = vartype,
                          quantile.CI = quantile.CI,
                          nboots = nboots, parallel = parallel,
-                         cores = cores, group.level = g.level, group = G)
+                         cores = cores, group.level = g.level, group = G,
+                         HTEid = HTEid, DataType = DataType, Nbins = Nbins, HTE.enp.seq = HTE.enp.seq)
 
         if(method %in% c("polynomial",  "cfe")){
             I <- out$I
             II <- out$II
         }
-    
+
     }
 
 
@@ -1649,26 +1632,28 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     N_bar <- NULL
     ## leave one period out placebo test for pre-treatment periods
 
-    if (is.null(proportion)==TRUE) {
-        proportion <- 0    
-    }
-    max.count <- max(out$count)
-    
-    max.pre.periods <- out$time[which(out$count >= max.count * proportion & out$time <= 0)]
-    all.pre.periods <- out$time[which(out$time <= 0)]
-    if (is.null(pre.periods) == TRUE) {        
-        pre.periods <- max.pre.periods     
-    } 
-    else {
-        pre.periods <- intersect(pre.periods[1]:pre.periods[length(pre.periods)], max.pre.periods)
-    }   
-    pre.term <- pre.periods
-    N_bar <- max(out$count[which(out$time %in% pre.periods)])
-      
+    # if (is.null(proportion)==TRUE) {
+    #     proportion <- 0
+    # }
+    # max.count <- max(out$count)
+    # max.pre.periods <- out$time[which(out$count >= max.count * proportion & out$time <= 0)]
+    # print(max.pre.periods)
+    # if (is.null(pre.periods) == TRUE) {
+    #     pre.periods <- max.pre.periods
+    # }
+    # # else {
+    # #   print(pre.periods)
+    # #   if (length(pre.periods) > 0){
+    # #     pre.periods <- intersect(pre.periods[1]:pre.periods[length(pre.periods)], max.pre.periods)
+    # #   }
+    # # }
+    # pre.term <- pre.periods
+    # N_bar <- max(out$count[which(out$time %in% pre.periods)])
+
     if (placeboEquiv == TRUE) {
-        pre.term <- all.pre.periods
-        r.cv <- out$r.cv 
-        lambda.cv <- out$lambda.cv 
+
+        r.cv <- out$r.cv
+        lambda.cv <- out$lambda.cv
         method <- out$method
         if (method == "fe") {
             method <- "ife"
@@ -1680,9 +1665,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         #} else {
         #    pre.term.bound <- sort(placebo.period)
         #    pre.term <- pre.term.bound[1]:pre.term.bound[length(pre.term.bound)]
-        #} 
+        #}
 
-        placebo.period <- pre.term[1]:pre.term[length(pre.term)] 
+        placebo.period <- pre.term[1]:pre.term[length(pre.term)]
 
         pre.est.att <- matrix(NA, length(pre.term), 6)
         pre.att.bound <- matrix(NA, length(pre.term), 2)
@@ -1722,14 +1707,14 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         pre.term <- sort(pre.term, decreasing = TRUE)
 
         for (kk in pre.term) {
-            
+
             placebo.pos <- which(T.on == kk)
 
-            pX <- X 
-            pY <- Y 
-            pD <- D 
-            pI <- I 
-            pII <- II 
+            pX <- X
+            pY <- Y
+            pD <- D
+            pI <- I
+            pII <- II
             pT.on <- T.on
             pT.off <- T.off
             pG <- G
@@ -1746,7 +1731,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 message(paste("All treated units have been removed for period ", kk, sep = ""))
                 message("\n")
                 jj <- jj - 1
-            
+
             } else {
 
                 te <- paste("Pre-period ", kk, sep = "")
@@ -1759,12 +1744,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
                 rem.id.new <- rem.id
                 rm.id.2.pos <- sort(which(T0.2 < min.T0))
-                rm.id.2 <- rem.id.new[rm.id.2.pos] 
+                rm.id.2 <- rem.id.new[rm.id.2.pos]
                 rem.id.2 <- setdiff(rem.id.new, rm.id.2)
 
                 rem.id.new <- rem.id.2
                 rm.id.new <- setdiff(1:N, rem.id.new)
-                 
+
                 if (length(rm.id.2) > 0) {
                     X.old <- pX
                     if (p > 0) {
@@ -1783,9 +1768,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                     pI <- as.matrix(I[,-rm.id.2.pos]) ## after removing
                     pII <- as.matrix(II[,-rm.id.2.pos])
                     pT.on <- as.matrix(T.on[,-rm.id.2.pos])
-                    if (!is.null(cl)) {
-                        p.cl <- cl[-rm.id.2.pos]
-                    }
+                    #if (!is.null(cl)) {
+                    #    cl <- cl[-rm.id.2.pos]
+                    #}
                     if(hasRevs){
                         pT.off <- as.matrix(T.off[,-rm.id.2.pos])
                     }
@@ -1801,31 +1786,31 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                     }
                 }
 
-          
-                p.out <- fect.boot(Y = pY, D = pD, X = pX, 
+
+                p.out <- fect.boot(Y = pY, D = pD, X = pX,
                              W = pW, I = pI, II = pII,
-                             T.on = pT.on, T.off = pT.off, cl = p.cl,T.on.carry = T.on.carry, 
+                             T.on = pT.on, T.off = pT.off, cl = NULL,T.on.carry = T.on.carry,
                              method = method, degree = degree,
                              knots = knots, criterion = criterion,
                              CV = 0, k = k, cv.prop = cv.prop,
                              cv.treat = cv.treat, cv.nobs = cv.nobs,
-                             r = r.cv, r.end = r.end, 
+                             r = r.cv, r.end = r.end,
                              nlambda = nlambda, lambda = lambda.cv,
                              alpha = alpha, binary = binary, QR = QR,
                              force = force, hasRevs = 0,
                              tol = tol , max.iteration = max.iteration, norm.para = norm.para,
-                             placeboTest = 0, 
+                             placeboTest = 0,
                              placebo.period = NULL,
                              carryoverTest = 0,
                              carryover.period = NULL,
                              vartype = vartype,
                              nboots = nboots, parallel = parallel,
                              quantile.CI = quantile.CI,
-                             cores = cores, group.level = g.level, group = pG, 
+                             cores = cores, group.level = g.level, group = pG,
                              dis = FALSE)
 
-                p.est.att <- p.out$est.att 
-                p.att.bound <- p.out$att.bound 
+                p.est.att <- p.out$est.att
+                p.att.bound <- p.out$att.bound
                 p.pos <- which(as.numeric(rownames(p.est.att)) == kk)
 
                 pre.est.att[jj, ] <- p.est.att[p.pos, ]
@@ -1845,7 +1830,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                             if(length(p.pos.sub)==1){
                                 pre.est.att.group[[group.name]][pre.period.name,] <- p.est.att.sub[p.pos.sub,]
                                 pre.att.bound.group[[group.name]][pre.period.name,] <- p.att.bound.sub[p.pos.sub,]
-                                pre.att.boot.group[[group.name]][pre.period.name,] <- p.att.boot.sub[p.pos.sub,] 
+                                pre.att.boot.group[[group.name]][pre.period.name,] <- p.att.boot.sub[p.pos.sub,]
                             }
                         }
                     }
@@ -1864,19 +1849,19 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 sub.output$pre.att.boot <- pre.att.boot.group[[group.name]]
                 pre.est.group.output[[group.name]] <- sub.output
             }
-        }           
+        }
     }
 
 
-    ## permutation test 
+    ## permutation test
     if (permute == TRUE) {
         message("Permuting under sharp null hypothesis ... ")
 
         out.permute <- fect.permu(Y = Y, X = X, D = D, I = I, r.cv = out$r.cv,
-                                  lambda.cv = out$lambda.cv, m = m, 
+                                  lambda.cv = out$lambda.cv, m = m,
                                   permu.dimension = permu.dimension,
-                                  method = out$method, degree = degree, 
-                                  knots = knots, force = force,                      
+                                  method = out$method, degree = degree,
+                                  knots = knots, force = force,
                                   tol = tol, norm.para = norm.para,
                                   nboots = nboots,
                                   parallel = parallel, cores = cores)
@@ -1887,7 +1872,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     }
 
-    
+
     if ((se == TRUE | permute) & parallel == TRUE) {
         stopCluster(para.clusters)
         #closeAllConnections()
@@ -1895,12 +1880,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
     ## message("\nOK4\n")
 
-       
-    
+
+
     ##-------------------------------##
     ## storage
-    ##-------------------------------## 
-    
+    ##-------------------------------##
+
     iname.old <- iname <- unique(sort(data.old[,id]))
     ## tname.old <- tname <- unique(sort(data.old[,time]))
     if (!0%in%I.use) {
@@ -1929,12 +1914,12 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             unit.type[i] <- 3 ## reversal
         }
     }
-    
-    # 1 treated 
-    # 2 control 
-    # 3 missing 
-    # 4 removed   
-    # 5 placebo or carryover 
+
+    # 1 treated
+    # 2 control
+    # 3 missing
+    # 4 removed
+    # 5 placebo or carryover
     obs.missing <- matrix(0, TT, N) ## not under treatment
     obs.missing[, rem.id] <- D + as.matrix(abs(I - 1)) * 3 ## under treatment
     obs.missing[which(obs.missing==0)] <- 2
@@ -1984,7 +1969,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 rownames(out$est.carryover) <- c("Carryover effect")
             }
         }
-    }  
+    }
     colnames(out$eff) <- iname
     rownames(out$eff) <- tname
     out$eff.calendar <- cbind(matrix(out$eff.calendar,ncol=1),out$N.calendar)
@@ -2041,30 +2026,30 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                      carryover.period = carryover.period,
                      unit.type = unit.type,
                      obs.missing = obs.missing,
-                     obs.missing.balance = obs.missing.balance), 
+                     obs.missing.balance = obs.missing.balance),
                      out)
-    
-                
+
+
     if (1 %in% rm.id) {
         output <- c(output,list(remove.id = remove.id))
         ## message("list of removed units:",remove.id)
         ## message("\n\n")
-    }    
-    
-    #if (se == TRUE) { 
-    #    suppressWarnings(test.out <- diagtest(output, pre.periods = pre.periods, 
+    }
+
+    #if (se == TRUE) {
+    #    suppressWarnings(test.out <- diagtest(output, pre.periods = pre.periods,
     #        f.threshold = f.threshold, tost.threshold = tost.threshold))
     #    output <- c(output, list(test.out = test.out))
     #}
-    
-    
+
+
     if (permute == TRUE) {
         output <- c(output,list(permute = permute.result))
     }
 
     if (placeboEquiv == TRUE) {
-        output <- c(output, list(pre.est.att = pre.est.att, 
-                                 pre.att.bound = pre.att.bound, 
+        output <- c(output, list(pre.est.att = pre.est.att,
+                                 pre.att.bound = pre.att.bound,
                                  pre.att.boot = pre.att.boot,
                                  pre.est.group.output = pre.est.group.output))
     }
@@ -2072,32 +2057,32 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     # if (placeboEquiv || placeboTest || carryoverTest) {
     # classic equivalence test, placeboTest, and carryoverTest
     # this can also be used in placeboTest
-    
-    # classic equivalence test
+
+    # this is the classic equivalence test
     if(loo==TRUE){
         output$loo <- FALSE
     }
 
     if(se==1){
         suppressWarnings(
-            test.out <- diagtest(output, pre.periods = pre.periods, 
-                    f.threshold = f.threshold, 
-                    tost.threshold = tost.threshold, 
+            test.out <- diagtest(output, pre.periods = pre.periods,
+                    f.threshold = f.threshold,
+                    tost.threshold = tost.threshold,
                     N_bar = N_bar)
         )
         output <- c(output, list(test.out = test.out))
     }
 
 
-    # loo equivalence test
+    # this is the loo equivalence test
     if(loo==TRUE){
         output$loo <- TRUE
     }
     if(loo==TRUE && se == 1){
         suppressWarnings(
-        test.out <- diagtest(output, pre.periods = pre.periods, 
-                    f.threshold = f.threshold, 
-                    tost.threshold = tost.threshold, 
+        test.out <- diagtest(output, pre.periods = pre.periods,
+                    f.threshold = f.threshold,
+                    tost.threshold = tost.threshold,
                     N_bar = N_bar)
         )
         output <- c(output, list(loo.test.out = test.out))
@@ -2107,8 +2092,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     output <- c(output, list(call = match.call()))
     class(output) <- "fect"
     return(output)
-} ## Program fect ends 
-
+} ## Program fect ends
 
 
 

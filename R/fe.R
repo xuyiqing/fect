@@ -4,18 +4,18 @@
 fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                     X, # Explanatory variables:  (T*N*p) array
                     D, #  Indicator for treated unit (tr==1)
-                    W, 
+                    W,
                     I,
-                    II, 
-                    T.on, 
-                    T.off = NULL, 
-                    T.on.carry = NULL, 
+                    II,
+                    T.on,
+                    T.off = NULL,
+                    T.on.carry = NULL,
                     T.on.balance = NULL,
                     balance.period = NULL,
                     r.cv = 0, # initial number of factors considered if CV==1
                     binary = FALSE,
-                    QR = FALSE, 
-                    force, 
+                    QR = FALSE,
+                    force,
                     hasRevs = 1,
                     tol, # tolerance level
                     max.iteration = 1000,
@@ -35,11 +35,16 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                     group.level = NULL,
                     group = NULL,
                     time.on.seq.group = NULL,
-                    time.off.seq.group = NULL) {  
-    
+                    time.off.seq.group = NULL,
+                    HTEid = NULL,
+                    DataType = "discrete",
+                    Nbins = NULL,
+                    HTE.enp.seq = NULL,
+                    HTEbootVal = NULL)
+                    {
     ##-------------------------------##
     ## Parsing data
-    ##-------------------------------##  
+    ##-------------------------------##
     carryover.pos <- placebo.pos <- na.pos <- NULL
     res.sd1 <- res.sd2 <- NULL
 
@@ -55,7 +60,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
 
     ## replicate data
     YY <- Y
-    YY[which(II == 0)] <- 0 ## reset to 0 
+    YY[which(II == 0)] <- 0 ## reset to 0
 
     D.c <- apply(D, 2, function(vec){cumsum(vec)})
     D.c <- ifelse(D.c > 0, 1, 0)
@@ -78,21 +83,21 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     initialOut <- Y0 <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
     oci <- which(c(II) == 1)
 
-    if (binary == FALSE) { 
+    if (binary == FALSE) {
         if(!is.null(W)){
             initialOut <- initialFit(data = data.ini, force = force, w = c(W), oci = oci)
         }else{
             initialOut <- initialFit(data = data.ini, force = force, w = NULL, oci = oci)
         }
-        
+
         Y0 <- initialOut$Y0
         beta0 <- initialOut$beta0
         if (p > 0 && sum(is.na(beta0)) > 0) {
             beta0[which(is.na(beta0))] <- 0
         }
-        
+
         ## ini.res <- initialOut$res
-    } 
+    }
     else {
         initialOut <- BiInitialFit(data = data.ini, QR = QR, r = r.cv, force = force, oci = oci)
         Y0 <- initialOut$Y0
@@ -103,11 +108,11 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             factor0 <- initialOut$factor0
         }
     }
- 
+
     ##-------------------------------##
     ## ----------- Main Algorithm ----------- ##
     ##-------------------------------##
-    
+
     validX <- 1 ## no multi-colinearity
     est.fect <- NULL
 
@@ -119,16 +124,16 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     if (binary == FALSE) {
-        est.best <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r.cv, force = force, tol, max.iteration) 
+        est.best <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r.cv, force = force, tol, max.iteration)
         if (boot == FALSE) {
             if (r.cv == 0) {
                 est.fect <- est.best
-            } 
+            }
             else {
                 est.fect <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force = force, tol, max.iteration)
             }
         }
-    } 
+    }
     else {
         if (QR == FALSE) {
             est.best <- inter_fe_d_ub(YY, Y0, FE0, X, II, r.cv, force, tol = tol)
@@ -138,19 +143,19 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     }
     validX <- est.best$validX
     validF <- ifelse(r.cv > 0, 1, 0)
-        
+
         ##------------------------------##
     ## ----------- Summarize -------------- ##
-        ##------------------------------##    
+        ##------------------------------##
 
     ##-------------------------------##
     ##   ATT and Counterfactuals     ##
     ##-------------------------------##
 
-    ## we first adjustment for normalization 
+    ## we first adjustment for normalization
     if (!is.null(norm.para) && binary == FALSE) {
         Y <- Y * norm.para[1]
-        ## variance of the error term 
+        ## variance of the error term
         sigma2 <- est.best$sigma2 * (norm.para[1]^2)
         IC <- est.best$IC - log(est.best$sigma2) + log(sigma2)
         PC <- est.best$PC * (norm.para[1]^2)
@@ -159,23 +164,23 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         est.best$PC <- PC
 
         ## output of estimates
-        est.best$mu <- est.best$mu * norm.para[1] 
+        est.best$mu <- est.best$mu * norm.para[1]
         if (r.cv > 0) {
             est.best$lambda <- est.best$lambda * norm.para[1]
             est.best$VNT <- est.best$VNT * norm.para[1]
         }
         if (force%in%c(1, 3)) {
-            est.best$alpha <- est.best$alpha * norm.para[1] 
+            est.best$alpha <- est.best$alpha * norm.para[1]
         }
         if (force%in%c(2,3)) {
-            est.best$xi <- est.best$xi * norm.para[1] 
+            est.best$xi <- est.best$xi * norm.para[1]
         }
         #if (p>0) {
         #    est.best$beta <- est.best$beta * norm.para[1]
         #}
-        est.best$residuals <- est.best$residuals * norm.para[1] 
+        est.best$residuals <- est.best$residuals * norm.para[1]
         est.best$fit <- est.best$fit * norm.para[1]
-        ## ini.res <- ini.res * norm.para[1] 
+        ## ini.res <- ini.res * norm.para[1]
         if (boot == FALSE) {
             est.fect$fit <- est.fect$fit * norm.para[1]
         }
@@ -185,7 +190,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     ## 0. relevant parameters
     IC <- est.best$IC
     if (binary == FALSE) {
-        sigma2 <- est.best$sigma2   
+        sigma2 <- est.best$sigma2
         PC <- est.best$PC
     } else {
         loglikelihood <- est.best$loglikelihood
@@ -200,7 +205,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     } else {
         beta <- NA
     }
-   
+
     ## 1. estimated att and counterfactuals
     Y.ct.equiv <- Y.ct <- NULL
     if (binary == FALSE) {
@@ -211,7 +216,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     } else {
         Y.ct <- pnorm(est.best$fit)
     }
-    eff <- Y - Y.ct   
+    eff <- Y - Y.ct
     missing.index <- which(is.na(eff))
     if(length(missing.index)>0){
         I[missing.index] <- 0
@@ -219,7 +224,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     }
     if (0 %in% I) {
         eff[which(I == 0)] <- NA
-    } 
+    }
     complete.index <- which(!is.na(eff))
     att.avg <- sum(eff[complete.index] * D[complete.index])/(sum(D[complete.index]))
 
@@ -250,14 +255,14 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     tr.pos <- which(apply(D, 2, sum) > 0)
     att.unit <- sapply(1:length(tr.pos), function(vec){return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))})
     att.avg.unit <- mean(att.unit,na.rm=TRUE)
-    
+
     equiv.att.avg <- eff.equiv <- NULL
     if (binary == FALSE && boot == FALSE) {
         eff.equiv <- Y - Y.ct.equiv
         if (0 %in% I) {
             eff.equiv[which(I == 0)] <- NA
         }
-        complete.index <- which(!is.na(eff.equiv)) 
+        complete.index <- which(!is.na(eff.equiv))
         equiv.att.avg <- sum(eff.equiv[complete.index] * D[complete.index])/(sum(D[complete.index]))
     }
 
@@ -279,13 +284,13 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         est.best$fit[which(I == 0)] <- NA
     }
     if (binary == FALSE) {
-        est.best$residuals[which(II == 0)] <- NA 
+        est.best$residuals[which(II == 0)] <- NA
     }
-      
+
 
     ## 4. dynamic effects
     t.on <- c(T.on)
-    eff.v <- c(eff) ## a vector    
+    eff.v <- c(eff) ## a vector
     eff.equiv.v <- NULL
     if (binary == FALSE && boot == FALSE) {
         eff.equiv.v <- c(eff.equiv)
@@ -373,16 +378,16 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         att.on.sum.med.W <- att.on.sum.W <- count.on.med.W <- att.on.med.W <- W.on.sum.med <- att.on.W <- count.on.W <- time.on.W <- W.on.sum <- NULL
     }
 
-    ## 4.1 carryover effect 
-    carry.att <- NULL 
+    ## 4.1 carryover effect
+    carry.att <- NULL
     if (!is.null(T.on.carry)) {
         t.on.carry <- c(T.on.carry)
-        rm.pos4 <- which(is.na(t.on.carry)) 
+        rm.pos4 <- which(is.na(t.on.carry))
         t.on.carry.use <- t.on.carry
 
         if (NA %in% eff.v | NA %in% t.on.carry) {
             eff.v.use3  <- eff.v[-c(rm.pos1, rm.pos4)]
-            t.on.carry.use <- t.on.carry[-c(rm.pos1, rm.pos4)]        
+            t.on.carry.use <- t.on.carry[-c(rm.pos1, rm.pos4)]
         }
 
         carry.time <- sort(unique(t.on.carry.use))
@@ -396,16 +401,16 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
-    ## 4.2 balance effect 
-    balance.att <- NULL 
+    ## 4.2 balance effect
+    balance.att <- NULL
     if (!is.null(balance.period)) {
         t.on.balance <- c(T.on.balance)
-        rm.pos4 <- which(is.na(t.on.balance)) 
+        rm.pos4 <- which(is.na(t.on.balance))
         t.on.balance.use <- t.on.balance
 
         if (NA %in% eff.v | NA %in% t.on.balance) {
             eff.v.use3  <- eff.v[-c(rm.pos1, rm.pos4)]
-            t.on.balance.use <- t.on.balance[-c(rm.pos1, rm.pos4)]        
+            t.on.balance.use <- t.on.balance[-c(rm.pos1, rm.pos4)]
         }
 
         balance.time <- sort(unique(t.on.balance.use))
@@ -417,7 +422,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             balance.count.med <- rep(0, length(time.on.balance.seq))
             balance.att.med[which(time.on.balance.seq %in% balance.time)] <- balance.att
             if(length(balance.count)>0){
-                balance.count.med[which(time.on.balance.seq %in% balance.time)] <- balance.count                
+                balance.count.med[which(time.on.balance.seq %in% balance.time)] <- balance.count
             }
             balance.count <- balance.count.med
             balance.att <- balance.att.med
@@ -429,7 +434,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             if (length(placebo.period) == 1) {
                 balance.placebo.pos <- which(balance.time == placebo.period)
                 balance.att.placebo <- balance.att[balance.placebo.pos]
-            } 
+            }
             else {
                 balance.placebo.pos <- which(balance.time >= placebo.period[1] & balance.time <= placebo.period[2])
                 balance.att.placebo <- sum(balance.att[balance.placebo.pos] * balance.count[balance.placebo.pos]) / sum(balance.count[balance.placebo.pos])
@@ -437,12 +442,12 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
-    ## 5. placebo effect, if placeboTest == 1 
-    if (!is.null(placebo.period) && placeboTest == 1) {              
+    ## 5. placebo effect, if placeboTest == 1
+    if (!is.null(placebo.period) && placeboTest == 1) {
         if (length(placebo.period) == 1) {
             placebo.pos <- which(time.on == placebo.period)
             att.placebo <- att.on[placebo.pos]
-        } 
+        }
         else {
             placebo.pos <- which(time.on >= placebo.period[1] & time.on <= placebo.period[2])
             att.placebo <- sum(att.on[placebo.pos] * count.on[placebo.pos]) / sum(count.on[placebo.pos])
@@ -452,7 +457,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             if (length(placebo.period) == 1) {
                 placebo.pos.W <- which(time.on.W == placebo.period)
                 att.placebo.W <- att.on.W[placebo.pos.W]
-            } 
+            }
             else {
                 placebo.pos.W <- which(time.on.W >= placebo.period[1] & time.on.W <= placebo.period[2])
                 att.placebo.W <- sum(att.on.sum.W[placebo.pos.W]) / sum(W.on.sum[placebo.pos.W])
@@ -460,10 +465,10 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
-    
+
     ## 6. switch-off effects
     eff.off.equiv <- off.sd <- eff.off <- NULL
-    if (hasRevs == 1) {    
+    if (hasRevs == 1) {
         t.off <- c(T.off)
         rm.pos3 <- which(is.na(t.off))
         eff.v.use2 <- eff.v
@@ -511,7 +516,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             }
 
             time.off.W <- sort(unique(t.off.use.W))
-            att.off.sum.W <- as.numeric(tapply(eff.v.use2.W*W.v.use2, t.off.use.W, sum)) 
+            att.off.sum.W <- as.numeric(tapply(eff.v.use2.W*W.v.use2, t.off.use.W, sum))
             W.off.sum <- as.numeric(tapply(W.v.use2, t.off.use.W, sum))
             att.off.W <- att.off.sum.W/W.off.sum ## NA already removed
             count.off.W <- as.numeric(table(t.off.use.W))
@@ -543,7 +548,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         if (length(carryover.period) == 1) {
             carryover.pos <- which(time.off == carryover.period)
             att.carryover <- att.off[carryover.pos]
-        } 
+        }
         else {
             carryover.pos <- which(time.off >= carryover.period[1] & time.off <= carryover.period[2])
             att.carryover <- sum(att.off[carryover.pos] * count.off[carryover.pos]) / sum(count.off[carryover.pos])
@@ -553,11 +558,11 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             if (length(carryover.period) == 1) {
                 carryover.pos.W <- which(time.off.W == carryover.period)
                 att.carryover.W <- att.off.W[carryover.pos.W]
-            } 
+            }
             else {
                 carryover.pos.W <- which(time.off.W >= carryover.period[1] & time.off.W <= carryover.period[2])
                 att.carryover.W <- sum(att.off.sum.W[carryover.pos.W]) / sum(W.off.sum[carryover.pos.W])
-            }            
+            }
         }
     }
 
@@ -575,7 +580,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             }
         }
         if(is.null(calendar.enp.seq)){
-            loess.fit <- suppressWarnings(try(loess(eff.calendar~T.calendar,weights = N.calendar),silent=TRUE))      
+            loess.fit <- suppressWarnings(try(loess(eff.calendar~T.calendar,weights = N.calendar),silent=TRUE))
         }
         else{
             loess.fit <- suppressWarnings(try(loess(eff.calendar~T.calendar,weights = N.calendar,enp.target=calendar.enp.seq),silent=TRUE))
@@ -587,7 +592,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         else{
             eff.calendar.fit <- eff.calendar
             eff.calendar.fit[which(!is.na(eff.calendar))] <- loess.fit$fit
-            calendar.enp <- loess.fit$enp              
+            calendar.enp <- loess.fit$enp
         }
     }
     else{
@@ -596,8 +601,248 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     }
 
 
+    ## 10. loess HTE by any variable
+    D.missing <- D
+    D.missing[which(D == 0)] <- NA
+    # if ((length(HTEid) != 1 | length(HTEid) == 0){
+    #     stop("not 1 variable for HTE")
+    # }
+    #generate variables for dynamic effects
+    att.on.HTE = list()
+    time.on.HTE = list()
+    count.on.HTE = list()
 
 
+    if(length(HTEid) == 1){
+      HTEvalue = X[,,HTEid]
+      if(DataType == "discrete"){    #代表离散型变量
+          HTEuni = unique(as.vector(HTEvalue))
+          # if(length(HTEbootVal) > 0){
+          #   HTEuni = HTEbootVal
+          # }
+          HTEuni <- sort(HTEuni)
+          avg.HTE <- rep(NA,length(HTEuni))
+          N.HTE = rep(0,length(HTEuni))
+          Ntr.HTE = rep(0,length(HTEuni))
+          Val.HTE = HTEuni
+          for(i in c(1:length(HTEuni))){
+              INDEX <- D.missing
+              INDEX[which(HTEvalue != HTEuni[i])] <- NA
+              avg.HTE[i] = mean(INDEX * eff, na.rm = TRUE)
+              Ntr.HTE[i] = length(INDEX) - length(which(is.na(INDEX)))
+              N.HTE[i] =  length(which(HTEvalue == HTEuni[i]))
+
+              #dynamic effects result storage
+              temp.index <- which(HTEvalue == HTEuni[i])
+              temp.t.on = c(T.on[temp.index])
+              temp.eff.v = c(eff[temp.index])
+              temp.n.on = c(n.on.use[temp.index])
+
+              rm.pos1 <- which(is.na(temp.eff.v))
+              rm.pos2 <- which(is.na(temp.t.on))
+
+              temp.eff.v.use1 <- temp.eff.v
+              temp.t.on.use <- temp.t.on
+              temp.n.on.use <- rep(1:N, each = TT)
+              if (NA %in% eff.v | NA %in% t.on) {
+                temp.eff.v.use1 <- temp.eff.v[-c(rm.pos1, rm.pos2)]
+                temp.t.on.use <- temp.t.on[-c(rm.pos1, rm.pos2)]
+                temp.n.on.use <- temp.n.on[-c(rm.pos1, rm.pos2)]
+                # if (binary == FALSE && boot == FALSE) {
+                #   eff.equiv.v <- eff.equiv.v[-c(rm.pos1, rm.pos2)]
+                # }
+              }
+
+              temp.time.on <- sort(unique(temp.t.on.use))
+              temp.att.on <- as.numeric(tapply(temp.eff.v.use1, temp.t.on.use, mean)) ## NA already removed
+              temp.count.on <- as.numeric(table(temp.t.on.use))
+
+              if (!is.null(time.on.seq)) {
+                temp.count.on.med <- temp.att.on.med <- rep(NA, length(time.on.seq))
+                temp.att.on.med[which(time.on.seq %in% temp.time.on)] <- temp.att.on
+                temp.count.on.med[which(time.on.seq %in% temp.time.on)] <- temp.count.on
+                temp.att.on <- temp.att.on.med
+                temp.count.on <- temp.count.on.med
+                temp.time.on <- time.on.seq
+              }
+
+              att.on.HTE[[i]] = temp.att.on
+              time.on.HTE[[i]] = temp.time.on
+              count.on.HTE[[i]] = temp.count.on
+
+          }
+          avg.HTE.fit <- NULL
+          HTE.enp <- NULL
+          # eff.HTE <- eff.HTE[which(N.HTE > 0)]    #先把不存在treat对应值的情况删掉
+          # Val.HTE <- Val.HTE[which(N.HTE > 0)]
+          # N.HTE <- N.HTE[which(N.HTE > 0)]
+          # N.HTE <- N.HTE[which(!is.na(eff.HTE))]  #再删掉eff为na的情况
+          # Val.HTE <- Val.HTE[which(!is.na(eff.HTE))]
+          # eff.HTE <- eff.HTE[which(!is.na(eff.HTE))]
+          # eff.HTE.fit <- eff.HTE
+          # HTE.enp <- NULL
+          }
+      if(DataType == "continuous"){   #代表连续型变量
+            nbins = Nbins
+            avg.HTE <- rep(NA,nbins)
+            N.HTE = rep(0,nbins)
+            Ntr.HTE = rep(0,nbins)
+            Val.HTE = rep(NA,nbins)
+            quan = 1/nbins
+            HTEquantile = quantile(HTEvalue,seq(quan,1,quan))
+
+            for(i in c(1:nbins)){
+              INDEX <- D.missing
+                if (i == 1){
+                  INDEX[which((HTEvalue >= HTEquantile[i]))] <- NA
+                  temp.index <- which(HTEvalue < HTEquantile[i])
+                }
+                else if (i == nbins){
+                  INDEX[which((HTEvalue < HTEquantile[i - 1]))] <- NA
+                  temp.index <- which(HTEvalue >= HTEquantile[i - 1])
+                }
+                else {
+                  INDEX[which((HTEvalue < HTEquantile[i - 1]) | HTEvalue >= HTEquantile[i])] <- NA
+                  temp.index <- which((HTEvalue >= HTEquantile[i - 1]) & (HTEvalue < HTEquantile[i]))
+                }
+                avg.HTE[i] = mean(INDEX * eff, na.rm = TRUE)
+                Ntr.HTE[i] = length(INDEX) - length(which(is.na(INDEX)))
+                N.HTE[i] = length(temp.index)
+                Val.HTE[i] = quan * i
+
+                temp.t.on = c(T.on[temp.index])
+                temp.eff.v = c(eff[temp.index])
+
+                rm.pos1 <- which(is.na(temp.eff.v))
+                rm.pos2 <- which(is.na(temp.t.on))
+
+                temp.eff.v.use1 <- temp.eff.v
+                temp.t.on.use <- temp.t.on
+                temp.n.on.use <- rep(1:N, each = TT)
+                if (NA %in% eff.v | NA %in% t.on) {
+                  temp.eff.v.use1 <- temp.eff.v[-c(rm.pos1, rm.pos2)]
+                  temp.t.on.use <- temp.t.on[-c(rm.pos1, rm.pos2)]
+                  temp.n.on.use <- temp.n.on.use[-c(rm.pos1, rm.pos2)]
+                  # if (binary == FALSE && boot == FALSE) {
+                  #   eff.equiv.v <- eff.equiv.v[-c(rm.pos1, rm.pos2)]
+                  # }
+                }
+
+                temp.time.on <- sort(unique(temp.t.on.use))
+                temp.att.on <- as.numeric(tapply(temp.eff.v.use1, temp.t.on.use, mean)) ## NA already removed
+                temp.count.on <- as.numeric(table(temp.t.on.use))
+
+                if (!is.null(time.on.seq)) {
+                  temp.count.on.med <- temp.att.on.med <- rep(NA, length(time.on.seq))
+                  temp.att.on.med[which(time.on.seq %in% temp.time.on)] <- temp.att.on
+                  temp.count.on.med[which(time.on.seq %in% temp.time.on)] <- temp.count.on
+                  temp.att.on <- temp.att.on.med
+                  temp.count.on <- temp.count.on.med
+                  temp.time.on <- time.on.seq
+                }
+
+                att.on.HTE[[i]] = temp.att.on
+                time.on.HTE[[i]] = temp.time.on
+                count.on.HTE[[i]] = temp.count.on
+            }
+            # eff.HTE <- eff.HTE[which(N.HTE > 0)]    #把不存在treat对应值的情况删掉
+            # Val.HTE <- Val.HTE[which(N.HTE > 0)]
+            # N.HTE <- N.HTE[which(N.HTE > 0)]
+            #loess fit
+        #     if(!is.null(HTE.enp.seq)){
+        #         if(length(HTE.enp.seq)==1 & is.na(HTE.enp.seq)){
+        #             HTE.enp.seq <- NULL
+        #             }
+        #         }
+        #     if(is.null(HTE.enp.seq)){
+        #         loess.fit <- suppressWarnings(try(loess(eff.HTE~Val.HTE,weights = N.HTE),silent=TRUE))
+        #         }
+        #     else{
+        #         loess.fit <- suppressWarnings(try(loess(eff.HTE~Val.HTE,weights = N.HTE,enp.target=HTE.enp.seq),silent=TRUE))
+        #         }
+        #     if('try-error' %in% class(loess.fit)){
+        #         eff.HTE.fit <- eff.HTE
+        #         HTE.enp <- NULL
+        #         }
+        #     else{
+        #         eff.HTE.fit <- eff.HTE
+        #         eff.HTE.fit[which(!is.na(eff.HTE))] <- loess.fit$fit
+        #         HTE.enp <- loess.fit$enp
+        #         }
+        #     if(is.null(eff.HTE.fit)){
+        #         eff.HTE.fit <- eff.HTE
+        #         calendar.enp <- NULL
+        #     }
+        # }
+
+
+
+    HTEX <- HTEvalue[which(D == 1)]
+    HTEY <- eff[which(D == 1)]
+
+    avg.HTE.fit = NULL
+
+    # if(DataType == "discrete"){
+    #   bootVal = HTEuni
+    #   HTEX <- as.factor(HTEX)
+    # }
+    # if(DataType == "continuous"){
+    #   bootVal = c(HTEmin,HTEmax)
+    # }
+    #regression for HTE estimate
+    #data_reg <- data.frame(HTEX,HTEY)
+    #REGout <- lm(HTEY ~ HTEX, data = data_reg)
+    #HTEcoef <- as.vector(REGout$coefficients[2])
+    #print(HTEcoef)
+        }
+    }
+    else{
+      avg.HTE = NULL
+      Val.HTE = NULL
+      N.HTE = NULL
+      Ntr.HTE = NULL
+      avg.HTE.fit = NULL
+      HTE.enp = NULL
+      bootVal = NULL
+      #HTEcoef = NULL
+      att.on.HTE = NULL
+      time.on.HTE = NULL
+      count.on.HTE = NULL
+    }
+    ##10.a dynamic effect by different groups
+    # if(DataType != 0){
+    #   stop("not seperate groups")
+    # }
+    # if(length(HTEuni) > 100){
+    #   stop("too many groups")
+    # }
+    # att.HTE.on <- list()
+    # time.HTE.on <- list()
+    # count.HTE.on <- list
+    # for(j in c(1:length(HTEuni))){
+    #   INDEX.temp <- which(HTEvalue == HTEuni[j])
+    #   t.on.temp <- c(T.on[INDEX.temp])
+    #   eff.v.temp <-c(eff[INDEX.temp])
+    #   rm.pos1 <- which(is.na(eff.v.temp))
+    #   rm.pos2 <- which(is.na(t.on.temp))
+    #
+    #   eff.v.use1.temp <- eff.v.temp
+    #   t.on.use.temp <- t.on.temp
+    #   n.on.use.temp <- rep(1:N, each = TT)
+    #   if (NA %in% eff.v.temp | NA %in% t.on.temp) {
+    #     eff.v.use1.temp <- eff.v.temp[-c(rm.pos1, rm.pos2)]
+    #     t.on.use.temp <- t.on.temp[-c(rm.pos1, rm.pos2)]
+    #     n.on.use.temp <- n.on.use.temp[-c(rm.pos1, rm.pos2)]
+    #   }
+    #
+    #     time.on.temp <- sort(unique(t.on.use.temp))
+    #     att.on.temp <- as.numeric(tapply(eff.v.use1.temp, t.on.use.temp, mean)) ## NA already removed
+    #     count.on.temp <- as.numeric(table(t.on.use.temp))
+    #
+    #     time.HTE.on[[j]] <- time.on.temp
+    #     att.HTE.on[[j]] <- att.on.temp
+    #     count.HTE.on[[j]] <- count.on.temp
+    # }
 
     ## 8. cohort effects
     if (!is.null(group)) {
@@ -623,7 +868,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             t.on.sub <- c(T.on[which(group==sub.group)])
             eff.v.sub <- c(eff[which(group==sub.group)]) ## a vector
             rm.pos1.sub <- which(is.na(eff.v.sub))
-            rm.pos2.sub <- which(is.na(t.on.sub)) 
+            rm.pos2.sub <- which(is.na(t.on.sub))
             eff.v.use1.sub <- eff.v.sub
             t.on.use.sub <- t.on.sub
             if (NA %in% eff.v.sub | NA %in% t.on.sub) {
@@ -632,15 +877,15 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             }
             if(length(t.on.use.sub)>0){
                 time.on.sub <- sort(unique(t.on.use.sub))
-                att.on.sub <- as.numeric(tapply(eff.v.use1.sub, 
-                                            t.on.use.sub, 
+                att.on.sub <- as.numeric(tapply(eff.v.use1.sub,
+                                            t.on.use.sub,
                                             mean)) ## NA already removed
                 count.on.sub <- as.numeric(table(t.on.use.sub))
             }
             else{
                 time.on.sub <- att.on.sub <- count.on.sub <- NULL
             }
-            
+
             if (!is.null(time.on.seq.group)) {
                 count.on.med.sub <- att.on.med.sub <- rep(NA, length(time.on.seq.group[[sub.group.name]]))
                 time.on.seq.sub <- time.on.seq.group[[sub.group.name]]
@@ -657,28 +902,28 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                               time.on=time.on.sub,
                               count.on=count.on.sub)
 
-            ## placebo effect, if placeboTest == 1 
-            if (!is.null(placebo.period) && placeboTest == 1) {              
+            ## placebo effect, if placeboTest == 1
+            if (!is.null(placebo.period) && placeboTest == 1) {
                 if (length(placebo.period) == 1) {
                     placebo.pos.sub <- which(time.on.sub == placebo.period)
                     if(length(placebo.pos.sub)>0){
                         att.placebo.sub <- att.on.sub[placebo.pos.sub]
                     }
-                    else{att.placebo.sub <- NULL} 
-                } 
+                    else{att.placebo.sub <- NULL}
+                }
                 else {
                     placebo.pos.sub <- which(time.on.sub >= placebo.period[1] & time.on.sub <= placebo.period[2])
                     if(length(placebo.pos.sub)>0){
                         att.placebo.sub <- sum(att.on.sub[placebo.pos.sub] * count.on.sub[placebo.pos.sub]) / sum(count.on.sub[placebo.pos.sub])
                     }
-                    else{att.placebo.sub <- NULL} 
+                    else{att.placebo.sub <- NULL}
                 }
                 if(length(att.placebo.sub)==0){att.placebo.sub <- NULL}
                 suboutput <- c(suboutput, list(att.placebo = att.placebo.sub))
             }
 
             ## T.off
-            if (hasRevs == 1) {    
+            if (hasRevs == 1) {
                 t.off.sub <- c(T.off[which(group==sub.group)])
                 rm.pos3.sub <- which(is.na(t.off.sub))
                 eff.v.use2.sub <- eff.v.sub
@@ -716,12 +961,12 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                         carryover.pos.sub <- which(time.off.sub == carryover.period)
                         if(length(carryover.pos.sub)>0){
                             att.carryover.sub <- att.off.sub[carryover.pos.sub]
-                        } else{att.carryover.sub <- NULL}      
+                        } else{att.carryover.sub <- NULL}
                     } else {
                         carryover.pos.sub <- which(time.off.sub >= carryover.period[1] & time.off.sub <= carryover.period[2])
                         if(length(carryover.pos.sub)>0){
                             att.carryover.sub <- sum(att.off.sub[carryover.pos.sub] * count.off.sub[carryover.pos.sub]) / sum(count.off.sub[carryover.pos.sub])
-                        } else{att.carryover.sub <- NULL}  
+                        } else{att.carryover.sub <- NULL}
                     }
                     if(length(att.carryover.sub)==0){att.carryover.sub <- NULL}
                     suboutput <- c(suboutput,list(att.carryover = att.carryover.sub))
@@ -735,12 +980,16 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     method <- ifelse(r.cv > 0, "ife", "fe")
 
 
-  
+
     ##-------------------------------##
     ##            Storage            ##
-    ##-------------------------------##  
+    ##-------------------------------##
+
+    avg.HTE.fit = NULL
+    HTE.enp <- NULL
+
     out<-list(
-        ## main results 
+        ## main results
         method = method,
         Y.ct = Y.ct,
         Y.ct.full = Y.ct.full,
@@ -761,8 +1010,8 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         tr = tr,
         co = co,
         p = p,
-        r.cv = r.cv, 
-        IC = IC, 
+        r.cv = r.cv,
+        IC = IC,
         beta = beta,
         est = est.best,
         mu = est.best$mu,
@@ -778,19 +1027,36 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         calendar.enp = calendar.enp,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
-        pre.sd = pre.sd)
+        pre.sd = pre.sd,
+        avg.HTE = avg.HTE,
+        Val.HTE = Val.HTE,
+        N.HTE = N.HTE,
+        Ntr.HTE = Ntr.HTE,
+        #avg.HTE.fit = avg.HTE.fit,
+        #HTE.enp = HTE.enp,
+        #bootVal = bootVal,
+        #HTEcoef = HTEcoef,
+        att.HTE = att.on.HTE,
+        time.HTE = time.on.HTE,
+        count.HTE = count.on.HTE,
+        DataType = DataType,
+        Nbins = Nbins
+        # time.HTE = time.HTE.on,
+        # att.HTE = att.HTE.on,
+        # count.HTE = count.HTE.on
+        )
 
     if (binary == 0) {
         out <- c(out, list(PC = PC,
                            sigma2 = sigma2,
-                           sigma2.fect = est.fect$sigma2, 
+                           sigma2.fect = est.fect$sigma2,
                            res = est.best$residuals,
                            res.full = res.full,
                            rmse = rmse))
         #if (boot == FALSE) {
         #    out <- c(out, list(equiv.att.avg = equiv.att.avg))
         #}
-    } 
+    }
     else {
         out <- c(out, list(loglikelihood = loglikelihood, marginal = marginal))
     }
@@ -800,14 +1066,14 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     if(!is.null(balance.period)){
-        out <- c(out, list(balance.att = balance.att, balance.time = balance.time,balance.count = balance.count,balance.avg.att = att.avg.balance))        
+        out <- c(out, list(balance.att = balance.att, balance.time = balance.time,balance.count = balance.count,balance.avg.att = att.avg.balance))
         if (!is.null(placebo.period) && placeboTest == 1) {
             out <- c(out, list(balance.att.placebo = balance.att.placebo))
-        }    
+        }
     }
-    
+
     if (hasRevs == 1) {
-        out <- c(out, list(time.off = time.off, 
+        out <- c(out, list(time.off = time.off,
                            att.off = att.off,
                            count.off = count.off,
                            eff.off = eff.off,
@@ -822,7 +1088,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     if (force == 1) {
-        out<-c(out, list(alpha = est.best$alpha, 
+        out<-c(out, list(alpha = est.best$alpha,
                          alpha.tr = as.matrix(est.best$alpha[tr,]),
                          alpha.co = as.matrix(est.best$alpha[co,])))
     } else if (force == 2) {
@@ -870,4 +1136,4 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                            group.output=group.output))
     }
     return(out)
-} ## fe functions ends. 
+} ## fe functions ends.
