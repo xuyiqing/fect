@@ -50,8 +50,8 @@ fect.boot <- function(Y,
                       group = NULL,
                       dis = TRUE,
                       HTEid = NULL,
-                      DataType = "discrete",
-                      Nbins = NULL,
+                      moderator.type = NULL,
+                      moderator.nbins = 3,
                       HTE.enp.seq = NULL
                       ) {
 
@@ -99,13 +99,28 @@ fect.boot <- function(Y,
         Nco <- length(co)
     }
     if(length(HTEid) == 1){   #for HTE estimation, get the number of bins
-      if (DataType == "discrete"){
+      #check the key option moderator.type
+      if(!is.null(moderator.type)){
+        if(! moderator.type %in% c("discrete","continuous")){
+          stop("\"moderator.type\" option misspecified. Must be one of followings:\"discrete\",\"continuous\".")
+        }
+      }
+      else {
+        HTEuni = unique(as.vector(HTEvalue))
+        if (length(HTEuni) > 5){
+          moderator.type = "continuous"
+        } else{
+          moderator.type = "discrete"
+        }
+      }
+
+      if (moderator.type == "discrete"){
       HTEvalue = X[,,HTEid]
       HTEuni = unique(as.vector(HTEvalue))
       nbins = length(HTEuni)
     }
-    else if (DataType == "continuous"){
-      nbins = Nbins
+    else if (moderator.type == "continuous"){
+      nbins = moderator.nbins
     }
     }
 
@@ -143,8 +158,8 @@ fect.boot <- function(Y,
                            carryoverTest = carryoverTest,
                            group.level = group.level, group = group,
                            HTEid = HTEid,
-                           DataType = DataType,
-                           Nbins = Nbins,
+                           moderator.type = moderator.type,
+                           moderator.nbins = moderator.nbins,
                            HTE.enp.seq = HTE.enp.seq)
 
         } else if (method == "mc") {
@@ -206,8 +221,8 @@ fect.boot <- function(Y,
                        cv.prop = cv.prop, cv.treat = cv.treat,
                        cv.nobs = cv.nobs,
                        HTEid = HTEid,
-                       DataType = DataType,
-                       Nbins = Nbins,
+                       moderator.type = moderator.type,
+                       moderator.nbins = moderator.nbins,
                        HTE.enp.seq = HTE.enp.seq)
 
             method <- out$method
@@ -236,11 +251,11 @@ fect.boot <- function(Y,
     calendar.eff.fit <- out$eff.calendar.fit
     calendar.N <- out$N.calendar
     avg.HTE <- out$avg.HTE
-    avg.eff.fit <- out$avg.HTE.fit
+    avg.HTE.fit <- out$avg.HTE.fit
     N.HTE <- out$N.HTE
     Val.HTE <- out$Val.HTE
-    HTEbootVal <- out$bootVal
-    HTEcoef <- out$HTEcoef
+    # HTEbootVal <- out$bootVal
+    # HTEcoef <- out$HTEcoef
 
     if(length(HTEid) != 1){
       est.avg.HTE = NULL
@@ -255,6 +270,7 @@ fect.boot <- function(Y,
     att <- out$att
     time.on <- out$time
     target.enp <- out$calendar.enp
+    HTE.enp <- out$HTE.enp
 
     # att.HTE <- out$att.HTE
     # time.HTE <- out$time.HTE
@@ -349,6 +365,7 @@ fect.boot <- function(Y,
 
     if(length(HTEid) == 1){
     avg.HTE.boot <- matrix(0,nbins,nboots)
+    avg.HTE.fit.boot <- matrix(0,nbins,nboots)
 
     att.boot.HTE = list()
     for (i in c(1:length(out$att.HTE))){
@@ -476,6 +493,7 @@ fect.boot <- function(Y,
                                     hasRevs = hasRevs, tol = tol, max.iteration = max.iteration, boot = 1,
                                     norm.para = norm.para,
                                     calendar.enp.seq = target.enp,
+                                    HTE.enp.seq = HTE.enp,
                                     # time.on.seq = time.on,
                                     # time.off.seq = time.off,
                                     # time.on.carry.seq = carry.time,
@@ -695,6 +713,7 @@ fect.boot <- function(Y,
                                          carryover.period = carryover.period,
                                          carryoverTest = carryoverTest,
                                          calendar.enp.seq = target.enp,
+                                         #HTE.enp.seq = HTE.enp,
                                          time.on.seq = time.on,
                                          time.off.seq = time.off,
                                          time.on.seq.W = time.on.W,
@@ -778,6 +797,7 @@ fect.boot <- function(Y,
                             carryoverTest = carryoverTest,
                             group.level = group.level, group = group,
                             calendar.enp.seq = target.enp,
+                            HTE.enp.seq = HTE.enp,
                             # time.on.seq = time.on,
                             # time.off.seq = time.off,
                             # time.on.seq.W = time.on.W,
@@ -787,9 +807,8 @@ fect.boot <- function(Y,
                             # time.on.seq.group = group.time.on,
                             # time.off.seq.group = group.time.off,
                             HTEid = HTEid,
-                            DataType = DataType,
-                            Nbins = Nbins,
-                            HTE.enp.seq = HTE.enp.seq,
+                            moderator.type = moderator.type,
+                            moderator.nbins = moderator.nbins,
                             #HTEbootVal = HTEbootVal
                             ),silent = TRUE)
             }
@@ -809,6 +828,7 @@ fect.boot <- function(Y,
                             carryoverTest = carryoverTest,
                             group.level = group.level, group = group,
                             calendar.enp.seq = target.enp,
+                            #HTE.enp.seq = HTE.enp,
                             time.on.seq = time.on,
                             time.off.seq = time.off,
                             time.on.seq.W = time.on.W,
@@ -839,6 +859,7 @@ fect.boot <- function(Y,
                                     norm.para = norm.para,
                                     group.level = group.level, group = group,
                                     calendar.enp.seq = target.enp,
+                                    #HTE.enp.seq = HTE.enp,
                                     time.on.seq = time.on,
                                     time.off.seq = time.off,
                                     time.on.seq.W = time.on.W,
@@ -1009,6 +1030,7 @@ fect.boot <- function(Y,
                                     hasRevs = hasRevs, tol = tol, max.iteration = max.iteration, boot = 1,
                                     norm.para = norm.para,
                                     calendar.enp.seq = target.enp,
+                                    #HTE.enp.seq = HTE.enp,
                                     time.on.seq = time.on,
                                     time.off.seq = time.off,
                                     time.on.seq.W = time.on.W,
@@ -1035,6 +1057,7 @@ fect.boot <- function(Y,
                                     hasRevs = hasRevs, tol = tol, max.iteration = max.iteration, boot = 1,
                                     norm.para = norm.para,
                                     calendar.enp.seq = target.enp,
+                                    HTE.enp.seq = HTE.enp,
                                     time.on.seq = time.on,
                                     time.off.seq = time.off,
                                     time.on.seq.W = time.on.W,
@@ -1050,9 +1073,8 @@ fect.boot <- function(Y,
                                     time.on.seq.group = group.time.on,
                                     time.off.seq.group = group.time.off,
                                     HTEid = HTEid,
-                                    DataType = DataType,
-                                    Nbins = Nbins,
-                                    HTE.enp.seq = HTE.enp.seq,
+                                    moderator.type = moderator.type,
+                                    moderator.nbins = moderator.nbins,
                                     #HTEbootVal = bootVal
                                     ), silent = TRUE)
                 } else if (method == "mc") {
@@ -1067,6 +1089,7 @@ fect.boot <- function(Y,
                                     tol = tol, max.iteration = max.iteration, boot = 1,
                                     norm.para = norm.para,
                                     calendar.enp.seq = target.enp,
+                                    #HTE.enp.seq = HTE.enp,
                                     time.on.seq = time.on,
                                     time.off.seq = time.off,
                                     time.on.seq.W = time.on.W,
@@ -1100,6 +1123,7 @@ fect.boot <- function(Y,
                                                     norm.para = norm.para,
                                                     time.on.seq = time.on,
                                                     calendar.enp.seq = target.enp,
+                                                    #HTE.enp.seq = HTE.enp,
                                                     time.off.seq = time.off,
                                                     time.on.seq.W = time.on.W,
                                                     time.off.seq.W = time.off.W,
@@ -1157,6 +1181,7 @@ fect.boot <- function(Y,
                             }
 
         for (j in 1:nboots) {
+
             att.avg.boot[,j] <- boot.out[[j]]$att.avg
             att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
             att.boot[,j] <- boot.out[[j]]$att
@@ -1174,6 +1199,8 @@ fect.boot <- function(Y,
 
             if (length(HTEid) == 1){
             avg.HTE.boot[,j] = boot.out[[j]]$avg.HTE
+            avg.HTE.fit.boot[,j] <- boot.out[[j]]$avg.HTE.fit
+
             for (k in c(1:length(att.boot.HTE))){
               temp.att.HTE.med <- rep(NA,length(out$att.HTE[[k]]))
               temp.timeseq <- out$time.HTE[[k]]
@@ -1185,7 +1212,7 @@ fect.boot <- function(Y,
 
             # if(length(HTEid) == 1){
             # HTE.eff.boot[,j] <- boot.out[[j]]$eff.HTE
-            # if(DataType == "continuous"){
+            # if(moderator.type == "continuous"){
             #   HTE.eff.fit.boot[,j] <- boot.out[[j]]$eff.HTE.fit
             # }
             # HTEcoef.boot[,j] <- boot.out[[j]]$HTEcoef
@@ -1281,6 +1308,8 @@ fect.boot <- function(Y,
             eff.boot[,,j] >- boot.out[[j]]$eff
             att.count.boot[,j] <- boot$count
 
+
+
             # for (i in c(1:length(att.HTE))){
             #   time.temp <- c(boot$time.HTE[[i]])
             #   index.temp <- which(c(time.HTE[[i]]) %in% time.temp)
@@ -1291,7 +1320,8 @@ fect.boot <- function(Y,
             calendar.eff.fit.boot[,j] <- boot$eff.calendar.fit
             if(length(HTEid) == 1){
             avg.HTE.boot[,j] = boot.out[[j]]$avg.HTE
-            #HTE.eff.boot[,j] <- boot$eff.HTE
+            avg.HTE.fit.boot[,j] <- boot.out[[j]]$avg.HTE.fit
+
             for (k in c(1:length(att.boot.HTE))){
               temp.att.HTE.med <- rep(NA,length(out$att.HTE[[k]]))
               temp.timeseq <- out$time.HTE[[k]]
@@ -1299,7 +1329,7 @@ fect.boot <- function(Y,
               temp.att.HTE.med[which(temp.timeseq %in% temp.time.HTE)] <-  boot.out[[j]]$att.HTE[[k]]
               att.boot.HTE[[k]][,j] = temp.att.HTE.med
             }
-            #if(DataType == "continuous"){
+            #if(moderator.type == "continuous"){
             #HTE.eff.fit.boot[,j] <- boot$eff.HTE.fit
             #}
             # HTEcoef.boot[,j] <- boot$HTEcoef
@@ -1398,7 +1428,7 @@ fect.boot <- function(Y,
         calendar.eff.fit.boot <- as.matrix(calendar.eff.fit.boot[,-boot.rm])
         if(length(HTEid) == 1){
         HTE.eff.boot <- as.matrix(HTE.eff.boot[,-boot.rm])
-        if(DataType == "continuous"){
+        if(moderator.type == "continuous"){
         HTE.eff.fit.boot <- as.matrix(HTE.eff.fit.boot[,-boot.rm])
         }
         # HTEcoef.boot <- as.matrix(HTEcoef.boot[,-boot.rm])
@@ -1532,13 +1562,20 @@ fect.boot <- function(Y,
                                          "p.value", "count")
           rownames(est.att.HTE[[i]]) <- out$time.HTE[[i]]
         }
+
+
+        avg.HTE.fit.j <- jackknifed(avg.HTE.fit,avg.HTE.fit.boot,alpha,quantile.CI = quantile.CI)
+        est.avg.HTE.fit <- cbind(avg.HTE.fit, avg.HTE.fit.j$se, avg.HTE.fit.j$CI.l, avg.HTE.fit.j$CI.u, avg.HTE.fit.j$P, out$N.HTE)
+        colnames(est.avg.HTE.fit) <- c("AVG", "S.E.", "CI.lower", "CI.upper",
+                                       "p.value", "count")
+        rownames(est.avg.HTE.fit) <- out$Val.HTE
         }
 
         # if(length(HTEid) == 1){
         # eff.HTE.j <- jackknifed(HTE.eff, HTE.eff.boot, alpha, quantile.CI = quantile.CI)
         # est.eff.HTE <- cbind(HTE.eff, eff.HTE.j$se, eff.HTE.j$CI.l, eff.HTE.j$CI.u, eff.HTE.j$P, HTE.N)
         # colnames(est.eff.HTE) <- c("ATT-HTE", "S.E.", "CI.lower", "CI.upper","p.value", "count")
-        # if(DataType == "continuous"){
+        # if(moderator.type == "continuous"){
         # eff.HTE.fit.j <- jackknifed(HTE.eff.fit, HTE.eff.fit.boot, alpha, quantile.CI = quantile.CI)
         # est.eff.HTE.fit <- cbind(HTE.eff.fit, eff.HTE.fit.j$se, eff.HTE.fit.j$CI.l, eff.HTE.fit.j$CI.u, eff.HTE.fit.j$P, HTE.N)
         # colnames(est.eff.HTE.fit) <- c("ATT-HTE Fitted", "S.E.", "CI.lower", "CI.upper","p.value", "count")
@@ -1833,6 +1870,22 @@ fect.boot <- function(Y,
 
           est.att.HTE[[i]] <- cbind(out$att.HTE[[i]],temp.se.att,temp.CI.att,temp.pvalue.att,out$count.HTE[[i]])
         }
+
+        se.avg.HTE.fit <- apply(avg.HTE.fit.boot, 1, function(vec) sd(vec, na.rm=TRUE))
+        if(quantile.CI == FALSE){
+          CI.avg.HTE.fit <- cbind(avg.HTE.fit - se.avg.HTE.fit * qnorm(1-alpha/2), avg.HTE.fit + se.avg.HTE.fit * qnorm(1-alpha/2)) # normal approximation
+          pvalue.avg.HTE.fit <- (1-pnorm(abs(avg.HTE.fit/se.avg.HTE.fit)))*2
+        }
+        else{
+          CI.avg.HTE.fit <- t(apply(avg.HTE.fit.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE)))
+          pvalue.avg.HTE.fit <- apply(avg.HTE.fit.boot, 1, get.pvalue)
+        }
+
+        est.avg.HTE.fit <- cbind(avg.HTE.fit, se.avg.HTE.fit, CI.avg.HTE.fit, pvalue.avg.HTE.fit, out$N.HTE)
+        colnames(est.avg.HTE.fit) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                       "p.value", "count")
+        rownames(est.avg.HTE.fit) <- out$Val.HTE
+
         }
 
 
@@ -2155,7 +2208,7 @@ fect.boot <- function(Y,
         # }
         # est.eff.HTE <- cbind(HTE.eff, se.eff.HTE, CI.eff.HTE, pvalue.eff.HTE,HTE.N)
         # colnames(est.eff.HTE) <- c("ATT-HTE", "S.E.", "CI.lower", "CI.upper","p.value", "count")
-        # if(DataType == "continuous"){
+        # if(moderator.type == "continuous"){
         # se.eff.HTE.fit <- apply(HTE.eff.fit.boot, 1, function(vec) sd(vec, na.rm=TRUE))
         # if(quantile.CI == FALSE){
         #     CI.eff.HTE.fit <- cbind(HTE.eff.fit - se.eff.HTE.fit * qnorm(1-alpha/2), HTE.eff.fit + se.eff.HTE.fit * qnorm(1-alpha/2))
@@ -2415,7 +2468,7 @@ fect.boot <- function(Y,
     if (length(HTEid) != 1){
       est.avg.HTE = NULL
       avg.HTE = NULL
-      # est.eff.HTE = NULL
+      est.avg.HTE.fit = NULL
       # est.eff.HTE.fit = NULL
       #est.HTEcoef = NULL
       Val.HTE = NULL
@@ -2431,7 +2484,7 @@ fect.boot <- function(Y,
                  est.eff.calendar.fit = est.eff.calendar.fit,
                  est.avg.HTE = est.avg.HTE,
                  avg.HTE = avg.HTE,
-                 # est.eff.HTE = est.eff.HTE,
+                 est.avg.HTE.fit = est.avg.HTE.fit,
                  # est.eff.HTE.fit = est.eff.HTE.fit,
 #                 est.HTEcoef = est.HTEcoef,
                  Val.HTE = Val.HTE,

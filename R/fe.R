@@ -37,8 +37,8 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
                     time.on.seq.group = NULL,
                     time.off.seq.group = NULL,
                     HTEid = NULL,
-                    DataType = "discrete",
-                    Nbins = NULL,
+                    moderator.type = NULL,
+                    moderator.nbins = 3,
                     HTE.enp.seq = NULL,
                     HTEbootVal = NULL)
                     {
@@ -615,7 +615,22 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
 
     if(length(HTEid) == 1){
       HTEvalue = X[,,HTEid]
-      if(DataType == "discrete"){    #代表离散型变量
+      #check the key option moderator.type
+      if(!is.null(moderator.type)){
+        if(! moderator.type %in% c("discrete","continuous")){
+          stop("\"moderator.type\" option misspecified. Must be one of followings:\"discrete\",\"continuous\".")
+        }
+      }
+      else {
+        HTEuni = unique(as.vector(HTEvalue))
+        if (length(HTEuni) > 5){
+          moderator.type = "continuous"
+        } else{
+          moderator.type = "discrete"
+        }
+      }
+
+      if(moderator.type == "discrete"){    #代表离散型变量
           HTEuni = unique(as.vector(HTEvalue))
           # if(length(HTEbootVal) > 0){
           #   HTEuni = HTEbootVal
@@ -671,8 +686,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
               count.on.HTE[[i]] = temp.count.on
 
           }
-          avg.HTE.fit <- NULL
-          HTE.enp <- NULL
+
           # eff.HTE <- eff.HTE[which(N.HTE > 0)]    #先把不存在treat对应值的情况删掉
           # Val.HTE <- Val.HTE[which(N.HTE > 0)]
           # N.HTE <- N.HTE[which(N.HTE > 0)]
@@ -682,8 +696,8 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
           # eff.HTE.fit <- eff.HTE
           # HTE.enp <- NULL
           }
-      if(DataType == "continuous"){   #代表连续型变量
-            nbins = Nbins
+      if(moderator.type == "continuous"){   #代表连续型变量
+            nbins = moderator.nbins
             avg.HTE <- rep(NA,nbins)
             N.HTE = rep(0,nbins)
             Ntr.HTE = rep(0,nbins)
@@ -748,45 +762,18 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
             # eff.HTE <- eff.HTE[which(N.HTE > 0)]    #把不存在treat对应值的情况删掉
             # Val.HTE <- Val.HTE[which(N.HTE > 0)]
             # N.HTE <- N.HTE[which(N.HTE > 0)]
-            #loess fit
-        #     if(!is.null(HTE.enp.seq)){
-        #         if(length(HTE.enp.seq)==1 & is.na(HTE.enp.seq)){
-        #             HTE.enp.seq <- NULL
-        #             }
-        #         }
-        #     if(is.null(HTE.enp.seq)){
-        #         loess.fit <- suppressWarnings(try(loess(eff.HTE~Val.HTE,weights = N.HTE),silent=TRUE))
-        #         }
-        #     else{
-        #         loess.fit <- suppressWarnings(try(loess(eff.HTE~Val.HTE,weights = N.HTE,enp.target=HTE.enp.seq),silent=TRUE))
-        #         }
-        #     if('try-error' %in% class(loess.fit)){
-        #         eff.HTE.fit <- eff.HTE
-        #         HTE.enp <- NULL
-        #         }
-        #     else{
-        #         eff.HTE.fit <- eff.HTE
-        #         eff.HTE.fit[which(!is.na(eff.HTE))] <- loess.fit$fit
-        #         HTE.enp <- loess.fit$enp
-        #         }
-        #     if(is.null(eff.HTE.fit)){
-        #         eff.HTE.fit <- eff.HTE
-        #         calendar.enp <- NULL
-        #     }
-        # }
 
 
 
     HTEX <- HTEvalue[which(D == 1)]
     HTEY <- eff[which(D == 1)]
 
-    avg.HTE.fit = NULL
 
-    # if(DataType == "discrete"){
+    # if(moderator.type == "discrete"){
     #   bootVal = HTEuni
     #   HTEX <- as.factor(HTEX)
     # }
-    # if(DataType == "continuous"){
+    # if(moderator.type == "continuous"){
     #   bootVal = c(HTEmin,HTEmax)
     # }
     #regression for HTE estimate
@@ -794,7 +781,38 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     #REGout <- lm(HTEY ~ HTEX, data = data_reg)
     #HTEcoef <- as.vector(REGout$coefficients[2])
     #print(HTEcoef)
+      }
+
+      #loess fit for HTE
+
+      if(!is.null(HTE.enp.seq)){
+        if(length(HTE.enp.seq)==1 & is.na(HTE.enp.seq)){
+          HTE.enp.seq <- NULL
         }
+      }
+      if(is.null(HTE.enp.seq)){
+        loess.HTE.fit <- suppressWarnings(try(loess(avg.HTE~Val.HTE,weights = N.HTE),silent=TRUE))
+      }
+      else{
+        loess.HTE.fit <- suppressWarnings(try(loess(avg.HTE~Val.HTE,weights = N.HTE,enp.target=HTE.enp.seq),silent=TRUE))
+      }
+
+
+      if('try-error' %in% class(loess.HTE.fit)){
+        avg.HTE.fit <- avg.HTE
+        HTE.enp <- NULL
+      }
+      else{
+        avg.HTE.fit <- avg.HTE
+        avg.HTE.fit[which(!is.na(avg.HTE))] <- loess.HTE.fit$fit
+        HTE.enp <- loess.HTE.fit$enp
+      }
+
+      if(is.null(avg.HTE.fit)){
+        avg.HTE.fit <- avg.HTE
+        HTE.enp <- NULL
+      }
+
     }
     else{
       avg.HTE = NULL
@@ -810,7 +828,7 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
       count.on.HTE = NULL
     }
     ##10.a dynamic effect by different groups
-    # if(DataType != 0){
+    # if(moderator.type != 0){
     #   stop("not seperate groups")
     # }
     # if(length(HTEuni) > 100){
@@ -985,9 +1003,6 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     ##            Storage            ##
     ##-------------------------------##
 
-    avg.HTE.fit = NULL
-    HTE.enp <- NULL
-
     out<-list(
         ## main results
         method = method,
@@ -1032,15 +1047,15 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
         Val.HTE = Val.HTE,
         N.HTE = N.HTE,
         Ntr.HTE = Ntr.HTE,
-        #avg.HTE.fit = avg.HTE.fit,
-        #HTE.enp = HTE.enp,
+        avg.HTE.fit = avg.HTE.fit,
+        HTE.enp = HTE.enp,
         #bootVal = bootVal,
         #HTEcoef = HTEcoef,
         att.HTE = att.on.HTE,
         time.HTE = time.on.HTE,
         count.HTE = count.on.HTE,
-        DataType = DataType,
-        Nbins = Nbins
+        moderator.type = moderator.type,
+        moderator.nbins = moderator.nbins
         # time.HTE = time.HTE.on,
         # att.HTE = att.HTE.on,
         # count.HTE = count.HTE.on

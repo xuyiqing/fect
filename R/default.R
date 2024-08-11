@@ -81,9 +81,9 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  permute = FALSE, ## permutation test
                  m = 2, ## block length
                  normalize = FALSE, # accelerate option
-                 Moderator = NULL, #the variable needs heterogeneity estimation
-                 DataType = "discrete", #data type of moderator
-                 Nbins = NULL, #number of bins
+                 moderator = NULL, #the variable needs heterogeneity estimation
+                 moderator.type = NULL, #data type of moderator
+                 moderator.nbins = 3, #number of bins
                  HTE.enp.seq = NULL #parameter used in loess fit estimation
                 ) {
     UseMethod("fect")
@@ -145,9 +145,9 @@ fect.formula <- function(formula = NULL,
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
                          normalize = FALSE,
-                         Moderator = NULL, #the variable needs heterogeneity estimation
-                         DataType = "discrete", #the data type of moderator, "discrete" or "continuous"
-                         Nbins = NULL, #number of bins if the moderator is continuous
+                         moderator = NULL, #the variable needs heterogeneity estimation
+                         moderator.type = NULL, #the data type of moderator, "discrete" or "continuous"
+                         moderator.nbins = 3, #number of bins if the moderator is continuous
                          HTE.enp.seq = NULL #parameter used in loess fit estimation
                         ) {
     ## parsing
@@ -235,9 +235,9 @@ fect.formula <- function(formula = NULL,
                         permute = permute,
                         m = m,
                         normalize = normalize,
-                        Moderator = Moderator,
-                        DataType = DataType,
-                        Nbins = Nbins,
+                        moderator = moderator,
+                        moderator.type = moderator.type,
+                        moderator.nbins = moderator.nbins,
                         HTE.enp.seq = HTE.enp.seq
                         )
 
@@ -303,9 +303,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
                          normalize = FALSE,
-                         Moderator = NULL, #the variable needs heterogeneity estimation
-                         DataType = "discrete", #data type of moderator
-                         Nbins = NULL, #number of bins
+                         moderator = NULL, #the variable needs heterogeneity estimation
+                         moderator.type = NULL, #data type of moderator
+                         moderator.nbins = NULL, #number of bins
                          HTE.enp.seq = NULL #parameter used in loess fit estimation
                         ) {
 
@@ -758,7 +758,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     #    }
     #}
     ##calculate HTEid
-    HTEid = which(Xname == Moderator)
+    HTEid = which(Xname == moderator)
 
     ## normalize
     norm.para <- NULL
@@ -1488,7 +1488,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                force = force, hasRevs = hasRevs,
                                tol = tol, max.iteration = max.iteration, norm.para = norm.para,
                                group.level = g.level, group = G,
-                               HTEid = HTEid, DataType = DataType, Nbins = Nbins, HTE.enp.seq = HTE.enp.seq)
+                               HTEid = HTEid, moderator.type = moderator.type, moderator.nbins = moderator.nbins, HTE.enp.seq = HTE.enp.seq)
             }
             else {
                 out <- fect.binary.cv(Y = Y, D = D, X = X,
@@ -1520,7 +1520,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                carryoverTest = carryoverTest,
                                carryover.period = carryover.period,
                                group.level = g.level, group = G,
-                               HTEid = HTEid, DataType = DataType, Nbins = Nbins, HTE.enp.seq = HTE.enp.seq)
+                               HTEid = HTEid, moderator.type = moderator.type, moderator.nbins = moderator.nbins, HTE.enp.seq = HTE.enp.seq)
             }
             else if(method == "gsynth"){
                 out <- fect.gsynth(Y = Y, D = D, X = X,
@@ -1612,7 +1612,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          quantile.CI = quantile.CI,
                          nboots = nboots, parallel = parallel,
                          cores = cores, group.level = g.level, group = G,
-                         HTEid = HTEid, DataType = DataType, Nbins = Nbins, HTE.enp.seq = HTE.enp.seq)
+                         HTEid = HTEid, moderator.type = moderator.type, moderator.nbins = moderator.nbins, HTE.enp.seq = HTE.enp.seq)
 
         if(method %in% c("polynomial",  "cfe")){
             I <- out$I
