@@ -20,7 +20,7 @@ importFrom("ggplot2", "ggplot_build", "geom_boxplot", "geom_density", "geom_tile
            "scale_colour_manual", "aes", "annotate", "ggtitle", "geom_rect", 
            "scale_color_discrete", "scale_color_manual", "ggplotGrob", 
            "guide_legend", "margin", "geom_jitter", "geom_pointrange", 
-           "guides","xlab","ylab","element_rect","geom_errorbar")
+           "guides","xlab","ylab","element_rect","geom_errorbar","ggsave")
 importFrom("abind", "abind")
 importFrom("mvtnorm", "rmvnorm")
 importFrom("GGally", "ggpairs")
@@ -28,8 +28,10 @@ importFrom("graphics", "plot")
 importFrom("gridExtra", "grid.arrange", "arrangeGrob")
 importFrom("grid", "textGrob", "gpar")
 importFrom("fixest", "feols")
+importFrom("cowplot","plot_grid")
 
-
+export(fectHTE)
+export(plotHTE)
 export(interFE)
 export(fect)
 S3method("fect", "default")
