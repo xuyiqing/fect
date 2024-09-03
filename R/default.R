@@ -1734,6 +1734,9 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             pT.off <- T.off
             pG <- G
             pW <- W
+            if (!is.null(cl)) {
+                p.cl <- cl
+            }else{p.cl <- NULL}
 
             pII[placebo.pos] <- 0 ## placebo treatment
 
@@ -1785,7 +1788,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                     pT.on <- as.matrix(T.on[,-rm.id.2.pos])
                     if (!is.null(cl)) {
                         p.cl <- cl[-rm.id.2.pos]
-                    }
+                    }else{p.cl <- NULL}
                     if(hasRevs){
                         pT.off <- as.matrix(T.off[,-rm.id.2.pos])
                     }
