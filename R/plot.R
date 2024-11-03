@@ -28,6 +28,8 @@ plot.fect <- function(
     ylim = NULL,
     xlab = NULL,
     ylab = NULL,
+    xangle = NULL,
+    yangle = NULL,
     xbreaks = NULL,
     ybreaks = NULL,
     gridOff = FALSE,
@@ -3336,7 +3338,6 @@ plot.fect <- function(
         )
     }
 
-
     if (type == "status") {
         if (is.null(xlab) == TRUE) {
             xlab <- index[2]
@@ -3524,6 +3525,14 @@ plot.fect <- function(
 
     if (is.null(ybreaks) == FALSE) {
         p <- p + scale_y_continuous(breaks = ybreaks)
+    }
+
+    if (is.null(xangle) == FALSE) {
+        p <- p + theme(axis.text.x = element_text(angle = xangle))
+    }
+
+    if (is.null(yangle) == FALSE) {
+        p <- p + theme(axis.text.y = element_text(angle = yangle))
     }
 
     # suppressWarnings(print(p))
