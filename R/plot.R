@@ -32,6 +32,8 @@ plot.fect <- function(
     yangle = NULL,
     xbreaks = NULL,
     ybreaks = NULL,
+    xticklabels = NULL,
+    yticklabels = NULL,
     gridOff = FALSE,
     legendOff = FALSE,
     legend.pos = NULL,
@@ -3500,15 +3502,33 @@ plot.fect <- function(
                 plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(8, 0, 8, 0))
             )
 
+        if (is.null(xticklabels) == FALSE) {
+            xticks <- c()
+            for (xticklabel in xticklabels) {
+                xticks <- c(xticks, which(time.label == xticklabel))
+            }
+        } else {
+            xticks <- T.b
+        }
+
+        if (is.null(yticklabels) == FALSE) {
+            yticks <- c()
+            for (yticklabel in yticklabels) {
+                yticks <- c(yticks, which(id == yticklabel))
+            }
+        } else {
+            yticks <- N.b
+        }
+
         if (axis.lab == "both") {
-            p <- p + scale_x_continuous(expand = c(0, 0), breaks = T.b, labels = time.label[T.b]) +
-                scale_y_continuous(expand = c(0, 0), breaks = N.b, labels = id[N.b])
+            p <- p + scale_x_continuous(expand = c(0, 0), breaks = xticks, labels = time.label[xticks]) +
+                scale_y_continuous(expand = c(0, 0), breaks = yticks, labels = id[yticks])
         } else if (axis.lab == "unit") {
-            p <- p + scale_x_continuous(expand = c(0, 0), breaks = T.b, labels = NULL) +
-                scale_y_continuous(expand = c(0, 0), breaks = N.b, labels = id[N.b])
+            p <- p + scale_x_continuous(expand = c(0, 0), breaks = xticks, labels = NULL) +
+                scale_y_continuous(expand = c(0, 0), breaks = yticks, labels = id[yticks])
         } else if (axis.lab == "time") {
-            p <- p + scale_x_continuous(expand = c(0, 0), breaks = T.b, labels = time.label[T.b]) +
-                scale_y_continuous(expand = c(0, 0), breaks = N.b, labels = NULL)
+            p <- p + scale_x_continuous(expand = c(0, 0), breaks = T.xticks, labels = time.label[xticks]) +
+                scale_y_continuous(expand = c(0, 0), breaks = yticks, labels = NULL)
         } else if (axis.lab == "off") {
             p <- p + scale_x_continuous(expand = c(0, 0), breaks = 1:length(show), labels = NULL) +
                 scale_y_continuous(expand = c(0, 0), breaks = 1:N, labels = NULL)
