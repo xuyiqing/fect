@@ -3292,7 +3292,6 @@ plot.fect <- function(
             data = data.pre.2,
             color = "skyblue", size = 1.25, alpha = 0.8
         )
-        p <- p + scale_x_discrete(limits = levels)
 
         if (count == TRUE) {
             T.start <- c()
@@ -3338,6 +3337,21 @@ plot.fect <- function(
             axis.text.y = element_text(size = cex.axis),
             plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
         )
+
+        if (is.null(xticklabels) == FALSE) {
+            xticklabels.all <- ggplot_build(p)$layout$panel_params[[1]]$x$breaks
+            labels <- c()
+            for (xticklabel.all in xticklabels.all) {
+                if (xticklabel.all %in% xticklabels) {
+                    labels <- c(labels, xticklabel.all)
+                } else {
+                    labels <- c(labels, "")
+                }
+            }
+            p <- p + scale_x_discrete(limits = levels, breaks = xticklabels.all, labels = labels)
+        } else {
+            p <- p + scale_x_discrete(limits = levels)
+        }
     }
 
     if (type == "status") {
