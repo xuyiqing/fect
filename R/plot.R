@@ -3541,7 +3541,7 @@ plot.fect <- function(
             p <- p + scale_x_continuous(expand = c(0, 0), breaks = xticks, labels = NULL) +
                 scale_y_continuous(expand = c(0, 0), breaks = yticks, labels = id[yticks])
         } else if (axis.lab == "time") {
-            p <- p + scale_x_continuous(expand = c(0, 0), breaks = T.xticks, labels = time.label[xticks]) +
+            p <- p + scale_x_continuous(expand = c(0, 0), breaks = xticks, labels = time.label[xticks]) +
                 scale_y_continuous(expand = c(0, 0), breaks = yticks, labels = NULL)
         } else if (axis.lab == "off") {
             p <- p + scale_x_continuous(expand = c(0, 0), breaks = 1:length(show), labels = NULL) +
