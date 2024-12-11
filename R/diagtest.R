@@ -155,11 +155,20 @@ diagtest <- function(
           
         S <- cov(t(coef_mat)) ## * N_bar
         
-        psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
+        inv_S <- try(solve(S), silent = TRUE)
+        if ('try-error' %in% class(inv_S)) {
+            message("\n")
+            message("F-test Failed. The estimated covariance matrix is singular. Adding a very small diagonal matrix to the covariance matrix.")
+            message("\n")
+            S <- S + 10^(-8) * diag(NROW(S))
+            inv_S <- solve(S)
+        }
+
+        psi <- try(as.numeric(t(D) %*% inv_S %*% D), silent = TRUE)
         
         if ('try-error' %in% class(psi)) {
             message("\n")
-            message("The estimated covariance matrix is irreversible.")
+            message("F-test Failed. The estimated covariance matrix is singular.")
             message("\n")
             f.stat <- f.p <- f.equiv.p <- f.threshold <- NA            
         } 

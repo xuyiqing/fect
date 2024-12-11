@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 
 **R** package for implementing counterfactual estimators in panel fixed-effect settings. It is suitable for panel/TSCS analysis with binary treatments under (hypothetically) baseline randomization. It allows a treatment to switch on and off and limited carryover effects. It supports linear factor models---hence, a generalization of [**gsynth**](https://yiqingxu.org/packages/gsynth/index.html)---and the matrix completion method. 
 
-**Repo:** [GitHub](https://github.com/xuyiqing/fect) (1.0.0) 
+**Repo:** [GitHub](https://github.com/xuyiqing/fect) (1.0.13) 
 
 **Examples:** R code used in the [tutorial](https://yiqingxu.org/packages/fect/articles/tutorial.html) can be downloaded from [here](fect_examples.R).
 

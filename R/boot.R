@@ -1270,6 +1270,7 @@ fect.boot <- function(Y,
 
     ## remove failure bootstrap
     ## alternative condition? max(apply(is.na(att.boot),2,sum)) == dim(att.boot)[1]
+    att.boot.original <- att.boot
     if (sum(is.na(c(att.avg.boot))) > 0) {
         boot.rm <- which(is.na(c(att.avg.boot)))
         att.avg.boot <- t(as.matrix(att.avg.boot[,-boot.rm]))
@@ -1643,7 +1644,14 @@ fect.boot <- function(Y,
             pvalue.att <- apply(att.boot, 1, get.pvalue)
         }
 
-        vcov.att <- cov(t(att.boot), use = "pairwise.complete.obs")
+        vcov.att <- tryCatch(
+            {
+                cov(t(att.boot), use = "pairwise.complete.obs")
+            },
+            error = function(e) {
+                NA
+            }
+        )
         
         est.att <- cbind(att, se.att, CI.att, pvalue.att, out$count)
         colnames(est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
@@ -1673,9 +1681,14 @@ fect.boot <- function(Y,
                 CI.att.off <- t(apply(att.off.boot, 1, function(vec) quantile(vec,c(alpha/2, 1 - alpha/2), na.rm=TRUE))) 
                 pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
             } 
-
-            vcov.att.off <- cov(t(att.off.boot), use = "pairwise.complete.obs")
-            
+            vcov.att.off <- tryCatch(
+                {
+                    cov(t(att.off.boot), use = "pairwise.complete.obs")
+                },
+                error = function(e) {
+                    NA
+                }
+            )          
             est.att.off <- cbind(att.off, se.att.off, CI.att.off, pvalue.att.off, out$count.off)
             colnames(est.att.off) <- c("ATT.OFF", "S.E.", "CI.lower", "CI.upper",
                                        "p.value", "count.off")
@@ -2207,6 +2220,7 @@ fect.boot <- function(Y,
                  est.att = est.att,
                  att.bound = att.bound,
                  att.boot = att.boot,
+                 att.boot.original = att.boot.original,
                  att.vcov = vcov.att,
                  att.count.boot = att.count.boot)
 
@@ -2296,6 +2310,8 @@ jackknifed <- function(x,  ## ols estimates
     Ysd <- sqrt(Yvar/vn)  ## jackknife se
     
     vcov_matrix <- 1 / vn * cov(t(Y), use = "pairwise.complete.obs")
+
+
 
     if(quantile.CI == FALSE){
         CI.l <- Ysd * qnorm(alpha/2) + c(x)

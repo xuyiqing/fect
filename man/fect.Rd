@@ -12,7 +12,7 @@ assumptions.}
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
             quantile.CI = FALSE, nboots = 200, alpha = 0.05, 
-            parallel = TRUE, cores = NULL, tol = 0.001, 
+            parallel = TRUE, cores = NULL, tol = 1e-5, 
             max.iteration = 1000, seed = NULL, 
             min.T0 = NULL, max.missing = NULL, 
             proportion = 0.3, pre.periods = NULL, 
