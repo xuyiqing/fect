@@ -78,3 +78,5 @@ S3method("print", "interFE")
 # export(fe_ad_inter_covar_iter)
 # export(beta_iter)
 # export(inter_fe_mc) 
+
+export(get.cohort)
