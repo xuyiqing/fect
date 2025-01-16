@@ -563,7 +563,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
                 if (criterion == "pc") {
-                    message("\n r = ", r, "; sigma2 = ",
+                    message("r = ", r, "; sigma2 = ",
                         sprintf("%.5f", sigma2), "; IC = ",
                         sprintf("%.5f", IC), "; PC = ",
                         sprintf("%.5f", PC), "; MSPTATT = ",
@@ -572,7 +572,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                         sep = ""
                     )
                 } else {
-                    # message("\n r = ",r, "; sigma2 = ",
+                    # message("r = ",r, "; sigma2 = ",
                     #    sprintf("%.5f",sigma2), "; IC = ",
                     #    sprintf("%.5f",IC), "; PC = ",
                     #    sprintf("%.5f",PC), "; MSPE = ",
@@ -582,7 +582,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                     #    sprintf("%.5f",MSPTATT), "; MSE = ",
                     #    sprintf("%.5f",MSE), sep="")
                     message(
-                        "\n r = ", r, "; sigma2 = ",
+                        "r = ", r, "; sigma2 = ",
                         sprintf("%.5f", sigma2), "; IC = ",
                         sprintf("%.5f", IC), "; PC = ",
                         sprintf("%.5f", PC), "; MSPE = ",
@@ -597,7 +597,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             ## compare
             if (criterion == "both") {
                 if (r.cv > r.pc) {
-                    message("\n\n Factor number selected via cross validation may be larger than the true number. Using the PC criterion.\n\n ")
+                    message("\n Factor number selected via cross validation may be larger than the true number. Using the PC criterion.\n\n ")
                     r.cv <- r.pc
                     est.best <- est.pc.best
                     MSPE.best <- MSPE.pc.best
@@ -621,8 +621,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             if (r > (TT - 1)) {
                 message(" (r hits maximum)")
             }
-            message("\n\n r* = ", r.cv, sep = "")
-            message("\n\n")
+            message("\n r* = ", r.cv, sep = "")
         }
 
         ##  ------------------------------------- ##
@@ -898,7 +897,7 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
                 CV.out.mc[i, 2:10] <- c(MSPE, WMSPE, GMSPE, WGMSPE, MAD, moment, gmoment, MSPTATT, MSE)
-                message("\n lambda.norm = ",
+                message("lambda.norm = ",
                     sprintf("%.5f", lambda[i] / max(eigen.all)), "; MSPE = ",
                     sprintf("%.5f", MSPE), "; MSPTATT = ",
                     sprintf("%.5f", MSPTATT), "; MSE = ",
@@ -917,8 +916,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             MAD.best.mc <- MAD.best
             moment.best.mc <- moment.best
             gmoment.best.mc <- gmoment.best
-            message("\n\n lambda.norm* = ", lambda.cv / max(eigen.all), sep = "")
-            message("\n\n")
+            message("\n lambda.norm* = ", lambda.cv / max(eigen.all), sep = "")
+            message("\n")
         }
     } ## End of Cross-Validation
 
@@ -1007,8 +1006,8 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
                 method <- "mc"
             }
         }
-        message("\n\n Recommended method through cross-validation: ", method, sep = "")
-        message("\n\n")
+        message("\n Recommended method through cross-validation: ", method, sep = "")
+        message("\n")
     }
     validX <- est.best$validX
 
