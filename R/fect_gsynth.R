@@ -141,7 +141,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
     if (CV == TRUE) {
         ## starting r
         if ((r > (T0.min - 1) & force %in% c(0, 2)) | (r > (T0.min - 2) & force %in% c(1, 3))) {
-            message("Warning: r is too big compared with T0; reset to 0.\n")
+            message("r is too big compared with T0; reset to 0.")
             r <- 0
         }
 
@@ -154,7 +154,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
 
         if (r.max == 0) {
             r.cv <- 0
-            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.\n ")
+            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
             if (!0 %in% I.co) {
                 est.co.best <- inter_fe(Y.co, X.co, 0, force = force, beta0 = beta0, tol, max.iteration)
             } else {
@@ -328,7 +328,7 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
                     est.co.pc.best <- est.co
                 }
                 CV.out[i, 2:5] <- c(sigma2, IC, PC, MSPE)
-                message("\n r = ", r, "; sigma2 = ",
+                message("r = ", r, "; sigma2 = ",
                     sprintf("%.5f", sigma2), "; IC = ",
                     sprintf("%.5f", IC), "; PC = ",
                     sprintf("%.5f", PC), "; MSPE = ",
@@ -341,8 +341,8 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
             if (r > (T0.min - 1)) {
                 message(" (r hits maximum)")
             }
-            message("\n\n r* = ", r.cv, sep = "")
-            message("\n\n")
+            message("\n r* = ", r.cv, sep = "")
+            message("\n")
         }
     } else {
         r.cv <- r

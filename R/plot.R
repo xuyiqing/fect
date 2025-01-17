@@ -116,7 +116,7 @@ plot.fect <- function(
     carryover.period <- x$carryover.period
     binary <- x$binary
     Ftest <- !is.null(x$pre.test)
-
+    
     if (!is.null(show.group)) {
         if (length(show.group) > 1) {
             stop("\"show.group\" should contain only one group.\n")
@@ -260,6 +260,11 @@ plot.fect <- function(
             }
         }
         if (type == "factors") {
+            
+            if (is.null(legend.pos) == TRUE) {
+              legend.pos <- "bottom"
+            } 
+          
             if (is.null(line.color) == TRUE) {
                 if (theme.bw == TRUE) {
                     line.color <- "#AAAAAA70"
@@ -1069,7 +1074,7 @@ plot.fect <- function(
         ## } else {
         T.b <- 1:length(show)
         ## }
-
+        
 
         ## legend on/off
         if (legendOff == TRUE) {
