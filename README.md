@@ -9,73 +9,84 @@
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental)
 [![License:
 MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[<img src="https://cranlogs.r-pkg.org/badges/grand-total/gsynth" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/gsynth/index.html)
+[<img src="https://cranlogs.r-pkg.org/badges/grand-total/fect" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/fect/index.html)
 <!-- badges: end -->
 
-**R** package for implementing counterfactual estimators in panel
-fixed-effect settings. It is suitable for panel/TSCS analysis with
-binary treatments under (hypothetically) baseline randomization. It
-allows a treatment to switch on and off and limited carryover effects.
-It supports linear factor models—hence, a generalization of
-[**gsynth**](https://yiqingxu.org/packages/gsynth/index.html)—and the
-matrix completion method.
+**R** package for implementing counterfactual estimators, also known as
+imputation estimators, in panel fixed-effect settings. Suitable for
+causal panel analysis with binary treatments under (hypothetically)
+baseline randomization. It allows a treatment to switch on and off and
+limited carryover effects. It supports two-way fixed effects, linear
+factor models, and the matrix completion method.
 
-**Repo:** [GitHub](https://github.com/xuyiqing/fect) (1.0.0)
+Starting from v.2.0.0, all **gsynth** functionalities have been merged
+into **fect**.
 
-**Examples:** R code used in the
-[tutorial](https://yiqingxu.org/packages/fect/articles/tutorial.html)
-can be downloaded from [here](fect_examples.R).
+**Github Repo:** [GitHub](https://github.com/xuyiqing/fect) (2.0.0)
 
-**Reference:** Licheng Liu, Ye Wang, Yiqing Xu (2021). [A Practical
-Guide to Counterfactual Estimators for Causal Inference with Time-Series
+**User Manual:** R code used in the [User
+Manual](https://yiqingxu.org/packages/fect/) can be downloaded from
+[here](fect_examples.R).
+
+**Main References:**
+
+Xu, Yiqing (2017). [Generalized Synthetic Control Method: Causal
+Inference with Interactive Fixed Effects
+Models](https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3).
+*Political Analysis* 25 (1): 57–76.
+
+Licheng Liu, Ye Wang, Yiqing Xu (2024). [A Practical Guide to
+Counterfactual Estimators for Causal Inference with Time-Series
 Cross-Sectional
 Data](https://yiqingxu.org/papers/english/2022_fect/LWX2022.pdf).
-*American Journal of Political Science*, conditionally accepted.
+*American Journal of Political Science*, 68 (1): 160–76.
 
 ## Installation
 
-You can install **fect** directly from CRAN by typing the following
-command in the **R** console:
+To install **fect** from CRAN, run the code chunk below:
 
 ``` r
-install.packages('fect')
+install.packages("fect")
 ```
 
-You can install the development version of **fect** from GitHub by
-typing the following commands:
+We recommend users to install the most up-to-date version of **fect**
+from Github using:
 
 ``` r
-devtools::install_github('xuyiqing/fect')
+devtools::install_github("xuyiqing/fect")
 ```
 
-**panelview** for panel data visualization is also highly recommended:
+After installation, check **fect** version to make sure the package is
+up-to-date.
 
 ``` r
-devtools::install_github('xuyiqing/panelView')
+installed.packages()["fect", "Version"]
+#> [1] "2.0.0"
 ```
 
-**fect** depends on the following packages, which will be installed
+**fect** depends on the following packages, which should be installed
 automatically when **fect** is being installed. You can also install
 them manually.
 
 ``` r
-## for processing C++ code
-require(Rcpp) 
-## for plotting
-require(ggplot2)  
-require(GGally) 
-require(grid)
-require(gridExtra)
-## for parallel computing 
-require(foreach)
-require(future)  
-require(doParallel) 
-require(abind) 
+install_all <- function(packages) {
+  installed_pkgs <- installed.packages()[, "Package"]
+  for (pkg in packages) {
+    if (!pkg %in% installed_pkgs) {
+      install.packages(pkg)
+    }
+  }
+}
+packages <- c("abind", "doParallel", "doRNG", "fixest", "foreach", "future", 
+              "GGally", "ggplot2", "grid", "gridExtra", "Mass", 
+              "panelView", "Rcpp")
+install_all(packages)
 ```
 
 ### Notes on installation failures
 
-1.  Mac users who have updated to MacOS BigSur or Monterey will likely
-    encounter compilation problems. See
+1.  Intel Mac users may encounter compilation problems. See
     [here](http://yiqingxu.org/public/BigSurError.pdf) for a potential
     solution.
 2.  Windows users please consider upgrading R to 4.0.0 or higher and
@@ -94,5 +105,7 @@ require(abind)
 
 ## Report bugs
 
-Please report bugs to **yiqingxu \[at\] stanford.edu** with your sample
-code and data file. Much appreciated!
+Please report any bugs to me (yiqingxu \[at\] stanford.edu) or submit an
+issue on [GitHub](https://github.com/xuyiqing/fect/issues). Please
+include your minimally replicable code & data file and a **panelView**
+treatment status plot. Your feedback is highly valued!
