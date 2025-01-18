@@ -1,17 +1,17 @@
 Package: fect
 Type: Package
-Title: Fixed Effects Counterfactuals
-Version: 1.0.13
-Date: 2024-12-10
+Title: Fixed Effects Counterfactual Estimators
+Version: 2.0.0
+Date: 2025-01-17
 Authors@R: 
-  c(person("Licheng", "Liu", ,"liulch@mit.edu", role = c("aut")), 
+  c(person("Licheng", "Liu", ,"lichengl@stanford.edu", role = c("aut")), 
   person("Ziyi", "Liu", ,"zyliu2023@berkeley.edu", role = c("aut", "cre")),
   person("Ye", "Wang", , "yezhehuzhi@gmail.com", role = c("aut")), 
   person("Yiqing", "Xu", ,"yiqingxu@stanford.edu", role = c("aut"), 
   comment = c(ORCID = "0000-0003-2041-6671")))
 Maintainer: Ziyi Liu <zyliu2023@berkeley.edu>
-Description: Estimates causal effects with panel data using the counterfactual methods. It is suitable for panel or time-series cross-sectional analysis with binary treatments under (hypothetically) baseline randomization.It allows a treatment to switch on and off and limited carryover effects. It supports linear factor models, a generalization of gsynth and the matrix completion method. Implementation details can be found in Liu, Wang and Xu (2022) <arXiv:2107.00856>.
-URL: https://yiqingxu.org/packages/fect/articles/tutorial.html
+Description: Estimates causal effects with panel data using the counterfactual methods. It is suitable for panel or time-series cross-sectional analysis with binary treatments under (hypothetically) baseline randomization.It allows a treatment to switch on and off and limited carryover effects. It supports various imputation estimators, including Gsynth (Xu 2017), linear factor models, and the matrix completion method. Implementation details can be found in Liu, Wang and Xu (2024) <arXiv:2107.00856>.
+URL: https://yiqingxu.org/packages/fect/
 NeedsCompilation: yes
 License: MIT + file LICENSE
 Imports: Rcpp (>= 0.12.3), ggplot2 (>= 2.1.0), GGally (>= 1.0.1),
