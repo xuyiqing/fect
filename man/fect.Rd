@@ -43,17 +43,16 @@ assumptions.}
 \item{cv.prop}{a numerical value specifying the proportion of testing set compared to sample size during the cross-validation procedure.}
 \item{cv.treat}{a logical flag speficying whether to only use observations of treated units as testing set.}
 \item{cv.nobs}{an integer specifying the length of continuous observations within a unit in the testing set. Default is \code{cv.nobs = 3}.}
-\item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}. 
-  These removed observations will not be used to fit the data nor be in the validation set for the cross-validation, e.g, if \code{cv.nobs=3} and \code{cv.donut = 1}, the first and the last observation in each triplet will not be included in the test set. 
-  Default is \code{cv.donut = 0}.}
+\item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}.}
 \item{criterion}{criterion used for model selection. Default is "mspe". 
   \code{"mspe"} for the mean squared prediction error,
   \code{"gmspe"} for the geometric-mean squared prediction errors,
-  if \code{criterion="moment"}, we average the residuals in test sets by their relative periods to treatments and then average the squares of these period-wise deviations weighted by the number of observations at each period, it yields a better pre-trend fitting on test sets rather than a better prediction ability.
-  \code{"pc"} for the information criterion of interactive fixed effects or generalized synthetic control model.}
-\item{binary}{This version doesn't support this option. a logical flag indicating whether a probit link function will be used.}
-\item{QR}{This version doesn't support this option. a logical flag indicating whether QR decomposition will be used for factor analysis in probit model.}
+  \code{"moment"} for period-weighted residuals in test sets,
+  \code{"pc"} for an information criterion method.}
+\item{binary}{This version doesn't support this option.}
+\item{QR}{This version doesn't support this option.}
 \item{method}{a string specifying which imputation algorithm will be used. 
+<<<<<<< Updated upstream
   \code{"fe"} for fixed effects model, 
   \code{"ife"} for interactive fixed effects model, 
   \code{"mc"} for matrix copletion method, 
@@ -122,51 +121,84 @@ assumptions.}
   \code{m = 2}.}
 \item{normalize}{a logic flag indicating whether to scale outcome and 
   covariates. Useful for accelerating computing speed when magnitude of data is large. The default is \code{normalize=FALSE}.}
+=======
+  \code{"fe"}, \code{"ife"}, \code{"mc"}, \code{"polynomial"}, \code{"bspline"},
+  \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
+\item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
+\item{vartype}{a string specifying the type of variance estimator, e.g. \code{"bootstrap"}.}
+\item{cl}{a string specifying the cluster for cluster bootstrapping.}
+\item{quantile.CI}{a logical flag indicating whether to use quantile confidence intervals when bootstrapping.}
+\item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}.}
+\item{alpha}{the significance level for hypothesis tests and confidence intervals. Default \code{0.05}.}
+\item{parallel}{a logical flag indicating whether parallel computing will be used in bootstrapping or cross-validation.}
+\item{cores}{an integer indicating the number of cores for parallel computing.}
+\item{tol}{a positive number indicating the tolerance level for EM updates.}
+\item{max.iteration}{the maximal number of iterations for the EM algorithm.}
+\item{seed}{an integer seed for random number generation.}
+\item{min.T0}{an integer specifying the minimum number of pre-treatment periods for each treated unit.}
+\item{max.missing}{an integer specifying the maximum number of missing observations allowed per unit.}
+\item{proportion}{a numeric value specifying which pre-treatment periods are used for goodness-of-fit tests.}
+\item{pre.periods}{a vector specifying the range of pre-treatment periods used for the goodness-of-fit test.}
+\item{f.threshold}{a numeric threshold for an F-test in equivalence testing. Default \code{0.5}.}
+\item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
+\item{knots}{a numeric vector specifying knots for the b-spline.}
+\item{degree}{an integer specifying the polynomial or b-spline degree.}
+\item{sfe}{vector specifying other fixed effects for \code{method="cfe"}.}
+\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
+\item{balance.period}{a length-2 vector specifying a time range for a balanced sample.}
+\item{fill.missing}{a logical flag indicating whether to allow missing observations in a balanced sample.}
+\item{placeboTest}{a logical flag indicating whether to perform a placebo test.}
+\item{placebo.period}{an integer or 2-element numeric vector specifying pseudo-treatment periods.}
+\item{carryoverTest}{a logical flag for carryover tests.}
+\item{carryover.period}{an integer or 2-element numeric vector specifying pseudo-carryover periods.}
+\item{carryover.rm}{an integer specifying the range of post-treatment periods to treat as carryover.}
+\item{loo}{a logical flag for leave-one-period-out goodness-of-fit tests.}
+\item{permute}{a logical flag indicating whether to run a permutation test.}
+\item{m}{an integer specifying the block length for permutation tests. Default \code{2}.}
+\item{normalize}{a logical flag indicating whether to scale outcome and covariates.}
+>>>>>>> Stashed changes
 }
 \details{
-  \code{fect} implements counterfactual estimators in TSCS data analysis. These estimators first impute counterfactuals for 
-  each treated observation in a TSCS dataset by fitting an outcome model (fixed effects model, interactive fixed effects model, or
-  matrix completion) using the untreated observations. They then estimate the individualistic treatment effect for each treated 
-  observation by subtracting the predicted counterfactual outcome from its observed outcome. Finally, the average treatment effect
-  on the treated (ATT) or period-specific ATTs are calculated. A placebo test and an equivalence test are included to evaluate the
-  validity of identification assumptions behind these estimators. Data must be with a dichotomous treatment.
+  \code{fect} implements counterfactual estimators for TSCS data. It first imputes counterfactuals by fitting an outcome model using untreated observations, then estimates the individual treatment effect as the difference between observed and predicted outcomes. Finally, it computes average treatment effects on the treated (ATT) and period-specific ATTs. Placebo and equivalence tests help evaluate identification assumptions.
 }
 \value{
+<<<<<<< Updated upstream
   \item{Y.dat}{a T-by-N matrix storing data of the outcome variable.}
   \item{D.dat}{a T-by-N matrix storing data of the treatment variable.}
   \item{I.dat}{a T-by-N matrix storing data of the indicator for whether is observed or missing.}
+=======
+  \item{Y.dat}{T-by-N matrix of the outcome variable.}
+  \item{D.dat}{T-by-N matrix of the treatment variable.}
+  \item{I.dat}{T-by-N matrix of observation indicators (observed/missing).}
+>>>>>>> Stashed changes
   \item{Y}{name of the outcome variable.}
   \item{D}{name of the treatment variable.}
-  \item{X}{name of the time-varying control variables.}
+  \item{X}{name of any time-varying covariates.}
   \item{W}{name of the weight variable.}
   \item{index}{name of the unit and time indicators.}
-  \item{force}{user specified \code{force} option.}
-  \item{T}{the number of time periods.}
-  \item{N}{the total number of units.}
-  \item{p}{the number of time-varying observables.}
-  \item{r.cv}{the number of factors included in the model -- either
-    supplied by users or automatically chosen via cross-validation.}
-  \item{lambda.cv}{the optimal hyper-parameter in matrix completion method
-  chosen via cross-validation.}
-  \item{beta}{coefficients of time-varying observables from the
-    interactive fixed effect model.}
-  \item{sigma2}{the mean squared error of interactive fixed effect model.}
-  \item{IC}{the information criterion.}
-  \item{est}{result of the interactive fixed effect model based on
-    observed values.}
-  \item{MSPE}{mean squared prediction error of the cross-validated model.}
-  \item{CV.out}{result of the cross-validation procedure.}
-  \item{niter}{the number of iterations in the estimation of the
-    interactive fixed effect model.}
+  \item{force}{specified fixed effects option.}
+  \item{T}{number of time periods.}
+  \item{N}{number of units.}
+  \item{p}{number of time-varying observables.}
+  \item{r.cv}{number of factors (selected by cross-validation if needed).}
+  \item{lambda.cv}{optimal hyper-parameter for matrix completion, if applicable.}
+  \item{beta}{coefficients for any covariates in an interactive fixed effects model.}
+  \item{sigma2}{mean squared error.}
+  \item{IC}{information criterion.}
+  \item{est}{results of the fitted model.}
+  \item{MSPE}{mean squared prediction error from cross-validation.}
+  \item{CV.out}{results of the cross-validation procedure.}
+  \item{niter}{number of iterations.}
   \item{factor}{estimated time-varying factors.}
   \item{lambda}{estimated loadings.}
   \item{lambda.tr}{estimated loadings for treated units.}
   \item{lambda.co}{estimated loadings for control units.}
-  \item{mu}{estimated ground mean. }
+  \item{mu}{estimated grand mean.}
   \item{xi}{estimated time fixed effects.}
   \item{alpha}{estimated unit fixed effects.}
   \item{alpha.tr}{estimated unit fixed effects for treated units.}
   \item{alpha.co}{estimated unit fixed effects for control units.}
+<<<<<<< Updated upstream
   \item{validX}{a logic value indicating if multicollinearity exists.}
   \item{validF}{a logic value indicating if factor exists.}
   \item{id}{a vector of unit IDs.}
@@ -186,10 +218,29 @@ assumptions.}
   \item{att.avg.unit}{by unit average treatment effect on the treated.}
   \item{time}{term for switch-on treatment effect.}
   \item{count}{count of each term for switch-on treatment effect.}
+=======
+  \item{validX}{logical indicating if valid covariates exist.}
+  \item{validF}{logical indicating if factors exist.}
+  \item{id}{vector of unit IDs.}
+  \item{rawtime}{vector of time periods.}
+  \item{obs.missing}{matrix indicating missingness patterns.}
+  \item{Y.ct}{T-by-N matrix of predicted outcomes under no treatment.}
+  \item{eff}{T-by-N matrix of estimated individual treatment effects.}
+  \item{res}{residuals for observed values.}
+  \item{eff.pre}{effects for treated units in pre-treatment periods.}
+  \item{eff.pre.equiv}{pre-treatment effects under baseline (two-way FE) model.}
+  \item{pre.sd}{by-period residual standard deviations for pre-treatment ATT.}
+  \item{att.avg}{overall average treatment effect on the treated.}
+  \item{att.avg.W}{weighted ATT.}
+  \item{att.avg.unit}{by-unit average treatment effect on the treated.}
+  \item{time}{time index for switch-on treatment effect.}
+  \item{count}{count of observations for each switch-on effect time.}
+>>>>>>> Stashed changes
   \item{att}{switch-on treatment effect.}
-  \item{att.on.W}{weighted switch-on treatment effect.}
-  \item{time.off}{term for switch-off treatment effect.}
+  \item{att.on.W}{weighted switch-on effect.}
+  \item{time.off}{time index for switch-off treatment effect.}
   \item{att.off}{switch-off treatment effect.}
+<<<<<<< Updated upstream
   \item{att.off.W}{weighted switch-off treatment effect.}
   \item{count.off}{count of each term for switch-off treatment effect.}
   \item{att.placebo}{average treatment effect for placebo period.}
@@ -212,13 +263,38 @@ assumptions.}
   \item{est.att.off}{inference for \code{att.off.W}.}
   \item{est.placebo}{inference for \code{att.placebo}.}
   \item{est.carryover}{inference for \code{att.carryover}.}
+=======
+  \item{att.off.W}{weighted switch-off effect.}
+  \item{count.off}{count for each switch-off period.}
+  \item{att.placebo}{ATT for placebo periods.}
+  \item{att.carryover}{ATT for carryover periods.}
+  \item{eff.calendar}{ATT by calendar time.}
+  \item{eff.calendar.fit}{loess-fitted ATT by calendar time.}
+  \item{N.calandar}{number of treated observations each calendar period.}
+  \item{balance.avg.att}{ATT for balanced sample.}
+  \item{balance.att}{switch-on ATT for balanced sample.}
+  \item{balance.time}{time index for balanced sample.}
+  \item{balance.count}{count for each time in balanced sample.}
+  \item{balance.att.placebo}{ATT for placebo period in balanced sample.}
+  \item{group.att}{ATT for different groups.}
+  \item{group.output}{list of switch-on treatment effects by group.}
+  \item{est.att.avg}{inference for \code{att.avg}.}
+  \item{est.att.avg.unit}{inference for \code{att.avg.unit}.}
+  \item{est.att}{inference for \code{att}.}
+  \item{est.att.W}{inference for weighted \code{att}.}
+  \item{est.att.off}{inference for switch-off.}
+  \item{est.att.off.W}{inference for weighted switch-off.}
+  \item{est.placebo}{inference for placebo ATT.}
+  \item{est.carryover}{inference for carryover ATT.}
+>>>>>>> Stashed changes
   \item{est.eff.calendar}{inference for \code{eff.calendar}.}
   \item{est.eff.calendar.fit}{inference for \code{eff.calendar.fit}.}
-  \item{est.balance.att}{inference for \code{balance.att}.}
-  \item{est.balance.avg}{inference for \code{balance.avg.att}.}
-  \item{est.balance.placebo}{inference for \code{balance.att.placebo}.}
+  \item{est.balance.att}{inference for balanced sample switch-on.}
+  \item{est.balance.avg}{inference for balanced sample average ATT.}
+  \item{est.balance.placebo}{inference for balanced sample placebo.}
   \item{est.avg.W}{inference for \code{att.avg.W}.}
   \item{est.beta}{inference for \code{beta}.}
+<<<<<<< Updated upstream
   \item{est.group.att}{inference for \code{group.att}.}
   \item{est.group.output}{inference for \code{group.output}.}  
   \item{att.avg.boot}{bootstrap results for \code{att.avg}.}
@@ -236,6 +312,24 @@ assumptions.}
   \item{test.out}{goodness-of-fit test and equivalent test results for pre-treatment fitting check.}
   \item{loo.test.out}{leave-one-period-out goodness-of-fit test and equivalent test results for pre-treatment fitting check.}
   \item{permute}{permutation test results for sharp null hypothesis.}
+=======
+  \item{est.group.att}{inference for group-specific ATT.}
+  \item{est.group.output}{inference for group output.}
+  \item{att.avg.boot}{bootstrap draws for \code{att.avg}.}
+  \item{att.avg.unit.boot}{bootstrap draws for \code{att.avg.unit}.}
+  \item{att.count.boot}{bootstrap draws for \code{count}.}
+  \item{att.off.boot}{bootstrap draws for \code{att.off}.}
+  \item{att.off.count.boot}{bootstrap draws for \code{count.off}.}
+  \item{att.placebo.boot}{bootstrap draws for \code{att.placebo}.}
+  \item{att.carryover.boot}{bootstrap draws for \code{att.carryover}.}
+  \item{balance.att.boot}{bootstrap draws for \code{balance.att}.}
+  \item{att.bound}{equivalence confidence interval for pre-trend.}
+  \item{att.off.bound}{equivalence confidence interval for switch-off.}
+  \item{beta.boot}{bootstrap draws for \code{beta}.}
+  \item{test.out}{F-test and equivalence test results for pre-treatment fit.}
+  \item{loo.test.out}{leave-one-period-out test results.}
+  \item{permute}{permutation test results.}
+>>>>>>> Stashed changes
 }
 \author{
   Licheng Liu; Ye Wang; Yiqing Xu; Ziyi Liu
@@ -246,15 +340,21 @@ assumptions.}
   Yiqing Xu. 2017. "Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models." Political 
   Analysis. 
   
+<<<<<<< Updated upstream
   Athey, Susan, et al. 2021 "Matrix completion methods for causal panel data models." Journal of the American Statistical Association. 
   
   Licheng Liu, et al. 2022. "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional 
   Data." American Journal of Political Science. 
 
   For more details about the matrix completion method, see \url{https://github.com/susanathey/MCPanel}. 
+=======
+  Xu, Y. (2017). 
+  Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models. 
+  \emph{Political Analysis, 25}(1), 57-76.
+>>>>>>> Stashed changes
 }
 \seealso{
-  \code{\link{plot.fect}} and \code{\link{print.fect}}
+  \code{\link{plot.fect}}, \code{\link{print.fect}}
 }
 \examples{
 library(fect)
@@ -264,4 +364,7 @@ out <- fect(Y ~ D + X1 + X2, data = simdata1,
             CV = TRUE, r = c(0, 5), se = 0, parallel = FALSE) 
 }
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes

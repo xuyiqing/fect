@@ -23,6 +23,7 @@
             balance = NULL, weight = NULL, \dots)
 }
 \arguments{
+<<<<<<< Updated upstream
   \item{x}{a \code{\link{fect}} object.}
   \item{type}{a string specifying the type of the plot. 
     \code{"gap"} plots the estimated period-wise ATT (dynamic treatment effects), 
@@ -101,6 +102,75 @@
 \value{
   \item{p}{a ggplot2 object saving the graph.}
   \item{test.out}{a list storing the results of statistical tests if \code{return.test=TRUE}.}
+=======
+  \item{x}{A fitted \code{\link{fect}} object.}
+  \item{type}{Plot type: \code{"gap"}, \code{"equiv"}, \code{"status"}, \code{"exit"},
+    \code{"factors"}, \code{"loadings"}, \code{"calendar"}, \code{"box"}, or \code{"counterfactual"}.}
+  \item{loo}{Logical; if \code{TRUE}, use leave-one-out for equivalence tests.}
+  \item{highlight}{Logical; if \code{TRUE}, highlight certain periods (e.g., placebo).}
+  \item{plot.ci}{What confidence interval to show: e.g., \code{"0.9"}, \code{"0.95"}, or \code{"none"}.}
+  \item{show.points}{Logical; if \code{TRUE}, show point estimates on the plot.}
+  \item{show.group}{Optional; specify a subgroup to plot.}
+  \item{bound}{Which bounds to display in bounding/equivalence tests: \code{"none"}, \code{"min"}, \code{"equiv"}, \code{"both"}.}
+  \item{vis}{For placebo/carryover tests, how lines are displayed: \code{"connected"} or \code{"none"}.}
+  \item{count}{Logical; if \code{TRUE}, shows a histogram of the number of observations.}
+  \item{proportion}{Restrict time points to those with at least this fraction of the max units.}
+  \item{pre.periods}{Specific pre-treatment periods used for bounding.}
+  \item{f.threshold}{F-test threshold in equivalence checks.}
+  \item{tost.threshold}{Threshold for TOST-based checks.}
+  \item{effect.bound.ratio}{If \code{TRUE}, show ratio of ATT to the minimal bound.}
+  \item{stats}{Which stats to display, e.g. \code{"F.p"}, \code{"equiv.p"}, etc.}
+  \item{stats.labs}{Custom labels for the displayed stats.}
+  \item{raw}{For \code{"counterfactual"} plot: \code{"none"}, \code{"band"}, or \code{"all"}.}
+  \item{main}{Main plot title.}
+  \item{xlim}{x-axis limits.}
+  \item{ylim}{y-axis limits.}
+  \item{xlab}{x-axis label.}
+  \item{ylab}{y-axis label.}
+  \item{xangle}{Angle in degrees for x-axis labels.}
+  \item{yangle}{Angle in degrees for y-axis labels.}
+  \item{xbreaks}{Major x-axis tick locations.}
+  \item{ybreaks}{Major y-axis tick locations.}
+  \item{xticklabels}{Labels for x-axis ticks.}
+  \item{yticklabels}{Labels for y-axis ticks.}
+  \item{gridOff}{Logical; if \code{TRUE}, removes grid lines.}
+  \item{legendOff}{Logical; if \code{TRUE}, hides the legend.}
+  \item{legend.pos}{Legend position.}
+  \item{legend.nrow}{Number of rows in legend.}
+  \item{legend.labs}{Custom legend labels.}
+  \item{stats.pos}{Position (x,y) for test statistics text.}
+  \item{show.stats}{Logical; if \code{TRUE}, shows test statistic text on plot.}
+  \item{theme.bw}{Logical; if \code{TRUE}, uses a black-and-white ggplot2 theme.}
+  \item{nfactors}{Number of factors to plot for \code{"factors"} or \code{"loadings"}.}
+  \item{include.FE}{Whether to include fixed effects as "factors".}
+  \item{id}{Vector specifying a subset of units to plot.}
+  \item{cex.main}{Size of main title.}
+  \item{cex.main.sub}{Size of a possible subtitle.}
+  \item{cex.axis}{Size of axis tick labels.}
+  \item{cex.lab}{Size of axis labels.}
+  \item{cex.legend}{Size of legend text.}
+  \item{cex.text}{Size of text annotations.}
+  \item{axis.adjust}{If \code{TRUE}, attempts to adjust axis labels for large data.}
+  \item{axis.lab}{Controls axis labeling in \code{"status"} plots. Could be \code{"both"}, \code{"time"}, \code{"unit"}, or \code{"off"}.}
+  \item{axis.lab.gap}{Controls spacing for axis labels in \code{"status"} plots.}
+  \item{shade.post}{If \code{TRUE}, shades post-treatment periods in some plot types.}
+  \item{start0}{If \code{TRUE}, re-index first post-treatment period as 0.}
+  \item{return.test}{If \code{TRUE}, returns test statistics as well as the plot.}
+  \item{balance}{If \code{TRUE}, uses "balance sample" results.}
+  \item{weight}{If \code{TRUE}, uses weighting from the \code{fect} object.}
+  \item{line.color}{Color for main lines.}
+  \item{line.width}{Numeric vector specifying line widths.}
+  \item{lcolor}{Color for reference lines.}
+  \item{lwidth}{Width of reference lines.}
+  \item{...}{Additional graphical parameters.}
+}
+\details{
+  \code{plot.fect} can produce various diagnostic or substantive plots for objects from \code{\link{fect}}. Depending on \code{type}, it shows treatment effects, equivalence tests, factor/loadings, or raw vs. counterfactual outcomes.
+}
+\value{
+  \item{p}{A \code{ggplot2} object with the requested plot.}
+  \item{test.out}{If \code{return.test=TRUE}, includes test statistics (placebo, F-test, equivalence p-values, etc.).}
+>>>>>>> Stashed changes
 }
 \author{
   Licheng Liu; Ye Wang; Yiqing Xu, Ziyi Liu

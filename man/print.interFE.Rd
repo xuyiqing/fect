@@ -5,15 +5,26 @@
 \usage{\method{print}{interFE}(x, \dots)} 
 \arguments{
   \item{x}{an \code{\link{interFE}} object.}
-  \item{\dots}{other argv.}
+  \item{\dots}{other arguments.}
 }
 \author{
   Licheng Liu; Ye Wang; Yiqing Xu
 }
 \value{No return value.}
+<<<<<<< Updated upstream
 \references{Jushan Bai. 2009. "Panel Data Models with Interactive Fixed
   Effects." Econometrica 77:1229--1279.}
 \seealso{\code{\link{interFE}} and \code{\link{fect}}}
+=======
+\references{
+  Bai, J. (2009). 
+  Panel data models with interactive fixed effects. 
+  \emph{Econometrica, 77}(4), 1229-1279.
+}
+\seealso{
+  \code{\link{interFE}}, \code{\link{fect}}
+}
+>>>>>>> Stashed changes
 \examples{
 library(fect)
 data(fect)

@@ -29,8 +29,15 @@
   Yiqing Xu. 2017. "Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models." Political 
   Analysis. 
   
+<<<<<<< Updated upstream
   Athey, Susan, et al. 2021 "Matrix completion methods for causal panel data models." Journal of the American Statistical Association. 
   
   Licheng Liu, et al. 2022. "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional 
   Data." American Journal of Political Science. 
 }
+=======
+  Xu, Y. (2017). 
+  Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models. 
+  \emph{Political Analysis, 25}(1), 57-76.
+}
+>>>>>>> Stashed changes
