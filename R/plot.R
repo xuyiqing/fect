@@ -1239,7 +1239,7 @@ plot.fect <- function(
                     ## band
                     p <- p + geom_ribbon(
                         data = data.band,
-                        aes(ymin = co5, ymax = co95, x = time),
+                        aes_string(ymin = "co5", ymax = "co95", x = "time"),
                         alpha = 0.15, fill = "steelblue"
                     )
 
@@ -1490,12 +1490,12 @@ plot.fect <- function(
                     p <- p +
                         geom_ribbon(
                             data = data.band,
-                            aes(ymin = tr5, ymax = tr95, x = time, fill = "tr"),
+                            aes_string(ymin = "tr5", ymax = "tr95", x = "time", fill = "tr"),
                             alpha = 0.15
                         ) +
                         geom_ribbon(
                             data = data.band,
-                            aes(ymin = co5, ymax = co95, x = time, fill = "co"),
+                            aes_string(ymin = "co5", ymax = "co95", x = "time", fill = "co"),
                             alpha = 0.15
                         )
 
@@ -1817,7 +1817,7 @@ plot.fect <- function(
                 ## band
                 p <- p + geom_ribbon(
                     data = data.band,
-                    aes(ymin = tr5, ymax = tr95, x = time),
+                    aes_string(ymin = "tr5", ymax = "tr95", x = "time"),
                     alpha = 0.15, fill = "red"
                 )
 

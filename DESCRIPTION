@@ -35,8 +35,10 @@ Imports:
     fixest, 
     doRNG, 
     future, 
-    panelView,
-    mvtnorm
+    mvtnorm,
+    dplyr
+Suggests:
+    panelView
 SystemRequirements: A C++11 compiler
 Depends: R (>= 3.5.0)
 LinkingTo: Rcpp, RcppArmadillo

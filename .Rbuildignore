@@ -1,6 +1,8 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^README\.Rmd$
+^README\.md$
+^NEWS\.md$
 ^_pkgdown\.yml$
 ^LICENSE\.md$
 ^\.github$
