@@ -1839,7 +1839,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 p.pos <- which(as.numeric(rownames(p.est.att)) == kk)
                 pre.est.att[jj, ] <- p.est.att[p.pos, ]
                 pre.att.bound[jj, ] <- p.att.bound[p.pos, ]
-                pre.att.boot[jj, ] <- p.out$att.boot.original[p.pos, ]
+                pre.att.boot[jj, ] <- p.out$att.boot[p.pos, ]
                 pre.period.name <- rownames(pre.est.att)[jj]
 
 
