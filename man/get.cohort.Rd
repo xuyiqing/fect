@@ -3,7 +3,7 @@
 \alias{get.cohort}
 \title{Generate Cohort Information from Panel Data}
 \description{
-The \code{get.cohort} function processes panel data to generate cohort-related variables, including treatment timing, cohort membership, and treatment dynamics. This function ensures that the data is uniquely identified, handles staggered treatment adoption, and includes options for dropping always-treated units.
+The \code{get.cohort} function processes panel data to generate cohort-related variables, including treatment timing, cohort membership, and treatment dynamics.
 }
 \usage{
 get.cohort(data, 
@@ -43,13 +43,18 @@ A data frame with additional variables:
 }
 \examples{
 library(fect)
-data(fect)
-simdata.cohort <- get.cohort(data = simdata, D = 'D', index = c("id","time"))
+simdata <- data.frame(
+  id = rep(1:5, each = 10),
+  time = rep(1:10, times = 5),
+  D = c(rep(0, 20), rep(1, 30)),
+  outcome = rnorm(50)
+)
+simdata.cohort <- get.cohort(data = simdata, D = 'D', index = c("id", "time"))
 print(table(simdata.cohort[,'Cohort']))
 }
 \seealso{
 \code{\link{fect}}, \code{\link{plot.fect}}
 }
 \author{
-Tianzhu Qin; Yiqing Xu; Jinwen Wu
+Tianzhu Qin, Yiqing Xu, Jinwen Wu
 }

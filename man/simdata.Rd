@@ -1,15 +1,3 @@
-<<<<<<< Updated upstream
-\name{simdata}
-\docType{data}
-\alias{simdata}
-\title{Simulated data}
-\description{A simulated dataset with continuous outcomes.}
-\format{dataframe}
-\keyword{datasets}
-\references{
-  Liu, Licheng, Ye Wang, and Yiqing Xu. 2022. ``A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data.'' American Journal of Political Science, forthcoming.
-}
-=======
 \encoding{UTF-8}
 \name{simdata}
 \docType{data}
@@ -23,4 +11,3 @@
   A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data. 
   \emph{American Journal of Political Science, 68}(1), 160-176.
 }
->>>>>>> Stashed changes

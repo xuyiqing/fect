@@ -1,3 +1,4 @@
+\encoding{UTF-8}
 \name{fect}
 \alias{fect}
 \title{Fixed Effects Counterfactual Estimators}
@@ -22,8 +23,7 @@ assumptions.}
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,
             carryoverTest = FALSE, carryover.period = NULL, carryover.rm = NULL,
-            loo = FALSE, permute = FALSE, m = 2, normalize = FALSE)  
-}
+            loo = FALSE, permute = FALSE, m = 2, normalize = FALSE)}  
 \arguments{
 \item{formula}{an object of class "formula": a symbolic description of the model to be fitted, e.g, Y~D+X1+X2}
 \item{data}{a data frame, can be a balanced or unbalanced panel data.}
@@ -52,76 +52,6 @@ assumptions.}
 \item{binary}{This version doesn't support this option.}
 \item{QR}{This version doesn't support this option.}
 \item{method}{a string specifying which imputation algorithm will be used. 
-<<<<<<< Updated upstream
-  \code{"fe"} for fixed effects model, 
-  \code{"ife"} for interactive fixed effects model, 
-  \code{"mc"} for matrix copletion method, 
-  \code{"polynomial"} for polynomial trend terms, 
-  \code{"bspline"} for regression splines,
-  \code{"gsynth"} for generalized synthetic control method,
-  and \code{"cfe"} for complex fixed effects method 
-  Default is \code{method = "fe"}.}
-\item{se}{a logical flag indicating whether uncertainty estimates will
-  be produced.}
-\item{vartype}{a string specifying the type of variance estimator. Choose 
-  from \code{vartype = c("bootstrap", "jackknife", "parametric")}. Default value is 
-  \code{"bootstrap"}.}
-\item{cl}{a string specifying the cluster of cluster bootstrapping}
-\item{quantile.CI}{a logical flag indicating whether to use quantile 
-  confidence intervals when \code{vartype = "bootstrap"}. Default to FALSE.}
-\item{nboots}{an integer specifying the number of bootstrap
-  runs. Ignored if \code{se = FALSE}.}
-\item{alpha}{significant level for hypothesis test and CIs. Default value is 
-  \code{alpha = 0.05}.}
-\item{parallel}{a logical flag indicating whether parallel computing
-  will be used in bootstrapping and/or cross-validation. Ignored if
-  \code{se = FALSE}.}
-\item{cores}{an integer indicating the number of cores to be used in
-  parallel computing. If not specified, the algorithm will use the
-  maximum number of logical cores of your computer (warning: this
-  could prevent you from multi-tasking on your computer).}
-\item{tol}{a positive number indicating the tolerance level.}
-\item{max.iteration}{The maximal number of iterations for the EM algorithm.}
-\item{seed}{an integer that sets the seed in random number
-  generation. Ignored if \code{se = FALSE} and \code{r} is specified.}
-\item{min.T0}{an integer specifying the minimum value of observed periods 
-  that a unit is under control.}
-\item{max.missing}{an integer. Units with number of missing values greater than 
-  it will be removed. Ignored if this parameter is set "NULL"(i.e. \code{max.missing = NULL}, the default setting).}
-\item{proportion}{a numeric value specifying pre-treatment periods that have 
-  observations larger than the proportion of observations at period 0. 
-  These pre-treatment periods are used used for goodness-of-fit test.
-  Ignore if \code{se = FALSE}. Deafult is \code{proportion = 0.3}.}
-\item{pre.periods}{a vector specifying the range of pre-treatment period used for goodness-of-fit test. If left blank, all 
-  pre-treatment periods specified by \code{proportion} will be used. Ignore if \code{se = FALSE}.}
-\item{f.threshold}{a numeric value specifying the threshold for the F-statistic in the equivalent test.
-  Ignore if \code{se = FALSE}.  Deafult is \code{f.threshold = 0.5}.}
-\item{tost.threshold}{a numeric value specifying the threshold for the two-one-sided t-test.
-  If \code{alpha=0.05}, TOST checks whether the 90% confidence intervals for the estimated period-wise ATT exceeds this threshold.
-  The default value is 0.36 times the standard deviation of the outcome variable after two-way fixed effects are partialed out.}
-\item{knots}{a numeric vector speicfying the knots for b-spline curve trend term.}
-\item{degree}{an integer speifcying the order of either the b-spline or the 
-  polynomial trend term.}
-\item{sfe}{a vector specifying other fixed effects in addition to unit or time fixed effects that is used when \code{method="cfe"}.}
-\item{cfe}{a vector of lists specifying interactive fixed effects when \code{method="cfe"}. 
-  For each list, the value of the first element is the name of the group variable for which fixed effects are to be estimated.
-  The value of the second element is the name of a regressor (e.g., a time trend).}
-\item{balance.period}{a vector of length 2 specifying the range of periods for a balanced sample which has no missing observation in the specified range.}
-\item{fill.missing}{a logical flag indicating whether to allow missing observations in this balanced sample. The default is FALSE.}
-\item{placeboTest}{a logic flag indicating whether to perform placebo test.}
-\item{placebo.period}{an integer or a two-element numeric vector specifying the 
-  range of pre-treatment periods that will be assigned as pseudo treatment periods.}
-\item{carryoverTest}{a logic flag indicating whether to perform (no) carryover test.}
-\item{carryover.period}{an integer or a two-element numeric vector specifying the 
-  range of post-treatment periods that will be assigned as pseudo treatment periods.}
-\item{carryover.rm}{an integer specifying the range of post-treatment periods that will be assigned as pseudo treatment periods.}
-\item{loo}{a logic flag indicating whether to perform the leave-one-period-out goodness-of-fit test, which is very time-consuming.}
-\item{permute}{a logic flag indicating whether to perform permutation test.}
-\item{m}{an integer specifying the block length in permutation test. Default value is 
-  \code{m = 2}.}
-\item{normalize}{a logic flag indicating whether to scale outcome and 
-  covariates. Useful for accelerating computing speed when magnitude of data is large. The default is \code{normalize=FALSE}.}
-=======
   \code{"fe"}, \code{"ife"}, \code{"mc"}, \code{"polynomial"}, \code{"bspline"},
   \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
@@ -156,21 +86,14 @@ assumptions.}
 \item{permute}{a logical flag indicating whether to run a permutation test.}
 \item{m}{an integer specifying the block length for permutation tests. Default \code{2}.}
 \item{normalize}{a logical flag indicating whether to scale outcome and covariates.}
->>>>>>> Stashed changes
 }
 \details{
   \code{fect} implements counterfactual estimators for TSCS data. It first imputes counterfactuals by fitting an outcome model using untreated observations, then estimates the individual treatment effect as the difference between observed and predicted outcomes. Finally, it computes average treatment effects on the treated (ATT) and period-specific ATTs. Placebo and equivalence tests help evaluate identification assumptions.
 }
 \value{
-<<<<<<< Updated upstream
-  \item{Y.dat}{a T-by-N matrix storing data of the outcome variable.}
-  \item{D.dat}{a T-by-N matrix storing data of the treatment variable.}
-  \item{I.dat}{a T-by-N matrix storing data of the indicator for whether is observed or missing.}
-=======
   \item{Y.dat}{T-by-N matrix of the outcome variable.}
   \item{D.dat}{T-by-N matrix of the treatment variable.}
   \item{I.dat}{T-by-N matrix of observation indicators (observed/missing).}
->>>>>>> Stashed changes
   \item{Y}{name of the outcome variable.}
   \item{D}{name of the treatment variable.}
   \item{X}{name of any time-varying covariates.}
@@ -198,27 +121,6 @@ assumptions.}
   \item{alpha}{estimated unit fixed effects.}
   \item{alpha.tr}{estimated unit fixed effects for treated units.}
   \item{alpha.co}{estimated unit fixed effects for control units.}
-<<<<<<< Updated upstream
-  \item{validX}{a logic value indicating if multicollinearity exists.}
-  \item{validF}{a logic value indicating if factor exists.}
-  \item{id}{a vector of unit IDs.}
-  \item{rawtime}{a vector of time periods.}
-  \item{obs.missing}{a matrix stroing status of each unit at each time point.}
-  \item{Y.ct}{a T-by-N matrix storing the predicted Y(0).}
-  \item{eff}{a T-by-N matrix storing the difference between actual outcome and predicted Y(0).}
-  \item{res}{residuals for observed values.}
-  \item{eff.pre}{difference between actual outcome and predicted Y(0) for 
-    observations of treated units under control.}
-  \item{eff.pre.equiv}{difference between actual outcome and predicted Y(0) for 
-    observations of treated units under control based on baseline (two-way fixed effects) model.}
-  \item{pre.sd}{by period residual standard deviation for estimated pre-treatment 
-    average treatment effects.}
-  \item{att.avg}{average treatment effect on the treated.}
-  \item{att.avg.W}{weighted average treatment effect on the treated.}
-  \item{att.avg.unit}{by unit average treatment effect on the treated.}
-  \item{time}{term for switch-on treatment effect.}
-  \item{count}{count of each term for switch-on treatment effect.}
-=======
   \item{validX}{logical indicating if valid covariates exist.}
   \item{validF}{logical indicating if factors exist.}
   \item{id}{vector of unit IDs.}
@@ -235,35 +137,10 @@ assumptions.}
   \item{att.avg.unit}{by-unit average treatment effect on the treated.}
   \item{time}{time index for switch-on treatment effect.}
   \item{count}{count of observations for each switch-on effect time.}
->>>>>>> Stashed changes
   \item{att}{switch-on treatment effect.}
   \item{att.on.W}{weighted switch-on effect.}
   \item{time.off}{time index for switch-off treatment effect.}
   \item{att.off}{switch-off treatment effect.}
-<<<<<<< Updated upstream
-  \item{att.off.W}{weighted switch-off treatment effect.}
-  \item{count.off}{count of each term for switch-off treatment effect.}
-  \item{att.placebo}{average treatment effect for placebo period.}
-  \item{att.carryover}{average treatment effect for carryover period.}
-  \item{eff.calendar}{average treatment effect for each calendar period.}
-  \item{eff.calendar.fit}{loess fitted values of average treatment effect for each calendar period.}
-  \item{N.calandar}{number of treated observations at each calendar period.}
-  \item{balance.avg.att}{average treatment effect for the balance sample.}
-  \item{balance.att}{switch-on treatment effect for the balance sample.}
-  \item{balance.time}{term of switch-on treatment effect for the balance sample.}
-  \item{balance.count}{count of each term for switch-on treatment effect for the balance sample.}
-  \item{balance.att.placebo}{average treatment effect for placebo period of the balance sample.}
-  \item{group.att}{average treatment effect for different groups.}
-  \item{group.output}{a list saving the switch-on treatment effects for different groups.}
-  \item{est.att.avg}{inference for \code{att.avg}.}
-  \item{est.att.avg.unit}{inference for \code{att.avg.unit}.}
-  \item{est.att}{inference for \code{att.on}.}
-  \item{est.att.W}{inference for \code{att.on.W}.}
-  \item{est.att.off}{inference for \code{att.off}.}
-  \item{est.att.off}{inference for \code{att.off.W}.}
-  \item{est.placebo}{inference for \code{att.placebo}.}
-  \item{est.carryover}{inference for \code{att.carryover}.}
-=======
   \item{att.off.W}{weighted switch-off effect.}
   \item{count.off}{count for each switch-off period.}
   \item{att.placebo}{ATT for placebo periods.}
@@ -286,7 +163,6 @@ assumptions.}
   \item{est.att.off.W}{inference for weighted switch-off.}
   \item{est.placebo}{inference for placebo ATT.}
   \item{est.carryover}{inference for carryover ATT.}
->>>>>>> Stashed changes
   \item{est.eff.calendar}{inference for \code{eff.calendar}.}
   \item{est.eff.calendar.fit}{inference for \code{eff.calendar.fit}.}
   \item{est.balance.att}{inference for balanced sample switch-on.}
@@ -294,25 +170,6 @@ assumptions.}
   \item{est.balance.placebo}{inference for balanced sample placebo.}
   \item{est.avg.W}{inference for \code{att.avg.W}.}
   \item{est.beta}{inference for \code{beta}.}
-<<<<<<< Updated upstream
-  \item{est.group.att}{inference for \code{group.att}.}
-  \item{est.group.output}{inference for \code{group.output}.}  
-  \item{att.avg.boot}{bootstrap results for \code{att.avg}.}
-  \item{att.avg.unit.boot}{bootstrap results for \code{att.avg.unit}.}
-  \item{att.count.boot}{bootstrap results for \code{count}.}
-  \item{att.off.boot}{bootstrap results for \code{att.avg.off}.}
-  \item{att.off.count.boot}{bootstrap results for \code{count.off}.}
-  \item{att.placebo.boot}{bootstrap results for \code{att.placebo}.}
-  \item{att.carryover.boot}{bootstrap results for \code{att.carryover}.}
-  \item{balance.att.boot}{bootstrap results for \code{balance.att}.}
-  \item{att.bound}{equivalence confidence interval for equivalence test.}
-  \item{att.off.bound}{equivalence confidence interval for equivalence test for 
-  switch-off effect.}
-  \item{beta.boot}{bootstrap results for \code{beta}.}
-  \item{test.out}{goodness-of-fit test and equivalent test results for pre-treatment fitting check.}
-  \item{loo.test.out}{leave-one-period-out goodness-of-fit test and equivalent test results for pre-treatment fitting check.}
-  \item{permute}{permutation test results for sharp null hypothesis.}
-=======
   \item{est.group.att}{inference for group-specific ATT.}
   \item{est.group.output}{inference for group output.}
   \item{att.avg.boot}{bootstrap draws for \code{att.avg}.}
@@ -329,29 +186,26 @@ assumptions.}
   \item{test.out}{F-test and equivalence test results for pre-treatment fit.}
   \item{loo.test.out}{leave-one-period-out test results.}
   \item{permute}{permutation test results.}
->>>>>>> Stashed changes
 }
 \author{
   Licheng Liu; Ye Wang; Yiqing Xu; Ziyi Liu
 }
 \references{
-  Jushan Bai. 2009. "Panel Data Models with Interactive Fixed Effects." Econometrica.
+  Athey, S., Bayati, M., Doudchenko, N., Imbens, G., and Khosravi, K. (2021). 
+  Matrix completion methods for causal panel data models. 
+  \emph{Journal of the American Statistical Association, 116}(536), 1716-1730. 
   
-  Yiqing Xu. 2017. "Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models." Political 
-  Analysis. 
+  Bai, J. (2009). 
+  Panel data models with interactive fixed effects. 
+  \emph{Econometrica, 77}(4), 1229-1279.
+    
+  Liu, L., Wang, Y., and Xu, Y. (2022).
+  A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data. 
+  \emph{American Journal of Political Science, 68}(1), 160-176.
   
-<<<<<<< Updated upstream
-  Athey, Susan, et al. 2021 "Matrix completion methods for causal panel data models." Journal of the American Statistical Association. 
-  
-  Licheng Liu, et al. 2022. "A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional 
-  Data." American Journal of Political Science. 
-
-  For more details about the matrix completion method, see \url{https://github.com/susanathey/MCPanel}. 
-=======
   Xu, Y. (2017). 
   Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models. 
   \emph{Political Analysis, 25}(1), 57-76.
->>>>>>> Stashed changes
 }
 \seealso{
   \code{\link{plot.fect}}, \code{\link{print.fect}}
@@ -359,12 +213,7 @@ assumptions.}
 \examples{
 library(fect)
 data(fect)
-out <- fect(Y ~ D + X1 + X2, data = simdata1, 
+out <- fect(Y ~ D + X1 + X2, data = simdata, 
             index = c("id","time"), force = "two-way",
             CV = TRUE, r = c(0, 5), se = 0, parallel = FALSE) 
 }
-
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes

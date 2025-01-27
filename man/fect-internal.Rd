@@ -1,4 +1,4 @@
-
+\encoding{UTF-8}
 \name{fect-internal}
 \alias{XXinv}
 \alias{beta_iter}
