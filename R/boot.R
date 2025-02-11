@@ -1273,6 +1273,7 @@ fect.boot <- function(Y,
 
     ## remove failure bootstrap
     ## alternative condition? max(apply(is.na(att.boot),2,sum)) == dim(att.boot)[1]
+    att.boot.original <- att.boot
     if (sum(is.na(c(att.avg.boot))) > 0) {
         boot.rm <- which(is.na(c(att.avg.boot)))
         att.avg.boot <- t(as.matrix(att.avg.boot[, -boot.rm]))
@@ -1690,7 +1691,15 @@ fect.boot <- function(Y,
             pvalue.att <- apply(att.boot, 1, get.pvalue)
         }
         
-        vcov.att <- cov(t(att.boot), use = "pairwise.complete.obs")
+        #vcov.att <- cov(t(att.boot), use = "pairwise.complete.obs")
+        vcov.att <- tryCatch(
+            {
+                cov(t(att.boot), use = "pairwise.complete.obs")
+            },
+            error = function(e) {
+                NA
+            }
+        )
 
         est.att <- cbind(att, se.att, CI.att, pvalue.att, out$count)
         colnames(est.att) <- c(
@@ -1720,7 +1729,16 @@ fect.boot <- function(Y,
                 pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
             }
 
-            vcov.att.off <- cov(t(att.off.boot), use = "pairwise.complete.obs")
+            #vcov.att.off <- cov(t(att.off.boot), use = "pairwise.complete.obs")
+            vcov.att.off <- tryCatch(
+                {
+                    cov(t(att.off.boot), use = "pairwise.complete.obs")
+                },
+                error = function(e) {
+                    NA
+                }
+            )   
+
 
             est.att.off <- cbind(att.off, se.att.off, CI.att.off, pvalue.att.off, out$count.off)
             colnames(est.att.off) <- c(
@@ -1780,7 +1798,16 @@ fect.boot <- function(Y,
                 pvalue.balance.att <- apply(balance.att.boot, 1, get.pvalue)
             }
 
-            vcov.balance.att <- cov(t(balance.att.boot), use = "pairwise.complete.obs")
+            #vcov.balance.att <- cov(t(balance.att.boot), use = "pairwise.complete.obs")
+
+            vcov.balance.att <- tryCatch(
+            {
+                cov(t(balance.att.boot), use = "pairwise.complete.obs")
+            },
+            error = function(e) {
+                NA
+            }
+            )
 
             est.balance.att <- cbind(
                 balance.att, se.balance.att, CI.balance.att,
@@ -1888,7 +1915,15 @@ fect.boot <- function(Y,
                 pvalue.att.W <- apply(att.on.W.boot, 1, get.pvalue)
             }
 
-            vcov.att.W <- cov(t(att.on.W.boot), use = "pairwise.complete.obs")
+            #vcov.att.W <- cov(t(att.on.W.boot), use = "pairwise.complete.obs")
+            vcov.att.W <- tryCatch(
+            {
+                cov(t(att.on.W.boot), use = "pairwise.complete.obs")
+            },
+            error = function(e) {
+                NA
+            }
+            )
 
             est.att.W <- cbind(
                 att.on.W, se.att.W, CI.att.W,
@@ -1957,7 +1992,15 @@ fect.boot <- function(Y,
                     pvalue.att.off.W <- apply(att.off.W.boot, 1, get.pvalue)
                 }
 
-                vcov.att.off.W <- cov(t(att.off.W.boot), use = "pairwise.complete.obs")
+                #vcov.att.off.W <- cov(t(att.off.W.boot), use = "pairwise.complete.obs")
+                vcov.att.off.W <- tryCatch(
+                {
+                    cov(t(att.off.W.boot), use = "pairwise.complete.obs")
+                },
+                error = function(e) {
+                    NA
+                }
+                )
 
                 est.att.off.W <- cbind(
                     att.off.W, se.att.off.W, CI.att.off.W,
@@ -2344,6 +2387,7 @@ fect.boot <- function(Y,
         est.att = est.att,
         att.bound = att.bound,
         att.boot = att.boot,
+        att.boot.original = att.boot.original,
         att.vcov = vcov.att,
         att.count.boot = att.count.boot
     )

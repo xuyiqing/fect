@@ -2008,11 +2008,22 @@ plot.fect <- function(
 
     ## type of plots
     if (type == "gap" | type == "equiv") {
-        time <- x$time
-        count.num <- x$count
-        best.pos <- 1
-        max.count <- max(count.num)
-    } else if (type == "exit") {
+        if(loo==TRUE & x$loo==TRUE){
+            time.loo <- as.numeric(rownames(x$pre.est.att))
+            time.post <- as.numeric(rownames(x$est.att))
+            time.post <- time.post[which(time.post>0)]
+            time <- sort(c(time.loo,time.post))
+            count.num <- c(x$pre.est.att[,'count.on'],x$est.att[which(as.numeric(rownames(x$est.att))>0),'count'])
+            best.pos <- 1
+            max.count <- max(count.num)
+        }else{
+            time <- x$time
+            count.num <- x$count
+            best.pos <- 1
+            max.count <- max(count.num)            
+        }
+    }
+     else if (type == "exit") {
         time <- x$time.off
         count.num <- x$count.off
         best.pos <- 0
@@ -2955,7 +2966,7 @@ plot.fect <- function(
 
         T.post.length <- length(data[which(data[, "time"] > 0), "time"])
         T.pre.length <- length(data[which(data[, "time"] <= 0), "time"])
-        if (T.pre.length > 5 & T.post.length > 5) {
+        if (T.pre.length > 5 | T.post.length > 5) {
             p <- p + scale_x_continuous(labels = scaleFUN)
         } else {
             p <- p + scale_x_continuous(breaks = c(data[, "time"]))

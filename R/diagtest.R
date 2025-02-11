@@ -64,7 +64,7 @@ diagtest <- function(
         res_boot <- res_boot[, which(apply(!is.na(res_boot), 2, all))]
         if (length(pre.pos) == max.pre.periods) {
             pre.pos <- pre.pos[-1]
-            message("Cannot use full pre-treatment periods in F-test. The first period is removed.\n")
+            #message("Cannot use full pre-treatment periods in F-test. The first period is removed.\n")
         }
         if (length(pre.pos) > 1) {
             res_boot <- res_boot[pre.pos, ]
@@ -76,10 +76,11 @@ diagtest <- function(
         coef_mat <- res_boot
         S <- cov(t(coef_mat)) ## * N_bar
         psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
-
+        
         if ("try-error" %in% class(psi)) {
             message("\n")
-            message("The estimated covariance matrix is irreversible.")
+            #message("The estimated covariance matrix is irreversible.")
+            message("F-test Failed. The estimated covariance matrix is singular.")
             message("\n")
             f.stat <- f.p <- f.equiv.p <- f.threshold <- NA
         } else {
@@ -87,7 +88,7 @@ diagtest <- function(
             ## F statistic
 
             if (scale <= 0) {
-                warnings("Can't calculate the F statistic because of insufficient treated units.\n")
+                message("Can't calculate the F statistic because of insufficient treated units.\n")
                 f.stat <- NA
                 f.p <- NA
                 f.equiv.p <- NA
@@ -131,7 +132,7 @@ diagtest <- function(
         pre.pos <- which(x$time %in% pre.periods)
         if (length(pre.pos) == max.pre.periods) {
             pre.pos <- pre.pos[-1]
-            message("Cannot use full pre-treatment periods in the F test. The first period is removed.\n")
+            #message("Cannot use full pre-treatment periods in the F test. The first period is removed.\n")
         }
 
         res_boot <- x$att.boot
@@ -149,17 +150,17 @@ diagtest <- function(
         S <- cov(t(coef_mat)) ## * N_bar
 
         psi <- try(as.numeric(t(D) %*% solve(S) %*% D), silent = TRUE)
-
         if ("try-error" %in% class(psi)) {
             message("\n")
-            message("The estimated covariance matrix is irreversible.")
+            #message("The estimated covariance matrix is irreversible.")
+            message("F-test Failed. The estimated covariance matrix is singular.")
             message("\n")
             f.stat <- f.p <- f.equiv.p <- f.threshold <- NA
         } else {
             scale <- (N_bar - length(pre.pos)) / ((N_bar - 1) * length(pre.pos))
             ## F statistic
             if (scale <= 0) {
-                warnings("Can't calculate the F statistic because of insufficient treated units.\n")
+                message("Can't calculate the F statistic because of insufficient treated units.\n")
                 f.stat <- NA
                 f.p <- NA
                 f.equiv.p <- NA

@@ -1,8 +1,5 @@
 ## Causal inference using counterfactual estimators 
 ## (fect: fixed effects counterfactuals)
-## Version 0.7.0
-## Author: Licheng Liu (Tsinghua), Ye Wang(NYU), Yiqing Xu(Stanford), Ziyi Liu(Uchicago)
-## Date: 2022.08.07
 
 ## MAIN FUNCTION
 ## fect.formula()
@@ -58,7 +55,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  alpha = 0.05, # significance level
                  parallel = TRUE, # parallel computing
                  cores = NULL, # number of cores
-                 tol = 1e-5, # tolerance level
+                 tol = 1e-3, # tolerance level
                  max.iteration = 1000,
                  seed = NULL, # set seed
                  min.T0 = NULL, # minimum T0
@@ -119,7 +116,7 @@ fect.formula <- function(formula = NULL,
                          alpha = 0.05, # significance level
                          parallel = TRUE, # parallel computing
                          cores = NULL, # number of cores
-                         tol = 1e-5, # tolerance level
+                         tol = 1e-3, # tolerance level
                          max.iteration = 1000,
                          seed = NULL, # set seed
                          min.T0 = NULL,
@@ -269,7 +266,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          alpha = 0.05, # significance level
                          parallel = TRUE, # parallel computing
                          cores = NULL, # number of cores
-                         tol = 1e-5, # tolerance level
+                         tol = 1e-3, # tolerance level
                          max.iteration = 1000,
                          seed = NULL, # set seed
                          min.T0 = NULL,
@@ -629,6 +626,10 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         if (! cl %in% names(data)) {
             stop("\"cl\" misspecified.\n")
         }
+        if(length(cl)!=1){
+            stop("Length of \"cl\" must be 1.\n")
+        }
+        if(cl==index[1]){cl <- NULL}
     } 
 
     if(method == 'cfe'){
@@ -1839,7 +1840,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 p.pos <- which(as.numeric(rownames(p.est.att)) == kk)
                 pre.est.att[jj, ] <- p.est.att[p.pos, ]
                 pre.att.bound[jj, ] <- p.att.bound[p.pos, ]
-                pre.att.boot[jj, ] <- p.out$att.boot[p.pos, ]
+                pre.att.boot[jj, ] <- p.out$att.boot.original[p.pos, ]
                 pre.period.name <- rownames(pre.est.att)[jj]
 
 
