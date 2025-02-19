@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactual Estimators
-Version: 2.0.0
-Date: 2025-01-17
+Version: 2.0.1
+Date: 2025-02-17
 Authors@R: 
     c(person("Licheng", "Liu", , "lichengl@stanford.edu", role = c("aut")), 
       person("Ziyi", "Liu", , "zyliu2023@berkeley.edu", role = c("aut", "cre")),
