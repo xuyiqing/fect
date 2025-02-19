@@ -1487,17 +1487,19 @@ plot.fect <- function(
                     ))
 
                     ## band
+                    #print(data.band)
                     p <- p +
                         geom_ribbon(
                             data = data.band,
-                            aes_string(ymin = "tr5", ymax = "tr95", x = "time", fill = "tr"),
+                            aes(x = time, ymin = tr5, ymax = tr95, fill = "tr"),
                             alpha = 0.15
                         ) +
                         geom_ribbon(
                             data = data.band,
-                            aes_string(ymin = "co5", ymax = "co95", x = "time", fill = "co"),
+                            aes(x = time, ymin = co5, ymax = co95, fill = "co"),
                             alpha = 0.15
                         )
+
 
                     set.breaks <- c("tr", "co")
                     set.labels <- c(tr = "Treated Average", co = "Estimated Y(0) Average")
