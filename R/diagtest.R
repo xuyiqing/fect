@@ -49,8 +49,10 @@ diagtest <- function(
         max.pre.periods <- x$time[which(x$count >= max.count * proportion & x$time <= 0)]
         if (is.null(pre.periods) == TRUE) {
             pre.periods <- max.pre.periods
-        } else {
+        } else if(length(pre.periods)>0) {
             pre.periods <- intersect(pre.periods[1]:pre.periods[length(pre.periods)], max.pre.periods)
+        } else{
+            pre.periods <- NA
         }
         pre.term <- pre.periods
         N_bar <- max(x$count[which(x$time %in% pre.periods)])
