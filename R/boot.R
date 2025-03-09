@@ -299,7 +299,17 @@ fect.boot <- function(Y,
     }
 
     ## bootstrapped estimates
-    ## eff.boot <- array(0,dim = c(TT, Ntr, nboots))  ## to store results
+    if (vartype=="jackknife") {
+        D.boot <- array(NA, dim = c(TT, N-1, nboots))
+        I.boot <- array(NA, dim = c(TT, N-1, nboots))
+        eff.boot <- array(0, dim = c(TT, N-1, nboots))  ## to store results
+    } else {
+        D.boot <- array(NA, dim = c(TT, N, nboots))
+        I.boot <- array(NA, dim = c(TT, N, nboots))
+        eff.boot <- array(0, dim = c(TT, N, nboots))  ## to store results
+    }
+    colnames.boot <- c()
+
     att.avg.boot <- matrix(0, 1, nboots)
     att.avg.unit.boot <- matrix(0, 1, nboots)
     att.boot <- matrix(0, length(time.on), nboots)
@@ -309,6 +319,7 @@ fect.boot <- function(Y,
     calendar.eff.fit.boot <- matrix(0, TT, nboots)
 
     if (hasRevs == 1) {
+        eff.off.boot <- c()
         att.off.boot <- matrix(0, length(time.off), nboots)
         att.off.count.boot <- matrix(0, length(time.off), nboots)
     }
@@ -811,8 +822,8 @@ fect.boot <- function(Y,
             }
         }
     } else {
-        one.nonpara <- function(num = NULL) { ## bootstrap
-            if (is.null(num)) {
+        one.nonpara <- function(num = NULL) { 
+            if (is.null(num)) { ## bootstrap sample ids
                 if (is.null(cl)) {
                     if (hasRevs == 0) {
                         if (Nco > 0) {
@@ -886,7 +897,7 @@ fect.boot <- function(Y,
                 }
 
                 boot.group <- group[, boot.id]
-            } else { ## jackknife
+            } else { ## jackknife bootstrap ids
                 boot.group <- group[, -num]
                 boot.id <- 1:N
                 boot.id <- boot.id[-num]
@@ -1065,6 +1076,7 @@ fect.boot <- function(Y,
                     )
                     return(boot0)
                 } else {
+                    boot$boot.id <- boot.id
                     return(boot)
                 }
             }
@@ -1097,6 +1109,11 @@ fect.boot <- function(Y,
             att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
             att.boot[, j] <- boot.out[[j]]$att
             att.count.boot[, j] <- boot.out[[j]]$count
+            colnames(boot$eff) <- boot$boot.id
+            eff.boot[, , j] <- boot.out[[j]]$eff
+            D.boot[, , j] <- boot.out[[j]]$D
+            I.boot[, , j] <- boot.out[[j]]$I
+            colnames.boot <- c(colnames.boot, boot.out[[j]]$boot.id)
 
             calendar.eff.boot[, j] <- boot.out[[j]]$eff.calendar
             calendar.eff.fit.boot[, j] <- boot.out[[j]]$eff.calendar.fit
@@ -1109,6 +1126,7 @@ fect.boot <- function(Y,
             if (hasRevs == 1) {
                 att.off.boot[, j] <- boot.out[[j]]$att.off
                 att.off.count.boot[, j] <- boot.out[[j]]$count.off
+                eff.off.boot <- c(eff.off.boot, list(boot.out[[j]]$eff.off))
             }
             if (!is.null(T.on.carry)) {
                 carry.att.boot[, j] <- boot.out[[j]]$carry.att
@@ -1185,10 +1203,16 @@ fect.boot <- function(Y,
         # )
         for (j in 1:nboots) {
             boot <- one.nonpara(boot.seq[j])
+            colnames(boot$eff) <- boot$boot.id
+            assign("boot", boot, .GlobalEnv)
             att.avg.boot[, j] <- boot$att.avg
             att.avg.unit.boot[, j] <- boot$att.avg.unit
             att.boot[, j] <- boot$att
             att.count.boot[, j] <- boot$count
+            eff.boot[, , j] <- boot$eff
+            D.boot[, , j] <- boot$D
+            I.boot[, , j] <- boot$I
+            colnames.boot <- c(colnames.boot, boot$boot.id)
 
             calendar.eff.boot[, j] <- boot$eff.calendar
             calendar.eff.fit.boot[, j] <- boot$eff.calendar.fit
@@ -1199,6 +1223,7 @@ fect.boot <- function(Y,
                 }
             }
             if (hasRevs == 1) {
+                eff.off.boot <- c(eff.off.boot, list(boot$eff.off))
                 att.off.boot[, j] <- boot$att.off
                 att.off.count.boot[, j] <- boot$count.off
             }
@@ -2389,7 +2414,11 @@ fect.boot <- function(Y,
         att.boot = att.boot,
         att.boot.original = att.boot.original,
         att.vcov = vcov.att,
-        att.count.boot = att.count.boot
+        att.count.boot = att.count.boot,
+        eff.boot = eff.boot,
+        D.boot = D.boot,
+        I.boot = I.boot,
+        colnames.boot = colnames.boot
     )
 
     if (p > 0) {
@@ -2405,7 +2434,8 @@ fect.boot <- function(Y,
             att.off.boot = att.off.boot,
             att.off.vcov = vcov.att.off,
             att.off.bound = att.off.bound,
-            att.off.count.boot = att.off.count.boot
+            att.off.count.boot = att.off.count.boot,
+            eff.off.boot = eff.off.boot
         ))
     }
 

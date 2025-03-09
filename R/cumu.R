@@ -4,7 +4,7 @@
 att.cumu <- function(x, ## a fect object
                      period = NULL, ## range, length = 2
                      weighted = TRUE, ## weighted cumulative effect
-                     alpha = 0.05, 
+                     alpha = 0.05,
                      type = "on", ## switch on or switch off
                      plot = FALSE
                     ) {
@@ -28,7 +28,7 @@ att.cumu <- function(x, ## a fect object
     att <- x$att
     est.att <- x$est.att
 
-    if (!is.null(est.att) & sum(abs(c(x$att.boot)),na.rm = TRUE) != 0) {
+    if (!is.null(est.att) & sum(abs(c(x$att.boot)), na.rm = TRUE) != 0) {
         se <- 1
     }
 
@@ -201,6 +201,3 @@ get.pvalue <- function(vec) {
   }
   return(min(as.numeric(min(a, b)),1))
 }
-
-
-
