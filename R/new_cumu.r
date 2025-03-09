@@ -15,8 +15,9 @@ cumuEff <- function(x, ## a fect object
         mask <- (colSums(x$D.dat) > 0)
     } else {
         # Otherwise, select specified units
-        mask <- colnames(x$eff) %in% id
+        mask <- (colnames(x$eff) %in% id)
     }
+    print(colnames(x$eff))
     
     # Extract relevant matrices for selected units
     eff <- x$eff[, mask]      # Treatment effects
@@ -85,8 +86,9 @@ cumuEff <- function(x, ## a fect object
             if (is.null(id)){
                 mask.boot <- (colSums(D.boot) > 0) 
             } else {
-                mask.boot <- (x$colnames.boot[i] %in% id)
+                mask.boot <- (x$id[unlist(x$colnames.boot[i])] %in% id)
             }
+            assign("colnames", x$colnames.boot[i], .GlobalEnv)
             
             # Extract relevant matrices for selected units
             Itr.boot <- I.boot[, mask.boot]
@@ -126,6 +128,7 @@ cumuEff <- function(x, ## a fect object
     if (!is.null(catt.boot)) {
         # Check if inference method is jackknife
         is_jackknife <- !is.null(inference) && inference == "jackknife"
+        is_parametric <- !is.null(inference) && inference == "parametric"
         
         # Calculate standard errors with proper scaling for jackknife
         if (is_jackknife) {
@@ -146,6 +149,10 @@ cumuEff <- function(x, ## a fect object
             CI.att <- t(apply(cbind(catt, se.att), 1, function(row) {
                 c(row[1] - t_critical * row[2], row[1] + t_critical * row[2])
             }))
+        } else if (is_parametric) {
+            CI.att <- t(apply(catt - catt.boot, 1, function(vec) {
+                quantile(vec, c(0.025, 0.975), na.rm = TRUE)
+            }))
         } else {
             # For bootstrap, use empirical quantiles
             CI.att <- t(apply(catt.boot, 1, function(vec) {
@@ -161,6 +168,8 @@ cumuEff <- function(x, ## a fect object
                 t_stat <- catt[i] / se.att[i]
                 2 * pt(-abs(t_stat), df = N_samples - 1)
             })
+        } else if (is_parametric) {
+            pvalue.att <- apply(catt - catt.boot, 1, get.pvalue) 
         } else {
             # For bootstrap, use empirical distribution
             pvalue.att <- apply(catt.boot, 1, get.pvalue)

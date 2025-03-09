@@ -67,8 +67,6 @@ fect.boot <- function(Y,
         use_weight <- 1
     }
 
-
-
     if (hasRevs == 1) {
         ## D.fake : check reversals
         D.fake <- apply(D, 2, function(vec) {
@@ -680,6 +678,7 @@ fect.boot <- function(Y,
                 )
                 return(boot0)
             } else {
+                synth.out$boot.id <- id.boot
                 return(synth.out)
             }
         }
@@ -1113,7 +1112,11 @@ fect.boot <- function(Y,
             eff.boot[, , j] <- boot.out[[j]]$eff
             D.boot[, , j] <- boot.out[[j]]$D
             I.boot[, , j] <- boot.out[[j]]$I
-            colnames.boot <- c(colnames.boot, boot.out[[j]]$boot.id)
+            if (is.null(boot.out[[j]]$boot.id)){
+                colnames.boot <- c(colnames.boot, list(1:N))
+            } else {
+                colnames.boot <- c(colnames.boot, list(boot.out[[j]]$boot.id))    
+            }
 
             calendar.eff.boot[, j] <- boot.out[[j]]$eff.calendar
             calendar.eff.fit.boot[, j] <- boot.out[[j]]$eff.calendar.fit
@@ -1212,8 +1215,12 @@ fect.boot <- function(Y,
             eff.boot[, , j] <- boot$eff
             D.boot[, , j] <- boot$D
             I.boot[, , j] <- boot$I
-            colnames.boot <- c(colnames.boot, boot$boot.id)
-
+            if (is.null(boot$boot.id)){
+                colnames.boot <- c(colnames.boot, list(1:N)) # Parametric bootstrap
+                assign("boot", boot, .GlobalEnv)
+            } else {
+                colnames.boot <- c(colnames.boot, list(boot$boot.id)) # Raw bootstrap and jackknife
+            }
             calendar.eff.boot[, j] <- boot$eff.calendar
             calendar.eff.fit.boot[, j] <- boot$eff.calendar.fit
             if (p > 0) {
