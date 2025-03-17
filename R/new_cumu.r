@@ -9,6 +9,10 @@ cumuEff <- function(x, ## a fect object
                     id = NULL, ## units to be averaged on
                     type = "on", ## "on" or "off"
                     period = NULL) { ## event window
+    if (is.null(x$eff.boot)){
+        stop("No bootstrap results available. Choose need_cumu = TRUE in fect().")
+    }
+    
     # Select units for analysis
     if (is.null(id)) {
         # If no specific units provided, select all treated units
@@ -17,13 +21,14 @@ cumuEff <- function(x, ## a fect object
         # Otherwise, select specified units
         mask <- (colnames(x$eff) %in% id)
     }
-    print(colnames(x$eff))
+    # print(colnames(x$eff))
     
     # Extract relevant matrices for selected units
     eff <- x$eff[, mask]      # Treatment effects
     D <- x$D.dat[, mask]      # Treatment indicators
     I <- x$I.dat[, mask]      # Inclusion (non-missing) indicators
     inference <- x$call$vartype  # Inference type
+    method <- x$method        # Method
     
     # Get dimensions of data
     TT <- dim(eff)[1]  # Number of time periods
@@ -128,7 +133,7 @@ cumuEff <- function(x, ## a fect object
     if (!is.null(catt.boot)) {
         # Check if inference method is jackknife
         is_jackknife <- !is.null(inference) && inference == "jackknife"
-        is_parametric <- !is.null(inference) && inference == "parametric"
+        is_parametric <- !is.null(inference) && inference == "parametric" && method == "gsynth"
         
         # Calculate standard errors with proper scaling for jackknife
         if (is_jackknife) {
