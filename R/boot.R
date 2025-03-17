@@ -1112,7 +1112,7 @@ fect.boot <- function(Y,
             att.boot[, j] <- boot.out[[j]]$att
             att.count.boot[, j] <- boot.out[[j]]$count
             if (need_cumu){
-                colnames(boot$eff) <- boot$boot.id
+                colnames(boot.out[[j]]$eff) <- boot.out[[j]]$boot.id
                 eff.boot[, , j] <- boot.out[[j]]$eff
                 D.boot[, , j] <- boot.out[[j]]$D
                 I.boot[, , j] <- boot.out[[j]]$I

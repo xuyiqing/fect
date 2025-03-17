@@ -7,10 +7,13 @@
 cumuEff <- function(x, ## a fect object
                     cumu = TRUE, ## whether to calculate cumulative effect
                     id = NULL, ## units to be averaged on
-                    type = "on", ## "on" or "off"
+                    # type = "on", ## "on" or "off"
                     period = NULL) { ## event window
     if (is.null(x$eff.boot)){
         stop("No bootstrap results available. Choose need_cumu = TRUE in fect().")
+    }
+    if (x$hasRevs) {
+        stop("Cumulative effects are not well-defined for panels with treatment reversal.")
     }
     
     # Select units for analysis
@@ -21,7 +24,6 @@ cumuEff <- function(x, ## a fect object
         # Otherwise, select specified units
         mask <- (colnames(x$eff) %in% id)
     }
-    # print(colnames(x$eff))
     
     # Extract relevant matrices for selected units
     eff <- x$eff[, mask]      # Treatment effects
@@ -93,7 +95,6 @@ cumuEff <- function(x, ## a fect object
             } else {
                 mask.boot <- (x$id[unlist(x$colnames.boot[i])] %in% id)
             }
-            assign("colnames", x$colnames.boot[i], .GlobalEnv)
             
             # Extract relevant matrices for selected units
             Itr.boot <- I.boot[, mask.boot]
