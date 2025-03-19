@@ -13,7 +13,7 @@ cumuEff <- function(x, ## a fect object
         stop("No bootstrap results available. Choose need_cumu = TRUE in fect().")
     }
     if (x$hasRevs) {
-        stop("Cumulative effects are not well-defined for panels with treatment reversal.")
+        warning("Cumulative effects are not well-defined for panels with treatment reversal.")
     }
     
     # Select units for analysis
@@ -138,7 +138,7 @@ cumuEff <- function(x, ## a fect object
         
         # Calculate standard errors with proper scaling for jackknife
         if (is_jackknife) {
-            # For jackknife, scale by sqrt(N-1)/sqrt(N)
+            # For jackknife, scale by sqrt(N-1)
             N_samples <- ncol(catt.boot)
             jackknife_scale <- sqrt(N_samples - 1)
             se.att <- apply(catt.boot, 1, function(vec) sd(vec, na.rm = TRUE) * jackknife_scale)
@@ -156,7 +156,7 @@ cumuEff <- function(x, ## a fect object
                 c(row[1] - t_critical * row[2], row[1] + t_critical * row[2])
             }))
         } else if (is_parametric) {
-            CI.att <- t(apply(catt - catt.boot, 1, function(vec) {
+            CI.att <- t(apply(catt-catt.boot, 1, function(vec) {
                 quantile(vec, c(0.025, 0.975), na.rm = TRUE)
             }))
         } else {
@@ -175,7 +175,7 @@ cumuEff <- function(x, ## a fect object
                 2 * pt(-abs(t_stat), df = N_samples - 1)
             })
         } else if (is_parametric) {
-            pvalue.att <- apply(catt - catt.boot, 1, get.pvalue) 
+            pvalue.att <- apply(catt-catt.boot, 1, get.pvalue) 
         } else {
             # For bootstrap, use empirical distribution
             pvalue.att <- apply(catt.boot, 1, get.pvalue)
