@@ -8,12 +8,14 @@ cumuEff <- function(x, ## a fect object
                     cumu = TRUE, ## whether to calculate cumulative effect
                     id = NULL, ## units to be averaged on
                     # type = "on", ## "on" or "off"
-                    period = NULL) { ## event window
+                    period = NULL, ## event window
+                    plot = FALSE) {
     if (is.null(x$eff.boot)){
         stop("No bootstrap results available. Choose need_cumu = TRUE in fect().")
     }
     if (x$hasRevs) {
         warning("Cumulative effects are not well-defined for panels with treatment reversal.")
+        return() # Return NA
     }
     
     # Select units for analysis
@@ -134,7 +136,7 @@ cumuEff <- function(x, ## a fect object
     if (!is.null(catt.boot)) {
         # Check if inference method is jackknife
         is_jackknife <- !is.null(inference) && inference == "jackknife"
-        is_parametric <- !is.null(inference) && inference == "parametric" && method == "gsynth"
+        is_parametric <- !is.null(inference) && inference == "parametric"
         
         # Calculate standard errors with proper scaling for jackknife
         if (is_jackknife) {
@@ -148,16 +150,12 @@ cumuEff <- function(x, ## a fect object
         }
         
         # Calculate 95% confidence intervals
-        if (is_jackknife) {
+        if (is_jackknife || is_parametric) {
             # For jackknife, use t-distribution with N-1 degrees of freedom
             N_samples <- ncol(catt.boot)
             t_critical <- qt(0.975, df = N_samples - 1)
             CI.att <- t(apply(cbind(catt, se.att), 1, function(row) {
                 c(row[1] - t_critical * row[2], row[1] + t_critical * row[2])
-            }))
-        } else if (is_parametric) {
-            CI.att <- t(apply(catt-catt.boot, 1, function(vec) {
-                quantile(vec, c(0.025, 0.975), na.rm = TRUE)
             }))
         } else {
             # For bootstrap, use empirical quantiles
@@ -167,15 +165,13 @@ cumuEff <- function(x, ## a fect object
         }
         
         # Calculate p-values
-        if (is_jackknife) {
+        if (is_jackknife || is_parametric) {
             # For jackknife, use t-distribution for p-values
             N_samples <- ncol(catt.boot)
             pvalue.att <- sapply(1:nrow(catt.boot), function(i) {
                 t_stat <- catt[i] / se.att[i]
                 2 * pt(-abs(t_stat), df = N_samples - 1)
             })
-        } else if (is_parametric) {
-            pvalue.att <- apply(catt-catt.boot, 1, get.pvalue) 
         } else {
             # For bootstrap, use empirical distribution
             pvalue.att <- apply(catt.boot, 1, get.pvalue)
@@ -186,6 +182,92 @@ cumuEff <- function(x, ## a fect object
         rownames(est.catt) <- period[1]:period[2]
     }
     
+    # Plot
+    if (plot) {
+        # Create a data frame for plotting
+        plot_data <- data.frame(
+            time = as.numeric(rownames(est.catt)),
+            catt = est.catt[, "CATT"],
+            ci_lower = est.catt[, "CI.lower"],
+            ci_upper = est.catt[, "CI.upper"]
+        )
+        
+        # Add count data for the bar chart at the bottom
+        time_range <- unique(plot_data$time)
+        # Calculate treated units at each relative time point
+        # First re-create the relative time matrix (similar to what getEffect does)
+        D_rel <- D.old  # Start with original treatment matrix
+        for (i in 1:ncol(D_rel)) {
+            cumD <- cumsum(D_rel[, i])
+            t0 <- sum(cumD == 0)  # Find time of first treatment
+            if (t0 > 0) {  # Only process treated units
+                D_rel[, i] <- 1:nrow(D_rel) - t0  # Convert to relative time
+            } else {
+                D_rel[, i] <- NA  # Not treated
+            }
+        }
+        
+        # Count treated units at each time point
+        count_data <- data.frame(
+            time = time_range,
+            count = sapply(time_range, function(t) {
+                sum(D_rel == t, na.rm = TRUE)
+            })
+        )
+        
+        # Calculate rectangle dimensions for count display with more space between bars and main plot
+        y_range <- diff(range(plot_data$ci_lower, plot_data$ci_upper, na.rm = TRUE))
+        rect.min <- min(plot_data$ci_lower, na.rm = TRUE) - 0.2 * y_range
+        rect.length <- 0.15 * y_range
+        
+        T.start <- time_range - 0.25
+        T.end <- time_range + 0.25
+        ymin <- rep(rect.min, length(time_range))
+        ymax <- rect.min + rect.length * count_data$count / max(count_data$count)
+        
+        data.toplot <- data.frame(
+            xmin = T.start,
+            xmax = T.end,
+            ymin = ymin,
+            ymax = ymax
+        )
+        
+        # Create the plot
+        p <- ggplot() +
+            geom_point(data = plot_data, aes(x = time, y = catt), size = 2) +
+            geom_linerange(data = plot_data, 
+                         aes(x = time, ymin = ci_lower, ymax = ci_upper),
+                         size = 0.5) +
+            geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+            geom_rect(data = data.toplot, 
+                      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+                      fill = "gray50", alpha = 0.3, size = 0.3, color = "black") +
+            annotate("text", 
+                     x = time_range[which.max(count_data$count)],
+                     y = min(data.toplot$ymin) - 0.05 * y_range,
+                     label = max(count_data$count), 
+                     size = 3, hjust = 0.5) +
+            labs(
+                x = "Time",
+                y = "Cumulative ATT",
+                title = "Cumulative Treatment Effects"
+            ) +
+            theme_bw() +
+            theme(
+                panel.grid.minor = element_blank(),
+                panel.grid.major.x = element_blank(),
+                axis.title = element_text(size = 11),
+                axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
+                axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)),
+                axis.text = element_text(color = "black", size = 10),
+                plot.title = element_text(size = 14, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+            ) +
+            # Force integer breaks on x-axis
+            scale_x_continuous(breaks = function(x) seq(floor(x[1]), ceiling(x[2]), by = 1))
+        
+        # Print the plot
+        print(p)
+    }
     # Prepare output
     out <- list(catt = catt)
     if (!is.null(catt.boot)) {

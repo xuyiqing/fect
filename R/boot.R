@@ -188,8 +188,7 @@ fect.boot <- function(Y,
                 cv.prop = cv.prop, cv.treat = cv.treat,
                 cv.nobs = cv.nobs
             )
-
-            method <- out$method
+            # method <- out$method
         } else {
             out <- fect.binary.cv(
                 Y = Y, X = X, D = D,
@@ -200,7 +199,7 @@ fect.boot <- function(Y,
                 hasRevs = hasRevs, tol = tol,
                 group.level = group.level, group = group
             )
-            method <- "ife"
+            #method <- "ife"
         }
     }
 
@@ -824,7 +823,7 @@ fect.boot <- function(Y,
             }
         }
     } else {
-        one.nonpara <- function(num = NULL) { 
+        one.nonpara <- function(num = NULL) {
             if (is.null(num)) { ## bootstrap sample ids
                 if (is.null(cl)) {
                     if (hasRevs == 0) {
@@ -918,7 +917,6 @@ fect.boot <- function(Y,
                     ind.matrix.boot[[ind.name]] <- as.matrix(ind.matrix[[ind.name]][, boot.id])
                 }
             }
-
             if (sum(c(D.boot) == 0) == 0 | sum(c(D.boot) == 1) == 0 | sum(c(I.boot) == 1) == 0) {
                 boot0 <- list(
                     att.avg = NA, att = NA, count = NA,
@@ -946,7 +944,6 @@ fect.boot <- function(Y,
                 if (carryoverTest == TRUE) {
                     carryover.period.boot <- carryover.period
                 }
-
                 if (method == "gsynth") {
                     boot <- try(fect.gsynth(
                         Y = Y[, boot.id], X = X.boot, D = D.boot, W = W.boot,
@@ -1119,7 +1116,7 @@ fect.boot <- function(Y,
                 if (is.null(boot.out[[j]]$boot.id)){
                     colnames.boot <- c(colnames.boot, list(1:N))
                 } else {
-                    colnames.boot <- c(colnames.boot, list(boot.out[[j]]$boot.id))    
+                    colnames.boot <- c(colnames.boot, list(boot.out[[j]]$boot.id))
                 }
             }
 
@@ -1733,7 +1730,7 @@ fect.boot <- function(Y,
             CI.att <- t(apply(att.boot, 1, function(vec) quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)))
             pvalue.att <- apply(att.boot, 1, get.pvalue)
         }
-        
+
         #vcov.att <- cov(t(att.boot), use = "pairwise.complete.obs")
         vcov.att <- tryCatch(
             {
@@ -1780,7 +1777,7 @@ fect.boot <- function(Y,
                 error = function(e) {
                     NA
                 }
-            )   
+            )
 
 
             est.att.off <- cbind(att.off, se.att.off, CI.att.off, pvalue.att.off, out$count.off)
