@@ -1,0 +1,111 @@
+# Cheatsheet {#sec-cheatsheet}
+
+In this chapter, we provide an overview of the main functionalities of the **fect** package, including the required inputs, available plot types, key options, and testing capabilities across various methods.
+
+## Methods
+
+*Inputs for* `fect(methods = "___")`
+
+| **Method**     | **Model for** $\hat{Y}(0)$                            | **References**                                           |
+|--------------------|--------------------------------|--------------------|
+| **fe**         | Standard two-way fixed effects model                  | Liu, Wang & Xu (2022), Borusyak, Jaravel & Spiess (2024) |
+| **ife**        | Interactive fixed effects model                       | Gobillon & Magnac (2016), Xu (2017)                      |
+| **mc**         | Matrix completion method                              | Athey et al. (2021)                                      |
+| **polynomial** | Two-way fixed effects model with unit-specific trends | –                                                        |
+| **cfe**        | "Complex" or multi-level fixed effects                | –                                                        |
+| **gsynth**     | Interactive fixed effects model                       | Xu (2017)                                                |
+
+## Plot Types
+
+*Inputs for* `plot(fect_object, type = "___")`
+
+| **Type**           | **Description**                                    | **Applicable Methods**               |
+|-------------------|------------------------------|-----------------------|
+| **box**            | Box plot of ATT by period.                         | fe, ife, mc, gsynth, polynomial, cfe |
+| **calendar**       | ATT by calendar time.                              | fe, ife, mc, gsynth, polynomial, cfe |
+| **counterfactual** | Observed vs. imputed outcome for treated units.    | fe, ife, mc, gsynth                  |
+| **equiv**          | Pretreatment residuals with equivalence intervals. | fe, ife, mc, gsynth, polynomial, cfe |
+| **exit**           | Period-wise ATT relative to treatment exit.        | fe, ife, mc, polynomial, cfe         |
+| **factors**        | Estimated factors (factor-based methods).          | ife, gsynth                          |
+| **gap**            | ATT by pre- and post-treatment periods.            | fe, ife, mc, gsynth, polynomial, cfe |
+| **loadings**       | Estimated factor loadings (factor-based methods).  | ife, gsynth                          |
+| **status**         | Treatment status by period for all units.          | fe, ife, mc, gsynth, polynomial, cfe |
+
+## Tests as Options
+
+*Inputs for* `fect(...)`
+
+| Input              | **Description**                                                       | **Applicable Methods** |
+|-------------------|---------------------------------|--------------------|
+| `loo`              | Leave-one-period-out goodness-of-fit test (`TRUE/FALSE`).             | fe, ife, mc, gsynth    |
+| `carryoverTest`    | Tests for carryover effects in post-treatment periods (`TRUE/FALSE`). | fe, ife, mc            |
+| `carryover.period` | Range of post-treatment periods for the carryover test (vector).      | fe, ife, mc            |
+| `permute`          | Permutation test (`TRUE/FALSE`).                                      | fe, ife, mc, gsynth    |
+| `m`                | Block length for permutation test (`m=2` by default).                 | fe, ife, mc, gsynth    |
+| `CV`               | Cross-validation for factor-based methods.                            | ife, mc, gsynth        |
+
+## Required and Optional Inputs
+
+A check mark (✓) indicates that the method requires or accepts the input.
+
+### Required Inputs
+
+| **Input**                   | **fe** | **ife** | **mc** | **gsynth** | **polynomial** | cfe |
+|-----------|:---------:|:---------:|:---------:|:---------:|:---------:|:---------:|
+| `Y` (outcome)               |   ✓    |    ✓    |   ✓    |     ✓      |       ✓        |  ✓  |
+| `D` (treatment)             |   ✓    |    ✓    |   ✓    |     ✓      |       ✓        |  ✓  |
+| `X` (covariates)            |   ✓    |    ✓    |   ✓    |     ✓      |       ✓        |  ✓  |
+| `data`                      |   ✓    |    ✓    |   ✓    |     ✓      |       ✓        |  ✓  |
+| `index` (unit & time IDs)   |   ✓    |    ✓    |   ✓    |     ✓      |       ✓        |  ✓  |
+| `sfe` (simple additive FEs) |   –    |    –    |   –    |     –      |       –        |  ✓  |
+| `cfe` (complex FEs)         |   –    |    –    |   –    |     –      |       –        |  ✓  |
+
+### Optional Inputs
+
+| **Input**                                         | **fe** | **ife** | **mc** | **gsynth** | **polynomial** | **cfe** |
+|:----------|:----------|:---------:|:---------:|:---------:|:---------:|:---------:|
+| `W` (weight)                                      | ✓      |    ✓    |   ✓    |     ✓      |       ✓        |    ✓    |
+| `se` (uncertainty)                                | ✓      |    ✓    |   ✓    |     ✓      |       ✓        |    ✓    |
+| `nboots` (# bootstrap reps)                       | ✓      |    ✓    |   ✓    |     ✓      |       ✓        |    ✓    |
+| `force` (FE structure)                            | ✓      |    ✓    |   ✓    |     ✓      |       ✓        |    ✓    |
+| `lambda`(Hyper-parameter sequence)                | –      |    –    |   ✓    |     ✓      |       –        |    –    |
+| `nlambda`(Length of hyper-parameter sequence)     | –      |    –    |   ✓    |     ✓      |       –        |    –    |
+| `r` (# factor)                                    | –      |    ✓    |   –    |     ✓      |       –        |    –    |
+| `k` ( \# cross-validation rounds)                 | –      |    ✓    |   ✓    |     ✓      |       –        |    –    |
+| `degree` (degree of the interacted fixed effects) | –      |    –    |   –    |     –      |       ✓        |    –    |
+
+### Important Options
+
+| **Input**                            | **Options**                                                             | **Applicable Methods**           |
+|:-------------------------|:---------------------------|:------------------|
+| `force`                              | Fixed effects structure: "none", "unit", "time", "two-way" (default)    | fe, ife, mc, poly, cfe, gsynth   |
+| `vartype` (when `method = "gsynth"`) | Uncertainty estimator: "parametric" (default), "bootstrap", "jackknife" | gsynth                           |
+| `vartype` (otherwise)                | Uncertainty estimator: "bootstrap" (default), "jackknife"               | fe, ife, mc, polynomial, cfe     |
+| `criterion`                          | Model selection criterion: "mspe" (default), "gmspe", "moment", "pc".   | ife, mc, polynomial, cfe, gsynth |
+
+## Notes
+
+-   Most methods share core inputs (`Y`, `D`, `X`, `data`, `index`).
+
+-   Method `polynomial` and `cfe` allow either "jackknife" or "bootstrap" for uncertainty estimates.
+
+-   Factor-based methods (`ife`, `gsynth`) can use `r`and `k` for factor selection and cross validation. We can implement a similar process using `mc` or `gsynth` with `lambda` and`nlambda`.
+
+-   `carryoverTest` and `loo` are available in `fe`, `ife`, `mc`, `polynomial`, and `cfe` but not in `gsynth`.
+
+-   `force` allows various levels of fixed effects (`"none"`, `"unit"`, `"time"`, `"two-way"`).
+
+-   **fect** includes several built-in values for optional arguments that often require an integer or boolean input. All boolean arguments (such as `parallel`, `se`, or `CV`) are set to `FALSE` by default to speed up computation. Below is a complementary table listing parameters that require numeric inputs.
+
+| **Inputs** | **Description**                                     |    **Default**    |
+|:-----------------:|:---------------------------------|:-----------------:|
+|  `degree`  | The degree of the interacted fixed effects(int)     |         2         |
+|  `nboots`  | Number of bootstrap runs (int)                      |        200        |
+|    `k`     | Sets the number of cross-validation rounds(int)     |        10         |
+|    `r`     | Sets the number of factors                          | 0; c(0,5) when CV |
+|    `m`     | Specifies the block length for the permutation test |         2         |
+| `nlambda`  | Length of hyper-parameter sequence                  |        10         |
+
+-   With an integer input for `nlambda`, **fect** can randomly generate appropriate hyper-parameter sequence.
+
+Enjoy using **fect**!
