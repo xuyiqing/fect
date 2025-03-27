@@ -1,40 +1,40 @@
-\name{cumuEff}
-\alias{cumuEff}
-\title{Calculate Cumulative or Average Treatment Effects}
+\name{effect}
+\alias{effect}
+\title{Calculate Cumulative or Sub-group Treatment Effects}
 \description{
   Calculates cumulative or average treatment effects for specified units and time periods based on a fitted \code{fect} object. The function supports both cumulative effects over time and period-specific average treatment effects, with bootstrap-based uncertainty estimates.
 }
 
 \usage{
-cumuEff(x, cumu = TRUE, id = NULL, period = NULL)
+effect(x, cumu = TRUE, id = NULL, period = NULL)
 }
 
 \arguments{
   \item{x}{A \code{fect} object containing treatment effect estimates and bootstrap results.}
-  
+
   \item{cumu}{Logical. If \code{TRUE} (default), calculates cumulative treatment effects. If \code{FALSE}, calculates period-specific average treatment effects.}
-  
+
   \item{id}{Character vector or NULL. Unit identifiers to include in the analysis. If \code{NULL} (default), all treated units are included.}
-    
+
   \item{period}{Numeric vector of length 2 specifying the time window \code{c(start, end)} for effect calculation. If \code{NULL}, uses the maximum possible window based on the data.}
-  
+
   \item{plot}{Logical. If \code{TRUE}, creates a visualization of the cumulative treatment effects with confidence intervals and a bar chart showing the number of treated units at each time point. Default is \code{FALSE}.}
 }
 
 \details{
   The function processes treatment effects in several steps:
-  
+
   1. Selects units based on the \code{id} parameter or includes all treated units if \code{id = NULL}.
-  
+
   2. Calculates relative time to treatment for each unit.
-  
+
   3. If \code{cumu = TRUE}, computes cumulative effects by summing average effects up to each period.
-  
+
   4. Performs bootstrap analysis to estimate uncertainty (standard errors, confidence intervals, and p-values).
-  
+
   The function supports different inference methods (bootstrap, jackknife, parametric) and adjusts calculations accordingly.
-  
-  Note: The function requires bootstrap results in the input \code{fect} object (\code{need_cumu = TRUE} must be set when fitting the model).
+
+  Note: The function requires bootstrap results in the input \code{fect} object (\code{keep.bs = TRUE} must be set when fitting the model).
 }
 
 \value{
@@ -63,16 +63,16 @@ cumuEff(x, cumu = TRUE, id = NULL, period = NULL)
 \examples{
 \dontrun{
 # Fit fect model with bootstrap
-fit <- fect(Y ~ D + X, data = panel_data, need_cumu = TRUE)
+fit <- fect(Y ~ D + X, data = panel_data, keep.bs = TRUE)
 
 # Calculate cumulative effects for all treated units
-results <- cumuEff(fit)
+results <- effect(fit)
 
 # Calculate period-specific effects for specific units
-results_specific <- cumuEff(fit, 
+results_specific <- effect(fit,
                           cumu = FALSE,
                           id = c("unit1", "unit2"),
-                          period = c(-2, 4))
+                          period = c(1, 4))
 
 # View results
 print(results$est.catt)

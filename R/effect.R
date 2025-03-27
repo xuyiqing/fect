@@ -1,10 +1,9 @@
-## an auxiliary function for estimaing cumulative treatment effect based on fect
+## an auxiliary function for estimaing cumulative or sub-group treatment effect based on fect
 
 ## 1. cumulative effect for a specified event window
 ## 2. averaging treatment effect in a sub-group
 
-
-cumuEff <- function(x, ## a fect object
+effect <- function(x, ## a fect object
                     cumu = TRUE, ## whether to calculate cumulative effect
                     id = NULL, ## units to be averaged on
                     # type = "on", ## "on" or "off"
@@ -17,7 +16,7 @@ cumuEff <- function(x, ## a fect object
         warning("Cumulative effects are not well-defined for panels with treatment reversal.")
         return() # Return NA
     }
-    
+
     # Select units for analysis
     if (is.null(id)) {
         # If no specific units provided, select all treated units
@@ -26,41 +25,41 @@ cumuEff <- function(x, ## a fect object
         # Otherwise, select specified units
         mask <- (colnames(x$eff) %in% id)
     }
-    
+
     # Extract relevant matrices for selected units
     eff <- x$eff[, mask]      # Treatment effects
     D <- x$D.dat[, mask]      # Treatment indicators
     I <- x$I.dat[, mask]      # Inclusion (non-missing) indicators
     inference <- x$call$vartype  # Inference type
     method <- x$method        # Method
-    
+
     # Get dimensions of data
     TT <- dim(eff)[1]  # Number of time periods
     N <- dim(eff)[2]   # Number of units
-    
+
     # Replace NA values in treatment indicators with zeros
     if (sum(is.na(c(D))) > 0) {
         D[which(is.na(D))] <- 0
     }
-    
+
     # Store original treatment matrix
     D.old <- D
-    
+
     # Calculate cumulative treatment for determining time periods
     D <- apply(D, 2, function(vec) {
         cumsum(vec)
     })
-    
+
     # Find minimum pre-treatment period across all units
     minT0 <- min(apply(D, 2, function(vec) {
         sum(vec == 0)
     }))
-    
+
     # Restore original treatment matrix
     D <- D.old
-    
+
     # Set default period range if not provided
-    period.raw <- c(0, TT - minT0 - 1)
+    period.raw <- c(1, TT - minT0)
     if (!is.null(period)) {
         # Validate user-provided period
         if (period[2] > period.raw[2]) {
@@ -69,13 +68,13 @@ cumuEff <- function(x, ## a fect object
     } else {
         period <- period.raw
     }
-    
+
     # Calculate cumulative average treatment effect
     catt <- getEffect(D, I, eff, cumu, period)
-    
+
     # Initialize bootstrap results
     catt.boot <- NULL
-    
+
     # Check if uncertainty estimates are available
     if (is.null(x$est.avg)) {
         cat("No uncertainty estimates.")
@@ -83,26 +82,26 @@ cumuEff <- function(x, ## a fect object
         # Perform bootstrap analysis
         nboots <- length(x$att.avg.boot)
         catt.boot <- matrix(NA, period[2] - period[1] + 1, nboots)
-        
+
         # Calculate treatment effect for each bootstrap sample
         for (i in 1:nboots) {
             # Extract bootstrap matrices
             D.boot <- x$D.boot[, , i]
             I.boot <- x$I.boot[, , i]
             eff.boot <- x$eff.boot[, , i]
-            
+
             # Select treated units in bootstrap sample
             if (is.null(id)){
-                mask.boot <- (colSums(D.boot) > 0) 
+                mask.boot <- (colSums(D.boot) > 0)
             } else {
                 mask.boot <- (x$id[unlist(x$colnames.boot[i])] %in% id)
             }
-            
+
             # Extract relevant matrices for selected units
             Itr.boot <- I.boot[, mask.boot]
             Dtr.boot <- D.boot[, mask.boot]
             eff.tr.boot <- eff.boot[, mask.boot]
-            
+
             # Calculate treatment effect for this bootstrap sample
             catt.boot[, i] <- getEffect(
                 as.matrix(Dtr.boot),
@@ -111,7 +110,7 @@ cumuEff <- function(x, ## a fect object
                 cumu, period)
         }
     }
-    
+
     # Function to calculate p-values for non-parametric test
     get.pvalue <- function(vec) {
         if (NaN %in% vec | NA %in% vec) {
@@ -131,13 +130,13 @@ cumuEff <- function(x, ## a fect object
         # Return minimum p-value, capped at 1
         return(min(as.numeric(min(a, b)), 1))
     }
-    
+
     # Calculate confidence intervals and statistics if bootstrap results exist
     if (!is.null(catt.boot)) {
         # Check if inference method is jackknife
         is_jackknife <- !is.null(inference) && inference == "jackknife"
         is_parametric <- !is.null(inference) && inference == "parametric"
-        
+
         # Calculate standard errors with proper scaling for jackknife
         if (is_jackknife) {
             # For jackknife, scale by sqrt(N-1)
@@ -148,7 +147,7 @@ cumuEff <- function(x, ## a fect object
             # Standard calculation for bootstrap
             se.att <- apply(catt.boot, 1, function(vec) sd(vec, na.rm = TRUE))
         }
-        
+
         # Calculate 95% confidence intervals
         if (is_jackknife || is_parametric) {
             # For jackknife, use t-distribution with N-1 degrees of freedom
@@ -163,7 +162,7 @@ cumuEff <- function(x, ## a fect object
                 quantile(vec, c(0.025, 0.975), na.rm = TRUE)
             }))
         }
-        
+
         # Calculate p-values
         if (is_jackknife || is_parametric) {
             # For jackknife, use t-distribution for p-values
@@ -181,7 +180,7 @@ cumuEff <- function(x, ## a fect object
         colnames(est.catt) <- c("CATT", "S.E.", "CI.lower", "CI.upper", "p.value")
         rownames(est.catt) <- period[1]:period[2]
     }
-    
+
     # Plot
     if (plot) {
         # Create a data frame for plotting
@@ -191,7 +190,7 @@ cumuEff <- function(x, ## a fect object
             ci_lower = est.catt[, "CI.lower"],
             ci_upper = est.catt[, "CI.upper"]
         )
-        
+
         # Add count data for the bar chart at the bottom
         time_range <- unique(plot_data$time)
         # Calculate treated units at each relative time point
@@ -206,7 +205,7 @@ cumuEff <- function(x, ## a fect object
                 D_rel[, i] <- NA  # Not treated
             }
         }
-        
+
         # Count treated units at each time point
         count_data <- data.frame(
             time = time_range,
@@ -214,38 +213,38 @@ cumuEff <- function(x, ## a fect object
                 sum(D_rel == t, na.rm = TRUE)
             })
         )
-        
+
         # Calculate rectangle dimensions for count display with more space between bars and main plot
         y_range <- diff(range(plot_data$ci_lower, plot_data$ci_upper, na.rm = TRUE))
         rect.min <- min(plot_data$ci_lower, na.rm = TRUE) - 0.2 * y_range
         rect.length <- 0.15 * y_range
-        
+
         T.start <- time_range - 0.25
         T.end <- time_range + 0.25
         ymin <- rep(rect.min, length(time_range))
         ymax <- rect.min + rect.length * count_data$count / max(count_data$count)
-        
+
         data.toplot <- data.frame(
             xmin = T.start,
             xmax = T.end,
             ymin = ymin,
             ymax = ymax
         )
-        
+
         # Create the plot
         p <- ggplot() +
             geom_point(data = plot_data, aes(x = time, y = catt), size = 2) +
-            geom_linerange(data = plot_data, 
+            geom_linerange(data = plot_data,
                          aes(x = time, ymin = ci_lower, ymax = ci_upper),
                          size = 0.5) +
             geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-            geom_rect(data = data.toplot, 
-                      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+            geom_rect(data = data.toplot,
+                      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
                       fill = "gray50", alpha = 0.3, size = 0.3, color = "black") +
-            annotate("text", 
+            annotate("text",
                      x = time_range[which.max(count_data$count)],
                      y = min(data.toplot$ymin) - 0.05 * y_range,
-                     label = max(count_data$count), 
+                     label = max(count_data$count),
                      size = 3, hjust = 0.5) +
             labs(
                 x = "Time",
@@ -264,7 +263,7 @@ cumuEff <- function(x, ## a fect object
             ) +
             # Force integer breaks on x-axis
             scale_x_continuous(breaks = function(x) seq(floor(x[1]), ceiling(x[2]), by = 1))
-        
+
         # Print the plot
         print(p)
     }
@@ -296,7 +295,7 @@ getEffect <- function(D,           # Treatment indicator matrix
     if (sum(is.na(c(D))) > 0) {
         D[which(is.na(D))] <- 0
     }
-    
+
     # Calculate cumulative sum of treatment for each unit
     D <- apply(D, 2, function(vec) {
         cumsum(vec)
@@ -320,7 +319,7 @@ getEffect <- function(D,           # Treatment indicator matrix
     # Flatten matrices to vectors for processing
     vd <- c(D)       # Vector of relative times
     veff <- c(eff)   # Vector of effects
-    
+
     # Remove NA entries
     if (sum(is.na(vd)) > 0) {
         vd.rm <- which(is.na(vd))
