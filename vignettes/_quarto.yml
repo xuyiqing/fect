@@ -1,0 +1,39 @@
+project:
+  type: book
+
+book:
+  title: "fect -- User Manual"
+  sidebar:
+    style: docked
+    background: light
+  chapters:
+    - index.qmd
+    - 01-start.Rmd
+    - 02-fect.Rmd
+    - 03-plots.Rmd
+    - 04-gsynth.Rmd
+    - 05-panel.Rmd
+    - 06-cheetsheet.Rmd
+    - references.qmd
+  
+delete_merged_file: true
+
+bibliography: references.bib
+
+nocite: |
+  @*
+
+format:
+  html:
+    theme: cosmo
+    code-fold: false
+    code-tools: true
+    code-link: true
+
+knitr:
+  opts_chunk: 
+    collapse: true
+    comment: "#>" 
+
+editor: visual
+

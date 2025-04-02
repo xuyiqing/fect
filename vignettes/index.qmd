@@ -1,0 +1,98 @@
+# Welcome! {.unnumbered}
+
+This Quarto book serves as a user manual for the **fect** package in R, which implements counterfactual (imputation) estimators for causal inference with panel data and performs diagnostic tests. 
+
+**fect** covers a series of counterfactual estimators, including the five estimators from the last version and integrating the latest version of the **gsynth** package for the generalized synthetic control method (Gsynth). This Quarto book also facilitates the application of various new difference-in-differences (DID) estimators. For details of these methods, see 
+
+-   @Xu2017 for Gsynth \[[Paper](https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3)\]
+
+-   @LWX2022 for counterfactural estimators \[[Paper](https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723)\]
+
+-   @CLLX2025 for a survey of the new DID estimators  \[[Paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf)\]
+
+
+
+::: {.callout-note appearance="simple"}
+### Source Code
+
+For those interested in exploring the algorithms used in **fect** for calculating estimates, please visit the source [GitHub Repo](https://github.com/xuyiqing/fect) for further details. 
+:::
+
+## Why Counterfactual Estimators?
+
+There are several reasons why you might consider using counterfactual estimators for your panel data applications:
+
+-   Because "causal inference is a missing data problem" [@holland1986statistics], it is natural to impute treated counterfactuals when the ATT, if well defined, is the primary quantity of interest.
+-   Counterfactual estimators help avoid the (negative) weighting problem, which has been highlighted in recent applied econometrics literature regarding TWFE models, e.g., @CDH2020; @goodman2021difference.\
+-   Among the newer estimators that accommodate heterogeneous treatment effects, the fixed effect counterfactual estimator (imputation based on TWFE) is the most efficient under homoskedasticity [@BJS2024].\
+-   Counterfactual estimators enable the use of more complex modeling strategies, such as linear factor models and matrix completion methods, which naturally connect to the synthetic control setting.
+
+However, these counterfactual estimators come with important limitations:
+
+-   Most rely on some form of the parallel trends assumption or a low-rank structure.\
+-   They generally do not accommodate dynamic treatment assignment based on sequential ignorability.\
+-   Methods for continuous treatments are still underdeveloped and are not currently covered by **fect**.
+
+@CLLX2025 reanalyze numerous published studies in political science and offer detailed justifications for adopting these estimators.
+
+## Why the Merge?
+
+I have decided to merge the two packages, **gsynth** and **fect**, as **gsynth** is fundamentally a counterfactual estimator. The two packages increasingly share similar code modules and features, including core algorithms (the `ife` and `mc` methods in both packages are essentially identical), tuning methods, and visualization tools. This merge will greatly simplify package maintenance moving forward.
+
+However, some key differences between the two approaches remain:
+
+-   Gsynth is specifically designed for block and staggered DID settings *without* treatment reversal, while other methods accommodate treatment reversal under the assumption of limited carryover effects.
+-   Gsynth is particularly suited for cases where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure---analogous to conformal inference---to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
+-   Compared with IFEct (`method = "ife"`), Gsynth does not rely on pre-treatment data from the treated units to impute $\hat{Y}(0)$. This approach significantly speeds up computation and improves stability.
+
+Therefore, we recommend setting `method = "gsynth"` in **fect** for scenarios where the treatment does not reverse (or is coded accordingly) and the number of treated units is small .
+
+Moving forward, I will discontinue maintaining **gsynth** and focus on adding more functionalities to **fect**.
+
+## Organization
+
+The user guide is structured into the following chapters:
+
+-   [Chapter @sec-start]\
+    This chapter covers installation instructions and introduces the datasets.
+
+-   [Chapter @sec-fect]\
+    This chapter explains how to apply the five estimators and diagnostic tests available in previous versions of **fect**.
+
+-   [Chapter @sec-plots]\
+    In this chapter, we explore various plotting options available in **fect**.
+
+-   [Chapter @sec-gsynth]\
+    This chapter provides a step-by-step guide to implementing all the functionalities of the original **gsynth** R package using **fect**.
+
+-   [Chapter @sec-panel]\
+    This chapter facilitates the application of various new DID estimators and sensitivity analyses.
+
+-   [Chapter @sec-cheatsheet]\
+    The final chapter summarizes the core inputs required for implementing the six methods, along with options for plotting and diagnostics.
+
+## Contributors
+
+The following individuals have contributed to **gsynth** and **fect**, listed in the order of their involvement in the project:
+
+-   [Yiqing Xu](https://yiqingxu.org/)\
+-   [Licheng Liu](https://liulch.github.io/)\
+-   [Ye Wang](https://www.yewang-polisci.com/)\
+-   Ziyi Liu (PhD Student at Berkeley Haas)
+-   Shijian Liu (PhD Student at NYU Stern)
+-   [Tianzhu Qin](https://tianzhuqin.github.io/)\
+-   Jinwen Wu (Predoc at Stanford PoliSci)
+
+Special thanks to Ziyi and Tianzhu for their tireless efforts in improving this package. Thanks to Jinwen for setting up and maintaining this User Manual.
+
+## Report bugs
+
+Please report any bugs to me (yiqingxu \[at\] stanford.edu) or submit an issue on [GitHub](https://github.com/xuyiqing/fect/issues). Please include your minimally replicable code & data file and a **panelView** treatment status plot. Your feedback is highly valued!
+
+<!-- badges: start -->
+
+fect: [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/fect" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/fect/index.html)
+
+gsynth: [<img src="https://cranlogs.r-pkg.org/badges/grand-total/gsynth" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/gsynth/index.html) (retiring)
+
+<!-- badges: end -->

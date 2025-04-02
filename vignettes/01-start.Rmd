@@ -1,0 +1,69 @@
+# Get Started {#sec-start}
+
+This chapter provides installation instructions and introduces the datasets used in the tutorial.
+
+```{r echo = FALSE}
+rm(list = ls())
+```
+
+## Installation
+
+To install **fect** from CRAN, run the code chunk below:
+
+```{r eval = FALSE, message = FALSE, warning = FALSE}
+install.packages("fect")
+```
+
+We recommend users to install the most up-to-date version of **fect** from Github using:
+
+```{r eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
+devtools::install_github("xuyiqing/fect")
+```
+
+After installation, check **fect** version to make sure the package is up-to-date.
+
+```{r}
+installed.packages()["fect", "Version"]
+```
+
+**panelView** for panel data visualization is highly recommended and will be used in the tutorial:
+
+```{r eval=FALSE}
+devtools::install_github('xuyiqing/panelView')
+```
+
+**fect** depends on the following packages, which should be installed automatically when **fect** is being installed. You can also install them manually.
+
+```{r eval=FALSE}
+install_all <- function(packages) {
+  installed_pkgs <- installed.packages()[, "Package"]
+  for (pkg in packages) {
+    if (!pkg %in% installed_pkgs) {
+      install.packages(pkg)
+    }
+  }
+}
+packages <- c("abind", "doParallel", "doRNG", "fixest", "foreach", "future", 
+              "GGally", "ggplot2", "grid", "gridExtra", "Mass", 
+              "panelView", "Rcpp")
+install_all(packages)
+```
+
+## Datasets
+
+The **fect** package ships five datasets.
+
+```{r message = FALSE, warning = FALSE}
+library(fect)
+data(fect)
+ls()
+```
+
+Below is a brief explanation of the datasets used in this book:  
+
+- `simdata`: Based on @LWX2022. Used in [Chapter @sec-fect] to demonstrate various counterfactual estimators.  
+- `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-plots] and [Chapter @sec-panel].  
+- `simgsynth` & `turnout`: Based on @Xu2017. Used in [Chapter @sec-gsynth] to demonstrate Gsynth.
+- `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-panel].  
+
+
