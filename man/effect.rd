@@ -34,15 +34,15 @@ effect(x, cumu = TRUE, id = NULL, period = NULL)
 
   The function supports different inference methods (bootstrap, jackknife, parametric) and adjusts calculations accordingly.
 
-  Note: The function requires bootstrap results in the input \code{fect} object (\code{keep.bs = TRUE} must be set when fitting the model).
+  Note: The function requires bootstrap results in the input \code{fect} object (\code{keep.sims = TRUE} must be set when fitting the model).
 }
 
 \value{
   Returns a list containing:
-  \item{catt}{Vector of point estimates for cumulative or average treatment effects.}
-  \item{est.catt}{Matrix containing the following columns:
+  \item{eff}{Vector of point estimates for cumulative or average treatment effects.}
+  \item{est.eff}{Matrix containing the following columns:
     \itemize{
-      \item CATT: Point estimates
+      \item ATT: Point estimates
       \item S.E.: Standard errors
       \item CI.lower: Lower bound of confidence interval
       \item CI.upper: Upper bound of confidence interval
@@ -63,7 +63,7 @@ effect(x, cumu = TRUE, id = NULL, period = NULL)
 \examples{
 \dontrun{
 # Fit fect model with bootstrap
-fit <- fect(Y ~ D + X, data = panel_data, keep.bs = TRUE)
+fit <- fect(Y ~ D + X, data = panel_data, keep.sims = TRUE)
 
 # Calculate cumulative effects for all treated units
 results <- effect(fit)

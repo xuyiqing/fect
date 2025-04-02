@@ -1,19 +1,22 @@
-## an auxiliary function for estimaing cumulative or sub-group treatment effect based on fect
+## an auxiliary function for estimating cumulative or sub-group treatment effect based on fect
 
 ## 1. cumulative effect for a specified event window
 ## 2. averaging treatment effect in a sub-group
 
 effect <- function(x, ## a fect object
-                    cumu = TRUE, ## whether to calculate cumulative effect
-                    id = NULL, ## units to be averaged on
-                    # type = "on", ## "on" or "off"
-                    period = NULL, ## event window
-                    plot = FALSE) {
+                  cumu = TRUE, ## whether to calculate cumulative effect
+                  id = NULL, ## units to be averaged on
+                  period = NULL, ## event window
+                  plot = FALSE,
+                  count = TRUE,
+                  xlab = NULL,
+                  ylab = NULL,
+                  main = NULL) {
     if (is.null(x$eff.boot)){
-        stop("No bootstrap results available. Choose need_cumu = TRUE in fect().")
+        stop("No bootstrap/jackknife results available. Choose keep.sims = TRUE in fect().")
     }
     if (x$hasRevs) {
-        warning("Cumulative effects are not well-defined for panels with treatment reversal.")
+        warning("Cumulative effects are not well-defined for panels with treatment reversals.")
         return() # Return NA
     }
 
@@ -177,7 +180,7 @@ effect <- function(x, ## a fect object
         }
         # Combine results into a matrix
         est.catt <- cbind(catt, se.att, CI.att, pvalue.att)
-        colnames(est.catt) <- c("CATT", "S.E.", "CI.lower", "CI.upper", "p.value")
+        colnames(est.catt) <- c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value")
         rownames(est.catt) <- period[1]:period[2]
     }
 
@@ -186,7 +189,7 @@ effect <- function(x, ## a fect object
         # Create a data frame for plotting
         plot_data <- data.frame(
             time = as.numeric(rownames(est.catt)),
-            catt = est.catt[, "CATT"],
+            catt = est.catt[, "ATT"],
             ci_lower = est.catt[, "CI.lower"],
             ci_upper = est.catt[, "CI.upper"]
         )
@@ -216,7 +219,7 @@ effect <- function(x, ## a fect object
 
         # Calculate rectangle dimensions for count display with more space between bars and main plot
         y_range <- diff(range(plot_data$ci_lower, plot_data$ci_upper, na.rm = TRUE))
-        rect.min <- min(plot_data$ci_lower, na.rm = TRUE) - 0.2 * y_range
+        rect.min <- min(plot_data$ci_lower, na.rm = TRUE) - 0.3 * y_range
         rect.length <- 0.15 * y_range
 
         T.start <- time_range - 0.25
@@ -231,48 +234,62 @@ effect <- function(x, ## a fect object
             ymax = ymax
         )
 
+        # xlab, ylab, and main
+        if (is.null(xlab) == TRUE) {xlab <- "Time"}
+        if (is.null(ylab) == TRUE) {
+          if (cumu == TRUE) {
+            ylab <- "Cumulative ATT"
+          } else {
+            ylab <- "ATT"
+          }
+        }
+        if (is.null(main) == TRUE) {
+          if (cumu == TRUE) {
+            main <- "Average Cumulative Treatment Effects on the Treated"
+          } else {
+            main <- "Average Treatment Effects on the Treated"
+          }
+        }
+
         # Create the plot
         p <- ggplot() +
-            geom_point(data = plot_data, aes(x = time, y = catt), size = 2) +
-            geom_linerange(data = plot_data,
+          geom_point(data = plot_data, aes(x = time, y = catt), size = 2) +
+          geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+          geom_linerange(data = plot_data,
                          aes(x = time, ymin = ci_lower, ymax = ci_upper),
                          size = 0.5) +
-            geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-            geom_rect(data = data.toplot,
-                      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-                      fill = "gray50", alpha = 0.3, size = 0.3, color = "black") +
+          labs(x = xlab, y = ylab, title = main) +
+          theme_bw() +
+          theme(
+            panel.grid.minor = element_blank(),
+            panel.grid.major.x = element_blank(),
+            axis.title = element_text(size = 11),
+            axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
+            axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)),
+            axis.text = element_text(color = "black", size = 10),
+            plot.title = element_text(size = 14, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+          ) +
+          # Force integer breaks on x-axis
+          scale_x_continuous(breaks = function(x) seq(floor(x[1]), ceiling(x[2]), by = 1))
+
+        if (count == TRUE) {
+          p <- p + geom_rect(data = data.toplot,
+                             aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+                             fill = "gray50", alpha = 0.3, size = 0.3, color = "black") +
             annotate("text",
                      x = time_range[which.max(count_data$count)],
-                     y = min(data.toplot$ymin) - 0.05 * y_range,
+                     y = max(data.toplot$ymax) + 0.05 * y_range,
                      label = max(count_data$count),
-                     size = 3, hjust = 0.5) +
-            labs(
-                x = "Time",
-                y = "Cumulative ATT",
-                title = "Cumulative Treatment Effects"
-            ) +
-            theme_bw() +
-            theme(
-                panel.grid.minor = element_blank(),
-                panel.grid.major.x = element_blank(),
-                axis.title = element_text(size = 11),
-                axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
-                axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)),
-                axis.text = element_text(color = "black", size = 10),
-                plot.title = element_text(size = 14, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
-            ) +
-            # Force integer breaks on x-axis
-            scale_x_continuous(breaks = function(x) seq(floor(x[1]), ceiling(x[2]), by = 1))
-
+                     size = 3, hjust = 0.5)
+        }
         # Print the plot
         print(p)
     }
     # Prepare output
-    out <- list(catt = catt)
+    out <- list(eff = catt)
     if (!is.null(catt.boot)) {
-        # Add estimation results to output (commented out line would also include bootstrap samples)
-        ## out <- c(out, list(est.catt = est.catt, catt.boot = catt.boot))
-        out <- c(out, list(est.catt = est.catt))
+      # Add estimation results to output (commented out line would also include bootstrap samples)
+      out <- c(out, list(est.eff = est.catt))
     }
     return(out)
 }

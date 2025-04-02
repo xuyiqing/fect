@@ -79,7 +79,7 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  permute = FALSE, ## permutation test
                  m = 2, ## block length
                  normalize = FALSE, # accelerate option
-                 keep.bs = FALSE
+                 keep.sims = FALSE # keep individual bootstrap/jackknife simulations
                 ) {
     UseMethod("fect")
 }
@@ -141,7 +141,7 @@ fect.formula <- function(formula = NULL,
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
                          normalize = FALSE,
-                         keep.bs = FALSE
+                         keep.sims = FALSE
                         ) {
     ## parsing
     varnames <- all.vars(formula)
@@ -228,7 +228,7 @@ fect.formula <- function(formula = NULL,
                         permute = permute,
                         m = m,
                         normalize = normalize,
-                        keep.bs = keep.bs)
+                        keep.sims = keep.sims)
 
     out$call <- match.call()
     out$formula <- formula
@@ -293,7 +293,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
                          normalize = FALSE,
-                         keep.bs = FALSE
+                         keep.sims = FALSE
                         ) {
 
     ##-------------------------------##
@@ -1636,7 +1636,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          quantile.CI = quantile.CI,
                          nboots = nboots, parallel = parallel,
                          cores = cores, group.level = g.level, group = G,
-                         keep.bs=keep.bs)
+                         keep.sims=keep.sims)
 
         if(method %in% c("polynomial",  "cfe")){
             I <- out$I

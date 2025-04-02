@@ -49,7 +49,7 @@ fect.boot <- function(Y,
                       group.level = NULL,
                       group = NULL,
                       dis = TRUE,
-                      keep.bs = FALSE) {
+                      keep.sims = FALSE) {
     na.pos <- NULL
     TT <- dim(Y)[1]
     N <- dim(Y)[2]
@@ -297,7 +297,7 @@ fect.boot <- function(Y,
     }
 
     ## bootstrapped estimates
-    if (keep.bs) {
+    if (keep.sims) {
         if (vartype=="jackknife") {
             D.boot <- array(NA, dim = c(TT, N-1, nboots))
             I.boot <- array(NA, dim = c(TT, N-1, nboots))
@@ -1108,7 +1108,7 @@ fect.boot <- function(Y,
             att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
             att.boot[, j] <- boot.out[[j]]$att
             att.count.boot[, j] <- boot.out[[j]]$count
-            if (keep.bs){
+            if (keep.sims){
                 colnames(boot.out[[j]]$eff) <- boot.out[[j]]$boot.id
                 eff.boot[, , j] <- boot.out[[j]]$eff
                 D.boot[, , j] <- boot.out[[j]]$D
@@ -1131,7 +1131,7 @@ fect.boot <- function(Y,
             if (hasRevs == 1) {
                 att.off.boot[, j] <- boot.out[[j]]$att.off
                 att.off.count.boot[, j] <- boot.out[[j]]$count.off
-                if (keep.bs) {
+                if (keep.sims) {
                     eff.off.boot <- c(eff.off.boot, list(boot.out[[j]]$eff.off))
                 }
             }
@@ -1214,7 +1214,7 @@ fect.boot <- function(Y,
             att.avg.unit.boot[, j] <- boot$att.avg.unit
             att.boot[, j] <- boot$att
             att.count.boot[, j] <- boot$count
-            if (keep.bs) {
+            if (keep.sims) {
                 colnames(boot$eff) <- boot$boot.id
                 # assign("boot", boot, .GlobalEnv)
                 eff.boot[, , j] <- boot$eff
@@ -1236,7 +1236,7 @@ fect.boot <- function(Y,
                 }
             }
             if (hasRevs == 1) {
-                if (keep.bs){
+                if (keep.sims){
                     eff.off.boot <- c(eff.off.boot, list(boot$eff.off))
                 }
                 att.off.boot[, j] <- boot$att.off
@@ -2432,7 +2432,7 @@ fect.boot <- function(Y,
         att.count.boot = att.count.boot
     )
 
-    if (keep.bs) {
+    if (keep.sims) {
         result = c(result, list(
             eff.boot = eff.boot,
             D.boot = D.boot,
@@ -2456,7 +2456,7 @@ fect.boot <- function(Y,
             att.off.bound = att.off.bound,
             att.off.count.boot = att.off.count.boot
         ))
-        if (keep.bs) {
+        if (keep.sims) {
             result <- c(result, list(eff.off.boot = eff.off.boot))
         }
     }
