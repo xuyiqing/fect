@@ -345,7 +345,7 @@ getEffect <- function(D,           # Treatment indicator matrix
     }
 
     # Get unique relative time periods
-    uniT <- unique(vd)
+    uniT <- sort(unique(vd))
 
     # Define effective time range
     ts <- period[1]  # Start period
@@ -373,5 +373,6 @@ getEffect <- function(D,           # Treatment indicator matrix
             }
         }
     }
+
     return(aeff)  # Return vector of treatment effects
 }
