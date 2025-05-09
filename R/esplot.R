@@ -41,6 +41,10 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    count.color = "gray80"
 )
 {
+  all_integer_like <- function(x) {
+    x_chr <- if (is.factor(x)) as.character(x) else x
+    all(grepl("^[-+]?[0-9]+$", x_chr))
+  }
   # Helper to format X-axis ticks as integers
   scaleFUN <- function(x) sprintf("%.f", x)
   # If input is a did_wrapper object, extract the event-study data
@@ -55,7 +59,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     found_period <- common_period_names[common_period_names %in% names(data)]
     if (length(found_period) > 0) {
       Period <- found_period[1]
-    } else if (is.numeric(rownames(data))) {
+    } else if (all_integer_like(rownames(data))) {
       data$Period_generated <- as.numeric(rownames(data))
       Period <- "Period_generated"
     } else {
@@ -777,6 +781,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       }
     }
   }
+
   if (!is.null(stats)) {
     actual_stats_pos <- stats.pos
     stats_hjust_val <- 0

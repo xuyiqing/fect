@@ -2223,23 +2223,6 @@ plot.fect <- function(
     # Reconstruct the p.label string if it's used elsewhere (e.g., for a single annotation object)
     p.label <- if (length(p.label.lines) > 0) paste(p.label.lines, collapse = "\n") else NULL
 
-
-    # --- The rest of your code for positioning and plotting stats ---
-    # You can now use 'stats_values' (numeric) and 'stats_labels' (character) directly.
-
-    if (("none" %in% stats == FALSE) && (show.stats == TRUE)) {
-      if (is.null(stats.pos)) {
-        # Ensure na.rm = TRUE for min/max operations if data can have NAs
-        min_time <- min(data[, "time"], na.rm = TRUE)
-        if (switch.on == TRUE) { # Assuming switch.on is defined
-          stats.pos[1] <- min_time
-        } else {
-          stats.pos[1] <- min_time
-        }
-        ci.top <- max(data[, "CI.upper"], na.rm = TRUE)
-        stats.pos[2] <- ifelse(is.null(ylim), ci.top, ylim[2]) # Assuming ylim is defined
-      }
-    }
     if (type == "equiv") {
       ylim = c(-max(abs(data2$bound))*1.4,max(abs(data2$bound))*1.4)
     }
@@ -2450,17 +2433,6 @@ plot.fect <- function(
           size = guide_legend(title = NULL, nrow = legend.nrow)
         )
 
-      if (effect.bound.ratio == TRUE) {
-        if (is.null(stats.pos)) {
-          stats.pos[1] <- min(data[, "time"], na.rm = 1)
-          stats.pos[2] <- ifelse(is.null(ylim), max(data[, "CI.upper"], na.rm = 1), ylim[1])
-        }
-        p.label <- paste("ATT / Min. Range = ", sprintf("%.3f", x$att.avg / minBound), sep = "")
-        p <- p + annotate("text",
-                          x = stats.pos[1], y = stats.pos[2],
-                          label = p.label, size = cex.text, hjust = 0
-        )
-      }
       p <- p + theme(legend.position = "bottom")
 
     }
@@ -3155,7 +3127,7 @@ plot.fect <- function(
                   max(c(fect.output.p$CI.upper, dte_output$ub)) * 1.3)
       }
       p <- esplot(
-        data_es,
+        fect.output.p,
         Period       = "Time",
         Estimate     = "ATT",
         SE           = "S.E.",
@@ -3197,7 +3169,7 @@ plot.fect <- function(
         geom_linerange(
           aes(x = postPeriod + 0.2, ymin = lb, ymax = ub, color = factor(Mbar, levels = mbar_levels)),
           data = dte_output,
-          linewidth = 1
+          linewidth = 1, inherit.aes = FALSE
         ) +
         scale_color_manual(name = "Mbar", values = setNames(final_palette, mbar_levels)) +
         guides(color = guide_legend(title = "Mbar")) +
@@ -3232,7 +3204,7 @@ plot.fect <- function(
                   max(c(fect.output.p$CI.upper, dte_output$ub)) * 1.3)
       }
       p <- esplot(
-        data_es,
+        fect.output.p,
         Period       = "Time",
         Estimate     = "ATT",
         SE           = "S.E.",
@@ -3274,7 +3246,7 @@ plot.fect <- function(
         geom_linerange(
           aes(x = postPeriod + 0.2, ymin = lb, ymax = ub, color = factor(M, levels = m_levels)),
           data = dte_output,
-          linewidth = 1
+          linewidth = 1, inherit.aes = FALSE
         ) +
         scale_color_manual(name = "M", values = setNames(final_palette, m_levels)) +
         guides(color = guide_legend(title = "M")) +
