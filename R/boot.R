@@ -57,7 +57,6 @@ fect.boot <- function(Y,
     } else {
         p <- 0
     }
-
     if (is.null(W)) {
         W.use <- as.matrix(0)
         use_weight <- 0
@@ -1348,9 +1347,369 @@ fect.boot <- function(Y,
     if (dis) {
         message(dim(att.boot)[2], " runs\n", sep = "")
     }
+    if (vartype != "parametric") {
+      ## Calculation of average outcomes
+      # --- Input Checks ---
+      # These checks are relevant for non-parametric types
+      if (!exists("boot.out")) { stop("List 'boot.out' required for non-parametric vartype.") }
+      if (exists("boot.out") && !is.list(boot.out)) { stop("'boot.out' must be a list.") }
+      if (!exists("T.on") || !exists("N")) { stop("'T.on' and 'N' must be defined.") }
+      T_val <- tryCatch(if (is.matrix(T.on) || is.data.frame(T.on)) nrow(T.on) else length(T.on), error = function(e) 0)
+      if (!is.numeric(T_val) || T_val < 0) { stop("'T.on' does not yield a valid number of time periods.") }
+      if (!is.numeric(N) || N < 0) { stop("'N' must be a non-negative numeric value.") }
+      if (!exists("D")) { stop("Reference treatment matrix 'D' must be defined.") }
+      if (!is.matrix(D) && !is.data.frame(D)) { stop("'D' must be a matrix or data frame.") }
+      if(!is.numeric(D)) { warning("Coercing reference matrix D to numeric."); mode(D) <- "numeric" }
+      if (nrow(D) != T_val || (N > 0 && ncol(D) != N)) { stop("Dimensions of 'D' do not match T.on and N.") }
+      # vartype check is general, but this whole block is for vartype != "parametric"
+      if (!is.character(vartype) || length(vartype) != 1) { stop("'vartype' must be a single string.") }
+      valid_vartypes <- c("bootstrap", "jackknife") # Only non-parametric types are valid here
+      if (!(vartype %in% valid_vartypes)) { stop(paste("'vartype' must be one of:", paste(valid_vartypes, collapse=", "))) }
 
+      # --- Preliminaries ---
+      D0 <- D # Use the provided reference matrix D as D0
+      n_replicates <- if (exists("boot.out")) length(boot.out) else 0 # Simplified as boot.out must exist here
 
-    ####################################
+      if (n_replicates == 0 && N > 0) { stop("'boot.out' is empty for non-parametric vartype.") }
+      if (vartype == "jackknife" && N <= 1) {
+        warning("Jackknife requires N > 1 units. Returning empty Y.avg.")
+        if (!exists("out")) out <- list()
+        out$Y.avg <- data.frame(period=numeric(0), treated=numeric(0), counterfactual=numeric(0), lower.tr=numeric(0), upper.tr=numeric(0), lower90.tr=numeric(0), upper90.tr=numeric(0), lower.ct=numeric(0), upper.ct=numeric(0), lower90.ct=numeric(0), upper90.ct=numeric(0))
+        return(invisible(NULL))
+      }
+      if (T_val == 0 || N == 0) {
+        warning(paste("Input data has zero ", if(T_val==0) "time periods" else "units", ". Returning empty Y.avg.", sep=""))
+        if (!exists("out")) out <- list()
+        out$Y.avg <- data.frame(period=numeric(0), treated=numeric(0), counterfactual=numeric(0), lower.tr=numeric(0), upper.tr=numeric(0), lower90.tr=numeric(0), upper90.tr=numeric(0), lower.ct=numeric(0), upper.ct=numeric(0), lower90.ct=numeric(0), upper90.ct=numeric(0))
+        return(invisible(NULL)) # Directly return for non-parametric case
+      }
+
+      # --- Helper Functions ---
+      find_first <- function(vec, min_val = 1) {
+        if (!is.numeric(vec)) { vec_num <- suppressWarnings(as.numeric(as.character(vec))) } else { vec_num <- vec }
+        idx <- which(vec_num >= min_val & !is.na(vec_num))
+        if (length(idx) == 0) return(NA_integer_) else return(min(idx))
+      }
+      calculate_first_treatment <- function(D_mat, N_val) {
+        if(N_val == 0) return(integer(0))
+        if(!is.matrix(D_mat)) D_mat <- as.matrix(D_mat)
+        if(!is.numeric(D_mat)) { mode(D_mat) <- "numeric" }
+        apply(D_mat, 2, find_first, min_val = 1)
+      }
+
+      # --- Determine Treatment Timing and Type ---
+      first_treat_period_D0 <- if(N > 0) calculate_first_treatment(D0, N) else integer(0)
+      treated_units_idx_D0 <- which(!is.na(first_treat_period_D0))
+      control_units_idx_D0 <- which(is.na(first_treat_period_D0))
+      Ntr <- length(treated_units_idx_D0)
+      Nco <- length(control_units_idx_D0)
+
+      if (Ntr == 0) {
+        warning("No treated units found based on reference D matrix (D0).")
+        is_staggered <- FALSE; common_G_D0 <- NA
+      } else {
+        unique_adoption_times_D0 <- unique(first_treat_period_D0[treated_units_idx_D0])
+        is_staggered <- length(unique_adoption_times_D0) > 1
+        if(!is_staggered) { common_G_D0 <- unique_adoption_times_D0 } else { common_G_D0 <- NA }
+      }
+
+      # --- Period Labels ---
+      calendar_periods_labels <- seq.int(T_val) # Default labels (1:T)
+      if (!is.null(rownames(D0))) {
+        cal_labels_from_rows <- tryCatch(as.numeric(rownames(D0)), warning = function(w) NULL)
+        if (!is.null(cal_labels_from_rows) && !anyNA(cal_labels_from_rows) && length(cal_labels_from_rows) == T_val) {
+          calendar_periods_labels <- cal_labels_from_rows
+        } else { warning("Rownames of D not valid numeric labels. Using 1:T.") }
+      }
+      periods <- NULL # Will be set later based on staggered/non-staggered
+
+      # --- Initialize Placeholders ---
+      event_times_range <- NULL
+      period_type_attr <- "calendar_time"
+      repl_tr <- NULL; repl_cf <- NULL
+      theta_tr <- NULL; theta_cf <- NULL
+
+      # --- Calculate Averages and Determine Output Periods ---
+
+      if (is_staggered) {
+        period_type_attr <- "event_time"
+        min_event_time <- -(T_val - 1) + 1; max_event_time <- T_val
+        event_times_range <- min_event_time:max_event_time
+        n_event_times <- length(event_times_range)
+        event_time_matrix_D0 <- outer(seq.int(T_val), first_treat_period_D0, FUN = "-") + 1
+
+        # Calculate Replicates if Bootstrap/Jackknife
+        event_repl_cf <- matrix(NA_real_, nrow = n_event_times, ncol = n_replicates); event_repl_tr <- matrix(NA_real_, nrow = n_event_times, ncol = n_replicates)
+        rownames(event_repl_cf) <- rownames(event_repl_tr) <- event_times_range
+        if (n_replicates > 0) {
+          for (b in seq_len(n_replicates)) {
+            repl_data <- boot.out[[b]]
+            if (is.null(repl_data) || !is.list(repl_data) || is.null(repl_data$D) || is.null(repl_data$Y) || is.null(repl_data$Y.ct)) { next }
+            D_b <- repl_data$D; Y_b <- repl_data$Y; Yct_b <- repl_data$Y.ct
+            if(!is.matrix(D_b)) D_b <- as.matrix(D_b); if(!is.matrix(Y_b)) Y_b <- as.matrix(Y_b); if(!is.matrix(Yct_b)) Yct_b <- as.matrix(Yct_b)
+            if(!is.numeric(D_b)) mode(D_b) <- "numeric"
+            if(!is.numeric(Y_b)) { warning(paste("Coercing replicate", b, "Y to numeric.")); mode(Y_b) <- "numeric" }
+            if(!is.numeric(Yct_b)) { warning(paste("Coercing replicate", b, "Y.ct to numeric.")); mode(Yct_b) <- "numeric" }
+
+            N_b <- ncol(D_b); expected_N_b <- N; if (vartype == "jackknife") { expected_N_b <- N - 1 }
+            if (N > 0 && N_b != expected_N_b) {
+              warning(paste("Replicate", b, ": For vartype '", vartype, "', expected ", expected_N_b, " columns in D_b, but got ", N_b, ". Skipping replicate."), call. = FALSE)
+              next
+            }
+            if (nrow(D_b) != T_val || nrow(Y_b) != T_val || nrow(Yct_b) != T_val || (N_b > 0 && (ncol(Y_b) != N_b || ncol(Yct_b) != N_b))) {
+              warning(paste("Replicate", b, ": Dimension mismatch with T_val. Skipping replicate."), call. = FALSE)
+              next
+            }
+            if (N_b == 0) { next }
+
+            Y_b[is.na(Yct_b)] <- NA
+
+            first_treat_period_b <- calculate_first_treatment(D_b, N_b)
+            event_time_matrix_b <- outer(seq.int(T_val), first_treat_period_b, FUN = "-") + 1
+
+            for (e_idx in seq_along(event_times_range)) {
+              e <- event_times_range[e_idx]
+              potential_mask <- (event_time_matrix_b == e); potential_mask[is.na(potential_mask)] <- FALSE
+              if (!any(potential_mask)) { next }
+
+              if (e <= 0) { final_mask <- potential_mask } else { final_mask <- potential_mask & (D_b == 1); final_mask[is.na(final_mask)] <- FALSE }
+              if (!any(final_mask)) { next }
+
+              event_repl_tr[e_idx, b] <- mean(Y_b[final_mask], na.rm = TRUE)
+              event_repl_cf[e_idx, b] <- mean(Yct_b[final_mask], na.rm = TRUE)
+            }
+          }
+        }
+
+        valid_event_times_repl_tr <- rowSums(!is.na(event_repl_tr)) > 0
+        valid_event_times_repl_cf <- rowSums(!is.na(event_repl_cf)) > 0
+        valid_event_times_overall <- valid_event_times_repl_tr | valid_event_times_repl_cf
+
+        if (!any(valid_event_times_overall)) {
+          periods <- numeric(0); theta_tr <- numeric(0); theta_cf <- numeric(0)
+          repl_tr <- matrix(NA_real_, 0, n_replicates); repl_cf <- matrix(NA_real_, 0, n_replicates)
+        } else {
+          periods <- event_times_range[valid_event_times_overall]
+          repl_tr <- event_repl_tr[valid_event_times_overall, , drop = FALSE]
+          repl_cf <- event_repl_cf[valid_event_times_overall, , drop = FALSE]
+          theta_tr <- rowMeans(repl_tr, na.rm = TRUE)
+          theta_cf <- rowMeans(repl_cf, na.rm = TRUE)
+        }
+
+      } else { # Non-Staggered Case
+        period_type_attr <- "calendar_time"
+        periods <- calendar_periods_labels
+        # num_periods_out <- T_val # This was used later, now length(periods) is the source of truth
+
+        calendar_repl_cf <- matrix(NA_real_, nrow = T_val, ncol = n_replicates)
+        calendar_repl_tr <- matrix(NA_real_, nrow = T_val, ncol = n_replicates)
+        rownames(calendar_repl_cf) <- rownames(calendar_repl_tr) <- 1:T_val
+        if (n_replicates > 0) {
+          for (b in seq_len(n_replicates)) {
+            repl_data <- boot.out[[b]]
+            if (is.null(repl_data) || !is.list(repl_data) || is.null(repl_data$D) || is.null(repl_data$Y) || is.null(repl_data$Y.ct)) { next }
+            D_b <- repl_data$D; Y_b <- repl_data$Y; Yct_b <- repl_data$Y.ct
+            if(!is.matrix(D_b)) D_b <- as.matrix(D_b); if(!is.matrix(Y_b)) Y_b <- as.matrix(Y_b); if(!is.matrix(Yct_b)) Yct_b <- as.matrix(Yct_b)
+            if(!is.numeric(D_b)) mode(D_b) <- "numeric"
+            if(!is.numeric(Y_b)) { warning(paste("Coercing replicate", b, "Y to numeric.")); mode(Y_b) <- "numeric" }
+            if(!is.numeric(Yct_b)) { warning(paste("Coercing replicate", b, "Y.ct to numeric.")); mode(Yct_b) <- "numeric" }
+
+            N_b <- ncol(D_b)
+            expected_N_b <- N
+
+            present_original_indices <- if (N > 0) 1:N else integer(0)
+            replicate_col_to_original_idx <- if (N_b > 0) 1:N_b else integer(0)
+
+            if(vartype == "jackknife") {
+              expected_N_b <- N - 1
+              if (N_b == N - 1 && n_replicates == N) {
+                omitted_original_idx <- b
+                present_original_indices <- (1:N)[-omitted_original_idx]
+                replicate_col_to_original_idx <- present_original_indices
+              } else {
+                warning(paste("Replicate", b, ": Jackknife replicate has", N_b, "columns (expected N-1=", N-1, ") or n_replicates (", n_replicates, ") != N (", N, "). Skipping replicate."), call. = FALSE)
+                next
+              }
+            }
+
+            if (N > 0 && N_b != expected_N_b) {
+              warning(paste("Replicate", b, ": For vartype '", vartype, "', expected ", expected_N_b, " columns in D_b, but got ", N_b, ". Skipping replicate."), call. = FALSE)
+              next
+            }
+
+            if (nrow(D_b) != T_val || nrow(Y_b) != T_val || nrow(Yct_b) != T_val || (N_b > 0 && (ncol(Y_b) != N_b || ncol(Yct_b) != N_b))) {
+              warning(paste("Replicate", b, ": Dimension mismatch with T_val. Skipping replicate."), call. = FALSE)
+              next
+            }
+
+            if (N_b == 0 && N > 0) { next }
+
+            Y_b[is.na(Yct_b)] <- NA
+
+            target_units_present_in_b_orig_idx <- intersect(treated_units_idx_D0, present_original_indices)
+            if (length(target_units_present_in_b_orig_idx) == 0) { next }
+            replicate_cols_for_target_units_all <- which(replicate_col_to_original_idx %in% target_units_present_in_b_orig_idx)
+            if (length(replicate_cols_for_target_units_all) == 0) { next }
+
+            for (t in seq.int(T_val)) {
+              cols_to_avg <- integer(0)
+              if (!is.na(common_G_D0) && t < common_G_D0) {
+                cols_to_avg <- replicate_cols_for_target_units_all
+              } else if (!is.na(common_G_D0) && t >= common_G_D0) {
+                is_treated_in_b <- D_b[t, replicate_cols_for_target_units_all] == 1
+                is_treated_in_b[is.na(is_treated_in_b)] <- FALSE
+                cols_to_avg <- replicate_cols_for_target_units_all[is_treated_in_b]
+              } else {
+                warning(paste("Replicate", b, ": common_G_D0 is NA in non-staggered case. Skipping time", t), call. = FALSE)
+                next
+              }
+
+              if (length(cols_to_avg) > 0) {
+                calendar_repl_tr[t, b] <- mean(Y_b[t, cols_to_avg], na.rm = TRUE)
+                calendar_repl_cf[t, b] <- mean(Yct_b[t, cols_to_avg], na.rm = TRUE)
+              }
+            }
+          }
+        }
+
+        valid_calendar_times_repl_tr <- rowSums(!is.na(calendar_repl_tr)) > 0
+        valid_calendar_times_repl_cf <- rowSums(!is.na(calendar_repl_cf)) > 0
+        valid_calendar_times_overall <- valid_calendar_times_repl_tr | valid_calendar_times_repl_cf
+
+        if (!any(valid_calendar_times_overall)) {
+          periods <- numeric(0); theta_tr <- numeric(0); theta_cf <- numeric(0)
+          repl_tr <- matrix(NA_real_, 0, n_replicates); repl_cf <- matrix(NA_real_, 0, n_replicates)
+        } else {
+          periods <- calendar_periods_labels[valid_calendar_times_overall]
+          repl_tr <- calendar_repl_tr[valid_calendar_times_overall, , drop = FALSE]
+          repl_cf <- calendar_repl_cf[valid_calendar_times_overall, , drop = FALSE]
+          theta_tr <- rowMeans(repl_tr, na.rm = TRUE)
+          theta_cf <- rowMeans(repl_cf, na.rm = TRUE)
+        }
+      } # End Staggered/Non-Staggered block
+
+      # --- Confidence Interval Calculation (Non-Parametric) ---
+      num_periods_out <- length(periods)
+
+      ci_tr95 <- matrix(NA_real_, nrow = num_periods_out, ncol = 2, dimnames = list(NULL, c("lower","upper")))
+      ci_cf95 <- matrix(NA_real_, nrow = num_periods_out, ncol = 2, dimnames = list(NULL, c("lower","upper")))
+      ci_tr90 <- matrix(NA_real_, nrow = num_periods_out, ncol = 2, dimnames = list(NULL, c("lower","upper")))
+      ci_cf90 <- matrix(NA_real_, nrow = num_periods_out, ncol = 2, dimnames = list(NULL, c("lower","upper")))
+
+      if (vartype == "bootstrap") {
+        if (n_replicates > 0 && num_periods_out > 0) {
+          if (nrow(repl_tr) != num_periods_out || nrow(repl_cf) != num_periods_out) {
+            warning("Bootstrap replicate matrix dimensions mismatch after filtering. Skipping CI.")
+          } else {
+            basic_ci_alpha <- function(theta, boots, alpha) {
+              n_p <- length(theta); if(n_p == 0) return(matrix(NA_real_, 0, 2, dimnames=list(NULL, c("lower","upper"))))
+              ci <- matrix(NA_real_, n_p, 2, dimnames=list(NULL, c("lower","upper"))); probs <- c(alpha/2, 1 - alpha/2)
+              if(is.null(dim(boots)) || nrow(boots) != n_p || ncol(boots) != n_replicates) { return(ci) }
+              for (i in seq_len(n_p)) {
+                deviations <- boots[i, ] - theta[i]
+                valid_deviations <- deviations[!is.na(deviations)]
+                if (length(valid_deviations) > 1) {
+                  qs_dev <- tryCatch(quantile(valid_deviations, probs=probs, na.rm=TRUE, type=8), error=function(e) c(NA_real_, NA_real_))
+                  if(all(!is.na(qs_dev))) {
+                    ci[i, ] <- c( theta[i] - qs_dev[2], theta[i] - qs_dev[1] )
+                  }
+                }
+              }
+              ci
+            }
+            ci_tr95 <- basic_ci_alpha(theta_tr, repl_tr, alpha = 0.05)
+            ci_cf95 <- basic_ci_alpha(theta_cf, repl_cf, alpha = 0.05)
+            ci_tr90 <- basic_ci_alpha(theta_tr, repl_tr, alpha = 0.10)
+            ci_cf90 <- basic_ci_alpha(theta_cf, repl_cf, alpha = 0.10)
+          }
+        } else { warning("Cannot calculate bootstrap CIs: No replicates or periods remain.") }
+
+      } else if (vartype == "jackknife") {
+        if (n_replicates > 1 && num_periods_out > 0) { # Jackknife needs n_replicates > 1 (i.e., N > 1)
+          if (nrow(repl_tr) != num_periods_out || nrow(repl_cf) != num_periods_out) {
+            warning("Jackknife replicate matrix dimensions mismatch after filtering. Skipping CI.")
+          } else {
+            jackknife_ci_alpha <- function(theta, replicates, alpha) {
+              n_p <- length(theta); if(n_p == 0) return(matrix(NA_real_, 0, 2, dimnames=list(NULL, c("lower","upper"))))
+              ci <- matrix(NA_real_, n_p, 2, dimnames=list(NULL, c("lower","upper"))); n_repl <- ncol(replicates)
+              if (is.null(dim(replicates)) || nrow(replicates) != n_p || n_repl <= 1) { return(ci) }
+
+              dev_sq <- sweep(replicates, 1, theta, FUN = "-")^2
+              sum_dev_sq <- rowSums(dev_sq, na.rm = TRUE); valid_counts <- rowSums(!is.na(replicates))
+              jk_variance <- ifelse(valid_counts > 1, ((n_repl - 1) / n_repl) * sum_dev_sq, NA_real_)
+              jk_se <- sqrt(jk_variance); jk_se[!is.finite(jk_se)] <- NA_real_
+              z_crit <- qnorm(1 - alpha / 2)
+              for (i in seq_len(n_p)) {
+                if (!is.na(theta[i]) && !is.na(jk_se[i]) && jk_se[i] > 0) {
+                  ci[i, "lower"] <- theta[i] - z_crit * jk_se[i]; ci[i, "upper"] <- theta[i] + z_crit * jk_se[i]
+                }
+              }
+              return(ci)
+            }
+            ci_tr95 <- jackknife_ci_alpha(theta_tr, repl_tr, alpha = 0.05)
+            ci_cf95 <- jackknife_ci_alpha(theta_cf, repl_cf, alpha = 0.05)
+            ci_tr90 <- jackknife_ci_alpha(theta_tr, repl_tr, alpha = 0.10)
+            ci_cf90 <- jackknife_ci_alpha(theta_cf, repl_cf, alpha = 0.10)
+          }
+        } else { warning("Cannot calculate jackknife CIs: Need >1 replicate or no periods remain.") }
+      } else {
+        # This case should ideally not be reached if initial vartype checks are robust
+        stop("Internal error: Invalid 'vartype' for non-parametric CI calculation.")
+      }
+
+      # --- Assemble into out$Y.avg ---
+      if (!exists("out")) out <- list()
+
+      final_components <- list(periods=periods, theta_tr=theta_tr, theta_cf=theta_cf, ci_tr95=ci_tr95, ci_cf95=ci_cf95, ci_tr90=ci_tr90, ci_cf90=ci_cf90)
+      lengths_ok <- TRUE
+      for(comp_name in names(final_components)){
+        comp <- final_components[[comp_name]]; comp_len <- if(is.matrix(comp)) nrow(comp) else length(comp)
+        if(num_periods_out > 0 && is.null(comp)) { warning(paste("Component is NULL:", comp_name)); lengths_ok <- FALSE
+        } else if (!is.null(comp) && comp_len != num_periods_out){ warning(paste("Length mismatch:", comp_name, ". Expected", num_periods_out, "got", comp_len)); lengths_ok <- FALSE }
+      }
+      if (!lengths_ok && num_periods_out > 0) { warning("Dimension mismatch assembling final data frame. Trying anyway.") }
+
+      ensure_numeric_matrix_cols <- function(mat, expected_rows) {
+        if (expected_rows == 0) { return(matrix(NA_real_, 0, 2, dimnames = list(NULL, c("lower","upper")))) }
+        if (!is.matrix(mat) || ncol(mat) != 2 || nrow(mat) != expected_rows) {
+          mat <- matrix(NA_real_, expected_rows, 2, dimnames = list(NULL, c("lower","upper")))
+        } else if (!is.numeric(mat)) {
+          mat_num <- matrix(as.numeric(mat), nrow=nrow(mat), ncol=ncol(mat), dimnames=dimnames(mat)); mat <- mat_num
+        }
+        mat[is.nan(mat)] <- NA_real_
+        mat
+      }
+      ci_tr95 <- ensure_numeric_matrix_cols(ci_tr95, num_periods_out)
+      ci_cf95 <- ensure_numeric_matrix_cols(ci_cf95, num_periods_out)
+      ci_tr90 <- ensure_numeric_matrix_cols(ci_tr90, num_periods_out)
+      ci_cf90 <- ensure_numeric_matrix_cols(ci_cf90, num_periods_out)
+
+      if (num_periods_out > 0) {
+        theta_tr_vec <- if(length(theta_tr) == num_periods_out) as.numeric(theta_tr) else rep(NA_real_, num_periods_out)
+        theta_cf_vec <- if(length(theta_cf) == num_periods_out) as.numeric(theta_cf) else rep(NA_real_, num_periods_out)
+        out$Y.avg <- data.frame(
+          period         = periods,
+          treated        = theta_tr_vec, counterfactual = theta_cf_vec,
+          lower.tr       = ci_tr95[,"lower"], upper.tr       = ci_tr95[,"upper"],
+          lower90.tr     = ci_tr90[,"lower"], upper90.tr     = ci_tr90[,"upper"],
+          lower.ct       = ci_cf95[,"lower"], upper.ct       = ci_cf95[,"upper"],
+          lower90.ct     = ci_cf90[,"lower"], upper90.ct     = ci_cf90[,"upper"]
+        )
+      } else {
+        out$Y.avg <- data.frame(period=numeric(0), treated=numeric(0), counterfactual=numeric(0),
+                                lower.tr=numeric(0), upper.tr=numeric(0), lower90.tr=numeric(0), upper90.tr=numeric(0),
+                                lower.ct=numeric(0), upper.ct=numeric(0), lower90.ct=numeric(0), upper90.ct=numeric(0))
+      }
+      attr(out$Y.avg, "period_type") <- period_type_attr
+
+    } else { # This 'else' corresponds to: if (vartype == "parametric")
+      message("Average values of treated and counterfactual outcomes not supported for the parametric bootstrap in this version")
+      if (!exists("out")) out <- list() # Ensure 'out' exists
+      out$Y.avg <- data.frame(period=numeric(0), treated=numeric(0), counterfactual=numeric(0),
+                              lower.tr=numeric(0), upper.tr=numeric(0), lower90.tr=numeric(0), upper90.tr=numeric(0),
+                              lower.ct=numeric(0), upper.ct=numeric(0), lower90.ct=numeric(0), upper90.ct=numeric(0))
+    }
+    ####################################go
     ## Variance and CIs
     ####################################
 
@@ -1373,17 +1732,24 @@ fect.boot <- function(Y,
     ## ATT estimates
     if (vartype == "jackknife") {
         att.j <- jackknifed(att, att.boot, alpha, quantile.CI = quantile.CI)
+        att.bound <- cbind(att + qnorm(alpha) * att.j$se, att + qnorm(1 - alpha) * att.j$se)
+        colnames(att.bound) <- c("CI.lower", "CI.upper")
+        rownames(att.bound) <- out$time
+
         est.att <- cbind(att, att.j$se, att.j$CI.l, att.j$CI.u, att.j$P, out$count)
+        est.att90 <- cbind(att, att.j$se, att.bound, att.j$P, out$count)
         colnames(est.att) <- c(
             "ATT", "S.E.", "CI.lower", "CI.upper",
             "p.value", "count"
         )
+        colnames(est.att90) <- c(
+          "ATT", "S.E.", "CI.lower", "CI.upper",
+          "p.value", "count"
+        )
         rownames(est.att) <- out$time
+        rownames(est.att90) <- out$time
         vcov.att <- att.j$vcov
 
-        att.bound <- cbind(att + qnorm(alpha) * att.j$se, att + qnorm(1 - alpha) * att.j$se)
-        colnames(att.bound) <- c("CI.lower", "CI.upper")
-        rownames(att.bound) <- out$time
 
         eff.calendar.j <- jackknifed(calendar.eff, calendar.eff.boot, alpha, quantile.CI = quantile.CI)
         est.eff.calendar <- cbind(calendar.eff, eff.calendar.j$se, eff.calendar.j$CI.l, eff.calendar.j$CI.u, eff.calendar.j$P, calendar.N)
@@ -1687,10 +2053,12 @@ fect.boot <- function(Y,
             CI.att <- cbind(att - se.att * qnorm(1 - alpha / 2), att + se.att * qnorm(1 - alpha / 2)) # normal approximation
             pvalue.att <- (1 - pnorm(abs(att / se.att))) * 2
         } else {
-            CI.att <- t(apply(att.boot, 1, function(vec) quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)))
+          CI.att <- t(apply(att.boot, 1, function(vec) {
+            2 * att[which.max(!is.na(vec))] - quantile(vec, c(1 - alpha / 2, alpha / 2), na.rm = TRUE)
+          }))
             pvalue.att <- apply(att.boot, 1, get.pvalue)
         }
-        
+
         #vcov.att <- cov(t(att.boot), use = "pairwise.complete.obs")
         vcov.att <- tryCatch(
             {
@@ -1700,22 +2068,28 @@ fect.boot <- function(Y,
                 NA
             }
         )
+        # for equivalence test
+        if (quantile.CI == FALSE) {
+          att.bound <- cbind(att - se.att * qnorm(1 - alpha), att + se.att * qnorm(1 - alpha)) # one-sided
+        } else {
+          att.bound <- t(apply(att.boot, 1, function(vec) quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)))
+        }
 
+        colnames(att.bound) <- c("CI.lower", "CI.upper")
+        rownames(att.bound) <- out$time
         est.att <- cbind(att, se.att, CI.att, pvalue.att, out$count)
+        est.att90 <- cbind(att, se.att, att.bound, pvalue.att, out$count)
         colnames(est.att) <- c(
             "ATT", "S.E.", "CI.lower", "CI.upper",
             "p.value", "count"
         )
+        colnames(est.att90) <- c(
+          "ATT", "S.E.", "CI.lower", "CI.upper",
+          "p.value", "count"
+        )
         rownames(est.att) <- out$time
+        rownames(est.att90) <- out$time
 
-        # for equivalence test
-        if (quantile.CI == FALSE) {
-            att.bound <- cbind(att - se.att * qnorm(1 - alpha), att + se.att * qnorm(1 - alpha)) # one-sided
-        } else {
-            att.bound <- t(apply(att.boot, 1, function(vec) quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)))
-        }
-        colnames(att.bound) <- c("CI.lower", "CI.upper")
-        rownames(att.bound) <- out$time
 
 
 
@@ -1737,7 +2111,7 @@ fect.boot <- function(Y,
                 error = function(e) {
                     NA
                 }
-            )   
+            )
 
 
             est.att.off <- cbind(att.off, se.att.off, CI.att.off, pvalue.att.off, out$count.off)
@@ -2379,13 +2753,14 @@ fect.boot <- function(Y,
     ## storage
     result <- list(
         est.avg = est.avg,
+        att.bound = att.bound,
         att.avg.boot = att.avg.boot,
         est.avg.unit = est.avg.unit,
         att.avg.unit.boot = att.avg.unit.boot,
         est.eff.calendar = est.eff.calendar,
         est.eff.calendar.fit = est.eff.calendar.fit,
         est.att = est.att,
-        att.bound = att.bound,
+        est.att90 = est.att90,
         att.boot = att.boot,
         att.boot.original = att.boot.original,
         att.vcov = vcov.att,
@@ -2458,6 +2833,9 @@ fect.boot <- function(Y,
             est.group.output = est.group.out
         ))
     }
+
+
+
 
     return(c(out, result))
 } ## end of boot

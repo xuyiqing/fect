@@ -1,0 +1,357 @@
+---
+title: "Updates to fect"
+author: "Rivka Lipkovitz"
+output: html_document
+---
+
+# Updates to plotting
+
+This document explains all of the new features that have been added to **fect**.
+
+---
+
+**Quick summary of major changes:**
+
+- Created `did_wrapper` function
+- Created function `fect_sens_anlys` for Rambachan & Roth style robust confidence sets
+- Added plotting option for `fect_sens_anlys` (both average and period)
+- Fixed bug during removing carryover period
+- Replaced `vis` with an argument called `connected`
+- Added deprecation message for `vis`
+- Set `gridOff = TRUE` by default (makes plots look more clean)
+- Set `show.points = TRUE` by default for connected plot
+- Created `grayscale` and `vibrant` themes
+- Added arguments to `fect` so that users can pass in their own colors
+- Made color transition for placebo/carryover effects happen in between points
+- Made lines thinner and vertical line dashed
+- Removed outline around count bars
+- Made background of status plot white by default
+- Small visual QoL changes in all plots
+
+## Load Libraries
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(fixest)
+library(did)
+library(fect)
+library(PanelMatch)
+library(DIDmultiplegtDYN)
+library(ggplot2)
+library(panelView)
+library(HonestDiDFEct)
+```
+
+## Wrapper for New DID Methods
+
+The outputs of `did_wrapper` will be the same as shown in the [tutorial](https://yiqingxu.org/packages/fect/05-panel.html).
+
+```{r message=FALSE, warning=FALSE}
+data(fect)
+df <- hh2019
+head(df)
+
+# Main variables
+Y <- "nat_rate_ord"
+D <- "indirect"
+index <- c("bfs", "year")
+```
+
+### TWFE
+
+```{r warning=FALSE}
+res_twfe <- did_wrapper(
+  data   = df,
+  Y      = Y,
+  D      = D,
+  index  = index,
+  method = "twfe",
+  se     = "default"
+)
+cat("\n>>> TWFE results:\n")
+print(res_twfe$est.avg)
+
+p_twfe <- esplot(data = res_twfe,
+                 main = "TWFE event-study", xlim = c(-12,10))
+print(p_twfe)
+```
+
+### Stacked DID
+
+```{r warning=FALSE}
+res_st <- did_wrapper(
+  data   = df,
+  Y      = Y,
+  D      = D,
+  index  = index,
+  method = "st",
+  se     = "default"
+)
+cat("\n>>> Stacked DID Results:\n")
+print(res_st$est.avg)
+
+p_st <- esplot(data = res_st,
+               main = "Stacked DID", xlim = c(-12,10))
+print(p_st)
+```
+
+### Interaction Weighted DID
+
+```{r warning=FALSE}
+res_iw <- did_wrapper(
+  data   = df,
+  Y      = Y,
+  D      = D,
+  index  = index,
+  method = "iw",
+  se     = "default"
+)
+cat("\n>>> Interaction Weighted Results:\n")
+print(res_iw$est.avg)
+
+p_iw <- esplot(data = res_iw,
+               main = "Interaction Weighted DID", xlim = c(-12,10))
+print(p_iw)
+```
+
+### Callaway and Sant’Anna DID
+
+#### 5.1) cs_never
+
+```{r warning=FALSE}
+res_csnever <- did_wrapper(
+  data   = df,
+  Y      = Y,
+  D      = D,
+  index  = index,
+  method = "cs_never",
+  se     = "default"
+)
+cat("\n>>> CSDID (never-treated) Results:\n")
+print(res_csnever$est.avg)
+
+p_csnever <- esplot(data = res_csnever,
+                    main = "CSDID (never-treated) ES", xlim = c(-12,10))
+print(p_csnever)
+```
+
+#### 5.2) cs_notyet
+
+```{r warning=FALSE}
+res_csnotyet <- did_wrapper(
+  data   = df,
+  Y      = Y,
+  D      = D,
+  index  = index,
+  method = "cs_notyet",
+  se     = "default"
+)
+cat("\n>>> CSDID (not-yet-treated) Results:\n")
+print(res_csnotyet$est.avg)
+
+p_csnotyet <- esplot(data = res_csnotyet,
+                    main = "CSDID (not-yet-treated) ES", xlim = c(-12,10))
+print(p_csnotyet)
+```
+
+### DIDmultiplegtDYN ("didm") Example
+
+```{r warning=FALSE}
+res_didm <- did_wrapper(
+  data         = df,
+  Y            = Y,
+  D            = D,
+  index        = index,
+  method       = "didm",
+  didm.effects = 12,
+  didm.placebo = 9,
+  se           = "default"
+)
+cat("\n>>> DIDmultiple Results:\n")
+print(res_didm$est.avg)
+
+p_didm <- esplot(data = res_didm,
+                 main = "DIDmultiple ES", xlim = c(-12,9))
+print(p_didm)
+```
+
+### TWFE with Cluster Bootstrap Example
+
+```{r warning=FALSE}
+res_twfe_boot <- did_wrapper(
+  data   = df,
+  Y      = Y,
+  D      = D,
+  index  = index,
+  method = "twfe",
+  se     = "boot",
+  nboots = 100,
+  parallel = TRUE
+)
+cat("\n>>> TWFE With Cluster Bootstrap:\n")
+print(res_twfe_boot$est.avg)
+
+p_res_twfe_boot <- esplot(data = res_twfe_boot,
+                 main = "TWFE with Cluster Bootstrap", xlim = c(-12,9))
+print(p_res_twfe_boot)
+```
+
+## Rambachan and Roth Sensitivity Analysis
+Fit fect with  `placeboTest = TRUE` and run the sensitivity analysis
+```{r warning=FALSE}
+out.fect.placebo <- fect(
+  nat_rate_ord ~ indirect,
+  data  = hh2019,
+  index = c("bfs", "year"),
+  method        = 'fe',
+  se            = TRUE,
+  placeboTest   = TRUE,
+  placebo.period = c(-2, 0)
+)
+out.fect.placebo <- fect_sens(
+  fect.out     = out.fect.placebo,
+  post.periods = 1:10,
+  Mbarvec      = seq(0,1, by=0.1),
+  periodMbarvec      = seq(0,1, by=0.5),
+  Mvec         = seq(0,0.25,0.05), 
+  periodMvec         = seq(0,0.25,0.25)
+)
+```
+### Plotting
+Relative Magnitude Restriction
+```{r warning=FALSE}
+plot(out.fect.placebo, type = "sens", restrict = "rm", main = "Relative Magnitude Restriction")
+```
+Smoothness Restriction
+```{r warning=FALSE}
+plot(out.fect.placebo, type = "sens", restrict = "sm",  main = "Smoothness Restriction")
+```
+Relative Magnitude Restriction Gaps Plot
+```{r warning=FALSE}
+plot(out.fect.placebo, xlim = c(-12,10),  type = "sens_es", restrict = "rm",  main = "Relative Magnitude Restriction")
+```
+```{r warning=FALSE}
+plot(out.fect.placebo,  xlim = c(-12,10),type = "sens_es", restrict = "sm", main = "Smoothness Restriction")
+```
+Changing color
+```{r warning=FALSE}
+plot(out.fect.placebo, type = "sens_es", restrict = "sm",sens.robust.colors = c("violet"))
+
+plot(out.fect.placebo, xlim = c(-12,10), type = "sens", restrict = "rm",sens.robust.colors = c("pink1","purple3","lightblue"))
+```
+
+
+## Improved plotting
+Creating fect object
+```{r warning=FALSE}
+out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+                        force = "two-way", method = "ife", r = 2, CV = 0,
+                        parallel = TRUE, se = TRUE, nboots = 200)
+
+out.fect.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+                        force = "two-way", method = "ife", r = 2, CV = 0,
+                        parallel = TRUE, se = TRUE, 
+                        nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))
+
+out.fect.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+                        force = "two-way", method = "ife", r = 2, CV = 0,
+                        parallel = TRUE, se = TRUE,  carryover.rm = 3,
+                        nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
+```
+###Gaps plot
+Disconnected points
+```{r warning=FALSE}
+plot(out.fect)
+```
+Connected points and gsynth
+```{r warning=FALSE}
+plot(out, connected = TRUE)
+```
+`vis` is deprecated now
+```{r}
+plot(out.fect, vis = "none")
+```
+Custom colors
+```{r warning=FALSE}
+plot(out.fect, connected = TRUE, count.color = "red", color = "orange")
+```
+
+###Placebo plot
+```{r warning=FALSE}
+plot(out.fect.p, connected = TRUE)
+```
+###Carryover plot
+```{r warning=FALSE}
+plot(out.fect.c)
+```
+###Equivalence plot
+```{r warning=FALSE}
+plot(out.fect, type = "equiv")
+```
+###Calendar plot
+```{r warning=FALSE}
+plot(out.fect, type = "calendar", xlim = c(1, 35))
+```
+###Status plot
+```{r warning=FALSE}
+plot(out.fect.c, type="status")
+```
+###Themes
+Grayscale
+```{r warning=FALSE}
+plot(out.fect.c,ylim = c(-3.5,3.5), theme = "grayscale")
+```
+Vibrant
+```{r warning=FALSE}
+plot(out.fect.c, theme = "vibrant", show.count = FALSE)
+```
+Vibrant without points
+```{r warning=FALSE}
+plot(out.fect.c,ylim = c(-3.5,3.5), theme = "vibrant", show.points = FALSE)
+```
+###Gsynth
+```{r warning=FALSE}
+out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+            method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+            se = TRUE, nboots = 1000, parallel = TRUE, cores = 16) #vartype = 'parametric',
+out.jack <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+            method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+            se = TRUE, nboots = 1000, parallel = TRUE, cores = 16, vartype = 'jackknife',) 
+out.para <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+            method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+            se = TRUE, nboots = 1000, parallel = TRUE, cores = 16, vartype = 'parametric',) 
+out2 <- fect(Y ~ D + X1 + X2, data = simgsynth2, index = c("id","time"),
+            method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+            se = TRUE, nboots = 1000, parallel = TRUE, cores = 16) #vartype = 'parametric',
+out.para.gsynth <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+            method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+            se = TRUE, nboots = 1000, parallel = TRUE, cores = 16 , vartype = "parametric")
+out.boot.ife <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+            method = "ife", force = "two-way", CV = TRUE, r = c(0, 5),
+            se = TRUE, nboots = 1000, parallel = TRUE, cores = 16 , vartype = "bootstrap", seed = 1)
+staggered <- fect(nat_rate_ord~indirect, data = df, 
+                 index = c("bfs","year"),
+                 method = 'ife', se = TRUE,nboots=1000)
+staggered.jack <- fect(nat_rate_ord~indirect, data = df, 
+                 index = c("bfs","year"),
+                 method = 'ife', se = TRUE,nboots=1000, vartype = "jackknife")
+staggered.para <- fect(nat_rate_ord~indirect, data = df, 
+                 index = c("bfs","year"),
+                 method = 'gsynth', se = TRUE,nboots=1000, vartype = "parametric")
+```
+```{r warning=FALSE}
+plot(out, type = "counterfactual")
+```
+```{r warning=FALSE}
+plot(out, type = "counterfactual", raw = "all")
+```
+```{r warning=FALSE}
+plot(out, type = "counterfactual", raw = "band")
+```
+```{r warning=FALSE}
+plot(out, type = "counterfactual", show.CI = ".95")
+```
+
+
+
+
