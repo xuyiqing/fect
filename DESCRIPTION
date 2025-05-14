@@ -45,8 +45,9 @@ Suggests:
 SystemRequirements: A C++11 compiler
 Depends: R (>= 3.5.0)
 LinkingTo: Rcpp, RcppArmadillo
-RoxygenNote: 7.1.0
+RoxygenNote: 7.3.2
 Packaged: 2024-01-26 03:25:56 UTC; ziyil
+Encoding: UTF-8
 Author: Shiyun Hu [aut],
     Rivka Lipkovitz [aut],
     Licheng Liu [aut],

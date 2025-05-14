@@ -76,7 +76,7 @@ did_wrapper <- function(
     time_to_treat_var = "Time_to_Treatment",
     treat_indicator   = "treat",
 
-    ## Callaway–Sant’Anna options
+    ## Callaway-Sant'Anna options
     csdid.base_period = "universal",
 
     ## DIDmultiplegtDYN options
@@ -307,7 +307,7 @@ did_wrapper <- function(
                             ctab$`Std. Error`[valid], count_df, method)
 
 
-      # ── 4) Callaway–Sant’Anna (never-treated) ─────────────────────────────
+      # ── 4) Callaway-Sant'Anna (never-treated) ─────────────────────────────
     } else if (method == "cs_never") {
 
       if (!"FirstTreat" %in% names(dd)) # 'FirstTreat' is gname for did::att_gt
@@ -346,7 +346,7 @@ did_wrapper <- function(
         make_es_df(dyn$egt, dyn$att.egt, dyn$se.egt, count_df, method)
 
 
-      # ── 5) Callaway–Sant’Anna (not-yet-treated) ───────────────────────────
+      # ── 5) Callaway-Sant'Anna (not-yet-treated) ───────────────────────────
     } else if (method == "cs_notyet") {
 
       if (!"FirstTreat" %in% names(dd))

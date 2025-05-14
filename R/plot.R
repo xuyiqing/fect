@@ -1213,8 +1213,8 @@ plot.fect <- function(
                 p <- p + geom_ribbon(data = ci_data_filtered_abs, aes(x = period, ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
                   geom_ribbon(data = ci_data_filtered_abs, aes(x = period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
                 y_data_for_range_calc <- c(y_data_for_range_calc, ci_data_filtered_abs[[tr_lo_col]], ci_data_filtered_abs[[tr_hi_col]], ci_data_filtered_abs[[cf_lo_col]], ci_data_filtered_abs[[cf_hi_col]])
-              } else { warning("No CI data for absolute time CI.") }
-            } else { warning("CI columns not found for absolute time CI.") }
+              } else { warning("No CI data for treated/counterfactual averages.") }
+            } else { warning("CI columns not found for treated/counterfactual averages.") }
           }
           p <- p + geom_line(data = data_plot_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
           set.limits <- c("tr", "co"); set.labels <- c("Treated Average", "Estimated Y(0) Average"); set.colors <- c(color, counterfactual.color); set.linetypes <- c("solid", counterfactual.linetype); set.linewidth <- c(est.lwidth, est.lwidth); set.fill <- c(color, counterfactual.color) # fill for CI ribbons
@@ -1485,8 +1485,8 @@ plot.fect <- function(
               p <- p + geom_ribbon(data = ci_data_filtered, aes(x = time_axis_period, ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
                 geom_ribbon(data = ci_data_filtered, aes(x = time_axis_period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
               y_data_for_range_calc <- c(y_data_for_range_calc, ci_data_filtered[[tr_lo_col]], ci_data_filtered[[tr_hi_col]], ci_data_filtered[[cf_lo_col]], ci_data_filtered[[cf_hi_col]])
-            } else { warning("No CI data for relative time CI after filtering.") }
-          } else { warning("CI columns not found for relative time CI.") }
+            } else { warning("No CI data for treated/counterfactual averages.") }
+          } else { warning("CI columns not found for treated/counterfactual averages.") }
         }
         p <- p + geom_line(data = data_plot_main, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
         set.limits <- c("tr", "co"); set.labels <- c("Treated Average", "Estimated Y(0) Average"); set.colors <- c(color, counterfactual.color); set.linetypes <- c("solid", counterfactual.linetype); set.linewidth <- c(est.lwidth, est.lwidth); set.fill <- c(color, counterfactual.color)
@@ -1794,7 +1794,7 @@ plot.fect <- function(
     ## axes labels
     if (is.null(xlab) == TRUE) {
       if (switch.on == TRUE) {
-        xlab <- paste("Time Since the Treatment’s Onset")
+        xlab <- paste("Time Since the Treatment's Onset")
       } else {
         xlab <- paste("Time Relative to Exiting the Treatment")
       }
@@ -2258,7 +2258,7 @@ plot.fect <- function(
         CI.lower     = "CI.lower",
         CI.upper     = "CI.upper",
         Count        = "count",
-        show.count   = show.count,      # user’s choice
+        show.count   = show.count,      # user's choice
         show.points = show.points,
         ci.outline = ci.outline,
         connected    = connected,  # line+CI or point-range
