@@ -78,7 +78,8 @@ fect <- function(formula = NULL, data, # a data frame (long-form)
                  loo = FALSE, # leave one period out placebo
                  permute = FALSE, ## permutation test
                  m = 2, ## block length
-                 normalize = FALSE # accelerate option
+                 normalize = FALSE, # accelerate option
+                 keep.sims = FALSE # keep individual bootstrap/jackknife simulations
                 ) {
     UseMethod("fect")
 }
@@ -139,7 +140,8 @@ fect.formula <- function(formula = NULL,
                          loo = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
-                         normalize = FALSE
+                         normalize = FALSE,
+                         keep.sims = FALSE
                         ) {
     ## parsing
     varnames <- all.vars(formula)
@@ -225,7 +227,8 @@ fect.formula <- function(formula = NULL,
                         loo = loo,
                         permute = permute,
                         m = m,
-                        normalize = normalize)
+                        normalize = normalize,
+                        keep.sims = keep.sims)
 
     out$call <- match.call()
     out$formula <- formula
@@ -289,7 +292,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          loo = FALSE, # leave one period out placebo
                          permute = FALSE, ## permutation test
                          m = 2, ## block length
-                         normalize = FALSE
+                         normalize = FALSE,
+                         keep.sims = FALSE
                         ) {
 
     ##-------------------------------##
@@ -1633,7 +1637,8 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                          vartype = vartype,
                          quantile.CI = quantile.CI,
                          nboots = nboots, parallel = parallel,
-                         cores = cores, group.level = g.level, group = G)
+                         cores = cores, group.level = g.level, group = G,
+                         keep.sims=keep.sims)
 
         if(method %in% c("polynomial",  "cfe")){
             I <- out$I

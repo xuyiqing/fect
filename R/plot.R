@@ -318,6 +318,9 @@ plot.fect <- function(
       type <- "gap"
     }
   }
+  if (!is.null(x$effect.est.att)){
+    type = "cumul"
+  }
 
   type.old <- type
 
@@ -3024,8 +3027,14 @@ plot.fect <- function(
       # Combine the data into one data frame
       data <- rbind(data_original, data_results)
 
-      p <- ggplot(data, aes(x = Mbar)) +
-        geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1]) +
+      p <- ggplot(data, aes(x = Mbar))
+      if (theme.bw == TRUE) {
+        p <- p + theme_bw()
+      }
+      if (gridOff == TRUE) {
+        p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+      }
+      p <- p+  geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1]) +
         geom_errorbar(
           aes(ymin = lb, ymax = ub, color = color_group),
           width = 0.02,  # Width of error bar caps
@@ -3033,16 +3042,15 @@ plot.fect <- function(
         ) +
         scale_color_manual(values = c("Original" = sens.original.color, "Robust Confidence Set" = sens.colors[1])) +
         labs(
-          x = "M",
+          x = expression(bar(M)),
           y = "Treatment Effect",
           title = "Smoothness Restriction Sensitivity Analysis"
         ) +
-        theme_bw() +
         theme(
           legend.title = element_blank(),
-          legend.position = c(0.02, 0.98),
+          legend.position = "inside",
+          legend.position.inside = c(0.02, 0.98),
           legend.justification = c("left", "top"),
-          legend.background = element_rect(fill = alpha("white", 0.7), color = NA)
         )
     }
 
@@ -3080,8 +3088,14 @@ plot.fect <- function(
     # Combine the data into one data frame
     data <- rbind(data_original, data_results)
 
-    p <- ggplot(data, aes(x = M)) +
-      geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1]) +
+    p <- ggplot(data, aes(x = M))
+    if (theme.bw == TRUE) {
+      p <- p + theme_bw()
+    }
+    if (gridOff == TRUE) {
+      p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+    }
+    p <- p + geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1]) +
       geom_errorbar(
         aes(ymin = lb, ymax = ub, color = color_group),
         width = 0.02,  # Width of error bar caps
@@ -3096,9 +3110,9 @@ plot.fect <- function(
       theme_bw() +
       theme(
         legend.title = element_blank(),
-        legend.position = c(0.02, 0.98),
-        legend.justification = c("left", "top"),
-        legend.background = element_rect(fill = alpha("white", 0.7), color = NA)
+        legend.position = "inside",
+        legend.position.inside = c(0.02, 0.98),
+        legend.justification = c("left", "top")
       )
   }
   }
@@ -3172,11 +3186,11 @@ plot.fect <- function(
           linewidth = 1, inherit.aes = FALSE
         ) +
         scale_color_manual(name = "Mbar", values = setNames(final_palette, mbar_levels)) +
-        guides(color = guide_legend(title = "Mbar")) +
+        guides(color = guide_legend(title = expression(bar(M)))) +
         theme(
+          legend.position = "inside",
           legend.position.inside = c(0.02, 0.98),
-          legend.justification = c("left", "top"),
-          legend.background = element_rect(fill = alpha("white", 0.7), color = NA)
+          legend.justification = c("left", "top")
         )
     }
 
@@ -3251,19 +3265,19 @@ plot.fect <- function(
         scale_color_manual(name = "M", values = setNames(final_palette, m_levels)) +
         guides(color = guide_legend(title = "M")) +
         theme(
+          legend.position = "inside",
           legend.position.inside = c(0.02, 0.98),
-          legend.justification = c("left", "top"),
-          legend.background = element_rect(fill = alpha("white", 0.7), color = NA)
+          legend.justification = c("left", "top")
         )
 
     }
-  }    else if (type == "cumul") {
-    if (is.null(x$est.eff)) {
-      stop("No cumulative ATT data found in x$est.eff.")
+  }
+  else if (type == "cumul") {
+    if (is.null(x$effect.est.att)) {
+      stop("No period-by-period cumulative ATT data found in x$est.eff.")
     }
     p <- esplot(
-      x$est.eff,
-      Period    = "Time",
+      x$effect.est.att,
       Estimate  = "ATT",
       SE        = "S.E.",
       CI.lower  = "CI.lower",
@@ -3284,7 +3298,7 @@ plot.fect <- function(
       ci.outline = ci.outline,
       axis.adjust = axis.adjust,
       Count     = "count",
-      show.count = show.count,
+      show.count = FALSE,
       proportion = proportion,
       color = color,
       count.color = count.color,

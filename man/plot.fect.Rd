@@ -202,7 +202,7 @@
   \code{plot.fect} generates various visualizations for objects estimated via \code{\link{fect}}. Depending on
   the selected \code{type}, it can show treatment-effect dynamics (\code{"gap"}, \code{"exit"}, \code{"cumul"}),
   equivalence test outcomes (\code{"equiv"}), factor/loadings for factor models (\code{"factors"}, \code{"loadings"}),
-  raw vs. counterfactual trajectories (\code{"counterfactual"}), treatment status maps (\code{"status"}),
+  raw vs. counterfactual trajectories (\code{"counterfactual"}), treatment status (\code{"status"}),
   effects by calendar time (\code{"calendar"}), distribution of individual effects (\code{"box"}),
   or sensitivity analysis results (\code{"sens"}, \code{"sens_es"}).
   The \code{theme} argument allows for quick customization of plot aesthetics using predefined color schemes.

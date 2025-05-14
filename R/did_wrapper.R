@@ -66,7 +66,7 @@ make_es_df <- function(Period_vec, est_vec, se_vec = NULL,
 did_wrapper <- function(
     data, Y, D, X = NULL,
     index,                 # c("unit_id","time_id")
-    method = c("twfe","st","iw","cs_never","cs_notyet","pm","didm"),
+    method = c("twfe","st","iw","cs_never","cs_notyet","didm"),
     se     = c("default","boot","bootstrap","jackknife"),
     nboots = 200,
     parallel = TRUE,
@@ -442,22 +442,7 @@ did_wrapper <- function(
         } else {
           peri <- c(if (T.pre>0) seq(-T.pre,-1) else numeric(0),
                     if (T.post>0) seq(0, T.post-1) else numeric(0)) # didm effects often 0-indexed
-          # Adjust period based on how make_es_df expects it for didm
-          # The original make_es_df adds + as.numeric(method != "didm")
-          # For didm, this means period is taken as is.
-          # If didm output periods are -k,...,-1,0,...,L then this is fine.
-          # If didm output periods are 1,...,L for post, then adjust seq(0,T.post-1) to seq(1,T.post)
-          # The provided code uses seq(1,T.post) for didm effects in make_es_df if method != "didm" is false.
-          # Let's assume didm output is relative to treatment, 0 is treatment period.
-          # The original code had seq(1,T.post) for effects.
-          # If didm.effects is, say, 5, it means periods 0,1,2,3,4.
-          # If didm.placebo is 3, it means periods -3,-2,-1.
-          # So, periods should be seq(-didm.placebo, didm.effects-1) if 0 is first effect period.
-          # Or seq(-T.pre, -1) and seq(0, T.post-1) if T.pre/T.post are counts.
-          # The original code for didm in make_es_df: Period_vec + as.numeric(method != "didm")
-          # For didm, as.numeric(method != "didm") is 0. So Period_vec is used as is.
-          # The seq(-T.pre, -1) and seq(1, T.post) seems more aligned with typical event study plots.
-          # Let's stick to original seq(1,T.post) for effects for now.
+
           peri <- c(if (T.pre>0) seq(-T.pre,-1) else numeric(0),
                     if (T.post>0) seq(1,T.post) else numeric(0))
 
@@ -542,34 +527,15 @@ did_wrapper <- function(
     } else {
       out_full  <- run_estimator_once(data) # Get point estimate from full sample
       theta_hat <- out_full$ATT
-
-      # Percentile interval (common for bootstrap)
-      # Bias-corrected and accelerated (BCa) intervals are generally better if assumptions hold.
-      # Using percentile interval based on 2*theta_hat - quantile (reflection method)
-      # This is one way to construct CIs; standard percentile (quantile(att_reps, c(0.025, 0.975))) is also common.
       out_full$CI_lower <- 2*theta_hat - stats::quantile(att_reps_clean, 0.975, na.rm=TRUE)
       out_full$CI_upper <- 2*theta_hat - stats::quantile(att_reps_clean, 0.025, na.rm=TRUE)
       out_full$ATT_se   <- stats::sd(att_reps_clean, na.rm = TRUE)
-
-      # P-value based on bootstrap distribution
-      # Two-sided p-value: 2 * min(P(T_boot <= 0), P(T_boot >= 0)) assuming H0: ATT=0
-      # Or, if H0 is theta_hat, then P(T_boot <= theta_hat) etc.
-      # The code calculates p-value for H0: ATT=0
       p1 <- if (theta_hat > 0) mean(att_reps_clean <= 0, na.rm = TRUE)
       else mean(att_reps_clean >= 0, na.rm = TRUE)
       overall_p <- min(2*p1, 1)
     }
 
-
-    ## bootstrapped event-study SE / CIs / p-values
     if (nrow(out_full$es) > 0) {
-      # Ensure rownames of out_full$es are consistent if they are used for matching
-      # The original make_es_df sets rownames. If it can fail, `out_full$es` might not have them.
-      # Let's assume make_es_df produces a 'Period' column or rownames that can be used.
-      # The original code used `out_full$es$` ` which is unusual, likely a placeholder for actual period column name.
-      # Assuming `make_es_df` now ensures rownames are the periods.
-      # If `make_es_df` was modified to keep 'Period' column, use that.
-      # For this example, let's assume rownames are the periods.
       periods_from_es <- as.numeric(rownames(out_full$es))
 
 
@@ -591,7 +557,6 @@ did_wrapper <- function(
 
       if(ncol(boot_mat_filtered) > 0){
         boot_se  <- apply(boot_mat_filtered, 2, stats::sd, na.rm = TRUE)
-        # Using reflection method for CIs, consistent with overall ATT CI
         ci_quantiles_upper <- apply(boot_mat_filtered, 2, stats::quantile, probs = 0.975, na.rm = TRUE)
         ci_quantiles_lower <- apply(boot_mat_filtered, 2, stats::quantile, probs = 0.025, na.rm = TRUE)
 

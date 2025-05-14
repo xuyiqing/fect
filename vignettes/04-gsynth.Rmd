@@ -127,10 +127,16 @@ Setting `theme.bw = FALSE` sets the plotting style to the default *ggplot2* them
 plot(out, theme.bw = FALSE) 
 ```
 
-By switching off `show.points`, the confidence interval of the ATT estimates will be represented by a shaded area.
+By switching on `connected`, the confidence interval of the ATT estimates will be represented by a shaded area.
 
 ```{r fig.height=5, fig.width=7}
-plot(out, show.points = FALSE) 
+plot(out, connected = TRUE) 
+```
+
+Moreover, by switching off `show.points`, ATT estimates can be displayed as a line plot.
+
+```{r fig.height=5, fig.width=7}
+plot(out, connected = TRUE, show.points = FALSE) 
 ```
 
 Aesthetic options for ggplot2 objects are compatible for all **fect** plots.

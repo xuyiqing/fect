@@ -2,36 +2,35 @@
 
 In this chapter, we explore various visualization options avialable in the **fect** package using data from @GS2020. This chapter is authored by Jinwen Wu and Yiqing Xu.
 
----
+------------------------------------------------------------------------
 
 `plot.fect` is an S3 method that offers various options for customizing data and results visualization. Below is a brief summary of the most commonly used options.
 
-- **Starting Period:**  
-  - `start0`: If `TRUE`, shifts the time axis so that treatment begins at Period 0 instead of Period 1.
+-   **Starting Period:**
+    -   `start0`: If `TRUE`, shifts the time axis so that treatment begins at Period 0 instead of Period 1.
+-   **Confidence Intervals:**
+    -   `plot.ci`: Options include `"none"`, `"0.9"`, or `"0.95"` to hide confidence intervals or display 90% or 95% confidence intervals.
+-   **Axis and Legend Customization:**
+    -   `xlim` / `ylim`: Set the x- and y-axis ranges.\
+    -   `xlab` / `ylab`: Customize axis labels.\
+    -   `xbreaks` / `ybreaks`: Specify tick marks.\
+    -   `xangle` / `yangle`: Adjust the rotation angle of axis text.\
+    -   `legend.pos`, `legend.nrow`, `legend.labs`: Control legend placement, number of rows, and labels.
+-   **Theme and Text:**
+    -   `theme.bw`: If `TRUE`, applies a black-and-white theme.
 
-- **Confidence Intervals:**  
-  - `plot.ci`: Options include `"none"`, `"90"`, or `"95"` to hide confidence intervals or display 90% or 95% confidence intervals.
+    -   `theme`: If `NULL`, will be the default color theme, which is mostly black and white with a bit of color. Other options include `"vibrant"` and `"grayscale"`.\
 
-- **Axis and Legend Customization:**  
-  - `xlim` / `ylim`: Set the x- and y-axis ranges.  
-  - `xlab` / `ylab`: Customize axis labels.  
-  - `xbreaks` / `ybreaks`: Specify tick marks.  
-  - `xangle` / `yangle`: Adjust the rotation angle of axis text.  
-  - `legend.pos`, `legend.nrow`, `legend.labs`: Control legend placement, number of rows, and labels.
-
-- **Theme and Text:**  
-  - `theme.bw`: If `TRUE`, applies a black-and-white theme.  
-  - `cex.main`, `cex.axis`, `cex.lab`, `cex.text`: Adjust text sizes for the title, tick labels, axis labels, and annotations.
-
-- **Lines and Bounds:**  
-  - `line.color` / `line.width`: Define the color and width of main lines.  
-  - `lcolor` / `lwidth`: Set the color and width for the horizontal zero line.
+    -   `cex.main`, `cex.axis`, `cex.lab`, `cex.text`: Adjust text sizes for the title, tick labels, axis labels, and annotations.
+-   **Lines and Bounds:**
+    -   `color` / `est.lwidth`: Define the color and width of main lines.\
+    -   `lcolor` / `lwidth`: Set the color and width for the axes. Takes a vector, where the first value is applied the horizontal axis and the second is applied the vertical axis. If only one value is given, both axes will take on the same value.
 
 While these customization options are demonstrated using the default `gap` plot, they can be applied universally, with only a few exceptions.
 
 ## Load Data
 
-As explained in the previous chapter, @GS2020 examines the mobilizing effect of minority candidates on coethnic support in U.S. congressional elections. The treatment variable indicates the presence of an Asian candidate, and the outcome variable represents the proportion of general election contributions from Asian donors.  
+As explained in the previous chapter, @GS2020 examines the mobilizing effect of minority candidates on coethnic support in U.S. congressional elections. The treatment variable indicates the presence of an Asian candidate, and the outcome variable represents the proportion of general election contributions from Asian donors.
 
 First, we load the required packages. The dataset, `gs2020`, is included with the **fect** package and can be loaded using `data(fect)`. We also specify the treatment, outcome, controls (covariates), unit and time indices, and level of clustering.
 
@@ -69,7 +68,7 @@ plot(out)
 
 ### Starting Period
 
-By default, the first post-treatment period is set to 0, and the last pre-treatment period is set to -1. However, some researchers prefer to designate the former as 1 and the latter as 0. To achieve this, set `start0 = TRUE`. 
+By default, the first post-treatment period is set to 0, and the last pre-treatment period is set to -1. However, some researchers prefer to designate the former as 1 and the latter as 0. To achieve this, set `start0 = TRUE`.
 
 ```{r begin-post-customization}
 plot(out, start0 = TRUE,  # Shift time so treatment begins at 0
@@ -78,7 +77,7 @@ plot(out, start0 = TRUE,  # Shift time so treatment begins at 0
 
 ### Axis and Legend
 
-Below, we customize the x- and y-axis ranges, labels, tick breaks, and legend. The x-axis labels are rotated for clarity. Moreover, by setting `xlim = c(-10, 1)`, the x-axis is restricted to time periods -8 to 1, with the treatment shifted to begin at period 0 instead of period 1.
+Below, we customize the x- and y-axis ranges, labels, tick breaks, and legend. The x-axis labels are rotated for clarity. Moreover, by setting `xlim = c(-10, 1)`, the x-axis is restricted to time periods -8 to 1, with the treatment shifted to begin at period 0 instead of period 1. We also add grid lines by setting `gridOff = FALSE`.
 
 ```{r axis-legend-customization}
 plot(out, 
@@ -88,6 +87,7 @@ plot(out,
      ylab = "Estimated ATT", # y-axis label
      xangle = 90, # rotate x-axis labels by 90°
      xbreaks = seq(-10, 1, by = 2), 
+     gridOff = FALSE,
      # Label x-axis from -12 to 1 with a break of 2
      main = "Axis and Legend Customization")
 ```
@@ -95,6 +95,7 @@ plot(out,
 ### Confidence Intervals
 
 Below, we plot the treatment effect with 90% confidence intervals instead of 95%.
+
 ```{r ci-raw-customization}
 plot(out, plot.ci = "0.9", 
      main = "90% confidence intervals")
@@ -102,7 +103,7 @@ plot(out, plot.ci = "0.9",
 
 ### Text and Theme
 
-This plot adjusts text sizes with a series of `cex` options.
+This plot adjusts text sizes with a series of `cex` options, turns off the `theme.bw` option, and adds the `vibrant` color theme.
 
 ```{r text-theme-customization}
 plot(out, 
@@ -113,30 +114,32 @@ plot(out,
      cex.lab = 1.2,       # Axis label size
      cex.legend = 1,    # Legend text size
      cex.text = 1.2,        # Annotation text size
+     theme = "vibrant", # Vibrant theme
      main = "Text and Theme Customization")
 ```
 
-### Line Customization
+### Line and Point Customization
 
-Here, we demonstrate how to change main and the horizontal reference lines.
+Here, we demonstrate how to change main and the horizontal reference lines, as well as the points and lines in the plot.
 
 ```{r line-bound-customization}
 plot(out, 
-     line.width = c(1.5, 0.5),  
-     lcolor = "skyblue",      # Color for horizontal zero line
-     lwidth = 2,                # Width of the horizontal line
+     est.lwidth = 1.5, # Makes the confidence intervals thicker  
+     est.pointsize = 3, # Makes the points larger
+     lcolor = c("red","skyblue"),      # Color for horizontal and vertical lines
+     lwidth = 2,                # Widths of the horizontal and vertical lines
      main = "Line Customization")
 ```
 
 ## Pretrend Tests
 
-We can conduct several tests to shed light on (not directly test) the parallel trends (PT) assumption, including the equivalence test and the placebo test. For details, see @sec-fect or @LWX2022. 
+We can conduct several tests to shed light on (not directly test) the parallel trends (PT) assumption, including the equivalence test and the placebo test. For details, see @sec-fect or @LWX2022.
 
 ### Equivalence Test
 
 In the equivalence plot (`type = "equiv"`), the equivalence bound is defined by the two-one-sided test (TOST) threshold. For example, in the plot below, the bound is set by `tost.threshold = 0.1`, with lines at -0.1 and 0.1. This threshold should be set based on the magnitude of the ATT or the standard deviation of the outcome (or residualized outcome).
 
-The `bound` option has four choices: `"none"`, `"min"`, `"equiv"`, or `"both"`. When set to `"none"`, no bound is displayed. 
+The `bound` option has four choices: `"none"`, `"min"`, `"equiv"`, or `"both"`. When set to `"none"`, no bound is displayed.
 
 ```{r}
 plot(out, type = "equiv", bound = "equiv", tost.threshold = 0.1, 
@@ -162,7 +165,7 @@ plot(out, type = "equiv",
      ylim = c(-0.25, 0.25),
      stats = c("F.p", "equiv.p"),
      stats.labs = c("F Test P-value", "Equivalence P-value"),
-     stats.pos = c(-8, 0.2),   # (x, y) position for the stats text
+     stats.pos = c(-8, 0.02),   # (x, y) position for the stats text
      show.stats = TRUE,     # Can be switched off to hide all test stats
      main = "Statistical Test Annotations")
 ```
@@ -185,12 +188,18 @@ plot(out_fe_placebo)
 
 The plot shows the estimated "effects" in the pre-treatment periods (placebo effects). The blue lines in the pre-treatment period suggest that we do not observe significant effects of the treatment in the pre-periods.
 
+We can also change the color of the placebo periods by using the `placebo.color` argument. Colors for many other plot types can also be adjusted in a similar way, including, but not limited to, the carryover and box plots.
+
+```{r}
+plot(out_fe_placebo, placebo.color = "green4")
+```
+
 ## Carryover Effects
 
 One type of plot rarely seen in the empirical literature is how the difference between treatment and control groups evolves after treatment ends. We call it the `"exit"` plot, where the x-axis represents time relative to treatment exit. In contrast, the `"gap"` plot focuses on treatment entry. The `"exit"` plot is essential for assessing potential carryover effects.
 
 ```{r}
-plot(out, type = "exit")
+plot(out_fe_placebo, type = "exit")
 ```
 
 The test for carryover effects examines whether the treatment effect persists after treatment ends. It artificially labels several post-treatment periods as treated and estimates the "placebo effect" in those periods. By setting `carryover.period = c(1, 3)`, we specify a placebo period that includes three post-treatment periods. If the treatment effect is purely contemporaneous (i.e., there are no carryover effects), the test will not reject the null hypothesis. In this application, the average carryover effect is close to zero and statistically indistinguishable from zero.
@@ -204,20 +213,18 @@ out_fe_carryover <- fect(Y = y, D = d, X = controls, data = gs2020,
 plot(out_fe_carryover)
 ```
 
-
-## Effect Heterogenity
+## Effect Heterogeneity
 
 We provide two ways to visualize treatment effect heterogeneity: a `"box"` plot, which shows the distribution of individual treatment effects, and a `"calendar"` plot, which depicts the ATT conditional on calendar time. We plan to expand this functionality to allow for more pre-treatment covariates soon.
 
 In the box plot, the box in each period represents the range of the middle 50% of the individual effects, while the whiskers show the 2.5%–95% quantiles and the horizontal line represents the median.
+
 ```{r}
 plot(out, type = "box", xlim = c(-12, 5))
 ```
 
 In the calendar plot, the blue ribbon represents a loess fit of the conditional ATT, with 95% confidence intervals.
+
 ```{r}
 plot(out, type = "calendar")
 ```
-
-
-

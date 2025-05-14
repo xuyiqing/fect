@@ -29,7 +29,7 @@ did_wrapper(
   \item{D}{Treatment indicator variable name (string).}
   \item{X}{Optional covariate vector for adjustment.}
   \item{index}{Character vector of unit and time variable names, e.g., \code{c("id", "time")}.}
-  \item{method}{DiD method: \code{"twfe"}, \code{"st"}, \code{"iw"}, \code{"cs_never"}, \code{"cs_notyet"}, \code{"pm"}, or \code{"didm"}.}
+  \item{method}{DiD method: \code{"twfe"}, \code{"st"}, \code{"iw"}, \code{"cs_never"}, \code{"cs_notyet"}, or \code{"didm"}.}
   \item{se}{Standard error method: \code{"default"}, \code{"boot"}, or \code{"jackknife"}.}
   \item{nboots}{Number of bootstrap replications (if applicable).}
   \item{parallel}{Logical; use parallel computation for bootstrapping.}
