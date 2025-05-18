@@ -1,6 +1,6 @@
 # Fect Main Program {#sec-fect}
 
-In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022 $$[Paper](https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723)$$. Download the R code used in this chapter [here](rscript/02-fect.R).
+In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022--[Paper](https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723). Download the R code used in this chapter [here](rscript/02-fect.R).
 
 ## Simulated data
 
