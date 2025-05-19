@@ -1117,6 +1117,7 @@ plot.fect <- function(
       if (!all(subset.tr %in% x$tr) || length(subset.tr) < 1){
         stop("One or more of the units given in \"id\" is not treated.\n")
       }
+      x$Y.avg = NULL
       subset = sort(c(subset.tr,x$co))
     }
     tr <- x$tr; co <- x$co; I_orig <- x$I; II_orig <- x$II; Y_orig <- x$Y.dat
@@ -1209,7 +1210,6 @@ plot.fect <- function(
       xlab_final <- if (is.null(xlab)) x$index[2] else if (xlab == "") NULL else xlab
       ylab_final <- if (is.null(ylab)) x$Yname else if (ylab == "") NULL else ylab
       plot_single_unit_flag <- FALSE; unit_to_plot_name <- NULL
-
       plot_single_unit_flag <- length(id.tr_names) == 1
       unit_to_plot_name <- id.tr_names[1]
       if (plot_single_unit_flag) {
@@ -1218,9 +1218,8 @@ plot.fect <- function(
         if(length(unit_col_idx_in_Y.tr) != 1) stop(paste("Could not find unique column for unit", unit_to_plot_name, "in Y.tr."))
         tr.info_unit <- Y.tr[show_abs, unit_col_idx_in_Y.tr]; ct.info_unit <- Y.ct[show_abs, unit_col_idx_in_Y.tr] # Subset by show_abs here
         y_data_for_range_calc <- c(tr.info_unit, ct.info_unit) # Already subsetted
-
         if (raw == "none") {
-          if (x$vartype == "parametric" & !is.null(id)) {
+          if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
             if (plot.ci == "95"){
               para.ci <- basic_ci_alpha(
                 rowMeans(x$eff.boot[,which(tr %in% subset.tr),]),
@@ -1231,8 +1230,8 @@ plot.fect <- function(
                 period   = x$rawtime,
                 lower.tr = Yb[,"Tr_Avg"],
                 upper.tr = Yb[,"Tr_Avg"],
-                lower.ct = Yb[,"Ct_Avg"] - para.ci[ , "upper"],
-                upper.ct = Yb[,"Ct_Avg"] - para.ci[ , "lower"]
+                lower.ct = Yb[,"Ct_Avg"] + para.ci[ , "upper"],
+                upper.ct = Yb[,"Ct_Avg"] + para.ci[ , "lower"]
               )
             } else if (plot.ci == "90"){
               para.ci <- basic_ci_alpha(
@@ -1244,13 +1243,13 @@ plot.fect <- function(
                 period   = x$rawtime,
                 lower90.tr = Yb[,"Tr_Avg"],
                 upper90.tr = Yb[,"Tr_Avg"],
-                lower90.ct = Yb[,"Ct_Avg"] - para.ci[ , "upper"],
-                upper90.ct = Yb[,"Ct_Avg"] - para.ci[ , "lower"]
+                lower90.ct = Yb[,"Ct_Avg"] + para.ci[ , "upper"],
+                upper90.ct = Yb[,"Ct_Avg"] + para.ci[ , "lower"]
               )
             } else{
               warning("Invalid plot.ci provided.")
             }
-          } else if (x$vartype == "parametric" & raw == "none"){
+          } else if (x$vartype == "parametric" & raw == "none" & is.null(id)) {
             if (plot.ci == "95"){
               x$Y.avg <- data.frame(
                 period   = x$rawtime,
@@ -1354,7 +1353,7 @@ plot.fect <- function(
         maintext <- "Treated and Counterfactual Averages"; Yb_show_abs <- Yb[show_abs, , drop = FALSE]
         y_data_for_range_calc <- c(Yb_show_abs[,1], Yb_show_abs[,2])
         if (raw == "none") {
-          if (x$vartype == "parametric" & !is.null(id)) {
+          if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
             subset.eff.boot <- sapply(seq_len(dim(x$eff.boot)[3]), function(j) {
               rowMeans(x$eff.boot[,which(tr %in% subset.tr),j], na.rm = TRUE)
             })
@@ -1368,8 +1367,8 @@ plot.fect <- function(
                 period   = x$rawtime,
                 lower.tr = Yb[,"Tr_Avg"],
                 upper.tr = Yb[,"Tr_Avg"],
-                lower.ct = Yb[,"Ct_Avg"] - para.ci[ , "upper"],
-                upper.ct = Yb[,"Ct_Avg"] - para.ci[ , "lower"]
+                lower.ct = Yb[,"Ct_Avg"] + para.ci[ , "upper"],
+                upper.ct = Yb[,"Ct_Avg"] + para.ci[ , "lower"]
               )
             } else if (plot.ci == "90"){
               para.ci <- basic_ci_alpha(
@@ -1381,13 +1380,13 @@ plot.fect <- function(
                 period   = x$rawtime,
                 lower90.tr = Yb[,"Tr_Avg"],
                 upper90.tr = Yb[,"Tr_Avg"],
-                lower90.ct = Yb[,"Ct_Avg"] - para.ci[ , "upper"],
-                upper90.ct = Yb[,"Ct_Avg"] - para.ci[ , "lower"]
+                lower90.ct = Yb[,"Ct_Avg"] + para.ci[ , "upper"],
+                upper90.ct = Yb[,"Ct_Avg"] + para.ci[ , "lower"]
               )
             } else{
               warning("Invalid plot.ci provided.")
             }
-          } else if (x$vartype == "parametric" & raw == "none"){
+          } else if (x$vartype == "parametric" & raw == "none" & is.null(id)){
             if (plot.ci == "95"){
               x$Y.avg <- data.frame(
                 period   = x$rawtime,
@@ -1499,7 +1498,7 @@ plot.fect <- function(
             time_step_for_bars_abs <- if(length(unique(counts_for_plot_df_abs$time)) > 1) min(diff(sort(unique(counts_for_plot_df_abs$time))),na.rm=TRUE) else 1; if(!is.finite(time_step_for_bars_abs) || time_step_for_bars_abs <=0) time_step_for_bars_abs <- 1
             bar_width_half_abs <- time_step_for_bars_abs * 0.20; counts_for_plot_df_abs$xmin <- counts_for_plot_df_abs$time - bar_width_half_abs; counts_for_plot_df_abs$xmax <- counts_for_plot_df_abs$time + bar_width_half_abs
             max_count_time_pos_abs <- counts_for_plot_df_abs$time[which.max(counts_for_plot_df_abs$count)[1]]; text_y_pos_abs <- rect_min_val_abs + actual_rect_length_abs + (count_bar_space_height_abs - actual_rect_length_abs) * 0.5
-            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5)
+            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5,alpha = 0.7)
           }
         }
       }
@@ -1631,7 +1630,7 @@ plot.fect <- function(
 
       # --- Plotting logic using time_for_plot_axis, Yb_data_subset, Ytr_aug_data_subset ---
       if (raw == "none") {
-        if (x$vartype == "parametric" & !is.null(id)) {
+        if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
           subset.eff.boot <- sapply(seq_len(dim(x$eff.boot)[3]), function(j) {
             rowMeans(align_time_series(
               x$eff.boot[,which(tr %in% subset.tr),j],
@@ -1648,8 +1647,8 @@ plot.fect <- function(
               period   = xx$timeline,
               lower.tr = xx$Yb[,"Y.tr.bar"],
               upper.tr = xx$Yb[,"Y.tr.bar"],
-              lower.ct = xx$Yb[,"Y.ct.bar"] - para.ci[ , "upper"],
-              upper.ct = xx$Yb[,"Y.ct.bar"] - para.ci[ , "lower"]
+              lower.ct = xx$Yb[,"Y.ct.bar"] + para.ci[ , "upper"],
+              upper.ct = xx$Yb[,"Y.ct.bar"] + para.ci[ , "lower"]
             )
           } else if (plot.ci == "90"){
             para.ci <- basic_ci_alpha(
@@ -1661,13 +1660,13 @@ plot.fect <- function(
               period   = xx$timeline,
               lower90.tr = xx$Yb[,"Y.tr.bar"],
               upper90.tr = xx$Yb[,"Y.tr.bar"],
-              lower90.ct = xx$Yb[,"Y.ct.bar"] - para.ci[ , "upper"],
-              upper90.ct = xx$Yb[,"Y.ct.bar"] - para.ci[ , "lower"]
+              lower90.ct = xx$Yb[,"Y.ct.bar"] + para.ci[ , "upper"],
+              upper90.ct = xx$Yb[,"Y.ct.bar"] + para.ci[ , "lower"]
             )
           } else{
             warning("Invalid plot.ci provided.")
           }
-        } else if (x$vartype == "parametric" & raw == "none"){
+        } else if (x$vartype == "parametric" & raw == "none" & is.null(id)){
           if (plot.ci == "95"){
             x$Y.avg <- data.frame(
               period   = xx$timeline,
@@ -1856,7 +1855,7 @@ plot.fect <- function(
             max_count_time_pos <- counts_for_plot_df$time[which.max(counts_for_plot_df$count)[1]]
             text_y_pos <- rect_min_val + actual_rect_length + (count_bar_space_height - actual_rect_length) * 0.5
 
-            p <- p + geom_rect(data = counts_for_plot_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE) +
+            p <- p + geom_rect(data = counts_for_plot_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE, alpha = 0.7) +
               annotate("text", x = max_count_time_pos, y = text_y_pos, label = max_count_val, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5)
           }
         }
@@ -2794,7 +2793,7 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- mean(TTT[which.max(d1[, "count"])])
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = 0.7)
       p <- p + annotate("text",
                         x = max.count.pos - 0.02 * T.gap,
                         y = max(data.toplot$ymax) + 0.2 * rect.length,
@@ -2986,7 +2985,7 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- data.count[which.max(data.count[, 2]), 1][1] - min(data.count[, 1]) + 1
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3 , alpha = 0.7)
       p <- p + annotate("text",
                         x = max.count.pos - 0.02 * T.gap,
                         y = max(data.toplot$ymax) + 0.1 * rect.length,

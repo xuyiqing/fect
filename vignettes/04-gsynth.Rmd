@@ -353,8 +353,7 @@ We can also visualize this using the "counterfactual" plot.
 plot(out_turnout, type = "counterfactual")
 ```
 
-
-If we want to zoom in to examine the treatment effect on a specific state, such as Wisconsin, we can do so by setting the `id` option accordingly. The `id` option can also accept a vector if one wishes to plot multiple units. This plot can only be done if `keep.sims = TRUE` is set in the estimation step.
+If we want to zoom in to examine the treatment effect on a specific state, such as Wisconsin, we can do so by setting the `id` option accordingly. The `id` option can also accept a vector if one wishes to plot multiple treated units. This plot will only display CIs if `keep.sims = TRUE` is set in the estimation step and `vartype = "parametric"`.
 
 ```{r turnout_gap2, fig.height=5, fig.width=7}
 plot(out_turnout, type = "counterfactual", id = "WI", main = "Wisconsin")
