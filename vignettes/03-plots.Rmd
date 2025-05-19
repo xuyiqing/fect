@@ -124,7 +124,7 @@ Here, we demonstrate how to change main and the horizontal reference lines, as w
 
 ```{r line-bound-customization}
 plot(out, 
-     est.lwidth = 1.5, # Makes the confidence intervals thicker (when connected = TRUE it changes thickness of the line between points)
+     est.lwidth = 1.5, # Makes the confidence intervals thicker  
      est.pointsize = 3, # Makes the points larger
      lcolor = c("red","skyblue"),      # Color for horizontal and vertical lines
      lwidth = 2,                # Widths of the horizontal and vertical lines

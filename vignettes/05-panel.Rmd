@@ -659,6 +659,7 @@ p.fect.balance <- esplot(fect.balance.output,Period = 'Time',
 p.fect.balance
 ```
 
+````{=html}
 <!--
 ````{=html}
 ### Comparison of All Estimators
@@ -765,6 +766,7 @@ ggplot(estimates, aes(x = method, y = estimate,
   ) +  theme(plot.title = element_text(hjust = 0.5))
 ```
 -->
+````
 
 ## Streamlining Implementation with `did_wrapper`
 
@@ -774,21 +776,22 @@ Here's the corrected and formatted version of your bullet points in Markdown:
 
 The `did_wrapper` function can execute methods such as:
 
-* **Two-Way Fixed Effects (TWFE)**: by setting `method = "twfe"`.
-  This replicates the dynamic TWFE event study estimation.
+-   **Two-Way Fixed Effects (TWFE)**: by setting `method = "twfe"`.
+    This replicates the dynamic TWFE event study estimation.
 
-* **Stacked DID**: by setting `method = "st"`.
-  This implements the stacked difference-in-differences approach by @CDLZ.
+-   **Stacked DID**: by setting `method = "st"`.
+    This implements the stacked difference-in-differences approach by @CDLZ.
 
-* **Interaction Weighted (IW) DID**: by setting `method = "iw"`.
-  This corresponds to the @sun2021-event estimator.
+-   **Interaction Weighted (IW) DID**: by setting `method = "iw"`.
+    This corresponds to the @sun2021-event estimator.
 
-* **Callaway and Sant’Anna (CSDID)**:
-  * Using never-treated controls: `method = "cs_never"`.
-  * Using not-yet-treated controls: `method = "cs_notyet"`.
+-   **Callaway and Sant’Anna (CSDID)**:
 
-* **DIDmultiplegtDYN ("didm")**: by setting `method = "didm"`.
-  This calls the estimator by @CDH2020.
+    -   Using never-treated controls: `method = "cs_never"`.
+    -   Using not-yet-treated controls: `method = "cs_notyet"`.
+
+-   **DIDmultiplegtDYN ("didm")**: by setting `method = "didm"`.
+    This calls the estimator by @CDH2020.
 
 You could use `did_wrapper` to implement Stacked DID as follows:
 
