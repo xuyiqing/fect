@@ -59,9 +59,11 @@ data(fect)
 ls()
 ```
 
-Below is a brief explanation of the datasets used in this book:
+Below is a brief explanation of the datasets used in this book:  
 
--   `simdata`: Based on @LWX2022. Used in [Chapter @sec-fect] to demonstrate various counterfactual estimators.\
--   `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-plots] and [Chapter @sec-panel].\
--   `simgsynth` & `turnout`: Based on @Xu2017. Used in [Chapter @sec-gsynth] to demonstrate Gsynth.
--   `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-panel] and [Chapter @sec-panel-sens].
+- `simdata`: Based on @LWX2022. Used in [Chapter @sec-fect] to demonstrate various counterfactual estimators.  
+- `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-plots] and [Chapter @sec-panel].  
+- `simgsynth` & `turnout`: Based on @Xu2017. Used in [Chapter @sec-gsynth] to demonstrate Gsynth.
+- `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-panel].  
+
+

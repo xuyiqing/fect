@@ -1024,18 +1024,84 @@ plot.fect <- function(
   ## -------------------------------##
   ## Plotting
   ## -------------------------------##
-  # Main plotting logic for counterfactual type
-  if (type %in% c("counterfactual", "ct")) {
+  align_time_series <- function(Y, T0_counts, D_full, tr_idx_logical_full) {
+    # Y: T × N matrix; T0_counts: length-N vector
+    T_rows <- nrow(Y)
+    N_tr   <- ncol(Y)
+    # subset out just the treated columns of D_full
+    D_tr <- D_full[, tr_idx_logical_full, drop = FALSE]
+    if (ncol(D_tr) != N_tr) {
+      stop("Number of columns in Y and in D_full[,tr_idx] must match.")
+    }
 
+    # compute timeline
+    T0_valid <- T0_counts[!is.na(T0_counts) & is.finite(T0_counts)]
+    if (length(T0_valid) == 0) {
+      return(list(
+        timeline = integer(0),
+        Y_aug    = matrix(NA_real_, 0, N_tr)
+      ))
+    }
+    min_rel  <- 1 - max(T0_valid)
+    max_rel  <- T_rows - min(T0_valid)
+    timeline <- if (min_rel > max_rel) integer(0) else seq(min_rel, max_rel)
+
+    # build aligned matrix
+    Y_aug <- matrix(NA_real_, nrow = length(timeline), ncol = N_tr)
+    if (length(timeline)>0) rownames(Y_aug) <- as.character(timeline)
+
+    for (i in seq_len(N_tr)) {
+      t0 <- T0_counts[i]
+      if (!is.finite(t0)) next
+      for (t_abs in seq_len(T_rows)) {
+        rel_time <- t_abs - t0
+        row_idx  <- match(as.character(rel_time), rownames(Y_aug))
+        if (is.na(row_idx)) next
+        include <- (rel_time <= 0) ||
+          (t_abs <= nrow(D_tr) && D_tr[t_abs,i]==1 && !is.na(D_tr[t_abs,i]))
+        if (include) Y_aug[row_idx, i] <- Y[t_abs, i]
+      }
+    }
+
+    list(timeline = timeline, Y_aug = Y_aug)
+  }
+
+  ct.adjust <- function(Y.tr, Y.ct, T0_counts, D_full, tr_idx_logical_full) {
+    # align both
+    res.tr <- align_time_series(Y.tr, T0_counts, D_full, tr_idx_logical_full)
+    res.ct <- align_time_series(Y.ct, T0_counts, D_full, tr_idx_logical_full)
+
+    # mask treated where control missing
+    res.tr$Y_aug[is.na(res.ct$Y_aug)] <- NA_real_
+
+    # compute row‐means
+    if (length(res.tr$timeline) > 0) {
+      Y.tr.bar <- apply(res.tr$Y_aug, 1, mean, na.rm = TRUE)
+      Y.ct.bar <- apply(res.ct$Y_aug, 1, mean, na.rm = TRUE)
+      Y.tr.bar[is.nan(Y.tr.bar)] <- NA_real_
+      Y.ct.bar[is.nan(Y.ct.bar)] <- NA_real_
+      Yb <- cbind(Y.tr.bar, Y.ct.bar)
+      colnames(Yb) <- c("Y.tr.bar","Y.ct.bar")
+    } else {
+      Yb <- matrix(NA_real_, 0, 2,
+                   dimnames = list(NULL, c("Y.tr.bar","Y.ct.bar")))
+    }
+
+    list(
+      timeline = res.tr$timeline,
+      Y.tr.aug = res.tr$Y_aug,
+      Y.ct.aug = res.ct$Y_aug,
+      Yb       = Yb
+    )
+  }
+
+  if (type %in% c("counterfactual", "ct")) {
     # --- Basic Setup ---
     scaleFUN <- function(x) sprintf("%.f", x)
 
     if (!raw %in% c("none", "band", "all")) {
       cat("\"raw\" option misspecifed. Reset to \"none\".\n")
       raw <- "none"
-    }
-    if (!is.null(id) && length(id) > 1) {
-      stop("More than 1 element in \"id\".")
     }
     if (axis.adjust == TRUE) {
       angle <- 45; x.v <- 1; x.h <- 1
@@ -1044,18 +1110,29 @@ plot.fect <- function(
     }
 
     # --- Data Extraction and Cleaning ---
+    subset = 1:x$N
+    subset.tr <- x$tr
+    if (!is.null(id)) {
+      subset.tr = which(x$id %in% as.character(id))
+      if (!all(subset.tr %in% x$tr) || length(subset.tr) < 1){
+        stop("One or more of the units given in \"id\" is not treated.\n")
+      }
+      subset = sort(c(subset.tr,x$co))
+    }
     tr <- x$tr; co <- x$co; I_orig <- x$I; II_orig <- x$II; Y_orig <- x$Y.dat
     Y.ct_orig <- x$Y.ct; D_orig <- x$D.dat; rawid_orig <- x$id
     time_orig_vec <- x$rawtime; TT_dim <- dim(Y_orig)[1]
     if (!is.numeric(time_orig_vec[1])) { time_orig_vec <- 1:TT_dim }
-
-    I_mat <- as.matrix(I_orig); colnames(I_mat) <- rawid_orig; rownames(I_mat) <- time_orig_vec
-    II_mat <- as.matrix(II_orig); colnames(II_mat) <- rawid_orig; rownames(II_mat) <- time_orig_vec
-    Y_mat <- as.matrix(Y_orig); colnames(Y_mat) <- rawid_orig; rownames(Y_mat) <- time_orig_vec
-    Y.ct_mat <- as.matrix(Y.ct_orig); colnames(Y.ct_mat) <- rawid_orig; rownames(Y.ct_mat) <- time_orig_vec
-    D_mat <- as.matrix(D_orig); colnames(D_mat) <- rawid_orig; rownames(D_mat) <- time_orig_vec
-
-    tr_idx_logical <- (1:ncol(Y_mat)) %in% tr
+    I_mat <- as.matrix(I_orig)[,subset]; colnames(I_mat) <- rawid_orig[subset]; rownames(I_mat) <- time_orig_vec
+    II_mat <- as.matrix(II_orig)[,subset]; colnames(II_mat) <- rawid_orig[subset]; rownames(II_mat) <- time_orig_vec
+    Y_mat <- as.matrix(Y_orig)[,subset]; colnames(Y_mat) <- rawid_orig[subset]; rownames(Y_mat) <- time_orig_vec
+    Y.ct_mat <- as.matrix(Y.ct_orig)[,subset]; colnames(Y.ct_mat) <- rawid_orig[subset]; rownames(Y.ct_mat) <- time_orig_vec
+    D_mat <- as.matrix(D_orig)[,subset]; colnames(D_mat) <- rawid_orig[subset]; rownames(D_mat) <- time_orig_vec
+    if (!is.null(id))
+      tr_idx_logical <- (1:ncol(Y_mat)) %in% which(x$id[subset] %in% as.character(id))
+    else{
+      tr_idx_logical <- (1:ncol(Y_mat)) %in% tr
+    }
     I.tr <- I_mat[, tr_idx_logical, drop = FALSE]; II.tr <- II_mat[, tr_idx_logical, drop = FALSE]
     D.tr <- D_mat[, tr_idx_logical, drop = FALSE]; Y.tr <- Y_mat[, tr_idx_logical, drop = FALSE]
     Y.ct <- Y.ct_mat[, tr_idx_logical, drop = FALSE]
@@ -1063,13 +1140,13 @@ plot.fect <- function(
     Y.co <- Y_mat[, co_idx_logical, drop = FALSE]
 
     if (!0 %in% I.tr) { pre <- as.matrix(D.tr == 0 & II.tr == 1) } else { pre <- as.matrix(D.tr == 0 & I.tr == 1 & II.tr == 1) }
-    T0 <- apply(x$D.dat[, tr], 2, function(col) {
+    T0 <- apply(x$D.dat[, subset.tr, drop = FALSE], 2, function(col) {
       first_one <- which(col == 1)[1]
       if (is.na(first_one)) length(col) else first_one - 1
     })
     id.tr_names <- colnames(Y.tr); id.co_names <- colnames(Y.co)
     sameT0 <- length(unique(T0)) == 1
-    is_case1_scenario <- ( !is.null(id) && length(id) == 1 ) || length(id.tr_names) == 1 || sameT0 == TRUE
+    is_case1_scenario <- length(id.tr_names) == 1 || sameT0 == TRUE
 
     if (is_case1_scenario) {
       num_treated_units_for_plot <- ncol(D.tr); num_time_periods_for_plot <- nrow(D.tr)
@@ -1100,21 +1177,13 @@ plot.fect <- function(
       else { validated_user_xlim <- sort(user_xlim) }
     }
     y_data_for_range_calc <- c()
-
+    Y.tr[is.na(Y.ct)] <- NA_real_
     # Case 1: Single Treated Unit or All Treated Units have Same T0 (Absolute Time)
     if (is_case1_scenario) {
       plot_time_abs <- time_orig_vec; time_bf_abs_val <- NA
       time_step_abs <- if(length(plot_time_abs) > 1) min(diff(sort(unique(plot_time_abs))), na.rm=TRUE) else 1
       if(!is.finite(time_step_abs) || time_step_abs <= 0) time_step_abs <- 1
-      if (!is.null(id) && length(id) == 1) {
-        if (!id[1] %in% id.tr_names) stop(paste(id[1], "not in plotted treated units."))
-        t0_unit_col_idx <- which(id.tr_names == id[1])
-        if(length(t0_unit_col_idx) == 1 && t0_unit_col_idx <= length(T0)) {
-          time_bf_period_count <- T0[t0_unit_col_idx]
-          if (!is.na(time_bf_period_count) && time_bf_period_count >= 0 && (time_bf_period_count + 1) <= length(plot_time_abs)) { time_bf_abs_val <- plot_time_abs[time_bf_period_count + 1] }
-          else if (!is.na(time_bf_period_count) && time_bf_period_count == length(plot_time_abs)) { time_bf_abs_val <- plot_time_abs[length(plot_time_abs)] + time_step_abs }
-        }
-      } else if (sameT0) {
+      if (sameT0){
         unique_t0_val_count <- unique(T0)[1]
         if(!is.na(unique_t0_val_count) && unique_t0_val_count >= 0 && (unique_t0_val_count + 1) <= length(plot_time_abs)) { time_bf_abs_val <- plot_time_abs[unique_t0_val_count + 1] }
         else if (!is.na(unique_t0_val_count) && unique_t0_val_count == length(plot_time_abs)) { time_bf_abs_val <- plot_time_abs[length(plot_time_abs)] + time_step_abs }
@@ -1140,9 +1209,9 @@ plot.fect <- function(
       xlab_final <- if (is.null(xlab)) x$index[2] else if (xlab == "") NULL else xlab
       ylab_final <- if (is.null(ylab)) x$Yname else if (ylab == "") NULL else ylab
       plot_single_unit_flag <- FALSE; unit_to_plot_name <- NULL
-      if (!is.null(id) && length(id) == 1) { plot_single_unit_flag <- TRUE; unit_to_plot_name <- id[1] }
-      else if (is.null(id) && length(id.tr_names) == 1) { plot_single_unit_flag <- TRUE; unit_to_plot_name <- id.tr_names[1] }
 
+      plot_single_unit_flag <- length(id.tr_names) == 1
+      unit_to_plot_name <- id.tr_names[1]
       if (plot_single_unit_flag) {
         maintext <- paste("Treated and Counterfactual (", unit_to_plot_name, ")", sep = "")
         unit_col_idx_in_Y.tr <- which(colnames(Y.tr) == unit_to_plot_name)
@@ -1151,14 +1220,99 @@ plot.fect <- function(
         y_data_for_range_calc <- c(tr.info_unit, ct.info_unit) # Already subsetted
 
         if (raw == "none") {
+          if (x$vartype == "parametric" & !is.null(id)) {
+            if (plot.ci == "95"){
+              para.ci <- basic_ci_alpha(
+                rowMeans(x$eff.boot[,which(tr %in% subset.tr),]),
+                x$eff.boot[,which(tr %in% subset.tr),],
+                alpha = 0.05
+              )
+              x$Y.avg <- data.frame(
+                period   = x$rawtime,
+                lower.tr = Yb[,"Tr_Avg"],
+                upper.tr = Yb[,"Tr_Avg"],
+                lower.ct = Yb[,"Ct_Avg"] - para.ci[ , "upper"],
+                upper.ct = Yb[,"Ct_Avg"] - para.ci[ , "lower"]
+              )
+            } else if (plot.ci == "90"){
+              para.ci <- basic_ci_alpha(
+                rowMeans(x$eff.boot[,which(tr %in% subset.tr),]),
+                x$eff.boot[,which(tr %in% subset.tr),],
+                alpha = 0.1
+              )
+              x$Y.avg <- data.frame(
+                period   = x$rawtime,
+                lower90.tr = Yb[,"Tr_Avg"],
+                upper90.tr = Yb[,"Tr_Avg"],
+                lower90.ct = Yb[,"Ct_Avg"] - para.ci[ , "upper"],
+                upper90.ct = Yb[,"Ct_Avg"] - para.ci[ , "lower"]
+              )
+            } else{
+              warning("Invalid plot.ci provided.")
+            }
+          } else if (x$vartype == "parametric" & raw == "none"){
+            if (plot.ci == "95"){
+              x$Y.avg <- data.frame(
+                period   = x$rawtime,
+                lower.tr = Yb[,"Tr_Avg"],
+                upper.tr = Yb[,"Tr_Avg"],
+                lower.ct = Yb[,"Ct_Avg"] - (x$est.att[, "CI.upper"]-x$est.att[,"ATT"]),
+                upper.ct = Yb[,"Ct_Avg"] - (x$est.att[, "CI.lower"]-x$est.att[,"ATT"])
+              )
+            } else if (plot.ci == "90"){
+              x$Y.avg <- data.frame(
+                period   = x$rawtime,
+                lower90.tr = Yb[,"Tr_Avg"],
+                upper90.tr = Yb[,"Tr_Avg"],
+                lower90.ct = Yb[,"Ct_Avg"] - (x$est.att90[, "CI.upper"]-x$est.att90[,"ATT"]),
+                upper90.ct = Yb[,"Ct_Avg"] - (x$est.att90[, "CI.lower"]-x$est.att90[,"ATT"])
+              )
+            } else{
+              warning("Invalid plot.ci provided.")
+            }
+          }
           data_plot_abs <- data.frame(
-            time = rep(plot_time_abs[show_abs], 2),
-            outcome = c(tr.info_unit, ct.info_unit), # Use already subsetted data
-            type = factor(c(rep("tr", nT_abs), rep("ct", nT_abs)), levels = c("tr", "ct"))
+            time    = rep(plot_time_abs[show_abs], 2),
+            outcome = c(tr.info_unit, ct.info_unit),
+            type    = factor(
+              rep(c("tr", "ct"), each = nT_abs),
+              levels = c("tr", "ct")
+            )
           )
-          p <- ggplot(data_plot_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type)) + geom_line()
-          set.limits <- c("tr", "ct"); set.labels <- c(paste0("Treated (",unit_to_plot_name,")"), paste0("Est. Y(0) (",unit_to_plot_name,")"))
-          set.colors <- c(color, counterfactual.color); set.linetypes <- c("solid", counterfactual.linetype); set.linewidth <- c(est.lwidth, est.lwidth)
+          p <- ggplot()
+          if (plot.ci %in% c("90","95") && !is.null(x$Y.avg)) {
+            tr_lo_col <- if (plot.ci=="95") "lower.tr"   else "lower90.tr"
+            tr_hi_col <- if (plot.ci=="95") "upper.tr"   else "upper90.tr"
+            cf_lo_col <- if (plot.ci=="95") "lower.ct"   else "lower90.ct"
+            cf_hi_col <- if (plot.ci=="95") "upper.ct"   else "upper90.ct"
+            ci_data <- x$Y.avg[x$Y.avg$period %in% plot_time_abs[show_abs], ]
+
+            if (nrow(ci_data) > 0) {
+              p <- p +
+                geom_ribbon(
+                  data = ci_data,
+                  aes(x = period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "ct"),
+                  alpha = 0.2, inherit.aes = FALSE
+                )
+            }
+          }
+          p <- p +
+            geom_line(
+              data = data_plot_abs,
+              aes(x = time, y = outcome,
+                  colour = type,
+                  linetype = type,
+                  linewidth = type)
+            )
+          set.limits    <- c("tr", "ct")
+          set.labels    <- c(
+            paste0("Treated (", unit_to_plot_name,      ")"),
+            paste0("Est. Y(0) (", unit_to_plot_name,    ")")
+          )
+          set.colors    <- c(color, counterfactual.color)
+          set.linetypes <- c("solid", counterfactual.linetype)
+          set.linewidth <- c(est.lwidth, est.lwidth)
+          set.fill      <- c(color, counterfactual.color)  # for the ribbon legend
         } else if (raw == "band") {
           Y.co.quantiles <- t(apply(Y.co[show_abs, , drop=FALSE], 1, quantile, prob = c(0.05, 0.95), na.rm = TRUE))
           main_lines_data_abs <- data.frame(
@@ -1200,6 +1354,60 @@ plot.fect <- function(
         maintext <- "Treated and Counterfactual Averages"; Yb_show_abs <- Yb[show_abs, , drop = FALSE]
         y_data_for_range_calc <- c(Yb_show_abs[,1], Yb_show_abs[,2])
         if (raw == "none") {
+          if (x$vartype == "parametric" & !is.null(id)) {
+            subset.eff.boot <- sapply(seq_len(dim(x$eff.boot)[3]), function(j) {
+              rowMeans(x$eff.boot[,which(tr %in% subset.tr),j], na.rm = TRUE)
+            })
+            if (plot.ci == "95"){
+              para.ci <- basic_ci_alpha(
+                rowMeans(subset.eff.boot),
+                subset.eff.boot,
+                alpha = 0.05
+              )
+              x$Y.avg <- data.frame(
+                period   = x$rawtime,
+                lower.tr = Yb[,"Tr_Avg"],
+                upper.tr = Yb[,"Tr_Avg"],
+                lower.ct = Yb[,"Ct_Avg"] - para.ci[ , "upper"],
+                upper.ct = Yb[,"Ct_Avg"] - para.ci[ , "lower"]
+              )
+            } else if (plot.ci == "90"){
+              para.ci <- basic_ci_alpha(
+                rowMeans(subset.eff.boot),
+                subset.eff.boot,
+                alpha = 0.1
+              )
+              x$Y.avg <- data.frame(
+                period   = x$rawtime,
+                lower90.tr = Yb[,"Tr_Avg"],
+                upper90.tr = Yb[,"Tr_Avg"],
+                lower90.ct = Yb[,"Ct_Avg"] - para.ci[ , "upper"],
+                upper90.ct = Yb[,"Ct_Avg"] - para.ci[ , "lower"]
+              )
+            } else{
+              warning("Invalid plot.ci provided.")
+            }
+          } else if (x$vartype == "parametric" & raw == "none"){
+            if (plot.ci == "95"){
+              x$Y.avg <- data.frame(
+                period   = x$rawtime,
+                lower.tr = Yb[,"Tr_Avg"],
+                upper.tr = Yb[,"Tr_Avg"],
+                lower.ct = Yb[,"Ct_Avg"] - (x$est.att[, "CI.upper"]-x$est.att[,"ATT"]),
+                upper.ct = Yb[,"Ct_Avg"] - (x$est.att[, "CI.lower"]-x$est.att[,"ATT"])
+              )
+            } else if (plot.ci == "90"){
+              x$Y.avg <- data.frame(
+                period   = x$rawtime,
+                lower90.tr = Yb[,"Tr_Avg"],
+                upper90.tr = Yb[,"Tr_Avg"],
+                lower90.ct = Yb[,"Ct_Avg"] - (x$est.att90[, "CI.upper"]-x$est.att90[,"ATT"]),
+                upper90.ct = Yb[,"Ct_Avg"] - (x$est.att90[, "CI.lower"]-x$est.att90[,"ATT"])
+              )
+            } else{
+              warning("Invalid plot.ci provided.")
+            }
+          }
           data_plot_abs <- data.frame(time = rep(plot_time_abs[show_abs], 2), outcome = c(Yb_show_abs[, 1], Yb_show_abs[, 2]), type = factor(c(rep("tr", nT_abs), rep("co", nT_abs)), levels = c("tr", "co")))
           p <- ggplot() # Start with empty ggplot for CI
           if (plot.ci %in% c("90", "95") && !is.null(x$Y.avg)) {
@@ -1214,7 +1422,7 @@ plot.fect <- function(
                   geom_ribbon(data = ci_data_filtered_abs, aes(x = period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
                 y_data_for_range_calc <- c(y_data_for_range_calc, ci_data_filtered_abs[[tr_lo_col]], ci_data_filtered_abs[[tr_hi_col]], ci_data_filtered_abs[[cf_lo_col]], ci_data_filtered_abs[[cf_hi_col]])
               } else { warning("No CI data for treated/counterfactual averages.") }
-            } else { warning("CI columns not found for treated/counterfactual averages.") }
+            } else {warning("CI columns not found for treated/counterfactual averages.") }
           }
           p <- p + geom_line(data = data_plot_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
           set.limits <- c("tr", "co"); set.labels <- c("Treated Average", "Estimated Y(0) Average"); set.colors <- c(color, counterfactual.color); set.linetypes <- c("solid", counterfactual.linetype); set.linewidth <- c(est.lwidth, est.lwidth); set.fill <- c(color, counterfactual.color) # fill for CI ribbons
@@ -1248,7 +1456,6 @@ plot.fect <- function(
           lw <- c(est.lwidth,est.lwidth/2); set.linewidth <- c(lw[1], lw[1], lw[2], lw[2])
         }
       }
-      # ... (Plot finalization common to Case 1: theme, vline, scales, guides, title, count bars, coord_cartesian) ...
       p <- p + xlab(xlab_final) + ylab(ylab_final) + theme(legend.position = legend.pos, axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v), axis.text = element_text(size = cex.axis), axis.title = element_text(size = cex.lab), plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)))
       if (theme.bw == TRUE) { p <- p + theme_bw() }
       p <- p + theme(
@@ -1303,37 +1510,7 @@ plot.fect <- function(
       p <- p + theme(legend.position = legend.pos)
 
     } else { # Case 2: Staggered Adoption (Different T0) -> Relative Time Plot
-      # --- ct.adjust function definition (remains the same) ---
-      ct.adjust <- function(Y.tr, Y.ct, T0_counts, D_full, tr_idx_logical_full) {
-        if (!is.matrix(Y.tr) || !is.matrix(Y.ct) || !is.vector(T0_counts)) stop("Y.tr, Y.ct must be matrices, T0_counts must be a vector.")
-        if (!all(dim(Y.tr) == dim(Y.ct))) stop("Dimensions of Y.tr and Y.ct must match.")
-        T_rows <- nrow(Y.tr); N_tr <- ncol(Y.tr)
-        if (length(T0_counts) != N_tr) stop("Length of T0_counts must match N_tr.")
-        if (T_rows == 0 || N_tr == 0) { return(list(timeline = integer(0), Y.tr.aug = matrix(NA, 0, N_tr), Y.ct.aug = matrix(NA, 0, N_tr), Yb = matrix(NA, 0, 2, dimnames=list(NULL, c("Y.tr.bar", "Y.ct.bar"))))) }
-        D_tr_local <- D_full[, tr_idx_logical_full, drop = FALSE]
-        if (ncol(D_tr_local) != N_tr) stop("Dimension mismatch for D_tr_local in ct.adjust.")
-        T0_counts_valid <- T0_counts[!is.na(T0_counts) & is.finite(T0_counts)]
-        if (length(T0_counts_valid) == 0) { return(list(timeline = integer(0), Y.tr.aug = matrix(NA,0,N_tr), Y.ct.aug = matrix(NA,0,N_tr), Yb = matrix(NA,0,2))) }
-        min_rel_time <- 1 - max(T0_counts_valid); max_rel_time <- T_rows - min(T0_counts_valid); timeline <- if (min_rel_time > max_rel_time) integer(0) else min_rel_time:max_rel_time
-        Y.tr.aug <- matrix(NA_real_, nrow = length(timeline), ncol = N_tr); Y.ct.aug <- matrix(NA_real_, nrow = length(timeline), ncol = N_tr)
-        if(length(timeline)>0) rownames(Y.tr.aug) <- rownames(Y.ct.aug) <- as.character(timeline)
-        for (i in seq_len(N_tr)) {
-          unit_t0_count_val <- T0_counts[i]; if (is.na(unit_t0_count_val) || !is.finite(unit_t0_count_val)) next
-          for (t_abs_idx in seq_len(T_rows)) {
-            rel_time <- t_abs_idx - unit_t0_count_val; row_idx_aug <- match(as.character(rel_time), rownames(Y.tr.aug)); if (is.na(row_idx_aug)) next
-            include_value <- FALSE; if (rel_time <= 0) { include_value <- TRUE } else { if (t_abs_idx <= nrow(D_tr_local) && i <= ncol(D_tr_local)) { if (!is.na(D_tr_local[t_abs_idx, i]) && D_tr_local[t_abs_idx, i] == 1) { include_value <- TRUE } } }
-            if (include_value) { if (t_abs_idx <= nrow(Y.tr) && t_abs_idx <= nrow(Y.ct)) { Y.tr.aug[row_idx_aug, i] <- Y.tr[t_abs_idx, i]; Y.ct.aug[row_idx_aug, i] <- Y.ct[t_abs_idx, i] } }
-          }
-        }
-        Y.tr.aug[is.na(Y.ct.aug)] <- NA_real_
-        Y.tr.bar <- if(length(timeline)>0) apply(Y.tr.aug, 1, mean, na.rm = TRUE) else numeric(0); Y.ct.bar <- if(length(timeline)>0) apply(Y.ct.aug, 1, mean, na.rm = TRUE) else numeric(0)
-        if(length(Y.tr.bar)>0) Y.tr.bar[is.nan(Y.tr.bar)] <- NA_real_; if(length(Y.ct.bar)>0) Y.ct.bar[is.nan(Y.ct.bar)] <- NA_real_
-        Yb_rel <- cbind(Y.tr.bar, Y.ct.bar); if(length(timeline)>0 && ncol(Yb_rel)>0) colnames(Yb_rel) <- c("Y.tr.bar", "Y.ct.bar")
-        return(list(timeline = timeline, Y.tr.aug = Y.tr.aug, Y.ct.aug = Y.ct.aug, Yb = Yb_rel))
-      }
-
       xx <- ct.adjust(Y.tr, Y.ct, T0, D_mat, tr_idx_logical)
-
       # Original event-time scale (e.g., 0 = last pre-treatment, 1 = first treatment period)
       event_time_full_series <- xx$timeline
       if (length(event_time_full_series) == 0 || all(is.na(event_time_full_series))) {
@@ -1454,6 +1631,63 @@ plot.fect <- function(
 
       # --- Plotting logic using time_for_plot_axis, Yb_data_subset, Ytr_aug_data_subset ---
       if (raw == "none") {
+        if (x$vartype == "parametric" & !is.null(id)) {
+          subset.eff.boot <- sapply(seq_len(dim(x$eff.boot)[3]), function(j) {
+            rowMeans(align_time_series(
+              x$eff.boot[,which(tr %in% subset.tr),j],
+              T0,
+              D_mat, tr_idx_logical)$Y_aug, na.rm = TRUE)
+          })
+          if (plot.ci == "95"){
+            para.ci <- basic_ci_alpha(
+              rowMeans(subset.eff.boot),
+              subset.eff.boot,
+              alpha = 0.05
+            )
+            x$Y.avg <- data.frame(
+              period   = xx$timeline,
+              lower.tr = xx$Yb[,"Y.tr.bar"],
+              upper.tr = xx$Yb[,"Y.tr.bar"],
+              lower.ct = xx$Yb[,"Y.ct.bar"] - para.ci[ , "upper"],
+              upper.ct = xx$Yb[,"Y.ct.bar"] - para.ci[ , "lower"]
+            )
+          } else if (plot.ci == "90"){
+            para.ci <- basic_ci_alpha(
+              rowMeans(subset.eff.boot),
+              subset.eff.boot,
+              alpha = 0.1
+            )
+            x$Y.avg <- data.frame(
+              period   = xx$timeline,
+              lower90.tr = xx$Yb[,"Y.tr.bar"],
+              upper90.tr = xx$Yb[,"Y.tr.bar"],
+              lower90.ct = xx$Yb[,"Y.ct.bar"] - para.ci[ , "upper"],
+              upper90.ct = xx$Yb[,"Y.ct.bar"] - para.ci[ , "lower"]
+            )
+          } else{
+            warning("Invalid plot.ci provided.")
+          }
+        } else if (x$vartype == "parametric" & raw == "none"){
+          if (plot.ci == "95"){
+            x$Y.avg <- data.frame(
+              period   = xx$timeline,
+              lower.tr = xx$Yb[,"Y.tr.bar"],
+              upper.tr = xx$Yb[,"Y.tr.bar"],
+              lower.ct = xx$Yb[,"Y.ct.bar"] - (x$est.att[, "CI.upper"]-x$est.att[,"ATT"]),
+              upper.ct = xx$Yb[,"Y.ct.bar"] - (x$est.att[, "CI.lower"]-x$est.att[,"ATT"])
+            )
+          } else if (plot.ci == "90"){
+            x$Y.avg <- data.frame(
+              period   = xx$timeline,
+              lower90.tr = xx$Yb[,"Y.tr.bar"],
+              upper90.tr = xx$Yb[,"Y.tr.bar"],
+              lower90.ct = xx$Yb[,"Y.ct.bar"] - (x$est.att90[, "CI.upper"]-x$est.att90[,"ATT"]),
+              upper90.ct = xx$Yb[,"Y.ct.bar"] - (x$est.att90[, "CI.lower"]-x$est.att90[,"ATT"])
+            )
+          } else{
+            warning("Invalid plot.ci provided.")
+          }
+        }
         data_plot_main <- data.frame(
           time = rep(time_for_plot_axis, 2),
           outcome = c(Yb_data_subset[, 1], Yb_data_subset[, 2]),

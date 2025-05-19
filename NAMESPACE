@@ -20,8 +20,7 @@ importFrom("ggplot2", "ggplot_build", "geom_boxplot", "geom_density", "geom_tile
            "scale_colour_manual", "aes", "aes_string", "annotate", "ggtitle", "geom_rect",
            "scale_color_discrete", "scale_color_manual", "ggplotGrob",
            "guide_legend", "margin", "geom_jitter", "geom_pointrange",
-           "guides","xlab","ylab","element_rect","geom_errorbar","geom_linerange",
-           "scale_linewidth_manual")
+           "guides","xlab","ylab","element_rect","geom_errorbar","geom_linerange")
 importFrom("abind", "abind")
 importFrom("mvtnorm", "rmvnorm")
 importFrom("GGally", "ggpairs")

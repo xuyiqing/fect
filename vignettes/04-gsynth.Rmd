@@ -312,14 +312,14 @@ plot(out0, type = "gap", xlim = c(-15, 15))
 
 ### Estimation w/ factors
 
-We now allow the algorithm to determine the optimal number of factors that best predict the pre-treatment data with cross-validation.
+We now allow the algorithm to determine the optimal number of factors that best predict the pre-treatment data with cross-validation. The `keep.sims` option must be set to `TRUE` if the user wishes to visualize subsets of the treated units in the "counterfactual" plot.
 
 ```{r turnout_est, cache = TRUE}
 out_turnout <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor, 
               data = turnout,  index = c("abb","year"), 
-              se = TRUE, method = "gsynth", 
+              se = TRUE, method = "gsynth", vartype = "parametric",
               r = c(0, 5), CV = TRUE, force = "two-way", 
-              nboots = 1000, seed = 02139)
+              nboots = 1000, seed = 02139, keep.sims = TRUE)
 ```
 
 ### Implied weights
@@ -347,10 +347,17 @@ plot(out_turnout, type = "status",xlab = "Year", ylab = "State", main = "Treatme
                    1968, 1976, 1984, 1992, 2000, 2008), xangle=10)
 ```
 
-If we want to zoom in to examine the treatment effect on a specific state, such as Wisconsin, we can do so by setting the `id` option accordingly.
+We can also visualize this using the "counterfactual" plot.
+
+```{r turnout_counterfactual, fig.height=5, fig.width=7}
+plot(out_turnout, type = "counterfactual")
+```
+
+
+If we want to zoom in to examine the treatment effect on a specific state, such as Wisconsin, we can do so by setting the `id` option accordingly. The `id` option can also accept a vector if one wishes to plot multiple units. This plot can only be done if `keep.sims = TRUE` is set in the estimation step.
 
 ```{r turnout_gap2, fig.height=5, fig.width=7}
-plot(out_turnout, type = "gap", id = "WI", main = "Wisconsin")
+plot(out_turnout, type = "counterfactual", id = "WI", main = "Wisconsin")
 ```
 
 As we have seen in the last example, due to the small number of treated units, the box plot reduces to a scatter plot.
