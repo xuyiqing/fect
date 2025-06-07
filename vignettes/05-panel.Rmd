@@ -935,7 +935,7 @@ You could use `did_wrapper` to implement Stacked DID as follows:
 
 ```{r wrapper, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 res_st <- did_wrapper(
-  data   = data,
+  data   = hh2019,
   Y      = "nat_rate_ord",
   D      = "indirect",
   index  = c("bfs", "year"),
@@ -949,7 +949,7 @@ It also supports a bootstrap variance estimator via the `se` argument: `se = "de
 
 ```{r wrapper_boot, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 res_st <- did_wrapper(
-  data   = data,
+  data   = hh2019,
   Y      = "nat_rate_ord",
   D      = "indirect",
   index  = c("bfs", "year"),
