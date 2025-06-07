@@ -4,7 +4,7 @@ Download the R code used in this chapter [here](rscript/05-sens.R).
 
 ------------------------------------------------------------------------
 
-@rambachan2023more propose a partial identification approach that relaxes the PT assumption in the post-treatment period by allowing violations that do not exceed the magnitude of those observed in the pre-treatment period. This framework enables sensitivity analysis of estimates from **fect** or similar methods by comparing pre-treatment deviations from PT to potential post-treatment deviations.
+@rambachan2023more propose a partial identification approach that relaxes the PT assumption in the post-treatment period by allowing violations that do not exceed the magnitude of those observed in the pre-treatment period. This framework enables sensitivity analysis of estimates from **fect** or similar methods by comparing pre-treatment deviations from parallel trends (PT) to potential post-treatment deviations.
 
 The key intuition is that if an event study demonstrates strong post-treatment effects yet only minor PT deviations before treatment, any post-treatment departure large enough to reverse these findings must be substantially larger than those observed in the pre-treatment period. Consequently, this approach quantifies how sensitive the estimated dynamic treatment effects are to possible PT violations, using pretrend estimates as the benchmark.
 
@@ -191,4 +191,4 @@ In this figure, different lines/bands will represent the robust CIs for $M=0$ (s
 
 ## How to Cite
 
-Please cite the authors of the original papers for their innovations. If you find this tutorial helpful, you can cite @CLLX2025.
+Please cite @rambachan2023more for their original contribution to the sensitivity analysis framework for causal panel analysis. If you find this tutorial helpful, you can cite @CLLX2025.

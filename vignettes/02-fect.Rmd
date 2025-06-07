@@ -503,8 +503,7 @@ plot(out.ife.g, show.group = "Cohort:22",
 
 ## Cumulative Effects
 
-Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`.
-- Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
+Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. - Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
 
 ```{r}
 out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
@@ -521,11 +520,13 @@ effect(out, cumu=FALSE)
 ```
 
 Calculate the cumulative effect of certain units at certain periods.
+
 ```{r}
 effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
 ```
 
 `effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
+
 ```{r}
 out2 <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
@@ -535,6 +536,7 @@ effect(out2)
 ```
 
 We can also use jackknife instead of bootstrap for inference:
+
 ```{r}
 out2 <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
@@ -548,6 +550,7 @@ We can plot the cumulative effects using the `plot` function as usual.
 ```{r, echo=FALSE}
 plot(effect(out2))
 ```
+
 ------------------------------------------------------------------------
 
 ## Additional Notes

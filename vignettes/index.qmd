@@ -1,21 +1,19 @@
 # Welcome! {.unnumbered}
 
-This Quarto book serves as a user manual for the **fect** package in R, which implements counterfactual (imputation) estimators for causal inference with panel data and performs diagnostic tests. 
+This Quarto book serves as a user manual for the **fect** package in R, which implements counterfactual (imputation) estimators for causal inference with panel data and performs diagnostic tests.
 
-**fect** covers a series of counterfactual estimators, including the five estimators from the last version and integrating the latest version of the **gsynth** package for the generalized synthetic control method (Gsynth). This Quarto book also facilitates the application of various new difference-in-differences (DID) estimators. For details of these methods, see 
+**fect** covers a series of counterfactual estimators, including the five estimators from the last version and integrating the latest version of the **gsynth** package for the generalized synthetic control method (Gsynth). This Quarto book also facilitates the application of various new difference-in-differences (DID) estimators. For details of these methods, see
 
 -   @Xu2017 for Gsynth \[[Paper](https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3)\]
 
 -   @LWX2022 for counterfactural estimators \[[Paper](https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723)\]
 
--   @CLLX2025 for a survey of the new DID estimators  \[[Paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf)\]
-
-
+-   @CLLX2025 for a survey of the new DID estimators \[[Paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf)\]
 
 ::: {.callout-note appearance="simple"}
 ### Source Code
 
-For those interested in exploring the algorithms used in **fect** for calculating estimates, please visit the source [GitHub Repo](https://github.com/xuyiqing/fect) for further details. 
+For those interested in exploring the algorithms used in **fect** for calculating estimates, please visit the source [GitHub Repo](https://github.com/xuyiqing/fect) for further details.
 :::
 
 ## Why Counterfactual Estimators?
@@ -66,7 +64,10 @@ The user guide is structured into the following chapters:
     This chapter provides a step-by-step guide to implementing all the functionalities of the original **gsynth** R package using **fect**.
 
 -   [Chapter @sec-panel]\
-    This chapter facilitates the application of various new DID estimators and sensitivity analyses.
+    This chapter facilitates the application of various new DID estimators.
+    
+-   [Chapter @sec-panel-sens]\
+    This chapter introduces the sensitivity analysis for the counterfactual estimators.   
 
 -   [Chapter @sec-cheatsheet]\
     The final chapter summarizes the core inputs required for implementing the six methods, along with options for plotting and diagnostics.
@@ -82,8 +83,9 @@ The following individuals have contributed to **gsynth** and **fect**, listed in
 -   Shijian Liu (PhD Student at NYU Stern)
 -   [Tianzhu Qin](https://tianzhuqin.github.io/)\
 -   Jinwen Wu (Predoc at Stanford PoliSci)
+-   [Rivka Lipkovitz](https://rivka.me/) (Undergraduate at MIT)
 
-Special thanks to Ziyi and Tianzhu for their tireless efforts in improving this package. Thanks to Jinwen for setting up and maintaining this User Manual.
+Special thanks to Ziyi, Tianzhu, and Rivka for their tireless efforts in improving this package. Thanks to Jinwen for setting up and maintaining this User Manual.
 
 ## Report bugs
 

@@ -659,175 +659,8 @@ p.fect.balance <- esplot(fect.balance.output,Period = 'Time',
 p.fect.balance
 ```
 
-````{=html}
-<!--
-````{=html}
-### Comparison of All Estimators
 
-```{r hh_compare, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 5, cache=TRUE}
-estimates <- data.frame(
-  method = c(
-    "1) TWFE \n (all obs)",
-    "2) TWFE \n (drop always treated)",
-    "3) Stacked \n DID",
-    "4) Interacted \n Weights",
-    "5) CS-DID \n (never treated)",
-    "6) CS-DID \n (not yet treated)",
-    "7) DID_multiplegt",
-    "8) Panelmatch",
-    "9) FEct \n imputation",
-    "10) DID_imputation"
-  ),
-  estimate = c(
-    1.33932,      # (1)
-    1.60858,      # (2)
-    1.66861,      # (3)
-    1.33090,      # (4)
-    1.33090,      # (5)
-    1.29230,      # (6)
-    1.29328,      # (7)
-    1.177674,     # (8)
-    1.506416,     # (9)
-    1.51          # (10)
-  ),
-  ci_lower = c(
-    # (1) TWFE all obs: computed from SE = 0.186525
-    1.33932 - 1.96 * 0.186525,
-    # (2) TWFE drop always treated: SE = 0.195296
-    1.60858 - 1.96 * 0.195296,
-    # (3) Stacked DID: SE = 0.18237
-    1.66861 - 1.96 * 0.18237,
-    # (4) Interacted Weights: SE = 0.287971
-    1.33090 - 1.96 * 0.287971,
-    # (5) CS-DID (never treated): given directly in output [0.7392, 1.9226]
-    0.7392,
-    # (6) CS-DID (not yet treated): [0.6886, 1.896]
-    0.6886,
-    # (7) DID_M: [0.70477, 1.88178]
-    0.70477,
-    # (8) Panelmatch: [0.4634517, 1.857656]
-    0.4634517,
-    # (9) FEct imputation: [1.117869, 1.894964]
-    1.117869,
-    # (10) DID_imputation: estimate=1.51, SE=0.187 => [1.14,1.87]
-    1.14
-  ),
-  ci_upper = c(
-    # (1)
-    1.33932 + 1.96 * 0.186525,
-    # (2)
-    1.60858 + 1.96 * 0.195296,
-    # (3)
-    1.66861 + 1.96 * 0.18237,
-    # (4)
-    1.33090 + 1.96 * 0.287971,
-    # (5)
-    1.9226,
-    # (6)
-    1.896,
-    # (7)
-    1.88178,
-    # (8)
-    1.857656,
-    # (9)
-    1.894964,
-    # (10)
-    1.87
-  )
-)
 
-estimates$method <- factor(
-  estimates$method,
-  levels = c(
-    "1) TWFE \n (all obs)",
-    "2) TWFE \n (drop always treated)",
-    "3) Stacked \n DID",
-    "4) Interacted \n Weights",
-    "5) CS-DID \n (never treated)",
-    "6) CS-DID \n (not yet treated)",
-    "7) DID_multiplegt",
-    "8) Panelmatch",
-    "9) FEct \n imputation",
-    "10) DID_imputation"
-  )
-)
-
-#------------------------------------------------
-# 4) Plot each estimator with 95% CI as a horizontal chart
-#------------------------------------------------
-ggplot(estimates, aes(x = method, y = estimate, 
-                      ymin = ci_lower, ymax = ci_upper)) +
-  geom_pointrange(color = "blue", size = 0.7) +
-  theme_bw(base_size = 14) +
-  labs(
-    x = NULL, 
-    y = "Estimated ATT (95% CI)",
-    title = "Comparison of 10 Different ATT Estimators"
-  ) +  theme(plot.title = element_text(hjust = 0.5))
-```
--->
-````
-
-## Streamlining Implementation with `did_wrapper`
-
-While the preceding sections have meticulously detailed the individual implementation of various HTE-robust DID estimators, the **fect** package also provides a convenient function, `did_wrapper`, that can significantly streamline this process for several common methods.
-
-Here's the corrected and formatted version of your bullet points in Markdown:
-
-The `did_wrapper` function can execute methods such as:
-
--   **Two-Way Fixed Effects (TWFE)**: by setting `method = "twfe"`.
-    This replicates the dynamic TWFE event study estimation.
-
--   **Stacked DID**: by setting `method = "st"`.
-    This implements the stacked difference-in-differences approach by @CDLZ.
-
--   **Interaction Weighted (IW) DID**: by setting `method = "iw"`.
-    This corresponds to the @sun2021-event estimator.
-
--   **Callaway and Sant’Anna (CSDID)**:
-
-    -   Using never-treated controls: `method = "cs_never"`.
-    -   Using not-yet-treated controls: `method = "cs_notyet"`.
-
--   **DIDmultiplegtDYN ("didm")**: by setting `method = "didm"`.
-    This calls the estimator by @CDH2020.
-
-You could use `did_wrapper` to implement Stacked DID as follows:
-
-```{r wrapper, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
-res_st <- did_wrapper(
-  data   = data,
-  Y      = "nat_rate_ord",
-  D      = "indirect",
-  index  = c("bfs", "year"),
-  method = "st",
-  se     = "default"
-)
-print(res_st)
-```
-
-It also supports a bootstrap variance estimator via the `se` argument: `se = "default"` uses the standard errors from the underlying estimator, while `se = "boot"` applies bootstrapping.
-
-```{r wrapper_boot, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
-res_st <- did_wrapper(
-  data   = data,
-  Y      = "nat_rate_ord",
-  D      = "indirect",
-  index  = c("bfs", "year"),
-  method = "st",
-  se     = "boot"
-)
-print(res_st)
-```
-
-Finally, `esplot` can be used to visualize the results.
-The `did_wrapper` function returns a list of objects, including the estimated coefficients and standard errors, which can be used to create event study plots.
-
-```{r wrapper_plot, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
-p_st <- esplot(data = res_st, main = "Stacked DID", xlim = c(-12,10))
-print(p_st)
-```
 
 ## With Treatment Reversals
 
@@ -1071,6 +904,67 @@ p.fect.balance <- esplot(fect.balance.output,Period = 'Time',Estimate = 'ATT',
                    SE = 'S.E.',CI.lower = "CI.lower", 
                    CI.upper = 'CI.upper')
 p.fect.balance
+```
+
+## `did_wrapper()`
+
+While the preceding sections have meticulously detailed the individual implementation of various HTE-robust DID estimators, the **fect** package also provides a convenient function, `did_wrapper`, that can significantly streamline this process for several common methods.
+
+Here's the corrected and formatted version of your bullet points in Markdown:
+
+The `did_wrapper` function can execute methods such as:
+
+-   **Two-Way Fixed Effects (TWFE)**: by setting `method = "twfe"`.
+    This replicates the dynamic TWFE event study estimation.
+
+-   **Stacked DID**: by setting `method = "st"`.
+    This implements the stacked difference-in-differences approach by @CDLZ.
+
+-   **Interaction Weighted (IW) DID**: by setting `method = "iw"`.
+    This corresponds to the @sun2021-event estimator.
+
+-   **Callaway and Sant’Anna (CSDID)**:
+
+    -   Using never-treated controls: `method = "cs_never"`.
+    -   Using not-yet-treated controls: `method = "cs_notyet"`.
+
+-   **DIDmultiplegtDYN ("didm")**: by setting `method = "didm"`.
+    This calls the estimator by @CDH2020.
+
+You could use `did_wrapper` to implement Stacked DID as follows:
+
+```{r wrapper, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
+res_st <- did_wrapper(
+  data   = data,
+  Y      = "nat_rate_ord",
+  D      = "indirect",
+  index  = c("bfs", "year"),
+  method = "st",
+  se     = "default"
+)
+print(res_st)
+```
+
+It also supports a bootstrap variance estimator via the `se` argument: `se = "default"` uses the standard errors from the underlying estimator, while `se = "boot"` applies bootstrapping.
+
+```{r wrapper_boot, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
+res_st <- did_wrapper(
+  data   = data,
+  Y      = "nat_rate_ord",
+  D      = "indirect",
+  index  = c("bfs", "year"),
+  method = "st",
+  se     = "boot"
+)
+print(res_st)
+```
+
+Finally, `esplot` can be used to visualize the results.
+The `did_wrapper` function returns a list of objects, including the estimated coefficients and standard errors, which can be used to create event study plots.
+
+```{r wrapper_plot, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
+p_st <- esplot(data = res_st, main = "Stacked DID", xlim = c(-12,10))
+print(p_st)
 ```
 
 ## How to Cite
