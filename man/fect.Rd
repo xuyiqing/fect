@@ -2,28 +2,28 @@
 \name{fect}
 \alias{fect}
 \title{Fixed Effects Counterfactual Estimators}
-\description{Implements counterfactual estimators in TSCS data analysis and statistical tools to test their identification 
+\description{Implements counterfactual estimators in TSCS data analysis and statistical tools to test their identification
 assumptions.}
-\usage{fect(formula = NULL, data, Y, D, X = NULL, 
+\usage{fect(formula = NULL, data, Y, D, X = NULL,
             W = NULL, group = NULL,
-            na.rm = FALSE, 
+            na.rm = FALSE,
             index, force = "two-way", r = 0, lambda = NULL, nlambda = 10,
-            CV = NULL, k = 10, cv.prop = 0.1, cv.treat = FALSE, 
+            CV = NULL, k = 10, cv.prop = 0.1, cv.treat = FALSE,
             cv.nobs = 3, cv.donut = 0, criterion = "mspe",
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
-            quantile.CI = FALSE, nboots = 200, alpha = 0.05, 
-            parallel = TRUE, cores = NULL, tol = 1e-3, 
-            max.iteration = 1000, seed = NULL, 
-            min.T0 = NULL, max.missing = NULL, 
-            proportion = 0.3, pre.periods = NULL, 
+            quantile.CI = FALSE, nboots = 200, alpha = 0.05,
+            parallel = TRUE, cores = NULL, tol = 1e-3,
+            max.iteration = 1000, seed = NULL,
+            min.T0 = NULL, max.missing = NULL,
+            proportion = 0.3, pre.periods = NULL,
             f.threshold = 0.5, tost.threshold = NULL,
-            knots = NULL, degree = 2, 
+            knots = NULL, degree = 2,
             sfe = NULL, cfe = NULL,
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,
             carryoverTest = FALSE, carryover.period = NULL, carryover.rm = NULL,
-            loo = FALSE, permute = FALSE, m = 2, normalize = FALSE)}  
+            loo = FALSE, permute = FALSE, m = 2, normalize = FALSE, keep.sims = FALSE)}
 \arguments{
 \item{formula}{an object of class "formula": a symbolic description of the model to be fitted, e.g, Y~D+X1+X2}
 \item{data}{a data frame, can be a balanced or unbalanced panel data.}
@@ -44,14 +44,14 @@ assumptions.}
 \item{cv.treat}{a logical flag speficying whether to only use observations of treated units as testing set.}
 \item{cv.nobs}{an integer specifying the length of continuous observations within a unit in the testing set. Default is \code{cv.nobs = 3}.}
 \item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}.}
-\item{criterion}{criterion used for model selection. Default is "mspe". 
+\item{criterion}{criterion used for model selection. Default is "mspe".
   \code{"mspe"} for the mean squared prediction error,
   \code{"gmspe"} for the geometric-mean squared prediction errors,
   \code{"moment"} for period-weighted residuals in test sets,
   \code{"pc"} for an information criterion method.}
 \item{binary}{This version doesn't support this option.}
 \item{QR}{This version doesn't support this option.}
-\item{method}{a string specifying which imputation algorithm will be used. 
+\item{method}{a string specifying which imputation algorithm will be used.
   \code{"fe"}, \code{"ife"}, \code{"mc"}, \code{"polynomial"}, \code{"bspline"},
   \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
@@ -86,6 +86,7 @@ assumptions.}
 \item{permute}{a logical flag indicating whether to run a permutation test.}
 \item{m}{an integer specifying the block length for permutation tests. Default \code{2}.}
 \item{normalize}{a logical flag indicating whether to scale outcome and covariates.}
+\item{keep.sims}{a logical flag indicating whether to save unit-time level bootstrap effects. Default \code{keep.sims = FALSE}. If \code{se = FALSE}, this argument is ignored.}
 }
 \details{
   \code{fect} implements counterfactual estimators for TSCS data. It first imputes counterfactuals by fitting an outcome model using untreated observations, then estimates the individual treatment effect as the difference between observed and predicted outcomes. Finally, it computes average treatment effects on the treated (ATT) and period-specific ATTs. Placebo and equivalence tests help evaluate identification assumptions.
@@ -191,20 +192,20 @@ assumptions.}
   Licheng Liu; Ye Wang; Yiqing Xu; Ziyi Liu
 }
 \references{
-  Athey, S., Bayati, M., Doudchenko, N., Imbens, G., and Khosravi, K. (2021). 
-  Matrix completion methods for causal panel data models. 
-  \emph{Journal of the American Statistical Association, 116}(536), 1716-1730. 
-  
-  Bai, J. (2009). 
-  Panel data models with interactive fixed effects. 
+  Athey, S., Bayati, M., Doudchenko, N., Imbens, G., and Khosravi, K. (2021).
+  Matrix completion methods for causal panel data models.
+  \emph{Journal of the American Statistical Association, 116}(536), 1716-1730.
+
+  Bai, J. (2009).
+  Panel data models with interactive fixed effects.
   \emph{Econometrica, 77}(4), 1229-1279.
-    
+
   Liu, L., Wang, Y., and Xu, Y. (2022).
-  A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data. 
+  A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data.
   \emph{American Journal of Political Science, 68}(1), 160-176.
-  
-  Xu, Y. (2017). 
-  Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models. 
+
+  Xu, Y. (2017).
+  Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models.
   \emph{Political Analysis, 25}(1), 57-76.
 }
 \seealso{
@@ -213,7 +214,7 @@ assumptions.}
 \examples{
 library(fect)
 data(fect)
-out <- fect(Y ~ D + X1 + X2, data = simdata, 
+out <- fect(Y ~ D + X1 + X2, data = simdata,
             index = c("id","time"), force = "two-way",
-            CV = TRUE, r = c(0, 5), se = 0, parallel = FALSE) 
+            CV = TRUE, r = c(0, 5), se = 0, parallel = FALSE)
 }

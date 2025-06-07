@@ -1,17 +1,27 @@
+---
+editor: 
+  markdown: 
+    wrap: sentence
+---
+
 # New DID Methods {#sec-panel}
 
-This chapter, authored by Ziyi Liu and Yiqing Xu, complements @CLLX2025 ([paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf), [slides](https://yiqingxu.org/papers/english/2023_panel/CLLX_slides.pdf)). 
-[Rivka Lipkovitz](https://rivka.me/) also contributed to this tutorial. 
+This chapter, authored by Ziyi Liu and Yiqing Xu, complements @CLLX2025 ([paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf), [slides](https://yiqingxu.org/papers/english/2023_panel/CLLX_slides.pdf)).
+[Rivka Lipkovitz](https://rivka.me/) also contributed to this tutorial.
 
-Download the R code used in this chapter [here](rscript/05-panel.R). 
+Download the R code used in this chapter [here](rscript/06-panel.R).
 
 ------------------------------------------------------------------------
 
-In recent years, researchers have proposed various heterogeneous treatment effect (HTE) robust estimators for causal panel analysis under parallel trends (PT) as alternatives to traditional two-way fixed effects (TWFE) models. Examples include those proposed by @CDLZ, @sun2021-event, @callaway2021-did, @CDH2020, @IKW2023, @BJS2024, and @LWX2022. These methods are closely connected to the classic difference-in-differences (DID) estimator.
+In recent years, researchers have proposed various heterogeneous treatment effect (HTE) robust estimators for causal panel analysis under parallel trends (PT) as alternatives to traditional two-way fixed effects (TWFE) models.
+Examples include those proposed by @CDLZ, @sun2021-event, @callaway2021-did, @CDH2020, @IKW2023, @BJS2024, and @LWX2022.
+These methods are closely connected to the classic difference-in-differences (DID) estimator.
 
-This chapter will guide you through implementing these HTE-robust estimators, as well as TWFE, in R. It will also provide instructions on creating event study plots to display estimated dynamic treatment effects. In the process, we will present a recommended pipeline for analyzing panel data, covering data exploration, estimation, result visualization, and diagnostic tests.
+This chapter will guide you through implementing these HTE-robust estimators, as well as TWFE, in R.
+It will also provide instructions on creating event study plots to display estimated dynamic treatment effects.
+In the process, we will present a recommended pipeline for analyzing panel data, covering data exploration, estimation, result visualization, and diagnostic tests.
 
-We first illustrate these methods with two empirical examples: @HH2019 (without treatment reversals) and @GS2020 (with treatment reversals). Then, we demonstrate how to implement the sensitivity analysis proposed by @rambachan2023more using the imputation estimator and data from the first example.
+We illustrate these methods with two empirical examples: @HH2019 (without treatment reversals) and @GS2020 (with treatment reversals).
 
 ## Install Packages
 
@@ -57,7 +67,8 @@ library(DIDmultiplegtDYN) # may require XQuartz
 
 ## No Treatment Reversals
 
-We begin with an empirical example from @HH2019, who investigate the effects of indirect democracy versus direct democracy on naturalization rates in Switzerland using municipality-year panel data from 1991 to 2009. The study finds that switching from direct to indirect democracy increased naturalization rates by an average of 1.22 percentage points (Model 1, Table 1).
+We begin with an empirical example from @HH2019, who investigate the effects of indirect democracy versus direct democracy on naturalization rates in Switzerland using municipality-year panel data from 1991 to 2009.
+The study finds that switching from direct to indirect democracy increased naturalization rates by an average of 1.22 percentage points (Model 1, Table 1).
 
 ```{r message = FALSE, warning = FALSE}
 data(fect)
@@ -67,7 +78,11 @@ head(data)
 
 ### Visualizing Data
 
-First, we examine the evolution of treatment status using the **panelView** package. The variables `bfs` and `year` represent the unit and time indicators, respectively. The treatment variable is `indirect`, and the outcome is `nat_rate_ord`. In the baseline analysis, we exclude covariates. We set `by.timing = TRUE` to sort units by the timing of treatment receipt.
+First, we examine the evolution of treatment status using the **panelView** package.
+The variables `bfs` and `year` represent the unit and time indicators, respectively.
+The treatment variable is `indirect`, and the outcome is `nat_rate_ord`.
+In the baseline analysis, we exclude covariates.
+We set `by.timing = TRUE` to sort units by the timing of treatment receipt.
 
 ```{r hh_panelview_treat, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 panelview(nat_rate_ord ~ indirect, data = data, index = c("bfs","year"), 
@@ -75,7 +90,10 @@ panelview(nat_rate_ord ~ indirect, data = data, index = c("bfs","year"),
   gridOff = TRUE, by.timing = TRUE)
 ```
 
-The treatment status plot shows that treatment is introduced in different years across municipalities, with no treatment reversals (a staggered adoption setting). Following @sun2021-event, we define units that receive treatment in the same year as a cohort. We can then use **panelView** to plot the average outcomes for each cohort. Because there are many cohorts, the figure is not as informative as desired.
+The treatment status plot shows that treatment is introduced in different years across municipalities, with no treatment reversals (a staggered adoption setting).
+Following @sun2021-event, we define units that receive treatment in the same year as a cohort.
+We can then use **panelView** to plot the average outcomes for each cohort.
+Because there are many cohorts, the figure is not as informative as desired.
 
 ```{r hh_panelview_cohort, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5,cache=TRUE}
 panelview(data = data,Y='nat_rate_ord',
@@ -86,7 +104,9 @@ panelview(data = data,Y='nat_rate_ord',
 
 ### TWFE
 
-The staggered adoption setup allows us to implement several estimators to obtain the treatment effect estimates. We will first estimate a two-way fixed-effects (TWFE) model, as the authors do in the paper: $$Y_{it} = \alpha_i + \xi_t + \delta^{TWFE}D_{it} + \epsilon$$ We can implement this estimator using the`feols` function in the **fixest** package. The estimated coefficient using TWFE is 1.339, with a standard error of 0.187.
+The staggered adoption setup allows us to implement several estimators to obtain the treatment effect estimates.
+We will first estimate a two-way fixed-effects (TWFE) model, as the authors do in the paper: $$Y_{it} = \alpha_i + \xi_t + \delta^{TWFE}D_{it} + \epsilon$$ We can implement this estimator using the`feols` function in the **fixest** package.
+The estimated coefficient using TWFE is 1.339, with a standard error of 0.187.
 
 ```{r hh_twfe1, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 # remember to cluster standard errors
@@ -97,7 +117,9 @@ print(model.twfe.0)
 
 ### Goodman-Bacon Decomposition
 
-@goodman2021difference shows that the TWFE estimator in a staggered adoption setting can be expressed as a weighted average of all possible 2×2 DID estimates across different cohorts. However, when treatment effects vary over time across cohorts, forbidden comparisons—where post-treatment data from early adopters serve as controls for late adopters—can introduce bias into the TWFE estimator. To address this, we follow the procedure in @goodman2021difference and decompose the TWFE estimate using the `bacon` function from the **bacondecomp** package.
+@goodman2021difference shows that the TWFE estimator in a staggered adoption setting can be expressed as a weighted average of all possible 2×2 DID estimates across different cohorts.
+However, when treatment effects vary over time across cohorts, forbidden comparisons—where post-treatment data from early adopters serve as controls for late adopters—can introduce bias into the TWFE estimator.
+To address this, we follow the procedure in @goodman2021difference and decompose the TWFE estimate using the `bacon` function from the **bacondecomp** package.
 
 ```{r hh_bacon, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 data.complete <- data[which(!is.na(data$nat_rate_ord)),] # bacon requires no missingness in the data
@@ -114,9 +136,12 @@ print(aggregate(df_bacon$estimate * df_bacon$weight,
                 list(df_bacon$type), FUN=sum))
 ```
 
-The decomposition of the TWFE estimator in a staggered adoption setting, as shown by @goodman2021difference, reveals that the largest contribution to the TWFE estimate comes from DIDs comparing ever-treated cohorts switching into treatment with the never-treated (purple crosses labeled "Treated vs Untreated"). The second-largest contribution comes from DIDs comparing ever-treated cohorts switching into treatment with other ever-treated cohorts still in their pretreatment periods (red dots labeled "Earlier vs Later Treated"), followed by forbidden comparisons between ever-treated cohorts and the always-treated (green triangles labeled "Later vs Always Treated"). The smallest contribution comes from "forbidden" DIDs comparing ever-treated cohorts switching into treatment with other ever-treated cohorts already treated (blue squares labeled "Later vs Earlier Treated").
+The decomposition of the TWFE estimator in a staggered adoption setting, as shown by @goodman2021difference, reveals that the largest contribution to the TWFE estimate comes from DIDs comparing ever-treated cohorts switching into treatment with the never-treated (purple crosses labeled "Treated vs Untreated").
+The second-largest contribution comes from DIDs comparing ever-treated cohorts switching into treatment with other ever-treated cohorts still in their pretreatment periods (red dots labeled "Earlier vs Later Treated"), followed by forbidden comparisons between ever-treated cohorts and the always-treated (green triangles labeled "Later vs Always Treated").
+The smallest contribution comes from "forbidden" DIDs comparing ever-treated cohorts switching into treatment with other ever-treated cohorts already treated (blue squares labeled "Later vs Earlier Treated").
 
-Before applying HTE-robust estimators, we first remove the always-treated units for easier comparison. Then, we create an event study plot using a dynamic specification of TWFE.
+Before applying HTE-robust estimators, we first remove the always-treated units for easier comparison.
+Then, we create an event study plot using a dynamic specification of TWFE.
 
 ```{r hh_twfe2, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 # drop always treated units
@@ -135,7 +160,10 @@ After removing the always-treated units, the estimated treatment effect increase
 
 ### TWFE Event Study Plot
 
-To create an event study plot, we first generate the cohort index and the relative time period for each observation in relation to treatment. These details are essential for various HTE-robust estimators, such as those in @sun2021-event and @callaway2021-did. We use the `get.cohort` function in **fect** to generate these indices. To maintain consistency with canonical TWFE regressions, we set `start0 = TRUE`, designating period 0 as the first post-treatment period and period -1 as the last pre-treatment period.
+To create an event study plot, we first generate the cohort index and the relative time period for each observation in relation to treatment.
+These details are essential for various HTE-robust estimators, such as those in @sun2021-event and @callaway2021-did.
+We use the `get.cohort` function in **fect** to generate these indices.
+To maintain consistency with canonical TWFE regressions, we set `start0 = TRUE`, designating period 0 as the first post-treatment period and period -1 as the last pre-treatment period.
 
 ```{r hh_cohort, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 df.use <- get.cohort(df.use, D = "indirect", index=c("bfs","year"), 
@@ -143,11 +171,18 @@ df.use <- get.cohort(df.use, D = "indirect", index=c("bfs","year"),
 head(df.use[,-5],19)
 ```
 
-The column `FirstTreat` indicates the first period when a unit receives treatment (set to `NA` for never-treated units). The column `Time_to_Treatment` represents the relative period to treatment onset (set to `NA` for always-treated and never-treated units). The period `-1` corresponds to the last pre-treatment period.
+The column `FirstTreat` indicates the first period when a unit receives treatment (set to `NA` for never-treated units).
+The column `Time_to_Treatment` represents the relative period to treatment onset (set to `NA` for always-treated and never-treated units).
+The period `-1` corresponds to the last pre-treatment period.
 
-Now, we run a dynamic TWFE regression, also known as a model with "leads and lags." This is the standard approach for estimating dynamic treatment effects in event studies. The model includes a series of interaction terms between a dummy indicating whether a unit is treated and each lead and lag indicator relative to treatment in a TWFE regression. This specification allows effects to vary over time, typically using the period immediately before treatment as the reference period. If the regression is fully saturated and there is no HTE across cohorts, the dynamic TWFE model can consistently estimate the dynamic treatment effect.
+Now, we run a dynamic TWFE regression, also known as a model with "leads and lags." This is the standard approach for estimating dynamic treatment effects in event studies.
+The model includes a series of interaction terms between a dummy indicating whether a unit is treated and each lead and lag indicator relative to treatment in a TWFE regression.
+This specification allows effects to vary over time, typically using the period immediately before treatment as the reference period.
+If the regression is fully saturated and there is no HTE across cohorts, the dynamic TWFE model can consistently estimate the dynamic treatment effect.
 
-We use `feols` to implement this estimator. The column `Time_to_Treatment` can serve as the lead/lag indicator (we need to replace the `NA` in `Time_to_Treatment` with an arbitrary number). Note that the period `-1` in `Time_to_Treatment` corresponds to the last pre-treatment period and is the reference period.
+We use `feols` to implement this estimator.
+The column `Time_to_Treatment` can serve as the lead/lag indicator (we need to replace the `NA` in `Time_to_Treatment` with an arbitrary number).
+Note that the period `-1` in `Time_to_Treatment` corresponds to the last pre-treatment period and is the reference period.
 
 ```{r hh_twfeplot, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 # Dynamic TWFE
@@ -161,7 +196,10 @@ twfe.output <- as.matrix(twfe.est$coeftable)
 print(round(twfe.output, 3))
 ```
 
-**fect** includes a plotting function, `esplot()`, to create an event study plot based on a vector of point estimates and estimated standard errors. Here, we use this function to examine dynamic effects over a 13-period pre-treatment span and a 10-period post-treatment span. The data reveals a significant treatment effect, along with a subtle pre-trend discrepancy in several periods preceding treatment. Notably, `esplot()` treats period 0 as the last pre-treatment period by default, so the period index must be shifted by one.
+**fect** includes a plotting function, `esplot()`, to create an event study plot based on a vector of point estimates and estimated standard errors.
+Here, we use this function to examine dynamic effects over a 13-period pre-treatment span and a 10-period post-treatment span.
+The data reveals a significant treatment effect, along with a subtle pre-trend discrepancy in several periods preceding treatment.
+Notably, `esplot()` treats period 0 as the last pre-treatment period by default, so the period index must be shifted by one.
 
 ```{r hh_twfeplot2, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 twfe.output <- as.data.frame(twfe.output)
@@ -171,7 +209,8 @@ p.twfe <- esplot(twfe.output,Period = 'Time',Estimate = 'Estimate',
 p.twfe
 ```
 
-By setting `start0 = TRUE`, we designate period 0 as the first post-treatment period, making period -1 the last pre-treatment period. As a result, there is no need to shift the period index, as it already aligns with the conventional TWFE framework.
+By setting `start0 = TRUE`, we designate period 0 as the first post-treatment period, making period -1 the last pre-treatment period.
+As a result, there is no need to shift the period index, as it already aligns with the conventional TWFE framework.
 
 ```{r hh_twfeplot3, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 twfe.output <- as.data.frame(twfe.est$coeftable)
@@ -184,11 +223,14 @@ p.twfe
 
 ### Stacked DID
 
-@CDLZ examine the effect of variations in minimum wage on low-wage employment across 138 state-level minimum wage changes in the United States between 1979 and 2016, using a stacked DID approach. A similar estimator is also implemented in the Stata package STACKEDEV [@STACKEDEV]. See a simple illustration below.
+@CDLZ examine the effect of variations in minimum wage on low-wage employment across 138 state-level minimum wage changes in the United States between 1979 and 2016, using a stacked DID approach.
+A similar estimator is also implemented in the Stata package STACKEDEV [@STACKEDEV].
+See a simple illustration below.
 
 ![Stacked DID](fig/fig_st.png)
 
-The stacked DID method removes the bias caused by forbidden comparisons in the Goodman-Bacon decomposition. However, it returns a variance-weighted ATT with the implicit weights chosen by OLS instead of the ATT.
+The stacked DID method removes the bias caused by forbidden comparisons in the Goodman-Bacon decomposition.
+However, it returns a variance-weighted ATT with the implicit weights chosen by OLS instead of the ATT.
 
 ```{r hh_st, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 df.st <- NULL
@@ -231,13 +273,17 @@ The stacked DID plot closely resembles that of the TWFE model, suggesting that p
 
 ### Interaction Weighted
 
-@sun2021-event proposes an interaction-weighted (IW) estimator for estimating the ATT. the IW estimator computes a weighted average of ATT estimates for each cohort, obtained from a TWFE regression where cohort dummies are fully interacted with indicators of relative time to treatment onset. See a simple illustration below.
+@sun2021-event proposes an interaction-weighted (IW) estimator for estimating the ATT.
+the IW estimator computes a weighted average of ATT estimates for each cohort, obtained from a TWFE regression where cohort dummies are fully interacted with indicators of relative time to treatment onset.
+See a simple illustration below.
 
 ```{r, echo=FALSE, out.width="50%", fig.align="center"}
 knitr::include_graphics("fig/fig_iw.png")
 ```
 
-The IW estimator is HTE-robust and can be implemented using the `sunab` function in the **fixest** package. The column `FirstTreat` serves as the cohort indicator, with any missing values replaced by an arbitrary number. The estimated ATT using the IW estimator is 1.331, with a standard error of 0.288.
+The IW estimator is HTE-robust and can be implemented using the `sunab` function in the **fixest** package.
+The column `FirstTreat` serves as the cohort indicator, with any missing values replaced by an arbitrary number.
+The estimated ATT using the IW estimator is 1.331, with a standard error of 0.288.
 
 ```{r hh_sa, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 df.sa <- df.use
@@ -249,7 +295,9 @@ model.sa.1 <- feols(nat_rate_ord~sunab(FirstTreat,year)|bfs+year,
 summary(model.sa.1,agg = "ATT")
 ```
 
-The estimation results are saved `coeftable` for plotting. We can make an event study plot as before. The results are quite similar to TWFE and stacked DID.
+The estimation results are saved `coeftable` for plotting.
+We can make an event study plot as before.
+The results are quite similar to TWFE and stacked DID.
 
 ```{r hh_saplot, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 sa.output <- as.data.frame(as.matrix(model.sa.1$coeftable))
@@ -261,9 +309,13 @@ p.sa
 
 ### CSDID
 
-@callaway2021-did propose a doubly robust estimator, known as CSDID, which incorporates pre-treatment covariates by using either never-treated or not-yet-treated units as the comparison group. Due to lack of time-invariant covariates, we use only the outcome model (rather than the full doubly robust estimator) to estimate the ATT and dynamic treatment effects.
+@callaway2021-did propose a doubly robust estimator, known as CSDID, which incorporates pre-treatment covariates by using either never-treated or not-yet-treated units as the comparison group.
+Due to lack of time-invariant covariates, we use only the outcome model (rather than the full doubly robust estimator) to estimate the ATT and dynamic treatment effects.
 
-First, we use the never-treated units as the comparison group. The column `FirstTreat` serves as the cohort indicator, with missing values replaced by 0. The estimated ATT is numerically identical to the IW estimator. Additionally, we set `bstrap = FALSE` to report the analytical standard error, which is 0.302.
+First, we use the never-treated units as the comparison group.
+The column `FirstTreat` serves as the cohort indicator, with missing values replaced by 0.
+The estimated ATT is numerically identical to the IW estimator.
+Additionally, we set `bstrap = FALSE` to report the analytical standard error, which is 0.302.
 
 ```{r hh_cs1, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 df.cs <- df.use
@@ -281,7 +333,9 @@ cs.est.att.1 <- aggte(cs.est.1, type = "simple", na.rm=T, bstrap = F)
 print(cs.est.att.1)
 ```
 
-Using the **csdid** package, we can use the `aggte` function to aggregate cohort-period average treatment effects. We set `bstrap = FALSE` to report analytical standard errors and `cband = FALSE` to display period-wise confidence intervals, allowing for easy comparison with other estimators. While `aggte` can compute uniform confidence bands by setting both `cband` and `bstrap` to `TRUE`, we opt to report period-wise intervals in this case.
+Using the **csdid** package, we can use the `aggte` function to aggregate cohort-period average treatment effects.
+We set `bstrap = FALSE` to report analytical standard errors and `cband = FALSE` to display period-wise confidence intervals, allowing for easy comparison with other estimators.
+While `aggte` can compute uniform confidence bands by setting both `cband` and `bstrap` to `TRUE`, we opt to report period-wise intervals in this case.
 
 ```{r hh_csplot1, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 cs.att.1 <- aggte(cs.est.1, type = "dynamic",
@@ -289,7 +343,8 @@ cs.att.1 <- aggte(cs.est.1, type = "dynamic",
 print(cs.att.1)
 ```
 
-The estimated dynamic treatment effects in the post-treatment period are numerically identical to those from the IW estimator. However, pre-treatment estimates may differ because **csdid** defaults to using the preceding period as the reference point in pre-treatment periods.
+The estimated dynamic treatment effects in the post-treatment period are numerically identical to those from the IW estimator.
+However, pre-treatment estimates may differ because **csdid** defaults to using the preceding period as the reference point in pre-treatment periods.
 
 ```{r hh_csplot1a, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 cs.output <- cbind.data.frame(Estimate = cs.att.1$att.egt,
@@ -300,7 +355,8 @@ p.cs.1 <- esplot(cs.output,Period = 'time',Estimate = 'Estimate',
 p.cs.1
 ```
 
-We prefer to set `base_period = "universal"`, which designates the last pre-treatment period as the reference period. This produces results that closely align with the IW estimator.
+We prefer to set `base_period = "universal"`, which designates the last pre-treatment period as the reference period.
+This produces results that closely align with the IW estimator.
 
 ```{r hh_csplot1b, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 cs.est.1.u <- att_gt(yname = "nat_rate_ord",
@@ -323,13 +379,15 @@ p.cs.1.u <- esplot(cs.output.u,Period = 'time',Estimate = 'Estimate',
 p.cs.1.u
 ```
 
-One advantage of CSDID is the ability to use **not-yet-treated** units as the comparison group by setting `control_group = "notyettreated"`. See a simple illustration below.
+One advantage of CSDID is the ability to use **not-yet-treated** units as the comparison group by setting `control_group = "notyettreated"`.
+See a simple illustration below.
 
 ```{r, echo=FALSE, out.width="50%", fig.align="center"}
 knitr::include_graphics("fig/fig_cs.png")
 ```
 
-The choice of the comparison group depends on the specific version of the parallel trends assumption that researchers aim to justify. The estimated ATT is 1.292, with a standard error of 0.308.
+The choice of the comparison group depends on the specific version of the parallel trends assumption that researchers aim to justify.
+The estimated ATT is 1.292, with a standard error of 0.308.
 
 ```{r hh_cs2, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 cs.est.2 <- att_gt(yname = "nat_rate_ord",
@@ -345,7 +403,8 @@ cs.est.att.2 <- aggte(cs.est.2, type = "simple",na.rm=T, bstrap = F)
 print(cs.est.att.2)
 ```
 
-We can calculate the dynamic treatment effects using the same method, and then use `esplot` to make the event study plot. Note that we set the reference period to be the last pre-treatment period.
+We can calculate the dynamic treatment effects using the same method, and then use `esplot` to make the event study plot.
+Note that we set the reference period to be the last pre-treatment period.
 
 ```{r hh_csplot2b, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 cs.est.2.u <- att_gt(yname = "nat_rate_ord", gname = "FirstTreat",
@@ -367,12 +426,17 @@ p.cs.2.u <- esplot(cs.output.u,Period = 'time',Estimate = 'Estimate',
 p.cs.2.u
 ```
 
-
 ### DIDmultiple
 
-@de2020two and @de2024difference introduce a method for multi-group, multi-period designs that accommodate a potentially non-binary treatment, which can change (increase or decrease) multiple times. For details, see @de2024event. Here, we demonstrate only the basic usage for a binary, staggered treatment.
+@de2020two and @de2024difference introduce a method for multi-group, multi-period designs that accommodate a potentially non-binary treatment, which can change (increase or decrease) multiple times.
+For details, see @de2024event.
+Here, we demonstrate only the basic usage for a binary, staggered treatment.
 
-When calling `did_multiplegt_dyn`, specify the outcome, treatment, unit index (`group`), and time index (`time`). The `effects` option determines how many event-study coefficients to estimate. For each period $l$, the event-study effect represents the average change in the outcome for all switchers after receiving the treatment for $l$ periods, compared to remaining at their initial treatment level. The `placebo` option specifies how many placebo coefficients to compute. For each placebo period $k$, the command compares the outcome evolution of switchers and their controls $k$ periods before the switchers' first treatment change. 
+When calling `did_multiplegt_dyn`, specify the outcome, treatment, unit index (`group`), and time index (`time`).
+The `effects` option determines how many event-study coefficients to estimate.
+For each period $l$, the event-study effect represents the average change in the outcome for all switchers after receiving the treatment for $l$ periods, compared to remaining at their initial treatment level.
+The `placebo` option specifies how many placebo coefficients to compute.
+For each placebo period $k$, the command compares the outcome evolution of switchers and their controls $k$ periods before the switchers' first treatment change.
 
 See a simple illustration below with $l = 2$ (number of lags, capturing post-treatment effects) and $k = 2$ (number of leads, capturing pre-treatment placebo effects).
 
@@ -409,17 +473,22 @@ didm.vis[,'Time'] <- c(c(-1:-(T.pre)),c(1:T.post))
 est.dynamic <- didm.vis[,c(9,1,2,3,4)]
 colnames(est.dynamic) <- c("T","estimate","se","lb","ub")
 p.didm <- esplot(est.dynamic,Period = 'T',Estimate = 'estimate',
-                               SE = 'se', xlim = c(-12, 9))
+                               SE = 'se', xlim = c(-9, 9))
 p.didm
 ```
 
 ### PanelMatch
 
-@IKW2023 propose a matching method, similar in spirit to DIDm, for panel data analysis. It allows researchers to match each treated observation for a given unit in a particular period with untreated observations from other units in the same period that have similar treatment, outcome, or covariate histories. Their package is called **PanelMatch**.
+@IKW2023 propose a matching method, similar in spirit to DIDm, for panel data analysis.
+It allows researchers to match each treated observation for a given unit in a particular period with untreated observations from other units in the same period that have similar treatment, outcome, or covariate histories.
+Their package is called **PanelMatch**.
 
-The `PanelMatch` function in **PanelMatch** creates matched sets. The option `lag = 3` specifies that pre-treatment history should span three periods, while `lead = c(0:3)` sets the lead window to include four post-treatment periods. Note that the terms *lead* and *lag* here are opposite to their traditional usage in a dynamic TWFE specification, where *lags* correspond to post-treatment effects and *leads* correspond to pre-treatment placebo effects.
+The `PanelMatch` function in **PanelMatch** creates matched sets.
+The option `lag = 3` specifies that pre-treatment history should span three periods, while `lead = c(0:3)` sets the lead window to include four post-treatment periods.
+Note that the terms *lead* and *lag* here are opposite to their traditional usage in a dynamic TWFE specification, where *lags* correspond to post-treatment effects and *leads* correspond to pre-treatment placebo effects.
 
-To assign equal weights to all control units in each matched set, we set `refinement.method = "none"` (without matching on controls). Notably, by matching on treatment history and defining the lead window, `PanelMatch` uses only the subset of treated units with three pre-treatment periods and four post-treatment periods to compute the average treatment effects.
+To assign equal weights to all control units in each matched set, we set `refinement.method = "none"` (without matching on controls).
+Notably, by matching on treatment history and defining the lead window, `PanelMatch` uses only the subset of treated units with three pre-treatment periods and four post-treatment periods to compute the average treatment effects.
 
 The PanelMatch estimator is equivalent to the DIDmulitple estimator proposed by @CDH2020 if we only match on the last pre-treatment period and only estimate the treatment effect at the first post-treatment period.
 
@@ -455,7 +524,10 @@ PM.results.placebo <- PanelMatch(lag=3,
 
 ```
 
-We can estimate the ATT and dynamic treatment effects using the function `PanelEstimate`. To obtain the ATT, we set the option `pooled = TRUE`. The standard error is calculated using a block bootstrapping method. This is different from the standard boostrapping method, which is not valid for matching estimators \cite{abadie2008failure}.
+We can estimate the ATT and dynamic treatment effects using the function `PanelEstimate`.
+To obtain the ATT, we set the option `pooled = TRUE`.
+The standard error is calculated using a block bootstrapping method.
+This is different from the standard boostrapping method, which is not valid for matching estimators \cite{abadie2008failure}.
 
 ```{r hh_pm1, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 # ATT
@@ -463,7 +535,8 @@ PE.results.pool <- PanelEstimate(PM.results, panel.data = df.pm, pooled = TRUE)
 summary(PE.results.pool)
 ```
 
-We can also use the function `PanelEstimate` to estimate the dynamic treatment effects at post-treatment periods. Additionally, for pre-treatment periods, **PanelMatch** offers the function `placebo_test` to compute the change in outcomes for each pre-treatment period in the lag window compared to the last pre-treatment period.
+We can also use the function `PanelEstimate` to estimate the dynamic treatment effects at post-treatment periods.
+Additionally, for pre-treatment periods, **PanelMatch** offers the function `placebo_test` to compute the change in outcomes for each pre-treatment period in the lag window compared to the last pre-treatment period.
 
 ```{r hh_pm2, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 # Dynamic Treatment Effects
@@ -487,13 +560,16 @@ p.pm
 
 ### Imputation Method
 
-Now, we return to the imputation method, which **fect** is originally designed to implement. See a simple illustration below. For details, see @sec-fect.
+Now, we return to the imputation method, which **fect** is originally designed to implement.
+See a simple illustration below.
+For details, see @sec-fect.
 
 ```{r, echo=FALSE, out.width="50%", fig.align="center"}
 knitr::include_graphics("fig/fig_fect.png")
 ```
 
-For a fair comparison, we implement this estimator—the fixed effects counterfactual (**fect**) estimator—based on a TWFE model. The estimated ATT is 1.506, with a standard error of 0.197.
+For a fair comparison, we implement this estimator—the fixed effects counterfactual (**fect**) estimator—based on a TWFE model.
+The estimated ATT is 1.506, with a standard error of 0.197.
 
 ```{r hh_fect, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 out.fect <- fect(nat_rate_ord~indirect, data = df, 
@@ -502,7 +578,8 @@ out.fect <- fect(nat_rate_ord~indirect, data = df,
 print(out.fect$est.avg)
 ```
 
-The `fect` function stores the estimated dynamic treatment effects obtained using the counterfactual method in the object `est.att`. Uncertainty estimates are derived through a nonparametric clustered bootstrap/jackknife procedure.
+The `fect` function stores the estimated dynamic treatment effects obtained using the counterfactual method in the object `est.att`.
+Uncertainty estimates are derived through a nonparametric clustered bootstrap/jackknife procedure.
 
 ```{r hh_fectplot, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 fect.output <- as.matrix(out.fect$est.att)
@@ -525,7 +602,8 @@ out.impute <- did_imputation(data = df.impute,
 out.impute
 ```
 
-We can use `esplot()` to create the event study plot as before. Additionally, the **fect** package offers more advanced visualization tools specifically designed for imputation estimators (see the previous chapters and the next chapter).
+We can use `esplot()` to create the event study plot as before.
+Additionally, the **fect** package offers more advanced visualization tools specifically designed for imputation estimators (see the previous chapters and the next chapter).
 
 ```{r hh_fectplot2, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 fect.output <- as.data.frame(fect.output)
@@ -536,7 +614,9 @@ p.fect <- esplot(fect.output,Period = 'Time',Estimate = 'ATT',
 p.fect
 ```
 
-The **didimputation** package also supports event study estimation, producing numerically equivalent estimates for dynamic treatment effects in the post-treatment period. However, `didimputation` uses a distinct TWFE regression applied only to untreated observations to obtain pre-treatment estimates and test for parallel trends. In this case, we specify `pretrends = c(-13:-1)` to compute regression coefficients for pre-treatment periods ranging from -13 to -1.
+The **didimputation** package also supports event study estimation, producing numerically equivalent estimates for dynamic treatment effects in the post-treatment period.
+However, `didimputation` uses a distinct TWFE regression applied only to untreated observations to obtain pre-treatment estimates and test for parallel trends.
+In this case, we specify `pretrends = c(-13:-1)` to compute regression coefficients for pre-treatment periods ranging from -13 to -1.
 
 ```{r hh_impute2, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 model.impute <- did_imputation(data = df.impute,
@@ -558,7 +638,8 @@ esplot(data=to_plot,Period = "term",
 out.impute
 ```
 
-To compare the results with those obtained using the **PanelMatch** method, **fect** provides the option to compute the ATT for the subset of units with three pre-treatment periods and four post-treatment periods. This can be done by setting `balance.period = c(-2,4)`, which includes periods -2, -1, and 0 for pre-treatment and 1, 2, 3, and 4 for post-treatment.
+To compare the results with those obtained using the **PanelMatch** method, **fect** provides the option to compute the ATT for the subset of units with three pre-treatment periods and four post-treatment periods.
+This can be done by setting `balance.period = c(-2,4)`, which includes periods -2, -1, and 0 for pre-treatment and 1, 2, 3, and 4 for post-treatment.
 
 ```{r hh_balance, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 out.fect.balance <- fect(nat_rate_ord~indirect, data = df, 
@@ -578,121 +659,17 @@ p.fect.balance <- esplot(fect.balance.output,Period = 'Time',
 p.fect.balance
 ```
 
-<!--
-````{=html}
-### Comparison of All Estimators
-
-```{r hh_compare, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 5, cache=TRUE}
-estimates <- data.frame(
-  method = c(
-    "1) TWFE \n (all obs)",
-    "2) TWFE \n (drop always treated)",
-    "3) Stacked \n DID",
-    "4) Interacted \n Weights",
-    "5) CS-DID \n (never treated)",
-    "6) CS-DID \n (not yet treated)",
-    "7) DID_multiplegt",
-    "8) Panelmatch",
-    "9) FEct \n imputation",
-    "10) DID_imputation"
-  ),
-  estimate = c(
-    1.33932,      # (1)
-    1.60858,      # (2)
-    1.66861,      # (3)
-    1.33090,      # (4)
-    1.33090,      # (5)
-    1.29230,      # (6)
-    1.29328,      # (7)
-    1.177674,     # (8)
-    1.506416,     # (9)
-    1.51          # (10)
-  ),
-  ci_lower = c(
-    # (1) TWFE all obs: computed from SE = 0.186525
-    1.33932 - 1.96 * 0.186525,
-    # (2) TWFE drop always treated: SE = 0.195296
-    1.60858 - 1.96 * 0.195296,
-    # (3) Stacked DID: SE = 0.18237
-    1.66861 - 1.96 * 0.18237,
-    # (4) Interacted Weights: SE = 0.287971
-    1.33090 - 1.96 * 0.287971,
-    # (5) CS-DID (never treated): given directly in output [0.7392, 1.9226]
-    0.7392,
-    # (6) CS-DID (not yet treated): [0.6886, 1.896]
-    0.6886,
-    # (7) DID_M: [0.70477, 1.88178]
-    0.70477,
-    # (8) Panelmatch: [0.4634517, 1.857656]
-    0.4634517,
-    # (9) FEct imputation: [1.117869, 1.894964]
-    1.117869,
-    # (10) DID_imputation: estimate=1.51, SE=0.187 => [1.14,1.87]
-    1.14
-  ),
-  ci_upper = c(
-    # (1)
-    1.33932 + 1.96 * 0.186525,
-    # (2)
-    1.60858 + 1.96 * 0.195296,
-    # (3)
-    1.66861 + 1.96 * 0.18237,
-    # (4)
-    1.33090 + 1.96 * 0.287971,
-    # (5)
-    1.9226,
-    # (6)
-    1.896,
-    # (7)
-    1.88178,
-    # (8)
-    1.857656,
-    # (9)
-    1.894964,
-    # (10)
-    1.87
-  )
-)
-
-estimates$method <- factor(
-  estimates$method,
-  levels = c(
-    "1) TWFE \n (all obs)",
-    "2) TWFE \n (drop always treated)",
-    "3) Stacked \n DID",
-    "4) Interacted \n Weights",
-    "5) CS-DID \n (never treated)",
-    "6) CS-DID \n (not yet treated)",
-    "7) DID_multiplegt",
-    "8) Panelmatch",
-    "9) FEct \n imputation",
-    "10) DID_imputation"
-  )
-)
-
-#------------------------------------------------
-# 4) Plot each estimator with 95% CI as a horizontal chart
-#------------------------------------------------
-ggplot(estimates, aes(x = method, y = estimate, 
-                      ymin = ci_lower, ymax = ci_upper)) +
-  geom_pointrange(color = "blue", size = 0.7) +
-  theme_bw(base_size = 14) +
-  labs(
-    x = NULL, 
-    y = "Estimated ATT (95% CI)",
-    title = "Comparison of 10 Different ATT Estimators"
-  ) +  theme(plot.title = element_text(hjust = 0.5))
-```
--->
 
 
-We will come back to this empirical example when we implement the sensitivity analysis in [Chapter @sec-panel-sens].
 
 ## With Treatment Reversals
 
-We use data from @GS2020 to demonstrate methods that can accommodate treatment reversals, where treatment can switch on and off. These methods include TWFE, PanelMatch, and the imputation estimator.
+We use data from @GS2020 to demonstrate methods that can accommodate treatment reversals, where treatment can switch on and off.
+These methods include TWFE, PanelMatch, and the imputation estimator.
 
-In the original paper, the authors use district by election-cycle panel data from U.S. House general elections between 1980 and 2012, arguing that the presence of Asian (Black/Latino) candidates in general elections increases the proportion of campaign contributions from Asian (Black/Latino) donors. Here, we focus specifically on the effects of Asian candidates, as shown in the top left panel of Figure 5 in the paper.
+In the original paper, the authors use district by election-cycle panel data from U.S.
+House general elections between 1980 and 2012, arguing that the presence of Asian (Black/Latino) candidates in general elections increases the proportion of campaign contributions from Asian (Black/Latino) donors.
+Here, we focus specifically on the effects of Asian candidates, as shown in the top left panel of Figure 5 in the paper.
 
 ```{r message = FALSE, warning = FALSE}
 data(fect)
@@ -703,9 +680,13 @@ head(data)
 
 ### Visualizing Data
 
-In our analysis, `district_final` and `cycle` serve as the unit and time indices, respectively. The treatment variable, `cand_A_all`, indicates the presence of an Asian candidate, while the outcome variable, `general_sharetotal_A_all`, represents the proportion of donations from Asian donors. The covariates included are `cand_H_all`, indicating a Hispanic candidate, and `cand_B_all`, indicating a Black candidate.
+In our analysis, `district_final` and `cycle` serve as the unit and time indices, respectively.
+The treatment variable, `cand_A_all`, indicates the presence of an Asian candidate, while the outcome variable, `general_sharetotal_A_all`, represents the proportion of donations from Asian donors.
+The covariates included are `cand_H_all`, indicating a Hispanic candidate, and `cand_B_all`, indicating a Black candidate.
 
-As usual, we use the **panelView** package to examine treatment conditions and missing values in the data. We set `by.timing = TRUE` to organize units by treatment timing. Below, we can see that this dataset has missing values in the outcome variable, and the treatment may switch on and off.
+As usual, we use the **panelView** package to examine treatment conditions and missing values in the data.
+We set `by.timing = TRUE` to organize units by treatment timing.
+Below, we can see that this dataset has missing values in the outcome variable, and the treatment may switch on and off.
 
 ```{r gb_panelview_treat, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 y <- "general_sharetotal_A_all"
@@ -724,7 +705,8 @@ panelview(Y=y, D=d, X=controls, index = index, data = data,
 
 ### TWFE
 
-First, we estimate the effect of an Asian candidate on the proportion of Asian donations using the TWFE estimator. The estimated coefficient is 0.128, with a standard error of 0.025, clustered at the district level.
+First, we estimate the effect of an Asian candidate on the proportion of Asian donations using the TWFE estimator.
+The estimated coefficient is 0.128, with a standard error of 0.025, clustered at the district level.
 
 ```{r gb_twfe1, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 model.twfe <- feols(general_sharetotal_A_all ~ cand_A_all + 
@@ -733,7 +715,8 @@ model.twfe <- feols(general_sharetotal_A_all ~ cand_A_all +
 summary(model.twfe)
 ```
 
-To estimate dynamic treatment effects using TWFE, we first use the `get.cohort` function to determine the relative period to treatment. Next, we generate the treated unit indicator `treat` using the following steps:
+To estimate dynamic treatment effects using TWFE, we first use the `get.cohort` function to determine the relative period to treatment.
+Next, we generate the treated unit indicator `treat` using the following steps:
 
 1.  Set `treat = 0` for observations of units that have never been treated.\
 2.  For treated units, if the treatment switches on and off, assign `treat = 1` only for observations before the last treatment exit. For example, if a unit's treatment status sequence is `0, 0, 0, 1, 1, 0, 0`, we set `treat = 1` only for the first five observations. This approach assumes no carryover effects, meaning treatment affects only the current period.\
@@ -774,7 +757,10 @@ p.twfe
 
 ### PanelMatch
 
-PanelMatch can handle treatment reversals but uses only a subset of the data based on the specified numbers of leads and lags. DIDmultiple, proposed by @CDH2020, can also accommodate treatment reversals. However, its current implementation in R, **DIDmultiplegtDYN**, focuses only on the first switch from the control condition to the treatment condition for each unit. Therefore, we use **PanelMatch** to illustrate how matching methods work in this more general setting.
+PanelMatch can handle treatment reversals but uses only a subset of the data based on the specified numbers of leads and lags.
+DIDmultiple, proposed by @CDH2020, can also accommodate treatment reversals.
+However, its current implementation in R, **DIDmultiplegtDYN**, focuses only on the first switch from the control condition to the treatment condition for each unit.
+Therefore, we use **PanelMatch** to illustrate how matching methods work in this more general setting.
 
 In this case, we use a subset of treated units with four pre-treatment periods and one post-treatment period to estimate the average treatment effects.
 
@@ -842,7 +828,9 @@ p.pm
 
 ### Imputation Method
 
-Now we return to the imputation method proposed by @BJS2024 and @LWX2022. The estimated ATT is 0.127, with a standard error of 0.025. Both are very close to the TWFE estimates.
+Now we return to the imputation method proposed by @BJS2024 and @LWX2022.
+The estimated ATT is 0.127, with a standard error of 0.025.
+Both are very close to the TWFE estimates.
 
 ```{r gb_fect, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 model.fect <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", 
@@ -876,7 +864,8 @@ We can visualize the period-wise ATT relative to the **exit** of the treatment b
 plot(model.fect, type = 'exit')
 ```
 
-As discussed in @sec-fect, **fect** provides various diagnostic tests, including the $F$ test, placebo test, equivalence tests, and test for no-carryover effects. The figure below presents the results of a placebo test, where we set `placebo.period = c(-2, 0)`, specifying that the placebo periods include the three periods preceding treatment onset.
+As discussed in @sec-fect, **fect** provides various diagnostic tests, including the $F$ test, placebo test, equivalence tests, and test for no-carryover effects.
+The figure below presents the results of a placebo test, where we set `placebo.period = c(-2, 0)`, specifying that the placebo periods include the three periods preceding treatment onset.
 
 ```{r hh_fectplacebo, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 out.fect.p <- fect(Y = y, X = controls, D = d, data = data, index = index,
@@ -886,7 +875,8 @@ out.fect.p <- fect(Y = y, X = controls, D = d, data = data, index = index,
 plot(out.fect.p, proportion = 0.1, stats = "placebo.p")
 ```
 
-We then test for carryover effects by setting `carryoverTest = TRUE` and `carryover.period = c(1,2)`, which removes observations from periods after treatment has ended from the data used to fit the model. The test then assesses whether the estimated ATT in this range is significantly different from zero.
+We then test for carryover effects by setting `carryoverTest = TRUE` and `carryover.period = c(1,2)`, which removes observations from periods after treatment has ended from the data used to fit the model.
+The test then assesses whether the estimated ATT in this range is significantly different from zero.
 
 ```{r gb_fectcarryover, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 out.fect.c <- fect(Y = y, X = controls, D = d, data = data, index = index,
@@ -896,7 +886,8 @@ out.fect.c <- fect(Y = y, X = controls, D = d, data = data, index = index,
 plot(out.fect.c,  stats = "carryover.p", ylim = c(-0.15, 0.20))
 ```
 
-To compare with the estimates from **PanelMatch**, we can construct a balanced sample by setting `balance.period = c(-3,1))`, ensuring that both methods use the same set of treated observations. The ATT estimate is similar but slightly larger than that obtained using the full sample.
+To compare with the estimates from **PanelMatch**, we can construct a balanced sample by setting `balance.period = c(-3,1))`, ensuring that both methods use the same set of treated observations.
+The ATT estimate is similar but slightly larger than that obtained using the full sample.
 
 ```{r gb_balance, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 out.fect.balance <- fect(Y = y, X = controls, D = d, data = data, 
@@ -915,259 +906,68 @@ p.fect.balance <- esplot(fect.balance.output,Period = 'Time',Estimate = 'ATT',
 p.fect.balance
 ```
 
+## `did_wrapper()`
 
-## Sensitivity Analysis {#sec-panel-sens}
+While the preceding sections have meticulously detailed the individual implementation of various HTE-robust DID estimators, the **fect** package also provides a convenient function, `did_wrapper`, that can significantly streamline this process for several common methods.
 
-@rambachan2023more propose a partial identification approach that relaxes the PT assumption in the post-treatment period by allowing violations that do not exceed the magnitude of those observed in the pre-treatment period. This framework enables sensitivity analysis of estimates from **fect** or similar methods by comparing pre-treatment deviations from PT to potential post-treatment deviations.
+Here's the corrected and formatted version of your bullet points in Markdown:
 
-The key intuition is that if an event study demonstrates strong post-treatment effects yet only minor PT deviations before treatment, any post-treatment departure large enough to reverse these findings must be substantially larger than those observed in the pre-treatment period. Consequently, this approach quantifies how sensitive the estimated dynamic treatment effects are to possible PT violations, using pretrend estimates as the benchmark.
+The `did_wrapper` function can execute methods such as:
 
-Below, we revisit the @HH2019 data and illustrate how to apply this sensitivity analysis with **fect**. We focus on two restrictions from @rambachan2023more: the relative magnitude (RM) restriction and the smoothness restriction, both of which connect pre-treatment PT violations to potential post-treatment counterfactual deviations.
+-   **Two-Way Fixed Effects (TWFE)**: by setting `method = "twfe"`.
+    This replicates the dynamic TWFE event study estimation.
 
-### Implement with Placebo Tests
+-   **Stacked DID**: by setting `method = "st"`.
+    This implements the stacked difference-in-differences approach by @CDLZ.
 
-To implement this method with the imputation estimator, we use the dynamic treatment effects from pre-treatment *placebo tests* to gauge PT violations and determine whether post-treatment effects remain significant under similar violations. This requires symmetric estimation of dynamic treatment effects in both pre- and post-treatment periods. As [@roth2024interpreting] notes, some estimators (e.g., CSDID without `base_period = "universal"`) may not produce symmetrical estimates.
+-   **Interaction Weighted (IW) DID**: by setting `method = "iw"`.
+    This corresponds to the @sun2021-event estimator.
 
-Below, we designate placebo periods using **fect**. These placebo periods are excluded during model fitting, and counterfactuals are imputed for both placebo and post-treatment intervals to compute dynamic treatment effects, ensuring consistent estimation across all periods.
+-   **Callaway and Sant’Anna (CSDID)**:
 
-By setting `placeboTest = TRUE` and `placebo.period = c(-2, 0)`, we define three pre-treatment periods as placebo periods. Their dynamic treatment effects serve as the benchmark for PT violations in the post-treatment phase. In the code chunk below, we fit **fect** with these placebo settings, then extract both placebo and post-treatment dynamic treatment effects and the associated variance-covariance matrix.
+    -   Using never-treated controls: `method = "cs_never"`.
+    -   Using not-yet-treated controls: `method = "cs_notyet"`.
 
-```{r, hh_honest_placebo, warning=FALSE, message=FALSE, cache=TRUE}
-out.fect.placebo <- fect(nat_rate_ord~indirect, data = hh2019, 
-                         index = c("bfs","year"),
-                         method = 'fe', se = TRUE, 
-                         placeboTest = TRUE, placebo.period = c(-2,0))
+-   **DIDmultiplegtDYN ("didm")**: by setting `method = "didm"`.
+    This calls the estimator by @CDH2020.
 
-T.post <- 10 # 3 placebo periods, 10 post treatment periods
-index.use <- which(rownames(out.fect.placebo$est.att) %in% 
-                     as.character(c(-2:T.post)))
-beta.hat.p<- out.fect.placebo$est.att[index.use,1]
-vcov.hat.p <- out.fect.placebo$att.vcov[index.use,index.use]
-count <- out.fect.placebo$count[which(rownames(out.fect.placebo$est.att) %in% 
-                                        as.character(c(1:T.post)))]
+You could use `did_wrapper` to implement Stacked DID as follows:
+
+```{r wrapper, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
+res_st <- did_wrapper(
+  data   = data,
+  Y      = "nat_rate_ord",
+  D      = "indirect",
+  index  = c("bfs", "year"),
+  method = "st",
+  se     = "default"
+)
+print(res_st)
 ```
 
-### RM Restriction
+It also supports a bootstrap variance estimator via the `se` argument: `se = "default"` uses the standard errors from the underlying estimator, while `se = "boot"` applies bootstrapping.
 
-We first explore the Relative Magnitude (RM) restriction in the **HonestDiD** package. Let $\delta$ represent potential PT violations for placebo and post-treatment periods. Unlike a standard event study that assumes $\delta_t=0$ for $t>0$, RM allows PT deviations as long as they do not exceed $\bar{M}$ times the maximum deviation between consecutive placebo periods.
-
-Because **HonestDiD** is designed for event study estimators with a single reference period $\delta_0=0$ at $t=0$, this structure is not directly compatible with **fect**, which does not enforce a single reference period. We thus modify **HonestDiD** slightly to allow $\delta_0\neq 0$. The modified RM restriction becomes
-
-
-$$
-\Delta^{RM}(\bar{M}) = \left\{\delta : \forall t \geq 0,\; 
-\bigl|\delta_{t+1} - \delta_t\bigr| \leq \bar{M}\cdot\max\bigl(
-|\delta_{-1} - \delta_{-2}|,\,|\delta_0 - \delta_{-1}|
-\bigr)\right\}.
-$$
-
-
-Here, $max(|\delta_{-1}-\delta_{-2}|,|\delta_0-\delta_{-1}|)$ matches the largest consecutive discrepancy among the placebo periods. When $\bar{M}=0$, the PT violation observed at $t=0$ persists without change into the post-treatment window. Allowing $\bar{M}>0$ permits $\delta_t$ to vary across post-treatment periods, but the incremental changes must remain within $\bar{M}$ times the largest consecutive deviation among placebo periods.
-
-We implement these adaptations in a forked version of **HonestDiD**, called **HonestDiDFEct**:
-
-```{r, hh_honest_folk_install, warning=FALSE, message=FALSE, cache=TRUE,eval = FALSE}
-devtools::install_github("lzy318/HonestDiDFEct")
+```{r wrapper_boot, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
+res_st <- did_wrapper(
+  data   = data,
+  Y      = "nat_rate_ord",
+  D      = "indirect",
+  index  = c("bfs", "year"),
+  method = "st",
+  se     = "boot"
+)
+print(res_st)
 ```
 
-The code below illustrates how `createSensitivityResults_relativeMagnitudes` from **HonestDiDFEct** produces robust confidence intervals for the ATT using the RM restriction.
+Finally, `esplot` can be used to visualize the results.
+The `did_wrapper` function returns a list of objects, including the estimated coefficients and standard errors, which can be used to create event study plots.
 
-**Robust Confidence Set for the ATT**
-
-We begin by constructing a robust confidence set for the ATT, accounting for the extra uncertainty introduced by potential PT violations. The vector `betahat` comprises the DTE estimates for both placebo and post-treatment periods, and `sigma` is their corresponding variance-covariance matrix. We specify `numPrePeriods` and `numPostPeriods` for the number of pre- and post-treatment periods, and `l_vec` gives the weights applied to each post-treatment period for the ATT. In particular, we use `count/sum(count)`.
-
-We vary $\bar{M}$ from 0 to 1 using `Mbarvec = seq(0, 1, by=0.1)`. Increasing $\bar{M}$ allows proportionally larger PT violations in the post-treatment window. When $\bar{M}=0$, the resulting confidence set behaves as a "de-biased" interval that corrects post-treatment estimates based on the observed PT violation at $t=0$.
-
-```{r,hh_honest.placebo.honest, fig.width = 6, fig.height = 4.5, cache=TRUE}
-honest.result.p <- HonestDiDFEct::createSensitivityResults_relativeMagnitudes(betahat = beta.hat.p, 
-   sigma = vcov.hat.p,
-   numPrePeriods = 3,
-   
-   numPostPeriods = T.post,
-   l_vec = count/sum(count),
-   Mbarvec = seq(0,1,by=0.1)) 
-
-originalResults.p <- HonestDiDFEct::constructOriginalCS(betahat = beta.hat.p,
-                                       sigma = vcov.hat.p,
-                                       
-                                       numPrePeriods = 3,
-                                       numPostPeriods = T.post,
-                                       l_vec = count/sum(count))
-
-HonestDiDFEct::createSensitivityPlot_relativeMagnitudes(honest.result.p, originalResults.p)
+```{r wrapper_plot, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
+p_st <- esplot(data = res_st, main = "Stacked DID", xlim = c(-12,10))
+print(p_st)
 ```
-
-If the robust confidence set excludes zero at $\bar{M}=0.4$ but includes zero at $\bar{M}=0.5$, we infer that post-treatment PT violations must be at least half of the maximum observed placebo violation to overturn the estimated effect.
-
-**Period-by-Period Robust Confidence Set**
-
-By altering `l_vec`, one can generate period-specific robust confidence intervals. In the next code snippet, we set $\bar{M}=0$ and $\bar{M}=0.5$ to compute separate confidence intervals for each post-treatment period. In the final figure, the intervals for $\bar{M}=0$ (green) treat the observed violation at $t=0$ as persisting into all post-treatment periods, whereas the intervals for $\bar{M}=0.5$ (pink) allow added PT violations up to half of the largest placebo discrepancy.
-
-```{r,hh_honest.placebo.honest.gap, fig.width=7, fig.height=5, cache=TRUE}
-dte_base <- rep(0,T.post)
-dte_output <- cbind.data.frame(lb = c(), 
-                               ub = c(), 
-                               method = c(), 
-                               Delta = c(), 
-                               Mbar = c(),
-                               post = c())
-
-for(t.post in c(1:T.post)){
-  dte_l <- dte_base
-  dte_l[t.post] <- 1
-  honest.dte <- HonestDiDFEct::createSensitivityResults_relativeMagnitudes(betahat = beta.hat.p,
-     sigma = vcov.hat.p,
-     numPrePeriods = 3,
-     
-     numPostPeriods = T.post,
-     l_vec = dte_l,
-     Mbarvec = c(0,0.5))
-  
-  honest.dte <- as.data.frame(honest.dte)
-  honest.dte$post <- t.post
-  dte_output <- rbind(dte_output,honest.dte)
-}
-```
-
-```{r,hh_honest.placebo.honest.gap.plot, fig.width=7, fig.height=5}
-# event study plot
-fect.output.p <- as.data.frame(out.fect.placebo$est.att)
-fect.output.p$Time <- as.numeric(rownames(fect.output.p))
-p.placebo.honest <- esplot(fect.output.p,Period = 'Time',Estimate = 'ATT',
-                   SE = 'S.E.',CI.lower = "CI.lower", 
-                   main = "ATTs with Robust Confidence Sets (RM)",
-                   ylab = "Coefficients and 95% CI",
-                   CI.upper = "CI.upper", 
-                   xlim = c(-12,10), ylim = c(-6,8), 
-                   Count = 'count', show.count = T)
-dte_output <- as.data.frame(dte_output)
-
-# add confidence sets
-p.placebo.honest <- p.placebo.honest +
-  geom_linerange(aes(x=post+0.2,ymin=lb,ymax=ub),
-                 data = dte_output[which(dte_output$Mbar==0.5),],
-                 color = 'maroon1',linewidth = 1)
-
-# estimates assuming no PT violation
-p.placebo.honest <- p.placebo.honest +
-  geom_linerange(aes(x=post+0.2,ymin=lb,ymax=ub),
-                 data = dte_output[which(dte_output$Mbar==0),],
-                 color = '#228B22',linewidth = 1)
-
-# placebo estimates
-p.placebo.honest <- p.placebo.honest + 
-  geom_linerange(aes(x=Time,ymin=CI.lower,ymax=CI.upper),
-                 data = fect.output.p[which(fect.output.p$Time%in%c(-2:0)),],
-                 color = 'blue',linewidth = 1)
-p.placebo.honest
-```
-
-### Smoothness Restriction
-
-A second approach to bounding PT violations is the **smoothness restriction**, which prevents the post-treatment violation from diverging too sharply from a linear extrapolation of the pre-trend. This restriction is particularly relevant if we suspect a gradually varying or near-linear trend in the potential violation.
-
-Formally, one assumes $\delta\in\Delta^{SD}(M)$ where
-
-$$
-\Delta^{SD}(M) := \bigl\{\delta : 
-\bigl| (\delta_{t+1}-\delta_t) - (\delta_t -\delta_{t-1}) \bigr| \leqslant M,\ \forall t\bigr\}.
-$$
-
-
-The parameter $M\geq 0$ controls how quickly the slope of $\delta$ can vary. Note that $M=0$ restricts $\delta$ to be strictly linear, which does not imply $\delta=0$.
-
-Below, we demonstrate how to use `createSensitivityResults` from **HonestDiDFEct**, setting `Mvec` to explore different smoothness levels:
-
-```{r,hh_honest.placebo.honest.sd,   fig.width = 7, fig.height = 5,  cache=TRUE}
-honest.result.p <- HonestDiDFEct::createSensitivityResults(betahat = beta.hat.p,
-    sigma = vcov.hat.p,
-    numPrePeriods = 3,
-    numPostPeriods = T.post,
-    method = 'C-LF',
-    l_vec = count/sum(count),
-    Mvec = seq(0,0.25,0.05)) 
-
-originalResults.p <- HonestDiDFEct::constructOriginalCS(betahat = beta.hat.p,
-                                       sigma = vcov.hat.p,
-                                       numPrePeriods = 3,
-                                       numPostPeriods = T.post,
-                                       l_vec = count/sum(count))
-
-HonestDiD::createSensitivityPlot(honest.result.p, originalResults.p)
-```
-
-Here, the post-treatment effect is indistinguishable from zero even when $M=0$, suggesting that the estimated average treatment effect may not be robust to a strictly linear violation of PT observed in the placebo periods, let alone to variations in the slope of this linear trend.
-
-**Period-by-Period Robust Confidence Set**
-
-Finally, we replicate the previous approach to construct period-specific robust confidence sets under smoothness. In the code below, the black intervals represent original estimates under no PT violation, the orange intervals assume a strictly linear PT violation $M=0$, and the light blue intervals allow a slope deviation of 0.1:
-
-```{r,hh_honest.placebo.honest.gap.sd, fig.height=5, fig.width=7,  cache=TRUE,warning=FALSE}
-dte_base <- rep(0,T.post)
-dte_output <- cbind.data.frame(lb = c(), 
-                               ub = c(), 
-                               method = c(), 
-                               Delta = c(), 
-                               Mbar = c(),
-                               post = c())
-
-for(t.post in c(1:T.post)){
-  dte_l <- dte_base
-  dte_l[t.post] <- 1
-  honest.dte <- HonestDiDFEct::createSensitivityResults(betahat = beta.hat.p,
-                                                            sigma = vcov.hat.p,method = 'C-LF',
-                                                            numPrePeriods = 3,
-                                                            numPostPeriods = T.post,
-                                                            l_vec = dte_l,
-                                                            Mvec = c(0,0.1))
-  
-  honest.dte <- as.data.frame(honest.dte)
-  honest.dte$post <- t.post
-  dte_output <- rbind(dte_output,honest.dte)
-}
-```
-
-```{r,hh_honest.placebo.honest.gap.sd.plot, fig.height=5, fig.width=7}
-# prepare for plotting
-fect.output.p <- as.data.frame(out.fect.placebo$est.att)
-fect.output.p$Time <- as.numeric(rownames(fect.output.p))
-p.placebo.honest <- esplot(fect.output.p,Period = 'Time',Estimate = 'ATT',
-                   SE = 'S.E.',CI.lower = "CI.lower", 
-                   main = "ATTs with Robust Confidence Sets (Smoothness)",
-                   ylab = "Coefficients and 95% CI",
-                   CI.upper = "CI.upper",xlim = c(-12,10),
-                   ylim = c(-12,15),Count = 'count',show.count = T)
-dte_output <- as.data.frame(dte_output)
-
-# estimates assuming potential PT violation w/ a linear trend + partial deviation
-p.placebo.honest <- p.placebo.honest +
-  geom_linerange(aes(x=post+0.2,ymin=lb,ymax=ub),
-                 data = dte_output[which(dte_output$M==0.1),],
-                 color = 'skyblue',linewidth = 1)
-
-# estimates assuming a strictly linear PT violation
-p.placebo.honest <- p.placebo.honest + 
-  geom_linerange(aes(x=post+0.2,ymin=lb,ymax=ub), 
-                 data = dte_output[which(dte_output$M==0),],
-                 color = 'orange',linewidth = 1)
-
-# estimates assuming no PT violation 
-p.placebo.honest <- p.placebo.honest + 
-  geom_linerange(aes(x=Time,ymin=CI.lower,ymax=CI.upper), 
-                 data = fect.output.p[which(fect.output.p$Time>0),],
-                 color = 'black',linewidth = 1)
-
-# placebo estimates
-p.placebo.honest <- p.placebo.honest +
-  geom_linerange(aes(x=Time,ymin=CI.lower,ymax=CI.upper),
-                 data = fect.output.p[which(fect.output.p$Time%in%c(-2:0)),],
-                 color = 'blue',linewidth = 1) + xlim(-12.5,10.5)
-p.placebo.honest
-```
-
 
 ## How to Cite
 
-Please cite the authors of the original papers for their innovations. If you find this tutorial helpful, you can cite @CLLX2025.
-
-
+Please cite the authors of the original papers for their innovations.
+If you find this tutorial helpful, you can cite @CLLX2025.

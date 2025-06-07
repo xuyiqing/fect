@@ -21,8 +21,10 @@
 # produced vignettes
 vignettes/*.html
 vignettes/*.pdf
-vignettes/tutorial_cache
-vignettes/tutorial_files
+vignettes/*_cache/
+vignettes/*_files/
+vignettes/_book
+!vignettes/_book/rscript
 
 
 # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
@@ -42,3 +44,4 @@ docs
 man/.DS_Store
 .DS_Store
 .DS_Store
+.RData

@@ -1,6 +1,6 @@
 # Fect Main Program {#sec-fect}
 
-In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022  \[[Paper](https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723)\]. Download the R code used in this chapter [here](rscript/02-fect.R).
+In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022--[Paper](https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723). Download the R code used in this chapter [here](rscript/02-fect.R).
 
 ## Simulated data
 
@@ -233,8 +233,6 @@ The placebo test conducts two types of tests:
 
 By default, the plot will display the p-value of the $t$-test (`stats = "placebo.p"`). Users can also add the p-value of a corresponding TOST test by setting `stats = c("placebo.p","equiv.p")`. A larger placebo p-value from a t-test and a smaller placebo TOST p-value are preferred.
 
-Users can turn off the dotted plot in placebo periods by setting `vis = "none"`.
-
 ```{r placebo_1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.fect.p, cex.text = 0.8, stats = c("placebo.p","equiv.p"), 
      main = "Estimated ATT (TWFE)")
@@ -246,7 +244,7 @@ plot(out.ife.p, ylab = "Effect of D on Y", main = "Estimated ATT (IFE)",
 ```
 
 ```{r placebo_3, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.mc.p, vis = "none", cex.text = 0.8, stats = c("placebo.p","equiv.p"),
+plot(out.mc.p, cex.text = 0.8, stats = c("placebo.p","equiv.p"),
      main = "Estimated ATT (MC)")
 ```
 
@@ -422,24 +420,16 @@ We provide a few other options for estimation and visualization.
 
 The `plot` function shipped in **fect** offers some options that help to improve the visualization.
 
-We can remove the bar plot at the bottom of the plot by setting `count = FALSE`
+We can remove the bar plot at the bottom of the plot by setting `show.count = FALSE`
 
 ```{r bar_0, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5}
-plot(out.ife, count = FALSE)
+plot(out.ife, show.count = FALSE)
 ```
 
-By setting the option `show.points = TRUE`, we visualize the estimated period-wise ATTs as well as their uncertainty estimates in point-wise vertical intervals. The shorter interval at each point corresponds to the 90% confidence interval of ATT while the longer interval corresponds to the 95% confidence interval.
+By setting the option `type = "counterfactual"`, we visualize the period-wise average treated and counterfactual outcomes with shaded confidence intervals.
 
 ```{r point_1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.ife, show.points = TRUE)
-```
-
-```{r point_2, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.ife.p, show.points = TRUE)
-```
-
-```{r point_3, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.ife.c, type = "exit", show.points = TRUE, stats.pos = c(2.3,4))
+plot(out.ife, type = "counterfactual")
 ```
 
 By setting the option `type = "status"`, we can visualize the treatment status of all observations. We only present the label of the time by setting `axis.lab = "time"`.
@@ -454,7 +444,7 @@ For the placebo test, the manually hided observations are marked in cyan. We can
 plot(out.fect.p, type = 'status', axis.lab = "both", id = c(101:120), cex.axis  = 0.6)
 ```
 
-For the carryover test, the manually hidden observations are marked in light red. We can also move grid lines by setting `gridOff = TRUE`.
+For the carryover test, the manually hidden observations are marked in light red. We can also remove grid lines by setting `gridOff = TRUE`.
 
 ```{r status_c, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.fect.c, type = 'status', axis.lab = "off", gridOff = TRUE)
@@ -509,6 +499,56 @@ Then one can draw the gap plot, as well as the equivalence plot, for each sub-gr
 ```{r cohort_plot1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.ife.g, show.group = "Cohort:22", 
           xlim = c(-15, 10), ylim = c(-10, 10))
+```
+
+## Cumulative Effects
+
+Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. - Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
+
+```{r}
+out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+                        se = TRUE, nboots = 200, vartype = 'bootstrap',
+                        parallel = FALSE, keep.sims=TRUE)
+effect(out)
+```
+
+Users can choose to calculate by-period average effects by setting `cumu=FALSE`.
+
+```{r}
+effect(out, cumu=FALSE)
+```
+
+Calculate the cumulative effect of certain units at certain periods.
+
+```{r}
+effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
+```
+
+`effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
+
+```{r}
+out2 <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
+                        se = TRUE, nboots = 200, vartype = 'bootstrap',
+                        parallel = FALSE, keep.sims=TRUE)
+effect(out2)
+```
+
+We can also use jackknife instead of bootstrap for inference:
+
+```{r}
+out2 <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
+                        se = TRUE, nboots = 200, vartype = 'jackknife',
+                        parallel = FALSE, keep.sims=TRUE)
+effect(out2)
+```
+
+We can plot the cumulative effects using the `plot` function as usual.
+
+```{r, echo=FALSE}
+plot(effect(out2))
 ```
 
 ------------------------------------------------------------------------
