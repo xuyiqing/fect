@@ -62,16 +62,19 @@ plot.fect <- function(
     weight = NULL,
     lcolor = NULL,
     lwidth = NULL,
+    ltype = NULL,
     line.color = NULL,
     line.width = NULL,
     count = NULL,
-    theme = NULL,
+    preset = NULL,
     connected = NULL,
     ci.outline = FALSE,
     color =  NULL,
-    est.lwidth = .8,
-    est.pointsize = 3,
+    est.lwidth = NULL,
+    est.pointsize = NULL,
     count.color =  NULL,
+    count.alpha = NULL,
+    count.outline.color = NULL,
     placebo.color =  NULL,
     carryover.color =  NULL,
     carryover.rm.color = NULL,
@@ -103,47 +106,61 @@ plot.fect <- function(
     warning("'vis' is deprecated and will be removed in future versions.", call. = FALSE)
   }
   if (!missing(line.width)) {
-    warning("'line.width' is deprecated and will be removed in future versions. Please use lwidth instead.", call. = FALSE)
+    warning("'line.width' is deprecated. For gap/equiv/exit plots, use 'est.lwidth' for estimate lines/points. For factor/counterfactual plots, hline/vline widths are now typically controlled by 'lwidth'.", call. = FALSE)
   }
   if (!missing(line.color)) {
-    warning("'line.color' is deprecated and will be removed in future versions. Please use color or lcolor instead.", call. = FALSE)
+    warning("'line.color' is deprecated. For gap/equiv/exit plots, use 'color' for estimate lines/points. For factor/counterfactual plots, hline/vline colors are now typically controlled by 'lcolor'.", call. = FALSE)
   }
   if (!missing(count)) {
-    warning("'count' is deprecated and will be removed in future versions. Please use show.count instead.", call. = FALSE)
+    warning("'count' is deprecated. Use 'show.count'.", call. = FALSE)
+    if (is.logical(count) && missing(show.count)) show.count <- count
   }
-  if (is.null(theme)) {
+  if (is.null(preset)) {
     if (is.null(connected))              connected              <- FALSE
+    if (is.null(ltype))                  ltype                  <- c("solid", "solid")
+    if (is.null(gridOff))                gridOff                <- FALSE
     if (is.null(color))                  color                  <- "black"
-    if (is.null(count.color))            count.color            <- "gray80"
+    if (is.null(count.color))            count.color            <- "grey70"
+    if (is.null(count.alpha))            count.alpha            <- 0.4
+    if (is.null(count.outline.color))    count.outline.color    <- "grey69"
     if (is.null(placebo.color))          placebo.color          <- "blue"
     if (is.null(carryover.color))        carryover.color        <- "red"
     if (is.null(carryover.rm.color))     carryover.rm.color     <- "blue"
     if (is.null(sens.original.color))    sens.original.color    <- "darkblue"
     if (is.null(sens.colors))            sens.colors            <- c("#218C23","#FF34B4","#FF521B","#2B59C3")
+
     if (is.null(counterfactual.color))   counterfactual.color   <- "steelblue"
-    if (is.null(counterfactual.raw.controls.color)) counterfactual.raw.controls.color <- "#D5E1ED"
+    if (is.null(counterfactual.raw.controls.color)) counterfactual.raw.controls.color <- "#4682B420"
     if (is.null(counterfactual.raw.treated.color))  counterfactual.raw.treated.color  <- "#77777750"
-    if (is.null(counterfactual.linetype)) counterfactual.linetype <- "dashed"
+    if (is.null(counterfactual.linetype)) counterfactual.linetype <- "longdash"
+
     if (is.null(box.control))            box.control            <- "skyblue"
     if (is.null(box.treat))              box.treat              <- "pink"
+
     if (is.null(calendar.color))         calendar.color         <- "skyblue"
-    if (is.null(calendar.lcolor))    calendar.lcolor    <- "red"
+    if (is.null(calendar.lcolor))        calendar.lcolor        <- "red"
+
     if (is.null(equiv.color))            equiv.color            <- "red"
+
     if (is.null(status.treat.color))     status.treat.color     <- "#06266F"
     if (is.null(status.control.color))   status.control.color   <- "#B0C4DE"
-    if (is.null(status.missing.color))   status.missing.color   <- "#eeeeee"
+    if (is.null(status.missing.color))   status.missing.color   <- "#FFFFFF"
     if (is.null(status.removed.color))   status.removed.color   <- "#A9A9A9"
     if (is.null(status.placebo.color))   status.placebo.color   <- "#66C2A5"
     if (is.null(status.carryover.color)) status.carryover.color <- "#E78AC3"
     if (is.null(status.carryover.rm.color)) status.carryover.rm.color <- "#ffc425"
     if (is.null(status.balanced.post.color)) status.balanced.post.color <- "#00852B"
     if (is.null(status.balanced.pre.color))  status.balanced.pre.color  <- "#A5CA18"
-    if (is.null(status.background.color)) status.background.color <- "#FFFFFF"
+    if (is.null(status.background.color)) status.background.color <- "gray90"
   }
-  else if (theme == "vibrant") {
+  else if (preset == "vibrant") {
     if (is.null(connected))              connected              <- TRUE
     if (is.null(color))                  color                  <- "#054A91"
     if (is.null(count.color))            count.color            <- "#E6AF2E"
+    if (is.null(count.alpha))            count.alpha            <- 1
+    if (is.null(count.outline.color))    count.outline.color    <- "#E6AF2E"
+    if (is.null(lwidth))                 lwidth                 <- c(0.8, 1)
+    if (is.null(ltype))                  ltype                  <- c("solid", "dashed")
     if (is.null(placebo.color))          placebo.color          <- "#386641"
     if (is.null(carryover.color))        carryover.color        <- "#A40E4C"
     if (is.null(carryover.rm.color))     carryover.rm.color     <- "#FF5400"
@@ -170,10 +187,14 @@ plot.fect <- function(
     if (is.null(status.background.color))    status.background.color    <- "#FFFFFF"
 
     }
-  else if (theme %in% c("grayscale","greyscale")) {
+  else if (preset %in% c("grayscale","greyscale")) {
     if (is.null(connected))              connected              <- FALSE
     if (is.null(color))                  color                  <- "black"
     if (is.null(count.color))            count.color            <- "gray80"
+    if (is.null(count.alpha))            count.alpha            <- 0.5
+    if (is.null(count.outline.color))    count.outline.color    <- "black"
+    if (is.null(lwidth))                 lwidth                 <- c(1, 1)
+    if (is.null(ltype))                  ltype                  <- c("solid", "dashed")
     if (is.null(placebo.color))          placebo.color          <- "gray40"
     if (is.null(carryover.color))        carryover.color        <- "gray70"
     if (is.null(carryover.rm.color))     carryover.rm.color     <- "gray40"
@@ -199,7 +220,26 @@ plot.fect <- function(
     if (is.null(status.balanced.pre.color))  status.balanced.pre.color  <- "#eeeeee"
     if (is.null(status.background.color))    status.background.color    <- "#FFFFFF"
 
+  }
+  if (is.null(est.lwidth) || is.null(est.pointsize)) {
+    default_est_lwidth <- .8
+    default_est_pointsize <- 3
+
+    if (!connected) {
+      default_est_lwidth <- 0.6
+      default_est_pointsize <- 2
+    } else {
+      if (show.points) {
+        default_est_lwidth <- 0.7
+        default_est_pointsize <- 1.2
+      } else {
+        default_est_lwidth <- 1.2
+        default_est_pointsize <- 3
+      }
     }
+    if(is.null(est.lwidth)) est.lwidth <- default_est_lwidth
+    if(is.null(est.pointsize)) est.pointsize <- default_est_pointsize
+  }
 
 
   # come needed variables
@@ -235,9 +275,9 @@ plot.fect <- function(
   }
 
   if (is.null(lwidth) == TRUE) {
-    lwidth <- 1.5
+    lwidth <- 2
     if (theme.bw == TRUE) {
-      lwidth <- 1
+      lwidth <- 1.5
     }
   }
   if (length(as.vector(lwidth)) == 1) {
@@ -261,7 +301,7 @@ plot.fect <- function(
   if (is.null(lcolor) == TRUE) {
     lcolor <- "white"
     if (theme.bw == TRUE) {
-      lcolor <- "#aaaaaa"
+      lcolor <- "#AAAAAA70"
     }
   }
   if (length(as.vector(lcolor)) == 1) {
@@ -527,7 +567,7 @@ plot.fect <- function(
           p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
         }
         p <- p + xlab(xlab) + ylab(ylab) + ggtitle(main) +
-          geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1]) +
+          geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1],  linetype = ltype[1]) +
           theme(
             legend.position = legend.pos,
             axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
@@ -1465,7 +1505,7 @@ plot.fect <- function(
         plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
       )
       if (!is.na(vline_pos_abs)) {
-        p <- p + geom_vline(xintercept = vline_pos_abs, colour = lcolor[2], linewidth = lwidth[2], linetype = "dashed")
+        p <- p + geom_vline(xintercept = vline_pos_abs, colour = lcolor[2], linewidth = lwidth[2], linetype = ltype[2])
         if (shade.post == TRUE) { p <- p + annotate("rect", xmin = vline_pos_abs, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "grey80", alpha = .3) }
       }
       p <- p + scale_colour_manual(name = NULL, limits = set.limits, values = set.colors, labels = set.labels, na.value = NA, drop = FALSE) +
@@ -1498,7 +1538,7 @@ plot.fect <- function(
             time_step_for_bars_abs <- if(length(unique(counts_for_plot_df_abs$time)) > 1) min(diff(sort(unique(counts_for_plot_df_abs$time))),na.rm=TRUE) else 1; if(!is.finite(time_step_for_bars_abs) || time_step_for_bars_abs <=0) time_step_for_bars_abs <- 1
             bar_width_half_abs <- time_step_for_bars_abs * 0.20; counts_for_plot_df_abs$xmin <- counts_for_plot_df_abs$time - bar_width_half_abs; counts_for_plot_df_abs$xmax <- counts_for_plot_df_abs$time + bar_width_half_abs
             max_count_time_pos_abs <- counts_for_plot_df_abs$time[which.max(counts_for_plot_df_abs$count)[1]]; text_y_pos_abs <- rect_min_val_abs + actual_rect_length_abs + (count_bar_space_height_abs - actual_rect_length_abs) * 0.5
-            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5,alpha = 0.7)
+            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, color = count.outline.color, inherit.aes = FALSE) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5,alpha = count.alpha)
           }
         }
       }
@@ -1772,7 +1812,7 @@ plot.fect <- function(
 
       # --- Plot finalization common to Case 2 (Staggered) ---
       p <- p + xlab(xlab_final) + ylab(ylab_final) +
-        geom_vline(xintercept = vline_pos_for_plot_axis, colour = lcolor[2], linewidth = lwidth[2], linetype = "dashed") +
+        geom_vline(xintercept = vline_pos_for_plot_axis, colour = lcolor[2], linewidth = lwidth[2],  linetype = ltype[2]) +
         theme(legend.position = legend.pos,
               axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
               axis.text = element_text(size = cex.axis),
@@ -1855,7 +1895,7 @@ plot.fect <- function(
             max_count_time_pos <- counts_for_plot_df$time[which.max(counts_for_plot_df$count)[1]]
             text_y_pos <- rect_min_val + actual_rect_length + (count_bar_space_height - actual_rect_length) * 0.5
 
-            p <- p + geom_rect(data = counts_for_plot_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE, alpha = 0.7) +
+            p <- p + geom_rect(data = counts_for_plot_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE, alpha = count.alpha, color= count.outline.color) +
               annotate("text", x = max_count_time_pos, y = text_y_pos, label = max_count_val, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5)
           }
         }
@@ -2459,7 +2499,7 @@ plot.fect <- function(
     # Reconstruct the p.label string if it's used elsewhere (e.g., for a single annotation object)
     p.label <- if (length(p.label.lines) > 0) paste(p.label.lines, collapse = "\n") else NULL
 
-    if (type == "equiv") {
+    if (type == "equiv" && is.null(ylim)) {
       ylim = c(-max(abs(data2$bound))*1.4,max(abs(data2$bound))*1.4)
     }
     ## point estimates
@@ -2491,12 +2531,14 @@ plot.fect <- function(
         CI.lower     = "CI.lower",
         CI.upper     = "CI.upper",
         Count        = "count",
-        show.count   = show.count,      # user's choice
+        show.count   = show.count,
         show.points = show.points,
         ci.outline = ci.outline,
-        connected    = connected,  # line+CI or point-range
+        connected    = connected,
         color        = color,
         count.color  = count.color,
+        count.alpha = count.alpha,
+        count.outline.color = count.outline.color,
         xlab         = xlab,
         ylab         = ylab,
         main         = main,
@@ -2514,6 +2556,7 @@ plot.fect <- function(
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
+        ltype = ltype,
         axis.adjust = axis.adjust,
         stats        = if(exists("stats_values")) stats_values else NULL,
         stats.labs   = if(exists("stats_labels")) stats_labels else NULL,
@@ -2555,6 +2598,8 @@ plot.fect <- function(
         connected    = connected,
         color        = color,
         count.color  = count.color,
+        count.alpha = count.alpha,
+        count.outline.color = count.outline.color,
         show.points = show.points,
         ci.outline = ci.outline,
         highlight.periods = placebo_seq,
@@ -2570,6 +2615,7 @@ plot.fect <- function(
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
+        ltype = ltype,
         cex.main = cex.main/16,
         cex.axis = cex.axis/15,
         cex.lab = cex.lab/15,
@@ -2627,6 +2673,8 @@ plot.fect <- function(
         connected    = connected,
         color        = color,
         count.color  = count.color,
+        count.alpha = count.alpha,
+        count.outline.color = count.outline.color,
         highlight.periods = c(placebo_seq,carry_seq),
         highlight.colors  = c(rep(carryover.rm.color, n_placebo),rep(carryover.color, n_carry)),
         xlab         = xlab,
@@ -2638,6 +2686,7 @@ plot.fect <- function(
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
+        ltype = ltype,
         cex.main = cex.main/16,
         cex.axis = cex.axis/15,
         cex.lab = cex.lab/15,
@@ -2758,7 +2807,7 @@ plot.fect <- function(
     }
 
     # horizontal 0 line
-    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1])
+    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
 
     TTT <- as.numeric(rownames(data.1))
     TTT.2 <- as.numeric(rownames(data.2))
@@ -2793,7 +2842,7 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- mean(TTT[which.max(d1[, "count"])])
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = 0.7)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color)
       p <- p + annotate("text",
                         x = max.count.pos - 0.02 * T.gap,
                         y = max(data.toplot$ymax) + 0.2 * rect.length,
@@ -2888,7 +2937,7 @@ plot.fect <- function(
     }
 
     # horizontal 0 line
-    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1])
+    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1],  linetype = ltype[1])
 
     complete.index.eff <- which(!is.na(x$eff))
     complete.index.time <- which(!is.na(x$T.on))
@@ -2985,7 +3034,7 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- data.count[which.max(data.count[, 2]), 1][1] - min(data.count[, 1]) + 1
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3 , alpha = 0.7)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3 , alpha = count.alpha, color = count.outline.color)
       p <- p + annotate("text",
                         x = max.count.pos - 0.02 * T.gap,
                         y = max(data.toplot$ymax) + 0.1 * rect.length,
@@ -3267,7 +3316,7 @@ plot.fect <- function(
       if (gridOff == TRUE) {
         p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
       }
-      p <- p+  geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1]) +
+      p <- p+  geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
         geom_errorbar(
           aes(ymin = lb, ymax = ub, color = color_group),
           width = 0.02,  # Width of error bar caps
@@ -3328,7 +3377,7 @@ plot.fect <- function(
     if (gridOff == TRUE) {
       p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
     }
-    p <- p + geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1]) +
+    p <- p + geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1],  linetype = ltype[1]) +
       geom_errorbar(
         aes(ymin = lb, ymax = ub, color = color_group),
         width = 0.02,  # Width of error bar caps
@@ -3388,6 +3437,8 @@ plot.fect <- function(
         connected    = connected,
         color        = color,
         count.color  = count.color,
+        count.alpha = count.alpha,
+        count.outline.color = count.outline.color,
         highlight.periods = x$placebo.period[1]:x$placebo.period[2],
         highlight.colors = rep(placebo.color,x$placebo.period[2]-x$placebo.period[1]+1),
         xlab         = xlab,
@@ -3396,6 +3447,7 @@ plot.fect <- function(
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
+        ltype = ltype,
         cex.main = cex.main/16,
         cex.axis = cex.axis/15,
         cex.lab = cex.lab/15,
@@ -3465,6 +3517,8 @@ plot.fect <- function(
         connected    = connected,
         color        = color,
         count.color  = count.color,
+        count.alpha = count.alpha,
+        count.outline.color = count.outline.color,
         highlight.periods = x$placebo.period[1]:x$placebo.period[2],
         highlight.colors = rep(placebo.color,x$placebo.period[2]-x$placebo.period[1]+1),
         xlab         = xlab,
@@ -3476,6 +3530,7 @@ plot.fect <- function(
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
+        ltype = ltype,
         cex.main = cex.main/16,
         cex.axis = cex.axis/15,
         cex.lab = cex.lab/15,
@@ -3523,6 +3578,7 @@ plot.fect <- function(
       fill.gap = FALSE,
       lcolor = lcolor,
       lwidth = lwidth,
+      ltype = ltype,
       cex.main = cex.main/16,
       cex.axis = cex.axis/15,
       cex.lab = cex.lab/15,
@@ -3533,8 +3589,12 @@ plot.fect <- function(
       Count     = "count",
       show.count = FALSE,
       proportion = proportion,
+      est.pointsize = est.pointsize,
+      est.lwidth = est.lwidth,
       color = color,
       count.color = count.color,
+      count.alpha = count.alpha,
+      count.outline.color = count.outline.color,
       theme.bw = theme.bw,
       connected = connected,
       only.post = TRUE,

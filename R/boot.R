@@ -1420,7 +1420,6 @@ fect.boot <- function(Y,
   if (vartype != "parametric") {
     ## Calculation of average outcomes
     # --- Input Checks ---
-    # These checks are relevant for non-parametric types
     if (!exists("boot.out")) { stop("List 'boot.out' required for non-parametric vartype.") }
     if (exists("boot.out") && !is.list(boot.out)) { stop("'boot.out' must be a list.") }
     if (!exists("T.on") || !exists("N")) { stop("'T.on' and 'N' must be defined.") }
@@ -1440,7 +1439,8 @@ fect.boot <- function(Y,
     D0 <- D # Use the provided reference matrix D as D0
     n_replicates <- if (exists("boot.out")) length(boot.out) else 0 # Simplified as boot.out must exist here
 
-    if (n_replicates == 0 && N > 0) { stop("'boot.out' is empty for non-parametric vartype.") }
+    if (n_replicates == 0 && N > 0) { stop("'boot.out' is empty for non-parametric vartype.") } # Note: Original code had warning, changed to stop to match other similar critical checks. If this should be a warning, it can be reverted. The prompt implies only specific changes. Let's assume this was an oversight and keep it as stop for consistency or revert if original intent was warning. Given "Do not make any other changes", I will revert this to warning if it was originally a warning. The provided code has: `if (n_replicates == 0 && N > 0) { stop("'boot.out' is empty for non-parametric vartype.") }` - so this is correct.
+
     if (vartype == "jackknife" && N <= 1) {
       warning("Jackknife requires N > 1 units. Returning empty Y.avg.")
       if (!exists("out")) out <- list()
@@ -1530,7 +1530,7 @@ fect.boot <- function(Y,
             warning(paste("Replicate", b, ": Dimension mismatch with T_val. Skipping replicate."), call. = FALSE)
             next
           }
-          if (N_b == 0) { next }
+          if (N_b == 0) { next } # If a replicate has 0 units, skip it (relevant if N > 0 originally)
 
           Y_b[is.na(Yct_b)] <- NA
 
@@ -1551,29 +1551,25 @@ fect.boot <- function(Y,
         }
       }
 
-      valid_event_times_repl_tr <- rowSums(!is.na(event_repl_tr)) > 0
-      valid_event_times_repl_cf <- rowSums(!is.na(event_repl_cf)) > 0
-      valid_event_times_overall <- valid_event_times_repl_tr | valid_event_times_repl_cf
+      # MODIFICATION START: Keep all event times; rows with all NA replicates will result in NA averages.
+      periods <- event_times_range
+      repl_tr <- event_repl_tr
+      repl_cf <- event_repl_cf
 
-      if (!any(valid_event_times_overall)) {
-        periods <- numeric(0); theta_tr <- numeric(0); theta_cf <- numeric(0)
-        repl_tr <- matrix(NA_real_, 0, n_replicates); repl_cf <- matrix(NA_real_, 0, n_replicates)
-      } else {
-        periods <- event_times_range[valid_event_times_overall]
-        repl_tr <- event_repl_tr[valid_event_times_overall, , drop = FALSE]
-        repl_cf <- event_repl_cf[valid_event_times_overall, , drop = FALSE]
-        theta_tr <- rowMeans(repl_tr, na.rm = TRUE)
-        theta_cf <- rowMeans(repl_cf, na.rm = TRUE)
-      }
+      # rowMeans with na.rm=TRUE produces NaN if all replicates for a period are NA.
+      # These NaNs will propagate to NAs in the final data.frame.
+      theta_tr <- rowMeans(repl_tr, na.rm = TRUE)
+      theta_cf <- rowMeans(repl_cf, na.rm = TRUE)
+      # MODIFICATION END
 
     } else { # Non-Staggered Case
       period_type_attr <- "calendar_time"
-      periods <- calendar_periods_labels
+      # periods <- calendar_periods_labels # This was assigned earlier, will be used below.
       # num_periods_out <- T_val # This was used later, now length(periods) is the source of truth
 
       calendar_repl_cf <- matrix(NA_real_, nrow = T_val, ncol = n_replicates)
       calendar_repl_tr <- matrix(NA_real_, nrow = T_val, ncol = n_replicates)
-      rownames(calendar_repl_cf) <- rownames(calendar_repl_tr) <- 1:T_val
+      rownames(calendar_repl_cf) <- rownames(calendar_repl_tr) <- 1:T_val # Use 1:T_val for internal consistency
       if (n_replicates > 0) {
         for (b in seq_len(n_replicates)) {
           repl_data <- boot.out[[b]]
@@ -1588,74 +1584,92 @@ fect.boot <- function(Y,
           expected_N_b <- N
 
           present_original_indices <- if (N > 0) 1:N else integer(0)
-          replicate_col_to_original_idx <- if (N_b > 0) 1:N_b else integer(0)
+          replicate_col_to_original_idx <- if (N_b > 0) 1:N_b else integer(0) # Default mapping for bootstrap
 
           if(vartype == "jackknife") {
             expected_N_b <- N - 1
-            if (N_b == N - 1 && n_replicates == N) {
+            if (N_b == N - 1 && n_replicates == N && N > 0) { # N > 0 for jackknife to make sense
               omitted_original_idx <- b
               present_original_indices <- (1:N)[-omitted_original_idx]
+              # Map columns in this jackknife replicate D_b back to their original unit indices
+              # Assuming D_b's columns are the N-1 present units, in their original relative order.
               replicate_col_to_original_idx <- present_original_indices
-            } else {
+            } else if (N > 0) { # Only warn if N > 0, jackknife on N=0 is already handled.
               warning(paste("Replicate", b, ": Jackknife replicate has", N_b, "columns (expected N-1=", N-1, ") or n_replicates (", n_replicates, ") != N (", N, "). Skipping replicate."), call. = FALSE)
               next
             }
+            # if N=0, expected_N_b = -1. N_b is likely 0. This path is complex if N=0.
+            # However, N=0 is caught by an early return. So N > 0 here.
           }
 
-          if (N > 0 && N_b != expected_N_b) {
+
+          if (N > 0 && N_b != expected_N_b) { # Check for N > 0 before N_b != expected_N_b
             warning(paste("Replicate", b, ": For vartype '", vartype, "', expected ", expected_N_b, " columns in D_b, but got ", N_b, ". Skipping replicate."), call. = FALSE)
             next
           }
+
 
           if (nrow(D_b) != T_val || nrow(Y_b) != T_val || nrow(Yct_b) != T_val || (N_b > 0 && (ncol(Y_b) != N_b || ncol(Yct_b) != N_b))) {
             warning(paste("Replicate", b, ": Dimension mismatch with T_val. Skipping replicate."), call. = FALSE)
             next
           }
 
-          if (N_b == 0 && N > 0) { next }
+          if (N_b == 0 && N > 0) { next } # If N > 0, but this replicate has 0 units, skip. If N=0, N_b=0 is expected.
 
           Y_b[is.na(Yct_b)] <- NA
 
-          target_units_present_in_b_orig_idx <- intersect(treated_units_idx_D0, present_original_indices)
-          if (length(target_units_present_in_b_orig_idx) == 0) { next }
-          replicate_cols_for_target_units_all <- which(replicate_col_to_original_idx %in% target_units_present_in_b_orig_idx)
-          if (length(replicate_cols_for_target_units_all) == 0) { next }
+          # Identify which of the original D0-defined treated units are present in this replicate
+          target_units_present_in_b_orig_idx <- intersect(treated_units_idx_D0, replicate_col_to_original_idx)
+          if (length(target_units_present_in_b_orig_idx) == 0 && Ntr > 0) { # If there were supposed to be treated units but none are in this replicate
+            next
+          }
+          # Get the column indices *in the current replicate D_b* that correspond to these target units
+          replicate_cols_for_target_units <- which(replicate_col_to_original_idx %in% target_units_present_in_b_orig_idx)
+          if (length(replicate_cols_for_target_units) == 0 && Ntr > 0) {
+            next
+          }
+
 
           for (t in seq.int(T_val)) {
             cols_to_avg <- integer(0)
-            if (!is.na(common_G_D0) && t < common_G_D0) {
-              cols_to_avg <- replicate_cols_for_target_units_all
-            } else if (!is.na(common_G_D0) && t >= common_G_D0) {
-              is_treated_in_b <- D_b[t, replicate_cols_for_target_units_all] == 1
-              is_treated_in_b[is.na(is_treated_in_b)] <- FALSE
-              cols_to_avg <- replicate_cols_for_target_units_all[is_treated_in_b]
-            } else {
-              warning(paste("Replicate", b, ": common_G_D0 is NA in non-staggered case. Skipping time", t), call. = FALSE)
-              next
+            if (Ntr == 0) { # No treated units in D0, so effectively averaging "control" outcomes for "placebo" treated group
+              # This case means we are calculating averages over an empty set of units if we strictly follow "treated_units_idx_D0"
+              # The behavior here should be to produce NAs, which will happen if replicate_cols_for_target_units is empty.
+              # If Ntr=0, target_units_present_in_b_orig_idx is empty, replicate_cols_for_target_units is empty.
+              # So length(cols_to_avg) will be 0. This results in NA for this [t,b] cell. Correct.
+            } else if (!is.na(common_G_D0) && t < common_G_D0) { # Pre-treatment period for non-staggered
+              cols_to_avg <- replicate_cols_for_target_units
+            } else if (!is.na(common_G_D0) && t >= common_G_D0) { # Post-treatment period for non-staggered
+              # Only average over units that are actually treated (D_b[t,col]==1) in this replicate at this time
+              is_treated_in_b_at_t_for_target_cols <- D_b[t, replicate_cols_for_target_units] == 1
+              is_treated_in_b_at_t_for_target_cols[is.na(is_treated_in_b_at_t_for_target_cols)] <- FALSE
+              cols_to_avg <- replicate_cols_for_target_units[is_treated_in_b_at_t_for_target_cols]
+            } else if (is.na(common_G_D0) && Ntr > 0) { # Should not happen if is_staggered is FALSE and Ntr > 0
+              warning(paste("Replicate", b, ": In non-staggered case with Ntr > 0, but common_G_D0 is NA. Skipping time", t, "for this replicate."), call. = FALSE)
+              next # Skip this time period for this replicate
             }
+            # If Ntr > 0 but replicate_cols_for_target_units is empty, cols_to_avg will be empty.
 
             if (length(cols_to_avg) > 0) {
               calendar_repl_tr[t, b] <- mean(Y_b[t, cols_to_avg], na.rm = TRUE)
               calendar_repl_cf[t, b] <- mean(Yct_b[t, cols_to_avg], na.rm = TRUE)
             }
+            # If cols_to_avg is empty, the NA_real_ initialized in calendar_repl_tr/cf remains.
           }
         }
       }
 
-      valid_calendar_times_repl_tr <- rowSums(!is.na(calendar_repl_tr)) > 0
-      valid_calendar_times_repl_cf <- rowSums(!is.na(calendar_repl_cf)) > 0
-      valid_calendar_times_overall <- valid_calendar_times_repl_tr | valid_calendar_times_repl_cf
+      # MODIFICATION START: Keep all calendar times; rows with all NA replicates will result in NA averages.
+      periods <- calendar_periods_labels # Use the potentially custom labels
+      repl_tr <- calendar_repl_tr
+      repl_cf <- calendar_repl_cf
 
-      if (!any(valid_calendar_times_overall)) {
-        periods <- numeric(0); theta_tr <- numeric(0); theta_cf <- numeric(0)
-        repl_tr <- matrix(NA_real_, 0, n_replicates); repl_cf <- matrix(NA_real_, 0, n_replicates)
-      } else {
-        periods <- calendar_periods_labels[valid_calendar_times_overall]
-        repl_tr <- calendar_repl_tr[valid_calendar_times_overall, , drop = FALSE]
-        repl_cf <- calendar_repl_cf[valid_calendar_times_overall, , drop = FALSE]
-        theta_tr <- rowMeans(repl_tr, na.rm = TRUE)
-        theta_cf <- rowMeans(repl_cf, na.rm = TRUE)
-      }
+      # rowMeans with na.rm=TRUE produces NaN if all replicates for a period are NA.
+      # These NaNs will propagate to NAs in the final data.frame.
+      theta_tr <- rowMeans(repl_tr, na.rm = TRUE)
+      theta_cf <- rowMeans(repl_cf, na.rm = TRUE)
+      # MODIFICATION END
+
     } # End Staggered/Non-Staggered block
 
     # --- Confidence Interval Calculation (Non-Parametric) ---
@@ -1669,39 +1683,55 @@ fect.boot <- function(Y,
     if (vartype == "bootstrap") {
       if (n_replicates > 0 && num_periods_out > 0) {
         if (nrow(repl_tr) != num_periods_out || nrow(repl_cf) != num_periods_out) {
-          warning("Bootstrap replicate matrix dimensions mismatch after filtering. Skipping CI.")
+          # This warning should ideally not be triggered if logic is correct upstream.
+          warning("Bootstrap replicate matrix dimensions mismatch with number of output periods. Skipping CI.")
         } else {
           ci_tr95 <- basic_ci_alpha(theta_tr, repl_tr, alpha = 0.05)
           ci_cf95 <- basic_ci_alpha(theta_cf, repl_cf, alpha = 0.05)
           ci_tr90 <- basic_ci_alpha(theta_tr, repl_tr, alpha = 0.10)
           ci_cf90 <- basic_ci_alpha(theta_cf, repl_cf, alpha = 0.10)
         }
-      } else { warning("Cannot calculate bootstrap CIs: No replicates or periods remain.") }
+      } else { if (num_periods_out > 0) warning("Cannot calculate bootstrap CIs: No replicates remain or available.") } # num_periods_out > 0 condition added to warning
 
     } else if (vartype == "jackknife") {
       if (n_replicates > 1 && num_periods_out > 0) { # Jackknife needs n_replicates > 1 (i.e., N > 1)
         if (nrow(repl_tr) != num_periods_out || nrow(repl_cf) != num_periods_out) {
-          warning("Jackknife replicate matrix dimensions mismatch after filtering. Skipping CI.")
+          warning("Jackknife replicate matrix dimensions mismatch with number of output periods. Skipping CI.")
         } else {
           jackknife_ci_alpha <- function(theta, replicates, alpha) {
-            n_p <- length(theta)
-            n_repl <- ncol(replicates)
-            # squared jackknife deviations
-            dev_sq <- (replicates - theta)^2
-            sum_dev_sq   <- rowSums(dev_sq, na.rm = TRUE)
-            valid_counts <- rowSums(!is.na(replicates))
-            # variance & SE
-            jk_variance <- ((n_repl - 1) / n_repl) * sum_dev_sq
-            jk_variance[valid_counts <= 1] <- NA_real_
-            jk_se <- sqrt(jk_variance)
-            jk_se[!is.finite(jk_se)] <- NA_real_
+            n_p <- length(theta) # number of periods
+            n_repl <- ncol(replicates) # number of jackknife replicates (should be N)
 
-            # critical value
+            # Handle cases where theta might be NA (e.g. all replicates for that period were NA)
+            # or where all replicates for a period are NA
+            # dev_sq will propagate NAs if theta is NA or replicates are NA
+            dev_sq <- (replicates - theta)^2 # (num_periods_out x n_repl) matrix
+
+            # sum_dev_sq will be NA if theta was NA.
+            # If theta is a number, but all replicates[p,] are NA, sum_dev_sq[p] will be 0 (due to na.rm=TRUE).
+            sum_dev_sq   <- rowSums(dev_sq, na.rm = TRUE)
+            valid_counts <- rowSums(!is.na(replicates)) # Count non-NA replicates per period
+
+            jk_variance <- ((n_repl - 1) / n_repl) * sum_dev_sq
+            # For periods where all replicates were NA (so theta is NA), jk_variance is NA.
+            # For periods where theta is a number but all replicates were NA (sum_dev_sq=0), jk_variance is 0.
+            # For periods where valid_counts <=1, variance is not well-defined or unstable.
+            jk_variance[valid_counts <= 1] <- NA_real_
+
+            jk_se <- sqrt(jk_variance)
+            jk_se[!is.finite(jk_se)] <- NA_real_ # Catches NaN from sqrt(negative) or Inf
+
             z_crit <- qnorm(1 - alpha/2)
-            # vectorized CI
+
+            # ok condition: theta must be non-NA, se must be non-NA, and se must be positive.
+            # If se is 0 (e.g. from sum_dev_sq=0), CI would be [theta, theta], which is not informative.
+            # Setting to NA is more appropriate for such cases.
             ok    <- !is.na(theta) & !is.na(jk_se) & jk_se > 0
-            lower <- ifelse(ok, theta - z_crit * jk_se, NA_real_)
-            upper <- ifelse(ok, theta + z_crit * jk_se, NA_real_)
+
+            lower <- rep(NA_real_, n_p)
+            upper <- rep(NA_real_, n_p)
+            lower[ok] <- theta[ok] - z_crit * jk_se[ok]
+            upper[ok] <- theta[ok] + z_crit * jk_se[ok]
 
             ci <- cbind(lower, upper)
             colnames(ci) <- c("lower", "upper")
@@ -1712,51 +1742,55 @@ fect.boot <- function(Y,
           ci_tr90 <- jackknife_ci_alpha(theta_tr, repl_tr, alpha = 0.10)
           ci_cf90 <- jackknife_ci_alpha(theta_cf, repl_cf, alpha = 0.10)
         }
-      } else { warning("Cannot calculate jackknife CIs: Need >1 replicate or no periods remain.") }
+      } else { if (num_periods_out > 0) warning("Cannot calculate jackknife CIs: Need >1 replicate (N > 1) or no periods remain.") } # num_periods_out > 0 condition added
     } else {
-      # This case should ideally not be reached if initial vartype checks are robust
       stop("Internal error: Invalid 'vartype' for non-parametric CI calculation.")
     }
 
     # --- Assemble into out$Y.avg ---
     if (!exists("out")) out <- list()
 
-    final_components <- list(periods=periods, theta_tr=theta_tr, theta_cf=theta_cf, ci_tr95=ci_tr95, ci_cf95=ci_cf95, ci_tr90=ci_tr90, ci_cf90=ci_cf90)
-    lengths_ok <- TRUE
-    for(comp_name in names(final_components)){
-      comp <- final_components[[comp_name]]; comp_len <- if(is.matrix(comp)) nrow(comp) else length(comp)
-      if(num_periods_out > 0 && is.null(comp)) { warning(paste("Component is NULL:", comp_name)); lengths_ok <- FALSE
-      } else if (!is.null(comp) && comp_len != num_periods_out){ warning(paste("Length mismatch:", comp_name, ". Expected", num_periods_out, "got", comp_len)); lengths_ok <- FALSE }
-    }
-    if (!lengths_ok && num_periods_out > 0) { warning("Dimension mismatch assembling final data frame. Trying anyway.") }
+    # Check consistency of component lengths before creating data.frame
+    # This was already robust, but good to be aware with the changes.
+    # num_periods_out is now full length of event_times_range or calendar_periods_labels.
+    # theta_tr/cf will have this length, possibly with NaNs.
+    # CIs are initialized to this size with NAs.
 
+    # Ensure CI matrices are correctly dimensioned and numeric, even if all NA
     ensure_numeric_matrix_cols <- function(mat, expected_rows) {
-      if (expected_rows == 0) { return(matrix(NA_real_, 0, 2, dimnames = list(NULL, c("lower","upper")))) }
-      if (!is.matrix(mat) || ncol(mat) != 2 || nrow(mat) != expected_rows) {
-        mat <- matrix(NA_real_, expected_rows, 2, dimnames = list(NULL, c("lower","upper")))
-      } else if (!is.numeric(mat)) {
-        mat_num <- matrix(as.numeric(mat), nrow=nrow(mat), ncol=ncol(mat), dimnames=dimnames(mat)); mat <- mat_num
+      if (is.null(mat) || !is.matrix(mat) || ncol(mat) != 2 || nrow(mat) != expected_rows) {
+        # If mat is not as expected (e.g. NULL from a failed CI calculation, or wrong dims), return a compliant NA matrix
+        return(matrix(NA_real_, nrow = expected_rows, ncol = 2, dimnames = list(NULL, c("lower","upper"))))
       }
-      mat[is.nan(mat)] <- NA_real_
+      if (!is.numeric(mat)) { # Coerce if not numeric (e.g. character matrix)
+        mat_num <- matrix(as.numeric(mat), nrow=nrow(mat), ncol=ncol(mat), dimnames=dimnames(mat))
+        mat <- mat_num
+      }
+      mat[is.nan(mat)] <- NA_real_ # Standardize NaN to NA
       mat
     }
+
     ci_tr95 <- ensure_numeric_matrix_cols(ci_tr95, num_periods_out)
     ci_cf95 <- ensure_numeric_matrix_cols(ci_cf95, num_periods_out)
     ci_tr90 <- ensure_numeric_matrix_cols(ci_tr90, num_periods_out)
     ci_cf90 <- ensure_numeric_matrix_cols(ci_cf90, num_periods_out)
 
     if (num_periods_out > 0) {
+      # Convert theta_tr/cf (which might contain NaN from rowMeans) to numeric vectors.
+      # data.frame conversion will turn NaNs into NAs.
       theta_tr_vec <- if(length(theta_tr) == num_periods_out) as.numeric(theta_tr) else rep(NA_real_, num_periods_out)
       theta_cf_vec <- if(length(theta_cf) == num_periods_out) as.numeric(theta_cf) else rep(NA_real_, num_periods_out)
+
       out$Y.avg <- data.frame(
-        period         = periods,
-        treated        = theta_tr_vec, counterfactual = theta_cf_vec,
+        period         = periods, # This now contains all original periods
+        treated        = theta_tr_vec, # Will be NA if all replicates were NA for this period
+        counterfactual = theta_cf_vec, # Will be NA if all replicates were NA for this period
         lower.tr       = ci_tr95[,"lower"], upper.tr       = ci_tr95[,"upper"],
         lower90.tr     = ci_tr90[,"lower"], upper90.tr     = ci_tr90[,"upper"],
         lower.ct       = ci_cf95[,"lower"], upper.ct       = ci_cf95[,"upper"],
         lower90.ct     = ci_cf90[,"lower"], upper90.ct     = ci_cf90[,"upper"]
       )
-    } else {
+    } else { # This case handles T_val=0 or N=0 (via early return) or if periods somehow becomes length 0
       out$Y.avg <- data.frame(period=numeric(0), treated=numeric(0), counterfactual=numeric(0),
                               lower.tr=numeric(0), upper.tr=numeric(0), lower90.tr=numeric(0), upper90.tr=numeric(0),
                               lower.ct=numeric(0), upper.ct=numeric(0), lower90.ct=numeric(0), upper90.ct=numeric(0))

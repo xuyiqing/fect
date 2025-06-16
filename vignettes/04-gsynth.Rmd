@@ -197,7 +197,7 @@ plot(out, type = "loadings")
 plot(out, type = "factors", xlab = "Time")
 ```
 
-To visualize the estimated counterfactual outcomes, we use `type = "counterfactual"`. If no argument is assigned to `raw`, the plot will display the average of the *treated* and of the *estimated counterfactual* outcomes.
+To visualize the estimated counterfactual outcomes, we use `type = "counterfactual"`. If no argument is assigned to `raw`, the plot will display the average of the *treated* and of the *estimated counterfactual* outcomes. When `method = "gsynth"` and `vartype = "parametric"`, the CIs around the counterfactual outcomes will be the same as for the event-study ATT.
 
 ```{r cache = FALSE, fig.height=5, fig.width=7}
 plot(out, type = "counterfactual")

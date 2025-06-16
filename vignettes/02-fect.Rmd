@@ -505,7 +505,7 @@ plot(out.ife.g, show.group = "Cohort:22",
 
 Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. - Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
 
-```{r}
+```{r effect, cache = TRUE}
 out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
                         method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'bootstrap',
@@ -527,28 +527,22 @@ effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
 
 `effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
 
-```{r}
-out2 <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+```{r effect-mc, cache = TRUE}
+out_mc <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'bootstrap',
                         parallel = FALSE, keep.sims=TRUE)
-effect(out2)
+effect(out_mc)
 ```
 
 We can also use jackknife instead of bootstrap for inference:
 
-```{r}
-out2 <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+```{r effect-jackknife, cache = TRUE}
+out_jack <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'jackknife',
                         parallel = FALSE, keep.sims=TRUE)
-effect(out2)
-```
-
-We can plot the cumulative effects using the `plot` function as usual.
-
-```{r, echo=FALSE}
-plot(effect(out2))
+effect(out_jack)
 ```
 
 ------------------------------------------------------------------------

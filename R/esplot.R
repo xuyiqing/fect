@@ -7,8 +7,8 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    Count = NULL,
 
                    proportion = 0.3,
-                   est.lwidth = 1.2,  # line thickness
-                   est.pointsize = 3,    # point size if show.points=TRUE
+                   est.lwidth = NULL,  # line thickness
+                   est.pointsize = NULL,    # point size if show.points=TRUE
                    show.points = FALSE,  # for connected=TRUE, show points only at integer times
                    fill.gap = TRUE,      # fill missing times with 0
                    start0 = FALSE,       # if TRUE => vertical dashed line at x=-0.5
@@ -22,6 +22,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    highlight.colors  = NULL,    # color for each highlight time
                    lcolor = NULL,
                    lwidth = NULL,
+                   ltype = c("solid", "solid"),
                    connected = FALSE,    # if TRUE => line + ribbon
                    ci.outline = FALSE,
                    main      = NULL,
@@ -29,7 +30,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    ylim      = NULL,
                    xlab      = NULL,
                    ylab      = NULL,
-                   gridOff   = TRUE,
+                   gridOff   = FALSE,
                    stats.pos = NULL,
                    theme.bw  = TRUE,
                    cex.main  = NULL,
@@ -38,15 +39,35 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    cex.text  = NULL,
                    axis.adjust = FALSE,
                    color       = "#000000",
-                   count.color = "gray80"
+                   count.color = "gray70",
+                   count.alpha = 0.4,
+                   count.outline.color = "grey69"
 )
 {
+  if (is.null(est.lwidth) || is.null(est.pointsize)) {
+    default_est_lwidth <- .8
+    default_est_pointsize <- 3
+
+    if (!connected) {
+      default_est_lwidth <- 0.6
+      default_est_pointsize <- 2
+    } else {
+      if (show.points) {
+        default_est_lwidth <- 0.7
+        default_est_pointsize <- 1.2
+      } else {
+        default_est_lwidth <- 1.2
+        default_est_pointsize <- 3
+      }
+    }
+    if(is.null(est.lwidth)) est.lwidth <- default_est_lwidth
+    if(is.null(est.pointsize)) est.pointsize <- default_est_pointsize
+  }
+
   all_integer_like <- function(x) {
     x_chr <- if (is.factor(x)) as.character(x) else x
     all(grepl("^[-+]?[0-9]+$", x_chr))
   }
-  # Helper to format X-axis ticks as integers
-  scaleFUN <- function(x) sprintf("%.f", x)
   # If input is a did_wrapper object, extract the event-study data
   if (inherits(data, "did_wrapper")) {
     data <- data$est.att
@@ -333,7 +354,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
 
   if (is.null(lcolor)) {
     if (theme.bw) {
-      lcolor <- "#aaaaaa"
+      lcolor <- "#AAAAAA70"
     } else {
       lcolor <- "white" # This might be invisible on a white background if not theme_bw
     }
@@ -346,9 +367,9 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   }
   if (is.null(lwidth)) {
     if (theme.bw) {
-      lwidth <- 1
-    } else {
       lwidth <- 1.5
+    } else {
+      lwidth <- 2
     }
   }
   if (length(as.vector(lwidth)) == 1) {
@@ -582,7 +603,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   }
 
 
-  p <- ggplot(data = plot_data, aes_string(x = Period, y = Estimate))
+  p <- ggplot(data = plot_data)
 
 
   if (theme.bw) {
@@ -595,7 +616,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     )
   }
 
-  p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1])
+  p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
 
   vline_pos <- if (start0) -0.5 else 0.5
   show_vline <- TRUE
@@ -622,7 +643,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   if (show_vline) {
     p <- p + geom_vline(
       xintercept = vline_pos, colour = lcolor[2],
-      linewidth = lwidth[2], linetype = "dashed"
+      linewidth = lwidth[2], linetype = ltype[2]
     )
   }
 
@@ -754,7 +775,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
         rect_data[,"ymax"] <- rect.min_yval + (rect_data[[Count]] / max_rect_count) * rect_bar_max_h
         p <- p + geom_rect(
           data = rect_data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-          fill = count.color, linewidth = 0.2, inherit.aes = FALSE, alpha = 0.7)
+          fill = count.color, linewidth = 0.2, inherit.aes = FALSE, alpha = count.alpha, color = count.outline.color)
 
         max_count_val <- max_rect_count
         idx_max_count <- which(rect_data[[Count]] == max_count_val)
@@ -860,22 +881,6 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   } else if (main != "") {
     p <- p + ggtitle(main)
   }
-
-  all_period_vals_are_int_like <- if (nrow(plot_data) > 0 && Period %in% names(plot_data)) {
-    idx_finite_period_plot_data <- is.finite(plot_data[[Period]])
-    if (any(idx_finite_period_plot_data)) {
-      all(abs(as.numeric(plot_data[[Period]][idx_finite_period_plot_data]) - round(as.numeric(plot_data[[Period]][idx_finite_period_plot_data]))) < 1e-8, na.rm = TRUE)
-    } else {
-      FALSE
-    }
-  } else {
-    FALSE
-  }
-
-  if (all_period_vals_are_int_like) {
-    p <- p + scale_x_continuous(labels = scaleFUN)
-  }
-
 
   return(p)
 }

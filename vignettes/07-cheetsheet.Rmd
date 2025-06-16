@@ -30,7 +30,9 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 | **gap** | ATT by pre- and post-treatment periods. | fe, ife, mc, gsynth, polynomial, cfe |
 | **loadings** | Estimated factor loadings (factor-based methods). | ife, gsynth |
 | **status** | Treatment status by period for all units. | fe, ife, mc, gsynth, polynomial, cfe |
-
+| **sens** | Rambachan & Roth (2023) sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, polynomial, cfe |
+| **sens_es** | Event-study sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, polynomial, cfe |
+| **cumul** | Cumulative treatment effects over time. | `effect()` function applied to fe, ife, mc, gsynth, polynomial, cfe |
 ## Tests as Options
 
 *Inputs for* `fect(...)`

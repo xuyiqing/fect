@@ -19,12 +19,12 @@ In this chapter, we explore various visualization options avialable in the **fec
 -   **Theme and Text:**
     -   `theme.bw`: If `TRUE`, applies a black-and-white theme.
 
-    -   `theme`: If `NULL`, will be the default color theme, which is mostly black and white with a bit of color. Other options include `"vibrant"` and `"grayscale"`.\
+    -   `preset`: If `NULL`, will be the default color preset, which is mostly black and white with a bit of color. Other options include `"vibrant"` and `"grayscale"`.\
 
     -   `cex.main`, `cex.axis`, `cex.lab`, `cex.text`: Adjust text sizes for the title, tick labels, axis labels, and annotations.
 -   **Lines and Bounds:**
     -   `color` / `est.lwidth`: Define the color and width of main lines.\
-    -   `lcolor` / `lwidth`: Set the color and width for the axes. Takes a vector, where the first value is applied the horizontal axis and the second is applied the vertical axis. If only one value is given, both axes will take on the same value.
+    -   `lcolor` / `lwidth` / `ltype`: Set the color, width, and linetype for the axes. Takes a vector, where the first value is applied the horizontal axis and the second is applied the vertical axis. If only one value is given, both axes will take on the same value.
 
 While these customization options are demonstrated using the default `gap` plot, they can be applied universally, with only a few exceptions.
 
@@ -77,7 +77,7 @@ plot(out, start0 = TRUE,  # Shift time so treatment begins at 0
 
 ### Axis and Legend
 
-Below, we customize the x- and y-axis ranges, labels, tick breaks, and legend. The x-axis labels are rotated for clarity. Moreover, by setting `xlim = c(-10, 1)`, the x-axis is restricted to time periods -8 to 1, with the treatment shifted to begin at period 0 instead of period 1. We also add grid lines by setting `gridOff = FALSE`.
+Below, we customize the x- and y-axis ranges, labels, tick breaks, and legend. The x-axis labels are rotated for clarity. Moreover, by setting `xlim = c(-10, 1)`, the x-axis is restricted to time periods -8 to 1, with the treatment shifted to begin at period 0 instead of period 1. We also remove grid lines by setting `gridOff = TRUE`.
 
 ```{r axis-legend-customization}
 plot(out, 
@@ -87,7 +87,7 @@ plot(out,
      ylab = "Estimated ATT", # y-axis label
      xangle = 90, # rotate x-axis labels by 90°
      xbreaks = seq(-10, 1, by = 2), 
-     gridOff = FALSE,
+     gridOff = TRUE,
      # Label x-axis from -12 to 1 with a break of 2
      main = "Axis and Legend Customization")
 ```
@@ -101,11 +101,11 @@ plot(out, plot.ci = "0.9",
      main = "90% confidence intervals")
 ```
 
-### Text and Theme
+### Text and ggplot2 Theme
 
-This plot adjusts text sizes with a series of `cex` options, turns off the `theme.bw` option, and adds the `vibrant` color theme.
+This plot adjusts text sizes with a series of `cex` options and turns off the `theme.bw` option.
 
-```{r text-theme-customization}
+```{r text-customization}
 plot(out, 
      ylim = c(-0.15, 0.3), # set yrange
      theme.bw = FALSE,      # Change the color theme
@@ -114,8 +114,36 @@ plot(out,
      cex.lab = 1.2,       # Axis label size
      cex.legend = 1,    # Legend text size
      cex.text = 1.2,        # Annotation text size
-     theme = "vibrant", # Vibrant theme
      main = "Text and Theme Customization")
+```
+### Presets
+
+For convenience, we can use the `preset` argument to apply preset colors. The default is `"default"`, which is mostly black and white with a bit of color. Other options include `"vibrant"` and `"grayscale"`, which can be used to create more colorful or monochromatic plots, respectively.
+
+```{r preset}
+plot(out, 
+     preset = "vibrant", # Use vibrant colors
+     main = "Vibrant Preset Colors")
+```
+
+### Connected Estimates
+
+By default, the estimates are plotted as points. To connect the points with lines, set `connected = TRUE`. The width of the line and size of the points can be adjusted with `est.lwidth` and `est.pointsize`, respectively.
+
+```{r connected-estimates}
+plot(out, 
+     connected = TRUE, # Connect the points with lines
+     est.lwidth = 1.5, # Makes the lines thicker
+     est.pointsize = 3 # Makes the points larger
+)
+```
+
+Moreover, in any plot that uses a shaded band to represent the CIs, we can set `ci.outline` to `TRUE` to draw an outline around the shaded band to improve visibility. 
+
+```{r ci-outline}
+plot(out, 
+     connected = TRUE, 
+     ci.outline = TRUE) # Outline the confidence interval band
 ```
 
 ### Line and Point Customization
@@ -124,11 +152,92 @@ Here, we demonstrate how to change main and the horizontal reference lines, as w
 
 ```{r line-bound-customization}
 plot(out, 
-     est.lwidth = 1.5, # Makes the confidence intervals thicker (when connected = TRUE it changes thickness of the line between points)
+     est.lwidth = 1.5, # Makes the confidence intervals thicker
      est.pointsize = 3, # Makes the points larger
      lcolor = c("red","skyblue"),      # Color for horizontal and vertical lines
      lwidth = 2,                # Widths of the horizontal and vertical lines
      main = "Line Customization")
+```
+
+### Count Histogram Customization
+
+The count histogram on the bottom of the graph shows the number of observed units in each period. To customize its color, outline color, and opacity, we can use the `count.color`, `count.outline.color`, and `count.alpha` options, respectively.
+
+```{r count-histogram-customization}
+plot(out, 
+     count.color = "lightblue", # Color of the histogram bars
+     count.outline.color = "darkblue", # Outline color of the histogram bars
+     count.alpha = 0.2, # Opacity of the histogram bars
+     main = "Count Histogram Customization")
+```
+
+## Counterfactual Plot
+
+While the gap plot shows the *difference* (ATT) over time, researchers often want to see the **levels**: the observed outcome for the treated unit(s) and the model‑predicted counterfactual path side‑by‑side. To do this, set `type = "counterfactual"`:
+
+```{r counterfactual}
+plot(out, type = "counterfactual",
+     main = "Observed vs. Counterfactual Trajectory",
+     ylab = "Outcome",
+     legend.pos = "bottom")
+```
+
+We can also visualize the paths of the individual units by setting `raw = "all"`
+
+```{r counterfactual_rawall}
+plot(out, type = "counterfactual", raw = "all")
+```
+
+Setting `raw = "band` displays the the 5-95 interpercentile range of the treated and control units. When adoption is staggered, only the band around the treated units is shown.
+
+```{r counterfactual_rawband}
+plot(out, type = "counterfactual", raw = "band")
+```
+
+Many adjustments can be made to the counterfactual plot with the same options as in the gap plot, as well as the `counterfactual.color`, `counterfactual.raw.controls.color`, `counterfactual.raw.treated.color`, and `counterfactual.linetype` options.
+
+```{r counterfactual_colors}
+plot(out, type = "counterfactual",
+     color = "red", # Color for the main line
+     counterfactual.color = "purple", # Color for the counterfactual line
+     counterfactual.raw.treated.color = "orange", # Color for the treated units
+     counterfactual.linetype = "dotted", # Line type for the counterfactual line
+     raw = "all", 
+     main = "Counterfactual Plot with Custom Colors")
+```
+
+## Cumulative Effects
+
+We can also plot cumulative effects by plotting the output of the `effect()` function. Note that this is only well-defined when there are no treatment reversals, that is, all treated units remain treated for the duration of the study. Additionally, we must set `keep.sims=TRUE` to keep the unit-level bootstrap results.
+
+Since the `gs2020` datset has treatment reversals, we will first subset the units that remained treated throughout the study period. We do this by checking for any instances where the treatment variable changes from 1 to 0 within a unit.
+
+```{r}
+# flag units that ever have a 1 to 0 change in d
+rev_flag <- tapply(gs2020[[d]],
+                   gs2020[[unit]],
+                   function(x) any(diff(x) < 0))
+
+# units with no reversals
+good_units <- names(rev_flag)[!rev_flag]
+
+# subset the desired rows
+gs2020_no_reversals <- gs2020[gs2020[[unit]] %in% good_units, ]
+
+```
+
+Next we will estimate the function again on these units only.
+
+```{r no-reversals-est, cache = TRUE}
+out <- fect(Y = y, D = d, X = controls, index = c(unit, time), 
+               data = gs2020_no_reversals, method = "fe", force = "two-way", 
+               se = TRUE, parallel = TRUE, nboots = 100, keep.sims = TRUE)
+```
+
+Finally, we will plot the cumulative effects.
+
+```{r cumulative-effects}
+plot(effect(out))
 ```
 
 ## Pretrend Tests
@@ -211,6 +320,17 @@ out_fe_carryover <- fect(Y = y, D = d, X = controls, data = gs2020,
                          nboots = 1000, carryoverTest = TRUE,
                          carryover.period = c(1, 3))
 plot(out_fe_carryover)
+```
+
+## Status Plot
+The status plot (`type = "status"`) displays the treatment status by period for all units in a similar fashion to `panelView`. Each of the indicator colors can be customized using the `status.*.color` options. 
+```{r status}
+plot(out_fe_carryover, type = "status",
+     status.treat.color = "red", # Color for treated units
+     status.control.color = "blue",   # Color for control units
+     status.missing.color = "darkgreen",   # Color for missing data
+     status.background.color = "beige", # Background color
+     main = "Status Plot")
 ```
 
 ## Effect Heterogeneity
