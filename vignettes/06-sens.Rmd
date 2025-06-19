@@ -182,7 +182,7 @@ plot(out.fect.placebo,
     restrict = "sm",
     main = "ATTs with Robust Confidence Sets (Smoothness)",
     ylab = "Coefficients and 95% CI",
-    xlim = c(-12.5,10.5), # Adjusted to match original detailed plot
+    xlim = c(-12,10), # Adjusted to match original detailed plot
     ylim = c(-12,15),
     show.count = TRUE)
 ```

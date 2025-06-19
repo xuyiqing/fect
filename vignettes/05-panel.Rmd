@@ -963,8 +963,7 @@ Finally, `esplot` can be used to visualize the results.
 The `did_wrapper` function returns a list of objects, including the estimated coefficients and standard errors, which can be used to create event study plots.
 
 ```{r wrapper_plot, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
-p_st <- esplot(data = res_st, main = "Stacked DID", xlim = c(-12,10))
-print(p_st)
+esplot(data = res_st, main = "Stacked DID", xlim = c(-12,10))
 ```
 
 ## How to Cite

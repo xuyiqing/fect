@@ -371,6 +371,11 @@ plot.fect <- function(
       gridOff <- TRUE
     }
   }
+  if (!is.null(xlim) & !(type %in% c("gap", "equiv", "exit", "sens", "sens_es"))){
+    if (length(xlim) == 2) {
+      xlim = c(xlim[1]-0.2,xlim[2]+0.2)
+    }
+  }
   # factors, loadings, fe
   if (type %in% c("loadings", "factors")) {
     if (type == "loadings") {
@@ -1237,8 +1242,24 @@ plot.fect <- function(
       if (!is.null(plot_xlim_abs)) {
         show_abs_check <- which(plot_time_abs >= plot_xlim_abs[1] & plot_time_abs <= plot_xlim_abs[2])
         if (length(show_abs_check) == 0) { warning("No data points in xlim range. Plotting all.") } else { show_abs <- show_abs_check }
-      } else if (length(plot_time_abs) > 0) { plot_xlim_abs <- range(plot_time_abs[show_abs], na.rm = TRUE); if(any(!is.finite(plot_xlim_abs))) plot_xlim_abs <- NULL }
-      else { stop("Cannot determine time range for absolute time plot.") }
+      }
+
+      counts_for_filtering_abs <- apply(Y.tr, 1, function(row) sum(!is.na(row)))
+      max_count_for_filtering_abs <- max(counts_for_filtering_abs, na.rm = TRUE)
+      if (is.finite(max_count_for_filtering_abs) && max_count_for_filtering_abs > 0) {
+        indices_from_proportion_abs <- which(counts_for_filtering_abs >= proportion * max_count_for_filtering_abs)
+        show_abs <- intersect(show_abs, indices_from_proportion_abs)
+        if (length(show_abs) == 0) {
+          stop("No data points remain after applying the 'proportion' filter. Try a smaller value for 'proportion'.")
+        }
+      }
+
+      if (length(show_abs) > 0 && is.null(plot_xlim_abs)) {
+        plot_xlim_abs <- range(plot_time_abs[show_abs], na.rm = TRUE); if(any(!is.finite(plot_xlim_abs))) plot_xlim_abs <- NULL
+      } else if (length(show_abs) == 0) {
+        stop("Cannot determine time range for absolute time plot.")
+      }
+
       nT_abs <- length(show_abs); time_label_abs <- plot_time_abs[show_abs]; T.b_abs <- integer(0)
       if (nT_abs > 0) {
         if (is.numeric(time_label_abs) && length(time_label_abs) > 1) {
@@ -1253,7 +1274,7 @@ plot.fect <- function(
       plot_single_unit_flag <- length(id.tr_names) == 1
       unit_to_plot_name <- id.tr_names[1]
       if (plot_single_unit_flag) {
-        maintext <- paste("Treated and Counterfactual (", unit_to_plot_name, ")", sep = "")
+        maintext <- paste("Treated and Estimated Counterfactual (", unit_to_plot_name, ")", sep = "")
         unit_col_idx_in_Y.tr <- which(colnames(Y.tr) == unit_to_plot_name)
         if(length(unit_col_idx_in_Y.tr) != 1) stop(paste("Could not find unique column for unit", unit_to_plot_name, "in Y.tr."))
         tr.info_unit <- Y.tr[show_abs, unit_col_idx_in_Y.tr]; ct.info_unit <- Y.ct[show_abs, unit_col_idx_in_Y.tr] # Subset by show_abs here
@@ -1390,7 +1411,7 @@ plot.fect <- function(
           lw <- c(est.lwidth,est.lwidth/2); set.linewidth <- c(lw[1], lw[1], lw[2])
         }
       } else { # Multiple treated units, all with the same T0
-        maintext <- "Treated and Counterfactual Averages"; Yb_show_abs <- Yb[show_abs, , drop = FALSE]
+        maintext <- "Treated Average vs Estimated Counterfactual Average Trajectories"; Yb_show_abs <- Yb[show_abs, , drop = FALSE]
         y_data_for_range_calc <- c(Yb_show_abs[,1], Yb_show_abs[,2])
         if (raw == "none") {
           if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
@@ -1518,8 +1539,15 @@ plot.fect <- function(
       } else {
         p <- p + guides(colour = guide_obj_abs, linetype = guide_obj_abs, linewidth = guide_obj_abs)
       }
-      if (length(T.b_abs) > 0) { if (!is.numeric(time_label_abs)) { p <- p + scale_x_continuous(expand = c(0.01, 0.01), breaks = plot_time_abs[show_abs][T.b_abs], labels = time_label_abs[T.b_abs]) } else { p <- p + scale_x_continuous(expand = c(0.01, 0.01), labels = scaleFUN, breaks = plot_time_abs[show_abs][T.b_abs]) } }
-      else { p <- p + scale_x_continuous(expand = c(0.01, 0.01)) }
+      if (length(T.b_abs) > 0) {
+        if (!is.numeric(time_label_abs)) {
+          p <- p + scale_x_continuous(breaks = plot_time_abs[show_abs][T.b_abs], labels = time_label_abs[T.b_abs])
+        } else {
+          p <- p + scale_x_continuous(labels = scaleFUN, breaks = plot_time_abs[show_abs][T.b_abs])
+        }
+      } else {
+        p <- p + scale_x_continuous()
+      }
       final_main_text <- if (is.null(main)) maintext else if (main == "") NULL else main
       if (!is.null(final_main_text)) p <- p + ggtitle(final_main_text)
       if (show.count == TRUE) {
@@ -1538,14 +1566,14 @@ plot.fect <- function(
             time_step_for_bars_abs <- if(length(unique(counts_for_plot_df_abs$time)) > 1) min(diff(sort(unique(counts_for_plot_df_abs$time))),na.rm=TRUE) else 1; if(!is.finite(time_step_for_bars_abs) || time_step_for_bars_abs <=0) time_step_for_bars_abs <- 1
             bar_width_half_abs <- time_step_for_bars_abs * 0.20; counts_for_plot_df_abs$xmin <- counts_for_plot_df_abs$time - bar_width_half_abs; counts_for_plot_df_abs$xmax <- counts_for_plot_df_abs$time + bar_width_half_abs
             max_count_time_pos_abs <- counts_for_plot_df_abs$time[which.max(counts_for_plot_df_abs$count)[1]]; text_y_pos_abs <- rect_min_val_abs + actual_rect_length_abs + (count_bar_space_height_abs - actual_rect_length_abs) * 0.5
-            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, color = count.outline.color, inherit.aes = FALSE) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5,alpha = count.alpha)
+            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, color = count.outline.color, inherit.aes = FALSE) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5,alpha = count.alpha,linewidth = 0.2)
           }
         }
       }
-      coord_args_abs <- list(clip = "on")
+      coord_args_abs <- list(clip = "on", expand = TRUE)
       if (!is.null(ylim)) { coord_args_abs$ylim <- ylim } else if (show.count == TRUE && exists("rect_min_val_abs") && exists("counts_for_plot_df_abs") && nrow(counts_for_plot_df_abs) > 0 && exists("current_plot_yrange") && !is.null(current_plot_yrange)) { final_yrange_min <- min(current_plot_yrange[1], rect_min_val_abs, na.rm=TRUE); final_yrange_max <- current_plot_yrange[2]; coord_args_abs$ylim <- c(final_yrange_min, final_yrange_max) }
       if (!is.null(plot_xlim_abs)) { coord_args_abs$xlim <- plot_xlim_abs }
-      if (length(coord_args_abs) > 1) { p <- p + do.call(coord_cartesian, coord_args_abs) }
+      p <- p + do.call(coord_cartesian, coord_args_abs)
       p <- p + theme(legend.position = legend.pos)
 
     } else { # Case 2: Staggered Adoption (Different T0) -> Relative Time Plot
@@ -1556,8 +1584,8 @@ plot.fect <- function(
         stop("Relative timeline calculation resulted in zero length or all NA.")
       }
 
-      maintext <- "Treated and Counterfactual Averages"
-      xlab_final <- if (is.null(xlab)) "Time relative to Treatment" else if (xlab == "") NULL else xlab
+      maintext <- "Treated Average vs Estimated Counterfactual Average Trajectories"
+      xlab_final <- if (is.null(xlab)) "Time Since the Treatment's Onset" else if (xlab == "") NULL else xlab
       ylab_final <- if (is.null(ylab)) x$Yname else if (ylab == "") NULL else ylab
 
       # Determine xlim on the original event-time scale.
@@ -1611,6 +1639,19 @@ plot.fect <- function(
         stop("Cannot determine relative time range for plot as timeline is empty and xlim could not be determined.")
       }
 
+      if (length(xlim) != 0) {
+        proportion = 0
+      }
+      counts_for_filtering_rel <- rowSums(!is.na(xx$Y.tr.aug), na.rm = TRUE)
+      max_count_for_filtering_rel <- max(counts_for_filtering_rel, na.rm = TRUE)
+      if (is.finite(max_count_for_filtering_rel) && max_count_for_filtering_rel > 0) {
+        indices_from_proportion_rel <- which(counts_for_filtering_rel >= proportion * max_count_for_filtering_rel)
+        indices_to_show <- intersect(indices_to_show, indices_from_proportion_rel)
+        if (length(indices_to_show) == 0) {
+          stop("No data points remain after applying the 'proportion' filter. Try a smaller value for 'proportion'.")
+        }
+      }
+
       # Event times for the points that will actually be plotted (on original event time scale)
       event_times_for_data_subset <- event_time_full_series[indices_to_show]
 
@@ -1620,7 +1661,8 @@ plot.fect <- function(
 
       # Step 3: Define the time scale for the plot's x-axis and related elements
       time_for_plot_axis <- event_times_for_data_subset
-      xlim_for_plot_axis <- xlim_event_scale # This is the range of event_times_for_data_subset
+      xlim_for_plot_axis <- range(time_for_plot_axis, na.rm = TRUE) # Recalculate range based on filtered data
+      if(any(!is.finite(xlim_for_plot_axis))) xlim_for_plot_axis <- NULL
       vline_pos_for_plot_axis <- 0.5 # Default vline (between event time 0 and 1)
 
       # Apply shift if start0 is TRUE
@@ -1843,9 +1885,9 @@ plot.fect <- function(
       }
 
       if (length(T_b_axis_ticks_indices) > 0 && nT_on_axis > 0) {
-        p <- p + scale_x_continuous(expand = c(0.01, 0.01), labels = scaleFUN, breaks = time_for_plot_axis[T_b_axis_ticks_indices])
+        p <- p + scale_x_continuous(labels = scaleFUN, breaks = time_for_plot_axis[T_b_axis_ticks_indices])
       } else {
-        p <- p + scale_x_continuous(expand = c(0.01, 0.01), labels = scaleFUN)
+        p <- p + scale_x_continuous(labels = scaleFUN)
       }
 
       final_main_text <- if (is.null(main)) maintext else if (main == "") NULL else main
@@ -1895,13 +1937,13 @@ plot.fect <- function(
             max_count_time_pos <- counts_for_plot_df$time[which.max(counts_for_plot_df$count)[1]]
             text_y_pos <- rect_min_val + actual_rect_length + (count_bar_space_height - actual_rect_length) * 0.5
 
-            p <- p + geom_rect(data = counts_for_plot_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE, alpha = count.alpha, color= count.outline.color) +
+            p <- p + geom_rect(data = counts_for_plot_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE, alpha = count.alpha, color= count.outline.color, linewidth = 0.2) +
               annotate("text", x = max_count_time_pos, y = text_y_pos, label = max_count_val, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5)
           }
         }
       }
 
-      coord_args_staggered <- list(clip = "on")
+      coord_args_staggered <- list(clip = "on", expand = TRUE)
       if (!is.null(ylim)) {
         coord_args_staggered$ylim <- ylim
       } else if (show.count == TRUE && exists("rect_min_val") && exists("counts_for_plot_df") && nrow(counts_for_plot_df) > 0 && exists("current_plot_yrange") && !is.null(current_plot_yrange)) {
@@ -1910,7 +1952,7 @@ plot.fect <- function(
         coord_args_staggered$ylim <- c(final_yrange_min, final_yrange_max)
       }
       if (!is.null(xlim_for_plot_axis)) { coord_args_staggered$xlim <- xlim_for_plot_axis }
-      if (length(coord_args_staggered) > 1) { p <- p + do.call(coord_cartesian, coord_args_staggered) }
+      p <- p + do.call(coord_cartesian, coord_args_staggered)
       p <- p + theme(legend.position = legend.pos)
     } # End of Case 2 (Staggered Adoption)
 
@@ -1998,6 +2040,7 @@ plot.fect <- function(
   show.time <- 1:time.end
   if (length(xlim) != 0) {
     show.time <- which(time >= xlim[1] & time <= xlim[2])
+    proportion = 0
   }
   if (type %in% c("gap", "equiv", "exit")) {
     if (is.null(proportion) == TRUE) {
@@ -2842,7 +2885,7 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- mean(TTT[which.max(d1[, "count"])])
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color,linewidth =0.2)
       p <- p + annotate("text",
                         x = max.count.pos - 0.02 * T.gap,
                         y = max(data.toplot$ymax) + 0.2 * rect.length,
@@ -3034,7 +3077,7 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- data.count[which.max(data.count[, 2]), 1][1] - min(data.count[, 1]) + 1
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3 , alpha = count.alpha, color = count.outline.color)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3 , alpha = count.alpha, color = count.outline.color, linewidth =0.2)
       p <- p + annotate("text",
                         x = max.count.pos - 0.02 * T.gap,
                         y = max(data.toplot$ymax) + 0.1 * rect.length,
@@ -3537,6 +3580,9 @@ plot.fect <- function(
   else if (type == "cumul") {
     if (is.null(x$effect.est.att)) {
       stop("No period-by-period cumulative ATT data found in x$est.eff.")
+    }
+    if (is.null(main)){
+      main = "Estimated Cumulative Treatment Effects"
     }
     p <- esplot(
       x$effect.est.att,

@@ -748,7 +748,6 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       plot.title  = element_text(size = cex.main, hjust = 0.5, face = "bold")
     )
 
-  p <- p + coord_cartesian(xlim = final_xlim, ylim = final_ylim, expand = TRUE)
 
 
   if (show.count && !is.null(Count) && Count %in% names(plot_data)) {
@@ -881,6 +880,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   } else if (main != "") {
     p <- p + ggtitle(main)
   }
+  p <- p + coord_cartesian(xlim = c(final_xlim[1]-0.2,final_xlim[2]+0.2), ylim = final_ylim)
 
   return(p)
 }

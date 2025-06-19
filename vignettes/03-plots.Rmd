@@ -234,7 +234,7 @@ gs2020_no_reversals <- gs2020[gs2020[[unit]] %in% good_units, ]
 Next we will estimate the function again on these units only.
 
 ```{r no-reversals-est, cache = TRUE}
-out <- fect(Y = y, D = d, X = controls, index = c(unit, time), 
+out_no_reversals <- fect(Y = y, D = d, X = controls, index = c(unit, time), 
                data = gs2020_no_reversals, method = "fe", force = "two-way", 
                se = TRUE, parallel = TRUE, nboots = 100, keep.sims = TRUE)
 ```
@@ -242,7 +242,7 @@ out <- fect(Y = y, D = d, X = controls, index = c(unit, time),
 Finally, we will plot the cumulative effects.
 
 ```{r cumulative-effects}
-plot(effect(out))
+plot(effect(out_no_reversals))
 ```
 
 ## Pretrend Tests
