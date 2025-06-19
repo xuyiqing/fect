@@ -162,6 +162,13 @@ We can then visualize the dynamic treatment effects using the inbuilt function `
 plot(out.bal, main = "Estimated ATT (Balanced Sample)")
 ```
 
+The usual plotting options can be used to adjust the balanced plot as well.
+
+```{r fig.width = 6, fig.height = 4.5}
+plot(out.bal, main = "Estimated ATT (Balanced Sample)", 
+  color = "red", count.color = "blue")
+```
+
 ### Weighted Treatment Effect
 
 The package offers the option `W` to calculate the weighted average treatment effects. The weighting variable does not affect the estimation of fixed effects or factors. Only the weighted average treatment effects or weighted dynamic treatment effects are obtained by aggregating the treatment effects using the weight `W`.

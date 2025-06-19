@@ -3275,109 +3275,70 @@ plot.fect <- function(
     }
   }
   else if (type == "sens") {
+    # Determine plot-specific variables based on the 'restrict' option
+    sens_data_obj <- NULL
+    x_var_name <- NULL
+    default_xlab_val <- NULL
 
     if (restrict == "rm") {
-      # Check for the existence of sensitivity results and original data
-      if (is.null(x$sensitivity.rm) ||
-          is.null(x$sensitivity.rm$results) ||
-          is.null(x$sensitivity.rm$original)) {
-        stop("No sensitivity results found in x$sensitivity.rm$results or x$sensitivity.rm$original.")
+      if (is.null(x$sensitivity.rm) || is.null(x$sensitivity.rm$results) || is.null(x$sensitivity.rm$original)) {
+        stop("No sensitivity results found in x$sensitivity.rm. Required for restrict = 'rm'.")
       }
-
-      # Extract the two sets of data
-      data_original <- x$sensitivity.rm$original
-      data_results  <- x$sensitivity.rm$results
-
-      # For the original data, if the 'Mbar' column is missing, assign a default value to plot it left of zero.
-      if (!("Mbar" %in% colnames(data_original))) {
-        data_original$Mbar <- -0.05  # Adjust this value if needed.
+      sens_data_obj <- x$sensitivity.rm
+      x_var_name <- "Mbar"
+      default_xlab_val <- expression(bar(M))
+    } else if (restrict == "sm") {
+      if (is.null(x$sensitivity.smooth) || is.null(x$sensitivity.smooth$results) || is.null(x$sensitivity.smooth$original)) {
+        stop("No sensitivity results found in x$sensitivity.smooth. Required for restrict = 'sm'.")
       }
-
-      # Ensure that the necessary columns are present in each dataset.
-      # For original, we require 'lb' and 'ub'; for results, we require 'Mbar', 'lb', and 'ub'.
-      if (!all(c("lb", "ub") %in% colnames(data_original))) {
-        stop("Original sensitivity results require 'lb' and 'ub'. Check your data.")
-      }
-      if (!all(c("Mbar", "lb", "ub") %in% colnames(data_results))) {
-        stop("Results sensitivity require 'Mbar', 'lb', and 'ub'. Check your data.")
-      }
-
-      # Assign color groups: original data will be blue, and results will be red.
-      data_original$color_group <- "Original"
-      data_results$color_group  <- "Robust Confidence Set"
-
-      # Combine the data into one data frame
-      data <- rbind(data_original, data_results)
-
-      p <- ggplot(data, aes(x = Mbar))
-      if (theme.bw == TRUE) {
-        p <- p + theme_bw()
-      }
-      if (gridOff == TRUE) {
-        p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
-      }
-      p <- p+  geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
-        geom_errorbar(
-          aes(ymin = lb, ymax = ub, color = color_group),
-          width = 0.02,  # Width of error bar caps
-          linewidth = 1
-        ) +
-        scale_color_manual(values = c("Original" = sens.original.color, "Robust Confidence Set" = sens.colors[1])) +
-        labs(
-          x = expression(bar(M)),
-          y = "Treatment Effect",
-          title = "Smoothness Restriction Sensitivity Analysis"
-        ) +
-        theme(
-          legend.title = element_blank(),
-          legend.position = "inside",
-          legend.position.inside = c(0.02, 0.98),
-          legend.justification = c("left", "top"),
-        )
+      sens_data_obj <- x$sensitivity.smooth
+      x_var_name <- "M"
+      default_xlab_val <- "M"
     }
 
+    # Prepare data for plotting
+    data_original <- sens_data_obj$original
+    data_results  <- sens_data_obj$results
 
-  else if (restrict == "sm") {
-    # Check for the existence of sensitivity results and original data
-    if (is.null(x$sensitivity.smooth) ||
-        is.null(x$sensitivity.smooth$results) ||
-        is.null(x$sensitivity.smooth$original)) {
-      stop("No sensitivity results found in x$sensitivity.smooth$results or x$sensitivity.smooth$original.")
+    # Assign a default x-axis position for the original estimate to plot it left of zero
+    if (!(x_var_name %in% colnames(data_original))) {
+      data_original[[x_var_name]] <- -0.05
     }
 
-    # Extract the two sets of data
-    data_original <- x$sensitivity.smooth$original
-    data_results  <- x$sensitivity.smooth$results
-
-    # For the original data, if the 'M' column is missing, assign a default value to plot it left of zero.
-    if (!("M" %in% colnames(data_original))) {
-      data_original$M <- -0.05  # Adjust this value if needed.
-    }
-
-    # Ensure that the necessary columns are present in each dataset.
-    # For original, we require 'lb' and 'ub'; for results, we require 'M', 'lb', and 'ub'.
+    # Validate required columns
     if (!all(c("lb", "ub") %in% colnames(data_original))) {
-      stop("Original sensitivity results require 'lb' and 'ub'. Check your data.")
+      stop("Original sensitivity data requires 'lb' and 'ub' columns.")
     }
-    if (!all(c("M", "lb", "ub") %in% colnames(data_results))) {
-      stop("Results sensitivity require 'M', 'lb', and 'ub'. Check your data.")
+    if (!all(c(x_var_name, "lb", "ub") %in% colnames(data_results))) {
+      stop(paste("Sensitivity results data requires '", x_var_name, "', 'lb', and 'ub' columns."))
     }
 
-    # Assign color groups: original data will be blue, and results will be red.
+    # Assign color groups and combine into a single data frame
     data_original$color_group <- "Original"
     data_results$color_group  <- "Robust Confidence Set"
+    data_combined <- rbind(data_original, data_results)
 
-    # Combine the data into one data frame
-    data <- rbind(data_original, data_results)
+    # --- Handle Plot Labels and Title ---
+    # Use user-provided 'main' or set a default title
+    maintext <- if (is.null(main)) "Smoothness Restriction Sensitivity Analysis" else main
 
-    p <- ggplot(data, aes(x = M))
+    # Use user-provided 'xlab' or set a default based on 'restrict'
+    xlab_final <- if (is.null(xlab)) default_xlab_val else xlab
+
+    # Use user-provided 'ylab' or set a default
+    ylab_final <- if (is.null(ylab)) "Treatment Effect" else ylab
+
+    # --- Create the Plot ---
+    p <- ggplot(data_combined, aes_string(x = x_var_name))
+
     if (theme.bw == TRUE) {
       p <- p + theme_bw()
     }
     if (gridOff == TRUE) {
       p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
     }
-    p <- p + geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1],  linetype = ltype[1]) +
+
+    p <- p + geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
       geom_errorbar(
         aes(ymin = lb, ymax = ub, color = color_group),
         width = 0.02,  # Width of error bar caps
@@ -3385,18 +3346,31 @@ plot.fect <- function(
       ) +
       scale_color_manual(values = c("Original" = sens.original.color, "Robust Confidence Set" = sens.colors[1])) +
       labs(
-        x = "M",
-        y = "Treatment Effect",
-        title = "Smoothness Restriction Sensitivity Analysis"
-      ) +
-      theme_bw() +
-      theme(
-        legend.title = element_blank(),
-        legend.position = "inside",
-        legend.position.inside = c(0.02, 0.98),
-        legend.justification = c("left", "top")
+        x = xlab_final,
+        y = ylab_final
       )
-  }
+
+    # Add title only if it's not an empty string
+    if (!is.null(maintext) && maintext != "") {
+      p <- p + ggtitle(maintext)
+    }
+
+    # --- Apply Consistent Theming ---
+    p <- p + theme(
+      legend.title = element_blank(),
+      legend.position = "inside",
+      legend.position.inside = c(0.02, 0.98),
+      legend.justification = c("left", "top"),
+      legend.background = element_rect(fill = "transparent", colour = NA),
+      legend.text = element_text(size = cex.legend),
+      axis.title = element_text(size = cex.lab),
+      axis.text = element_text(size = cex.axis),
+      plot.title = element_text(
+        size = cex.main,
+        hjust = 0.5,
+        face = "bold",
+      )
+    )
   }
 
   else if (type == "sens_es") {

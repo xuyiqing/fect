@@ -120,10 +120,15 @@ plot(out,
 
 For convenience, we can use the `preset` argument to apply preset colors. The default is `"default"`, which is mostly black and white with a bit of color. Other options include `"vibrant"` and `"grayscale"`, which can be used to create more colorful or monochromatic plots, respectively.
 
-```{r preset}
+```{r preset-vibrant}
 plot(out, 
      preset = "vibrant", # Use vibrant colors
      main = "Vibrant Preset Colors")
+```
+```{r preset-grayscale}
+plot(out, 
+     preset = "grayscale", # Use grayscale colors
+     main = "Grayscale Preset Colors")
 ```
 
 ### Connected Estimates
