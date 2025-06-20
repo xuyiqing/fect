@@ -1,6 +1,6 @@
 # Fect Plot Options {#sec-plots}
 
-In this chapter, we explore various visualization options avialable in the **fect** package using data from @GS2020. This chapter is authored by Jinwen Wu and Yiqing Xu.
+In this chapter, we explore various visualization options available in the **fect** package using data from @GS2020. 
 
 ------------------------------------------------------------------------
 
@@ -18,21 +18,19 @@ In this chapter, we explore various visualization options avialable in the **fec
     -   `legend.pos`, `legend.nrow`, `legend.labs`: Control legend placement, number of rows, and labels.
 -   **Theme and Text:**
     -   `theme.bw`: If `TRUE`, applies a black-and-white theme.
-
     -   `preset`: If `NULL`, will be the default color preset, which is mostly black and white with a bit of color. Other options include `"vibrant"` and `"grayscale"`.\
-
     -   `cex.main`, `cex.axis`, `cex.lab`, `cex.text`: Adjust text sizes for the title, tick labels, axis labels, and annotations.
 -   **Lines and Bounds:**
     -   `color` / `est.lwidth`: Define the color and width of main lines.\
-    -   `lcolor` / `lwidth` / `ltype`: Set the color, width, and linetype for the axes. Takes a vector, where the first value is applied the horizontal axis and the second is applied the vertical axis. If only one value is given, both axes will take on the same value.
+    -   `lcolor` / `lwidth` / `ltype`: Set the color, width, and line type for the axes. Takes a vector, where the first value is applied the horizontal axis and the second is applied the vertical axis. If only one value is given, both axes will take on the same value.
 
 While these customization options are demonstrated using the default `gap` plot, they can be applied universally, with only a few exceptions.
 
 ## Load Data
 
-As explained in the previous chapter, @GS2020 examines the mobilizing effect of minority candidates on coethnic support in U.S. congressional elections. The treatment variable indicates the presence of an Asian candidate, and the outcome variable represents the proportion of general election contributions from Asian donors.
+We will be using two datasets in this chapter. As explained in @sec-panel, @GS2020 examines the mobilizing effect of minority candidates on coethnic support in U.S. congressional elections. The treatment variable indicates the presence of an Asian candidate, and the outcome variable represents the proportion of general election contributions from Asian donors. @HH2019 study the effects of indirect democracy versus direct democracy (treatment) on naturalization rates (outcome) in Switzerland using municipality-year panel data from 1991 to 2009.
 
-First, we load the required packages. The dataset, `gs2020`, is included with the **fect** package and can be loaded using `data(fect)`. We also specify the treatment, outcome, controls (covariates), unit and time indices, and level of clustering.
+First, we load the required packages. The datasets, `hh2019` and `gs2020`, are included with the **fect** package and can be loaded using `data(fect)`. 
 
 ```{r load, message=FALSE}
 # load libraries and data
@@ -40,14 +38,7 @@ library(ggplot2)
 library(panelView)
 library(fect)
 data(fect)
-
-# Define variables
-y <- "general_sharetotal_A_all"  # Outcome: Share of Asian contributions
-d <- "cand_A_all"                # Treatment: Presence of an Asian candidate
-controls <- c("cand_H_all", "cand_B_all") # Controls: Presence of Hispanic and Blank candidates
-unit <- "district_final"          # Unit variable: District
-time <- "cycle"                   # Time variable: Election cycle
-clust <- "district_final"         # Clustering variable: District
+ls()
 ```
 
 ## Gap Plot
@@ -55,15 +46,27 @@ clust <- "district_final"         # Clustering variable: District
 To create the gap plot, also known as the event study plot, we first apply `fect`, the fixed effects counterfactual estimator. For details, see @sec-fect.
 
 ```{r est, cache = TRUE}
-out <- fect(Y = y, D = d, X = controls, index = c(unit, time), 
-               data = gs2020, method = "fe", force = "two-way", 
-               se = TRUE, parallel = TRUE, nboots = 100)
+out <- fect(Y = "general_sharetotal_A_all", 
+            D = "cand_A_all", 
+            X = c("cand_H_all", "cand_B_all"), 
+            index = c("district_final", "cycle"), 
+            data = gs2020, method = "fe", 
+            force = "two-way", se = TRUE, 
+            parallel = TRUE, nboots = 1000)
+
+out.hh <- fect(nat_rate_ord ~ indirect, 
+               data = hh2019,
+               index = c("bfs","year"),
+               method = 'fe', se = TRUE, 
+               parallel = TRUE, nboots = 1000,
+               keep.sims = TRUE)
 ```
 
 After running the model, we can plot the dynamic treatment effects over (relative) time, including confidence intervals if `se = TRUE` is specified in the estimation. Note that `type = "gap"` is the default option, so we omit it here.
 
 ```{r}
-plot(out)
+plot(out) # the effect co-ethnic mobilization
+plot(out.hh) # the effect of indirect democrazy on naturalization rate
 ```
 
 ### Starting Period
@@ -123,7 +126,10 @@ For convenience, we can use the `preset` argument to apply preset colors. The de
 ```{r preset-vibrant}
 plot(out, 
      preset = "vibrant", # Use vibrant colors
-     main = "Vibrant Preset Colors")
+     main = "Vibrant Preset Colors: Grumbach and Sahn (2020)")
+plot(out.hh, 
+     preset = "vibrant", # Use vibrant colors
+     main = "Vibrant Preset Colors: Hainmueller and Hangartner (2019)")
 ```
 ```{r preset-grayscale}
 plot(out, 
@@ -148,7 +154,12 @@ Moreover, in any plot that uses a shaded band to represent the CIs, we can set `
 ```{r ci-outline}
 plot(out, 
      connected = TRUE, 
-     ci.outline = TRUE) # Outline the confidence interval band
+     ci.outline = TRUE,
+     main = "The Effect of Coethnic Mobilization") # Outline the confidence interval band
+plot(out.hh, 
+     preset = "vibrant",
+     ci.outline = TRUE,
+     main = "The Effect of Indirect Democracy") # Outline the confidence interval band
 ```
 
 ### Line and Point Customization
@@ -182,8 +193,15 @@ While the gap plot shows the *difference* (ATT) over time, researchers often wan
 
 ```{r counterfactual}
 plot(out, type = "counterfactual",
-     main = "Observed vs. Counterfactual Trajectory",
-     ylab = "Outcome",
+     main = "Grumbach & Sahn (2020): Treated vs. Counterfactuals",
+     ylab = "Proportion of Asian Donation",
+     legend.pos = "bottom")
+```
+
+```{r counterfactual_hh}
+plot(out.hh, type = "counterfactual",
+     main = "Hainmueller & Hangartner (2019): Treated vs. Counterfactuals",
+     ylab = "Naturalization Rate",
      legend.pos = "bottom")
 ```
 
@@ -213,30 +231,42 @@ plot(out, type = "counterfactual",
 
 ## Cumulative Effects
 
-We can also plot cumulative effects by plotting the output of the `effect()` function. Note that this is only well-defined when there are no treatment reversals, that is, all treated units remain treated for the duration of the study. Additionally, we must set `keep.sims=TRUE` to keep the unit-level bootstrap results.
+We can also plot cumulative effects by plotting the output of the `effect()` function. Note that this is only well-defined when there are no treatment reversals, that is, all treated units remain treated for the duration of the study. Additionally, we must set `keep.sims = TRUE` to keep the unit-level bootstrap results. We first apply it to `hh2019`.
+
+```{r}
+plot(effect(out.hh), main = "Cumulative Effect of Indirect Democracy",
+     ylab = "Cumulative Effect on Naturalization Rate")
+```
 
 Since the `gs2020` datset has treatment reversals, we will first subset the units that remained treated throughout the study period. We do this by checking for any instances where the treatment variable changes from 1 to 0 within a unit.
 
 ```{r}
 # flag units that ever have a 1 to 0 change in d
-rev_flag <- tapply(gs2020[[d]],
-                   gs2020[[unit]],
+rev_flag <- tapply(gs2020[["cand_A_all"]],
+                   gs2020[["district_final"]],
                    function(x) any(diff(x) < 0))
 
 # units with no reversals
 good_units <- names(rev_flag)[!rev_flag]
 
 # subset the desired rows
-gs2020_no_reversals <- gs2020[gs2020[[unit]] %in% good_units, ]
+gs2020_no_reversals <- gs2020[gs2020[["district_final"]] %in% good_units, ]
 
 ```
 
 Next we will estimate the function again on these units only.
 
 ```{r no-reversals-est, cache = TRUE}
-out_no_reversals <- fect(Y = y, D = d, X = controls, index = c(unit, time), 
-               data = gs2020_no_reversals, method = "fe", force = "two-way", 
-               se = TRUE, parallel = TRUE, nboots = 100, keep.sims = TRUE)
+out_no_reversals <- fect(Y = "general_sharetotal_A_all", 
+                         D = "cand_A_all" , 
+                         X = c("cand_H_all", "cand_B_all") ,
+                         index = c("district_final", "cycle"), 
+                         data = gs2020_no_reversals,
+                         method = "fe", 
+                         force =  "two-way", 
+                         se = TRUE, parallel = TRUE,
+                         nboots = 100, 
+                         keep.sims = TRUE)
 ```
 
 Finally, we will plot the cumulative effects.
@@ -279,7 +309,7 @@ plot(out, type = "equiv",
      ylim = c(-0.25, 0.25),
      stats = c("F.p", "equiv.p"),
      stats.labs = c("F Test P-value", "Equivalence P-value"),
-     stats.pos = c(-8, 0.02),   # (x, y) position for the stats text
+     stats.pos = c(-8, 0.2),   # (x, y) position for the stats text
      show.stats = TRUE,     # Can be switched off to hide all test stats
      main = "Statistical Test Annotations")
 ```
@@ -345,11 +375,13 @@ We provide two ways to visualize treatment effect heterogeneity: a `"box"` plot,
 In the box plot, the box in each period represents the range of the middle 50% of the individual effects, while the whiskers show the 2.5%–95% quantiles and the horizontal line represents the median.
 
 ```{r}
-plot(out, type = "box", xlim = c(-12, 5))
+plot(out, type = "box", xlim = c(-12, 3))
 ```
 
 In the calendar plot, the blue ribbon represents a loess fit of the conditional ATT, with 95% confidence intervals.
 
 ```{r}
-plot(out, type = "calendar")
+plot(out, type = "calendar", main = "The Effect of Coethnic Mobilization")
+plot(out.hh, type = "calendar", xlim = c(1995, 2010),
+     main = "The Effect of Indirect Democracy")
 ```
