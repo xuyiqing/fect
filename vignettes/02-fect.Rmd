@@ -1,6 +1,6 @@
 # Fect Main Program {#sec-fect}
 
-In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022--[Paper](https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723). Download the R code used in this chapter [here](rscript/02-fect.R).
+In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022--[<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>]. Download the R code used in this chapter [here](rscript/02-fect.R).
 
 ## Simulated data
 
@@ -379,10 +379,62 @@ out.ife.rm.test <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time")
   parallel = TRUE, se = TRUE,  carryover.rm = 3,
   nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))# remove three periods
 
-plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(7, 2.5))
+plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(5, 2))
 ```
 
 In the above plot, the three periods in blue are droppred from the first-stage estimation of the factor model while the periods in red are reserved for the (no) carryover effects test.
+
+------------------------------------------------------------------------
+
+## Cumulative Effects
+
+Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. - Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
+
+```{r effect, cache = TRUE}
+out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+                        se = TRUE, nboots = 200, vartype = 'bootstrap',
+                        parallel = FALSE, keep.sims=TRUE)
+cumu.out <- effect(out)
+```
+
+Print and plot cumulative effects
+```{r effect.plot, cache = TRUE}
+print(cumu.out)
+plot(cumu.out)
+```
+
+Users can choose to calculate by-period average effects by setting `cumu=FALSE`.
+
+```{r}
+effect(out, cumu=FALSE)
+```
+
+Calculate the cumulative effect of certain units at certain periods.
+
+```{r}
+effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
+```
+
+`effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
+
+```{r effect-mc, cache = TRUE}
+out_mc <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
+                        se = TRUE, nboots = 200, vartype = 'bootstrap',
+                        parallel = FALSE, keep.sims=TRUE)
+plot(effect(out_mc))
+```
+
+We can also use jackknife instead of bootstrap for inference:
+
+```{r effect-jackknife, cache = TRUE}
+out_jack <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
+                        se = TRUE, nboots = 200, vartype = 'jackknife',
+                        parallel = FALSE, keep.sims=TRUE)
+plot(effect(out_jack))
+```
 
 ------------------------------------------------------------------------
 
@@ -508,49 +560,6 @@ plot(out.ife.g, show.group = "Cohort:22",
           xlim = c(-15, 10), ylim = c(-10, 10))
 ```
 
-## Cumulative Effects
-
-Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. - Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
-
-```{r effect, cache = TRUE}
-out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
-                        method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 200, vartype = 'bootstrap',
-                        parallel = FALSE, keep.sims=TRUE)
-effect(out)
-```
-
-Users can choose to calculate by-period average effects by setting `cumu=FALSE`.
-
-```{r}
-effect(out, cumu=FALSE)
-```
-
-Calculate the cumulative effect of certain units at certain periods.
-
-```{r}
-effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
-```
-
-`effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
-
-```{r effect-mc, cache = TRUE}
-out_mc <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
-                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 200, vartype = 'bootstrap',
-                        parallel = FALSE, keep.sims=TRUE)
-effect(out_mc)
-```
-
-We can also use jackknife instead of bootstrap for inference:
-
-```{r effect-jackknife, cache = TRUE}
-out_jack <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
-                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 200, vartype = 'jackknife',
-                        parallel = FALSE, keep.sims=TRUE)
-effect(out_jack)
-```
 
 ------------------------------------------------------------------------
 

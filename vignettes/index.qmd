@@ -4,11 +4,11 @@ This Quarto book serves as a user manual for the **fect** package in R, which im
 
 **fect** covers a series of counterfactual estimators, including the five estimators from the last version and integrating the latest version of the **gsynth** package for the generalized synthetic control method (Gsynth). This Quarto book also facilitates the application of various new difference-in-differences (DID) estimators. For details of these methods, see
 
--   @Xu2017 for Gsynth \[[Paper](https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3)\]
+-   @Xu2017 for Gsynth [<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>]
 
--   @LWX2022 for counterfactural estimators \[[Paper](https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723)\]
+-   @LWX2022 for counterfactual estimators [<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>]
 
--   @CLLX2025 for a survey of the new DID estimators \[[Paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf)\]
+-   @CLLX2025 for a survey of the new DID estimators [<a href="https://www.cambridge.org/core/journals/american-political-science-review/article/causal-panel-analysis-under-parallel-trends-lessons-from-a-large-reanalysis-study/219275E0CE901F099F2CFFBA07079243" target="_blank">Paper</a>]
 
 ::: {.callout-note appearance="simple"}
 ### Source Code
@@ -31,7 +31,7 @@ However, these counterfactual estimators come with important limitations:
 -   They generally do not accommodate dynamic treatment assignment based on sequential ignorability.\
 -   Methods for continuous treatments are still underdeveloped and are not currently covered by **fect**.
 
-@CLLX2025 reanalyze numerous published studies in political science and offer detailed justifications for adopting these estimators.
+@CLLX2025 reanalyze 49 published studies in political science and offer justifications for adopting these estimators.
 
 ## Why the Merge?
 
@@ -40,7 +40,7 @@ I have decided to merge the two packages, **gsynth** and **fect**, as **gsynth**
 However, some key differences between the two approaches remain:
 
 -   Gsynth is specifically designed for block and staggered DID settings *without* treatment reversal, while other methods accommodate treatment reversal under the assumption of limited carryover effects.
--   Gsynth is particularly suited for cases where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure---analogous to conformal inference---to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
+-   Gsynth is particularly suited for cases where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
 -   Compared with IFEct (`method = "ife"`), Gsynth does not rely on pre-treatment data from the treated units to impute $\hat{Y}(0)$. This approach significantly speeds up computation and improves stability.
 
 Therefore, we recommend setting `method = "gsynth"` in **fect** for scenarios where the treatment does not reverse (or is coded accordingly) and the number of treated units is small .
@@ -81,7 +81,7 @@ The following individuals have contributed to **gsynth** and **fect**, listed in
 -   [Ye Wang](https://www.yewang-polisci.com/)\
 -   Ziyi Liu (PhD Student at Berkeley Haas)
 -   Shijian Liu (PhD Student at NYU Stern)
--   [Tianzhu Qin](https://tianzhuqin.github.io/)\
+-   [Tianzhu Qin](https://tianzhuqin.github.io/) (PhD Student at Cambridge University)
 -   Jinwen Wu (Predoc at Stanford PoliSci)
 -   [Rivka Lipkovitz](https://rivka.me/) (Undergraduate at MIT)
 

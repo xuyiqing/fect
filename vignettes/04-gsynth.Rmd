@@ -1,11 +1,11 @@
 # Gsynth Program {#sec-gsynth}
 
-This chapter demonstrate the generalized synthetic control method, or Gsynth, proposed in @Xu2017 ([Paper](https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3)). Download the R code used in this chapter [here](rscript/04-gsynth.R).
+This chapter demonstrate the generalized synthetic control method, or Gsynth, proposed in @Xu2017 ([<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>]). Download the R code used in this chapter [here](rscript/04-gsynth.R).
 
 Gsynth was originally implemented in the **gsynth** package but has now been fully integrated into the **fect** package. Gsynth (`method = "gsynth"`) and FEct/IFEct/MC (`method = "fe"/"ife"/"mc"`) are different in the following ways:
 
 -   Gsynth is designed to handle block and staggered DID settings **without** treatment reversal, whereas other methods allow for treatment reversal under the assumption of limited carryover effects.
--   Gsynth is particularly suited for cases where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure---analogous to conformal inference---to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
+-   Gsynth is particularly suited for cases where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
 -   Compared with IFEct (`method = "ife"`), Gsynth *does not* rely on pre-treatment data from the treated units to impute $\hat{Y}(0)$. This approach significantly speeds up computation and improves stability.
 
 Therefore, we recommend setting `method = "gsynth"` in **fect** for scenarios where the treatment does not reverse (or is coded accordingly) and the number of treated units is small .
@@ -197,17 +197,19 @@ plot(out, type = "loadings")
 plot(out, type = "factors", xlab = "Time")
 ```
 
-To visualize the estimated counterfactual outcomes, we use `type = "counterfactual"`. If no argument is assigned to `raw`, the plot will display the average of the *treated* and of the *estimated counterfactual* outcomes. When `method = "gsynth"` and `vartype = "parametric"`, the CIs around the counterfactual outcomes will be the same as for the event-study ATT.
+To visualize the estimated counterfactual outcomes, we use `type = "counterfactual"`. If no argument is assigned to `raw`, the plot will display the average of the *treated* and of the *estimated counterfactual* outcomes. When `method = "gsynth"` and `vartype = "parametric"`, the 95% confidence intervals around the counterfactual outcomes will be the same as for the event-study ATT (though flipped in shape).
 
 ```{r cache = FALSE, fig.height=5, fig.width=7}
 plot(out, type = "counterfactual")
 ```
 
-**fect** offers two options for displaying all estimated counterfactual estimates: `raw="all"` for linear and `raw="band"` for a graphical (shaded band) representation.
+**fect** offers two options for displaying all estimated counterfactual estimates: `raw = "all"` for linear and `raw = "band"` for a graphical (shaded band) representation.
 
 ```{r cache = FALSE,fig.height=5, fig.width=7}
 plot(out, type = "counterfactual", raw = "all")
 ```
+
+Note that in the plot below, the shaded areas represent the 5-95% quantiles of the treated and estimated counterfactual trajectories, not their uncertainty estimates. 
 
 ```{r cache = FALSE,fig.height=5, fig.width=7}
 plot(out, type = "counterfactual", raw = "band")
@@ -353,7 +355,7 @@ We can also visualize this using the "counterfactual" plot.
 plot(out_turnout, type = "counterfactual")
 ```
 
-If we want to zoom in to examine the treatment effect on a specific state, such as Wisconsin, we can do so by setting the `id` option accordingly. The `id` option can also accept a vector if one wishes to plot multiple treated units. This plot will only display CIs if `keep.sims = TRUE` is set in the estimation step and `vartype = "parametric"`.
+If we want to zoom in to examine the treatment effect on a specific state, such as Wisconsin, we can do so by setting the `id` option accordingly. The `id` option can also accept a vector if one wishes to plot multiple treated units. This plot will only display confidence intervals for the counterfactual estimates if `keep.sims = TRUE` is set in the estimation step and `vartype = "parametric"`.
 
 ```{r turnout_gap2, fig.height=5, fig.width=7}
 plot(out_turnout, type = "counterfactual", id = "WI", main = "Wisconsin")

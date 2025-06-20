@@ -1411,7 +1411,7 @@ plot.fect <- function(
           lw <- c(est.lwidth,est.lwidth/2); set.linewidth <- c(lw[1], lw[1], lw[2])
         }
       } else { # Multiple treated units, all with the same T0
-        maintext <- "Treated Average vs Estimated Counterfactual Average Trajectories"; Yb_show_abs <- Yb[show_abs, , drop = FALSE]
+        maintext <- "Treated vs Estimated Counterfactuals"; Yb_show_abs <- Yb[show_abs, , drop = FALSE]
         y_data_for_range_calc <- c(Yb_show_abs[,1], Yb_show_abs[,2])
         if (raw == "none") {
           if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
@@ -1584,7 +1584,7 @@ plot.fect <- function(
         stop("Relative timeline calculation resulted in zero length or all NA.")
       }
 
-      maintext <- "Treated Average vs Estimated Counterfactual Average Trajectories"
+      maintext <- "Treated vs Estimated Counterfactuals"
       xlab_final <- if (is.null(xlab)) "Time Since the Treatment's Onset" else if (xlab == "") NULL else xlab
       ylab_final <- if (is.null(ylab)) x$Yname else if (ylab == "") NULL else ylab
 
