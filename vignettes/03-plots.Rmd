@@ -205,6 +205,18 @@ plot(out.hh, type = "counterfactual",
      legend.pos = "bottom")
 ```
 
+We can change the color of the lines in this plot using `color`, which sets the color of the main line, and `counterfactual.color`, which sets the color of the counterfactual line. Additionally, we can add an outline to the CIs with `ci.outline = TRUE`.
+
+```{r counterfactual_colors}
+plot(out.hh, type = "counterfactual",
+     main = "Hainmueller & Hangartner (2019): Treated vs. Counterfactuals",
+     ylab = "Naturalization Rate",
+     legend.pos = "bottom",
+     ci.outline = TRUE, # Outline the confidence interval band
+     color = "red3", # Color for the main line
+     counterfactual.color = "green4") # Color for the counterfactual line
+```
+
 We can also visualize the paths of the individual units by setting `raw = "all"`
 
 ```{r counterfactual_rawall}
@@ -217,10 +229,12 @@ Setting `raw = "band` displays the the 5-95 interpercentile range of the treated
 plot(out, type = "counterfactual", raw = "band")
 ```
 
-Many adjustments can be made to the counterfactual plot with the same options as in the gap plot, as well as the `counterfactual.color`, `counterfactual.raw.controls.color`, `counterfactual.raw.treated.color`, and `counterfactual.linetype` options.
+We can also change the colors in this plot using the same options as in the gap plot, as well as the `counterfactual.color`, `counterfactual.raw.controls.color`, `counterfactual.raw.treated.color`, and `counterfactual.linetype` options.
 
-```{r counterfactual_colors}
+```{r counterfactual_colors2}
 plot(out, type = "counterfactual",
+     count.color = "black", # Color for the count histogram
+     count.alpha = 1, # Opacity for the count histogram
      color = "red", # Color for the main line
      counterfactual.color = "purple", # Color for the counterfactual line
      counterfactual.raw.treated.color = "orange", # Color for the treated units
@@ -321,8 +335,8 @@ A placebo test evaluates whether the "fake" ATT is statistically distinguishable
 Therefore, the model must be re-run. Below, we set `placebo.period = c(-2, 0)`, specifying the pre-treatment periods used for the placebo test.
 
 ```{r placebo, cache = TRUE}
-out_fe_placebo <- fect(Y = y, D = d, X = controls, data = gs2020, 
-                       index = c(unit, time), force = "two-way",
+out_fe_placebo <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020, 
+                       index = c("district_final", "cycle"), force = "two-way",
                        method = "fe", CV = FALSE, parallel = TRUE,
                        se = TRUE, nboots = 1000, placeboTest = TRUE,
                        placebo.period = c(-2, 0))
@@ -349,8 +363,8 @@ plot(out_fe_placebo, type = "exit")
 The test for carryover effects examines whether the treatment effect persists after treatment ends. It artificially labels several post-treatment periods as treated and estimates the "placebo effect" in those periods. By setting `carryover.period = c(1, 3)`, we specify a placebo period that includes three post-treatment periods. If the treatment effect is purely contemporaneous (i.e., there are no carryover effects), the test will not reject the null hypothesis. In this application, the average carryover effect is close to zero and statistically indistinguishable from zero.
 
 ```{r carryover, cache = TRUE}
-out_fe_carryover <- fect(Y = y, D = d, X = controls, data = gs2020,
-                         index = c(unit, time), force = "two-way",
+out_fe_carryover <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020, 
+                       index = c("district_final", "cycle"), force = "two-way",
                          parallel = TRUE, se = TRUE, CV = FALSE,
                          nboots = 1000, carryoverTest = TRUE,
                          carryover.period = c(1, 3))
@@ -361,10 +375,11 @@ plot(out_fe_carryover)
 The status plot (`type = "status"`) displays the treatment status by period for all units in a similar fashion to `panelView`. Each of the indicator colors can be customized using the `status.*.color` options. 
 ```{r status}
 plot(out_fe_carryover, type = "status",
-     status.treat.color = "red", # Color for treated units
-     status.control.color = "blue",   # Color for control units
-     status.missing.color = "darkgreen",   # Color for missing data
-     status.background.color = "beige", # Background color
+     status.treat.color      = "#D55E00",  # Color for treated units
+     status.control.color    = "#0072B2",  # Color for control units
+     status.carryover.color  = "#CC79A7",  # Color for carryover units
+     status.missing.color    = "#009E73",  # Color for missing data
+     status.background.color = "#F3EAD2",  # Background color
      main = "Status Plot")
 ```
 

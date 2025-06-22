@@ -371,11 +371,15 @@ plot.fect <- function(
       gridOff <- TRUE
     }
   }
+
+  # add spacing
   if (!is.null(xlim) & !(type %in% c("gap", "equiv", "exit", "sens", "sens_es"))){
     if (length(xlim) == 2) {
       xlim = c(xlim[1]-0.2,xlim[2]+0.2)
     }
   }
+
+
   # factors, loadings, fe
   if (type %in% c("loadings", "factors")) {
     if (type == "loadings") {
@@ -2773,6 +2777,10 @@ plot.fect <- function(
       CI <- FALSE
     } else {
       CI <- TRUE
+    }
+    if (!is.null(xlim)) {
+      x$est.eff.calendar <- x$est.eff.calendar[which(rownames(x$est.eff.calendar)  >= min(xlim) & rownames(x$est.eff.calendar)  <= max(xlim)), ]
+      x$est.eff.calendar.fit <- x$est.eff.calendar.fit[which(rownames(x$est.eff.calendar.fit)  >= min(xlim) & rownames(x$est.eff.calendar.fit)  <= max(xlim)), ]
     }
     if (plot.ci == "none") {
       CI <- FALSE

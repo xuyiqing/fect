@@ -1,6 +1,6 @@
 # Gsynth Program {#sec-gsynth}
 
-This chapter demonstrate the generalized synthetic control method, or Gsynth, proposed in @Xu2017 ([<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>]). Download the R code used in this chapter [here](rscript/04-gsynth.R).
+This chapter demonstrate the generalized synthetic control method, or Gsynth, proposed in @Xu2017 (\[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\]). Download the R code used in this chapter [here](rscript/04-gsynth.R).
 
 Gsynth was originally implemented in the **gsynth** package but has now been fully integrated into the **fect** package. Gsynth (`method = "gsynth"`) and FEct/IFEct/MC (`method = "fe"/"ife"/"mc"`) are different in the following ways:
 
@@ -209,7 +209,7 @@ plot(out, type = "counterfactual")
 plot(out, type = "counterfactual", raw = "all")
 ```
 
-Note that in the plot below, the shaded areas represent the 5-95% quantiles of the treated and estimated counterfactual trajectories, not their uncertainty estimates. 
+Note that in the plot below, the shaded areas represent the 5-95% quantiles of the treated and estimated counterfactual trajectories, not their uncertainty estimates.
 
 ```{r cache = FALSE,fig.height=5, fig.width=7}
 plot(out, type = "counterfactual", raw = "band")

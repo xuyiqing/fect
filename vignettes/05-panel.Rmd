@@ -910,8 +910,6 @@ p.fect.balance
 
 While the preceding sections have meticulously detailed the individual implementation of various HTE-robust DID estimators, the **fect** package also provides a convenient function, `did_wrapper`, that can significantly streamline this process for several common methods.
 
-Here's the corrected and formatted version of your bullet points in Markdown:
-
 The `did_wrapper` function can execute methods such as:
 
 -   **Two-Way Fixed Effects (TWFE)**: by setting `method = "twfe"`.

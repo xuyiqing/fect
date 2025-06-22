@@ -881,6 +881,22 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     p <- p + ggtitle(main)
   }
   p <- p + coord_cartesian(xlim = c(final_xlim[1]-0.2,final_xlim[2]+0.2), ylim = final_ylim)
+  p <- p + scale_x_continuous(
+    breaks = function(lims) {
+      ## 1. ggplot’s own suggestion (needs {scales})
+      br <- scales::pretty_breaks()(lims)
+
+      ## 2. keep only integers
+      br <- br[abs(br - round(br)) < 1e-8]
+
+      ## 3. if none left (very narrow panel or weird limits), make 5 integers
+      if (length(br) == 0) {
+        br <- round(seq(lims[1], lims[2], length.out = 5))
+      }
+      br
+    }
+  )
+
 
   return(p)
 }
