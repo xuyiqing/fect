@@ -131,6 +131,15 @@ plot(out.hh,
      preset = "vibrant", # Use vibrant colors
      main = "Vibrant Preset Colors: Hainmueller and Hangartner (2019)")
 ```
+
+We can change the color of the estimates (and their confidence intervals) using the `color` option. 
+```{r preset-vibrant2}
+plot(out.hh, 
+     preset = "vibrant", # Use vibrant colors
+     color = "green4", # Color of the estimates and CIs
+     main = "Change Estimates' Color: Hainmueller and Hangartner (2019)")
+```
+
 ```{r preset-grayscale}
 plot(out, 
      preset = "grayscale", # Use grayscale colors
@@ -143,8 +152,9 @@ By default, the estimates are plotted as points. To connect the points with line
 
 ```{r connected-estimates}
 plot(out, 
+     color = "green4", # color of the estimates and CIs
      connected = TRUE, # Connect the points with lines
-     est.lwidth = 1.5, # Makes the lines thicker
+     est.lwidth = 1.2, # Makes the lines thicker
      est.pointsize = 3 # Makes the points larger
 )
 ```
@@ -205,7 +215,7 @@ plot(out.hh, type = "counterfactual",
      legend.pos = "bottom")
 ```
 
-We can change the color of the lines in this plot using `color`, which sets the color of the main line, and `counterfactual.color`, which sets the color of the counterfactual line. Additionally, we can add an outline to the CIs with `ci.outline = TRUE`.
+We can change the color of the lines in this plot using `color`, which sets the color of the main line, and `counterfactual.color`, which sets the color of the counterfactual line (as well as the color of the confidence band but with more transparency). Additionally, we can add an outline to the CIs with `ci.outline = TRUE`.
 
 ```{r counterfactual_colors}
 plot(out.hh, type = "counterfactual",
@@ -286,7 +296,7 @@ out_no_reversals <- fect(Y = "general_sharetotal_A_all",
 Finally, we will plot the cumulative effects.
 
 ```{r cumulative-effects}
-plot(effect(out_no_reversals))
+plot(effect(out_no_reversals), xlim = c(1, 2))
 ```
 
 ## Pretrend Tests
@@ -397,6 +407,6 @@ In the calendar plot, the blue ribbon represents a loess fit of the conditional 
 
 ```{r}
 plot(out, type = "calendar", main = "The Effect of Coethnic Mobilization")
-plot(out.hh, type = "calendar", xlim = c(1995, 2010),
+plot(out.hh, type = "calendar", xlim = c(1995, 2009),
      main = "The Effect of Indirect Democracy")
 ```
