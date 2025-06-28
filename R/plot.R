@@ -371,7 +371,7 @@ plot.fect <- function(
       gridOff <- TRUE
     }
   }
-
+  provided_xlim <- xlim
   # add spacing
   if (!is.null(xlim) & !(type %in% c("gap", "equiv", "exit", "sens", "sens_es"))){
     if (length(xlim) == 2) {
@@ -517,8 +517,8 @@ plot.fect <- function(
       if (!is.numeric(time[1])) {
         time <- 1:x$T
       }
-      if (length(xlim) != 0) {
-        show <- which(time >= xlim[1] & time <= xlim[2])
+      if (length(provided_xlim) != 0) {
+        show <- which(time >= provided_xlim[1] & time <= provided_xlim[2])
         proportion = 0
       } else {
         show <- 1:length(time)
@@ -840,7 +840,7 @@ plot.fect <- function(
     }
     # classic equivalence test:
     if (length(xlim) != 0 && xlim[2] > 0) {
-      xlim[2] <- 0
+      xlim[2] <- 0.2
     }
     if (loo == 0) {
       maintext <- "Equivalence Test"
@@ -1158,6 +1158,16 @@ plot.fect <- function(
       angle <- 0; x.v <- 0; x.h <- 0.5
     }
 
+    plot_xlim <- xlim
+    if (!is.null(xlim)) {
+      if (is.numeric(xlim) && length(xlim) == 2) {
+        proportion <- 0 # When xlim is given, don't filter by proportion
+      } else {
+        warning("Invalid xlim provided. It must be a numeric vector of length 2. Ignoring xlim.")
+      }
+    }
+
+
     # --- Data Extraction and Cleaning ---
     subset = 1:x$N
     subset.tr <- x$tr
@@ -1220,11 +1230,12 @@ plot.fect <- function(
 
     if (is.null(shade.post)) { shade.post <- TRUE }
     else if (!is.logical(shade.post)) { stop("Option \"shade.post\" must be logical (TRUE/FALSE).") }
-    legend.pos <- if (legendOff) "none" else "bottom"
-    user_xlim <- xlim; validated_user_xlim <- NULL
-    if (length(user_xlim) != 0) {
-      if (!is.numeric(user_xlim) || length(user_xlim) != 2) { warning("Invalid xlim provided. Ignoring xlim.") }
-      else { validated_user_xlim <- sort(user_xlim) }
+    if (legendOff == TRUE) {
+      legend.pos <- "none"
+    } else {
+      if (is.null(legend.pos)) {
+        legend.pos <- "bottom"
+      }
     }
     y_data_for_range_calc <- c()
     Y.tr[is.na(Y.ct)] <- NA_real_
@@ -1239,12 +1250,11 @@ plot.fect <- function(
         else if (!is.na(unique_t0_val_count) && unique_t0_val_count == length(plot_time_abs)) { time_bf_abs_val <- plot_time_abs[length(plot_time_abs)] + time_step_abs }
       }
       vline_pos_abs <- if (!is.na(time_bf_abs_val)) time_bf_abs_val - (time_step_abs / 2) else NA
-      plot_xlim_abs <- NULL
-      if (!is.null(validated_user_xlim)) { plot_xlim_abs <- validated_user_xlim }
-      else { if (length(plot_time_abs) > 0) { plot_xlim_abs <- range(plot_time_abs, na.rm = TRUE); if(any(!is.finite(plot_xlim_abs))) plot_xlim_abs <- NULL } }
+
+      # Determine which points to show based on provided_xlim (un-padded)
       show_abs <- 1:length(plot_time_abs)
-      if (!is.null(plot_xlim_abs)) {
-        show_abs_check <- which(plot_time_abs >= plot_xlim_abs[1] & plot_time_abs <= plot_xlim_abs[2])
+      if (!is.null(provided_xlim)) {
+        show_abs_check <- which(plot_time_abs >= provided_xlim[1] & plot_time_abs <= provided_xlim[2])
         if (length(show_abs_check) == 0) { warning("No data points in xlim range. Plotting all.") } else { show_abs <- show_abs_check }
       }
 
@@ -1258,9 +1268,7 @@ plot.fect <- function(
         }
       }
 
-      if (length(show_abs) > 0 && is.null(plot_xlim_abs)) {
-        plot_xlim_abs <- range(plot_time_abs[show_abs], na.rm = TRUE); if(any(!is.finite(plot_xlim_abs))) plot_xlim_abs <- NULL
-      } else if (length(show_abs) == 0) {
+      if (length(show_abs) == 0) {
         stop("Cannot determine time range for absolute time plot.")
       }
 
@@ -1479,8 +1487,8 @@ plot.fect <- function(
             required_cols_ci <- c("period", tr_lo_col, tr_hi_col, cf_lo_col, cf_hi_col)
             if (all(required_cols_ci %in% names(x$Y.avg))) {
               ci_data_abs <- x$Y.avg; ci_data_filtered_abs <- NULL
-              if (!is.null(plot_xlim_abs) && is.numeric(ci_data_abs$period)) { ci_data_filtered_abs <- ci_data_abs[ci_data_abs$period >= plot_xlim_abs[1] & ci_data_abs$period <= plot_xlim_abs[2], ] }
-              else { ci_data_filtered_abs <- ci_data_abs[ci_data_abs$period %in% plot_time_abs[show_abs],] }
+              # Filter CI data based on the points being shown
+              ci_data_filtered_abs <- ci_data_abs[ci_data_abs$period %in% plot_time_abs[show_abs],]
               if (!is.null(ci_data_filtered_abs) && nrow(ci_data_filtered_abs) > 0) {
                 p <- p + geom_ribbon(data = ci_data_filtered_abs, aes(x = period, ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
                   geom_ribbon(data = ci_data_filtered_abs, aes(x = period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
@@ -1570,19 +1578,19 @@ plot.fect <- function(
             time_step_for_bars_abs <- if(length(unique(counts_for_plot_df_abs$time)) > 1) min(diff(sort(unique(counts_for_plot_df_abs$time))),na.rm=TRUE) else 1; if(!is.finite(time_step_for_bars_abs) || time_step_for_bars_abs <=0) time_step_for_bars_abs <- 1
             bar_width_half_abs <- time_step_for_bars_abs * 0.20; counts_for_plot_df_abs$xmin <- counts_for_plot_df_abs$time - bar_width_half_abs; counts_for_plot_df_abs$xmax <- counts_for_plot_df_abs$time + bar_width_half_abs
             max_count_time_pos_abs <- counts_for_plot_df_abs$time[which.max(counts_for_plot_df_abs$count)[1]]; text_y_pos_abs <- rect_min_val_abs + actual_rect_length_abs + (count_bar_space_height_abs - actual_rect_length_abs) * 0.5
-            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, color = count.outline.color, inherit.aes = FALSE) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5,alpha = count.alpha,linewidth = 0.2)
+            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, color = count.outline.color, inherit.aes = FALSE,alpha = count.alpha,linewidth = 0.2) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5)
           }
         }
       }
       coord_args_abs <- list(clip = "on", expand = TRUE)
       if (!is.null(ylim)) { coord_args_abs$ylim <- ylim } else if (show.count == TRUE && exists("rect_min_val_abs") && exists("counts_for_plot_df_abs") && nrow(counts_for_plot_df_abs) > 0 && exists("current_plot_yrange") && !is.null(current_plot_yrange)) { final_yrange_min <- min(current_plot_yrange[1], rect_min_val_abs, na.rm=TRUE); final_yrange_max <- current_plot_yrange[2]; coord_args_abs$ylim <- c(final_yrange_min, final_yrange_max) }
-      if (!is.null(plot_xlim_abs)) { coord_args_abs$xlim <- plot_xlim_abs }
+      # Use the padded plot_xlim for the final axis range
+      if (!is.null(plot_xlim)) { coord_args_abs$xlim <- plot_xlim }
       p <- p + do.call(coord_cartesian, coord_args_abs)
       p <- p + theme(legend.position = legend.pos)
 
     } else { # Case 2: Staggered Adoption (Different T0) -> Relative Time Plot
       xx <- ct.adjust(Y.tr, Y.ct, T0, D_mat, tr_idx_logical)
-      # Original event-time scale (e.g., 0 = last pre-treatment, 1 = first treatment period)
       event_time_full_series <- xx$timeline
       if (length(event_time_full_series) == 0 || all(is.na(event_time_full_series))) {
         stop("Relative timeline calculation resulted in zero length or all NA.")
@@ -1592,60 +1600,21 @@ plot.fect <- function(
       xlab_final <- if (is.null(xlab)) "Time Since the Treatment's Onset" else if (xlab == "") NULL else xlab
       ylab_final <- if (is.null(ylab)) x$Yname else if (ylab == "") NULL else ylab
 
-      # Determine xlim on the original event-time scale.
-      # validated_user_xlim is assumed by user to be on event-time scale (0=last pre, 1=first post)
-      # or, if start0=TRUE, they should adjust their xlim input accordingly (0=first post).
-      # The code here will apply validated_user_xlim to the *final* axis time.
-      # So, let's first establish the range on event_time_full_series, then shift if start0=TRUE.
-
-      # Step 1: Determine the range of event times to consider based on data and user_xlim (if any)
-      # This xlim_event_scale is on the original event time scale.
-      xlim_event_scale <- NULL
-      if (!is.null(validated_user_xlim)) {
-        # If start0 is TRUE, user's xlim should be for the shifted axis. We map it back to event_scale for initial filtering.
-        xlim_to_check_on_event_scale <- validated_user_xlim
-        if (exists("start0", inherits = FALSE) && isTRUE(start0)) {
-          xlim_to_check_on_event_scale <- validated_user_xlim + 1
-        }
-
-        show_check_event_scale <- which(event_time_full_series >= xlim_to_check_on_event_scale[1] & event_time_full_series <= xlim_to_check_on_event_scale[2])
-        if (length(show_check_event_scale) == 0) {
-          warning("User xlim for relative time contains no points after considering start0. Plotting full range.");
-          xlim_event_scale <- range(event_time_full_series, na.rm = TRUE);
-        } else {
-          xlim_event_scale <- range(event_time_full_series[show_check_event_scale], na.rm=TRUE) # Use the range of actual points within user's desire
-        }
-        if(any(!is.finite(xlim_event_scale))) xlim_event_scale <- NULL
-      } else {
-        xlim_event_scale <- range(event_time_full_series, na.rm = TRUE);
-        if(any(!is.finite(xlim_event_scale))) xlim_event_scale <- NULL
-      }
-
-      # Step 2: Determine indices of event_time_full_series to show, based on xlim_event_scale
+      # Determine indices of event_time_full_series to show, based on provided_xlim (un-padded)
       indices_to_show <- 1:length(event_time_full_series)
-      if (!is.null(xlim_event_scale)) {
-        check_indices <- which(event_time_full_series >= xlim_event_scale[1] & event_time_full_series <= xlim_event_scale[2])
-        if (length(check_indices) == 0 && length(event_time_full_series) > 0) {
-          warning("No relative time data points fall within the calculated event time xlim range. Plotting all available relative time data.")
-          indices_to_show <- 1:length(event_time_full_series)
-          # Recalculate xlim_event_scale to actual full range of data to be shown
-          xlim_event_scale <- range(event_time_full_series[indices_to_show], na.rm = TRUE)
-          if(any(!is.finite(xlim_event_scale))) xlim_event_scale <- NULL
-        } else if (length(check_indices) > 0) {
-          indices_to_show <- check_indices
-        } else if (length(event_time_full_series) == 0) { # Should have been caught earlier
-          stop("Cannot determine relative time range for plot as timeline is empty.")
+      if (!is.null(provided_xlim)) {
+        xlim_to_check <- provided_xlim
+        if (exists("start0", inherits = FALSE) && isTRUE(start0)) {
+          xlim_to_check <- provided_xlim + 1
         }
-      } else if (length(event_time_full_series) > 0) { # xlim_event_scale was NULL (e.g. range had non-finite)
-        xlim_event_scale <- range(event_time_full_series[indices_to_show], na.rm = TRUE) # Default to full range
-        if(any(!is.finite(xlim_event_scale))) xlim_event_scale <- NULL
-      } else { # Should have been caught earlier
-        stop("Cannot determine relative time range for plot as timeline is empty and xlim could not be determined.")
+        show_check <- which(event_time_full_series >= xlim_to_check[1] & event_time_full_series <= xlim_to_check[2])
+        if (length(show_check) == 0) {
+          warning("User xlim for relative time contains no points. Plotting full range.")
+        } else {
+          indices_to_show <- show_check
+        }
       }
 
-      if (length(xlim) != 0) {
-        proportion = 0
-      }
       counts_for_filtering_rel <- rowSums(!is.na(xx$Y.tr.aug), na.rm = TRUE)
       max_count_for_filtering_rel <- max(counts_for_filtering_rel, na.rm = TRUE)
       if (is.finite(max_count_for_filtering_rel) && max_count_for_filtering_rel > 0) {
@@ -1656,46 +1625,20 @@ plot.fect <- function(
         }
       }
 
-      # Event times for the points that will actually be plotted (on original event time scale)
       event_times_for_data_subset <- event_time_full_series[indices_to_show]
-
-      # Data subsetted for plotting (aligned with event_times_for_data_subset)
       Yb_data_subset <- xx$Yb[indices_to_show, , drop = FALSE]
-      Ytr_aug_data_subset <- xx$Y.tr.aug[indices_to_show, , drop = FALSE] # Rownames are character event_times_for_data_subset
+      Ytr_aug_data_subset <- xx$Y.tr.aug[indices_to_show, , drop = FALSE]
 
-      # Step 3: Define the time scale for the plot's x-axis and related elements
       time_for_plot_axis <- event_times_for_data_subset
-      xlim_for_plot_axis <- range(time_for_plot_axis, na.rm = TRUE) # Recalculate range based on filtered data
-      if(any(!is.finite(xlim_for_plot_axis))) xlim_for_plot_axis <- NULL
-      vline_pos_for_plot_axis <- 0.5 # Default vline (between event time 0 and 1)
-
-      # Apply shift if start0 is TRUE
-      # The `start0` variable is assumed to be defined in the calling environment of the plot function.
-      apply_start0_shift <- exists("start0", inherits = TRUE) && isTRUE(start0) # inherits=TRUE to find it in parent envs
+      vline_pos_for_plot_axis <- 0.5
+      apply_start0_shift <- exists("start0", inherits = TRUE) && isTRUE(start0)
 
       if (apply_start0_shift) {
         time_for_plot_axis <- time_for_plot_axis - 1
-        if (!is.null(xlim_for_plot_axis)) {
-          xlim_for_plot_axis <- xlim_for_plot_axis - 1
-        }
-        vline_pos_for_plot_axis <- -0.5 # New vline (between shifted -1 and 0)
-
-        # If user provided xlim, it's already for the shifted axis due to earlier logic,
-        # so xlim_for_plot_axis should align with validated_user_xlim if it was used.
-        if(!is.null(validated_user_xlim)){
-          xlim_for_plot_axis <- validated_user_xlim
-        }
-
-      } else {
-        # If not shifting, and user provided xlim, ensure xlim_for_plot_axis respects it
-        if(!is.null(validated_user_xlim)){
-          xlim_for_plot_axis <- validated_user_xlim
-        }
+        vline_pos_for_plot_axis <- -0.5
       }
 
-
       nT_on_axis <- length(time_for_plot_axis)
-      # Calculate breaks based on the final time_for_plot_axis
       T_b_axis_ticks_indices <- integer(0)
       if (nT_on_axis > 0) {
         if (is.numeric(time_for_plot_axis) && length(time_for_plot_axis) > 1) {
@@ -1712,9 +1655,8 @@ plot.fect <- function(
         }
       }
 
-      y_data_for_range_calc <- c(Yb_data_subset[,1], Yb_data_subset[,2]) # Outcome values are not shifted
+      y_data_for_range_calc <- c(Yb_data_subset[,1], Yb_data_subset[,2])
 
-      # --- Plotting logic using time_for_plot_axis, Yb_data_subset, Ytr_aug_data_subset ---
       if (raw == "none") {
         if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
           subset.eff.boot <- sapply(seq_len(dim(x$eff.boot)[3]), function(j) {
@@ -1786,19 +1728,11 @@ plot.fect <- function(
 
           if (all(required_cols_ci %in% names(x$Y.avg))) {
             ci_data_for_plot <- x$Y.avg
-            ci_data_for_plot$time_axis_period <- ci_data_for_plot$period # Original event time period
+            ci_data_for_plot$time_axis_period <- ci_data_for_plot$period
             if (apply_start0_shift) {
               ci_data_for_plot$time_axis_period <- ci_data_for_plot$time_axis_period - 1
             }
-
-            # Filter CI data:
-            # 1. Rows corresponding to event times being shown (before potential shift)
             ci_data_filtered <- ci_data_for_plot[ci_data_for_plot$period %in% event_times_for_data_subset, ]
-            # 2. Further filter by the final axis xlim (which is already shifted if needed)
-            if (!is.null(xlim_for_plot_axis) && nrow(ci_data_filtered) > 0) {
-              ci_data_filtered <- ci_data_filtered[ci_data_filtered$time_axis_period >= xlim_for_plot_axis[1] &
-                                                     ci_data_filtered$time_axis_period <= xlim_for_plot_axis[2], ]
-            }
 
             if (!is.null(ci_data_filtered) && nrow(ci_data_filtered) > 0) {
               p <- p + geom_ribbon(data = ci_data_filtered, aes(x = time_axis_period, ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
@@ -1828,7 +1762,6 @@ plot.fect <- function(
         set.limits <- c("tr", "co", "tr_band"); set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated (5-95% Quantiles)"); set.colors <- c(color, counterfactual.color, NA); set.linetypes <- c("solid", counterfactual.linetype, "blank"); set.linewidth <- c(est.lwidth, est.lwidth, 0); set.fill <- c(NA, NA, color)
 
       } else if (raw == "all") {
-        # Ytr_aug_data_subset has rownames as character event_times_for_data_subset
         raw_tr_data_plot <- NULL
         if (ncol(Ytr_aug_data_subset) > 0 && nrow(Ytr_aug_data_subset) > 0) {
           melt_temp_tr <- reshape2::melt(Ytr_aug_data_subset, varnames = c("event_t_char", "id"), value.name = "o")
@@ -1856,7 +1789,6 @@ plot.fect <- function(
         lw <- c(est.lwidth,est.lwidth/2); set.linewidth <- c(lw[1], lw[1], lw[2])
       }
 
-      # --- Plot finalization common to Case 2 (Staggered) ---
       p <- p + xlab(xlab_final) + ylab(ylab_final) +
         geom_vline(xintercept = vline_pos_for_plot_axis, colour = lcolor[2], linewidth = lwidth[2],  linetype = ltype[2]) +
         theme(legend.position = legend.pos,
@@ -1865,7 +1797,6 @@ plot.fect <- function(
               axis.title = element_text(size = cex.lab),
               plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)))
       if (theme.bw == TRUE) { p <- p + theme_bw() }
-      # Redundant theme call from original, kept for consistency if specific overrides were intended
       p <- p + theme(
         legend.position = legend.pos,
         axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
@@ -1898,9 +1829,7 @@ plot.fect <- function(
       if (!is.null(final_main_text)) p <- p + ggtitle(final_main_text)
 
       if (show.count == TRUE) {
-        # Time for count bars should be on the final plot axis scale
         time_for_count_bars <- time_for_plot_axis
-        # Counts are based on the data before any time shifting
         counts_values <- NULL
         if (nrow(Ytr_aug_data_subset) > 0 && ncol(Ytr_aug_data_subset) > 0) {
           counts_values <- rowSums(!is.na(Ytr_aug_data_subset), na.rm = TRUE)
@@ -1955,15 +1884,16 @@ plot.fect <- function(
         final_yrange_max <- current_plot_yrange[2]
         coord_args_staggered$ylim <- c(final_yrange_min, final_yrange_max)
       }
-      if (!is.null(xlim_for_plot_axis)) { coord_args_staggered$xlim <- xlim_for_plot_axis }
+      # Use the padded plot_xlim for the final axis range
+      if (!is.null(plot_xlim)) { coord_args_staggered$xlim <- plot_xlim }
       p <- p + do.call(coord_cartesian, coord_args_staggered)
       p <- p + theme(legend.position = legend.pos)
-    } # End of Case 2 (Staggered Adoption)
+    }
 
     if (gridOff == TRUE) {
       p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
     }
-    if (exists("set.fill")) rm(set.fill) # Clean up set.fill if it was created
+    if (exists("set.fill")) rm(set.fill)
     return(p)
   }
 
@@ -2778,9 +2708,9 @@ plot.fect <- function(
     } else {
       CI <- TRUE
     }
-    if (!is.null(xlim)) {
-      x$est.eff.calendar <- x$est.eff.calendar[which(rownames(x$est.eff.calendar)  >= min(xlim) & rownames(x$est.eff.calendar)  <= max(xlim)), ]
-      x$est.eff.calendar.fit <- x$est.eff.calendar.fit[which(rownames(x$est.eff.calendar.fit)  >= min(xlim) & rownames(x$est.eff.calendar.fit)  <= max(xlim)), ]
+    if (!is.null(provided_xlim)) {
+      x$est.eff.calendar <- x$est.eff.calendar[which(rownames(x$est.eff.calendar)  >= min(provided_xlim) & rownames(x$est.eff.calendar)  <= max(provided_xlim)), ]
+      x$est.eff.calendar.fit <- x$est.eff.calendar.fit[which(rownames(x$est.eff.calendar.fit)  >= min(provided_xlim) & rownames(x$est.eff.calendar.fit)  <= max(provided_xlim)), ]
     }
     if (plot.ci == "none") {
       CI <- FALSE
