@@ -1,6 +1,6 @@
 # Fect Plot Options {#sec-plots}
 
-In this chapter, we explore various visualization options available in the **fect** package using data from @GS2020. 
+In this chapter, we explore various visualization options available in the **fect** package using data from @GS2020. Download the R code used in this chapter [here](rscript/03-plot.R).
 
 ------------------------------------------------------------------------
 
@@ -212,7 +212,7 @@ plot(out, type = "counterfactual",
 plot(out.hh, type = "counterfactual",
      main = "Hainmueller & Hangartner (2019): Treated vs. Counterfactuals",
      ylab = "Naturalization Rate",
-     legend.pos = "bottom")
+     legend.pos = "top")
 ```
 
 We can change the color of the lines in this plot using `color`, which sets the color of the main line, and `counterfactual.color`, which sets the color of the counterfactual line (as well as the color of the confidence band but with more transparency). Additionally, we can add an outline to the CIs with `ci.outline = TRUE`.

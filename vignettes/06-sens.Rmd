@@ -1,6 +1,6 @@
 # Sensitivity Analysis {#sec-panel-sens}
 
-Download the R code used in this chapter [here](rscript/05-sens.R).
+Download the R code used in this chapter [here](rscript/06-sens.R).
 
 ------------------------------------------------------------------------
 

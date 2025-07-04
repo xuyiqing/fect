@@ -23,8 +23,9 @@ vignettes/*.html
 vignettes/*.pdf
 vignettes/*_cache/
 vignettes/*_files/
-vignettes/_book
-!vignettes/_book/rscript
+vignettes/_book/**
+!vignettes/_book/rscript/
+!vignettes/_book/rscript/*.R
 
 
 # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
