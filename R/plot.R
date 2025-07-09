@@ -1255,7 +1255,7 @@ plot.fect <- function(
       show_abs <- 1:length(plot_time_abs)
       if (!is.null(provided_xlim)) {
         show_abs_check <- which(plot_time_abs >= provided_xlim[1] & plot_time_abs <= provided_xlim[2])
-        if (length(show_abs_check) == 0) { warning("No data points in xlim range. Plotting all.") } else { show_abs <- show_abs_check }
+        if (length(show_abs_check) == 0) { warning("No data points in xlim range.") } else { show_abs <- show_abs_check }
       }
 
       counts_for_filtering_abs <- apply(Y.tr, 1, function(row) sum(!is.na(row)))
@@ -1488,12 +1488,13 @@ plot.fect <- function(
             if (all(required_cols_ci %in% names(x$Y.avg))) {
               ci_data_abs <- x$Y.avg; ci_data_filtered_abs <- NULL
               # Filter CI data based on the points being shown
-              ci_data_filtered_abs <- ci_data_abs[ci_data_abs$period %in% plot_time_abs[show_abs],]
+              ci_data_filtered_abs <- ci_data_abs[show_abs,]
               if (!is.null(ci_data_filtered_abs) && nrow(ci_data_filtered_abs) > 0) {
-                p <- p + geom_ribbon(data = ci_data_filtered_abs, aes(x = period, ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
-                  geom_ribbon(data = ci_data_filtered_abs, aes(x = period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
+                p <- p + geom_ribbon(data = ci_data_filtered_abs, aes(x = plot_time_abs[show_abs], ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
+                  geom_ribbon(data = ci_data_filtered_abs, aes(x = plot_time_abs[show_abs], ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
                 y_data_for_range_calc <- c(y_data_for_range_calc, ci_data_filtered_abs[[tr_lo_col]], ci_data_filtered_abs[[tr_hi_col]], ci_data_filtered_abs[[cf_lo_col]], ci_data_filtered_abs[[cf_hi_col]])
-              } else { warning("No CI data for treated/counterfactual averages.") }
+              } else {
+                warning("No CI data for treated/counterfactual averages.") }
             } else {warning("CI columns not found for treated/counterfactual averages.") }
           }
           p <- p + geom_line(data = data_plot_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
@@ -1609,7 +1610,7 @@ plot.fect <- function(
         }
         show_check <- which(event_time_full_series >= xlim_to_check[1] & event_time_full_series <= xlim_to_check[2])
         if (length(show_check) == 0) {
-          warning("User xlim for relative time contains no points. Plotting full range.")
+          warning("User xlim for relative time contains no points.")
         } else {
           indices_to_show <- show_check
         }

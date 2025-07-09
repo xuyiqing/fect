@@ -1618,13 +1618,9 @@ fect.boot <- function(Y,
 
           Y_b[is.na(Yct_b)] <- NA
 
-          # Identify which of the original D0-defined treated units are present in this replicate
-          target_units_present_in_b_orig_idx <- intersect(treated_units_idx_D0, replicate_col_to_original_idx)
-          if (length(target_units_present_in_b_orig_idx) == 0 && Ntr > 0) { # If there were supposed to be treated units but none are in this replicate
-            next
-          }
+
           # Get the column indices *in the current replicate D_b* that correspond to these target units
-          replicate_cols_for_target_units <- which(replicate_col_to_original_idx %in% target_units_present_in_b_orig_idx)
+          replicate_cols_for_target_units <- which(colSums(D_b == 1, na.rm = TRUE) > 0)
           if (length(replicate_cols_for_target_units) == 0 && Ntr > 0) {
             next
           }
@@ -1633,17 +1629,11 @@ fect.boot <- function(Y,
           for (t in seq.int(T_val)) {
             cols_to_avg <- integer(0)
             if (Ntr == 0) { # No treated units in D0, so effectively averaging "control" outcomes for "placebo" treated group
-              # This case means we are calculating averages over an empty set of units if we strictly follow "treated_units_idx_D0"
-              # The behavior here should be to produce NAs, which will happen if replicate_cols_for_target_units is empty.
-              # If Ntr=0, target_units_present_in_b_orig_idx is empty, replicate_cols_for_target_units is empty.
-              # So length(cols_to_avg) will be 0. This results in NA for this [t,b] cell. Correct.
             } else if (!is.na(common_G_D0) && t < common_G_D0) { # Pre-treatment period for non-staggered
               cols_to_avg <- replicate_cols_for_target_units
             } else if (!is.na(common_G_D0) && t >= common_G_D0) { # Post-treatment period for non-staggered
               # Only average over units that are actually treated (D_b[t,col]==1) in this replicate at this time
-              is_treated_in_b_at_t_for_target_cols <- D_b[t, replicate_cols_for_target_units] == 1
-              is_treated_in_b_at_t_for_target_cols[is.na(is_treated_in_b_at_t_for_target_cols)] <- FALSE
-              cols_to_avg <- replicate_cols_for_target_units[is_treated_in_b_at_t_for_target_cols]
+              cols_to_avg <- D_b[t,] == 1
             } else if (is.na(common_G_D0) && Ntr > 0) { # Should not happen if is_staggered is FALSE and Ntr > 0
               warning(paste("Replicate", b, ": In non-staggered case with Ntr > 0, but common_G_D0 is NA. Skipping time", t, "for this replicate."), call. = FALSE)
               next # Skip this time period for this replicate
