@@ -998,7 +998,7 @@ fect.boot <- function(Y,
             group = boot.group,
             time.on.seq.group = group.time.on,
             time.off.seq.group = group.time.off
-          ))
+          ), silent = TRUE)
         } else if (method == "ife") {
           boot <- try(fect.fe(
             Y = Y[, boot.id], X = X.boot, D = D.boot, W = W.boot,
