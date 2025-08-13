@@ -982,7 +982,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 tempID <- unique(data[, id])
                 for (i in tempID) {
                     subpos <- which(data[, id] == i)
-                    subtime <- data[data$id == i,]$time
+                    subtime <- data[subpos, time]
                     subd <- data[subpos, Dname]
                     if (sum(subd) >= 1) {
                         tr.time <- subtime[which(subd == 1)]
