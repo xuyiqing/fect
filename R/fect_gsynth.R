@@ -93,9 +93,10 @@ fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
 
     if (is.null(W)) {
         W.use <- as.matrix(0)
-    } else {
-        stop("Gsynth doesn't suppoort weighted outcome model in this version.\n")
-    }
+    } 
+    # else {
+    #     stop("Gsynth doesn't suppoort weighted outcome model in this version.\n")
+    # }
 
     if (!0 %in% I.tr) {
         ## a (TT*Ntr) matrix, time dimension: before treatment
