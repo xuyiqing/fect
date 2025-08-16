@@ -1,6 +1,9 @@
 name: release-to-cran-and-docs
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       submit_to_cran:
