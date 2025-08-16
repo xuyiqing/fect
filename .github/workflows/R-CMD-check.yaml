@@ -1,10 +1,6 @@
 name: R-CMD-check
 
 on:
-  push:
-    branches: ["**"]
-  pull_request:
-    branches: ["**"]
   workflow_dispatch:
 
 jobs:
@@ -41,6 +37,11 @@ jobs:
             any::devtools
             local::.
           needs: check
+
+      - name: Install GitHub packages (HonestDiDFEct)
+        run: |
+          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org')"
+          R -q -e "if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct')"
 
       - name: Session info
         run: |
