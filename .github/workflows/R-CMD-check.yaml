@@ -39,13 +39,13 @@ jobs:
           extra-packages: |
             any::rcmdcheck
             any::devtools
+            lzy318/HonestDiDFEct
             local::.
           needs: check
 
-      - name: Install GitHub packages (HonestDiDFEct)
+      - name: Install HonestDiDFEct via devtools
         run: |
-          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org')"
-          R -q -e "if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct')"
+          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org'); if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')"
 
       - name: Session info
         run: |

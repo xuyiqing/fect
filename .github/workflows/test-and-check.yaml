@@ -25,12 +25,12 @@ jobs:
           extra-packages: |
             any::devtools
             any::testthat
+            lzy318/HonestDiDFEct
             local::.
           needs: tests
-      - name: Install GitHub packages (HonestDiDFEct)
+      - name: Install HonestDiDFEct via devtools
         run: |
-          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org')"
-          R -q -e "if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct')"
+          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org'); if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')"
       - name: Run tests
         run: |
           R -q -e "devtools::test()"
@@ -52,12 +52,12 @@ jobs:
         with:
           extra-packages: |
             any::rcmdcheck
+            lzy318/HonestDiDFEct
             local::.
           needs: check
-      - name: Install GitHub packages (HonestDiDFEct)
+      - name: Install HonestDiDFEct via devtools
         run: |
-          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org')"
-          R -q -e "if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct')"
+          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org'); if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')"
       - name: CRAN incoming checks
         run: |
           R -q -e "rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on='warning', check_dir='check')"

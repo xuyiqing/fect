@@ -47,12 +47,12 @@ jobs:
             any::devtools
             any::rcmdcheck
             any::pkgdown
+            lzy318/HonestDiDFEct
             local::.
           needs: check
-      - name: Install GitHub packages (HonestDiDFEct)
+      - name: Install HonestDiDFEct via devtools
         run: |
-          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org')"
-          R -q -e "if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct')"
+          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org'); if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')"
       - name: CRAN checks (as-cran)
         run: |
           R -q -e "rcmdcheck::rcmdcheck(args=c('--no-manual','--as-cran'), error_on='warning')"
@@ -71,11 +71,10 @@ jobs:
           use-public-rspm: true
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::pkgdown, local::.
-      - name: Install GitHub packages (HonestDiDFEct)
+          extra-packages: any::pkgdown, lzy318/HonestDiDFEct, local::.
+      - name: Install HonestDiDFEct via devtools
         run: |
-          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org')"
-          R -q -e "if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct')"
+          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org'); if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')"
       - name: Build site
         run: |
           R -q -e "pkgdown::build_site(preview = FALSE)"
