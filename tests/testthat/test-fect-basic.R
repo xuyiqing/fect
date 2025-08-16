@@ -37,7 +37,5 @@ test_that("fect returns est.att and att.vcov when se=TRUE", {
 
   expect_true(!is.null(out$est.att))
   expect_true(!is.null(out$att.vcov))
-  expect_true(all(colnames(out$est.att) %in% c("ATT","S.E.","CI.lower","CI.upper","p.value","count")))
+  expect_true(all(colnames(out$est.att) %in% c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value", "count")))
 })
-
-

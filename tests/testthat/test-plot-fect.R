@@ -4,7 +4,7 @@ test_that("plot.fect executes for gap plot without error", {
   out <- fect::fect(
     Y ~ D + X1 + X2,
     data = simdata,
-    index = c("id","time"),
+    index = c("id", "time"),
     method = "ife",
     r = 1,
     CV = FALSE,
@@ -15,5 +15,3 @@ test_that("plot.fect executes for gap plot without error", {
   p <- plot.fect(out, type = "gap", show.count = FALSE)
   expect_s3_class(p, "ggplot")
 })
-
-

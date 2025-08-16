@@ -20,7 +20,5 @@ test_that("did_wrapper twfe runs and returns structure", {
   expect_s3_class(res, "did_wrapper")
   expect_true(is.data.frame(res$est.avg))
   expect_true(is.data.frame(res$est.att))
-  expect_true(all(colnames(res$est.avg) %in% c("ATT.avg","S.E.","CI.lower","CI.upper","p.value")))
+  expect_true(all(colnames(res$est.avg) %in% c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")))
 })
-
-

@@ -5,5 +5,3 @@ if (!exists("simdata", inherits = FALSE) || !exists("simgsynth", inherits = FALS
     try(load(f, envir = .GlobalEnv), silent = TRUE)
   }
 }
-
-

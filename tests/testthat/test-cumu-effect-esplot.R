@@ -3,7 +3,7 @@ test_that("cumu/att.cumu/esplot run without error on fect output", {
   out <- fect::fect(
     Y ~ D + X1 + X2,
     data = simdata,
-    index = c("id","time"),
+    index = c("id", "time"),
     method = "ife",
     r = 1,
     CV = FALSE,
@@ -15,7 +15,7 @@ test_that("cumu/att.cumu/esplot run without error on fect output", {
   out_keep <- fect::fect(
     Y ~ D + X1 + X2,
     data = simdata,
-    index = c("id","time"),
+    index = c("id", "time"),
     method = "ife",
     r = 1,
     CV = FALSE,
@@ -30,5 +30,3 @@ test_that("cumu/att.cumu/esplot run without error on fect output", {
   p <- esplot(out_keep$est.att, Estimate = "ATT")
   expect_s3_class(p, "ggplot")
 })
-
-

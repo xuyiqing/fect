@@ -28,5 +28,3 @@ test_that("fect_sens attaches sensitivity results when inputs present", {
   out2 <- fect_sens(out, post.periods = 1:10, parallel = FALSE)
   expect_true(!is.null(out2$sensitivity.rm) || !is.null(out2$sensitivity.smooth))
 })
-
-
