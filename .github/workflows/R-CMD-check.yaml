@@ -44,16 +44,20 @@ jobs:
           needs: check
 
       - name: Install HonestDiDFEct via devtools
+        shell: Rscript {0}
         run: |
-          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org'); if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')"
+          if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org')
+          if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')
 
       - name: Session info
+        shell: Rscript {0}
         run: |
-          R -q -e "sessionInfo()"
+          sessionInfo()
 
       - name: Check (CRAN-like)
+        shell: Rscript {0}
         run: |
-          R -q -e "rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on = 'warning', check_dir = 'check')"
+          rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on = 'warning', check_dir = 'check')
 
       - name: Upload check results
         if: failure()
