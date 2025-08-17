@@ -23,9 +23,14 @@ jobs:
       R_KEEP_PKG_SOURCE: yes
       _R_CHECK_CRAN_INCOMING_REMOTE_: false
       _R_CHECK_FORCE_SUGGESTS_: false
+      RGL_USE_NULL: true
 
     steps:
       - uses: actions/checkout@v4
+      - name: Clean precompiled objects
+        shell: bash
+        run: |
+          rm -f src/*.o src/*.so src/*.dll || true
 
       - uses: r-lib/actions/setup-pandoc@v2
 
@@ -46,8 +51,8 @@ jobs:
       - name: Install HonestDiDFEct via devtools
         shell: Rscript {0}
         run: |
-          if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org')
-          if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')
+          if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes', repos='https://cloud.r-project.org')
+          if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) remotes::install_github('lzy318/HonestDiDFEct', upgrade='never')
 
       - name: Session info
         shell: Rscript {0}

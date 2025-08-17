@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Clean precompiled objects
+        shell: bash
+        run: |
+          rm -f src/*.o src/*.so src/*.dll || true
       - name: Create tag
         run: |
           git config user.name github-actions
@@ -33,6 +37,7 @@ jobs:
     env:
       R_KEEP_PKG_SOURCE: yes
       _R_CHECK_CRAN_INCOMING_REMOTE_: false
+      RGL_USE_NULL: true
       GITHUB_PAT: ${{ secrets.GH_PAT }}
       CRAN_EMAIL: ${{ secrets.CRAN_EMAIL }}
     steps:
@@ -51,8 +56,10 @@ jobs:
             local::.
           needs: check
       - name: Install HonestDiDFEct via devtools
+        shell: Rscript {0}
         run: |
-          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org'); if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')"
+          if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes', repos='https://cloud.r-project.org')
+          if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) remotes::install_github('lzy318/HonestDiDFEct', upgrade='never')
       - name: CRAN checks (as-cran)
         shell: Rscript {0}
         run: |
@@ -75,8 +82,10 @@ jobs:
         with:
           extra-packages: any::pkgdown, lzy318/HonestDiDFEct, local::.
       - name: Install HonestDiDFEct via devtools
+        shell: Rscript {0}
         run: |
-          R -q -e "if (!requireNamespace('devtools', quietly=TRUE)) install.packages('devtools', repos='https://cloud.r-project.org'); if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) devtools::install_github('lzy318/HonestDiDFEct', upgrade='never')"
+          if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes', repos='https://cloud.r-project.org')
+          if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) remotes::install_github('lzy318/HonestDiDFEct', upgrade='never')
       - name: Build site
         shell: Rscript {0}
         run: |
