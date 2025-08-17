@@ -2,7 +2,7 @@ name: R-CMD-check
 
 on:
   pull_request:
-    branches: [ master ]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
@@ -13,9 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - {os: ubuntu-latest, r: 'release'}
-          - {os: macos-latest, r: 'release'}
-          - {os: windows-latest, r: 'release'}
+          - { os: ubuntu-latest, r: "release" }
+          - { os: macos-latest, r: "release" }
+          - { os: windows-latest, r: "release" }
 
     env:
       R_KEEP_PKG_SOURCE: yes
@@ -68,5 +68,3 @@ jobs:
         with:
           name: ${{ runner.os }}-r${{ matrix.config.r }}-check
           path: check
-
-
