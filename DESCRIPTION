@@ -5,10 +5,10 @@ Version: 2.0.3
 Date: 2025-06-20
 Authors@R: 
     c(person("Licheng", "Liu", , "lichengl@stanford.edu", role = c("aut")), 
-      person("Ziyi", "Liu", , "zyliu2023@berkeley.edu", role = c("aut", "cre")),
+      person("Ziyi", "Liu", , "zyliu2023@berkeley.edu", role = c("aut")),
       person("Ye", "Wang", , "yezhehuzhi@gmail.com", role = c("aut")), 
       person("Yiqing", "Xu", , "yiqingxu@stanford.edu", role = c("aut")),
-      person("Tianzhu", "Qin", , "tianzhu@stanford.edu", role = c("aut")),
+      person("Tianzhu", "Qin", , "tianzhu@stanford.edu", role = c("aut", "cre")),
       person("Shiyun", "Hu", , "hushiyun@pku.edu.cn", role = c("aut")),
       person("Rivka", "Lipkovitz", , "rivkal@mit.edu", role = c("aut")))
 Maintainer: Tianzhu Qin <tianzhu@stanford.edu>
