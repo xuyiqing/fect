@@ -1,10 +1,8 @@
 name: R-CMD-check
 
 on:
-  push:
-    branches: ["**"]
   pull_request:
-    branches: ["**"]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:

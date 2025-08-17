@@ -1,10 +1,6 @@
 name: test-and-check
 
 on:
-  push:
-    branches: [ main, master, fectbook ]
-  pull_request:
-    branches: [ main, master, fectbook ]
   workflow_dispatch:
 
 jobs:
