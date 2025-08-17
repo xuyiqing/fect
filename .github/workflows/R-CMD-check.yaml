@@ -68,3 +68,17 @@ jobs:
         with:
           name: ${{ runner.os }}-r${{ matrix.config.r }}-check
           path: check
+
+  aggregate:
+    name: R-CMD-check
+    runs-on: ubuntu-latest
+    needs: R-CMD-check
+    if: ${{ always() }}
+    steps:
+      - name: Aggregate matrix result
+        run: |
+          if [ "${{ needs.R-CMD-check.result }}" != "success" ]; then
+            echo "One or more matrix jobs failed" >&2
+            exit 1
+          fi
+          echo "All matrix jobs passed"
