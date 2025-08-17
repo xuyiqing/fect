@@ -11,8 +11,8 @@ did_wrapper(
   D,
   X = NULL,
   index,
-  method = c("twfe", "st", "iw", "cs_never", "cs_notyet", "pm", "didm"),
-  se = c("default", "boot", "jackknife"),
+  method = c("twfe", "st", "iw", "cs_never", "cs_notyet", "didm"),
+  se = c("default", "boot", "bootstrap", "jackknife"),
   nboots = 200,
   parallel = TRUE,
   core = NULL,
@@ -30,7 +30,7 @@ did_wrapper(
   \item{X}{Optional covariate vector for adjustment.}
   \item{index}{Character vector of unit and time variable names, e.g., \code{c("id", "time")}.}
   \item{method}{DiD method: \code{"twfe"}, \code{"st"}, \code{"iw"}, \code{"cs_never"}, \code{"cs_notyet"}, or \code{"didm"}.}
-  \item{se}{Standard error method: \code{"default"}, \code{"boot"}, or \code{"jackknife"}.}
+  \item{se}{Standard error method: \code{"default"}, \code{"boot"}, \code{"bootstrap"}, or \code{"jackknife"}.}
   \item{nboots}{Number of bootstrap replications (if applicable).}
   \item{parallel}{Logical; use parallel computation for bootstrapping.}
   \item{core}{Number of CPU cores to use if \code{parallel = TRUE}.}

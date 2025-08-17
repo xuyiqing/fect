@@ -12,7 +12,7 @@ Authors@R:
       person("Shiyun", "Hu", , "hushiyun@pku.edu.cn", role = c("aut")),
       person("Rivka", "Lipkovitz", , "rivkal@mit.edu", role = c("aut")))
 Maintainer: Tianzhu Qin <tianzhu@stanford.edu>
-Description: Provides tools for estimating causal effects in panel data using counterfactual methods, as well as other modern DID estimators. It is designed for causal panel analysis with binary treatments under the parallel trends assumption. The package supports scenarios where     treatments can switch on and off and allows for limited carryover effects. It includes several imputation estimators, such as Gsynth (Xu 2017), linear factor models, and the matrix completion method. Detailed methodology is described in Liu, Wang, and Xu (2024)<arXiv:2107.00856> and Chiu et al (2025)<arXiv:2309.15983>.
+Description: Provides tools for estimating causal effects in panel data using counterfactual methods, as well as other modern DID estimators. It is designed for causal panel analysis with binary treatments under the parallel trends assumption. The package supports scenarios where treatments can switch on and off and allows for limited carryover effects. It includes several imputation estimators, such as Gsynth (Xu 2017), linear factor models, and the matrix completion method. Detailed methodology is described in Liu, Wang, and Xu (2024) <doi:10.48550/arXiv.2107.00856> and Chiu et al. (2025) <doi:10.48550/arXiv.2309.15983>.
 URL: https://yiqingxu.org/packages/fect/
 NeedsCompilation: yes
 License: MIT + file LICENSE
@@ -31,13 +31,18 @@ Imports:
     ggplot2,
     future, 
     mvtnorm,
-    dplyr
+    dplyr,
+    future.apply,
+    reshape2,
+    rlang,
+    scales
 Suggests:
     panelView,
     testthat (>= 3.0.0),
     did,
     DIDmultiplegtDYN,
-    HonestDiDFEct
+    HonestDiDFEct,
+    ggrepel
 SystemRequirements: A C++11 compiler
 Depends: R (>= 3.5.0)
 LinkingTo: Rcpp, RcppArmadillo
