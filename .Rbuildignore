@@ -1,3 +1,6 @@
+^src/.*\.(o|so|dll)$
+^\.github$
+^pkgdown/.*$
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^README\.Rmd$

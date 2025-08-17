@@ -1,6 +1,7 @@
 test_that("did_wrapper twfe runs and returns structure", {
   skip_if_not_installed("fixest")
-  data("simdata", package = "fect")
+  suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
+  expect_true(exists("simdata"))
 
   # create a binary ever-treated indicator for TWFE event study helper
   sim <- simdata

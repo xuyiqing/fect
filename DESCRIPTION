@@ -8,9 +8,10 @@ Authors@R:
       person("Ziyi", "Liu", , "zyliu2023@berkeley.edu", role = c("aut", "cre")),
       person("Ye", "Wang", , "yezhehuzhi@gmail.com", role = c("aut")), 
       person("Yiqing", "Xu", , "yiqingxu@stanford.edu", role = c("aut")),
+      person("Tianzhu", "Qin", , "tianzhu@stanford.edu", role = c("aut")),
       person("Shiyun", "Hu", , "hushiyun@pku.edu.cn", role = c("aut")),
       person("Rivka", "Lipkovitz", , "rivkal@mit.edu", role = c("aut")))
-Maintainer: Ziyi Liu <zyliu2023@berkeley.edu>
+Maintainer: Tianzhu Qin <tianzhu@stanford.edu>
 Description: Provides tools for estimating causal effects in panel data using counterfactual methods, as well as other modern DID estimators. It is designed for causal panel analysis with binary treatments under the parallel trends assumption. The package supports scenarios where     treatments can switch on and off and allows for limited carryover effects. It includes several imputation estimators, such as Gsynth (Xu 2017), linear factor models, and the matrix completion method. Detailed methodology is described in Liu, Wang, and Xu (2024)<arXiv:2107.00856> and Chiu et al (2025)<arXiv:2309.15983>.
 URL: https://yiqingxu.org/packages/fect/
 NeedsCompilation: yes
@@ -43,10 +44,11 @@ LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 7.3.2
 Packaged: 2024-01-26 03:25:56 UTC; ziyil
 Encoding: UTF-8
-Author: Shiyun Hu [aut],
-    Rivka Lipkovitz [aut],
-    Licheng Liu [aut],
+Author: Licheng Liu [aut],
     Ziyi Liu [aut, cre],
     Ye Wang [aut],
-    Yiqing Xu [aut] (<https://orcid.org/0000-0003-2041-6671>)
+    Yiqing Xu [aut] (<https://orcid.org/0000-0003-2041-6671>),
+    Tianzhu Qin [aut],
+    Shiyun Hu [aut],
+    Rivka Lipkovitz [aut]
 Config/testthat/edition: 3

@@ -1,5 +1,6 @@
 test_that("fect formula basic runs on simdata and returns expected slots", {
-  data("simdata", package = "fect")
+  suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
+  expect_true(exists("simdata"))
 
   set.seed(1)
   out <- fect::fect(
@@ -20,7 +21,8 @@ test_that("fect formula basic runs on simdata and returns expected slots", {
 })
 
 test_that("fect returns est.att and att.vcov when se=TRUE", {
-  data("simdata", package = "fect")
+  suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
+  expect_true(exists("simdata"))
 
   set.seed(2)
   out <- fect::fect(

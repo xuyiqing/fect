@@ -1,6 +1,7 @@
 test_that("fect_sens attaches sensitivity results when inputs present", {
   skip_if_not_installed("HonestDiDFEct")
-  data("simdata", package = "fect")
+  suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
+  expect_true(exists("simdata"))
 
   set.seed(3)
   out <- fect::fect(

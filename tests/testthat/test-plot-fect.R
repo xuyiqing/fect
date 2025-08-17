@@ -1,5 +1,6 @@
 test_that("plot.fect executes for gap plot without error", {
-  data("simdata", package = "fect")
+  suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
+  expect_true(exists("simdata"))
   set.seed(4)
   out <- fect::fect(
     Y ~ D + X1 + X2,
