@@ -33,6 +33,7 @@ jobs:
             lzy318/HonestDiDFEct
             local::.
           needs: tests
+          cache-version: 2
       - name: Install HonestDiDFEct via devtools
         shell: Rscript {0}
         run: |
@@ -68,6 +69,7 @@ jobs:
             lzy318/HonestDiDFEct
             local::.
           needs: check
+          cache-version: 2
       - name: Install HonestDiDFEct via devtools
         shell: Rscript {0}
         run: |
