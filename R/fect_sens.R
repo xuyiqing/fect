@@ -9,7 +9,7 @@ fect_sens <- function(
     parallel = FALSE,
     cores = NULL) {
   if (parallel && is.null(cores)) {
-    cores <- parallel::detectCores() - 1
+    cores <- min(parallel::detectCores() - 2, 8)
     cl <- parallel::makeCluster(cores)
     doParallel::registerDoParallel(cl)
   }
