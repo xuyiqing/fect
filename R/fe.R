@@ -582,9 +582,6 @@ fect.fe <- function(Y, # Outcome variable, (T*N) matrix
     }
 
 
-
-
-
     ## 8. cohort effects
     if (!is.null(group)) {
         cohort <- cbind(c(group), c(D), c(eff.v))

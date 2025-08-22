@@ -1481,7 +1481,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             set.seed(seed)
         }
         if (is.null(cores) == TRUE) {
-            cores <- min(detectCores() - 2, 8)
+            cores <- min(detectCores() - 2, 8) # default to 8 cores if not specified
         }
         para.clusters <- future::makeClusterPSOCK(cores)
         registerDoParallel(para.clusters)
