@@ -88,8 +88,12 @@
     counterfactual.linetype =  NULL,
     box.control =  NULL,
     box.treat =  NULL,
-    calendar.color =  NULL,
-    calendar.lcolor =  NULL,
+    calendar.color = NULL,
+    calendar.lcolor = NULL,
+    calendar.cicolor = NULL,
+    heterogeneous.color = NULL,
+    heterogeneous.lcolor = NULL,
+    heterogeneous.cicolor = NULL,
     equiv.color =  NULL,
     status.treat.color =  NULL,
     status.control.color = NULL,
@@ -101,6 +105,7 @@
     status.balanced.post.color = NULL,
     status.balanced.pre.color = NULL,
     status.background.color = NULL,
+    covariate = NULL,
     ...
 )
 }
