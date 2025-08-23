@@ -347,6 +347,9 @@ plot.fect <- function(
     if (type == "es") {
       type <- "gap"
     }
+    if (type == "hte") {
+      type <- "heterogeneous"
+    }
     if (!type %in% c("status", "gap", "equiv", "exit", "factors", "loadings", "calendar", "box", "counterfactual", "sens", "sens_es", "cumul", "heterogeneous")) {
       stop("\"type\" option misspecified. Must be one of the following:\"status\",\"gap\",\"equiv\",\"exit\",\"calendar\",\"box\",\"counterfactual\",\"equiv\",\"sens\",\"sens_es\",\"cumul\",\"heterogeneous\".")
     }
@@ -864,10 +867,10 @@ plot.fect <- function(
       maintext <- "Carryover Effects"
     }
   } else if (type == "calendar") {
-    maintext <- "ATT by Calendar Time"
+    maintext <- "CATT by Calendar Time"
     ytitle <- paste("Effect on", x$Y)
   } else if (type == "heterogeneous") {
-    maintext <- "ATT by Covariate"
+    maintext <- paste("CATT by", covariate)
     ytitle <- paste("Effect on", x$Y)
   } else if (type == "box") {
     maintext <- "Individual Treatment Effects"
@@ -3079,7 +3082,7 @@ plot.fect <- function(
     }
 
     if (is.null(xlab) == TRUE) {
-      xlab <- paste0("Observed Covariate Range (", covariate, ")")
+      xlab <- covariate
     } else if (xlab == "") {
       xlab <- NULL
     }

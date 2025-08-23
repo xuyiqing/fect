@@ -1,6 +1,6 @@
 # Fect Main Program {#sec-fect}
 
-In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022--[<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>]. Download the R code used in this chapter [here](rscript/02-fect.R).
+In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022--\[<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>\]. Download the R code used in this chapter [here](rscript/02-fect.R).
 
 ## Simulated data
 
@@ -38,15 +38,14 @@ panelview(Y ~ D, data = simdata, index = c("id","time"),
 
 ------------------------------------------------------------------------
 
-## Counterfactual estimators
+## The imputation estimator (FEct)
 
 Using the current version of **fect**, we can apply several different methods to make counterfactual predictions and estimate treatment effects by specifying the `method` option: `"fe"` (two-way fixed effects, default), `"ife"` (interactive fixed effects), `"mc"` (matrix completion method), `"cfe"` (complex fixed effects), and `"polynomial"` (fixed effects with group-specific time trends). First, we illustrate the main syntax of **fect** using the `"fe"` method.
 
-### FEct
+The two-way fixed effects counterfactual estimator (FEct) is also independently proposed by @BJS2024 and @gardnertwo, who refer to it as the "imputation method" and "two-stage DID," respectively.
 
-The two-way fixed effects coutnerfacutal estimator (FEct) is also independently proposed by Borusyak, Jaravel & Spiess (2024) and John Gardner (2021), who refer to it as the "imputation method" and "two-stage DID," respectively.
-
-**Estimation.** We estimate the average treatment effect on the treated (ATT) using the following information: the outcome variable $Y$, binary treatment variable $D$, two observed covariates $X_{1}$ and $X_{2}$, and the unit and time indicators $id$ and $time$, respectively.
+### Estimation
+We estimate the average treatment effect on the treated (ATT) using the following information: the outcome variable $Y$, binary treatment variable $D$, two observed covariates $X_{1}$ and $X_{2}$, and the unit and time indicators $id$ and $time$, respectively.
 
 The first variable on the right hand side of the formula is the treatment indicator $D$; the rest of the right-hand-side variables serve as controls. The `index` option specifies the unit and time indicators. The `force` option ("none", "unit", "time", and "two-way") specifies the additive component(s) of the fixed effects included in the model. The default option is "two-way" (including both unit and time fixed effects).
 
@@ -55,7 +54,8 @@ out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                  method = "fe", force = "two-way")
 ```
 
-**Visualization.** We can use the `plot` function to visualize the estimation results. By default, the `plot` function produces a "gap" plot -- as if we type `plot(out.fect, type = "gap")` --- which visualizes the estimated period-wise ATT (dynamic treatment effects). For your reference, the true population average effects in `simdata` go from 1 to 3 from the 1st to the 10th post-treatment period.
+### Visualization
+We can use the `plot` function to visualize the estimation results. By default, the `plot` function produces a "gap" plot -- as if we type `plot(out.fect, type = "gap")` --- which visualizes the estimated period-wise ATT (dynamic treatment effects). For your reference, the true population average effects in `simdata` go from 1 to 3 from the 1st to the 10th post-treatment period.
 
 The bar plot at the bottom of the plot shows the number of treated units for each time period. The options `cex.main`, `cex.lab`, `cex.axis`, and `cex.text` adjust the font sizes of the title, axis labels, axis numbers, and in-graph text, respectively.
 
@@ -68,17 +68,22 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
 
 The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power.
 
-The graph is a **ggplot2** object; user can conveniently use the `ggsave` (preferred) function to export the resulting plot.
+The graph is a **ggplot2** object; user can conveniently use the `ggsave` (preferred) function to export the resulting plot. See [Chapter @sec-plots] for more visualization options. 
 
-**Uncertainty estimates.** The package can produce uncertainty estimates when `se = TRUE`. One can use the non-parametric bootstrap procedure by setting `vartype = "bootstrap"`. Note that it only works well when the number of units is relatively large and many units in the data set experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
+### Uncertainty estimates 
+
+The package can produce uncertainty estimates when `se = TRUE`. One can use the non-parametric bootstrap procedure by setting `vartype = "bootstrap"`. Note that it only works well when the number of units is relatively large and many units in the data set experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
 
 Alternatively, users can obtain uncertainty estimates using the jackknife method by specifying `vartype = "jackknife"`. The algorithm obtains standard errors by iteratively dropping one unit (the entire time-series) from the dataset.
 
-Parallel computing will speed up both cross-validation and uncertainty estimation significantly. When `parallel = TRUE` (default) and `cores` options are omitted, the algorithm will detect the number of available cores on your computer automatically. (Warning: it may consume most of your computer's computational power if all cores are being used.)
+::: {.callout-note appearance="simple"}
+Parallel computing will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
+:::
 
 ```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
-  method = "fe", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200)
+  method = "fe", force = "two-way", se = TRUE, 
+  cores = 8, parallel = TRUE, nboots = 1000)
 ```
 
 The `plot()` function can visualize the estimated period-wise ATTs as well as their uncertainty estimates. `stats = "F.p"` shows the p-value for the F test of no-pretrend (more details below).
@@ -88,7 +93,8 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")
 ```
 
-**Result summary.** Users can use the `print` function to take a look at a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. Specifically, `est.avg` and `est.avg.unit` show the ATT averaged over all periods -- the former weights each treated observation equally while the latter weights each treated unit equally. `est.beta` reports the coefficients of the time-varying covariates. `est.att` reports the average treatment effect on the treated (ATT) by period. Treatment effect estimates from each bootstrap run is stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
+### Save estiamtes 
+Users can use the `print` function to take a look at a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. Specifically, `est.avg` and `est.avg.unit` show the ATT averaged over all periods -- the former weights each treated observation equally while the latter weights each treated unit equally. `est.beta` reports the coefficients of the time-varying covariates. `est.att` reports the average treatment effect on the treated (ATT) by period. Treatment effect estimates from each bootstrap run is stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
 
 ```{r}
 print(out.fect)
@@ -102,9 +108,34 @@ out.fect$est.avg
 out.fect$est.beta
 ```
 
-### IFEct
+### Leave-on-out approach
 
-In addition to FEct, **fect** also supports the interactive fixed effects counterfactual (IFEct) method proposed by Laurent Gobillon & Thierry Magnac (2016) and Yiqing Xu (2017) and the matrix completion (MC) method proposed by Athey et al. (2021)---`method = "ife"` and `method = "mc"`, respectively. We use EM algorithm to impute the counterfactuals of treated observations.
+@li2025benchmarking show that in some applications, pre-trend estimates based on in-sample model fit can lead to the mistaken belief that no pre-trend exists, even when a non-parallel pre-trend is present. A simple fix is to use a leave-one-out method by setting `loo = TRUE` to obtain these estimates, although it is significantly more time-consuming. 
+
+::: {.callout-note appearance="simple"}
+We recommend setting `loo = TRUE` when (i) the event-study plot is intended as a critical piece of evidence to support the parallel trends assumption, which is often the case, or (ii) when implementing an equivalence test for the pre-trend estimates. For more discussion on the LOO pre-trend test, see [here](#loo-pre-trend-test)
+
+Our most preferred test, however, is the sensitivity analysis discussed in [Chapter @sec-panel-sens], which combines out-of-sample placebo estimates with post-treatment ATT estimates.
+:::
+
+We can implement the leave-one-out pre-trend test by setting `loo = TRUE`. 
+```{r fect_loo, eval=TRUE, cache = TRUE, message = FALSE}
+out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
+  method = "fe", force = "two-way", se = TRUE, loo = TRUE,
+  cores = 8, parallel = TRUE, nboots = 200)
+```
+
+The event study plot utilizing leave-one-out for pretreatment estimates is shown below. This graph is fairly similar to the graphics we presented earlier without using leave-one-out. However, this is not always true. 
+```{r, fig.width = 6, fig.height = 4.5}
+plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO", 
+  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+```
+
+## Interactive fixed effects & matrix completion
+
+In addition to FEct, **fect** also supports the interactive fixed effects counterfactual (IFEct) method proposed by @Gobillon2016 and @Xu2017 and the matrix completion (MC) method proposed by @Athey2021---`method = "ife"` and `method = "mc"`, respectively. We use EM algorithm to impute the counterfactuals of treated observations.
+
+### IFE
 
 For the IFE approach, we need to specify the number of factors using option `r`. For the MC method, we need to specify the tuning parameter in the penalty term using option `lambda`. By default, the algorithm will select an optimal hyper-parameter via a built-in cross-validation procedure.
 
@@ -146,6 +177,10 @@ out.mc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 plot(out.mc, main = "Estimated ATT (MC)")
 ```
 
+## Weighitng treatment effects
+
+After obtaining the individual treatment effects using one of the counterfactual estimators, we can weight these estimates using a constructed balanced treated sample or other user-supplied weighting schemes.
+
 ### Balanced treated sample
 
 **fect** also provides the option `balance.period`, which allows the calculation of the average treatment effects only for *treated* units that exhibit complete data in specified pre- and post-treatment periods. For instance, if the option is set to `balance.period = c(-3,4)`, the algorithm will calculate the average treatment effects for units that have at least four consecutive non-missing observations in the pre-treatment periods `(-3, -2, -1, 0)` and at least four consecutive non-missing observations in the post-treatment periods `(1, 2, 3, 4)`. Note that this option does not affect whether a never-treated unit enters estimation.
@@ -169,7 +204,7 @@ plot(out.bal, main = "Estimated ATT (Balanced Sample)",
   color = "red", count.color = "blue")
 ```
 
-### Weighted Treatment Effect
+### Weighted treatment effect
 
 The package offers the option `W` to calculate the weighted average treatment effects. The weighting variable does not affect the estimation of fixed effects or factors. Only the weighted average treatment effects or weighted dynamic treatment effects are obtained by aggregating the treatment effects using the weight `W`.
 
@@ -186,7 +221,7 @@ We can then visualize the weighted dynamic treatment effects using the inbuilt f
 plot(out.w, main = "Estimated Weighted ATT")
 ```
 
-## Heterogeneous treatment effects
+## Effect heterogeneity
 
 We provide several methods for researchers to explore heterogeneous treatment effects (HTE).
 
@@ -198,13 +233,21 @@ One way to understand HTE is to use a series of box plots to visualize the estim
 plot(out.ife, type = "box", xlim = c(-15, 10))
 ```
 
-### By calendar time
+### CATT by calendar time
 
 Another way to explore HTE is to investigate how the treatment effect evolves over time. In the plot below, the point estimates represents the ATTs by calendar time; the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively; and the red horizontal dashed line represents the ATT (averaged over all time periods).
 
 ```{r hte_time, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.ife, type = "calendar", xlim = c(1, 35))
 ```
+
+### CATT by a covariate
+
+By setting `type = "hte"` or `type = "heterogeneous`, we can also plot the HTE by arbitrary covariates that are unaffected by the treatment. As before, the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively. The red dashed line represents the ATT. The histogram at the bottom of the figure illustrates the distribution of the covariates, and can be turned off using `show.count = FALSE`. In our simulated case, the effect size is unrelated to the values of covariate `X1`.
+```{r hte_X1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+plot(out.ife, type = "hte", covariate = "X1")
+```
+
 
 ------------------------------------------------------------------------
 
@@ -286,9 +329,9 @@ plot(out.mc, type = "equiv", ylim = c(-4,4),
 
 From the above plots, we see that FEct fails both tests; IFEct passes both tests using a conventional test size (5%); and MC fails the F tests, but passes the TOST (equivalence) test. Hence, we may conclude that IFEct is a more suitable model.
 
-#### Leave-one-out pre-trend test
+### LOO pre-trend test
 
-Instead of using estimated ATTs for periods prior to the treatment to test for pre-trends, we can use a leave-one-out (LOO) approach (`loo = TRUE`) to consecutively hide one pretreatment period (relative to the timing of the treatment) and repeatedly estimate the pseudo treatment effects for that pretreatment period. The LOO approach can be understood as an extension of the placebo test. It has the benefit of providing users with a more holistic view of whether the identifying assumptions likely hold. However, as the program needs to conduct uncertainty estimates for each turn, it is much more time-consuming than the original one.
+Instead of using estimated ATTs for periods prior to the treatment to test for pre-trends, we recommend users employ a leave-one-out (LOO) approach (`loo = TRUE`) to consecutively hide one pretreatment period (relative to the timing of the treatment) and repeatedly estimate the pseudo treatment effects for that pretreatment period. The LOO approach can be understood as an extension of the placebo test. It has the benefit of providing users with a more holistic view of whether the identifying assumptions likely hold. However, as the program needs to conduct uncertainty estimates for each turn, it is much more time-consuming than the original one.
 
 ```{r simdata_fect_loo, eval=FALSE, cache = TRUE, message = FALSE, results = 'hide'}
 out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
@@ -386,7 +429,7 @@ In the above plot, the three periods in blue are droppred from the first-stage e
 
 ------------------------------------------------------------------------
 
-## Cumulative Effects
+## Cumulative effects
 
 Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. - Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
 
@@ -399,6 +442,7 @@ cumu.out <- effect(out)
 ```
 
 Print and plot cumulative effects
+
 ```{r effect.plot, cache = TRUE}
 print(cumu.out)
 plot(cumu.out)
@@ -560,10 +604,9 @@ plot(out.ife.g, show.group = "Cohort:22",
           xlim = c(-15, 10), ylim = c(-10, 10))
 ```
 
-
 ------------------------------------------------------------------------
 
-## Additional Notes
+## Additional notes
 
 1.  By default, the program will drop the units that have no larger than 5 observations under control, which is the reason why sometimes there are less available units in the placebo test or carryover test than in the original estimation. We can specify a preferred criteria in the option `min.T0` (default to 5). As a rule of thumb for the IFE estimator, the minimum number of observations under control for a unit should be larger than the specified number of factor `r`.
 

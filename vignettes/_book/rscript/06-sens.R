@@ -77,7 +77,7 @@ out.fect.placebo <- fect_sens(
   periodMbarvec = Mbar_vec_period_rm,
   Mvec          = M_vec_avg_smooth,
   periodMvec    = M_vec_period_smooth,
-  parallel      = FALSE # Set to TRUE for parallel processing if desired
+  parallel      = TRUE # Set to TRUE for parallel processing if desired
 )
 
 plot(out.fect.placebo,

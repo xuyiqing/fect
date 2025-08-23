@@ -4,11 +4,11 @@ This Quarto book serves as a user manual for the **fect** package in R, which im
 
 **fect** covers a series of counterfactual estimators, including the five estimators from the last version and integrating the latest version of the **gsynth** package for the generalized synthetic control method (Gsynth). This Quarto book also facilitates the application of various new difference-in-differences (DID) estimators. For details of these methods, see
 
--   @Xu2017 for Gsynth [<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>]
+-   @Xu2017 for Gsynth \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\]
 
--   @LWX2022 for counterfactual estimators [<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>]
+-   @LWX2022 for counterfactual estimators \[<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>\]
 
--   @CLLX2025 for a survey of the new DID estimators [<a href="https://www.cambridge.org/core/journals/american-political-science-review/article/causal-panel-analysis-under-parallel-trends-lessons-from-a-large-reanalysis-study/219275E0CE901F099F2CFFBA07079243" target="_blank">Paper</a>]
+-   @CLLX2025 for a survey of the new DID estimators \[<a href="https://www.cambridge.org/core/journals/american-political-science-review/article/causal-panel-analysis-under-parallel-trends-lessons-from-a-large-reanalysis-study/219275E0CE901F099F2CFFBA07079243" target="_blank">Paper</a>\]
 
 ::: {.callout-note appearance="simple"}
 ### Source Code
@@ -65,9 +65,9 @@ The user guide is structured into the following chapters:
 
 -   [Chapter @sec-panel]\
     This chapter facilitates the application of various new DID estimators.
-    
+
 -   [Chapter @sec-panel-sens]\
-    This chapter introduces the sensitivity analysis for the counterfactual estimators.   
+    This chapter introduces the sensitivity analysis for the counterfactual estimators.
 
 -   [Chapter @sec-cheatsheet]\
     The final chapter summarizes the core inputs required for implementing the six methods, along with options for plotting and diagnostics.

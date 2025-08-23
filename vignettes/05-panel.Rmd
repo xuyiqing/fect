@@ -6,7 +6,9 @@ editor:
 
 # New DID Methods {#sec-panel}
 
-This chapter, authored by Ziyi Liu and Yiqing Xu, complements @CLLX2025 ([paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf), [slides](https://yiqingxu.org/papers/english/2023_panel/CLLX_slides.pdf)). Rivka Lipkovitz also contributes to this tutorial. Download the R code used in this chapter [here](rscript/05-panel.R).
+This chapter, authored by Ziyi Liu and Yiqing Xu, complements @CLLX2025 ([paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf), [slides](https://yiqingxu.org/papers/english/2023_panel/CLLX_slides.pdf)).
+Rivka Lipkovitz also contributes to this tutorial.
+Download the R code used in this chapter [here](rscript/05-panel.R).
 
 ------------------------------------------------------------------------
 
@@ -655,9 +657,6 @@ p.fect.balance <- esplot(fect.balance.output,Period = 'Time',
                          CI.upper = 'CI.upper')
 p.fect.balance
 ```
-
-
-
 
 ## With Treatment Reversals
 

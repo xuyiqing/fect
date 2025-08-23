@@ -62,9 +62,13 @@ out.fect$est.att
 out.fect$est.avg
 out.fect$est.beta
 
+out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
+                     method = "fe", force = "two-way", se = TRUE, loo = TRUE,
+                     cores = 8, parallel = TRUE, nboots = 200)
+
 out.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
           force = "two-way", method = "ife", CV = TRUE, r = c(0, 5), 
-          se = TRUE, nboots = 200, parallel = TRUE)
+          se = TRUE, nboots = 1000, cores = 8, parallel = TRUE)
 
 plot(out.ife, main = "Estimated ATT (IFEct)")
 
@@ -90,10 +94,18 @@ out.w <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 
 plot(out.w, main = "Estimated Weighted ATT")
 
+## by calendar time
 plot(out.ife, type = "box", xlim = c(-15, 10))
 
 plot(out.ife, type = "calendar", xlim = c(1, 35))
 
+## by a covariate
+plot(out.ife, type = "hte", covariate = "X1")
+
+plot(out.ife, type = "heterogeneous", covariate = "X1", show.count = FALSE, xlab = "X1")
+
+
+# Diagnostic tests
 out.fect.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", parallel = TRUE, se = TRUE, CV = 0,
   nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))

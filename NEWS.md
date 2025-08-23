@@ -1,3 +1,12 @@
+# fect 2.0.4
+
+* Add new plot `type = "hte"`
+
+# fect 2.0.0
+
+* New syntax
+* Merged in **gsynth**
+
 # fect 1.0.0
 
 * First CRAN version
