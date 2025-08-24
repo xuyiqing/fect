@@ -104,6 +104,7 @@ plot.fect <- function(
     status.balanced.pre.color = NULL,
     status.background.color = NULL,
     covariate = NULL,
+    covariate.labels = NULL,
     ...) {
   group <- ATT5 <- ATT6 <- CI.lower.90 <- CI.lower6 <- CI.upper.90 <- CI.upper6 <- L1 <- eff <- NULL
 
@@ -898,7 +899,7 @@ plot.fect <- function(
   } else {
     angle <- 0
     x.v <- 0
-    if (type == "status") {
+    if (type == "status" || type == "heterogeneous" || type == "calendar") {
       x.h <- 0.5
     } else {
       x.h <- 0
@@ -3106,89 +3107,201 @@ plot.fect <- function(
     j <- order(X.vec)
     eff.vec <- eff.vec[j]
     X.vec <- X.vec[j]
+    
+    if (length(unique(X.vec)) <= 4) {
+      p <- ggplot()
+      ## xlab and ylab
+      p <- p + xlab(xlab) + ylab(ylab)
 
-    plx <- predict(loess(eff.vec ~ X.vec), se = T)
-    se <- qt(0.975, plx$df) * plx$se
-    y_hat <- plx$fit
-    y_hat_lower <- y_hat - se
-    y_hat_upper <- y_hat + se
-
-    p <- ggplot()
-    ## xlab and ylab
-    p <- p + xlab(xlab) + ylab(ylab)
-
-    ## theme
-    if (theme.bw == TRUE) {
-      p <- p + theme_bw()
-    }
-
-    ## grid
-    if (gridOff == TRUE) {
-      p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
-    }
-
-    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
-    p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, size = 0)
-    p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
-    p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, size = 1.1)
-
-    ## title
-    if (is.null(main) == TRUE) {
-      p <- p + ggtitle(maintext)
-    } else if (main != "") {
-      p <- p + ggtitle(main)
-    }
-
-    ## ylim
-    if (is.null(ylim) == FALSE) {
-      p <- p + coord_cartesian(ylim = ylim)
-    }
-
-    if (is.null(xlim) == FALSE) {
-      p <- p + coord_cartesian(xlim = xlim)
-    }
-
-    if (show.count == TRUE) {
-      if (length(ylim) != 0) {
-        rect.length <- (ylim[2] - ylim[1]) / 5
-        rect.min <- ylim[1]
-      } else {
-        y_min <- suppressWarnings(min(y_hat_lower, na.rm = TRUE))
-        y_max <- suppressWarnings(max(y_hat_upper, na.rm = TRUE))
-        rect.length <- (y_max - y_min) / 5
-        rect.min <- y_min - rect.length
+      ## theme
+      if (theme.bw == TRUE) {
+        p <- p + theme_bw()
       }
 
-      X.vec.for.hist <- X.vec
-      if (!is.null(xlim)) {
-        X.vec.for.hist <- X.vec.for.hist[which(X.vec.for.hist >= min(xlim) & X.vec.for.hist <= max(xlim))]
+      ## grid
+      if (gridOff == TRUE) {
+        p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
       }
-      if (length(na.omit(X.vec.for.hist)) > 0) {
-        breaks <- pretty(range(X.vec.for.hist, na.rm = TRUE), n = 50)
-        h <- hist(X.vec.for.hist, breaks = breaks, plot = FALSE)
-        bin_xmin <- h$breaks[-length(h$breaks)]
-        bin_xmax <- h$breaks[-1]
-        counts <- h$counts
-        ymax_scaled <- rect.min + rect.length * counts / max(counts, na.rm = TRUE)
-        data.toplot <- cbind.data.frame(
-          xmin = bin_xmin,
-          xmax = bin_xmax,
-          ymin = rep(rect.min, length(counts)),
-          ymax = ymax_scaled
+
+      ## title
+      if (is.null(main) == TRUE) {
+        p <- p + ggtitle(maintext)
+      } else if (main != "") {
+        p <- p + ggtitle(main)
+      }
+
+      ## Build discrete stats at evenly spaced factor positions
+      x_levels_sorted <- sort(unique(X.vec))
+      x_factor <- factor(X.vec, levels = x_levels_sorted, ordered = TRUE)
+      # stats per level
+      level_means <- tapply(eff.vec, x_factor, function(v) mean(v, na.rm = TRUE))
+      level_ns    <- tapply(eff.vec, x_factor, function(v) sum(!is.na(v)))
+      level_sds   <- tapply(eff.vec, x_factor, function(v) sd(v, na.rm = TRUE))
+      level_se    <- level_sds / sqrt(pmax(level_ns, 1))
+      level_qt    <- qt(0.975, pmax(level_ns - 1, 1))
+      level_ci    <- level_qt * level_se
+      level_lower <- as.numeric(level_means) - level_ci
+      level_upper <- as.numeric(level_means) + level_ci
+      data_disc <- cbind.data.frame(
+        x = factor(names(level_means), levels = names(level_means), ordered = TRUE),
+        mean = as.numeric(level_means),
+        lower = level_lower,
+        upper = level_upper,
+        count = as.numeric(level_ns)
+      )
+
+      ## core geoms (even spacing because x is factor)
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
+      # nicer CI + mean: thick error bars + solid point
+      p <- p + geom_linerange(
+        aes(x = x, ymin = lower, ymax = upper),
+        data = data_disc, color = heterogeneous.color, linewidth = 0.9
+      )
+      p <- p + geom_point(
+        aes(x = x, y = mean), data = data_disc,
+        shape = 21, fill = "white", color = heterogeneous.color, stroke = 1, size = 2.6
+      )
+
+      ## bottom rectangles for counts under each discrete level (stick to very bottom)
+      if (show.count == TRUE && any(!is.na(data_disc$count))) {
+        # obtain current plot y-range from built plot if ylim not set
+        current_plot_yrange <- NULL
+        if (!is.null(ylim)) {
+          current_plot_yrange <- ylim
+        } else {
+          gb <- ggplot_build(p)
+          current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
+        }
+        count_bar_space_prop <- 0.20
+        count_bar_space_height <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
+        actual_rect_length <- count_bar_space_height * 0.8
+        rect_min_val <- if (!is.null(ylim)) ylim[1] else current_plot_yrange[1] - count_bar_space_height
+
+        # Even spacing: rectangles centered on factor positions with fixed half-width
+        x_idx <- as.numeric(data_disc$x)
+        bar_half <- 0.1
+        counts <- data_disc$count
+        ymax_scaled <- rect_min_val + actual_rect_length * counts / max(counts, na.rm = TRUE)
+        data_counts <- cbind.data.frame(
+          xmin = x_idx - bar_half,
+          xmax = x_idx + bar_half,
+          ymin = rep(rect_min_val, length(counts)),
+          ymax = ymax_scaled,
+          xcenter = x_idx,
+          count = counts
         )
-        max_idx <- which.max(counts)
-        max_count_pos <- (bin_xmin[max_idx] + bin_xmax[max_idx]) / 2
         p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-          data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+          data = data_counts, fill = count.color, color = count.outline.color, alpha = count.alpha, linewidth = 0.2
         )
-        p <- p + annotate("text",
-          x = max_count_pos,
-          y = max(data.toplot$ymax) + 0.1 * rect.length,
-          label = max(counts, na.rm = TRUE), size = cex.text * 0.8, hjust = 0.5
-        )
+        p <- p + geom_text(aes(x = xcenter, y = ymax + 0.12 * count_bar_space_height, label = count),
+                           data = data_counts, size = cex.text * 0.85, hjust = 0.5, vjust = 0.5, color = "#444444")
+        if (!is.null(covariate.labels)) {
+          p <- p + scale_x_discrete(labels = covariate.labels)
+        } else {
+          p <- p + scale_x_discrete(labels = as.character(x_levels_sorted))
+        }
+      }
+
+      if (is.null(ylim) == FALSE) {
+        p <- p + coord_cartesian(ylim = ylim)
+      }
+
+      if (is.null(xlim) == FALSE) {
+        p <- p + coord_cartesian(xlim = xlim)
+      }
+
+    } else {
+      plx <- predict(loess(eff.vec ~ X.vec), se = T)
+      se <- qt(0.975, plx$df) * plx$se
+      y_hat <- plx$fit
+      y_hat_lower <- y_hat - se
+      y_hat_upper <- y_hat + se
+
+      p <- ggplot()
+      ## xlab and ylab
+      p <- p + xlab(xlab) + ylab(ylab)
+
+      ## theme
+      if (theme.bw == TRUE) {
+        p <- p + theme_bw()
+      }
+
+      ## grid
+      if (gridOff == TRUE) {
+        p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+      }
+
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+      p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, size = 0)
+      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, size = 1.1)
+
+      ## title
+      if (is.null(main) == TRUE) {
+        p <- p + ggtitle(maintext)
+      } else if (main != "") {
+        p <- p + ggtitle(main)
+      }
+
+      ## ylim
+      if (is.null(ylim) == FALSE) {
+        p <- p + coord_cartesian(ylim = ylim)
+      }
+
+      if (is.null(xlim) == FALSE) {
+        p <- p + coord_cartesian(xlim = xlim)
+      }
+
+      if (show.count == TRUE) {
+        current_plot_yrange <- NULL
+        if (!is.null(ylim)) {
+          current_plot_yrange <- ylim
+        } else {
+          gb <- ggplot_build(p)
+          current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
+        }
+        count_bar_space_prop <- 0.20
+        count_bar_space_height <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
+        actual_rect_length <- count_bar_space_height * 0.8
+        rect_min_val <- if (!is.null(ylim)) ylim[1] else current_plot_yrange[1] - count_bar_space_height
+
+        X.vec.for.hist <- X.vec
+        if (!is.null(xlim)) {
+          X.vec.for.hist <- X.vec.for.hist[which(X.vec.for.hist >= min(xlim) & X.vec.for.hist <= max(xlim))]
+        }
+        if (length(na.omit(X.vec.for.hist)) > 0) {
+          breaks <- pretty(range(X.vec.for.hist, na.rm = TRUE), n = 50)
+          h <- hist(X.vec.for.hist, breaks = breaks, plot = FALSE)
+          bin_xmin <- h$breaks[-length(h$breaks)]
+          bin_xmax <- h$breaks[-1]
+          counts <- h$counts
+          ymax_scaled <- rect_min_val + actual_rect_length * counts / max(counts, na.rm = TRUE)
+          data.toplot <- cbind.data.frame(
+            xmin = bin_xmin,
+            xmax = bin_xmax,
+            ymin = rep(rect_min_val, length(counts)),
+            ymax = ymax_scaled
+          )
+          max_idx <- which.max(counts)
+          max_count_pos <- (bin_xmin[max_idx] + bin_xmax[max_idx]) / 2
+          p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+            data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+          )
+          p <- p + annotate("text",
+            x = max_count_pos,
+            y = max(data.toplot$ymax) + 0.12 * count_bar_space_height,
+            label = max(counts, na.rm = TRUE), size = cex.text * 0.8, hjust = 0.5
+          )
+          if (is.null(ylim)) {
+            final_yrange_min <- min(current_plot_yrange[1], rect_min_val)
+            final_yrange_max <- current_plot_yrange[2]
+            p <- p + coord_cartesian(ylim = c(final_yrange_min, final_yrange_max))
+          }
+        }
       }
     }
-
+ 
     p <- p + theme(
       legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
       legend.position = legend.pos,
