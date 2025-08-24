@@ -46,3 +46,6 @@ man/.DS_Store
 .DS_Store
 .DS_Store
 .RData
+
+check/
+check/*
