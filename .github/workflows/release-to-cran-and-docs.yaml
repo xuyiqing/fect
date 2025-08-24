@@ -63,7 +63,7 @@ jobs:
       - name: CRAN checks (as-cran)
         shell: Rscript {0}
         run: |
-          rcmdcheck::rcmdcheck(args=c('--no-manual','--as-cran'), error_on='warning')
+          rcmdcheck::rcmdcheck(args=c('--no-manual','--as-cran'), error_on='note')
       - name: Submit to CRAN (manual email)
         shell: bash
         run: |

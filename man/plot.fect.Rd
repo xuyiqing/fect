@@ -254,8 +254,16 @@ library(fect)
 if(requireNamespace("ggplot2") && requireNamespace("ggrepel")) {
   data(simdata)
   # Estimate with fixed effects method
-  out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-    method = "fe", force = "two-way", se = TRUE, parallel = FALSE, nboots = 5) # nboots low for example
+  out.fect <- fect(
+    Y ~ D + X1 + X2,
+    data = simdata,
+    index = c("id","time"),
+    method = "fe",
+    force = "two-way",
+    se = TRUE,
+    parallel = FALSE,
+    nboots = 5 # nboots low for example
+  )
 
   # Default gap plot
   plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y")

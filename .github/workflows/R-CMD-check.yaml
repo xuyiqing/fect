@@ -60,7 +60,7 @@ jobs:
       - name: Check (CRAN-like)
         shell: Rscript {0}
         run: |
-          rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on = 'warning', check_dir = 'check')
+          rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on = 'note', check_dir = 'check')
 
       - name: Upload check results
         if: failure()

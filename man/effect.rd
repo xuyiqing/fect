@@ -6,7 +6,17 @@
 }
 
 \usage{
-effect(x, cumu = TRUE, id = NULL, period = NULL, plot = FALSE, count = TRUE, xlab = NULL, ylab = NULL, main = NULL)
+effect(
+  x,
+  cumu = TRUE,
+  id = NULL,
+  period = NULL,
+  plot = FALSE,
+  count = TRUE,
+  xlab = NULL,
+  ylab = NULL,
+  main = NULL
+)
 }
 
 \arguments{

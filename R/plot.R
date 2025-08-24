@@ -106,7 +106,6 @@ plot.fect <- function(
     covariate = NULL,
     covariate.labels = NULL,
     ...) {
-  group <- ATT5 <- ATT6 <- CI.lower.90 <- CI.lower6 <- CI.upper.90 <- CI.upper6 <- L1 <- eff <- NULL
 
   if (!missing(vis)) {
     warning("'vis' is deprecated and will be removed in future versions.", call. = FALSE)
@@ -3138,7 +3137,7 @@ plot.fect <- function(
       level_ns    <- tapply(eff.vec, x_factor, function(v) sum(!is.na(v)))
       level_sds   <- tapply(eff.vec, x_factor, function(v) sd(v, na.rm = TRUE))
       level_se    <- level_sds / sqrt(pmax(level_ns, 1))
-      level_qt    <- qt(0.975, pmax(level_ns - 1, 1))
+      level_qt    <- stats::qt(0.975, pmax(level_ns - 1, 1))
       level_ci    <- level_qt * level_se
       level_lower <- as.numeric(level_means) - level_ci
       level_upper <- as.numeric(level_means) + level_ci
@@ -3213,7 +3212,7 @@ plot.fect <- function(
 
     } else {
       plx <- predict(loess(eff.vec ~ X.vec), se = T)
-      se <- qt(0.975, plx$df) * plx$se
+      se <- stats::qt(0.975, plx$df) * plx$se
       y_hat <- plx$fit
       y_hat_lower <- y_hat - se
       y_hat_upper <- y_hat + se
