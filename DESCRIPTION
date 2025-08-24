@@ -48,11 +48,4 @@ LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 7.3.2
 Packaged: 2024-01-26 03:25:56 UTC; ziyil
 Encoding: UTF-8
-Author: Licheng Liu [aut],
-    Ziyi Liu [aut],
-    Ye Wang [aut],
-    Yiqing Xu [aut, cre] (<https://orcid.org/0000-0003-2041-6671>),
-    Tianzhu Qin [aut],
-    Shiyun Hu [aut],
-    Rivka Lipkovitz [aut]
 Config/testthat/edition: 3

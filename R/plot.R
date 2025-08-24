@@ -446,7 +446,7 @@ plot.fect <- function(
         )
 
         if (nfactors == 1) {
-          p <- ggplot(data, aes(x = group, y = L1, fill = group)) +
+          p <- ggplot(data, aes(x = .data$group, y = .data$L1, fill = .data$group)) +
             geom_boxplot(alpha = 0.7) +
             coord_flip() +
             guides(fill = FALSE) +
@@ -459,7 +459,7 @@ plot.fect <- function(
                 geom_density(..., alpha = 0.7, color = NA)
             }
             p <- GGally::ggpairs(data,
-              mapping = aes(color = group, fill = group),
+              mapping = aes(color = .data$group, fill = .data$group),
               columns = 1:nfactors,
               columnLabels = Llabel[1:nfactors],
               diag = list(continuous = my_dens),
@@ -472,7 +472,7 @@ plot.fect <- function(
                 geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
             }
             p <- GGally::ggpairs(data,
-              mapping = aes(color = group),
+              mapping = aes(color = .data$group),
               columns = 1:nfactors,
               columnLabels = Llabel[1:nfactors],
               diag = list(continuous = my_dens),
@@ -484,7 +484,7 @@ plot.fect <- function(
                 geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
             }
             p <- GGally::ggpairs(data,
-              mapping = aes(color = group),
+              mapping = aes(color = .data$group),
               columns = 1:nfactors, upper = "blank",
               columnLabels = Llabel[1:nfactors],
               diag = list(continuous = my_dens),
@@ -598,8 +598,8 @@ plot.fect <- function(
           )
         ## main plot
         p <- p + geom_line(aes(time, factor,
-          colour = group,
-          group = group
+          colour = .data$group,
+          group = .data$group
         ), size = 1.2)
 
 
@@ -1465,7 +1465,7 @@ plot.fect <- function(
           data.band_abs <- data.frame(time = plot_time_abs[show_abs], co5 = Y.co.quantiles[, 1], co95 = Y.co.quantiles[, 2], type = "co.band") # Add type for legend
           y_data_for_range_calc <- c(y_data_for_range_calc, data.band_abs$co5, data.band_abs$co95)
           p <- ggplot() +
-            geom_ribbon(data = data.band_abs, aes(x = time, ymin = co5, ymax = co95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
+            geom_ribbon(data = data.band_abs, aes(x = time, ymin = .data$co5, ymax = .data$co95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
             geom_line(data = main_lines_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
           set.limits <- c("tr", "ct", "co.band")
           set.labels <- c(paste0("Treated (", unit_to_plot_name, ")"), paste0("Est. Y(0) (", unit_to_plot_name, ")"), "Controls (5-95% Quantiles)")
@@ -1600,8 +1600,8 @@ plot.fect <- function(
           data.band_co_abs <- data.frame(time = plot_time_abs[show_abs], co5 = Y.co.quantiles[, 1], co95 = Y.co.quantiles[, 2], type = "co_band")
           y_data_for_range_calc <- c(y_data_for_range_calc, data.band_tr_abs$tr5, data.band_tr_abs$tr95, data.band_co_abs$co5, data.band_co_abs$co95)
           p <- ggplot() +
-            geom_ribbon(data = data.band_tr_abs, aes(x = time, ymin = tr5, ymax = tr95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
-            geom_ribbon(data = data.band_co_abs, aes(x = time, ymin = co5, ymax = co95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
+            geom_ribbon(data = data.band_tr_abs, aes(x = time, ymin = .data$tr5, ymax = .data$tr95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
+            geom_ribbon(data = data.band_co_abs, aes(x = time, ymin = .data$co5, ymax = .data$co95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
             geom_line(data = main_lines_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
           set.limits <- c("tr", "co", "tr_band", "co_band")
           set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated (5-95% Quantiles)", "Controls (5-95% Quantiles)")
@@ -1886,8 +1886,8 @@ plot.fect <- function(
             ci_data_filtered <- ci_data_for_plot[ci_data_for_plot$period %in% event_times_for_data_subset, ]
 
             if (!is.null(ci_data_filtered) && nrow(ci_data_filtered) > 0) {
-              p <- p + geom_ribbon(data = ci_data_filtered, aes(x = time_axis_period, ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
-                geom_ribbon(data = ci_data_filtered, aes(x = time_axis_period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
+              p <- p + geom_ribbon(data = ci_data_filtered, aes(x = .data$time_axis_period, ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
+                geom_ribbon(data = ci_data_filtered, aes(x = .data$time_axis_period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
               y_data_for_range_calc <- c(y_data_for_range_calc, ci_data_filtered[[tr_lo_col]], ci_data_filtered[[tr_hi_col]], ci_data_filtered[[cf_lo_col]], ci_data_filtered[[cf_hi_col]])
             } else {
               warning("No CI data for treated/counterfactual averages.")
@@ -1916,7 +1916,7 @@ plot.fect <- function(
         )
         y_data_for_range_calc <- c(y_data_for_range_calc, data_band_plot$tr5, data_band_plot$tr95)
         p <- ggplot() +
-          geom_ribbon(data = data_band_plot, aes(x = time, ymin = tr5, ymax = tr95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
+          geom_ribbon(data = data_band_plot, aes(x = time, ymin = .data$tr5, ymax = .data$tr95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
           geom_line(data = main_lines_data_plot, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
         set.limits <- c("tr", "co", "tr_band")
         set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated (5-95% Quantiles)")
@@ -3154,7 +3154,7 @@ plot.fect <- function(
       p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
       # nicer CI + mean: thick error bars + solid point
       p <- p + geom_linerange(
-        aes(x = x, ymin = lower, ymax = upper),
+        aes(x = x, ymin = .data$lower, ymax = .data$upper),
         data = data_disc, color = heterogeneous.color, linewidth = 0.9
       )
       p <- p + geom_point(
@@ -3193,7 +3193,7 @@ plot.fect <- function(
         p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
           data = data_counts, fill = count.color, color = count.outline.color, alpha = count.alpha, linewidth = 0.2
         )
-        p <- p + geom_text(aes(x = xcenter, y = ymax + 0.12 * count_bar_space_height, label = count),
+        p <- p + geom_text(aes(x = .data$xcenter, y = .data$ymax + 0.12 * count_bar_space_height, label = .data$count),
                            data = data_counts, size = cex.text * 0.85, hjust = 0.5, vjust = 0.5, color = "#444444")
         if (!is.null(covariate.labels)) {
           p <- p + scale_x_discrete(labels = covariate.labels)
@@ -3409,23 +3409,23 @@ plot.fect <- function(
     data.post.1$time <- factor(data.post.1$time, levels = levels)
     data.post.2$time <- factor(data.post.2$time, levels = levels)
 
-    p <- p + geom_boxplot(aes(x = time, y = eff),
+    p <- p + geom_boxplot(aes(x = .data$time, y = .data$eff),
       position = "dodge", alpha = 0.5,
       data = data.pre.1, fill = box.control,
       outlier.fill = box.control, outlier.size = 1.25,
       outlier.color = box.control,
     )
-    p <- p + geom_boxplot(aes(x = time, y = eff),
+    p <- p + geom_boxplot(aes(x = .data$time, y = .data$eff),
       position = "dodge", alpha = 0.5,
       data = data.post.1, fill = box.treat, outlier.fill = box.treat,
       outlier.size = 1.25, outlier.color = box.treat,
     )
 
-    p <- p + geom_point(aes(x = time, y = eff),
+    p <- p + geom_point(aes(x = .data$time, y = .data$eff),
       data = data.post.2,
       color = box.treat, size = 1.25, alpha = 0.8
     )
-    p <- p + geom_point(aes(x = time, y = eff),
+    p <- p + geom_point(aes(x = .data$time, y = .data$eff),
       data = data.pre.2,
       color = box.control, size = 1.25, alpha = 0.8
     )
@@ -3754,7 +3754,7 @@ plot.fect <- function(
 
     p <- p + geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
       geom_errorbar(
-        aes(ymin = lb, ymax = ub, color = color_group),
+        aes(ymin = .data$lb, ymax = .data$ub, color = .data$color_group),
         width = 0.02, # Width of error bar caps
         linewidth = 1
       ) +
@@ -3854,7 +3854,7 @@ plot.fect <- function(
       final_palette <- sens.colors[1:min(n_colors, length(sens.colors))]
       p <- p +
         geom_linerange(
-          aes(x = postPeriod + 0.2, ymin = lb, ymax = ub, color = factor(Mbar, levels = mbar_levels)),
+          aes(x = .data$postPeriod + 0.2, ymin = .data$lb, ymax = .data$ub, color = factor(.data$Mbar, levels = mbar_levels)),
           data = dte_output,
           linewidth = 1, inherit.aes = FALSE
         ) +
@@ -3933,7 +3933,7 @@ plot.fect <- function(
       final_palette <- sens.colors[1:min(n_colors, length(sens.colors))]
       p <- p +
         geom_linerange(
-          aes(x = postPeriod + 0.2, ymin = lb, ymax = ub, color = factor(M, levels = m_levels)),
+          aes(x = .data$postPeriod + 0.2, ymin = .data$lb, ymax = .data$ub, color = factor(.data$M, levels = m_levels)),
           data = dte_output,
           linewidth = 1, inherit.aes = FALSE
         ) +

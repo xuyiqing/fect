@@ -37,7 +37,7 @@ make_es_df <- function(Period_vec, est_vec, se_vec = NULL,
     df <- df |>
       dplyr::left_join(
         count_df |>
-          dplyr::mutate(Period = Period + 1), # Assuming Period in count_df is 0-indexed relative to event
+          dplyr::mutate(Period = .data$Period + 1), # Assuming Period in count_df is 0-indexed relative to event
         by = "Period"
       )
     # If Period_vec can have NAs, this might cause issues with rownames
