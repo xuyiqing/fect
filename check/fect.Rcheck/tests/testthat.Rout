@@ -1,0 +1,57 @@
+
+R version 4.4.2 (2024-10-31) -- "Pile of Leaves"
+Copyright (C) 2024 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(testthat)
+> library(fect)
+> 
+> test_check("fect")
+Bootstrapping for uncertainties ... 
+20 runs
+
+
+
+F-test Failed. The estimated covariance matrix is singular.
+
+
+Dropped 0 always-treated units.
+Bootstrapping for uncertainties ... 
+30 runs
+
+
+
+F-test Failed. The estimated covariance matrix is singular.
+
+
+Bootstrapping for uncertainties ... 
+20 runs
+
+
+
+F-test Failed. The estimated covariance matrix is singular.
+
+
+Number of Always Treated Observations Removed:0.
+
+Uncertainty estimates not available.
+
+[ FAIL 0 | WARN 1480 | SKIP 0 | PASS 26 ]
+
+[ FAIL 0 | WARN 1480 | SKIP 0 | PASS 26 ]
+> 
+> proc.time()
+   user  system elapsed 
+ 96.826   2.321  99.602 

@@ -16,35 +16,22 @@ Description: Provides tools for estimating causal effects in panel data using co
 URL: https://yiqingxu.org/packages/fect/
 NeedsCompilation: yes
 License: MIT + file LICENSE
-Imports: 
-    Rcpp (>= 0.12.3), 
-    ggplot2 (>= 2.1.0), 
-    GGally (>= 1.0.1),
-    doParallel (>= 1.0.10), 
-    foreach (>= 1.4.3), 
-    abind (>= 1.4-0),
-    MASS, 
-    gridExtra, 
-    grid, 
-    fixest, 
-    doRNG,
-    future, 
-    mvtnorm,
-    dplyr,
-    future.apply,
-    reshape2,
-    rlang,
-    scales
-Suggests:
-    panelView,
-    testthat (>= 3.0.0),
-    did,
-    DIDmultiplegtDYN,
-    HonestDiDFEct,
-    ggrepel
+Imports: Rcpp (>= 0.12.3), ggplot2 (>= 2.1.0), GGally (>= 1.0.1),
+        doParallel (>= 1.0.10), foreach (>= 1.4.3), abind (>= 1.4-0),
+        MASS, gridExtra, grid, fixest, doRNG, ggplot2, future, mvtnorm,
+        dplyr, future.apply, reshape2, rlang, scales
+Suggests: panelView, testthat (>= 3.0.0), did, DIDmultiplegtDYN,
+        HonestDiDFEct, ggrepel
 Depends: R (>= 3.5.0)
 LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 7.3.2
-Packaged: 2024-01-26 03:25:56 UTC; ziyil
+Packaged: 2025-08-24 23:39:05 UTC; tianzhuqin
 Encoding: UTF-8
 Config/testthat/edition: 3
+Author: Licheng Liu [aut],
+  Ziyi Liu [aut],
+  Ye Wang [aut],
+  Yiqing Xu [aut, cre],
+  Tianzhu Qin [aut],
+  Shiyun Hu [aut],
+  Rivka Lipkovitz [aut]

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head><title>R: Fixed Effects Counterfactual Estimators</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+<link rel="stylesheet" type="text/css" href="R.css" />
+</head><body><div class="container">
+<h1> Fixed Effects Counterfactual Estimators
+<img class="toplogo" src="../../../doc/html/Rlogo.svg" alt="[R logo]" />
+</h1>
+<hr/>
+<div style="text-align: center;">
+<a href="../../../doc/html/packages.html"><img class="arrow" src="../../../doc/html/left.jpg" alt="[Up]" /></a>
+<a href="../../../doc/html/index.html"><img class="arrow" src="../../../doc/html/up.jpg" alt="[Top]" /></a>
+</div><h2>Documentation for package &lsquo;fect&rsquo; version 2.0.4</h2>
+
+<ul><li><a href="../DESCRIPTION">DESCRIPTION file</a>.</li>
+</ul>
+
+<h2>Help Pages</h2>
+
+
+<table style="width: 100%;">
+<tr><td style="width: 25%;"><a href="fect-package.html">fect-package</a></td>
+<td>Fixed Effects Counterfactual Estimators</td></tr>
+<tr><td style="width: 25%;"><a href="att.cumu.html">att.cumu</a></td>
+<td>Calculate Cumulative Treatment Effects</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">beta_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">beta_iter_ub</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">cv.sample</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">data_ub_adj</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="did_wrapper.html">did_wrapper</a></td>
+<td>A Multi-Method Difference-in-Differences Estimator</td></tr>
+<tr><td style="width: 25%;"><a href="effect.html">effect</a></td>
+<td>Calculate Cumulative or Sub-group Treatment Effects</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">equiv_test</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="esplot.html">esplot</a></td>
+<td>Event Study Visualization</td></tr>
+<tr><td style="width: 25%;"><a href="fect.html">fect</a></td>
+<td>Fixed Effects Counterfactual Estimators</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fect.default</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fect.fe</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fect.formula</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fect.mc</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect_sens.html">fect_sens</a></td>
+<td>Sensitivity Analysis for fect Objects under Relative Magnitude and Smoothness Restrictions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fe_add</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fe_add2</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fe_ad_covar_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fe_ad_inter_covar_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fe_ad_inter_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">fe_ad_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="get.cohort.html">get.cohort</a></td>
+<td>Obatin the Cohort Index</td></tr>
+<tr><td style="width: 25%;"><a href="gs2020.html">gs2020</a></td>
+<td>Simulated Gsynth-like Panel Data (No Reversal)</td></tr>
+<tr><td style="width: 25%;"><a href="hh2019.html">hh2019</a></td>
+<td>Simulated Panel Data Example</td></tr>
+<tr><td style="width: 25%;"><a href="interFE.html">interFE</a></td>
+<td>Interactive Fixed Effects Models</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">interFE.default</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">interFE.formula</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">inter_fe</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">inter_fe_mc</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">inter_fe_ub</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">panel_beta</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">panel_est</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">panel_factor</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">panel_factor_ub</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">panel_fe</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">panel_fe_ub</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="plot.fect.html">plot.fect</a></td>
+<td>Plot Method for 'fect' Objects</td></tr>
+<tr><td style="width: 25%;"><a href="print.fect.html">print.fect</a></td>
+<td>Print Results</td></tr>
+<tr><td style="width: 25%;"><a href="print.interFE.html">print.interFE</a></td>
+<td>Print Results</td></tr>
+<tr><td style="width: 25%;"><a href="simdata.html">simdata</a></td>
+<td>Simulated data</td></tr>
+<tr><td style="width: 25%;"><a href="simgsynth.html">simgsynth</a></td>
+<td>Simulated data for Gsynth</td></tr>
+<tr><td style="width: 25%;"><a href="turnout.html">turnout</a></td>
+<td>EDR and Voter Turnout in the US</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">XXinv</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">Y_demean</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_beta_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_beta_iter_ub</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_data_ub_adj</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_fe_add</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_fe_add2</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_fe_ad_covar_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_fe_ad_inter_covar_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_fe_ad_inter_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_fe_ad_iter</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_inter_fe</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_inter_fe_mc</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_inter_fe_ub</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_panel_beta</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_panel_est</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_panel_factor</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_panel_factor_ub</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_panel_fe</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_panel_fe_ub</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_XXinv</a></td>
+<td>Internal FEct Functions</td></tr>
+<tr><td style="width: 25%;"><a href="fect-internal.html">_gsynth_Y_demean</a></td>
+<td>Internal FEct Functions</td></tr>
+</table>
+</div></body></html>
