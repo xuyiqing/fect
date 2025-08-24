@@ -106,6 +106,7 @@
     status.balanced.pre.color = NULL,
     status.background.color = NULL,
     covariate = NULL,
+    covariate.labels = NULL,
     ...
 )
 }
