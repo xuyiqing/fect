@@ -105,6 +105,17 @@ plot(out.ife, type = "hte", covariate = "X1")
 plot(out.ife, type = "heterogeneous", covariate = "X1", show.count = FALSE, xlab = "X1")
 
 
+simdata$X3 <- sample(1:3, size = nrow(simdata), replace = TRUE)
+out.ife.X3 <- fect(Y ~ D + X1 + X2 + X3, data = simdata, index = c("id","time"), 
+                   method = "ife", r = 2, se = TRUE, seed = 123,
+                   cores = 8, nboots = 1000, parallel = TRUE)
+
+plot(out.ife.X3, type="hte", covariate = "X3", 
+     xlab = "", ylab = "Effet of D on Y",
+     covariate.labels = c("USA", "China", "UK"),
+     ylim = c(-2, 6))
+
+
 # Diagnostic tests
 out.fect.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", parallel = TRUE, se = TRUE, CV = 0,
