@@ -91,38 +91,38 @@ event_data$count[event_data$time == -5 | event_data$time == 5] <- 20 # for propo
 esplot(event_data, Period = "time", Estimate = "ATT",
        CI.lower = "CI.lower", CI.upper = "CI.upper")
 
-# Connected plot with ribbon
-esplot(event_data, Period = "time", Estimate = "ATT",
-       CI.lower = "CI.lower", CI.upper = "CI.upper",
-       connected = TRUE, show.points = TRUE)
+# # Connected plot with ribbon
+# esplot(event_data, Period = "time", Estimate = "ATT",
+#        CI.lower = "CI.lower", CI.upper = "CI.upper",
+#        connected = TRUE, show.points = TRUE)
 
-# Connected plot using SE for CI calculation
-event_data_no_ci <- event_data[, c("time", "ATT", "SE", "count")]
-esplot(event_data_no_ci, Period = "time", Estimate = "ATT", SE = "SE",
-       connected = TRUE, ci.outline = TRUE, color = "blue")
+# # Connected plot using SE for CI calculation
+# event_data_no_ci <- event_data[, c("time", "ATT", "SE", "count")]
+# esplot(event_data_no_ci, Period = "time", Estimate = "ATT", SE = "SE",
+#        connected = TRUE, ci.outline = TRUE, color = "blue")
 
-# Show count bars and stats
-esplot(event_data, Period = "time", Estimate = "ATT",
-       CI.lower = "CI.lower", CI.upper = "CI.upper", Count = "count",
-       show.count = TRUE, stats = c(0.03, 0.12), stats.labs = c("P-val Pre", "P-val Post"),
-       main = "Event Study with Counts and Stats", proportion = 0.2)
+# # Show count bars and stats
+# esplot(event_data, Period = "time", Estimate = "ATT",
+#        CI.lower = "CI.lower", CI.upper = "CI.upper", Count = "count",
+#        show.count = TRUE, stats = c(0.03, 0.12), stats.labs = c("P-val Pre", "P-val Post"),
+#        main = "Event Study with Counts and Stats", proportion = 0.2)
 
-# Highlight specific periods (connected)
-esplot(event_data, Period = "time", Estimate = "ATT", SE = "SE",
-       connected = TRUE, highlight.periods = c(-1, 2),
-       highlight.colors = c("orange", "green"),
-       main = "Highlighted Periods (Connected)")
+# # Highlight specific periods (connected)
+# esplot(event_data, Period = "time", Estimate = "ATT", SE = "SE",
+#        connected = TRUE, highlight.periods = c(-1, 2),
+#        highlight.colors = c("orange", "green"),
+#        main = "Highlighted Periods (Connected)")
 
-# Highlight specific periods (point-range)
-esplot(event_data, Period = "time", Estimate = "ATT", SE = "SE",
-       connected = FALSE, highlight.periods = c(-1, 2),
-       highlight.colors = c("orange", "green"),
-       main = "Highlighted Periods (Point-Range)")
+# # Highlight specific periods (point-range)
+# esplot(event_data, Period = "time", Estimate = "ATT", SE = "SE",
+#        connected = FALSE, highlight.periods = c(-1, 2),
+#        highlight.colors = c("orange", "green"),
+#        main = "Highlighted Periods (Point-Range)")
 
-# Only post-treatment period, custom labels
-esplot(event_data, Period = "time", Estimate = "ATT", SE = "SE",
-       only.post = TRUE, xlab = "Years Post-Intervention", ylab = "Impact Metric",
-       start0 = TRUE, color = "darkred", est.lwidth = 1.5)
+# # Only post-treatment period, custom labels
+# esplot(event_data, Period = "time", Estimate = "ATT", SE = "SE",
+#        only.post = TRUE, xlab = "Years Post-Intervention", ylab = "Impact Metric",
+#        start0 = TRUE, color = "darkred", est.lwidth = 1.5)
 
 # Using did_wrapper object (conceptual example, requires `did` package and setup)
 # if (requireNamespace("did", quietly = TRUE)) {
