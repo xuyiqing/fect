@@ -1,3 +1,15 @@
+.has_honest <- function() {
+  requireNamespace("HonestDiDFEct", quietly = TRUE)
+}
+
+.honest <- function(fun) {
+  if (!.has_honest()) {
+    stop("Optional dependency ``HonestDiDFEct'' not available. Install from https://github.com/lzy318/HonestDiDFEct .", call. = FALSE)
+  }
+  getExportedValue("HonestDiDFEct", fun)
+}
+
+
 fect_sens <- function(
     fect.out,
     post.periods = NA, # Post-treatment periods
@@ -73,7 +85,7 @@ fect_sens <- function(
   # -------------------------------------------------------------------
   if (!is.null(Mbarvec) && length(Mbarvec) > 0) {
     # 3a) Weighted-average, across the entire post-treatment window
-    rm_sens_results <- HonestDiDFEct::createSensitivityResults_relativeMagnitudes(
+    rm_sens_results <- .honest("createSensitivityResults_relativeMagnitudes")(
       betahat = beta.hat,
       sigma = vcov.hat,
       numPrePeriods = numPrePeriods,
@@ -84,7 +96,7 @@ fect_sens <- function(
     )
 
 
-    rm_original_cs <- HonestDiDFEct::constructOriginalCS(
+    rm_original_cs <- .honest("constructOriginalCS")(
       betahat        = beta.hat,
       sigma          = vcov.hat,
       numPrePeriods  = numPrePeriods,
@@ -106,7 +118,7 @@ fect_sens <- function(
 
       # For each t_i, we run createSensitivityResults_relativeMagnitudes
       # across all Mbar in Mbarvec
-      honest.dte <- HonestDiDFEct::createSensitivityResults_relativeMagnitudes(
+      honest.dte <- .honest("createSensitivityResults_relativeMagnitudes")(
         betahat        = beta.hat,
         sigma          = vcov.hat,
         numPrePeriods  = numPrePeriods,
@@ -141,7 +153,7 @@ fect_sens <- function(
   if (!is.null(Mvec) && length(Mvec) > 0) {
     # 4a) Weighted-average analysis
 
-    smooth_sens_results <- HonestDiDFEct::createSensitivityResults(
+    smooth_sens_results <- .honest("createSensitivityResults")(
       betahat = beta.hat,
       sigma = vcov.hat,
       numPrePeriods = numPrePeriods,
@@ -152,7 +164,7 @@ fect_sens <- function(
       parallel = parallel
     )
 
-    sm_original_cs <- HonestDiDFEct::constructOriginalCS(
+    sm_original_cs <- .honest("constructOriginalCS")(
       betahat        = beta.hat,
       sigma          = vcov.hat,
       numPrePeriods  = numPrePeriods,
@@ -169,7 +181,7 @@ fect_sens <- function(
       dte_l <- rep(0, numPostPeriods)
       dte_l[t_i] <- 1
 
-      honest.dte <- HonestDiDFEct::createSensitivityResults(
+      honest.dte <- .honest("createSensitivityResults")(
         betahat = beta.hat,
         sigma = vcov.hat,
         numPrePeriods = numPrePeriods,
