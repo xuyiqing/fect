@@ -42,7 +42,7 @@ Suggests:
     DIDmultiplegtDYN,
     HonestDiDFEct,
     ggrepel
-Depends: R (>= 3.5.0)
+Depends: R (>= 4.1.0)
 LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 7.3.2
 Packaged: 2024-01-26 03:25:56 UTC; ziyil
