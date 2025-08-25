@@ -30,7 +30,7 @@ To begin, you will need to install the necessary packages from CRAN and GitHub.
 # install packages from CRAN
 packages <- c("dplyr", "fixest", "did", "didimputation", 
               "panelView", "ggplot2", "bacondecomp", "HonestDiD",
-              "DIDmultiplegtDYN", "PanelMatch")
+              "DIDmultiplegtDYN", "PanelMatch", "readstata13")
 install.packages(setdiff(packages, rownames(installed.packages())))  
 
 # install most up-to-date "fect" from Github

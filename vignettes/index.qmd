@@ -87,14 +87,52 @@ The following individuals have contributed to **gsynth** and **fect**, listed in
 
 Special thanks to Ziyi, Tianzhu, and Rivka for their tireless efforts in improving this package. Thanks to Jinwen for setting up and maintaining this User Manual.
 
-## Report bugs
+## Update Log
 
-Please report any bugs to me (yiqingxu \[at\] stanford.edu) or submit an issue on [GitHub](https://github.com/xuyiqing/fect/issues). Please include your minimally replicable code & data file and a **panelView** treatment status plot. Your feedback is highly valued!
+### v2.0.5
+(2025-08-25) CRAN release.
+
+- Fixed various bugs due to changes in dependencies
+- Added limit to `cores` by default in parallel computing  \
+- Add new plot `type = "hte"`
+- Added R-CMD-check for merging
+
+### v2.0.2
+(2025-05-07)
+ 
+- Fixed various bugs
+- Updated counterfactual plot
+- Added sensitivity analysis
+- Added `did_wrapper()` and `esplot()`
+- Added various plotting options
+- Improved documentation
+
+### v2.0.0 
+(2025-01-17) CRAN release.
+
+- Changed to new syntax
+- Fixed various bugs
+- Added `get_cohort()`
+- Merged in **gsynth**
+
+
+## Report Bugs
+
+Please report any bugs by submitting an issue on [GitHub](https://github.com/xuyiqing/fect/issues) or emailing me (yiqingxu \[at\] stanford.edu). We'd really appreciate it if you can include your minimally replicable code & data file and a **panelView** treatment status plot. Your feedback is highly valued!
 
 <!-- badges: start -->
 
-fect: [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/fect" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/fect/index.html)
+**fect**: [![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)](https://www.tidyverse.org/lifecycle/#stable) 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
+[<img src="https://www.r-pkg.org/badges/version/fect" alt="CRAN status"/>](https://CRAN.R-project.org/package=fect)
+[<img src="https://cranlogs.r-pkg.org/badges/grand-total/fect" alt="CRAN downloads"/>](https://cran.r-project.org/web/packages/fect/index.html) 
 
-gsynth: [<img src="https://cranlogs.r-pkg.org/badges/grand-total/gsynth" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/gsynth/index.html) (retiring)
+<!-- ... 
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental)
+-->
+
+**gsynth** (retiring): [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
+[<img src="https://www.r-pkg.org/badges/version/gsynth" alt="CRAN status"/>](https://CRAN.R-project.org/package=gsynth)
+[<img src="https://cranlogs.r-pkg.org/badges/grand-total/gsynth" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/gsynth/index.html) 
 
 <!-- badges: end -->
