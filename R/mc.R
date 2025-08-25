@@ -1,7 +1,7 @@
 ###################################################################
 ## Matrix Completion Function
 ###################################################################
-fect.mc <- function(Y, # Outcome variable, (T*N) matrix
+fect_mc <- function(Y, # Outcome variable, (T*N) matrix
                     X, # Explanatory variables:  (T*N*p) array
                     D,
                     W,

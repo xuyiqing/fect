@@ -1,4 +1,4 @@
-fect.gsynth <- function(Y, # Outcome variable, (T*N) matrix
+fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
                         X, # Explanatory variables:  (T*N*p) array
                         D, #  Indicator for treated unit (tr==1)
                         W,

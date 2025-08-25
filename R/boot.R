@@ -26,7 +26,7 @@ basic_ci_alpha <- function(theta, boots, alpha) {
   ci_mat
 }
 
-fect.boot <- function(Y,
+fect_boot <- function(Y,
                       X,
                       D,
                       W,
@@ -45,26 +45,26 @@ fect.boot <- function(Y,
                       ind.matrix = NULL,
                       knots = NULL,
                       criterion = "mspe",
-                      CV,
-                      k = 5,
+                      CV = 0,
+                      k = 10,
                       cv.prop = 0.1,
-                      cv.treat = 0,
-                      cv.nobs = 1,
+                      cv.treat = TRUE,
+                      cv.nobs = 3,
                       r = 0,
-                      r.end,
+                      r.end = 3,
                       lambda = NULL,
                       nlambda = 10,
                       alpha = 0.05,
-                      binary,
-                      QR,
-                      force,
+                      binary = 0,
+                      QR = 0,
+                      force = 0,
                       hasRevs = 1,
-                      tol,
+                      tol = 1e-3,
                       max.iteration = 1000,
-                      norm.para,
+                      norm.para = NULL,
                       placebo.period = NULL,
-                      placeboTest = FALSE,
-                      carryoverTest = FALSE,
+                      placeboTest = 0,
+                      carryoverTest = 0,
                       carryover.period = NULL,
                       vartype = "bootstrap",
                       quantile.CI = FALSE,
@@ -73,7 +73,7 @@ fect.boot <- function(Y,
                       cores = NULL,
                       group.level = NULL,
                       group = NULL,
-                      dis = TRUE,
+                      dis = 0,
                       keep.sims = FALSE) {
   na.pos <- NULL
   TT <- dim(Y)[1]
@@ -121,7 +121,7 @@ fect.boot <- function(Y,
   ## estimation
   if (CV == 0) {
     if (method == "gsynth") {
-      out <- fect.gsynth(
+      out <- fect_gsynth(
         Y = Y, X = X, D = D, W = W, I = I, II = II,
         T.on = T.on, T.off = T.off, CV = 0,
         T.on.balance = T.on.balance,
@@ -137,7 +137,7 @@ fect.boot <- function(Y,
         group.level = group.level, group = group
       )
     } else if (method == "ife") {
-      out <- fect.fe(
+      out <- fect_fe(
         Y = Y, X = X, D = D, W = W, I = I, II = II,
         T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
         T.on.balance = T.on.balance,
@@ -153,7 +153,7 @@ fect.boot <- function(Y,
         group.level = group.level, group = group
       )
     } else if (method == "mc") {
-      out <- try(fect.mc(
+      out <- try(fect_mc(
         Y = Y, X = X, D = D, W = W, I = I, II = II,
         T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
         T.on.balance = T.on.balance,
@@ -171,7 +171,7 @@ fect.boot <- function(Y,
         stop("\nCannot estimate using full data with MC algorithm.\n")
       }
     } else if (method %in% c("polynomial", "bspline", "cfe")) {
-      out <- try(fect.polynomial(
+      out <- try(fect_polynomial(
         Y = Y, D = D, X = X, W = W, I = I,
         II = II, T.on = T.on, T.on.carry = T.on.carry,
         T.on.balance = T.on.balance,
@@ -200,7 +200,7 @@ fect.boot <- function(Y,
   } else {
     ## cross-valiadtion
     if (binary == 0) {
-      out <- fect.cv(
+      out <- fect_cv(
         Y = Y, X = X, D = D, W = W, I = I, II = II,
         T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
         T.on.balance = T.on.balance,
@@ -217,7 +217,7 @@ fect.boot <- function(Y,
 
       # method <- out$method
     } else {
-      out <- fect.binary.cv(
+      out <- fect_binary_cv(
         Y = Y, X = X, D = D,
         I = I, II = II,
         T.on = T.on, T.off = T.off,
@@ -449,7 +449,7 @@ fect.boot <- function(Y,
         carryover.period.boot <- carryover.period
       }
 
-      boot <- try(fect.fe(
+      boot <- try(fect_fe(
         Y = Y.boot, X = X, D = D, W = W,
         I = I, II = II,
         T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
@@ -544,12 +544,12 @@ fect.boot <- function(Y,
       }
 
       ## output
-      # synth.out <- try(fect.gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
+      # synth.out <- try(fect_gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
       #                             I = I.id.pseudo, II = II.id.pseudo,
       #                             force = force, r = out$r.cv, CV = 0,
       #                             tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
 
-      synth.out <- try(fect.gsynth(
+      synth.out <- try(fect_gsynth(
         Y = Y.pseudo, X = X.pseudo, D = D.pseudo, W = NULL,
         I = I.id.pseudo, II = II.id.pseudo,
         T.on = T.on.pseudo, hasRevs = hasRevs,
@@ -580,7 +580,7 @@ fect.boot <- function(Y,
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
         .multicombine = TRUE,
-        .export = c("fect.gsynth", "initialFit"),
+        .export = c("fect_gsynth", "initialFit"),
         .packages = c("fect", "mvtnorm", "fixest"),
         .inorder = FALSE
       ) %dopar% {
@@ -669,7 +669,7 @@ fect.boot <- function(Y,
       if (!is.null(W)) {
         W.boot <- NULL
       }
-      synth.out <- try(fect.gsynth(
+      synth.out <- try(fect_gsynth(
         Y = Y.boot, X = X.boot, D = D.boot, W = W.boot,
         I = I.boot, II = II.boot, T.on = T.on[, id.boot],
         T.on.balance = T.on.balance[, id.boot],
@@ -749,7 +749,7 @@ fect.boot <- function(Y,
       }
 
       if (method == "ife") {
-        boot <- try(fect.fe(
+        boot <- try(fect_fe(
           Y = Y.boot, X = X, D = D,
           W = W, I = I, II = II,
           T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
@@ -775,7 +775,7 @@ fect.boot <- function(Y,
           time.off.seq.group = group.time.off
         ), silent = TRUE)
       } else if (method == "mc") {
-        boot <- try(fect.mc(
+        boot <- try(fect_mc(
           Y = Y.boot, X = X, D = D,
           W = W, I = I, II = II,
           T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
@@ -800,7 +800,7 @@ fect.boot <- function(Y,
           time.off.seq.group = group.time.off
         ), silent = TRUE)
       } else if (method %in% c("polynomial", "bspline", "cfe")) {
-        boot <- try(fect.polynomial(
+        boot <- try(fect_polynomial(
           Y = Y.boot, D = D, X = X,
           W = W, I = I,
           II = II, T.on = T.on,
@@ -974,7 +974,7 @@ fect.boot <- function(Y,
         }
 
         if (method == "gsynth") {
-          boot <- try(fect.gsynth(
+          boot <- try(fect_gsynth(
             Y = Y[, boot.id], X = X.boot, D = D.boot, W = W.boot,
             I = I.boot, II = II[, boot.id],
             T.on = T.on[, boot.id], T.off = T.off.boot, CV = 0,
@@ -1000,7 +1000,7 @@ fect.boot <- function(Y,
             time.off.seq.group = group.time.off
           ), silent = TRUE)
         } else if (method == "ife") {
-          boot <- try(fect.fe(
+          boot <- try(fect_fe(
             Y = Y[, boot.id], X = X.boot, D = D.boot, W = W.boot,
             I = I.boot, II = II[, boot.id],
             T.on = T.on[, boot.id], T.off = T.off.boot,
@@ -1028,7 +1028,7 @@ fect.boot <- function(Y,
             time.off.seq.group = group.time.off
           ), silent = TRUE)
         } else if (method == "mc") {
-          boot <- try(fect.mc(
+          boot <- try(fect_mc(
             Y = Y[, boot.id], X = X.boot, D = D[, boot.id], W = W.boot,
             I = I[, boot.id], II = II[, boot.id],
             T.on = T.on[, boot.id], T.off = T.off.boot,
@@ -1056,7 +1056,7 @@ fect.boot <- function(Y,
             time.off.seq.group = group.time.off
           ), silent = TRUE)
         } else if (method %in% c("polynomial", "bspline", "cfe")) {
-          boot <- try(fect.polynomial(
+          boot <- try(fect_polynomial(
             Y = Y[, boot.id], X = X.boot, W = W.boot,
             D = D[, boot.id],
             I = I[, boot.id], II = II[, boot.id],
@@ -1126,7 +1126,7 @@ fect.boot <- function(Y,
     boot.out <- foreach(
       j = 1:nboots,
       .inorder = FALSE,
-      .export = c("fect.fe", "fect.mc", "fect.polynomial", "get_term", "fect.gsynth", "initialFit"),
+      .export = c("fect_fe", "fect_mc", "fect_polynomial", "get_term", "fect_gsynth", "initialFit"),
       .packages = c("fect", "mvtnorm", "fixest")
     ) %dopar% {
       return(one.nonpara(boot.seq[j]))
@@ -1252,7 +1252,7 @@ fect.boot <- function(Y,
         I.boot[, , j] <- boot$I
         if (is.null(boot$boot.id)){
           colnames.boot <- c(colnames.boot, list(1:N)) # Parametric bootstrap
-          assign("boot", boot, .GlobalEnv)
+          # assign("boot", boot, .GlobalEnv)
         } else {
           colnames.boot <- c(colnames.boot, list(boot$boot.id)) # Raw bootstrap and jackknife
         }

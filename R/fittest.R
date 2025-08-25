@@ -2,7 +2,7 @@
 ## goodness of fit test: wild
 #####################################
 
-fect.test <- function(
+fect_test <- function(
     out, # from fect
     Y,
     X,
@@ -102,7 +102,7 @@ fect.test <- function(
             Y.boot <- Y.f + res.p * eff
             Y.boot[which(I == 0)] <- 0
             if (method %in% c("ife", "fe")) {
-                boot <- try(fect.fe(Y = Y.boot, X = X, D = D, I = I, II = II, 
+                boot <- try(fect_fe(Y = Y.boot, X = X, D = D, I = I, II = II, 
                                 T.on = T.on, T.off = NULL,
                                 r.cv = r, force = force, hasRevs = 0, 
                                 tol = tol, boot = 1,
@@ -110,7 +110,7 @@ fect.test <- function(
                                 placebo.period = NULL, placeboTest = 0), silent = TRUE)
             }
             else if (method == "mc") {
-                boot <- try(fect.mc(Y = Y.boot, X = X, D = D, 
+                boot <- try(fect_mc(Y = Y.boot, X = X, D = D, 
                                 I = I, II = II, hasF = out$validF,
                                 T.on = T.on, T.off = NULL, 
                                 lambda.cv = lambda, force = force, hasRevs = 0, 
@@ -119,7 +119,7 @@ fect.test <- function(
                                 placebo.period = NULL, placeboTest = 0), silent = TRUE)
             }
             else if (method %in% c("polynomial", "bspline")) {
-                boot <- try(fect.polynomial(Y = Y.boot, X = X, D = D, I = I, II = II, 
+                boot <- try(fect_polynomial(Y = Y.boot, X = X, D = D, I = I, II = II, 
                                 T.on = T.on, T.off = NULL, method = method, 
                                 degree = degree, knots = knots, 
                                 force = force, hasRevs = 0, tol = tol, boot = 1,
@@ -221,7 +221,7 @@ fect.test <- function(
     if (parallel == TRUE) { 
         boot.out <- foreach(j=1:nboots, 
                             .inorder = FALSE,
-                            .export = c("fect.fe", "fect.mc", "fect.polynomial", "get_term"),
+                            .export = c("fect_fe", "fect_mc", "fect_polynomial", "get_term"),
                             .packages = c("fect")
                             ) %dopar% {
                                 return(one.nonpara())
