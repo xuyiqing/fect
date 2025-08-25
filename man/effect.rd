@@ -6,7 +6,17 @@
 }
 
 \usage{
-effect(x, cumu = TRUE, id = NULL, period = NULL)
+effect(
+  x,
+  cumu = TRUE,
+  id = NULL,
+  period = NULL,
+  plot = FALSE,
+  count = TRUE,
+  xlab = NULL,
+  ylab = NULL,
+  main = NULL
+)
 }
 
 \arguments{
@@ -19,6 +29,14 @@ effect(x, cumu = TRUE, id = NULL, period = NULL)
   \item{period}{Numeric vector of length 2 specifying the time window \code{c(start, end)} for effect calculation. If \code{NULL}, uses the maximum possible window based on the data.}
 
   \item{plot}{Logical. If \code{TRUE}, creates a visualization of the cumulative treatment effects with confidence intervals and a bar chart showing the number of treated units at each time point. Default is \code{FALSE}.}
+
+  \item{count}{Logical. If \code{TRUE}, shows the count bars in the plot.}
+
+  \item{xlab}{Character. X-axis label for the plot.}
+
+  \item{ylab}{Character. Y-axis label for the plot.}
+
+  \item{main}{Character. Main title for the plot.}
 }
 
 \details{

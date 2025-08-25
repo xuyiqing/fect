@@ -6,12 +6,12 @@
 ## fect.default()
 
 ## DEPENDENT FUNCTIONS
-## fect.fe() ## interactive fixed effects model
-## fect.mc() ## matrix completion
-## fect.boot() ## bootstrap
+## fect_fe() ## interactive fixed effects model
+## fect_mc() ## matrix completion
+## fect_boot() ## bootstrap
 
 ## fitness test
-## fect.test ## wild bootstrap
+## fect_test ## wild bootstrap
 
 ## METHODS
 ## print.fect()
@@ -982,7 +982,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 tempID <- unique(data[, id])
                 for (i in tempID) {
                     subpos <- which(data[, id] == i)
-                    subtime <- data[data$id == i,]$time
+                    subtime <- data[subpos, time]
                     subd <- data[subpos, Dname]
                     if (sum(subd) >= 1) {
                         tr.time <- subtime[which(subd == 1)]
@@ -1481,7 +1481,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
             set.seed(seed)
         }
         if (is.null(cores) == TRUE) {
-            cores <- detectCores()
+            cores <- min(detectCores() - 2, 8) # default to 8 cores if not specified
         }
         para.clusters <- future::makeClusterPSOCK(cores)
         registerDoParallel(para.clusters)
@@ -1498,7 +1498,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
 
         if (CV == TRUE) {
             if (binary == FALSE) {
-                out <- fect.cv(Y = Y, D = D, X = X, W = W,
+                out <- fect_cv(Y = Y, D = D, X = X, W = W,
                                I = I, II = II,
                                T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
                                T.on.balance = T.on.balance,
@@ -1518,7 +1518,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                group.level = g.level, group = G)
             }
             else {
-                out <- fect.binary.cv(Y = Y, D = D, X = X,
+                out <- fect_binary_cv(Y = Y, D = D, X = X,
                                       I = I, II = II,
                                       T.on = T.on, T.off = T.off,
                                       k = k, cv.prop = cv.prop,
@@ -1533,7 +1533,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
         }
         else { ## non-binary case
             if (method == "ife") {
-                out <- fect.fe(Y = Y, D = D, X = X,
+                out <- fect_fe(Y = Y, D = D, X = X,
                                W = W, I = I, II = II,
                                T.on = T.on, T.off = T.off, r.cv = r, T.on.carry = T.on.carry,
                                T.on.balance = T.on.balance,
@@ -1549,7 +1549,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                group.level = g.level, group = G)
             }
             else if(method == "gsynth"){
-                out <- fect.gsynth(Y = Y, D = D, X = X,
+                out <- fect_gsynth(Y = Y, D = D, X = X,
                                    W = W, I = I, II = II,
                                    T.on = T.on, T.off = T.off, r = r, CV = 0,
                                    T.on.balance = T.on.balance,
@@ -1565,7 +1565,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                    group.level = g.level, group = G)
             }
             else if (method == "mc") {
-                out <- fect.mc(Y = Y, D = D, X = X,
+                out <- fect_mc(Y = Y, D = D, X = X,
                                W = W, I = I, II = II,
                                T.on = T.on, T.off = T.off, T.on.carry = T.on.carry,
                                T.on.balance = T.on.balance,
@@ -1581,7 +1581,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                                group.level = g.level, group = G)
             }
             else if (method %in% c("polynomial",  "cfe")) {
-                out <- fect.polynomial(Y = Y, D = D, X = X,
+                out <- fect_polynomial(Y = Y, D = D, X = X,
                                        W = W, I = I, II = II,
                                        T.on = T.on, T.on.carry = T.on.carry,
                                        T.on.balance = T.on.balance,
@@ -1615,7 +1615,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     }
     else { # SE == TRUE
 
-        out <- fect.boot(Y = Y, D = D, X = X,
+        out <- fect_boot(Y = Y, D = D, X = X,
                          W = W, I = I, II = II,
                          T.on = T.on, T.off = T.off, T.on.carry = T.on.carry, cl = cl,
                          T.on.balance = T.on.balance, balance.period = balance.period,
@@ -1820,7 +1820,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
                 }
 
 
-                p.out <- fect.boot(Y = pY, D = pD, X = pX,
+                p.out <- fect_boot(Y = pY, D = pD, X = pX,
                              W = pW, I = pI, II = pII,
                              T.on = pT.on, T.off = pT.off, cl = p.cl,T.on.carry = T.on.carry,
                              method = method, degree = degree,
@@ -1889,7 +1889,7 @@ fect.default <- function(formula = NULL, data, # a data frame (long-form)
     if (permute == TRUE) {
         message("Permuting under sharp null hypothesis ... ")
 
-        out.permute <- fect.permu(Y = Y, X = X, D = D, I = I, r.cv = out$r.cv,
+        out.permute <- fect_permu(Y = Y, X = X, D = D, I = I, r.cv = out$r.cv,
                                   lambda.cv = out$lambda.cv, m = m,
                                   permu.dimension = permu.dimension,
                                   method = out$method, degree = degree,

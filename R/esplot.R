@@ -773,7 +773,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
         rect_data[,"ymin"] <- rect.min_yval
         rect_data[,"ymax"] <- rect.min_yval + (rect_data[[Count]] / max_rect_count) * rect_bar_max_h
         p <- p + geom_rect(
-          data = rect_data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+          data = rect_data, aes(xmin = .data$xmin, xmax = .data$xmax, ymin = .data$ymin, ymax = .data$ymax),
           fill = count.color, linewidth = 0.2, inherit.aes = FALSE, alpha = count.alpha, color = count.outline.color)
 
         max_count_val <- max_rect_count

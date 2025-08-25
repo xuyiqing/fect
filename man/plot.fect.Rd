@@ -88,8 +88,12 @@
     counterfactual.linetype =  NULL,
     box.control =  NULL,
     box.treat =  NULL,
-    calendar.color =  NULL,
-    calendar.lcolor =  NULL,
+    calendar.color = NULL,
+    calendar.lcolor = NULL,
+    calendar.cicolor = NULL,
+    heterogeneous.color = NULL,
+    heterogeneous.lcolor = NULL,
+    heterogeneous.cicolor = NULL,
     equiv.color =  NULL,
     status.treat.color =  NULL,
     status.control.color = NULL,
@@ -101,6 +105,8 @@
     status.balanced.post.color = NULL,
     status.balanced.pre.color = NULL,
     status.background.color = NULL,
+    covariate = NULL,
+    covariate.labels = NULL,
     ...
 )
 }
@@ -193,6 +199,10 @@
   \item{box.treat}{Character string or \code{NULL} (default). If \code{NULL}, uses a default fill color for treated boxplots (e.g., \code{"pink"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{calendar.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for fitted lines in calendar plots (e.g., \code{"skyblue"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{calendar.lcolor}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for average ATT lines in calendar plots (e.g., \code{"red"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{calendar.cicolor}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for CI in calendar plots (e.g., \code{"red"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{heterogeneous.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for fitted lines in heterogeneous plots (e.g., \code{"red"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{heterogeneous.lcolor}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for average ATT lines in heterogeneous plots (e.g., \code{"red"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{heterogeneous.cicolor}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for CI in heterogeneous plots (e.g., \code{"red"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{equiv.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for equivalence bounds (e.g., \code{"red"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{status.treat.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for treated status (e.g., \code{"#06266F"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{status.control.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for control status (e.g., \code{"#B0C4DE"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
@@ -204,6 +214,8 @@
   \item{status.balanced.post.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for balanced post-treatment status (e.g., \code{"#00852B"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{status.balanced.pre.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for balanced pre-treatment status (e.g., \code{"#A5CA18"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{status.background.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default background color for status plots (e.g., \code{"gray90"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{covariate}{Character string or \code{NULL} (default). If \code{NULL}, uses a default covariate for heterogeneous plots (e.g., \code{"X"} for the base style). The \code{preset} argument may define a different covariate. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{covariate.labels}{Character vector or \code{NULL} (default). If \code{NULL}, uses a default covariate labels for heterogeneous plots (e.g., \code{"X1"} for the base style). The \code{preset} argument may define a different covariate labels. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{...}{Additional graphical parameters passed to internal plotting routines, primarily those accepted by \code{esplot} for event study style plots (gap, equiv, exit, sens_es, cumul).}
 }
 \details{
@@ -242,8 +254,16 @@ library(fect)
 if(requireNamespace("ggplot2") && requireNamespace("ggrepel")) {
   data(simdata)
   # Estimate with fixed effects method
-  out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-    method = "fe", force = "two-way", se = TRUE, parallel = FALSE, nboots = 5) # nboots low for example
+  out.fect <- fect(
+    Y ~ D + X1 + X2,
+    data = simdata,
+    index = c("id","time"),
+    method = "fe",
+    force = "two-way",
+    se = TRUE,
+    parallel = FALSE,
+    nboots = 5 # nboots low for example
+  )
 
   # Default gap plot
   plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y")

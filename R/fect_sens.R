@@ -1,20 +1,26 @@
 fect_sens <- function(
     fect.out,
-    post.periods     = NA,              # Post-treatment periods
-    l_vec            = NA,                # Optional custom weighting vector
-    Mbarvec          = seq(0, 1, by=0.1), # Vector of Mbar for RM analysis
-    Mvec             = seq(0, 0.25, 0.05),# Vector of M for Smoothness analysis
-    periodMbarvec    = c(0,0.5),          # Vector of Mbar for period-by-period RM analysis
-    periodMvec       = c(0,0.1),          # Vector of M for Smoothness analysis
-    parallel = TRUE
-) {
+    post.periods = NA, # Post-treatment periods
+    l_vec = NA, # Optional custom weighting vector
+    Mbarvec = seq(0, 1, by = 0.1), # Vector of Mbar for RM analysis
+    Mvec = seq(0, 0.25, 0.05), # Vector of M for Smoothness analysis
+    periodMbarvec = c(0, 0.5), # Vector of Mbar for period-by-period RM analysis
+    periodMvec = c(0, 0.1), # Vector of M for Smoothness analysis
+    parallel = FALSE,
+    cores = NULL) {
+  if (parallel && is.null(cores)) {
+    cores <- min(parallel::detectCores() - 2, 8) # default to 8 cores if not specified
+    cl <- parallel::makeCluster(cores)
+    doParallel::registerDoParallel(cl)
+  }
+
   # -------------------------------------------------------------------
   # 1) Identify relevant periods and extract fect estimates + vcov
   # -------------------------------------------------------------------
   # We want event-time strings for pre and post
-  pre.periods = fect.out$placebo.period[1]:fect.out$placebo.period[2]
-  if (any(is.na(post.periods))){
-    post.periods = 1:length(fect.out$time)-length(fect.out$pre.periods)-(fect.out$placebo.period[2]-fect.out$placebo.period[1]+1)
+  pre.periods <- fect.out$placebo.period[1]:fect.out$placebo.period[2]
+  if (any(is.na(post.periods))) {
+    post.periods <- 1:length(fect.out$time) - length(fect.out$pre.periods) - (fect.out$placebo.period[2] - fect.out$placebo.period[1] + 1)
   }
   all.periods.char <- as.character(c(pre.periods, post.periods))
 
@@ -27,14 +33,14 @@ fect_sens <- function(
 
   # Numeric indices corresponding to those event-time strings
   idx <- match(all.periods.char, rownames(fect.out$est.att))
-  idx <- idx[!is.na(idx)]  # remove anything not found
+  idx <- idx[!is.na(idx)] # remove anything not found
 
   # Extract DTE estimates (beta.hat) and var-cov (vcov.hat)
   beta.hat <- fect.out$est.att[idx, 1]
   vcov.hat <- fect.out$att.vcov[idx, idx]
 
   # Counts of pre and post periods
-  numPrePeriods  <- length(pre.periods)
+  numPrePeriods <- length(pre.periods)
   numPostPeriods <- length(post.periods)
 
   # -------------------------------------------------------------------
@@ -59,8 +65,8 @@ fect_sens <- function(
   #   (b) Period-by-period results
 
   # Initialize empty placeholders
-  fect.out$RM_Sensitivity       <- NULL
-  fect.out$Smooth_Sensitivity   <- NULL
+  fect.out$RM_Sensitivity <- NULL
+  fect.out$Smooth_Sensitivity <- NULL
 
   # -------------------------------------------------------------------
   # 3) Relative Magnitude Analysis (RM), if Mbarvec is non-empty
@@ -68,14 +74,15 @@ fect_sens <- function(
   if (!is.null(Mbarvec) && length(Mbarvec) > 0) {
     # 3a) Weighted-average, across the entire post-treatment window
     rm_sens_results <- HonestDiDFEct::createSensitivityResults_relativeMagnitudes(
-      betahat        = beta.hat,
-      sigma          = vcov.hat,
-      numPrePeriods  = numPrePeriods,
+      betahat = beta.hat,
+      sigma = vcov.hat,
+      numPrePeriods = numPrePeriods,
       numPostPeriods = numPostPeriods,
-      l_vec          = w.att,
-      Mbarvec        = Mbarvec,
+      l_vec = w.att,
+      Mbarvec = Mbarvec,
       parallel = parallel
     )
+
 
     rm_original_cs <- HonestDiDFEct::constructOriginalCS(
       betahat        = beta.hat,
@@ -88,7 +95,7 @@ fect_sens <- function(
   if (!is.null(periodMbarvec) && length(periodMbarvec) > 0) {
     # 3b) Period-by-period robust confidence sets
     #     We'll loop over each post-treatment period and set a vector of 0s except 1 for that period
-    rm_period_output <- cbind.data.frame()  # Will accumulate results
+    rm_period_output <- cbind.data.frame() # Will accumulate results
 
     for (t_i in seq_len(numPostPeriods)) {
       # l_vec for the "t_i-th" post period (in 1..numPostPeriods)
@@ -106,7 +113,7 @@ fect_sens <- function(
         numPostPeriods = numPostPeriods,
         l_vec          = dte_l,
         Mbarvec        = periodMbarvec,
-        parallel = parallel
+        parallel       = parallel
       )
 
       # Convert to data.frame
@@ -122,9 +129,9 @@ fect_sens <- function(
 
     # Store results in fect.out$sensitivity.rm
     fect.out$sensitivity.rm <- list(
-      results   = rm_sens_results,
-      original    = rm_original_cs,
-      periods    = rm_period_output
+      results = rm_sens_results,
+      original = rm_original_cs,
+      periods = rm_period_output
     )
   }
 
@@ -133,14 +140,15 @@ fect_sens <- function(
   # -------------------------------------------------------------------
   if (!is.null(Mvec) && length(Mvec) > 0) {
     # 4a) Weighted-average analysis
+
     smooth_sens_results <- HonestDiDFEct::createSensitivityResults(
-      betahat        = beta.hat,
-      sigma          = vcov.hat,
-      numPrePeriods  = numPrePeriods,
+      betahat = beta.hat,
+      sigma = vcov.hat,
+      numPrePeriods = numPrePeriods,
       numPostPeriods = numPostPeriods,
-      method         = "C-LF",
-      l_vec          = w.att,
-      Mvec           = Mvec,
+      method = "C-LF",
+      l_vec = w.att,
+      Mvec = Mvec,
       parallel = parallel
     )
 
@@ -162,13 +170,13 @@ fect_sens <- function(
       dte_l[t_i] <- 1
 
       honest.dte <- HonestDiDFEct::createSensitivityResults(
-        betahat        = beta.hat,
-        sigma          = vcov.hat,
-        numPrePeriods  = numPrePeriods,
+        betahat = beta.hat,
+        sigma = vcov.hat,
+        numPrePeriods = numPrePeriods,
         numPostPeriods = numPostPeriods,
-        method         = "C-LF",
-        l_vec          = dte_l,
-        Mvec           = periodMvec,
+        method = "C-LF",
+        l_vec = dte_l,
+        Mvec = periodMvec,
         parallel = parallel
       )
 
@@ -180,12 +188,14 @@ fect_sens <- function(
 
     # Store results in fect.out$sensitivity.smooth
     fect.out$sensitivity.smooth <- list(
-      results   = smooth_sens_results,
-      original    = sm_original_cs,
-      periods    = smooth_period_output
+      results = smooth_sens_results,
+      original = sm_original_cs,
+      periods = smooth_period_output
     )
   }
-
+  if (parallel) {
+    stopCluster(cl)
+  }
   # -------------------------------------------------------------------
   # 5) Return the updated fect.out
   # -------------------------------------------------------------------

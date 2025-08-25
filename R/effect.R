@@ -155,7 +155,7 @@ effect <- function(x, ## a fect object
     if (is_jackknife || is_parametric) {
       # For jackknife, use t-distribution with N-1 degrees of freedom
       N_samples <- ncol(catt.boot)
-      t_critical <- qt(0.975, df = N_samples - 1)
+      t_critical <- stats::qt(0.975, df = N_samples - 1)
       CI.att <- t(apply(cbind(catt, se.att), 1, function(row) {
         c(row[1] - t_critical * row[2], row[1] + t_critical * row[2])
       }))
@@ -172,7 +172,7 @@ effect <- function(x, ## a fect object
       N_samples <- ncol(catt.boot)
       pvalue.att <- sapply(1:nrow(catt.boot), function(i) {
         t_stat <- catt[i] / se.att[i]
-        2 * pt(-abs(t_stat), df = N_samples - 1)
+        2 * stats::pt(-abs(t_stat), df = N_samples - 1)
       })
     } else {
       # For bootstrap, use empirical distribution
@@ -253,10 +253,10 @@ effect <- function(x, ## a fect object
 
     # Create the plot
     p <- ggplot() +
-      geom_point(data = plot_data, aes(x = time, y = catt), size = 2) +
+      geom_point(data = plot_data, aes(x = .data$time, y = .data$catt), size = 2) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
       geom_linerange(data = plot_data,
-                     aes(x = time, ymin = ci_lower, ymax = ci_upper),
+                     aes(x = .data$time, ymin = .data$ci_lower, ymax = .data$ci_upper),
                      size = 0.5) +
       labs(x = xlab, y = ylab, title = main) +
       theme_bw() +
@@ -274,7 +274,7 @@ effect <- function(x, ## a fect object
 
     if (count == TRUE) {
       p <- p + geom_rect(data = data.toplot,
-                         aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+                         aes(xmin = .data$xmin, xmax = .data$xmax, ymin = .data$ymin, ymax = .data$ymax),
                          fill = "gray50", alpha = 0.3, size = 0.3, color = "black") +
         annotate("text",
                  x = time_range[which.max(count_data$count)],

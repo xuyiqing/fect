@@ -22,17 +22,19 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 | **Type** | **Description** | **Applicable Methods** |
 |-------------------|------------------------------|-----------------------|
 | **box** | Box plot of ATT by period. | fe, ife, mc, gsynth, polynomial, cfe |
-| **calendar** | ATT by calendar time. | fe, ife, mc, gsynth, polynomial, cfe |
-| **counterfactual** | Observed vs. imputed outcome for treated units. | fe, ife, mc, gsynth |
+| **calendar** | CATT by calendar time. | fe, ife, mc, gsynth, polynomial, cfe |
+| **heterogenous** or **hte** | CATT by a covariate. | fe, ife, mc, gsynth, polynomial, cfe |
+| **counterfactual** or **ct** | Observed vs. imputed outcome for treated units. | fe, ife, mc, gsynth |
 | **equiv** | Pretreatment residuals with equivalence intervals. | fe, ife, mc, gsynth, polynomial, cfe |
 | **exit** | Period-wise ATT relative to treatment exit. | fe, ife, mc, polynomial, cfe |
 | **factors** | Estimated factors (factor-based methods). | ife, gsynth |
-| **gap** | ATT by pre- and post-treatment periods. | fe, ife, mc, gsynth, polynomial, cfe |
+| **gap** or **es** | Event-study plot: ATT by pre- and post-treatment periods. | fe, ife, mc, gsynth, polynomial, cfe |
 | **loadings** | Estimated factor loadings (factor-based methods). | ife, gsynth |
 | **status** | Treatment status by period for all units. | fe, ife, mc, gsynth, polynomial, cfe |
 | **sens** | Rambachan & Roth (2023) sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, polynomial, cfe |
 | **sens_es** | Event-study sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, polynomial, cfe |
 | **cumul** | Cumulative treatment effects over time. | `effect()` function applied to fe, ife, mc, gsynth, polynomial, cfe |
+
 ## Tests as Options
 
 *Inputs for* `fect(...)`

@@ -1,7 +1,7 @@
 ###################################################################
 ## Cross-validation
 ###################################################################
-fect.cv <- function(Y, # Outcome variable, (T*N) matrix
+fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     X, # Explanatory variables:  (T*N*p) array
                     D, #  Indicator for treated unit (tr==1)
                     W,
@@ -172,10 +172,10 @@ fect.cv <- function(Y, # Outcome variable, (T*N) matrix
             message("Criterion: PC\n")
         }
 
-        ## for gsynth, use the cross-validation function in fect.gsynth
+        ## for gsynth, use the cross-validation function in fect_gsynth
         if (method == "gsynth") {
             message("Interactive fixed effects model...\n")
-            out <- fect.gsynth(
+            out <- fect_gsynth(
                 Y = Y, D = D, X = X, W = W, I = I, II = II,
                 T.on = T.on, T.off = T.off,
                 T.on.balance = T.on.balance,

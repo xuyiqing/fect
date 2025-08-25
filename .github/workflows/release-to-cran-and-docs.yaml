@@ -1,0 +1,97 @@
+name: release-to-cran-and-docs
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      submit_to_cran:
+        description: "Submit to CRAN (requires secrets.GH_PAT and CRAN_EMAIL set)"
+        required: true
+        default: "false"
+      tag:
+        description: "Git tag to create (e.g., v2.0.3)"
+        required: true
+
+jobs:
+  tag-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clean precompiled objects
+        shell: bash
+        run: |
+          rm -f src/*.o src/*.so src/*.dll || true
+      - name: Create tag
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git tag ${{ github.event.inputs.tag }}
+          git push origin ${{ github.event.inputs.tag }}
+
+  submit-cran:
+    if: ${{ github.event.inputs.submit_to_cran == 'true' }}
+    needs: tag-release
+    runs-on: ubuntu-latest
+    env:
+      R_KEEP_PKG_SOURCE: yes
+      _R_CHECK_CRAN_INCOMING_REMOTE_: false
+      RGL_USE_NULL: true
+      GITHUB_PAT: ${{ secrets.GH_PAT }}
+      CRAN_EMAIL: ${{ secrets.CRAN_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "release"
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            any::devtools
+            any::rcmdcheck
+            any::pkgdown
+            lzy318/HonestDiDFEct
+            local::.
+          needs: check
+      - name: Install HonestDiDFEct via devtools
+        shell: Rscript {0}
+        run: |
+          if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes', repos='https://cloud.r-project.org')
+          if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) remotes::install_github('lzy318/HonestDiDFEct', upgrade='never')
+      - name: CRAN checks (as-cran)
+        shell: Rscript {0}
+        run: |
+          rcmdcheck::rcmdcheck(args=c('--no-manual','--as-cran'), error_on='note')
+      - name: Submit to CRAN (manual email)
+        shell: bash
+        run: |
+          Rscript -e "devtools::build('.')"
+          echo "Please email the built tar.gz to CRAN maintainers from $CRAN_EMAIL or use devtools::release() interactively."
+
+  pkgdown:
+    needs: tag-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgdown, lzy318/HonestDiDFEct, local::.
+      - name: Install HonestDiDFEct via devtools
+        shell: Rscript {0}
+        run: |
+          if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes', repos='https://cloud.r-project.org')
+          if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) remotes::install_github('lzy318/HonestDiDFEct', upgrade='never')
+      - name: Build site
+        shell: Rscript {0}
+        run: |
+          pkgdown::build_site(preview = FALSE)
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs

@@ -1,8 +1,12 @@
+^src/.*\.(o|so|dll)$
+^\.github$
+^pkgdown/.*$
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^README\.Rmd$
 ^README\.md$
 ^NEWS\.md$
+^NEWS\.html$
 ^_pkgdown\.yml$
 ^LICENSE\.md$
 ^\.github$

@@ -6,7 +6,7 @@
 
 plot.fect <- function(
     x,
-    type = NULL, # gap, equiv, status, exit, factors, loadings, calendar, counterfactual
+    type = NULL, # gap, equiv, status, exit, factors, loadings, calendar, counterfactual, heterogeneous
     restrict = "rm",
     loo = FALSE,
     highlight = NULL, ## for carryover test and placebo test
@@ -69,38 +69,43 @@ plot.fect <- function(
     preset = NULL,
     connected = NULL,
     ci.outline = FALSE,
-    color =  NULL,
+    color = NULL,
     est.lwidth = NULL,
     est.pointsize = NULL,
-    count.color =  NULL,
+    count.color = NULL,
     count.alpha = NULL,
     count.outline.color = NULL,
-    placebo.color =  NULL,
-    carryover.color =  NULL,
+    placebo.color = NULL,
+    carryover.color = NULL,
     carryover.rm.color = NULL,
     sens.original.color = NULL,
-    sens.colors =  NULL,
-    counterfactual.color =  NULL,
-    counterfactual.raw.controls.color =  NULL,
-    counterfactual.raw.treated.color =  NULL,
-    counterfactual.linetype =  NULL,
-    box.control =  NULL,
-    box.treat =  NULL,
-    calendar.color =  NULL,
-    calendar.lcolor =  NULL,
-    equiv.color =  NULL,
-    status.treat.color =  NULL,
+    sens.colors = NULL,
+    counterfactual.color = NULL,
+    counterfactual.raw.controls.color = NULL,
+    counterfactual.raw.treated.color = NULL,
+    counterfactual.linetype = NULL,
+    box.control = NULL,
+    box.treat = NULL,
+    calendar.color = NULL,
+    calendar.lcolor = NULL,
+    calendar.cicolor = NULL,
+    heterogeneous.color = NULL,
+    heterogeneous.lcolor = NULL,
+    heterogeneous.cicolor = NULL,
+    equiv.color = NULL,
+    status.treat.color = NULL,
     status.control.color = NULL,
-    status.missing.color =  NULL,
-    status.removed.color =  NULL,
+    status.missing.color = NULL,
+    status.removed.color = NULL,
     status.placebo.color = NULL,
-    status.carryover.color =  NULL,
-    status.carryover.rm.color =  NULL,
+    status.carryover.color = NULL,
+    status.carryover.rm.color = NULL,
     status.balanced.post.color = NULL,
     status.balanced.pre.color = NULL,
     status.background.color = NULL,
+    covariate = NULL,
+    covariate.labels = NULL,
     ...) {
-  group <- ATT5 <- ATT6 <- CI.lower.90 <- CI.lower6 <- CI.upper.90 <- CI.upper6 <- L1 <- eff <- NULL
 
   if (!missing(vis)) {
     warning("'vis' is deprecated and will be removed in future versions.", call. = FALSE)
@@ -116,110 +121,111 @@ plot.fect <- function(
     if (is.logical(count) && missing(show.count)) show.count <- count
   }
   if (is.null(preset)) {
-    if (is.null(connected))              connected              <- FALSE
-    if (is.null(ltype))                  ltype                  <- c("solid", "solid")
-    if (is.null(gridOff))                gridOff                <- FALSE
-    if (is.null(color))                  color                  <- "black"
-    if (is.null(count.color))            count.color            <- "grey70"
-    if (is.null(count.alpha))            count.alpha            <- 0.4
-    if (is.null(count.outline.color))    count.outline.color    <- "grey69"
-    if (is.null(placebo.color))          placebo.color          <- "blue"
-    if (is.null(carryover.color))        carryover.color        <- "red"
-    if (is.null(carryover.rm.color))     carryover.rm.color     <- "blue"
-    if (is.null(sens.original.color))    sens.original.color    <- "darkblue"
-    if (is.null(sens.colors))            sens.colors            <- c("#218C23","#FF34B4","#FF521B","#2B59C3")
+    if (is.null(connected)) connected <- FALSE
+    if (is.null(ltype)) ltype <- c("solid", "solid")
+    if (is.null(gridOff)) gridOff <- FALSE
+    if (is.null(color)) color <- "black"
+    if (is.null(count.color)) count.color <- "grey70"
+    if (is.null(count.alpha)) count.alpha <- 0.4
+    if (is.null(count.outline.color)) count.outline.color <- "grey69"
+    if (is.null(placebo.color)) placebo.color <- "blue"
+    if (is.null(carryover.color)) carryover.color <- "red"
+    if (is.null(carryover.rm.color)) carryover.rm.color <- "blue"
+    if (is.null(sens.original.color)) sens.original.color <- "darkblue"
+    if (is.null(sens.colors)) sens.colors <- c("#218C23", "#FF34B4", "#FF521B", "#2B59C3")
 
-    if (is.null(counterfactual.color))   counterfactual.color   <- "steelblue"
+    if (is.null(counterfactual.color)) counterfactual.color <- "steelblue"
     if (is.null(counterfactual.raw.controls.color)) counterfactual.raw.controls.color <- "#4682B420"
-    if (is.null(counterfactual.raw.treated.color))  counterfactual.raw.treated.color  <- "#77777750"
+    if (is.null(counterfactual.raw.treated.color)) counterfactual.raw.treated.color <- "#77777750"
     if (is.null(counterfactual.linetype)) counterfactual.linetype <- "longdash"
 
-    if (is.null(box.control))            box.control            <- "skyblue"
-    if (is.null(box.treat))              box.treat              <- "pink"
+    if (is.null(box.control)) box.control <- "skyblue"
+    if (is.null(box.treat)) box.treat <- "pink"
 
-    if (is.null(calendar.color))         calendar.color         <- "skyblue"
-    if (is.null(calendar.lcolor))        calendar.lcolor        <- "red"
+    if (is.null(calendar.color)) calendar.color <- "#2C7FB8"
+    if (is.null(calendar.cicolor)) calendar.cicolor <- "skyblue"
+    if (is.null(calendar.lcolor)) calendar.lcolor <- "red"
 
-    if (is.null(equiv.color))            equiv.color            <- "red"
+    if (is.null(heterogeneous.color)) heterogeneous.color <- "#2C7FB8"
+    if (is.null(heterogeneous.cicolor)) heterogeneous.cicolor <- "skyblue"
+    if (is.null(heterogeneous.lcolor)) heterogeneous.lcolor <- "red"
 
-    if (is.null(status.treat.color))     status.treat.color     <- "#06266F"
-    if (is.null(status.control.color))   status.control.color   <- "#B0C4DE"
-    if (is.null(status.missing.color))   status.missing.color   <- "#FFFFFF"
-    if (is.null(status.removed.color))   status.removed.color   <- "#A9A9A9"
-    if (is.null(status.placebo.color))   status.placebo.color   <- "#66C2A5"
+    if (is.null(equiv.color)) equiv.color <- "red"
+
+    if (is.null(status.treat.color)) status.treat.color <- "#06266F"
+    if (is.null(status.control.color)) status.control.color <- "#B0C4DE"
+    if (is.null(status.missing.color)) status.missing.color <- "#FFFFFF"
+    if (is.null(status.removed.color)) status.removed.color <- "#A9A9A9"
+    if (is.null(status.placebo.color)) status.placebo.color <- "#66C2A5"
     if (is.null(status.carryover.color)) status.carryover.color <- "#E78AC3"
     if (is.null(status.carryover.rm.color)) status.carryover.rm.color <- "#ffc425"
     if (is.null(status.balanced.post.color)) status.balanced.post.color <- "#00852B"
-    if (is.null(status.balanced.pre.color))  status.balanced.pre.color  <- "#A5CA18"
+    if (is.null(status.balanced.pre.color)) status.balanced.pre.color <- "#A5CA18"
     if (is.null(status.background.color)) status.background.color <- "gray90"
-  }
-  else if (preset == "vibrant") {
-    if (is.null(connected))              connected              <- TRUE
-    if (is.null(color))                  color                  <- "#054A91"
-    if (is.null(count.color))            count.color            <- "#E6AF2E"
-    if (is.null(count.alpha))            count.alpha            <- 1
-    if (is.null(count.outline.color))    count.outline.color    <- "#E6AF2E"
-    if (is.null(lwidth))                 lwidth                 <- c(0.8, 1)
-    if (is.null(ltype))                  ltype                  <- c("solid", "dashed")
-    if (is.null(placebo.color))          placebo.color          <- "#386641"
-    if (is.null(carryover.color))        carryover.color        <- "#A40E4C"
-    if (is.null(carryover.rm.color))     carryover.rm.color     <- "#FF5400"
-    if (is.null(sens.original.color))    sens.original.color    <- "#054A91"
-    if (is.null(sens.colors))            sens.colors            <- c("#A40E4C", "#FF5400", "#E6AF2E", "#386641", "#ACC3DA")
-    if (is.null(counterfactual.color))       counterfactual.color       <- "#777777"
+  } else if (preset == "vibrant") {
+    if (is.null(connected)) connected <- TRUE
+    if (is.null(color)) color <- "#054A91"
+    if (is.null(count.color)) count.color <- "#E6AF2E"
+    if (is.null(count.alpha)) count.alpha <- 1
+    if (is.null(count.outline.color)) count.outline.color <- "#E6AF2E"
+    if (is.null(lwidth)) lwidth <- c(0.8, 1)
+    if (is.null(ltype)) ltype <- c("solid", "dashed")
+    if (is.null(placebo.color)) placebo.color <- "#386641"
+    if (is.null(carryover.color)) carryover.color <- "#A40E4C"
+    if (is.null(carryover.rm.color)) carryover.rm.color <- "#FF5400"
+    if (is.null(sens.original.color)) sens.original.color <- "#054A91"
+    if (is.null(sens.colors)) sens.colors <- c("#A40E4C", "#FF5400", "#E6AF2E", "#386641", "#ACC3DA")
+    if (is.null(counterfactual.color)) counterfactual.color <- "#777777"
     if (is.null(counterfactual.raw.controls.color)) counterfactual.raw.controls.color <- "#D5E1ED"
-    if (is.null(counterfactual.raw.treated.color))  counterfactual.raw.treated.color  <- "#77777750"
+    if (is.null(counterfactual.raw.treated.color)) counterfactual.raw.treated.color <- "#77777750"
     if (is.null(counterfactual.linetype)) counterfactual.linetype <- "dashed"
-    if (is.null(box.control))            box.control            <- "#ACC3DA"
-    if (is.null(box.treat))              box.treat              <- "#E1AFC3"
-    if (is.null(calendar.color))         calendar.color         <- "#ACC3DA"
-    if (is.null(calendar.lcolor))    calendar.lcolor    <- "#054A91"
-    if (is.null(equiv.color))            equiv.color            <- "#A40E4C"
-    if (is.null(status.treat.color))        status.treat.color        <- "#054A91"
-    if (is.null(status.control.color))      status.control.color      <- "#ACC3DA"
-    if (is.null(status.missing.color))      status.missing.color      <- "#dddddd"
-    if (is.null(status.removed.color))      status.removed.color      <- "#D7E8E0"
-    if (is.null(status.placebo.color))      status.placebo.color      <- "#386641"
-    if (is.null(status.carryover.color))    status.carryover.color    <- "#A40E4C"
+    if (is.null(box.control)) box.control <- "#ACC3DA"
+    if (is.null(box.treat)) box.treat <- "#E1AFC3"
+    if (is.null(calendar.color)) calendar.color <- "#ACC3DA"
+    if (is.null(calendar.lcolor)) calendar.lcolor <- "#054A91"
+    if (is.null(equiv.color)) equiv.color <- "#A40E4C"
+    if (is.null(status.treat.color)) status.treat.color <- "#054A91"
+    if (is.null(status.control.color)) status.control.color <- "#ACC3DA"
+    if (is.null(status.missing.color)) status.missing.color <- "#dddddd"
+    if (is.null(status.removed.color)) status.removed.color <- "#D7E8E0"
+    if (is.null(status.placebo.color)) status.placebo.color <- "#386641"
+    if (is.null(status.carryover.color)) status.carryover.color <- "#A40E4C"
     if (is.null(status.carryover.rm.color)) status.carryover.rm.color <- "#FF5400"
     if (is.null(status.balanced.post.color)) status.balanced.post.color <- "#E6AF2E"
-    if (is.null(status.balanced.pre.color))  status.balanced.pre.color  <- "#777777"
-    if (is.null(status.background.color))    status.background.color    <- "#FFFFFF"
-
-    }
-  else if (preset %in% c("grayscale","greyscale")) {
-    if (is.null(connected))              connected              <- FALSE
-    if (is.null(color))                  color                  <- "black"
-    if (is.null(count.color))            count.color            <- "gray80"
-    if (is.null(count.alpha))            count.alpha            <- 0.5
-    if (is.null(count.outline.color))    count.outline.color    <- "black"
-    if (is.null(lwidth))                 lwidth                 <- c(1, 1)
-    if (is.null(ltype))                  ltype                  <- c("solid", "dashed")
-    if (is.null(placebo.color))          placebo.color          <- "gray40"
-    if (is.null(carryover.color))        carryover.color        <- "gray70"
-    if (is.null(carryover.rm.color))     carryover.rm.color     <- "gray40"
-    if (is.null(sens.original.color))    sens.original.color    <- "gray20"
-    if (is.null(sens.colors))            sens.colors            <- c("gray80", "gray50", "black")
-    if (is.null(counterfactual.color))       counterfactual.color       <- "#777777"
+    if (is.null(status.balanced.pre.color)) status.balanced.pre.color <- "#777777"
+    if (is.null(status.background.color)) status.background.color <- "#FFFFFF"
+  } else if (preset %in% c("grayscale", "greyscale")) {
+    if (is.null(connected)) connected <- FALSE
+    if (is.null(color)) color <- "black"
+    if (is.null(count.color)) count.color <- "gray80"
+    if (is.null(count.alpha)) count.alpha <- 0.5
+    if (is.null(count.outline.color)) count.outline.color <- "black"
+    if (is.null(lwidth)) lwidth <- c(1, 1)
+    if (is.null(ltype)) ltype <- c("solid", "dashed")
+    if (is.null(placebo.color)) placebo.color <- "gray40"
+    if (is.null(carryover.color)) carryover.color <- "gray70"
+    if (is.null(carryover.rm.color)) carryover.rm.color <- "gray40"
+    if (is.null(sens.original.color)) sens.original.color <- "gray20"
+    if (is.null(sens.colors)) sens.colors <- c("gray80", "gray50", "black")
+    if (is.null(counterfactual.color)) counterfactual.color <- "#777777"
     if (is.null(counterfactual.raw.controls.color)) counterfactual.raw.controls.color <- "#eeeeee"
-    if (is.null(counterfactual.raw.treated.color))  counterfactual.raw.treated.color  <- "#666666"
+    if (is.null(counterfactual.raw.treated.color)) counterfactual.raw.treated.color <- "#666666"
     if (is.null(counterfactual.linetype)) counterfactual.linetype <- "dashed"
-    if (is.null(box.control))            box.control            <- "gray90"
-    if (is.null(box.treat))              box.treat              <- "gray50"
-    if (is.null(calendar.color))         calendar.color         <- "gray80"
-    if (is.null(calendar.lcolor))    calendar.lcolor    <- "black"
-    if (is.null(equiv.color))            equiv.color            <- "gray80"
-    if (is.null(status.treat.color))        status.treat.color        <- "black"
-    if (is.null(status.control.color))      status.control.color      <- "gray90"
-    if (is.null(status.missing.color))      status.missing.color      <- "white"
-    if (is.null(status.removed.color))      status.removed.color      <- "white"
-    if (is.null(status.placebo.color))      status.placebo.color      <- "gray50"
-    if (is.null(status.carryover.color))    status.carryover.color    <- "gray50"
+    if (is.null(box.control)) box.control <- "gray90"
+    if (is.null(box.treat)) box.treat <- "gray50"
+    if (is.null(calendar.color)) calendar.color <- "gray80"
+    if (is.null(calendar.lcolor)) calendar.lcolor <- "black"
+    if (is.null(equiv.color)) equiv.color <- "gray80"
+    if (is.null(status.treat.color)) status.treat.color <- "black"
+    if (is.null(status.control.color)) status.control.color <- "gray90"
+    if (is.null(status.missing.color)) status.missing.color <- "white"
+    if (is.null(status.removed.color)) status.removed.color <- "white"
+    if (is.null(status.placebo.color)) status.placebo.color <- "gray50"
+    if (is.null(status.carryover.color)) status.carryover.color <- "gray50"
     if (is.null(status.carryover.rm.color)) status.carryover.rm.color <- "#ffffff"
     if (is.null(status.balanced.post.color)) status.balanced.post.color <- "#aaaaaa"
-    if (is.null(status.balanced.pre.color))  status.balanced.pre.color  <- "#eeeeee"
-    if (is.null(status.background.color))    status.background.color    <- "#FFFFFF"
-
+    if (is.null(status.balanced.pre.color)) status.balanced.pre.color <- "#eeeeee"
+    if (is.null(status.background.color)) status.background.color <- "#FFFFFF"
   }
   if (is.null(est.lwidth) || is.null(est.pointsize)) {
     default_est_lwidth <- .8
@@ -237,8 +243,8 @@ plot.fect <- function(
         default_est_pointsize <- 3
       }
     }
-    if(is.null(est.lwidth)) est.lwidth <- default_est_lwidth
-    if(is.null(est.pointsize)) est.pointsize <- default_est_pointsize
+    if (is.null(est.lwidth)) est.lwidth <- default_est_lwidth
+    if (is.null(est.pointsize)) est.pointsize <- default_est_pointsize
   }
 
 
@@ -329,7 +335,7 @@ plot.fect <- function(
       return(0)
     }
   }
-  if (!(restrict %in% c("rm","sm"))) {
+  if (!(restrict %in% c("rm", "sm"))) {
     stop("\"restrict\" option misspecified. Must be either \"rm\" or \"sm\".")
   }
 
@@ -339,10 +345,13 @@ plot.fect <- function(
       type <- "counterfactual"
     }
     if (type == "es") {
-      type = "gap"
+      type <- "gap"
     }
-    if (!type %in% c("status", "gap", "equiv", "exit", "factors", "loadings", "calendar", "box", "counterfactual", "sens","sens_es", "cumul")) {
-      stop("\"type\" option misspecified. Must be one of the following:\"status\",\"gap\",\"equiv\",\"exit\",\"calendar\",\"box\",\"counterfactual\",\"equiv\",\"sens\",\"sens_es\",\"cumul\".")
+    if (type == "hte") {
+      type <- "heterogeneous"
+    }
+    if (!type %in% c("status", "gap", "equiv", "exit", "factors", "loadings", "calendar", "box", "counterfactual", "sens", "sens_es", "cumul", "heterogeneous")) {
+      stop("\"type\" option misspecified. Must be one of the following:\"status\",\"gap\",\"equiv\",\"exit\",\"calendar\",\"box\",\"counterfactual\",\"equiv\",\"sens\",\"sens_es\",\"cumul\",\"heterogeneous\".")
     }
     if (type == "exit" && is.null(x$att.off)) {
       stop("No exiting treatment effect to be plotted.")
@@ -358,24 +367,24 @@ plot.fect <- function(
       type <- "gap"
     }
   }
-  if (!is.null(x$effect.est.att)){
-    type = "cumul"
+  if (!is.null(x$effect.est.att)) {
+    type <- "cumul"
   }
 
   type.old <- type
 
-  if (is.null(gridOff)){
-    if (type == "status"){
+  if (is.null(gridOff)) {
+    if (type == "status") {
       gridOff <- FALSE
-    } else{
+    } else {
       gridOff <- TRUE
     }
   }
   provided_xlim <- xlim
   # add spacing
-  if (!is.null(xlim) & !(type %in% c("gap", "equiv", "exit", "sens", "sens_es"))){
+  if (!is.null(xlim) && !(type %in% c("gap", "equiv", "exit", "sens", "sens_es"))) {
     if (length(xlim) == 2) {
-      xlim = c(xlim[1]-0.2,xlim[2]+0.2)
+      xlim <- c(xlim[1] - 0.2, xlim[2] + 0.2)
     }
   }
 
@@ -420,7 +429,7 @@ plot.fect <- function(
         colnames(L.hat) <- Lname
         rownames(L.hat) <- c()
 
-        if (x$force %in% c(1, 3) & include.FE == TRUE) {
+        if (x$force %in% c(1, 3) && include.FE == TRUE) {
           L.hat <- cbind(c(x$alpha.tr, x$alpha.co), L.hat)
           colnames(L.hat) <- c(paste("Factor", 0), Lname)
           rownames(L.hat) <- c()
@@ -429,15 +438,15 @@ plot.fect <- function(
         }
 
         data <- cbind.data.frame(L.hat,
-                                 "id" = c(x$tr, x$co),
-                                 "group" = as.factor(c(
-                                   rep("Treated", x$Ntr),
-                                   rep("Control", x$Nco)
-                                 ))
+          "id" = c(x$tr, x$co),
+          "group" = as.factor(c(
+            rep("Treated", x$Ntr),
+            rep("Control", x$Nco)
+          ))
         )
 
         if (nfactors == 1) {
-          p <- ggplot(data, aes(x = group, y = L1, fill = group)) +
+          p <- ggplot(data, aes(x = .data$group, y = .data$L1, fill = .data$group)) +
             geom_boxplot(alpha = 0.7) +
             coord_flip() +
             guides(fill = FALSE) +
@@ -450,11 +459,11 @@ plot.fect <- function(
                 geom_density(..., alpha = 0.7, color = NA)
             }
             p <- GGally::ggpairs(data,
-                                 mapping = aes(color = group, fill = group),
-                                 columns = 1:nfactors,
-                                 columnLabels = Llabel[1:nfactors],
-                                 diag = list(continuous = my_dens),
-                                 title = main
+              mapping = aes(color = .data$group, fill = .data$group),
+              columns = 1:nfactors,
+              columnLabels = Llabel[1:nfactors],
+              diag = list(continuous = my_dens),
+              title = main
             ) +
               theme(plot.title = element_text(hjust = 0.5))
           } else if (x$Ntr > 1) {
@@ -463,11 +472,11 @@ plot.fect <- function(
                 geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
             }
             p <- GGally::ggpairs(data,
-                                 mapping = aes(color = group),
-                                 columns = 1:nfactors,
-                                 columnLabels = Llabel[1:nfactors],
-                                 diag = list(continuous = my_dens),
-                                 title = main
+              mapping = aes(color = .data$group),
+              columns = 1:nfactors,
+              columnLabels = Llabel[1:nfactors],
+              diag = list(continuous = my_dens),
+              title = main
             )
           } else {
             my_dens <- function(data, mapping, ...) {
@@ -475,11 +484,11 @@ plot.fect <- function(
                 geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
             }
             p <- GGally::ggpairs(data,
-                                 mapping = aes(color = group),
-                                 columns = 1:nfactors, upper = "blank",
-                                 columnLabels = Llabel[1:nfactors],
-                                 diag = list(continuous = my_dens),
-                                 title = main
+              mapping = aes(color = .data$group),
+              columns = 1:nfactors, upper = "blank",
+              columnLabels = Llabel[1:nfactors],
+              diag = list(continuous = my_dens),
+              title = main
             )
           }
         }
@@ -519,7 +528,7 @@ plot.fect <- function(
       }
       if (length(provided_xlim) != 0) {
         show <- which(time >= provided_xlim[1] & time <= provided_xlim[2])
-        proportion = 0
+        proportion <- 0
       } else {
         show <- 1:length(time)
       }
@@ -576,7 +585,7 @@ plot.fect <- function(
           p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
         }
         p <- p + xlab(xlab) + ylab(ylab) + ggtitle(main) +
-          geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1],  linetype = ltype[1]) +
+          geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
           theme(
             legend.position = legend.pos,
             axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
@@ -589,8 +598,8 @@ plot.fect <- function(
           )
         ## main plot
         p <- p + geom_line(aes(time, factor,
-                               colour = group,
-                               group = group
+          colour = .data$group,
+          group = .data$group
         ), size = 1.2)
 
 
@@ -858,7 +867,10 @@ plot.fect <- function(
       maintext <- "Carryover Effects"
     }
   } else if (type == "calendar") {
-    maintext <- "ATT by Calendar Time"
+    maintext <- "CATT by Calendar Time"
+    ytitle <- paste("Effect on", x$Y)
+  } else if (type == "heterogeneous") {
+    maintext <- paste("CATT by", covariate)
     ytitle <- paste("Effect on", x$Y)
   } else if (type == "box") {
     maintext <- "Individual Treatment Effects"
@@ -886,7 +898,7 @@ plot.fect <- function(
   } else {
     angle <- 0
     x.v <- 0
-    if (type == "status") {
+    if (type == "status" || type == "heterogeneous" || type == "calendar") {
       x.h <- 0.5
     } else {
       x.h <- 0
@@ -1076,7 +1088,7 @@ plot.fect <- function(
   align_time_series <- function(Y, T0_counts, D_full, tr_idx_logical_full) {
     # Y: T × N matrix; T0_counts: length-N vector
     T_rows <- nrow(Y)
-    N_tr   <- ncol(Y)
+    N_tr <- ncol(Y)
     # subset out just the treated columns of D_full
     D_tr <- D_full[, tr_idx_logical_full, drop = FALSE]
     if (ncol(D_tr) != N_tr) {
@@ -1091,23 +1103,23 @@ plot.fect <- function(
         Y_aug    = matrix(NA_real_, 0, N_tr)
       ))
     }
-    min_rel  <- 1 - max(T0_valid)
-    max_rel  <- T_rows - min(T0_valid)
+    min_rel <- 1 - max(T0_valid)
+    max_rel <- T_rows - min(T0_valid)
     timeline <- if (min_rel > max_rel) integer(0) else seq(min_rel, max_rel)
 
     # build aligned matrix
     Y_aug <- matrix(NA_real_, nrow = length(timeline), ncol = N_tr)
-    if (length(timeline)>0) rownames(Y_aug) <- as.character(timeline)
+    if (length(timeline) > 0) rownames(Y_aug) <- as.character(timeline)
 
     for (i in seq_len(N_tr)) {
       t0 <- T0_counts[i]
       if (!is.finite(t0)) next
       for (t_abs in seq_len(T_rows)) {
         rel_time <- t_abs - t0
-        row_idx  <- match(as.character(rel_time), rownames(Y_aug))
+        row_idx <- match(as.character(rel_time), rownames(Y_aug))
         if (is.na(row_idx)) next
         include <- (rel_time <= 0) ||
-          (t_abs <= nrow(D_tr) && D_tr[t_abs,i]==1 && !is.na(D_tr[t_abs,i]))
+          (t_abs <= nrow(D_tr) && D_tr[t_abs, i] == 1 && !is.na(D_tr[t_abs, i]))
         if (include) Y_aug[row_idx, i] <- Y[t_abs, i]
       }
     }
@@ -1130,10 +1142,11 @@ plot.fect <- function(
       Y.tr.bar[is.nan(Y.tr.bar)] <- NA_real_
       Y.ct.bar[is.nan(Y.ct.bar)] <- NA_real_
       Yb <- cbind(Y.tr.bar, Y.ct.bar)
-      colnames(Yb) <- c("Y.tr.bar","Y.ct.bar")
+      colnames(Yb) <- c("Y.tr.bar", "Y.ct.bar")
     } else {
       Yb <- matrix(NA_real_, 0, 2,
-                   dimnames = list(NULL, c("Y.tr.bar","Y.ct.bar")))
+        dimnames = list(NULL, c("Y.tr.bar", "Y.ct.bar"))
+      )
     }
 
     list(
@@ -1153,9 +1166,13 @@ plot.fect <- function(
       raw <- "none"
     }
     if (axis.adjust == TRUE) {
-      angle <- 45; x.v <- 1; x.h <- 1
+      angle <- 45
+      x.v <- 1
+      x.h <- 1
     } else {
-      angle <- 0; x.v <- 0; x.h <- 0.5
+      angle <- 0
+      x.v <- 0
+      x.h <- 0.5
     }
 
     plot_xlim <- xlim
@@ -1169,47 +1186,74 @@ plot.fect <- function(
 
 
     # --- Data Extraction and Cleaning ---
-    subset = 1:x$N
+    subset <- 1:x$N
     subset.tr <- x$tr
     if (!is.null(id)) {
-      subset.tr = which(x$id %in% as.character(id))
-      if (!all(subset.tr %in% x$tr) || length(subset.tr) < 1){
+      subset.tr <- which(x$id %in% as.character(id))
+      if (!all(subset.tr %in% x$tr) || length(subset.tr) < 1) {
         stop("One or more of the units given in \"id\" is not treated.\n")
       }
-      x$Y.avg = NULL
-      subset = sort(c(subset.tr,x$co))
+      x$Y.avg <- NULL
+      subset <- sort(c(subset.tr, x$co))
     }
-    tr <- x$tr; co <- x$co; I_orig <- x$I; II_orig <- x$II; Y_orig <- x$Y.dat
-    Y.ct_orig <- x$Y.ct; D_orig <- x$D.dat; rawid_orig <- x$id
-    time_orig_vec <- x$rawtime; TT_dim <- dim(Y_orig)[1]
-    if (!is.numeric(time_orig_vec[1])) { time_orig_vec <- 1:TT_dim }
-    I_mat <- as.matrix(I_orig)[,subset]; colnames(I_mat) <- rawid_orig[subset]; rownames(I_mat) <- time_orig_vec
-    II_mat <- as.matrix(II_orig)[,subset]; colnames(II_mat) <- rawid_orig[subset]; rownames(II_mat) <- time_orig_vec
-    Y_mat <- as.matrix(Y_orig)[,subset]; colnames(Y_mat) <- rawid_orig[subset]; rownames(Y_mat) <- time_orig_vec
-    Y.ct_mat <- as.matrix(Y.ct_orig)[,subset]; colnames(Y.ct_mat) <- rawid_orig[subset]; rownames(Y.ct_mat) <- time_orig_vec
-    D_mat <- as.matrix(D_orig)[,subset]; colnames(D_mat) <- rawid_orig[subset]; rownames(D_mat) <- time_orig_vec
-    if (!is.null(id))
+    tr <- x$tr
+    co <- x$co
+    I_orig <- x$I
+    II_orig <- x$II
+    Y_orig <- x$Y.dat
+    Y.ct_orig <- x$Y.ct
+    D_orig <- x$D.dat
+    rawid_orig <- x$id
+    time_orig_vec <- x$rawtime
+    TT_dim <- dim(Y_orig)[1]
+    if (!is.numeric(time_orig_vec[1])) {
+      time_orig_vec <- 1:TT_dim
+    }
+    I_mat <- as.matrix(I_orig)[, subset]
+    colnames(I_mat) <- rawid_orig[subset]
+    rownames(I_mat) <- time_orig_vec
+    II_mat <- as.matrix(II_orig)[, subset]
+    colnames(II_mat) <- rawid_orig[subset]
+    rownames(II_mat) <- time_orig_vec
+    Y_mat <- as.matrix(Y_orig)[, subset]
+    colnames(Y_mat) <- rawid_orig[subset]
+    rownames(Y_mat) <- time_orig_vec
+    Y.ct_mat <- as.matrix(Y.ct_orig)[, subset]
+    colnames(Y.ct_mat) <- rawid_orig[subset]
+    rownames(Y.ct_mat) <- time_orig_vec
+    D_mat <- as.matrix(D_orig)[, subset]
+    colnames(D_mat) <- rawid_orig[subset]
+    rownames(D_mat) <- time_orig_vec
+    if (!is.null(id)) {
       tr_idx_logical <- (1:ncol(Y_mat)) %in% which(x$id[subset] %in% as.character(id))
-    else{
+    } else {
       tr_idx_logical <- (1:ncol(Y_mat)) %in% tr
     }
-    I.tr <- I_mat[, tr_idx_logical, drop = FALSE]; II.tr <- II_mat[, tr_idx_logical, drop = FALSE]
-    D.tr <- D_mat[, tr_idx_logical, drop = FALSE]; Y.tr <- Y_mat[, tr_idx_logical, drop = FALSE]
+    I.tr <- I_mat[, tr_idx_logical, drop = FALSE]
+    II.tr <- II_mat[, tr_idx_logical, drop = FALSE]
+    D.tr <- D_mat[, tr_idx_logical, drop = FALSE]
+    Y.tr <- Y_mat[, tr_idx_logical, drop = FALSE]
     Y.ct <- Y.ct_mat[, tr_idx_logical, drop = FALSE]
     co_idx_logical <- (1:ncol(Y_mat)) %in% co
     Y.co <- Y_mat[, co_idx_logical, drop = FALSE]
 
-    if (!0 %in% I.tr) { pre <- as.matrix(D.tr == 0 & II.tr == 1) } else { pre <- as.matrix(D.tr == 0 & I.tr == 1 & II.tr == 1) }
+    if (!0 %in% I.tr) {
+      pre <- as.matrix(D.tr == 0 & II.tr == 1)
+    } else {
+      pre <- as.matrix(D.tr == 0 & I.tr == 1 & II.tr == 1)
+    }
     T0 <- apply(x$D.dat[, subset.tr, drop = FALSE], 2, function(col) {
       first_one <- which(col == 1)[1]
       if (is.na(first_one)) length(col) else first_one - 1
     })
-    id.tr_names <- colnames(Y.tr); id.co_names <- colnames(Y.co)
+    id.tr_names <- colnames(Y.tr)
+    id.co_names <- colnames(Y.co)
     sameT0 <- length(unique(T0)) == 1
     is_case1_scenario <- length(id.tr_names) == 1 || sameT0 == TRUE
 
     if (is_case1_scenario) {
-      num_treated_units_for_plot <- ncol(D.tr); num_time_periods_for_plot <- nrow(D.tr)
+      num_treated_units_for_plot <- ncol(D.tr)
+      num_time_periods_for_plot <- nrow(D.tr)
       if (num_treated_units_for_plot > 0 && num_time_periods_for_plot > 0) {
         for (j_unit_idx in 1:num_treated_units_for_plot) {
           first_treated_period_indices_for_unit <- which(D.tr[, j_unit_idx] == 1)
@@ -1217,7 +1261,8 @@ plot.fect <- function(
             first_ever_treated_period_row_idx <- min(first_treated_period_indices_for_unit)
             for (t_row_idx in first_ever_treated_period_row_idx:num_time_periods_for_plot) {
               if (is.na(D.tr[t_row_idx, j_unit_idx]) || D.tr[t_row_idx, j_unit_idx] == 0) {
-                Y.tr[t_row_idx, j_unit_idx] <- NA; Y.ct[t_row_idx, j_unit_idx] <- NA
+                Y.tr[t_row_idx, j_unit_idx] <- NA
+                Y.ct[t_row_idx, j_unit_idx] <- NA
               }
             }
           }
@@ -1228,8 +1273,11 @@ plot.fect <- function(
     Yb <- cbind(apply(Y.tr, 1, mean, na.rm = TRUE), apply(Y.ct, 1, mean, na.rm = TRUE))
     colnames(Yb) <- c("Tr_Avg", "Ct_Avg")
 
-    if (is.null(shade.post)) { shade.post <- TRUE }
-    else if (!is.logical(shade.post)) { stop("Option \"shade.post\" must be logical (TRUE/FALSE).") }
+    if (is.null(shade.post)) {
+      shade.post <- TRUE
+    } else if (!is.logical(shade.post)) {
+      stop("Option \"shade.post\" must be logical (TRUE/FALSE).")
+    }
     if (legendOff == TRUE) {
       legend.pos <- "none"
     } else {
@@ -1241,13 +1289,17 @@ plot.fect <- function(
     Y.tr[is.na(Y.ct)] <- NA_real_
     # Case 1: Single Treated Unit or All Treated Units have Same T0 (Absolute Time)
     if (is_case1_scenario) {
-      plot_time_abs <- time_orig_vec; time_bf_abs_val <- NA
-      time_step_abs <- if(length(plot_time_abs) > 1) min(diff(sort(unique(plot_time_abs))), na.rm=TRUE) else 1
-      if(!is.finite(time_step_abs) || time_step_abs <= 0) time_step_abs <- 1
-      if (sameT0){
+      plot_time_abs <- time_orig_vec
+      time_bf_abs_val <- NA
+      time_step_abs <- if (length(plot_time_abs) > 1) min(diff(sort(unique(plot_time_abs))), na.rm = TRUE) else 1
+      if (!is.finite(time_step_abs) || time_step_abs <= 0) time_step_abs <- 1
+      if (sameT0) {
         unique_t0_val_count <- unique(T0)[1]
-        if(!is.na(unique_t0_val_count) && unique_t0_val_count >= 0 && (unique_t0_val_count + 1) <= length(plot_time_abs)) { time_bf_abs_val <- plot_time_abs[unique_t0_val_count + 1] }
-        else if (!is.na(unique_t0_val_count) && unique_t0_val_count == length(plot_time_abs)) { time_bf_abs_val <- plot_time_abs[length(plot_time_abs)] + time_step_abs }
+        if (!is.na(unique_t0_val_count) && unique_t0_val_count >= 0 && (unique_t0_val_count + 1) <= length(plot_time_abs)) {
+          time_bf_abs_val <- plot_time_abs[unique_t0_val_count + 1]
+        } else if (!is.na(unique_t0_val_count) && unique_t0_val_count == length(plot_time_abs)) {
+          time_bf_abs_val <- plot_time_abs[length(plot_time_abs)] + time_step_abs
+        }
       }
       vline_pos_abs <- if (!is.na(time_bf_abs_val)) time_bf_abs_val - (time_step_abs / 2) else NA
 
@@ -1255,7 +1307,11 @@ plot.fect <- function(
       show_abs <- 1:length(plot_time_abs)
       if (!is.null(provided_xlim)) {
         show_abs_check <- which(plot_time_abs >= provided_xlim[1] & plot_time_abs <= provided_xlim[2])
-        if (length(show_abs_check) == 0) { warning("No data points in xlim range.") } else { show_abs <- show_abs_check }
+        if (length(show_abs_check) == 0) {
+          warning("No data points in xlim range.")
+        } else {
+          show_abs <- show_abs_check
+        }
       }
 
       counts_for_filtering_abs <- apply(Y.tr, 1, function(row) sum(!is.na(row)))
@@ -1272,91 +1328,103 @@ plot.fect <- function(
         stop("Cannot determine time range for absolute time plot.")
       }
 
-      nT_abs <- length(show_abs); time_label_abs <- plot_time_abs[show_abs]; T.b_abs <- integer(0)
+      nT_abs <- length(show_abs)
+      time_label_abs <- plot_time_abs[show_abs]
+      T.b_abs <- integer(0)
       if (nT_abs > 0) {
         if (is.numeric(time_label_abs) && length(time_label_abs) > 1) {
-          T.b_breaks_abs <- pretty(time_label_abs); T.b_breaks_abs <- T.b_breaks_abs[T.b_breaks_abs >= min(time_label_abs) & T.b_breaks_abs <= max(time_label_abs)]
-          if (length(T.b_breaks_abs) > 0) { T.b_abs <- sapply(T.b_breaks_abs, function(br) which.min(abs(time_label_abs - br))); T.b_abs <- unique(T.b_abs) }
+          T.b_breaks_abs <- pretty(time_label_abs)
+          T.b_breaks_abs <- T.b_breaks_abs[T.b_breaks_abs >= min(time_label_abs) & T.b_breaks_abs <= max(time_label_abs)]
+          if (length(T.b_breaks_abs) > 0) {
+            T.b_abs <- sapply(T.b_breaks_abs, function(br) which.min(abs(time_label_abs - br)))
+            T.b_abs <- unique(T.b_abs)
+          }
         }
-        if (length(T.b_abs) == 0) { max_labels <- 10; step <- max(1, floor(length(time_label_abs) / max_labels)); T.b_abs <- seq(1, length(time_label_abs), by = step) }
+        if (length(T.b_abs) == 0) {
+          max_labels <- 10
+          step <- max(1, floor(length(time_label_abs) / max_labels))
+          T.b_abs <- seq(1, length(time_label_abs), by = step)
+        }
       }
       xlab_final <- if (is.null(xlab)) x$index[2] else if (xlab == "") NULL else xlab
       ylab_final <- if (is.null(ylab)) x$Yname else if (ylab == "") NULL else ylab
-      plot_single_unit_flag <- FALSE; unit_to_plot_name <- NULL
+      plot_single_unit_flag <- FALSE
+      unit_to_plot_name <- NULL
       plot_single_unit_flag <- length(id.tr_names) == 1
       unit_to_plot_name <- id.tr_names[1]
       if (plot_single_unit_flag) {
         maintext <- paste("Treated and Estimated Counterfactual (", unit_to_plot_name, ")", sep = "")
         unit_col_idx_in_Y.tr <- which(colnames(Y.tr) == unit_to_plot_name)
-        if(length(unit_col_idx_in_Y.tr) != 1) stop(paste("Could not find unique column for unit", unit_to_plot_name, "in Y.tr."))
-        tr.info_unit <- Y.tr[show_abs, unit_col_idx_in_Y.tr]; ct.info_unit <- Y.ct[show_abs, unit_col_idx_in_Y.tr] # Subset by show_abs here
+        if (length(unit_col_idx_in_Y.tr) != 1) stop(paste("Could not find unique column for unit", unit_to_plot_name, "in Y.tr."))
+        tr.info_unit <- Y.tr[show_abs, unit_col_idx_in_Y.tr]
+        ct.info_unit <- Y.ct[show_abs, unit_col_idx_in_Y.tr] # Subset by show_abs here
         y_data_for_range_calc <- c(tr.info_unit, ct.info_unit) # Already subsetted
         if (raw == "none") {
           if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
-            if (plot.ci == "95"){
+            if (plot.ci == "95") {
               para.ci <- basic_ci_alpha(
-                rowMeans(x$eff.boot[,which(tr %in% subset.tr),]),
-                x$eff.boot[,which(tr %in% subset.tr),],
+                rowMeans(x$eff.boot[, which(tr %in% subset.tr), ]),
+                x$eff.boot[, which(tr %in% subset.tr), ],
                 alpha = 0.05
               )
               x$Y.avg <- data.frame(
                 period   = x$rawtime,
-                lower.tr = Yb[,"Tr_Avg"],
-                upper.tr = Yb[,"Tr_Avg"],
-                lower.ct = Yb[,"Ct_Avg"] + para.ci[ , "upper"],
-                upper.ct = Yb[,"Ct_Avg"] + para.ci[ , "lower"]
+                lower.tr = Yb[, "Tr_Avg"],
+                upper.tr = Yb[, "Tr_Avg"],
+                lower.ct = Yb[, "Ct_Avg"] + para.ci[, "upper"],
+                upper.ct = Yb[, "Ct_Avg"] + para.ci[, "lower"]
               )
-            } else if (plot.ci == "90"){
+            } else if (plot.ci == "90") {
               para.ci <- basic_ci_alpha(
-                rowMeans(x$eff.boot[,which(tr %in% subset.tr),]),
-                x$eff.boot[,which(tr %in% subset.tr),],
+                rowMeans(x$eff.boot[, which(tr %in% subset.tr), ]),
+                x$eff.boot[, which(tr %in% subset.tr), ],
                 alpha = 0.1
               )
               x$Y.avg <- data.frame(
-                period   = x$rawtime,
-                lower90.tr = Yb[,"Tr_Avg"],
-                upper90.tr = Yb[,"Tr_Avg"],
-                lower90.ct = Yb[,"Ct_Avg"] + para.ci[ , "upper"],
-                upper90.ct = Yb[,"Ct_Avg"] + para.ci[ , "lower"]
+                period = x$rawtime,
+                lower90.tr = Yb[, "Tr_Avg"],
+                upper90.tr = Yb[, "Tr_Avg"],
+                lower90.ct = Yb[, "Ct_Avg"] + para.ci[, "upper"],
+                upper90.ct = Yb[, "Ct_Avg"] + para.ci[, "lower"]
               )
-            } else{
+            } else {
               warning("Invalid plot.ci provided.")
             }
           } else if (x$vartype == "parametric" & raw == "none" & is.null(id)) {
-            if (plot.ci == "95"){
+            if (plot.ci == "95") {
               x$Y.avg <- data.frame(
                 period   = x$rawtime,
-                lower.tr = Yb[,"Tr_Avg"],
-                upper.tr = Yb[,"Tr_Avg"],
-                lower.ct = Yb[,"Ct_Avg"] - (x$est.att[, "CI.upper"]-x$est.att[,"ATT"]),
-                upper.ct = Yb[,"Ct_Avg"] - (x$est.att[, "CI.lower"]-x$est.att[,"ATT"])
+                lower.tr = Yb[, "Tr_Avg"],
+                upper.tr = Yb[, "Tr_Avg"],
+                lower.ct = Yb[, "Ct_Avg"] - (x$est.att[, "CI.upper"] - x$est.att[, "ATT"]),
+                upper.ct = Yb[, "Ct_Avg"] - (x$est.att[, "CI.lower"] - x$est.att[, "ATT"])
               )
-            } else if (plot.ci == "90"){
+            } else if (plot.ci == "90") {
               x$Y.avg <- data.frame(
-                period   = x$rawtime,
-                lower90.tr = Yb[,"Tr_Avg"],
-                upper90.tr = Yb[,"Tr_Avg"],
-                lower90.ct = Yb[,"Ct_Avg"] - (x$est.att90[, "CI.upper"]-x$est.att90[,"ATT"]),
-                upper90.ct = Yb[,"Ct_Avg"] - (x$est.att90[, "CI.lower"]-x$est.att90[,"ATT"])
+                period = x$rawtime,
+                lower90.tr = Yb[, "Tr_Avg"],
+                upper90.tr = Yb[, "Tr_Avg"],
+                lower90.ct = Yb[, "Ct_Avg"] - (x$est.att90[, "CI.upper"] - x$est.att90[, "ATT"]),
+                upper90.ct = Yb[, "Ct_Avg"] - (x$est.att90[, "CI.lower"] - x$est.att90[, "ATT"])
               )
-            } else{
+            } else {
               warning("Invalid plot.ci provided.")
             }
           }
           data_plot_abs <- data.frame(
-            time    = rep(plot_time_abs[show_abs], 2),
+            time = rep(plot_time_abs[show_abs], 2),
             outcome = c(tr.info_unit, ct.info_unit),
-            type    = factor(
+            type = factor(
               rep(c("tr", "ct"), each = nT_abs),
               levels = c("tr", "ct")
             )
           )
           p <- ggplot()
-          if (plot.ci %in% c("90","95") && !is.null(x$Y.avg)) {
-            tr_lo_col <- if (plot.ci=="95") "lower.tr"   else "lower90.tr"
-            tr_hi_col <- if (plot.ci=="95") "upper.tr"   else "upper90.tr"
-            cf_lo_col <- if (plot.ci=="95") "lower.ct"   else "lower90.ct"
-            cf_hi_col <- if (plot.ci=="95") "upper.ct"   else "upper90.ct"
+          if (plot.ci %in% c("90", "95") && !is.null(x$Y.avg)) {
+            tr_lo_col <- if (plot.ci == "95") "lower.tr" else "lower90.tr"
+            tr_hi_col <- if (plot.ci == "95") "upper.tr" else "upper90.tr"
+            cf_lo_col <- if (plot.ci == "95") "lower.ct" else "lower90.ct"
+            cf_hi_col <- if (plot.ci == "95") "upper.ct" else "upper90.ct"
             ci_data <- x$Y.avg[x$Y.avg$period %in% plot_time_abs[show_abs], ]
 
             if (nrow(ci_data) > 0) {
@@ -1371,40 +1439,47 @@ plot.fect <- function(
           p <- p +
             geom_line(
               data = data_plot_abs,
-              aes(x = time, y = outcome,
-                  colour = type,
-                  linetype = type,
-                  linewidth = type)
+              aes(
+                x = time, y = outcome,
+                colour = type,
+                linetype = type,
+                linewidth = type
+              )
             )
-          set.limits    <- c("tr", "ct")
-          set.labels    <- c(
-            paste0("Treated (", unit_to_plot_name,      ")"),
-            paste0("Est. Y(0) (", unit_to_plot_name,    ")")
+          set.limits <- c("tr", "ct")
+          set.labels <- c(
+            paste0("Treated (", unit_to_plot_name, ")"),
+            paste0("Est. Y(0) (", unit_to_plot_name, ")")
           )
-          set.colors    <- c(color, counterfactual.color)
+          set.colors <- c(color, counterfactual.color)
           set.linetypes <- c("solid", counterfactual.linetype)
           set.linewidth <- c(est.lwidth, est.lwidth)
-          set.fill      <- c(color, counterfactual.color)  # for the ribbon legend
+          set.fill <- c(color, counterfactual.color) # for the ribbon legend
         } else if (raw == "band") {
-          Y.co.quantiles <- t(apply(Y.co[show_abs, , drop=FALSE], 1, quantile, prob = c(0.05, 0.95), na.rm = TRUE))
+          Y.co.quantiles <- t(apply(Y.co[show_abs, , drop = FALSE], 1, quantile, prob = c(0.05, 0.95), na.rm = TRUE))
           main_lines_data_abs <- data.frame(
             time = rep(plot_time_abs[show_abs], 2),
             outcome = c(tr.info_unit, ct.info_unit), # Use already subsetted data
             type = factor(c(rep("tr", nT_abs), rep("ct", nT_abs)), levels = c("tr", "ct", "co.band"))
           )
-          data.band_abs <- data.frame(time = plot_time_abs[show_abs], co5 = Y.co.quantiles[, 1], co95 = Y.co.quantiles[, 2], type="co.band") # Add type for legend
+          data.band_abs <- data.frame(time = plot_time_abs[show_abs], co5 = Y.co.quantiles[, 1], co95 = Y.co.quantiles[, 2], type = "co.band") # Add type for legend
           y_data_for_range_calc <- c(y_data_for_range_calc, data.band_abs$co5, data.band_abs$co95)
           p <- ggplot() +
-            geom_ribbon(data = data.band_abs, aes(x = time, ymin = co5, ymax = co95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
+            geom_ribbon(data = data.band_abs, aes(x = time, ymin = .data$co5, ymax = .data$co95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
             geom_line(data = main_lines_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
-          set.limits <- c("tr", "ct", "co.band"); set.labels <- c(paste0("Treated (",unit_to_plot_name,")"), paste0("Est. Y(0) (",unit_to_plot_name,")"), "Controls (5-95% Quantiles)")
-          set.colors <- c(color, counterfactual.color, NA); set.linetypes <- c("solid", counterfactual.linetype, "blank"); set.linewidth <- c(est.lwidth, est.lwidth, 0); set.fill <- c(NA, NA, counterfactual.color)
+          set.limits <- c("tr", "ct", "co.band")
+          set.labels <- c(paste0("Treated (", unit_to_plot_name, ")"), paste0("Est. Y(0) (", unit_to_plot_name, ")"), "Controls (5-95% Quantiles)")
+          set.colors <- c(color, counterfactual.color, NA)
+          set.linetypes <- c("solid", counterfactual.linetype, "blank")
+          set.linewidth <- c(est.lwidth, est.lwidth, 0)
+          set.fill <- c(NA, NA, counterfactual.color)
         } else if (raw == "all") {
           # Data for Raw Control Lines
-          Y.co.subset <- Y.co[show_abs, , drop = FALSE]; raw_co_data_abs <- NULL
+          Y.co.subset <- Y.co[show_abs, , drop = FALSE]
+          raw_co_data_abs <- NULL
           if (ncol(Y.co.subset) > 0 && nrow(Y.co.subset) > 0) {
             melt_temp_co <- reshape2::melt(Y.co.subset, varnames = c("time_idx_abs", "id_co_idx_abs"), value.name = "outcome")
-            if(nrow(melt_temp_co) > 0) {
+            if (nrow(melt_temp_co) > 0) {
               raw_co_data_abs <- data.frame(time = as.numeric(melt_temp_co$time_idx_abs), id = as.character(melt_temp_co$id_co_idx_abs), outcome = melt_temp_co$outcome, type = "raw.co")
             }
           }
@@ -1412,25 +1487,31 @@ plot.fect <- function(
           main_tr_line_data_abs <- data.frame(time = plot_time_abs[show_abs], outcome = tr.info_unit, type = "tr", id = "_MAIN_TREATED_LINE_")
           # Data for Main Counterfactual Line
           main_ct_line_data_abs <- data.frame(time = plot_time_abs[show_abs], outcome = ct.info_unit, type = "ct", id = "_MAIN_COUNTERFACTUAL_LINE_")
-          y_data_for_range_calc <- c(y_data_for_range_calc, if(!is.null(raw_co_data_abs)) raw_co_data_abs$outcome else NULL)
+          y_data_for_range_calc <- c(y_data_for_range_calc, if (!is.null(raw_co_data_abs)) raw_co_data_abs$outcome else NULL)
 
           p <- ggplot()
-          if (!is.null(raw_co_data_abs)) { p <- p + geom_line(data = raw_co_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type)) }
+          if (!is.null(raw_co_data_abs)) {
+            p <- p + geom_line(data = raw_co_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type))
+          }
           p <- p + geom_line(data = main_tr_line_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
           p <- p + geom_line(data = main_ct_line_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
-          set.limits <- c("tr", "ct", "raw.co"); set.labels <- c(paste0("Treated (",unit_to_plot_name,")"), paste0("Est. Y(0) (",unit_to_plot_name,")"), "Controls")
-          set.colors <- c(color, counterfactual.color, counterfactual.raw.controls.color); set.linetypes <- c("solid", counterfactual.linetype, "solid")
-          lw <- c(est.lwidth,est.lwidth/2); set.linewidth <- c(lw[1], lw[1], lw[2])
+          set.limits <- c("tr", "ct", "raw.co")
+          set.labels <- c(paste0("Treated (", unit_to_plot_name, ")"), paste0("Est. Y(0) (", unit_to_plot_name, ")"), "Controls")
+          set.colors <- c(color, counterfactual.color, counterfactual.raw.controls.color)
+          set.linetypes <- c("solid", counterfactual.linetype, "solid")
+          lw <- c(est.lwidth, est.lwidth / 2)
+          set.linewidth <- c(lw[1], lw[1], lw[2])
         }
       } else { # Multiple treated units, all with the same T0
-        maintext <- "Treated vs Estimated Counterfactuals"; Yb_show_abs <- Yb[show_abs, , drop = FALSE]
-        y_data_for_range_calc <- c(Yb_show_abs[,1], Yb_show_abs[,2])
+        maintext <- "Treated vs Estimated Counterfactuals"
+        Yb_show_abs <- Yb[show_abs, , drop = FALSE]
+        y_data_for_range_calc <- c(Yb_show_abs[, 1], Yb_show_abs[, 2])
         if (raw == "none") {
           if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
             subset.eff.boot <- sapply(seq_len(dim(x$eff.boot)[3]), function(j) {
-              rowMeans(x$eff.boot[,which(tr %in% subset.tr),j], na.rm = TRUE)
+              rowMeans(x$eff.boot[, which(tr %in% subset.tr), j], na.rm = TRUE)
             })
-            if (plot.ci == "95"){
+            if (plot.ci == "95") {
               para.ci <- basic_ci_alpha(
                 rowMeans(subset.eff.boot),
                 subset.eff.boot,
@@ -1438,99 +1519,133 @@ plot.fect <- function(
               )
               x$Y.avg <- data.frame(
                 period   = x$rawtime,
-                lower.tr = Yb[,"Tr_Avg"],
-                upper.tr = Yb[,"Tr_Avg"],
-                lower.ct = Yb[,"Ct_Avg"] + para.ci[ , "upper"],
-                upper.ct = Yb[,"Ct_Avg"] + para.ci[ , "lower"]
+                lower.tr = Yb[, "Tr_Avg"],
+                upper.tr = Yb[, "Tr_Avg"],
+                lower.ct = Yb[, "Ct_Avg"] + para.ci[, "upper"],
+                upper.ct = Yb[, "Ct_Avg"] + para.ci[, "lower"]
               )
-            } else if (plot.ci == "90"){
+            } else if (plot.ci == "90") {
               para.ci <- basic_ci_alpha(
                 rowMeans(subset.eff.boot),
                 subset.eff.boot,
                 alpha = 0.1
               )
               x$Y.avg <- data.frame(
-                period   = x$rawtime,
-                lower90.tr = Yb[,"Tr_Avg"],
-                upper90.tr = Yb[,"Tr_Avg"],
-                lower90.ct = Yb[,"Ct_Avg"] + para.ci[ , "upper"],
-                upper90.ct = Yb[,"Ct_Avg"] + para.ci[ , "lower"]
+                period = x$rawtime,
+                lower90.tr = Yb[, "Tr_Avg"],
+                upper90.tr = Yb[, "Tr_Avg"],
+                lower90.ct = Yb[, "Ct_Avg"] + para.ci[, "upper"],
+                upper90.ct = Yb[, "Ct_Avg"] + para.ci[, "lower"]
               )
-            } else{
+            } else {
               warning("Invalid plot.ci provided.")
             }
-          } else if (x$vartype == "parametric" & raw == "none" & is.null(id)){
-            if (plot.ci == "95"){
+          } else if (x$vartype == "parametric" & raw == "none" & is.null(id)) {
+            if (plot.ci == "95") {
               x$Y.avg <- data.frame(
                 period   = x$rawtime,
-                lower.tr = Yb[,"Tr_Avg"],
-                upper.tr = Yb[,"Tr_Avg"],
-                lower.ct = Yb[,"Ct_Avg"] - (x$est.att[, "CI.upper"]-x$est.att[,"ATT"]),
-                upper.ct = Yb[,"Ct_Avg"] - (x$est.att[, "CI.lower"]-x$est.att[,"ATT"])
+                lower.tr = Yb[, "Tr_Avg"],
+                upper.tr = Yb[, "Tr_Avg"],
+                lower.ct = Yb[, "Ct_Avg"] - (x$est.att[, "CI.upper"] - x$est.att[, "ATT"]),
+                upper.ct = Yb[, "Ct_Avg"] - (x$est.att[, "CI.lower"] - x$est.att[, "ATT"])
               )
-            } else if (plot.ci == "90"){
+            } else if (plot.ci == "90") {
               x$Y.avg <- data.frame(
-                period   = x$rawtime,
-                lower90.tr = Yb[,"Tr_Avg"],
-                upper90.tr = Yb[,"Tr_Avg"],
-                lower90.ct = Yb[,"Ct_Avg"] - (x$est.att90[, "CI.upper"]-x$est.att90[,"ATT"]),
-                upper90.ct = Yb[,"Ct_Avg"] - (x$est.att90[, "CI.lower"]-x$est.att90[,"ATT"])
+                period = x$rawtime,
+                lower90.tr = Yb[, "Tr_Avg"],
+                upper90.tr = Yb[, "Tr_Avg"],
+                lower90.ct = Yb[, "Ct_Avg"] - (x$est.att90[, "CI.upper"] - x$est.att90[, "ATT"]),
+                upper90.ct = Yb[, "Ct_Avg"] - (x$est.att90[, "CI.lower"] - x$est.att90[, "ATT"])
               )
-            } else{
+            } else {
               warning("Invalid plot.ci provided.")
             }
           }
           data_plot_abs <- data.frame(time = rep(plot_time_abs[show_abs], 2), outcome = c(Yb_show_abs[, 1], Yb_show_abs[, 2]), type = factor(c(rep("tr", nT_abs), rep("co", nT_abs)), levels = c("tr", "co")))
           p <- ggplot() # Start with empty ggplot for CI
           if (plot.ci %in% c("90", "95") && !is.null(x$Y.avg)) {
-            tr_lo_col <- if (plot.ci == "95") "lower.tr" else "lower90.tr"; tr_hi_col <- if (plot.ci == "95") "upper.tr" else "upper90.tr"; cf_lo_col <- if (plot.ci == "95") "lower.ct" else "lower90.ct"; cf_hi_col <- if (plot.ci == "95") "upper.ct" else "upper90.ct"
+            tr_lo_col <- if (plot.ci == "95") "lower.tr" else "lower90.tr"
+            tr_hi_col <- if (plot.ci == "95") "upper.tr" else "upper90.tr"
+            cf_lo_col <- if (plot.ci == "95") "lower.ct" else "lower90.ct"
+            cf_hi_col <- if (plot.ci == "95") "upper.ct" else "upper90.ct"
             required_cols_ci <- c("period", tr_lo_col, tr_hi_col, cf_lo_col, cf_hi_col)
             if (all(required_cols_ci %in% names(x$Y.avg))) {
-              ci_data_abs <- x$Y.avg; ci_data_filtered_abs <- NULL
+              ci_data_abs <- x$Y.avg
+              ci_data_filtered_abs <- NULL
               # Filter CI data based on the points being shown
-              ci_data_filtered_abs <- ci_data_abs[show_abs,]
+              ci_data_filtered_abs <- ci_data_abs[show_abs, ]
               if (!is.null(ci_data_filtered_abs) && nrow(ci_data_filtered_abs) > 0) {
                 p <- p + geom_ribbon(data = ci_data_filtered_abs, aes(x = plot_time_abs[show_abs], ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
                   geom_ribbon(data = ci_data_filtered_abs, aes(x = plot_time_abs[show_abs], ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
                 y_data_for_range_calc <- c(y_data_for_range_calc, ci_data_filtered_abs[[tr_lo_col]], ci_data_filtered_abs[[tr_hi_col]], ci_data_filtered_abs[[cf_lo_col]], ci_data_filtered_abs[[cf_hi_col]])
               } else {
-                warning("No CI data for treated/counterfactual averages.") }
-            } else {warning("CI columns not found for treated/counterfactual averages.") }
+                warning("No CI data for treated/counterfactual averages.")
+              }
+            } else {
+              warning("CI columns not found for treated/counterfactual averages.")
+            }
           }
           p <- p + geom_line(data = data_plot_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
-          set.limits <- c("tr", "co"); set.labels <- c("Treated Average", "Estimated Y(0) Average"); set.colors <- c(color, counterfactual.color); set.linetypes <- c("solid", counterfactual.linetype); set.linewidth <- c(est.lwidth, est.lwidth); set.fill <- c(color, counterfactual.color) # fill for CI ribbons
+          set.limits <- c("tr", "co")
+          set.labels <- c("Treated Average", "Estimated Y(0) Average")
+          set.colors <- c(color, counterfactual.color)
+          set.linetypes <- c("solid", counterfactual.linetype)
+          set.linewidth <- c(est.lwidth, est.lwidth)
+          set.fill <- c(color, counterfactual.color) # fill for CI ribbons
         } else if (raw == "band") {
-          Y.tr.quantiles <- t(apply(Y.tr[show_abs, , drop=FALSE], 1, quantile, prob = c(0.05, 0.95), na.rm = TRUE))
-          Y.co.quantiles <- t(apply(Y.co[show_abs, , drop=FALSE], 1, quantile, prob = c(0.05, 0.95), na.rm = TRUE))
+          Y.tr.quantiles <- t(apply(Y.tr[show_abs, , drop = FALSE], 1, quantile, prob = c(0.05, 0.95), na.rm = TRUE))
+          Y.co.quantiles <- t(apply(Y.co[show_abs, , drop = FALSE], 1, quantile, prob = c(0.05, 0.95), na.rm = TRUE))
           main_lines_data_abs <- data.frame(time = rep(plot_time_abs[show_abs], 2), outcome = c(Yb_show_abs[, 1], Yb_show_abs[, 2]), type = factor(c(rep("tr", nT_abs), rep("co", nT_abs)), levels = c("tr", "co", "tr_band", "co_band")))
-          data.band_tr_abs <- data.frame(time = plot_time_abs[show_abs], tr5 = Y.tr.quantiles[, 1], tr95 = Y.tr.quantiles[, 2], type="tr_band")
-          data.band_co_abs <- data.frame(time = plot_time_abs[show_abs], co5 = Y.co.quantiles[, 1], co95 = Y.co.quantiles[, 2], type="co_band")
+          data.band_tr_abs <- data.frame(time = plot_time_abs[show_abs], tr5 = Y.tr.quantiles[, 1], tr95 = Y.tr.quantiles[, 2], type = "tr_band")
+          data.band_co_abs <- data.frame(time = plot_time_abs[show_abs], co5 = Y.co.quantiles[, 1], co95 = Y.co.quantiles[, 2], type = "co_band")
           y_data_for_range_calc <- c(y_data_for_range_calc, data.band_tr_abs$tr5, data.band_tr_abs$tr95, data.band_co_abs$co5, data.band_co_abs$co95)
           p <- ggplot() +
-            geom_ribbon(data = data.band_tr_abs, aes(x = time, ymin = tr5, ymax = tr95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
-            geom_ribbon(data = data.band_co_abs, aes(x = time, ymin = co5, ymax = co95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
+            geom_ribbon(data = data.band_tr_abs, aes(x = time, ymin = .data$tr5, ymax = .data$tr95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
+            geom_ribbon(data = data.band_co_abs, aes(x = time, ymin = .data$co5, ymax = .data$co95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
             geom_line(data = main_lines_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
-          set.limits <- c("tr", "co", "tr_band", "co_band"); set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated (5-95% Quantiles)", "Controls (5-95% Quantiles)")
-          set.colors <- c(color, counterfactual.color, NA, NA); set.linetypes <- c("solid", counterfactual.linetype, "blank", "blank"); set.linewidth <- c(est.lwidth, est.lwidth, 0, 0); set.fill <- c(NA, NA, color, counterfactual.color)
+          set.limits <- c("tr", "co", "tr_band", "co_band")
+          set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated (5-95% Quantiles)", "Controls (5-95% Quantiles)")
+          set.colors <- c(color, counterfactual.color, NA, NA)
+          set.linetypes <- c("solid", counterfactual.linetype, "blank", "blank")
+          set.linewidth <- c(est.lwidth, est.lwidth, 0, 0)
+          set.fill <- c(NA, NA, color, counterfactual.color)
         } else if (raw == "all") {
-          Y.tr.subset <- Y.tr[show_abs, , drop = FALSE]; Y.co.subset <- Y.co[show_abs, , drop = FALSE]
-          raw_tr_data_abs <- NULL; if (ncol(Y.tr.subset) > 0 && nrow(Y.tr.subset) > 0) { melt_temp_tr <- reshape2::melt(Y.tr.subset, varnames = c("t", "id"), value.name = "o"); if(nrow(melt_temp_tr)>0) raw_tr_data_abs <- data.frame(time=as.numeric(melt_temp_tr$t), id=as.character(melt_temp_tr$id), outcome=melt_temp_tr$o, type="raw.tr")}
-          raw_co_data_abs <- NULL; if (ncol(Y.co.subset) > 0 && nrow(Y.co.subset) > 0) { melt_temp_co <- reshape2::melt(Y.co.subset, varnames = c("t", "id"), value.name = "o"); if(nrow(melt_temp_co)>0) raw_co_data_abs <- data.frame(time=as.numeric(melt_temp_co$t), id=as.character(melt_temp_co$id), outcome=melt_temp_co$o, type="raw.co")}
-          avg_tr_data_abs <- data.frame(time=plot_time_abs[show_abs], outcome=Yb_show_abs[,1], type="tr", id="tr_avg_line")
-          avg_co_data_abs <- data.frame(time=plot_time_abs[show_abs], outcome=Yb_show_abs[,2], type="co", id="co_avg_line")
-          y_data_for_range_calc <- c(y_data_for_range_calc, if(!is.null(raw_tr_data_abs)) raw_tr_data_abs$outcome else NULL, if(!is.null(raw_co_data_abs)) raw_co_data_abs$outcome else NULL)
+          Y.tr.subset <- Y.tr[show_abs, , drop = FALSE]
+          Y.co.subset <- Y.co[show_abs, , drop = FALSE]
+          raw_tr_data_abs <- NULL
+          if (ncol(Y.tr.subset) > 0 && nrow(Y.tr.subset) > 0) {
+            melt_temp_tr <- reshape2::melt(Y.tr.subset, varnames = c("t", "id"), value.name = "o")
+            if (nrow(melt_temp_tr) > 0) raw_tr_data_abs <- data.frame(time = as.numeric(melt_temp_tr$t), id = as.character(melt_temp_tr$id), outcome = melt_temp_tr$o, type = "raw.tr")
+          }
+          raw_co_data_abs <- NULL
+          if (ncol(Y.co.subset) > 0 && nrow(Y.co.subset) > 0) {
+            melt_temp_co <- reshape2::melt(Y.co.subset, varnames = c("t", "id"), value.name = "o")
+            if (nrow(melt_temp_co) > 0) raw_co_data_abs <- data.frame(time = as.numeric(melt_temp_co$t), id = as.character(melt_temp_co$id), outcome = melt_temp_co$o, type = "raw.co")
+          }
+          avg_tr_data_abs <- data.frame(time = plot_time_abs[show_abs], outcome = Yb_show_abs[, 1], type = "tr", id = "tr_avg_line")
+          avg_co_data_abs <- data.frame(time = plot_time_abs[show_abs], outcome = Yb_show_abs[, 2], type = "co", id = "co_avg_line")
+          y_data_for_range_calc <- c(y_data_for_range_calc, if (!is.null(raw_tr_data_abs)) raw_tr_data_abs$outcome else NULL, if (!is.null(raw_co_data_abs)) raw_co_data_abs$outcome else NULL)
           p <- ggplot()
-          if(!is.null(raw_tr_data_abs)) { p <- p + geom_line(data=raw_tr_data_abs, aes(x=time, y=outcome, group=id, colour=type, linetype=type, linewidth=type)) }
-          if(!is.null(raw_co_data_abs)) { p <- p + geom_line(data=raw_co_data_abs, aes(x=time, y=outcome, group=id, colour=type, linetype=type, linewidth=type)) }
-          p <- p + geom_line(data=avg_tr_data_abs, aes(x=time, y=outcome, colour=type, linetype=type, linewidth=type))
-          p <- p + geom_line(data=avg_co_data_abs, aes(x=time, y=outcome, colour=type, linetype=type, linewidth=type))
-          set.limits <- c("tr", "co", "raw.tr", "raw.co"); set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated Raw Data", "Controls Raw Data")
-          set.colors <- c(color, counterfactual.color, counterfactual.raw.treated.color, counterfactual.raw.controls.color); set.linetypes <- c("solid", counterfactual.linetype, "solid", "solid")
-          lw <- c(est.lwidth,est.lwidth/2); set.linewidth <- c(lw[1], lw[1], lw[2], lw[2])
+          if (!is.null(raw_tr_data_abs)) {
+            p <- p + geom_line(data = raw_tr_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type))
+          }
+          if (!is.null(raw_co_data_abs)) {
+            p <- p + geom_line(data = raw_co_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type))
+          }
+          p <- p + geom_line(data = avg_tr_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
+          p <- p + geom_line(data = avg_co_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
+          set.limits <- c("tr", "co", "raw.tr", "raw.co")
+          set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated Raw Data", "Controls Raw Data")
+          set.colors <- c(color, counterfactual.color, counterfactual.raw.treated.color, counterfactual.raw.controls.color)
+          set.linetypes <- c("solid", counterfactual.linetype, "solid", "solid")
+          lw <- c(est.lwidth, est.lwidth / 2)
+          set.linewidth <- c(lw[1], lw[1], lw[2], lw[2])
         }
       }
       p <- p + xlab(xlab_final) + ylab(ylab_final) + theme(legend.position = legend.pos, axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v), axis.text = element_text(size = cex.axis), axis.title = element_text(size = cex.lab), plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)))
-      if (theme.bw == TRUE) { p <- p + theme_bw() }
+      if (theme.bw == TRUE) {
+        p <- p + theme_bw()
+      }
       p <- p + theme(
         legend.position = legend.pos,
         axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
@@ -1540,12 +1655,14 @@ plot.fect <- function(
       )
       if (!is.na(vline_pos_abs)) {
         p <- p + geom_vline(xintercept = vline_pos_abs, colour = lcolor[2], linewidth = lwidth[2], linetype = ltype[2])
-        if (shade.post == TRUE) { p <- p + annotate("rect", xmin = vline_pos_abs, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "grey80", alpha = .3) }
+        if (shade.post == TRUE) {
+          p <- p + annotate("rect", xmin = vline_pos_abs, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "grey80", alpha = .3)
+        }
       }
       p <- p + scale_colour_manual(name = NULL, limits = set.limits, values = set.colors, labels = set.labels, na.value = NA, drop = FALSE) +
         scale_linetype_manual(name = NULL, limits = set.limits, values = set.linetypes, labels = set.labels, na.value = "blank", drop = FALSE) +
         scale_linewidth_manual(name = NULL, limits = set.limits, values = set.linewidth, labels = set.labels, na.value = 0, drop = FALSE)
-      guide_obj_abs <- guide_legend(title = NULL, ncol = if(length(set.limits) > 2) ceiling(length(set.limits)/2) else length(set.limits))
+      guide_obj_abs <- guide_legend(title = NULL, ncol = if (length(set.limits) > 2) ceiling(length(set.limits) / 2) else length(set.limits))
       if (exists("set.fill") && !is.null(set.fill) && any(!is.na(set.fill))) { # Check if set.fill has actual values
         p <- p + scale_fill_manual(name = NULL, limits = set.limits, values = set.fill, labels = set.labels, na.value = NA, drop = FALSE)
         p <- p + guides(colour = guide_obj_abs, linetype = guide_obj_abs, linewidth = guide_obj_abs, fill = guide_obj_abs)
@@ -1564,32 +1681,61 @@ plot.fect <- function(
       final_main_text <- if (is.null(main)) maintext else if (main == "") NULL else main
       if (!is.null(final_main_text)) p <- p + ggtitle(final_main_text)
       if (show.count == TRUE) {
-        counts_values_abs <- NULL; current_times_abs <- plot_time_abs[show_abs]
-        if (plot_single_unit_flag) { unit_col_idx_for_count <- which(colnames(Y.tr) == unit_to_plot_name); counts_values_abs <- ifelse(!is.na(Y.tr[show_abs, unit_col_idx_for_count, drop = FALSE]), 1, 0) }
-        else { counts_values_abs <- apply(Y.tr[show_abs, , drop=FALSE], 1, function(row) sum(!is.na(row))) }
-        counts_for_plot_df_abs <- data.frame(time = current_times_abs, count = counts_values_abs); counts_for_plot_df_abs <- counts_for_plot_df_abs[counts_for_plot_df_abs$count > 0 & !is.na(counts_for_plot_df_abs$count), ]
+        counts_values_abs <- NULL
+        current_times_abs <- plot_time_abs[show_abs]
+        if (plot_single_unit_flag) {
+          unit_col_idx_for_count <- which(colnames(Y.tr) == unit_to_plot_name)
+          counts_values_abs <- ifelse(!is.na(Y.tr[show_abs, unit_col_idx_for_count, drop = FALSE]), 1, 0)
+        } else {
+          counts_values_abs <- apply(Y.tr[show_abs, , drop = FALSE], 1, function(row) sum(!is.na(row)))
+        }
+        counts_for_plot_df_abs <- data.frame(time = current_times_abs, count = counts_values_abs)
+        counts_for_plot_df_abs <- counts_for_plot_df_abs[counts_for_plot_df_abs$count > 0 & !is.na(counts_for_plot_df_abs$count), ]
         if (nrow(counts_for_plot_df_abs) > 0) {
           max_count_val_abs <- max(counts_for_plot_df_abs$count, na.rm = TRUE)
           if (max_count_val_abs > 0 && !is.na(max_count_val_abs)) {
             current_plot_yrange <- NULL
-            if (!is.null(ylim)) { current_plot_yrange <- ylim } else { if (length(y_data_for_range_calc) == 0 || all(is.na(y_data_for_range_calc))) { gb <- ggplot_build(p); current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range } else { current_plot_yrange <- range(y_data_for_range_calc, na.rm = TRUE) } }
-            count_bar_space_prop <- 0.20; count_bar_space_height_abs <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop; actual_rect_length_abs <- count_bar_space_height_abs * 0.8
+            if (!is.null(ylim)) {
+              current_plot_yrange <- ylim
+            } else {
+              if (length(y_data_for_range_calc) == 0 || all(is.na(y_data_for_range_calc))) {
+                gb <- ggplot_build(p)
+                current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
+              } else {
+                current_plot_yrange <- range(y_data_for_range_calc, na.rm = TRUE)
+              }
+            }
+            count_bar_space_prop <- 0.20
+            count_bar_space_height_abs <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
+            actual_rect_length_abs <- count_bar_space_height_abs * 0.8
             rect_min_val_abs <- if (!is.null(ylim)) ylim[1] else current_plot_yrange[1] - count_bar_space_height_abs
-            counts_for_plot_df_abs$ymin <- rect_min_val_abs; counts_for_plot_df_abs$ymax <- rect_min_val_abs + (counts_for_plot_df_abs$count / max_count_val_abs) * actual_rect_length_abs
-            time_step_for_bars_abs <- if(length(unique(counts_for_plot_df_abs$time)) > 1) min(diff(sort(unique(counts_for_plot_df_abs$time))),na.rm=TRUE) else 1; if(!is.finite(time_step_for_bars_abs) || time_step_for_bars_abs <=0) time_step_for_bars_abs <- 1
-            bar_width_half_abs <- time_step_for_bars_abs * 0.20; counts_for_plot_df_abs$xmin <- counts_for_plot_df_abs$time - bar_width_half_abs; counts_for_plot_df_abs$xmax <- counts_for_plot_df_abs$time + bar_width_half_abs
-            max_count_time_pos_abs <- counts_for_plot_df_abs$time[which.max(counts_for_plot_df_abs$count)[1]]; text_y_pos_abs <- rect_min_val_abs + actual_rect_length_abs + (count_bar_space_height_abs - actual_rect_length_abs) * 0.5
-            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, color = count.outline.color, inherit.aes = FALSE,alpha = count.alpha,linewidth = 0.2) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5)
+            counts_for_plot_df_abs$ymin <- rect_min_val_abs
+            counts_for_plot_df_abs$ymax <- rect_min_val_abs + (counts_for_plot_df_abs$count / max_count_val_abs) * actual_rect_length_abs
+            time_step_for_bars_abs <- if (length(unique(counts_for_plot_df_abs$time)) > 1) min(diff(sort(unique(counts_for_plot_df_abs$time))), na.rm = TRUE) else 1
+            if (!is.finite(time_step_for_bars_abs) || time_step_for_bars_abs <= 0) time_step_for_bars_abs <- 1
+            bar_width_half_abs <- time_step_for_bars_abs * 0.20
+            counts_for_plot_df_abs$xmin <- counts_for_plot_df_abs$time - bar_width_half_abs
+            counts_for_plot_df_abs$xmax <- counts_for_plot_df_abs$time + bar_width_half_abs
+            max_count_time_pos_abs <- counts_for_plot_df_abs$time[which.max(counts_for_plot_df_abs$count)[1]]
+            text_y_pos_abs <- rect_min_val_abs + actual_rect_length_abs + (count_bar_space_height_abs - actual_rect_length_abs) * 0.5
+            p <- p + geom_rect(data = counts_for_plot_df_abs, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, color = count.outline.color, inherit.aes = FALSE, alpha = count.alpha, linewidth = 0.2) + annotate("text", x = max_count_time_pos_abs, y = text_y_pos_abs, label = max_count_val_abs, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5)
           }
         }
       }
       coord_args_abs <- list(clip = "on", expand = TRUE)
-      if (!is.null(ylim)) { coord_args_abs$ylim <- ylim } else if (show.count == TRUE && exists("rect_min_val_abs") && exists("counts_for_plot_df_abs") && nrow(counts_for_plot_df_abs) > 0 && exists("current_plot_yrange") && !is.null(current_plot_yrange)) { final_yrange_min <- min(current_plot_yrange[1], rect_min_val_abs, na.rm=TRUE); final_yrange_max <- current_plot_yrange[2]; coord_args_abs$ylim <- c(final_yrange_min, final_yrange_max) }
+      if (!is.null(ylim)) {
+        coord_args_abs$ylim <- ylim
+      } else if (show.count == TRUE && exists("rect_min_val_abs") && exists("counts_for_plot_df_abs") && nrow(counts_for_plot_df_abs) > 0 && exists("current_plot_yrange") && !is.null(current_plot_yrange)) {
+        final_yrange_min <- min(current_plot_yrange[1], rect_min_val_abs, na.rm = TRUE)
+        final_yrange_max <- current_plot_yrange[2]
+        coord_args_abs$ylim <- c(final_yrange_min, final_yrange_max)
+      }
       # Use the padded plot_xlim for the final axis range
-      if (!is.null(plot_xlim)) { coord_args_abs$xlim <- plot_xlim }
+      if (!is.null(plot_xlim)) {
+        coord_args_abs$xlim <- plot_xlim
+      }
       p <- p + do.call(coord_cartesian, coord_args_abs)
       p <- p + theme(legend.position = legend.pos)
-
     } else { # Case 2: Staggered Adoption (Different T0) -> Relative Time Plot
       xx <- ct.adjust(Y.tr, Y.ct, T0, D_mat, tr_idx_logical)
       event_time_full_series <- xx$timeline
@@ -1644,29 +1790,31 @@ plot.fect <- function(
       if (nT_on_axis > 0) {
         if (is.numeric(time_for_plot_axis) && length(time_for_plot_axis) > 1) {
           pretty_breaks_axis <- pretty(time_for_plot_axis)
-          pretty_breaks_axis <- pretty_breaks_axis[pretty_breaks_axis >= min(time_for_plot_axis, na.rm=TRUE) & pretty_breaks_axis <= max(time_for_plot_axis, na.rm=TRUE)]
+          pretty_breaks_axis <- pretty_breaks_axis[pretty_breaks_axis >= min(time_for_plot_axis, na.rm = TRUE) & pretty_breaks_axis <= max(time_for_plot_axis, na.rm = TRUE)]
           if (length(pretty_breaks_axis) > 0) {
             T_b_axis_ticks_indices <- sapply(pretty_breaks_axis, function(br) which.min(abs(time_for_plot_axis - br)))
             T_b_axis_ticks_indices <- unique(T_b_axis_ticks_indices)
           }
         }
         if (length(T_b_axis_ticks_indices) == 0) {
-          max_labels <- 10; step <- max(1, floor(length(time_for_plot_axis) / max_labels))
+          max_labels <- 10
+          step <- max(1, floor(length(time_for_plot_axis) / max_labels))
           T_b_axis_ticks_indices <- seq(1, length(time_for_plot_axis), by = step)
         }
       }
 
-      y_data_for_range_calc <- c(Yb_data_subset[,1], Yb_data_subset[,2])
+      y_data_for_range_calc <- c(Yb_data_subset[, 1], Yb_data_subset[, 2])
 
       if (raw == "none") {
         if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
           subset.eff.boot <- sapply(seq_len(dim(x$eff.boot)[3]), function(j) {
             rowMeans(align_time_series(
-              x$eff.boot[,which(tr %in% subset.tr),j],
+              x$eff.boot[, which(tr %in% subset.tr), j],
               T0,
-              D_mat, tr_idx_logical)$Y_aug, na.rm = TRUE)
+              D_mat, tr_idx_logical
+            )$Y_aug, na.rm = TRUE)
           })
-          if (plot.ci == "95"){
+          if (plot.ci == "95") {
             para.ci <- basic_ci_alpha(
               rowMeans(subset.eff.boot),
               subset.eff.boot,
@@ -1674,45 +1822,45 @@ plot.fect <- function(
             )
             x$Y.avg <- data.frame(
               period   = xx$timeline,
-              lower.tr = xx$Yb[,"Y.tr.bar"],
-              upper.tr = xx$Yb[,"Y.tr.bar"],
-              lower.ct = xx$Yb[,"Y.ct.bar"] + para.ci[ , "upper"],
-              upper.ct = xx$Yb[,"Y.ct.bar"] + para.ci[ , "lower"]
+              lower.tr = xx$Yb[, "Y.tr.bar"],
+              upper.tr = xx$Yb[, "Y.tr.bar"],
+              lower.ct = xx$Yb[, "Y.ct.bar"] + para.ci[, "upper"],
+              upper.ct = xx$Yb[, "Y.ct.bar"] + para.ci[, "lower"]
             )
-          } else if (plot.ci == "90"){
+          } else if (plot.ci == "90") {
             para.ci <- basic_ci_alpha(
               rowMeans(subset.eff.boot),
               subset.eff.boot,
               alpha = 0.1
             )
             x$Y.avg <- data.frame(
-              period   = xx$timeline,
-              lower90.tr = xx$Yb[,"Y.tr.bar"],
-              upper90.tr = xx$Yb[,"Y.tr.bar"],
-              lower90.ct = xx$Yb[,"Y.ct.bar"] + para.ci[ , "upper"],
-              upper90.ct = xx$Yb[,"Y.ct.bar"] + para.ci[ , "lower"]
+              period = xx$timeline,
+              lower90.tr = xx$Yb[, "Y.tr.bar"],
+              upper90.tr = xx$Yb[, "Y.tr.bar"],
+              lower90.ct = xx$Yb[, "Y.ct.bar"] + para.ci[, "upper"],
+              upper90.ct = xx$Yb[, "Y.ct.bar"] + para.ci[, "lower"]
             )
-          } else{
+          } else {
             warning("Invalid plot.ci provided.")
           }
-        } else if (x$vartype == "parametric" & raw == "none" & is.null(id)){
-          if (plot.ci == "95"){
+        } else if (x$vartype == "parametric" & raw == "none" & is.null(id)) {
+          if (plot.ci == "95") {
             x$Y.avg <- data.frame(
               period   = xx$timeline,
-              lower.tr = xx$Yb[,"Y.tr.bar"],
-              upper.tr = xx$Yb[,"Y.tr.bar"],
-              lower.ct = xx$Yb[,"Y.ct.bar"] - (x$est.att[, "CI.upper"]-x$est.att[,"ATT"]),
-              upper.ct = xx$Yb[,"Y.ct.bar"] - (x$est.att[, "CI.lower"]-x$est.att[,"ATT"])
+              lower.tr = xx$Yb[, "Y.tr.bar"],
+              upper.tr = xx$Yb[, "Y.tr.bar"],
+              lower.ct = xx$Yb[, "Y.ct.bar"] - (x$est.att[, "CI.upper"] - x$est.att[, "ATT"]),
+              upper.ct = xx$Yb[, "Y.ct.bar"] - (x$est.att[, "CI.lower"] - x$est.att[, "ATT"])
             )
-          } else if (plot.ci == "90"){
+          } else if (plot.ci == "90") {
             x$Y.avg <- data.frame(
-              period   = xx$timeline,
-              lower90.tr = xx$Yb[,"Y.tr.bar"],
-              upper90.tr = xx$Yb[,"Y.tr.bar"],
-              lower90.ct = xx$Yb[,"Y.ct.bar"] - (x$est.att90[, "CI.upper"]-x$est.att90[,"ATT"]),
-              upper90.ct = xx$Yb[,"Y.ct.bar"] - (x$est.att90[, "CI.lower"]-x$est.att90[,"ATT"])
+              period = xx$timeline,
+              lower90.tr = xx$Yb[, "Y.tr.bar"],
+              upper90.tr = xx$Yb[, "Y.tr.bar"],
+              lower90.ct = xx$Yb[, "Y.ct.bar"] - (x$est.att90[, "CI.upper"] - x$est.att90[, "ATT"]),
+              upper90.ct = xx$Yb[, "Y.ct.bar"] - (x$est.att90[, "CI.lower"] - x$est.att90[, "ATT"])
             )
-          } else{
+          } else {
             warning("Invalid plot.ci provided.")
           }
         }
@@ -1723,8 +1871,10 @@ plot.fect <- function(
         )
         p <- ggplot()
         if (plot.ci %in% c("90", "95") && !is.null(x$Y.avg)) {
-          tr_lo_col <- if (plot.ci == "95") "lower.tr" else "lower90.tr"; tr_hi_col <- if (plot.ci == "95") "upper.tr" else "upper90.tr"
-          cf_lo_col <- if (plot.ci == "95") "lower.ct" else "lower90.ct"; cf_hi_col <- if (plot.ci == "95") "upper.ct" else "upper90.ct"
+          tr_lo_col <- if (plot.ci == "95") "lower.tr" else "lower90.tr"
+          tr_hi_col <- if (plot.ci == "95") "upper.tr" else "upper90.tr"
+          cf_lo_col <- if (plot.ci == "95") "lower.ct" else "lower90.ct"
+          cf_hi_col <- if (plot.ci == "95") "upper.ct" else "upper90.ct"
           required_cols_ci <- c("period", tr_lo_col, tr_hi_col, cf_lo_col, cf_hi_col)
 
           if (all(required_cols_ci %in% names(x$Y.avg))) {
@@ -1736,15 +1886,23 @@ plot.fect <- function(
             ci_data_filtered <- ci_data_for_plot[ci_data_for_plot$period %in% event_times_for_data_subset, ]
 
             if (!is.null(ci_data_filtered) && nrow(ci_data_filtered) > 0) {
-              p <- p + geom_ribbon(data = ci_data_filtered, aes(x = time_axis_period, ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
-                geom_ribbon(data = ci_data_filtered, aes(x = time_axis_period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
+              p <- p + geom_ribbon(data = ci_data_filtered, aes(x = .data$time_axis_period, ymin = .data[[tr_lo_col]], ymax = .data[[tr_hi_col]], fill = "tr"), alpha = 0.2, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE) +
+                geom_ribbon(data = ci_data_filtered, aes(x = .data$time_axis_period, ymin = .data[[cf_lo_col]], ymax = .data[[cf_hi_col]], fill = "co"), alpha = 0.2, color = if (ci.outline) adjustcolor(counterfactual.color, offset = c(0.3, 0.3, 0.3, 0)) else NA, inherit.aes = FALSE)
               y_data_for_range_calc <- c(y_data_for_range_calc, ci_data_filtered[[tr_lo_col]], ci_data_filtered[[tr_hi_col]], ci_data_filtered[[cf_lo_col]], ci_data_filtered[[cf_hi_col]])
-            } else { warning("No CI data for treated/counterfactual averages.") }
-          } else { warning("CI columns not found for treated/counterfactual averages.") }
+            } else {
+              warning("No CI data for treated/counterfactual averages.")
+            }
+          } else {
+            warning("CI columns not found for treated/counterfactual averages.")
+          }
         }
         p <- p + geom_line(data = data_plot_main, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
-        set.limits <- c("tr", "co"); set.labels <- c("Treated Average", "Estimated Y(0) Average"); set.colors <- c(color, counterfactual.color); set.linetypes <- c("solid", counterfactual.linetype); set.linewidth <- c(est.lwidth, est.lwidth); set.fill <- c(color, counterfactual.color)
-
+        set.limits <- c("tr", "co")
+        set.labels <- c("Treated Average", "Estimated Y(0) Average")
+        set.colors <- c(color, counterfactual.color)
+        set.linetypes <- c("solid", counterfactual.linetype)
+        set.linewidth <- c(est.lwidth, est.lwidth)
+        set.fill <- c(color, counterfactual.color)
       } else if (raw == "band") {
         Ytr_aug_quantiles <- t(apply(Ytr_aug_data_subset, 1, quantile, prob = c(0.05, 0.95), na.rm = TRUE))
         main_lines_data_plot <- data.frame(
@@ -1754,19 +1912,23 @@ plot.fect <- function(
         )
         data_band_plot <- data.frame(
           time = time_for_plot_axis,
-          tr5 = Ytr_aug_quantiles[, 1], tr95 = Ytr_aug_quantiles[, 2], type="tr_band"
+          tr5 = Ytr_aug_quantiles[, 1], tr95 = Ytr_aug_quantiles[, 2], type = "tr_band"
         )
         y_data_for_range_calc <- c(y_data_for_range_calc, data_band_plot$tr5, data_band_plot$tr95)
         p <- ggplot() +
-          geom_ribbon(data = data_band_plot, aes(x = time, ymin = tr5, ymax = tr95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
+          geom_ribbon(data = data_band_plot, aes(x = time, ymin = .data$tr5, ymax = .data$tr95, fill = type), alpha = 0.15, color = if (ci.outline) adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)) else NA) +
           geom_line(data = main_lines_data_plot, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
-        set.limits <- c("tr", "co", "tr_band"); set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated (5-95% Quantiles)"); set.colors <- c(color, counterfactual.color, NA); set.linetypes <- c("solid", counterfactual.linetype, "blank"); set.linewidth <- c(est.lwidth, est.lwidth, 0); set.fill <- c(NA, NA, color)
-
+        set.limits <- c("tr", "co", "tr_band")
+        set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated (5-95% Quantiles)")
+        set.colors <- c(color, counterfactual.color, NA)
+        set.linetypes <- c("solid", counterfactual.linetype, "blank")
+        set.linewidth <- c(est.lwidth, est.lwidth, 0)
+        set.fill <- c(NA, NA, color)
       } else if (raw == "all") {
         raw_tr_data_plot <- NULL
         if (ncol(Ytr_aug_data_subset) > 0 && nrow(Ytr_aug_data_subset) > 0) {
           melt_temp_tr <- reshape2::melt(Ytr_aug_data_subset, varnames = c("event_t_char", "id"), value.name = "o")
-          if(nrow(melt_temp_tr)>0) {
+          if (nrow(melt_temp_tr) > 0) {
             plot_time_for_melted_data <- as.numeric(as.character(melt_temp_tr$event_t_char))
             if (apply_start0_shift) {
               plot_time_for_melted_data <- plot_time_for_melted_data - 1
@@ -1775,29 +1937,39 @@ plot.fect <- function(
               time = plot_time_for_melted_data,
               id = as.character(melt_temp_tr$id),
               outcome = melt_temp_tr$o,
-              type="raw.tr"
+              type = "raw.tr"
             )
           }
         }
-        avg_tr_data_plot <- data.frame(time=time_for_plot_axis, outcome=Yb_data_subset[,1], type="tr", id="tr_avg_line")
-        avg_co_data_plot <- data.frame(time=time_for_plot_axis, outcome=Yb_data_subset[,2], type="co", id="co_avg_line")
-        y_data_for_range_calc <- c(y_data_for_range_calc, if(!is.null(raw_tr_data_plot)) raw_tr_data_plot$outcome else NULL)
+        avg_tr_data_plot <- data.frame(time = time_for_plot_axis, outcome = Yb_data_subset[, 1], type = "tr", id = "tr_avg_line")
+        avg_co_data_plot <- data.frame(time = time_for_plot_axis, outcome = Yb_data_subset[, 2], type = "co", id = "co_avg_line")
+        y_data_for_range_calc <- c(y_data_for_range_calc, if (!is.null(raw_tr_data_plot)) raw_tr_data_plot$outcome else NULL)
         p <- ggplot()
-        if(!is.null(raw_tr_data_plot)) { p <- p + geom_line(data=raw_tr_data_plot, aes(x=time, y=outcome, group=id, colour=type, linetype=type, linewidth=type)) }
-        p <- p + geom_line(data=avg_tr_data_plot, aes(x=time, y=outcome, colour=type, linetype=type, linewidth=type))
-        p <- p + geom_line(data=avg_co_data_plot, aes(x=time, y=outcome, colour=type, linetype=type, linewidth=type))
-        set.limits <- c("tr", "co", "raw.tr"); set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated Raw Data"); set.colors <- c(color, counterfactual.color, counterfactual.raw.treated.color); set.linetypes <- c("solid", counterfactual.linetype, "solid")
-        lw <- c(est.lwidth,est.lwidth/2); set.linewidth <- c(lw[1], lw[1], lw[2])
+        if (!is.null(raw_tr_data_plot)) {
+          p <- p + geom_line(data = raw_tr_data_plot, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type))
+        }
+        p <- p + geom_line(data = avg_tr_data_plot, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
+        p <- p + geom_line(data = avg_co_data_plot, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
+        set.limits <- c("tr", "co", "raw.tr")
+        set.labels <- c("Treated Average", "Estimated Y(0) Average", "Treated Raw Data")
+        set.colors <- c(color, counterfactual.color, counterfactual.raw.treated.color)
+        set.linetypes <- c("solid", counterfactual.linetype, "solid")
+        lw <- c(est.lwidth, est.lwidth / 2)
+        set.linewidth <- c(lw[1], lw[1], lw[2])
       }
 
       p <- p + xlab(xlab_final) + ylab(ylab_final) +
-        geom_vline(xintercept = vline_pos_for_plot_axis, colour = lcolor[2], linewidth = lwidth[2],  linetype = ltype[2]) +
-        theme(legend.position = legend.pos,
-              axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
-              axis.text = element_text(size = cex.axis),
-              axis.title = element_text(size = cex.lab),
-              plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)))
-      if (theme.bw == TRUE) { p <- p + theme_bw() }
+        geom_vline(xintercept = vline_pos_for_plot_axis, colour = lcolor[2], linewidth = lwidth[2], linetype = ltype[2]) +
+        theme(
+          legend.position = legend.pos,
+          axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
+          axis.text = element_text(size = cex.axis),
+          axis.title = element_text(size = cex.lab),
+          plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+        )
+      if (theme.bw == TRUE) {
+        p <- p + theme_bw()
+      }
       p <- p + theme(
         legend.position = legend.pos,
         axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
@@ -1808,13 +1980,13 @@ plot.fect <- function(
       if (shade.post == TRUE) {
         p <- p + annotate("rect", xmin = vline_pos_for_plot_axis, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "grey80", alpha = .3)
       }
-      p <- p + scale_colour_manual(name = NULL, limits = set.limits, values = set.colors, labels = set.labels, na.value = NA, drop=FALSE) +
-        scale_linetype_manual(name = NULL, limits = set.limits, values = set.linetypes, labels = set.labels, na.value = "blank", drop=FALSE) +
-        scale_linewidth_manual(name = NULL, limits = set.limits, values = set.linewidth, labels = set.labels, na.value = 0, drop=FALSE)
+      p <- p + scale_colour_manual(name = NULL, limits = set.limits, values = set.colors, labels = set.labels, na.value = NA, drop = FALSE) +
+        scale_linetype_manual(name = NULL, limits = set.limits, values = set.linetypes, labels = set.labels, na.value = "blank", drop = FALSE) +
+        scale_linewidth_manual(name = NULL, limits = set.limits, values = set.linewidth, labels = set.labels, na.value = 0, drop = FALSE)
 
-      guide_obj_staggered <- guide_legend(title = NULL, ncol = if(length(set.limits) > 2) ceiling(length(set.limits)/2) else length(set.limits))
+      guide_obj_staggered <- guide_legend(title = NULL, ncol = if (length(set.limits) > 2) ceiling(length(set.limits) / 2) else length(set.limits))
       if (exists("set.fill") && !is.null(set.fill) && any(!is.na(set.fill))) {
-        p <- p + scale_fill_manual(name = NULL, limits = set.limits, values = set.fill, labels = set.labels, na.value = NA, drop=FALSE)
+        p <- p + scale_fill_manual(name = NULL, limits = set.limits, values = set.fill, labels = set.labels, na.value = NA, drop = FALSE)
         p <- p + guides(colour = guide_obj_staggered, linetype = guide_obj_staggered, linewidth = guide_obj_staggered, fill = guide_obj_staggered)
       } else {
         p <- p + guides(colour = guide_obj_staggered, linetype = guide_obj_staggered, linewidth = guide_obj_staggered)
@@ -1849,7 +2021,8 @@ plot.fect <- function(
               current_plot_yrange <- ylim
             } else {
               if (length(y_data_for_range_calc) == 0 || all(is.na(y_data_for_range_calc))) {
-                gb <- ggplot_build(p); current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
+                gb <- ggplot_build(p)
+                current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
               } else {
                 current_plot_yrange <- range(y_data_for_range_calc, na.rm = TRUE)
               }
@@ -1862,8 +2035,8 @@ plot.fect <- function(
             counts_for_plot_df$ymin <- rect_min_val
             counts_for_plot_df$ymax <- rect_min_val + (counts_for_plot_df$count / max_count_val) * actual_rect_length
 
-            time_step_for_bars <- if(length(unique(counts_for_plot_df$time)) > 1) min(diff(sort(unique(counts_for_plot_df$time))), na.rm=TRUE) else 1
-            if(!is.finite(time_step_for_bars) || time_step_for_bars <=0) time_step_for_bars <- 1
+            time_step_for_bars <- if (length(unique(counts_for_plot_df$time)) > 1) min(diff(sort(unique(counts_for_plot_df$time))), na.rm = TRUE) else 1
+            if (!is.finite(time_step_for_bars) || time_step_for_bars <= 0) time_step_for_bars <- 1
             bar_width_half <- time_step_for_bars * 0.20
             counts_for_plot_df$xmin <- counts_for_plot_df$time - bar_width_half
             counts_for_plot_df$xmax <- counts_for_plot_df$time + bar_width_half
@@ -1871,7 +2044,7 @@ plot.fect <- function(
             max_count_time_pos <- counts_for_plot_df$time[which.max(counts_for_plot_df$count)[1]]
             text_y_pos <- rect_min_val + actual_rect_length + (count_bar_space_height - actual_rect_length) * 0.5
 
-            p <- p + geom_rect(data = counts_for_plot_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE, alpha = count.alpha, color= count.outline.color, linewidth = 0.2) +
+            p <- p + geom_rect(data = counts_for_plot_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = count.color, inherit.aes = FALSE, alpha = count.alpha, color = count.outline.color, linewidth = 0.2) +
               annotate("text", x = max_count_time_pos, y = text_y_pos, label = max_count_val, size = cex.text * 0.8, hjust = 0.5, vjust = 0.5)
           }
         }
@@ -1881,12 +2054,14 @@ plot.fect <- function(
       if (!is.null(ylim)) {
         coord_args_staggered$ylim <- ylim
       } else if (show.count == TRUE && exists("rect_min_val") && exists("counts_for_plot_df") && nrow(counts_for_plot_df) > 0 && exists("current_plot_yrange") && !is.null(current_plot_yrange)) {
-        final_yrange_min <- min(current_plot_yrange[1], rect_min_val, na.rm=TRUE)
+        final_yrange_min <- min(current_plot_yrange[1], rect_min_val, na.rm = TRUE)
         final_yrange_max <- current_plot_yrange[2]
         coord_args_staggered$ylim <- c(final_yrange_min, final_yrange_max)
       }
       # Use the padded plot_xlim for the final axis range
-      if (!is.null(plot_xlim)) { coord_args_staggered$xlim <- plot_xlim }
+      if (!is.null(plot_xlim)) {
+        coord_args_staggered$xlim <- plot_xlim
+      }
       p <- p + do.call(coord_cartesian, coord_args_staggered)
       p <- p + theme(legend.position = legend.pos)
     }
@@ -1944,22 +2119,21 @@ plot.fect <- function(
 
   ## type of plots
   if (type == "gap" | type == "equiv") {
-    if(loo==TRUE & x$loo==TRUE){
+    if (loo == TRUE & x$loo == TRUE) {
       time.loo <- as.numeric(rownames(x$pre.est.att))
       time.post <- as.numeric(rownames(x$est.att))
-      time.post <- time.post[which(time.post>0)]
-      time <- sort(c(time.loo,time.post))
-      count.num <- c(x$pre.est.att[,'count.on'],x$est.att[which(as.numeric(rownames(x$est.att))>0),'count'])
+      time.post <- time.post[which(time.post > 0)]
+      time <- sort(c(time.loo, time.post))
+      count.num <- c(x$pre.est.att[, "count.on"], x$est.att[which(as.numeric(rownames(x$est.att)) > 0), "count"])
       best.pos <- 1
       max.count <- max(count.num)
-    }else{
+    } else {
       time <- x$time
       count.num <- x$count
       best.pos <- 1
       max.count <- max(count.num)
     }
-  }
-  else if (type == "exit") {
+  } else if (type == "exit") {
     time <- x$time.off
     count.num <- x$count.off
     best.pos <- 0
@@ -1975,7 +2149,7 @@ plot.fect <- function(
   show.time <- 1:time.end
   if (length(xlim) != 0) {
     show.time <- which(time >= xlim[1] & time <= xlim[2])
-    proportion = 0
+    proportion <- 0
   }
   if (type %in% c("gap", "equiv", "exit")) {
     if (is.null(proportion) == TRUE) {
@@ -2238,9 +2412,9 @@ plot.fect <- function(
       if (CI == FALSE) {
         data <- cbind.data.frame(time, ATT = x$att, count = count.num)[show, ]
       } else {
-        tb   <- est.att
+        tb <- est.att
         data <- cbind.data.frame(time, tb)[show, ]
-        colnames(data)[2] <- "ATT"    # rename 2nd column to "ATT"
+        colnames(data)[2] <- "ATT" # rename 2nd column to "ATT"
 
         if (plot.ci %in% c("90", "95")) {
           # Optionally set the names of the CI columns:
@@ -2256,7 +2430,7 @@ plot.fect <- function(
       if (CI == FALSE) {
         data <- cbind.data.frame(time, ATT = x$att.off, count = count.num)[show, ]
       } else {
-        tb   <- est.att.off
+        tb <- est.att.off
         data <- cbind.data.frame(time, tb)[show, ]
 
         # second column is the estimated ATT, rename it
@@ -2344,11 +2518,11 @@ plot.fect <- function(
     # and also in a LOO (Leave-One-Out) context.
 
     # For standard (non-LOO like) calls
-    cached_test_out_f <- NULL    # Results when f.threshold is primary
+    cached_test_out_f <- NULL # Results when f.threshold is primary
     cached_test_out_tost <- NULL # Results when tost.threshold is primary
 
     # For LOO calls
-    cached_loo_test_out_f <- NULL    # LOO results when f.threshold is primary
+    cached_loo_test_out_f <- NULL # LOO results when f.threshold is primary
     cached_loo_test_out_tost <- NULL # LOO results when tost.threshold is primary
 
     # Determine the effective LOO setting for the current context
@@ -2364,16 +2538,17 @@ plot.fect <- function(
       # --- Path 1: Non-LOO calculations or types other than 'equiv'/'gap' LOO ---
       if (!is_current_scenario_loo) {
         original_x_loo_state <- x$loo # Preserve original x$loo
-        x$loo <- FALSE                # Ensure diagtest runs in non-LOO mode
+        x$loo <- FALSE # Ensure diagtest runs in non-LOO mode
 
         # Category 1.1: F-statistics (F.p, F.stat, F.equiv.p)
         if (stat_name_from_user %in% c("F.p", "F.stat")) {
           # Recalculate if basic parameters changed or if not cached
           if (change.proportion || change.pre.periods || !is.null(show.group) || use.balance || is.null(cached_test_out_f)) {
             cached_test_out_f <- diagtest(x,
-                                          proportion = proportion,
-                                          pre.periods = pre.periods,
-                                          f.threshold = f.threshold)
+              proportion = proportion,
+              pre.periods = pre.periods,
+              f.threshold = f.threshold
+            )
           }
           if (stat_name_from_user == "F.p") value_to_store <- cached_test_out_f$f.p
           if (stat_name_from_user == "F.stat") value_to_store <- cached_test_out_f$f.stat
@@ -2381,9 +2556,10 @@ plot.fect <- function(
           # Recalculate also if f.threshold changed
           if (change.f.threshold || change.proportion || change.pre.periods || !is.null(show.group) || use.balance || is.null(cached_test_out_f)) {
             cached_test_out_f <- diagtest(x,
-                                          proportion = proportion,
-                                          pre.periods = pre.periods,
-                                          f.threshold = f.threshold)
+              proportion = proportion,
+              pre.periods = pre.periods,
+              f.threshold = f.threshold
+            )
           }
           value_to_store <- cached_test_out_f$f.equiv.p
         }
@@ -2425,7 +2601,7 @@ plot.fect <- function(
       # --- Path 2: LOO calculations (only for type 'equiv' or 'gap') ---
       else { # This means is_current_scenario_loo is TRUE
         original_x_loo_state <- x$loo # Preserve original x$loo
-        x$loo <- TRUE                 # Ensure diagtest runs in LOO mode
+        x$loo <- TRUE # Ensure diagtest runs in LOO mode
 
         # Category 2.1: LOO F-statistics
         if (stat_name_from_user %in% c("F.p", "F.stat")) {
@@ -2434,9 +2610,10 @@ plot.fect <- function(
           # This version consistently uses a LOO-mode diagtest call.
           if (change.proportion || change.pre.periods || !is.null(show.group) || is.null(cached_loo_test_out_f)) {
             cached_loo_test_out_f <- diagtest(x,
-                                              proportion = proportion,
-                                              pre.periods = pre.periods,
-                                              f.threshold = f.threshold)
+              proportion = proportion,
+              pre.periods = pre.periods,
+              f.threshold = f.threshold
+            )
           }
           # Assuming diagtest output fields (f.p, f.stat) are the LOO versions when x$loo = TRUE
           if (stat_name_from_user == "F.p") value_to_store <- cached_loo_test_out_f$f.p
@@ -2444,9 +2621,10 @@ plot.fect <- function(
         } else if (stat_name_from_user == "F.equiv.p") { # LOO F-equivalence p-value
           if (change.f.threshold || change.proportion || change.pre.periods || !is.null(show.group) || is.null(cached_loo_test_out_f)) {
             cached_loo_test_out_f <- diagtest(x,
-                                              proportion = proportion,
-                                              pre.periods = pre.periods,
-                                              f.threshold = f.threshold)
+              proportion = proportion,
+              pre.periods = pre.periods,
+              f.threshold = f.threshold
+            )
           }
           # Assuming diagtest output field f.equiv.p is the LOO version when x$loo = TRUE
           value_to_store <- cached_loo_test_out_f$f.equiv.p
@@ -2456,9 +2634,10 @@ plot.fect <- function(
         else if (stat_name_from_user == "equiv.p") {
           if (change.tost.threshold || change.proportion || change.pre.periods || !is.null(show.group) || is.null(cached_loo_test_out_tost)) {
             cached_loo_test_out_tost <- diagtest(x,
-                                                 proportion = proportion,
-                                                 pre.periods = pre.periods,
-                                                 tost.threshold = tost.threshold)
+              proportion = proportion,
+              pre.periods = pre.periods,
+              tost.threshold = tost.threshold
+            )
           }
           # Assuming diagtest output field tost.equiv.p is the LOO version when x$loo = TRUE
           value_to_store <- cached_loo_test_out_tost$tost.equiv.p
@@ -2478,212 +2657,223 @@ plot.fect <- function(
     p.label <- if (length(p.label.lines) > 0) paste(p.label.lines, collapse = "\n") else NULL
 
     if (type == "equiv" && is.null(ylim)) {
-      ylim = c(-max(abs(data2$bound))*1.4,max(abs(data2$bound))*1.4)
+      ylim <- c(-max(abs(data2$bound)) * 1.4, max(abs(data2$bound)) * 1.4)
     }
     ## point estimates
     if (classic == 1) {
-
       #
       # --- REGULAR EVENT-STUDY PLOT (no highlights) ---
       #
 
       # 1) Build a data frame that esplot() expects
       data_es <- data.frame(
-        Period     = data$time,
-        ATT        = data$ATT,
-        `S.E.`     = if (CI) data$S.E. else NA, # if you have standard errors
-        CI.lower   = if (CI) {
+        Period = data$time,
+        ATT = data$ATT,
+        `S.E.` = if (CI) data$S.E. else NA, # if you have standard errors
+        CI.lower = if (CI) {
           if (plot.ci == "95") data$CI.lower else data$CI.lower.90
-        } else NA,
-        CI.upper   = if (CI) {
+        } else {
+          NA
+        },
+        CI.upper = if (CI) {
           if (plot.ci == "95") data$CI.upper else data$CI.upper.90
-        } else NA,
-        count      = if (!is.null(data$count)) data$count else NA
+        } else {
+          NA
+        },
+        count = if (!is.null(data$count)) data$count else NA
       )
       # 2) Call esplot()
       p <- esplot(
         data_es,
-        Period       = "Period",
-        Estimate     = "ATT",
-        SE           = "S.E.",
-        CI.lower     = "CI.lower",
-        CI.upper     = "CI.upper",
-        Count        = "count",
-        show.count   = show.count,
+        Period = "Period",
+        Estimate = "ATT",
+        SE = "S.E.",
+        CI.lower = "CI.lower",
+        CI.upper = "CI.upper",
+        Count = "count",
+        show.count = show.count,
         show.points = show.points,
         ci.outline = ci.outline,
-        connected    = connected,
-        color        = color,
-        count.color  = count.color,
+        connected = connected,
+        color = color,
+        count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
-        xlab         = xlab,
-        ylab         = ylab,
-        main         = main,
-        xlim         = xlim,
-        ylim         = ylim,
-        gridOff      = gridOff,
-        start0       = start0,
-        cex.main = cex.main/16,
-        cex.axis = cex.axis/15,
-        cex.lab = cex.lab/15,
-        cex.text = cex.text/5,
+        xlab = xlab,
+        ylab = ylab,
+        main = main,
+        xlim = xlim,
+        ylim = ylim,
+        gridOff = gridOff,
+        start0 = start0,
+        cex.main = cex.main / 16,
+        cex.axis = cex.axis / 15,
+        cex.lab = cex.lab / 15,
+        cex.text = cex.text / 5,
         proportion = proportion,
         est.lwidth = est.lwidth,
-        est.pointsize  = est.pointsize,
+        est.pointsize = est.pointsize,
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
         ltype = ltype,
         axis.adjust = axis.adjust,
-        stats        = if(exists("stats_values")) stats_values else NULL,
-        stats.labs   = if(exists("stats_labels")) stats_labels else NULL,
-        stats.pos    = stats.pos,
+        stats = if (exists("stats_values")) stats_values else NULL,
+        stats.labs = if (exists("stats_labels")) stats_labels else NULL,
+        stats.pos = stats.pos,
         theme.bw = theme.bw,
-        only.pre = type == "equiv")
-
+        only.pre = type == "equiv"
+      )
     } else if (classic == 0 && switch.on == TRUE) {
-
       #
       # --- PLACEBO TEST PLOT ---
       #
 
       data_es <- data.frame(
-        Period     = data$time,
-        ATT        = data$ATT,
-        `S.E.`     = if (CI) data$S.E. else NA,
-        CI.lower   = if (CI) {
+        Period = data$time,
+        ATT = data$ATT,
+        `S.E.` = if (CI) data$S.E. else NA,
+        CI.lower = if (CI) {
           if (plot.ci == "95") data$CI.lower else data$CI.lower.90
-        } else NA,
-        CI.upper   = if (CI) {
+        } else {
+          NA
+        },
+        CI.upper = if (CI) {
           if (plot.ci == "95") data$CI.upper else data$CI.upper.90
-        } else NA,
-        count      = if (!is.null(data$count)) data$count else NA
+        } else {
+          NA
+        },
+        count = if (!is.null(data$count)) data$count else NA
       )
 
       # highlight the placebo interval [placebo.period[1], placebo.period[2]]
       placebo_seq <- seq(placebo.period[1], placebo.period[2])
-      n_placebo   <- length(placebo_seq)
+      n_placebo <- length(placebo_seq)
       p <- esplot(
         data_es,
-        Period       = "Period",
-        Estimate     = "ATT",
-        SE           = "S.E.",
-        CI.lower     = "CI.lower",
-        CI.upper     = "CI.upper",
-        Count        = "count",
-        show.count   = show.count,
-        connected    = connected,
-        color        = color,
-        count.color  = count.color,
+        Period = "Period",
+        Estimate = "ATT",
+        SE = "S.E.",
+        CI.lower = "CI.lower",
+        CI.upper = "CI.upper",
+        Count = "count",
+        show.count = show.count,
+        connected = connected,
+        color = color,
+        count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
         show.points = show.points,
         ci.outline = ci.outline,
         highlight.periods = placebo_seq,
-        highlight.colors  = rep(placebo.color, n_placebo),
-        xlab         = xlab,
-        ylab         = ylab,
-        main         = main,
-        xlim         = xlim,
-        ylim         = ylim,
-        gridOff      = gridOff,
-        start0       = start0,
+        highlight.colors = rep(placebo.color, n_placebo),
+        xlab = xlab,
+        ylab = ylab,
+        main = main,
+        xlim = xlim,
+        ylim = ylim,
+        gridOff = gridOff,
+        start0 = start0,
         proportion = proportion,
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
         ltype = ltype,
-        cex.main = cex.main/16,
-        cex.axis = cex.axis/15,
-        cex.lab = cex.lab/15,
-        cex.text = cex.text/5,
+        cex.main = cex.main / 16,
+        cex.axis = cex.axis / 15,
+        cex.lab = cex.lab / 15,
+        cex.text = cex.text / 5,
         axis.adjust = axis.adjust,
         est.lwidth = est.lwidth,
-        est.pointsize  = est.pointsize,
-        stats        = if(exists("stats_values")) stats_values else NULL,
-        stats.labs   = if(exists("stats_labels")) stats_labels else NULL,
+        est.pointsize = est.pointsize,
+        stats = if (exists("stats_values")) stats_values else NULL,
+        stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         theme.bw = theme.bw,
-        stats.pos    = stats.pos)
-
+        stats.pos = stats.pos
+      )
     } else if (classic == 0 && switch.on == FALSE) {
       #
       # --- CARRYOVER TEST OR EXITING TREATMENT ---
       #
       if (is.null(x$est.carry.att)) {
         placebo_seq <- c()
-        n_placebo   <- 0
-        shift  = 0
-      } else{
-        placebo_seq <- seq(carryover.period[1], carryover.period[1]-1+dim(x$est.carry.att)[1])
-        n_placebo   <- length(placebo_seq)
-        shift = dim(x$est.carry.att)[1]
+        n_placebo <- 0
+        shift <- 0
+      } else {
+        placebo_seq <- seq(carryover.period[1], carryover.period[1] - 1 + dim(x$est.carry.att)[1])
+        n_placebo <- length(placebo_seq)
+        shift <- dim(x$est.carry.att)[1]
       }
 
       data_es <- data.frame(
-        Period     = data$time + shift,
-        ATT        = data$ATT,
-        `S.E.`     = if (CI) data$S.E. else NA,
-        CI.lower   = if (CI) {
+        Period = data$time + shift,
+        ATT = data$ATT,
+        `S.E.` = if (CI) data$S.E. else NA,
+        CI.lower = if (CI) {
           if (plot.ci == "95") data$CI.lower else data$CI.lower.90
-        } else NA,
-        CI.upper   = if (CI) {
+        } else {
+          NA
+        },
+        CI.upper = if (CI) {
           if (plot.ci == "95") data$CI.upper else data$CI.upper.90
-        } else NA,
-        count      = if (!is.null(data$count)) data$count else NA
+        } else {
+          NA
+        },
+        count = if (!is.null(data$count)) data$count else NA
       )
 
 
       carry_seq <- seq(carryover.period[1] + shift, carryover.period[2] + shift)
-      n_carry   <- length(carry_seq)
+      n_carry <- length(carry_seq)
 
       p <- esplot(
         data_es,
-        Period       = "Period",
-        Estimate     = "ATT",
-        SE           = "S.E.",
-        CI.lower     = "CI.lower",
-        CI.upper     = "CI.upper",
-        Count        = "count",
-        show.count   = show.count,
+        Period = "Period",
+        Estimate = "ATT",
+        SE = "S.E.",
+        CI.lower = "CI.lower",
+        CI.upper = "CI.upper",
+        Count = "count",
+        show.count = show.count,
         show.points = show.points,
         ci.outline = ci.outline,
-        connected    = connected,
-        color        = color,
-        count.color  = count.color,
+        connected = connected,
+        color = color,
+        count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
-        highlight.periods = c(placebo_seq,carry_seq),
-        highlight.colors  = c(rep(carryover.rm.color, n_placebo),rep(carryover.color, n_carry)),
-        xlab         = xlab,
-        ylab         = ylab,
-        main         = main,
-        xlim         = xlim,
-        ylim         = ylim,
-        gridOff      = gridOff,
+        highlight.periods = c(placebo_seq, carry_seq),
+        highlight.colors = c(rep(carryover.rm.color, n_placebo), rep(carryover.color, n_carry)),
+        xlab = xlab,
+        ylab = ylab,
+        main = main,
+        xlim = xlim,
+        ylim = ylim,
+        gridOff = gridOff,
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
         ltype = ltype,
-        cex.main = cex.main/16,
-        cex.axis = cex.axis/15,
-        cex.lab = cex.lab/15,
-        cex.text = cex.text/5,
+        cex.main = cex.main / 16,
+        cex.axis = cex.axis / 15,
+        cex.lab = cex.lab / 15,
+        cex.text = cex.text / 5,
         axis.adjust = axis.adjust,
-        start0       = start0,
+        start0 = start0,
         proportion = proportion,
         ## newly added options:
         est.lwidth = est.lwidth,
-        est.pointsize  = est.pointsize,
-        stats        = if(exists("stats_values")) stats_values else NULL,
-        stats.labs   = if(exists("stats_labels")) stats_labels else NULL,
+        est.pointsize = est.pointsize,
+        stats = if (exists("stats_values")) stats_values else NULL,
+        stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         theme.bw = theme.bw,
-        stats.pos    = stats.pos)
+        stats.pos = stats.pos
+      )
     }
 
     # plot bound
-    if (bound.old != "none")  { ## with bounds
-      p <- p + geom_line(data= data2,aes(time, bound, colour = type, linetype = type, size = type, group = id))
+    if (bound.old != "none") { ## with bounds
+      p <- p + geom_line(data = data2, aes(time, bound, colour = type, linetype = type, size = type, group = id))
       ## legends for bounds
       if (is.null(legend.nrow) == TRUE) {
         legend.nrow <- ifelse(length(set.limits) <= 3, 1, 2)
@@ -2697,9 +2887,7 @@ plot.fect <- function(
         )
 
       p <- p + theme(legend.position = "bottom")
-
     }
-
   }
 
   if (type == "calendar") {
@@ -2710,8 +2898,8 @@ plot.fect <- function(
       CI <- TRUE
     }
     if (!is.null(provided_xlim)) {
-      x$est.eff.calendar <- x$est.eff.calendar[which(rownames(x$est.eff.calendar)  >= min(provided_xlim) & rownames(x$est.eff.calendar)  <= max(provided_xlim)), ]
-      x$est.eff.calendar.fit <- x$est.eff.calendar.fit[which(rownames(x$est.eff.calendar.fit)  >= min(provided_xlim) & rownames(x$est.eff.calendar.fit)  <= max(provided_xlim)), ]
+      x$est.eff.calendar <- x$est.eff.calendar[which(rownames(x$est.eff.calendar) >= min(provided_xlim) & rownames(x$est.eff.calendar) <= max(provided_xlim)), ]
+      x$est.eff.calendar.fit <- x$est.eff.calendar.fit[which(rownames(x$est.eff.calendar.fit) >= min(provided_xlim) & rownames(x$est.eff.calendar.fit) <= max(provided_xlim)), ]
     }
     if (plot.ci == "none") {
       CI <- FALSE
@@ -2796,12 +2984,12 @@ plot.fect <- function(
 
     if (CI == FALSE) {
       p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, size = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
       p <- p + geom_point(aes(x = TTT, y = d1[, 1]), color = "gray50", fill = "gray50", alpha = 1, size = 1.2)
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
     } else {
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
-      p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.color, fill = calendar.color, alpha = 0.5, size = 0)
+      p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, size = 0)
       p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, size = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
       p <- p + geom_pointrange(aes(x = TTT, y = d1[, 1], ymin = d1[, 3], ymax = d1[, 4]), color = "gray50", fill = "gray50", alpha = 1, size = 0.6)
     }
 
@@ -2824,11 +3012,11 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- mean(TTT[which.max(d1[, "count"])])
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color,linewidth =0.2)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2)
       p <- p + annotate("text",
-                        x = max.count.pos - 0.02 * T.gap,
-                        y = max(data.toplot$ymax) + 0.2 * rect.length,
-                        label = max(x$N.calendar), size = cex.text * 0.8, hjust = 0.5
+        x = max.count.pos - 0.02 * T.gap,
+        y = max(data.toplot$ymax) + 0.2 * rect.length,
+        label = max(x$N.calendar), size = cex.text * 0.8, hjust = 0.5
       )
     }
 
@@ -2882,6 +3070,251 @@ plot.fect <- function(
     )
   }
 
+  if (type == "heterogeneous") {
+    Xs <- x[names(x) == "X"][[2]]
+
+    if ((is.null(covariate) == TRUE) && ((dim(Xs) > 2) && (dim(Xs)[3] > 1))) {
+      stop("Please provide a covariate to plot heterogeneous effects.\n")
+    }
+
+    if ((is.null(covariate) == FALSE) && (!covariate %in% x$X)) {
+      stop("Please provide a valid covariate to plot heterogeneous effects.\n")
+    }
+
+    if (is.null(xlab) == TRUE) {
+      xlab <- covariate
+    } else if (xlab == "") {
+      xlab <- NULL
+    }
+
+    if (is.null(ylab) == TRUE) {
+      ylab <- ytitle
+    } else if (ylab == "") {
+      ylab <- NULL
+    }
+
+    D.missing <- x$D.dat
+    D.missing[which(D == 0)] <- NA
+    D.missing.vec <- as.vector(D.missing)
+
+    eff.vec <- as.vector(x$eff)
+    X.vec <- as.vector(x[names(x) == "X"][2]$X[, , which(x$X == covariate)])
+
+    eff.vec <- eff.vec[which(!is.na(D.missing.vec))]
+    X.vec <- X.vec[which(!is.na(D.missing.vec))]
+
+    j <- order(X.vec)
+    eff.vec <- eff.vec[j]
+    X.vec <- X.vec[j]
+    
+    if (length(unique(X.vec)) <= 4) {
+      p <- ggplot()
+      ## xlab and ylab
+      p <- p + xlab(xlab) + ylab(ylab)
+
+      ## theme
+      if (theme.bw == TRUE) {
+        p <- p + theme_bw()
+      }
+
+      ## grid
+      if (gridOff == TRUE) {
+        p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+      }
+
+      ## title
+      if (is.null(main) == TRUE) {
+        p <- p + ggtitle(maintext)
+      } else if (main != "") {
+        p <- p + ggtitle(main)
+      }
+
+      ## Build discrete stats at evenly spaced factor positions
+      x_levels_sorted <- sort(unique(X.vec))
+      x_factor <- factor(X.vec, levels = x_levels_sorted, ordered = TRUE)
+      # stats per level
+      level_means <- tapply(eff.vec, x_factor, function(v) mean(v, na.rm = TRUE))
+      level_ns    <- tapply(eff.vec, x_factor, function(v) sum(!is.na(v)))
+      level_sds   <- tapply(eff.vec, x_factor, function(v) sd(v, na.rm = TRUE))
+      level_se    <- level_sds / sqrt(pmax(level_ns, 1))
+      level_qt    <- stats::qt(0.975, pmax(level_ns - 1, 1))
+      level_ci    <- level_qt * level_se
+      level_lower <- as.numeric(level_means) - level_ci
+      level_upper <- as.numeric(level_means) + level_ci
+      data_disc <- cbind.data.frame(
+        x = factor(names(level_means), levels = names(level_means), ordered = TRUE),
+        mean = as.numeric(level_means),
+        lower = level_lower,
+        upper = level_upper,
+        count = as.numeric(level_ns)
+      )
+
+      ## core geoms (even spacing because x is factor)
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
+      # nicer CI + mean: thick error bars + solid point
+      p <- p + geom_linerange(
+        aes(x = x, ymin = .data$lower, ymax = .data$upper),
+        data = data_disc, color = heterogeneous.color, linewidth = 0.9
+      )
+      p <- p + geom_point(
+        aes(x = x, y = mean), data = data_disc,
+        shape = 21, fill = "white", color = heterogeneous.color, stroke = 1, size = 2.6
+      )
+
+      ## bottom rectangles for counts under each discrete level (stick to very bottom)
+      if (show.count == TRUE && any(!is.na(data_disc$count))) {
+        # obtain current plot y-range from built plot if ylim not set
+        current_plot_yrange <- NULL
+        if (!is.null(ylim)) {
+          current_plot_yrange <- ylim
+        } else {
+          gb <- ggplot_build(p)
+          current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
+        }
+        count_bar_space_prop <- 0.20
+        count_bar_space_height <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
+        actual_rect_length <- count_bar_space_height * 0.8
+        rect_min_val <- if (!is.null(ylim)) ylim[1] else current_plot_yrange[1] - count_bar_space_height
+
+        # Even spacing: rectangles centered on factor positions with fixed half-width
+        x_idx <- as.numeric(data_disc$x)
+        bar_half <- 0.1
+        counts <- data_disc$count
+        ymax_scaled <- rect_min_val + actual_rect_length * counts / max(counts, na.rm = TRUE)
+        data_counts <- cbind.data.frame(
+          xmin = x_idx - bar_half,
+          xmax = x_idx + bar_half,
+          ymin = rep(rect_min_val, length(counts)),
+          ymax = ymax_scaled,
+          xcenter = x_idx,
+          count = counts
+        )
+        p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+          data = data_counts, fill = count.color, color = count.outline.color, alpha = count.alpha, linewidth = 0.2
+        )
+        p <- p + geom_text(aes(x = .data$xcenter, y = .data$ymax + 0.12 * count_bar_space_height, label = .data$count),
+                           data = data_counts, size = cex.text * 0.85, hjust = 0.5, vjust = 0.5, color = "#444444")
+        if (!is.null(covariate.labels)) {
+          p <- p + scale_x_discrete(labels = covariate.labels)
+        } else {
+          p <- p + scale_x_discrete(labels = as.character(x_levels_sorted))
+        }
+      }
+
+      if (is.null(ylim) == FALSE) {
+        p <- p + coord_cartesian(ylim = ylim)
+      }
+
+      if (is.null(xlim) == FALSE) {
+        p <- p + coord_cartesian(xlim = xlim)
+      }
+
+    } else {
+      plx <- predict(loess(eff.vec ~ X.vec), se = T)
+      se <- stats::qt(0.975, plx$df) * plx$se
+      y_hat <- plx$fit
+      y_hat_lower <- y_hat - se
+      y_hat_upper <- y_hat + se
+
+      p <- ggplot()
+      ## xlab and ylab
+      p <- p + xlab(xlab) + ylab(ylab)
+
+      ## theme
+      if (theme.bw == TRUE) {
+        p <- p + theme_bw()
+      }
+
+      ## grid
+      if (gridOff == TRUE) {
+        p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+      }
+
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+      p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, size = 0)
+      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, size = 1.1)
+
+      ## title
+      if (is.null(main) == TRUE) {
+        p <- p + ggtitle(maintext)
+      } else if (main != "") {
+        p <- p + ggtitle(main)
+      }
+
+      ## ylim
+      if (is.null(ylim) == FALSE) {
+        p <- p + coord_cartesian(ylim = ylim)
+      }
+
+      if (is.null(xlim) == FALSE) {
+        p <- p + coord_cartesian(xlim = xlim)
+      }
+
+      if (show.count == TRUE) {
+        current_plot_yrange <- NULL
+        if (!is.null(ylim)) {
+          current_plot_yrange <- ylim
+        } else {
+          gb <- ggplot_build(p)
+          current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
+        }
+        count_bar_space_prop <- 0.20
+        count_bar_space_height <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
+        actual_rect_length <- count_bar_space_height * 0.8
+        rect_min_val <- if (!is.null(ylim)) ylim[1] else current_plot_yrange[1] - count_bar_space_height
+
+        X.vec.for.hist <- X.vec
+        if (!is.null(xlim)) {
+          X.vec.for.hist <- X.vec.for.hist[which(X.vec.for.hist >= min(xlim) & X.vec.for.hist <= max(xlim))]
+        }
+        if (length(na.omit(X.vec.for.hist)) > 0) {
+          breaks <- pretty(range(X.vec.for.hist, na.rm = TRUE), n = 50)
+          h <- hist(X.vec.for.hist, breaks = breaks, plot = FALSE)
+          bin_xmin <- h$breaks[-length(h$breaks)]
+          bin_xmax <- h$breaks[-1]
+          counts <- h$counts
+          ymax_scaled <- rect_min_val + actual_rect_length * counts / max(counts, na.rm = TRUE)
+          data.toplot <- cbind.data.frame(
+            xmin = bin_xmin,
+            xmax = bin_xmax,
+            ymin = rep(rect_min_val, length(counts)),
+            ymax = ymax_scaled
+          )
+          max_idx <- which.max(counts)
+          max_count_pos <- (bin_xmin[max_idx] + bin_xmax[max_idx]) / 2
+          p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+            data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+          )
+          p <- p + annotate("text",
+            x = max_count_pos,
+            y = max(data.toplot$ymax) + 0.12 * count_bar_space_height,
+            label = max(counts, na.rm = TRUE), size = cex.text * 0.8, hjust = 0.5
+          )
+          if (is.null(ylim)) {
+            final_yrange_min <- min(current_plot_yrange[1], rect_min_val)
+            final_yrange_max <- current_plot_yrange[2]
+            p <- p + coord_cartesian(ylim = c(final_yrange_min, final_yrange_max))
+          }
+        }
+      }
+    }
+ 
+    p <- p + theme(
+      legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
+      legend.position = legend.pos,
+      legend.background = element_rect(fill = "transparent", colour = NA),
+      axis.title = element_text(size = cex.lab),
+      axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0)),
+      axis.title.y = element_text(margin = margin(t = 0, r = 0, b = 0, l = 0)),
+      axis.text = element_text(color = "black", size = cex.axis),
+      axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
+      axis.text.y = element_text(size = cex.axis),
+      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+    )
+  }
+
   if (type == "box") {
     if (is.null(xlab) == TRUE) {
       xlab <- index[2]
@@ -2919,7 +3352,7 @@ plot.fect <- function(
     }
 
     # horizontal 0 line
-    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1],  linetype = ltype[1])
+    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
 
     complete.index.eff <- which(!is.na(x$eff))
     complete.index.time <- which(!is.na(x$T.on))
@@ -2976,25 +3409,25 @@ plot.fect <- function(
     data.post.1$time <- factor(data.post.1$time, levels = levels)
     data.post.2$time <- factor(data.post.2$time, levels = levels)
 
-    p <- p + geom_boxplot(aes(x = time, y = eff),
-                          position = "dodge", alpha = 0.5,
-                          data = data.pre.1, fill =box.control,
-                          outlier.fill = box.control, outlier.size = 1.25,
-                          outlier.color = box.control,
+    p <- p + geom_boxplot(aes(x = .data$time, y = .data$eff),
+      position = "dodge", alpha = 0.5,
+      data = data.pre.1, fill = box.control,
+      outlier.fill = box.control, outlier.size = 1.25,
+      outlier.color = box.control,
     )
-    p <- p + geom_boxplot(aes(x = time, y = eff),
-                          position = "dodge", alpha = 0.5,
-                          data = data.post.1, fill = box.treat, outlier.fill =box.treat,
-                          outlier.size = 1.25, outlier.color = box.treat,
+    p <- p + geom_boxplot(aes(x = .data$time, y = .data$eff),
+      position = "dodge", alpha = 0.5,
+      data = data.post.1, fill = box.treat, outlier.fill = box.treat,
+      outlier.size = 1.25, outlier.color = box.treat,
     )
 
-    p <- p + geom_point(aes(x = time, y = eff),
-                        data = data.post.2,
-                        color = box.treat, size = 1.25, alpha = 0.8
+    p <- p + geom_point(aes(x = .data$time, y = .data$eff),
+      data = data.post.2,
+      color = box.treat, size = 1.25, alpha = 0.8
     )
-    p <- p + geom_point(aes(x = time, y = eff),
-                        data = data.pre.2,
-                        color = box.control, size = 1.25, alpha = 0.8
+    p <- p + geom_point(aes(x = .data$time, y = .data$eff),
+      data = data.pre.2,
+      color = box.control, size = 1.25, alpha = 0.8
     )
 
     if (show.count == TRUE & !(type == "gap" | type == "equiv")) {
@@ -3016,11 +3449,11 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- data.count[which.max(data.count[, 2]), 1][1] - min(data.count[, 1]) + 1
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3 , alpha = count.alpha, color = count.outline.color, linewidth =0.2)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2)
       p <- p + annotate("text",
-                        x = max.count.pos - 0.02 * T.gap,
-                        y = max(data.toplot$ymax) + 0.1 * rect.length,
-                        label = max(data.count[, 2]), size = cex.text * 0.7, hjust = 0.5
+        x = max.count.pos - 0.02 * T.gap,
+        y = max(data.toplot$ymax) + 0.1 * rect.length,
+        label = max(data.count[, 2]), size = cex.text * 0.7, hjust = 0.5
       )
     }
 
@@ -3212,7 +3645,7 @@ plot.fect <- function(
         axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
         axis.text.y = element_text(size = cex.axis),
         plot.background = element_rect(fill = status.background.color),
-        legend.background = element_rect(fill =status.background.color),
+        legend.background = element_rect(fill = status.background.color),
         legend.position = legend.pos,
         legend.margin = margin(c(0, 5, 5, 0)),
         legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
@@ -3255,8 +3688,7 @@ plot.fect <- function(
     if (length(all) >= 3) {
       p <- p + guides(fill = guide_legend(nrow = 2, byrow = TRUE))
     }
-  }
-  else if (type == "sens") {
+  } else if (type == "sens") {
     # Determine plot-specific variables based on the 'restrict' option
     sens_data_obj <- NULL
     x_var_name <- NULL
@@ -3280,7 +3712,7 @@ plot.fect <- function(
 
     # Prepare data for plotting
     data_original <- sens_data_obj$original
-    data_results  <- sens_data_obj$results
+    data_results <- sens_data_obj$results
 
     # Assign a default x-axis position for the original estimate to plot it left of zero
     if (!(x_var_name %in% colnames(data_original))) {
@@ -3297,7 +3729,7 @@ plot.fect <- function(
 
     # Assign color groups and combine into a single data frame
     data_original$color_group <- "Original"
-    data_results$color_group  <- "Robust Confidence Set"
+    data_results$color_group <- "Robust Confidence Set"
     data_combined <- rbind(data_original, data_results)
 
     # --- Handle Plot Labels and Title ---
@@ -3322,8 +3754,8 @@ plot.fect <- function(
 
     p <- p + geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
       geom_errorbar(
-        aes(ymin = lb, ymax = ub, color = color_group),
-        width = 0.02,  # Width of error bar caps
+        aes(ymin = .data$lb, ymax = .data$ub, color = .data$color_group),
+        width = 0.02, # Width of error bar caps
         linewidth = 1
       ) +
       scale_color_manual(values = c("Original" = sens.original.color, "Robust Confidence Set" = sens.colors[1])) +
@@ -3353,11 +3785,8 @@ plot.fect <- function(
         face = "bold",
       )
     )
-  }
-
-  else if (type == "sens_es") {
+  } else if (type == "sens_es") {
     if (restrict == "rm") {
-
       if (is.null(x$sensitivity.rm) || is.null(x$sensitivity.rm$periods)) {
         stop("No period-by-period Smoothness data found in x$sensitivity.rm$periods.")
       }
@@ -3375,54 +3804,57 @@ plot.fect <- function(
       fect.output.p <- as.data.frame(x$est.att)
       fect.output.p$Time <- as.numeric(rownames(fect.output.p))
       if (is.null(ylim)) {
-        ylim <- c(min(c(fect.output.p$CI.lower, dte_output$lb)) * 1.3,
-                  max(c(fect.output.p$CI.upper, dte_output$ub)) * 1.3)
+        ylim <- c(
+          min(c(fect.output.p$CI.lower, dte_output$lb)) * 1.3,
+          max(c(fect.output.p$CI.upper, dte_output$ub)) * 1.3
+        )
       }
       p <- esplot(
         fect.output.p,
-        Period       = "Time",
-        Estimate     = "ATT",
-        SE           = "S.E.",
-        CI.lower     = "CI.lower",
-        CI.upper     = "CI.upper",
-        Count        = "count",
-        show.count   = show.count,
+        Period = "Time",
+        Estimate = "ATT",
+        SE = "S.E.",
+        CI.lower = "CI.lower",
+        CI.upper = "CI.upper",
+        Count = "count",
+        show.count = show.count,
         proportion = proportion,
         show.points = show.points,
         ci.outline = ci.outline,
-        connected    = connected,
-        color        = color,
-        count.color  = count.color,
+        connected = connected,
+        color = color,
+        count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
         highlight.periods = x$placebo.period[1]:x$placebo.period[2],
-        highlight.colors = rep(placebo.color,x$placebo.period[2]-x$placebo.period[1]+1),
-        xlab         = xlab,
-        ylab         = ylab,
-        main         = main,
+        highlight.colors = rep(placebo.color, x$placebo.period[2] - x$placebo.period[1] + 1),
+        xlab = xlab,
+        ylab = ylab,
+        main = main,
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
         ltype = ltype,
-        cex.main = cex.main/16,
-        cex.axis = cex.axis/15,
-        cex.lab = cex.lab/15,
-        cex.text = cex.text/5,
+        cex.main = cex.main / 16,
+        cex.axis = cex.axis / 15,
+        cex.lab = cex.lab / 15,
+        cex.text = cex.text / 5,
         axis.adjust = axis.adjust,
-        xlim         = xlim,
-        ylim         = ylim,
-        gridOff      = gridOff,
-        start0       = start0,
+        xlim = xlim,
+        ylim = ylim,
+        gridOff = gridOff,
+        start0 = start0,
         est.lwidth = est.lwidth,
         theme.bw = theme.bw,
-        est.pointsize  = est.pointsize)
+        est.pointsize = est.pointsize
+      )
 
       mbar_levels <- sort(unique(dte_output$Mbar))
       n_colors <- length(mbar_levels)
       final_palette <- sens.colors[1:min(n_colors, length(sens.colors))]
       p <- p +
         geom_linerange(
-          aes(x = postPeriod + 0.2, ymin = lb, ymax = ub, color = factor(Mbar, levels = mbar_levels)),
+          aes(x = .data$postPeriod + 0.2, ymin = .data$lb, ymax = .data$ub, color = factor(.data$Mbar, levels = mbar_levels)),
           data = dte_output,
           linewidth = 1, inherit.aes = FALSE
         ) +
@@ -3433,11 +3865,7 @@ plot.fect <- function(
           legend.position.inside = c(0.02, 0.98),
           legend.justification = c("left", "top")
         )
-    }
-
-
-    else if (restrict == "sm") {
-
+    } else if (restrict == "sm") {
       if (is.null(x$sensitivity.smooth) || is.null(x$sensitivity.smooth$periods)) {
         stop("No period-by-period Smoothness data found in x$sensitivity.smooth$periods.")
       }
@@ -3455,54 +3883,57 @@ plot.fect <- function(
       fect.output.p <- as.data.frame(x$est.att)
       fect.output.p$Time <- as.numeric(rownames(fect.output.p))
       if (is.null(ylim)) {
-        ylim <- c(min(c(fect.output.p$CI.lower, dte_output$lb)) * 1.3,
-                  max(c(fect.output.p$CI.upper, dte_output$ub)) * 1.3)
+        ylim <- c(
+          min(c(fect.output.p$CI.lower, dte_output$lb)) * 1.3,
+          max(c(fect.output.p$CI.upper, dte_output$ub)) * 1.3
+        )
       }
       p <- esplot(
         fect.output.p,
-        Period       = "Time",
-        Estimate     = "ATT",
-        SE           = "S.E.",
-        CI.lower     = "CI.lower",
-        CI.upper     = "CI.upper",
-        Count        = "count",
-        show.count   = show.count,
+        Period = "Time",
+        Estimate = "ATT",
+        SE = "S.E.",
+        CI.lower = "CI.lower",
+        CI.upper = "CI.upper",
+        Count = "count",
+        show.count = show.count,
         proportion = proportion,
         show.points = show.points,
         ci.outline = ci.outline,
-        connected    = connected,
-        color        = color,
-        count.color  = count.color,
+        connected = connected,
+        color = color,
+        count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
         highlight.periods = x$placebo.period[1]:x$placebo.period[2],
-        highlight.colors = rep(placebo.color,x$placebo.period[2]-x$placebo.period[1]+1),
-        xlab         = xlab,
-        ylab         = ylab,
-        main         = main,
-        xlim         = xlim,
-        ylim         = ylim,
-        gridOff      = gridOff,
+        highlight.colors = rep(placebo.color, x$placebo.period[2] - x$placebo.period[1] + 1),
+        xlab = xlab,
+        ylab = ylab,
+        main = main,
+        xlim = xlim,
+        ylim = ylim,
+        gridOff = gridOff,
         fill.gap = FALSE,
         lcolor = lcolor,
         lwidth = lwidth,
         ltype = ltype,
-        cex.main = cex.main/16,
-        cex.axis = cex.axis/15,
-        cex.lab = cex.lab/15,
-        cex.text = cex.text/5,
+        cex.main = cex.main / 16,
+        cex.axis = cex.axis / 15,
+        cex.lab = cex.lab / 15,
+        cex.text = cex.text / 5,
         axis.adjust = axis.adjust,
-        start0       = start0,
+        start0 = start0,
         theme.bw = theme.bw,
         est.lwidth = est.lwidth,
-        est.pointsize  = est.pointsize)
+        est.pointsize = est.pointsize
+      )
 
       m_levels <- sort(unique(dte_output$M))
       n_colors <- length(m_levels)
       final_palette <- sens.colors[1:min(n_colors, length(sens.colors))]
       p <- p +
         geom_linerange(
-          aes(x = postPeriod + 0.2, ymin = lb, ymax = ub, color = factor(M, levels = m_levels)),
+          aes(x = .data$postPeriod + 0.2, ymin = .data$lb, ymax = .data$ub, color = factor(.data$M, levels = m_levels)),
           data = dte_output,
           linewidth = 1, inherit.aes = FALSE
         ) +
@@ -3513,39 +3944,37 @@ plot.fect <- function(
           legend.position.inside = c(0.02, 0.98),
           legend.justification = c("left", "top")
         )
-
     }
-  }
-  else if (type == "cumul") {
+  } else if (type == "cumul") {
     if (is.null(x$effect.est.att)) {
       stop("No period-by-period cumulative ATT data found in x$est.eff.")
     }
-    if (is.null(main)){
-      main = "Estimated Cumulative Treatment Effects"
+    if (is.null(main)) {
+      main <- "Estimated Cumulative Treatment Effects"
     }
     p <- esplot(
       x$effect.est.att,
-      Estimate  = "ATT",
-      SE        = "S.E.",
-      CI.lower  = "CI.lower",
-      CI.upper  = "CI.upper",
-      main      = main,
-      xlab      = xlab,
-      ylab      = ylab,
-      xlim      = xlim,
-      ylim      = ylim,
+      Estimate = "ATT",
+      SE = "S.E.",
+      CI.lower = "CI.lower",
+      CI.upper = "CI.upper",
+      main = main,
+      xlab = xlab,
+      ylab = ylab,
+      xlim = xlim,
+      ylim = ylim,
       fill.gap = FALSE,
       lcolor = lcolor,
       lwidth = lwidth,
       ltype = ltype,
-      cex.main = cex.main/16,
-      cex.axis = cex.axis/15,
-      cex.lab = cex.lab/15,
-      cex.text = cex.text/5,
+      cex.main = cex.main / 16,
+      cex.axis = cex.axis / 15,
+      cex.lab = cex.lab / 15,
+      cex.text = cex.text / 5,
       show.points = show.points,
       ci.outline = ci.outline,
       axis.adjust = axis.adjust,
-      Count     = "count",
+      Count = "count",
       show.count = FALSE,
       proportion = proportion,
       est.pointsize = est.pointsize,

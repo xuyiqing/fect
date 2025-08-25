@@ -30,7 +30,7 @@ While these customization options are demonstrated using the default `gap` plot,
 
 We will be using two datasets in this chapter. As explained in @sec-panel, @GS2020 examines the mobilizing effect of minority candidates on coethnic support in U.S. congressional elections. The treatment variable indicates the presence of an Asian candidate, and the outcome variable represents the proportion of general election contributions from Asian donors. @HH2019 study the effects of indirect democracy versus direct democracy (treatment) on naturalization rates (outcome) in Switzerland using municipality-year panel data from 1991 to 2009.
 
-First, we load the required packages. The datasets, `hh2019` and `gs2020`, are included with the **fect** package and can be loaded using `data(fect)`. 
+First, we load the required packages. The datasets, `hh2019` and `gs2020`, are included with the **fect** package and can be loaded using `data(fect)`.
 
 ```{r load, message=FALSE}
 # load libraries and data
@@ -119,6 +119,7 @@ plot(out,
      cex.text = 1.2,        # Annotation text size
      main = "Text and Theme Customization")
 ```
+
 ### Presets
 
 For convenience, we can use the `preset` argument to apply preset colors. The default is `"default"`, which is mostly black and white with a bit of color. Other options include `"vibrant"` and `"grayscale"`, which can be used to create more colorful or monochromatic plots, respectively.
@@ -132,7 +133,8 @@ plot(out.hh,
      main = "Vibrant Preset Colors: Hainmueller and Hangartner (2019)")
 ```
 
-We can change the color of the estimates (and their confidence intervals) using the `color` option. 
+We can change the color of the estimates (and their confidence intervals) using the `color` option.
+
 ```{r preset-vibrant2}
 plot(out.hh, 
      preset = "vibrant", # Use vibrant colors
@@ -159,7 +161,7 @@ plot(out,
 )
 ```
 
-Moreover, in any plot that uses a shaded band to represent the CIs, we can set `ci.outline` to `TRUE` to draw an outline around the shaded band to improve visibility. 
+Moreover, in any plot that uses a shaded band to represent the CIs, we can set `ci.outline` to `TRUE` to draw an outline around the shaded band to improve visibility.
 
 ```{r ci-outline}
 plot(out, 
@@ -382,7 +384,9 @@ plot(out_fe_carryover)
 ```
 
 ## Status Plot
-The status plot (`type = "status"`) displays the treatment status by period for all units in a similar fashion to `panelView`. Each of the indicator colors can be customized using the `status.*.color` options. 
+
+The status plot (`type = "status"`) displays the treatment status by period for all units in a similar fashion to `panelView`. Each of the indicator colors can be customized using the `status.*.color` options.
+
 ```{r status}
 plot(out_fe_carryover, type = "status",
      status.treat.color      = "#D55E00",  # Color for treated units

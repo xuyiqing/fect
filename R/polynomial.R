@@ -1,7 +1,7 @@
 ###################################################################
 ## IFE Model Function
 ###################################################################
-fect.polynomial <- function(Y, # Outcome variable, (T*N) matrix
+fect_polynomial <- function(Y, # Outcome variable, (T*N) matrix
                             X, # Explanatory variables:  (T*N*p) array
                             D, #  Indicator for treated unit (tr==1)
                             W,

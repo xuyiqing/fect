@@ -1,0 +1,84 @@
+name: R-CMD-check
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  R-CMD-check:
+    name: ${{ matrix.config.os }} (R ${{ matrix.config.r }})
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { os: ubuntu-latest, r: "release" }
+          - { os: macos-latest, r: "release" }
+          - { os: windows-latest, r: "release" }
+
+    env:
+      R_KEEP_PKG_SOURCE: yes
+      _R_CHECK_CRAN_INCOMING_REMOTE_: false
+      _R_CHECK_FORCE_SUGGESTS_: false
+      RGL_USE_NULL: true
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clean precompiled objects
+        shell: bash
+        run: |
+          rm -f src/*.o src/*.so src/*.dll || true
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            any::rcmdcheck
+            any::devtools
+            lzy318/HonestDiDFEct
+            local::.
+          needs: check
+
+      - name: Install HonestDiDFEct via devtools
+        shell: Rscript {0}
+        run: |
+          if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes', repos='https://cloud.r-project.org')
+          if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) remotes::install_github('lzy318/HonestDiDFEct', upgrade='never')
+
+      - name: Session info
+        shell: Rscript {0}
+        run: |
+          sessionInfo()
+
+      - name: Check (CRAN-like)
+        shell: Rscript {0}
+        run: |
+          rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on = 'note', check_dir = 'check')
+
+      - name: Upload check results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-r${{ matrix.config.r }}-check
+          path: check
+
+  aggregate:
+    name: R-CMD-check
+    runs-on: ubuntu-latest
+    needs: R-CMD-check
+    if: ${{ always() }}
+    steps:
+      - name: Aggregate matrix result
+        run: |
+          if [ "${{ needs.R-CMD-check.result }}" != "success" ]; then
+            echo "One or more matrix jobs failed" >&2
+            exit 1
+          fi
+          echo "All matrix jobs passed"

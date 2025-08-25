@@ -13,7 +13,8 @@ fect_sens(
   Mvec = seq(0, 0.25, 0.05),
   periodMbarvec = c(0, 0.5),
   periodMvec = c(0, 0.1),
-  parallel = TRUE
+  parallel = FALSE,
+  cores = NULL
 )
 }
 \arguments{
@@ -24,7 +25,8 @@ fect_sens(
   \item{Mvec}{Values of \code{M} for overall smoothness-based sensitivity analysis.}
   \item{periodMbarvec}{Values of \code{Mbar} for period-specific RM sensitivity analysis.}
   \item{periodMvec}{Values of \code{M} for period-specific smoothness sensitivity analysis.}
-  \item{parallel}{Logical; if \code{TRUE} (default), uses parallel computation where supported.}
+  \item{parallel}{Logical; if \code{TRUE}, uses parallel computation where supported. Default is \code{FALSE}.}
+  \item{cores}{Optional integer; number of workers when \code{parallel = TRUE}.}
 }
 \details{
 This function:
