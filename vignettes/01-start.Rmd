@@ -49,7 +49,7 @@ install_all <- function(packages) {
   }
 }
 packages <- c("abind", "doParallel", "doRNG", "fixest", "foreach", "future", 
-              "GGally", "ggplot2", "grid", "gridExtra", "Mass", 
+              "GGally", "ggplot2", "grid", "gridExtra", "MASS", 
               "panelView", "Rcpp")
 install_all(packages)
 ```

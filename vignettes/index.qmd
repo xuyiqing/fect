@@ -93,7 +93,7 @@ Special thanks to Ziyi, Tianzhu, and Rivka for their tireless efforts in improvi
 (2025-08-25) CRAN release.
 
 - Fixed various bugs due to changes in dependencies
-- Added limit to `cores` by default in parallel computing  \
+- Added limit to `cores` by default in parallel computing
 - Add new plot `type = "hte"`
 - Added R-CMD-check for merging
 
