@@ -4,8 +4,7 @@
 
 /* unbalanced panel: response demean function */
 // [[Rcpp::export]]
-List Y_demean(arma::mat Y, int force)
-{
+List Y_demean(arma::mat Y, int force) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   double mu_Y = 0;
@@ -13,24 +12,20 @@ List Y_demean(arma::mat Y, int force)
   arma::mat xi_Y(T, 1, arma::fill::zeros);
   arma::mat YY = Y;
   mu_Y = accu(YY) / (N * T);
-  if (force == 0)
-  {
+  if (force == 0) {
     YY = YY - mu_Y;
   }
   /* unit fixed effects */
-  if (force == 1)
-  {
+  if (force == 1) {
     alpha_Y = mean(YY, 0).t();           // colMeans, (N * 1) matrix
     YY = YY - repmat(alpha_Y.t(), T, 1); // (T * N) matrix
   }
   /* time fixed effects  */
-  if (force == 2)
-  {
+  if (force == 2) {
     xi_Y = mean(YY, 1); // rowMeans, (N * 1) matrix
     YY = YY - repmat(xi_Y, 1, N);
   }
-  if (force == 3)
-  {
+  if (force == 3) {
     alpha_Y = mean(YY, 0).t();
     xi_Y = mean(YY, 1);
     YY = YY - repmat(alpha_Y.t(), T, 1) - repmat(xi_Y, 1, N) + mu_Y;
@@ -41,12 +36,10 @@ List Y_demean(arma::mat Y, int force)
   result["mu_Y"] = mu_Y;
   result["YY"] = YY;
 
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     result["alpha_Y"] = alpha_Y;
   }
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     result["xi_Y"] = xi_Y;
   }
   return (result);
@@ -55,8 +48,7 @@ List Y_demean(arma::mat Y, int force)
 /* Weighted Demean Outcome Matrix*/
 /* return fixed effects */
 // [[Rcpp::export]]
-List Y_wdemean(arma::mat Y, arma::mat W, int force)
-{
+List Y_wdemean(arma::mat Y, arma::mat W, int force) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   double mu_Y = 0;
@@ -65,27 +57,23 @@ List Y_wdemean(arma::mat Y, arma::mat W, int force)
   arma::mat YY = Y;
 
   mu_Y = accu(YY % W) / accu(W);
-  if (force == 0)
-  {
+  if (force == 0) {
     YY = YY - mu_Y;
   }
 
   /* unit fixed effects */
-  if (force == 1)
-  {
+  if (force == 1) {
     alpha_Y = (sum(YY % W, 0) / sum(W, 0)).t(); // colMeans, (N * 1) matrix
     YY = YY - repmat(alpha_Y.t(), T, 1);        // (T * N) matrix
   }
 
   /* time fixed effects  */
-  if (force == 2)
-  {
+  if (force == 2) {
     xi_Y = (sum(YY % W, 1) / sum(W, 1)); // rowMeans, (N * 1) matrix
     YY = YY - repmat(xi_Y, 1, N);
   }
 
-  if (force == 3)
-  {
+  if (force == 3) {
     alpha_Y = (sum(YY % W, 0) / sum(W, 0)).t();
     xi_Y = (sum(YY % W, 1) / sum(W, 1));
     YY = YY - repmat(alpha_Y.t(), T, 1) - repmat(xi_Y, 1, N) + mu_Y;
@@ -94,12 +82,10 @@ List Y_wdemean(arma::mat Y, arma::mat W, int force)
   List result;
   result["mu_Y"] = mu_Y;
   result["YY"] = YY;
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     result["alpha_Y"] = alpha_Y;
   }
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     result["xi_Y"] = xi_Y;
   }
   return (result);
@@ -107,48 +93,37 @@ List Y_wdemean(arma::mat Y, arma::mat W, int force)
 
 /* estimate additive fe for unbalanced panel, without covariates */
 // [[Rcpp::export]]
-List fe_add(arma::mat alpha_Y,
-            arma::mat xi_Y,
-            double mu_Y,
-            int T,
-            int N,
-            int force)
-{
+List fe_add(arma::mat alpha_Y, arma::mat xi_Y, double mu_Y, int T, int N,
+            int force) {
   arma::mat FE_ad(T, N, arma::fill::zeros);
   double mu = 0;
   arma::mat alpha(N, 1, arma::fill::zeros);
   arma::mat xi(T, 1, arma::fill::zeros);
 
   mu = mu_Y;
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     alpha = alpha_Y - mu_Y;
   }
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     xi = xi_Y - mu_Y;
   }
 
   FE_ad = FE_ad + mu;
 
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     FE_ad = FE_ad + repmat(alpha.t(), T, 1);
   }
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     FE_ad = FE_ad + repmat(xi, 1, N);
   }
 
   List result;
   result["mu"] = mu;
   result["FE_ad"] = FE_ad;
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     result["alpha"] = alpha;
   }
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     result["xi"] = xi;
   }
 
@@ -157,8 +132,7 @@ List fe_add(arma::mat alpha_Y,
 
 /* Obtain factors and loading given error */
 // [[Rcpp::export]]
-List panel_factor(arma::mat E, int r)
-{
+List panel_factor(arma::mat E, int r) {
   int T = E.n_rows;
   int N = E.n_cols;
   arma::mat factor(T, r, arma::fill::zeros);
@@ -168,8 +142,7 @@ List panel_factor(arma::mat E, int r)
   arma::mat U;
   arma::vec s;
   arma::mat V;
-  if (T < N)
-  {
+  if (T < N) {
     /*arma::mat EE = E * E.t() /(N * T) ;
     arma::eig_sym(s, U, EE) ;
     factor = U.tail_cols(r) * sqrt(double(T)) ;
@@ -180,9 +153,7 @@ List panel_factor(arma::mat E, int r)
     factor = U.head_cols(r) * sqrt(double(T));
     lambda = E.t() * factor / T;
     VNT = diagmat(s.head_rows(r));
-  }
-  else
-  {
+  } else {
     /*arma::mat EE = E.t() * E / (N * T) ;
     arma::eig_sym(s, U, EE) ;
     lambda = U.tail_cols(r) * sqrt(double(N)) ;
@@ -205,13 +176,11 @@ List panel_factor(arma::mat E, int r)
 
 /* Obtain interactive fe directly */
 // [[Rcpp::export]]
-arma::mat panel_FE(arma::mat E, double lambda, int hard)
-{
+arma::mat panel_FE(arma::mat E, double lambda, int hard) {
   int T = E.n_rows;
   int N = E.n_cols;
   int r = T;
-  if (T >= N)
-  {
+  if (T >= N) {
     r = N;
   }
 
@@ -222,31 +191,21 @@ arma::mat panel_FE(arma::mat E, double lambda, int hard)
   arma::mat V;
   arma::svd(U, s, V, E / (T * N));
 
-  for (int i = 0; i < r; i++)
-  {
-    if (s(i) > lambda)
-    {
-      if (hard == 1)
-      {
+  for (int i = 0; i < r; i++) {
+    if (s(i) > lambda) {
+      if (hard == 1) {
         D(i, i) = s(i); // hard impute
-      }
-      else
-      {
+      } else {
         D(i, i) = s(i) - lambda; // soft impute
       }
-    }
-    else
-    {
+    } else {
       D(i, i) = 0;
     }
   }
-  if (T >= N)
-  {
+  if (T >= N) {
     arma::mat UU = U.cols(0, r - 1);
     FE = UU * D * V.t() * (T * N);
-  }
-  else
-  {
+  } else {
     arma::mat VV = V.cols(0, r - 1);
     FE = U * D * VV.t() * (T * N);
   }
@@ -255,13 +214,9 @@ arma::mat panel_FE(arma::mat E, double lambda, int hard)
 
 /* factor analysis: mu add ife*/
 // [[Rcpp::export]]
-List ife(arma::mat E,
-         int force,
+List ife(arma::mat E, int force,
          int mc, // whether pac or mc method
-         int r,
-         int hard,
-         double lambda)
-{
+         int r, int hard, double lambda) {
   int T = E.n_rows;
   int N = E.n_cols;
 
@@ -288,30 +243,23 @@ List ife(arma::mat E,
   E_ad = Y_demean(E, force);
   EE = as<arma::mat>(E_ad["YY"]);
   mu_E = as<double>(E_ad["mu_Y"]);
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     alpha_E = as<arma::mat>(E_ad["alpha_Y"]);
   }
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     xi_E = as<arma::mat>(E_ad["xi_Y"]);
   }
-  E_fe_ad = fe_add(alpha_E, xi_E, mu_E,
-                   T, N, force);
+  E_fe_ad = fe_add(alpha_E, xi_E, mu_E, T, N, force);
   FE_add_use = as<arma::mat>(E_fe_ad["FE_ad"]); // additive fe
 
-  if (r > 0)
-  {
-    if (mc == 0)
-    {
+  if (r > 0) {
+    if (mc == 0) {
       pf = panel_factor(EE, r);
       F = as<arma::mat>(pf["factor"]);
       L = as<arma::mat>(pf["lambda"]);
       VNT = as<arma::mat>(pf["VNT"]);
       FE_inter_use = F * L.t(); // interactive fe
-    }
-    else
-    {
+    } else {
       FE_inter_use = panel_FE(EE, lambda, hard);
     }
   }
@@ -323,20 +271,16 @@ List ife(arma::mat E,
   mu = as<double>(E_fe_ad["mu"]);
   result["mu"] = mu;
   result["FE"] = FE;
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     alpha = as<arma::mat>(E_fe_ad["alpha"]);
     result["alpha"] = alpha;
   }
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     xi = as<arma::mat>(E_fe_ad["xi"]);
     result["xi"] = xi;
   }
-  if (r > 0)
-  {
-    if (mc == 0)
-    {
+  if (r > 0) {
+    if (mc == 0) {
       result["lambda"] = L;
       result["factor"] = F;
       result["VNT"] = VNT;

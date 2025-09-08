@@ -54,5 +54,6 @@ List inter_fe_d(arma::mat Y, arma::mat Y_fit0, arma::mat FE0, arma::cube X, int 
 List inter_fe_d_ub(arma::mat Y, arma::mat Y_fit0, arma::mat FE0, arma::cube X, arma::mat I, int r, int force, int mniter, double w, double tol);
 List inter_fe_d_qr(arma::mat Y, arma::mat Y_fit0, arma::mat FE0, arma::mat factor0, arma::mat xi0, arma::cube X, int r, int force, int mniter, double w, double tol);
 List inter_fe_d_qr_ub(arma::mat Y, arma::mat Y_fit0, arma::mat FE0, arma::mat factor0, arma::mat xi0, arma::cube X, arma::mat I, int r, int force, int mniter, double w, double tol);
-
+List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe, arma::cube X_time_inv, arma::cube X_time_trend, arma::mat Y, arma::mat Y0, arma::mat I, arma::mat W, arma::mat beta0, int force, int r, double tolerate, int max_iter);
+List complex_inter_fe_ub(arma::mat Y, arma::mat Y0, arma::cube X_covariates, arma::cube X_sfe, arma::cube X_time_inv, arma::cube X_time_trend, arma::mat I, arma::mat W, arma::mat beta0, int r, int force, double tol, int max_iter);
 #endif

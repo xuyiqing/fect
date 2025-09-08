@@ -1,0 +1,83 @@
+name: rhub
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  ubuntu-release:
+    runs-on: ubuntu-latest
+    container: ghcr.io/r-hub/containers/ubuntu-release:latest
+    env:
+      RGL_USE_NULL: true
+      R_KEEP_PKG_SOURCE: yes
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        shell: bash
+        run: |
+          R -q -e "if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes')"
+          R -q -e "remotes::install_deps(dependencies = TRUE)"
+          R -q -e "install.packages('rcmdcheck')"
+      - name: rcmdcheck (ubuntu-release)
+        shell: bash
+        run: |
+          R -q -e "rcmdcheck::rcmdcheck(args=c('--no-manual','--as-cran'), error_on='note', check_dir='check')"
+
+  ubuntu-next:
+    runs-on: ubuntu-latest
+    container: ghcr.io/r-hub/containers/ubuntu-next:latest
+    env:
+      RGL_USE_NULL: true
+      R_KEEP_PKG_SOURCE: yes
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        shell: bash
+        run: |
+          R -q -e "if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes')"
+          R -q -e "remotes::install_deps(dependencies = TRUE)"
+          R -q -e "install.packages('rcmdcheck')"
+      - name: rcmdcheck (ubuntu-next)
+        shell: bash
+        run: |
+          R -q -e "rcmdcheck::rcmdcheck(args=c('--no-manual','--as-cran'), error_on='note', check_dir='check')"
+
+  clang-asan:
+    runs-on: ubuntu-latest
+    container: ghcr.io/r-hub/containers/clang-asan:latest
+    env:
+      RGL_USE_NULL: true
+      R_KEEP_PKG_SOURCE: yes
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        shell: bash
+        run: |
+          R -q -e "if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes')"
+          R -q -e "remotes::install_deps(dependencies = TRUE)"
+          R -q -e "install.packages('rcmdcheck')"
+      - name: rcmdcheck (clang-asan)
+        shell: bash
+        run: |
+          R -q -e "rcmdcheck::rcmdcheck(args=c('--no-manual','--as-cran'), error_on='note', check_dir='check')"
+
+  valgrind:
+    runs-on: ubuntu-latest
+    container: ghcr.io/r-hub/containers/valgrind:latest
+    env:
+      RGL_USE_NULL: true
+      R_KEEP_PKG_SOURCE: yes
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        shell: bash
+        run: |
+          R -q -e "if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes')"
+          R -q -e "remotes::install_deps(dependencies = TRUE)"
+          R -q -e "install.packages('rcmdcheck')"
+      - name: rcmdcheck (valgrind)
+        shell: bash
+        run: |
+          R -q -e "rcmdcheck::rcmdcheck(args=c('--no-manual','--as-cran'), error_on='note', check_dir='check')"
+

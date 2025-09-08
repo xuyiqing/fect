@@ -4,14 +4,8 @@
 
 /* Interactive Fixed Effects */
 // [[Rcpp::export]]
-List inter_fe(arma::mat Y,
-              arma::cube X,
-              int r,
-              int force,
-              arma::mat beta0,
-              double tol = 1e-5,
-              int max_iter = 500)
-{
+List inter_fe(arma::mat Y, arma::cube X, int r, int force, arma::mat beta0,
+              double tol = 1e-5, int max_iter = 500) {
   /* Dimensions */
   int b_r = beta0.n_rows;
   int T = Y.n_rows;
@@ -50,24 +44,19 @@ List inter_fe(arma::mat Y,
   /* grand mean */
   mu_Y = accu(YY) / obs;
   YY = YY - mu_Y;
-  if (p > 0)
-  {
-    for (int i = 0; i < p; i++)
-    {
+  if (p > 0) {
+    for (int i = 0; i < p; i++) {
       mu_X(i, 0) = accu(XX.slice(i)) / obs;
       XX.slice(i) = XX.slice(i) - mu_X(i, 0);
     }
   }
 
   /* unit fixed effects */
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     alpha_Y = mean(YY, 0).t();           // colMeans, (N * 1) matrix
     YY = YY - repmat(alpha_Y.t(), T, 1); // (T * N) matrix
-    if (p > 0)
-    {
-      for (int i = 0; i < p; i++)
-      {
+    if (p > 0) {
+      for (int i = 0; i < p; i++) {
         alpha_X.col(i) = mean(XX.slice(i), 0).t(); // colMeans
         XX.slice(i) = XX.slice(i) - repmat(alpha_X.col(i).t(), T, 1);
       }
@@ -75,14 +64,11 @@ List inter_fe(arma::mat Y,
   }
 
   /* time fixed effects  */
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     xi_Y = mean(YY, 1); // rowMeans, (N * 1) matrix
     YY = YY - repmat(xi_Y, 1, N);
-    if (p > 0)
-    {
-      for (int i = 0; i < p; i++)
-      {
+    if (p > 0) {
+      for (int i = 0; i < p; i++) {
         xi_X.col(i) = mean(XX.slice(i), 1); // rowMeans
         XX.slice(i) = XX.slice(i) - repmat(xi_X.col(i), 1, N);
       }
@@ -94,10 +80,8 @@ List inter_fe(arma::mat Y,
   arma::mat X_invar(p, 1, arma::fill::zeros); // =1 if invar
 
   int j = 0;
-  for (int i = 0; i < p1; i++)
-  {
-    if (arma::accu(abs(XX.slice(i))) < 1e-5)
-    {
+  for (int i = 0; i < p1; i++) {
+    if (arma::accu(abs(XX.slice(i))) < 1e-5) {
       XX.shed_slice(i);
       mu_X.shed_row(i);
       alpha_X.shed_col(i);
@@ -110,50 +94,37 @@ List inter_fe(arma::mat Y,
   }
 
   int validX = 1;
-  if (p1 == 0)
-  {
+  if (p1 == 0) {
     validX = 0;
-  }
-  else
-  {
+  } else {
     invXX = XXinv(XX);
   }
 
   /* Main Algorithm */
-  if (p1 == 0)
-  {
-    if (r > 0)
-    {
+  if (p1 == 0) {
+    if (r > 0) {
       List pf = panel_factor(YY, r);
       factor = as<arma::mat>(pf["factor"]);
       lambda = as<arma::mat>(pf["lambda"]);
       VNT = as<arma::mat>(pf["VNT"]);
       U = YY - factor * lambda.t();
-    }
-    else
-    {
+    } else {
       U = YY;
     }
-  }
-  else
-  {
+  } else {
     /* starting value:  the OLS/LSDV estimator */
-    if (accu(abs(beta0)) < 1e-10 || r == 0 || b_r != p1)
-    {                                                                  //
+    if (accu(abs(beta0)) < 1e-10 || r == 0 || b_r != p1) {             //
       beta0 = panel_beta(XX, invXX, YY, arma::zeros<arma::mat>(T, N)); //
     }
-    if (r == 0)
-    {
+    if (r == 0) {
       U = YY;
       beta = beta0;
-      for (int k = 0; k < p1; k++)
-      {
+      for (int k = 0; k < p1; k++) {
         U = U - XX.slice(k) * beta(k, 0);
       }
-    }
-    else if (r > 0)
-    {
-      // arma::mat invXX =  XXinv(XX) ;  // compute (X'X)^{-1}, outside beta iteration
+    } else if (r > 0) {
+      // arma::mat invXX =  XXinv(XX) ;  // compute (X'X)^{-1}, outside beta
+      // iteration
       List out = beta_iter(XX, invXX, YY, r, tol, beta0, max_iter);
       beta = as<arma::mat>(out["beta"]);
       factor = as<arma::mat>(out["factor"]);
@@ -165,15 +136,12 @@ List inter_fe(arma::mat Y,
   }
 
   /* save fixed effects */
-  if (p1 == 0)
-  {
+  if (p1 == 0) {
     mu = mu_Y;
-    if (force == 1 || force == 3)
-    {
+    if (force == 1 || force == 3) {
       alpha = alpha_Y;
     }
-    if (force == 2 || force == 3)
-    {
+    if (force == 2 || force == 3) {
       xi = xi_Y;
     }
     /*
@@ -189,18 +157,14 @@ List inter_fe(arma::mat Y,
       FE_inter_use = factor * lambda.t()
       fit = FE_add_use + FE_inter_use
     }*/
-  }
-  else
-  { // with valid covariates
+  } else { // with valid covariates
 
     mu = mu_Y - crossprod(mu_X, beta)(0, 0);
 
-    if (force == 1 || force == 3)
-    {
+    if (force == 1 || force == 3) {
       alpha = alpha_Y - alpha_X * beta;
     }
-    if (force == 2 || force == 3)
-    {
+    if (force == 2 || force == 3) {
       xi = xi_Y - xi_X * beta;
     }
     /*
@@ -229,16 +193,11 @@ List inter_fe(arma::mat Y,
   // number of estimated parameters
   // force = 0
   double np = r * (N + T) - pow(double(r), 2) + p1 + 1;
-  if (force == 1)
-  {
+  if (force == 1) {
     np = np + (N - 1) - r;
-  }
-  else if (force == 2)
-  {
+  } else if (force == 2) {
     np = np + (T - 1) - r;
-  }
-  else if (force == 3)
-  {
+  } else if (force == 3) {
     np = np + (N - 1) + (T - 1) - 2 * r;
   }
 
@@ -251,18 +210,17 @@ List inter_fe(arma::mat Y,
   double mse = trace(U * U.t()) / (N * T);
 
   double m1 = 0;
-  if (N < 60)
-  {
+  if (N < 60) {
     m1 = 60 - N;
   }
   double m2 = 0;
-  if (T < 60)
-  {
+  if (T < 60) {
     m2 = 60 - T;
   }
 
   double C = (N + m1) * (T + m2) / (N * T);
-  double PC = mse + r * sigma2 * C * (N + T) / (N * T) * log(double(N * T) / double(N + T));
+  double PC = mse + r * sigma2 * C * (N + T) / (N * T) *
+                        log(double(N * T) / double(N + T));
 
   //-------------------------------#
   // Storage
@@ -273,32 +231,24 @@ List inter_fe(arma::mat Y,
   output["mu"] = mu;
   // output["p1"] = p1 ;
 
-  if (p > 0)
-  {
+  if (p > 0) {
     // output["beta_valid"] = beta ;
     arma::mat beta_total(p, 1);
     // arma::mat beta_tot(p,1);
 
-    if (p > p1)
-    {
+    if (p > p1) {
       int j4 = 0;
-      for (int i = 0; i < p; i++)
-      {
-        if (X_invar(i, 0) == 1)
-        {
+      for (int i = 0; i < p; i++) {
+        if (X_invar(i, 0) == 1) {
           beta_total(i, 0) = arma::datum::nan;
           // beta_tot(i,0) = 0;
-        }
-        else
-        {
+        } else {
           beta_total(i, 0) = beta(j4, 0);
           // beta_tot(i,0) = beta(j4,0);
           j4++;
         }
       }
-    }
-    else
-    {
+    } else {
       beta_total = beta;
       // beta_tot = beta;
     }
@@ -306,24 +256,20 @@ List inter_fe(arma::mat Y,
     // output["beta_tot"] = beta_tot;
   }
 
-  if (r > 0)
-  {
+  if (r > 0) {
     output["factor"] = factor;
     output["lambda"] = lambda;
     output["VNT"] = VNT;
     // FE = factor * lambda.t() ;
     // output["FE"] = FE ;
   }
-  if ((p1 > 0) && (r > 0))
-  {
+  if ((p1 > 0) && (r > 0)) {
     output["niter"] = niter;
   }
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     output["alpha"] = alpha;
   }
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     output["xi"] = xi;
   }
   output["residuals"] = U;
@@ -336,17 +282,11 @@ List inter_fe(arma::mat Y,
 
 /* Interactive Fixed Effects: ub */
 // [[Rcpp::export]]
-List inter_fe_ub(arma::mat Y,
-                 arma::mat Y0,
-                 arma::cube X,
-                 arma::mat I,
-                 arma::mat W,
-                 arma::mat beta0,
-                 int r, // r > 0, the outcome has a factor-type fixed effect; r = 0 else
-                 int force,
-                 double tol = 1e-5,
-                 int max_iter = 1000)
-{
+List inter_fe_ub(
+    arma::mat Y, arma::mat Y0, arma::cube X, arma::mat I, arma::mat W,
+    arma::mat beta0,
+    int r, // r > 0, the outcome has a factor-type fixed effect; r = 0 else
+    int force, double tol = 1e-5, int max_iter = 1000) {
 
   /* Dimensions */
   int T = Y.n_rows;
@@ -371,14 +311,11 @@ List inter_fe_ub(arma::mat Y,
   arma::mat WI;
   int burn_in = 0;
 
-  if (Y.n_rows == W.n_rows && Y.n_cols == W.n_cols)
-  {
+  if (Y.n_rows == W.n_rows && Y.n_cols == W.n_cols) {
     use_weight = 1;
     W = W / W.max();
     WI = W % I;
-  }
-  else
-  {
+  } else {
     use_weight = 0;
   }
 
@@ -391,18 +328,13 @@ List inter_fe_ub(arma::mat Y,
 
   int flag_var;
   int j = 0;
-  for (int i = 0; i < p1; i++)
-  {
-    if (use_weight == 1)
-    {
+  for (int i = 0; i < p1; i++) {
+    if (use_weight == 1) {
+      flag_var = (arma::accu(abs(XX.slice(i))) < 1e-5);
+    } else {
       flag_var = (arma::accu(abs(XX.slice(i))) < 1e-5);
     }
-    else
-    {
-      flag_var = (arma::accu(abs(XX.slice(i))) < 1e-5);
-    }
-    if (flag_var)
-    {
+    if (flag_var) {
       XX.shed_slice(i);
       X_invar(j, 0) = 1;
       i--;
@@ -412,19 +344,14 @@ List inter_fe_ub(arma::mat Y,
   }
 
   int validX = 1;
-  if (p1 == 0)
-  {
+  if (p1 == 0) {
     validX = 0;
-    if (force == 0 && r == 0)
-    { // no covariate and force == 0 and r == 0
-      if (use_weight == 1)
-      {
+    if (force == 0 && r == 0) { // no covariate and force == 0 and r == 0
+      if (use_weight == 1) {
         mu_Y = accu(YY % WI) / accu(WI);
         mu = mu_Y;
         YY = FE_adj(YY - mu_Y, I);
-      }
-      else
-      {
+      } else {
         mu_Y = accu(YY) / obs;
         mu = mu_Y;
         YY = FE_adj(YY - mu_Y, I);
@@ -432,12 +359,11 @@ List inter_fe_ub(arma::mat Y,
     }
   }
   /* Main Algorithm */
-  if (p1 == 0)
-  {
-    if (r > 0)
-    {
+  if (p1 == 0) {
+    if (r > 0) {
       // add fe ; inter fe ; iteration
-      List fe_ad_inter = fe_ad_inter_iter(YY, Y0, I, W, force, 0, r, 0, 0, tol, max_iter);
+      List fe_ad_inter =
+          fe_ad_inter_iter(YY, Y0, I, W, force, 0, r, 0, 0, tol, max_iter);
       mu = as<double>(fe_ad_inter["mu"]);
       U = as<arma::mat>(fe_ad_inter["e"]);
       fit = as<arma::mat>(fe_ad_inter["fit"]);
@@ -445,101 +371,77 @@ List inter_fe_ub(arma::mat Y,
       factor = as<arma::mat>(fe_ad_inter["factor"]);
       lambda = as<arma::mat>(fe_ad_inter["lambda"]);
       VNT = as<arma::mat>(fe_ad_inter["VNT"]);
-      if (use_weight == 1)
-      {
+      if (use_weight == 1) {
         burn_in = as<int>(fe_ad_inter["burn_in"]);
       }
-      if (force == 1 || force == 3)
-      {
+      if (force == 1 || force == 3) {
         alpha = as<arma::mat>(fe_ad_inter["alpha"]);
       }
-      if (force == 2 || force == 3)
-      {
+      if (force == 2 || force == 3) {
         xi = as<arma::mat>(fe_ad_inter["xi"]);
       }
       niter = as<int>(fe_ad_inter["niter"]);
-    }
-    else
-    {
-      if (force == 0)
-      {
+    } else {
+      if (force == 0) {
         U = YY;
         fit.fill(mu);
-      }
-      else
-      {
+      } else {
         // add fe; iteration
         List fe_ad = fe_ad_iter(YY, Y0, I, W, force, tol, max_iter);
         mu = as<double>(fe_ad["mu"]);
         U = as<arma::mat>(fe_ad["e"]);
         fit = as<arma::mat>(fe_ad["fit"]);
-        if (force == 1 || force == 3)
-        {
+        if (force == 1 || force == 3) {
           alpha = as<arma::mat>(fe_ad["alpha"]);
         }
-        if (force == 2 || force == 3)
-        {
+        if (force == 2 || force == 3) {
           xi = as<arma::mat>(fe_ad["xi"]);
         }
         niter = as<int>(fe_ad["niter"]);
       }
     }
-  }
-  else
-  {
+  } else {
     /* starting value:  the OLS estimator */
-    if (use_weight == 1)
-    {
+    if (use_weight == 1) {
       invXX = wXXinv(XX, W);
-    }
-    else
-    {
+    } else {
       invXX = XXinv(XX); // compute (X'X)^{-1}, outside beta iteration
     }
 
-    if (r == 0)
-    {
+    if (r == 0) {
       // add fe, covar; iteration
-      List fe_ad = fe_ad_covar_iter(XX, invXX,
-                                    YY, Y0, I, beta0, W, force, tol, max_iter);
+      List fe_ad = fe_ad_covar_iter(XX, invXX, YY, Y0, I, beta0, W, force, tol,
+                                    max_iter);
       mu = as<double>(fe_ad["mu"]);
       beta = as<arma::mat>(fe_ad["beta"]);
       U = as<arma::mat>(fe_ad["e"]);
       fit = as<arma::mat>(fe_ad["fit"]);
-      if (force == 1 || force == 3)
-      {
+      if (force == 1 || force == 3) {
         alpha = as<arma::mat>(fe_ad["alpha"]);
       }
-      if (force == 2 || force == 3)
-      {
+      if (force == 2 || force == 3) {
         xi = as<arma::mat>(fe_ad["xi"]);
       }
       niter = as<int>(fe_ad["niter"]);
-    }
-    else if (r > 0)
-    {
+    } else if (r > 0) {
       // add, covar, interactive, iteration
-      List fe_ad_inter_covar = fe_ad_inter_covar_iter(XX, invXX,
-                                                      YY, Y0, I, W,
-                                                      beta0, force, 0, r, 0, 0, tol, max_iter);
+      List fe_ad_inter_covar = fe_ad_inter_covar_iter(
+          XX, invXX, YY, Y0, I, W, beta0, force, 0, r, 0, 0, tol, max_iter);
       mu = as<double>(fe_ad_inter_covar["mu"]);
       beta = as<arma::mat>(fe_ad_inter_covar["beta"]);
       U = as<arma::mat>(fe_ad_inter_covar["e"]);
       fit = as<arma::mat>(fe_ad_inter_covar["fit"]);
-      if (use_weight == 1)
-      {
+      if (use_weight == 1) {
         burn_in = as<int>(fe_ad_inter_covar["burn_in"]);
       }
       factor = as<arma::mat>(fe_ad_inter_covar["factor"]);
       lambda = as<arma::mat>(fe_ad_inter_covar["lambda"]);
       VNT = as<arma::mat>(fe_ad_inter_covar["VNT"]);
 
-      if (force == 1 || force == 3)
-      {
+      if (force == 1 || force == 3) {
         alpha = as<arma::mat>(fe_ad_inter_covar["alpha"]);
       }
-      if (force == 2 || force == 3)
-      {
+      if (force == 2 || force == 3) {
         xi = as<arma::mat>(fe_ad_inter_covar["xi"]);
       }
       niter = as<int>(fe_ad_inter_covar["niter"]);
@@ -548,16 +450,11 @@ List inter_fe_ub(arma::mat Y,
   /* sigma2 and IC */
   // number of estimated parameters
   double np = r * (N + T) - pow(double(r), 2) + p1 + 1;
-  if (force == 1)
-  {
+  if (force == 1) {
     np = np + (N - 1) - r;
-  }
-  else if (force == 2)
-  {
+  } else if (force == 2) {
     np = np + (T - 1) - r;
-  }
-  else if (force == 3)
-  {
+  } else if (force == 3) {
     np = np + (N - 1) + (T - 1) - 2 * r;
   }
 
@@ -570,46 +467,37 @@ List inter_fe_ub(arma::mat Y,
   double mse = trace(U * U.t()) / obs;
 
   double m1 = 0;
-  if (N < 60)
-  {
+  if (N < 60) {
     m1 = 60 - N;
   }
   double m2 = 0;
-  if (T < 60)
-  {
+  if (T < 60) {
     m2 = 60 - T;
   }
 
   double C = (N + m1) * (T + m2) / obs;
-  double PC = mse + r * sigma2 * C * (N + T) / (N * T) * log(double(N * T) / double(N + T));
+  double PC = mse + r * sigma2 * C * (N + T) / (N * T) *
+                        log(double(N * T) / double(N + T));
   //-------------------------------#
   // Storage
   //-------------------------------#
 
   List output;
 
-  if (p > 0)
-  {
+  if (p > 0) {
     arma::mat beta_total(p, 1);
 
-    if (p > p1)
-    {
+    if (p > p1) {
       int j4 = 0;
-      for (int i = 0; i < p; i++)
-      {
-        if (X_invar(i, 0) == 1)
-        {
+      for (int i = 0; i < p; i++) {
+        if (X_invar(i, 0) == 1) {
           beta_total(i, 0) = arma::datum::nan;
-        }
-        else
-        {
+        } else {
           beta_total(i, 0) = beta(j4, 0);
           j4++;
         }
       }
-    }
-    else
-    {
+    } else {
       beta_total = beta;
     }
     output["beta"] = beta_total;
@@ -618,25 +506,20 @@ List inter_fe_ub(arma::mat Y,
   output["mu"] = mu;
   output["fit"] = fit;
 
-  if (!(force == 0 && r == 0 && p1 == 0))
-  {
+  if (!(force == 0 && r == 0 && p1 == 0)) {
     output["niter"] = niter;
   }
-  if (force == 1 || force == 3)
-  {
+  if (force == 1 || force == 3) {
     output["alpha"] = alpha;
   }
-  if (force == 2 || force == 3)
-  {
+  if (force == 2 || force == 3) {
     output["xi"] = xi;
   }
-  if (r > 0)
-  {
+  if (r > 0) {
     output["factor"] = factor;
     output["lambda"] = lambda;
     output["VNT"] = VNT;
-    if (use_weight == 1)
-    {
+    if (use_weight == 1) {
       output["burn_in"] = burn_in;
     }
   }
