@@ -114,7 +114,7 @@ List gamma_part(arma::mat E, arma::mat Z, arma::mat zzinv) {
 // [[Rcpp::export]]
 arma::mat Kappa(const arma::mat E,const arma::mat F, const arma::mat ffinv) {
   arma::mat kappa = E.t() * F.t() * ffinv;
-  return kappa; // p x T  return zeta;
+  return kappa; // N x p_time_trend
 }
 
 // [[Rcpp::export]]
@@ -263,15 +263,14 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
   arma::mat fit5(T, N, arma::fill::zeros);
   arma::mat fit5_old(T, N, arma::fill::ones);
   arma::mat FE(T, N, arma::fill::zeros);
-  arma::mat FE_old(T, N, arma::fill::ones);
 
   fit = Y0;
   fit_old = fit;
   for (int i = 0; i < p; i++) {
-    fit2 = fit2 + XX.slice(i) * beta0(i);
+    fit1 = fit1 + XX.slice(i) * beta0(i);
   }
 
-  FE = fit - fit2 - fit3 - fit4; // fit1 + fit5
+  FE = fit - fit1 - fit2 - fit3; // fit4 + fit5
 
   int N_time_inv = X_time_inv.n_cols;
   int p_time_inv = X_time_inv.n_slices;
@@ -314,23 +313,22 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
           dif3 > tolerate || dif4 > tolerate || dif5 > tolerate) &&
          niter <= max_iter) {
     YYY = E_adj(Y, fit, I);
-    // m2: estimate covariates beta
-    result2 = beta_part(YYY - FE - fit3 - fit4, XX, xxinv, W, use_weight);
-    fit2 = as<arma::mat>(result2["fit"]);
-    // // m3: estimate time invariant
-    YY = YY_adj(YYY - FE - fit2 - fit4, fit3, I, use_weight, W);
-    result3 = gamma_part(YY, Z, zzinv);
-    fit3 = as<arma::mat>(result3["fit"]);
-    // m4: estimate time trend
-    YY = YY_adj(YYY - FE - fit2 - fit3, fit4, I, use_weight, W);
-    result4 = kappa_part(YY, F, ffinv);
-    fit4 = as<arma::mat>(result4["fit"]);
-    // m1: estimate fixed effects
-    YY = YY_adj(YYY - fit2 - fit3 - fit4 - fit5, FE - fit5, I, use_weight, W);
-    result1 = fixed_effects_part(YY, force, X_sfe, sfe_index_cache);
+    result1 = beta_part(YYY - fit2 - fit3 - FE, XX, xxinv, W, use_weight);
     fit1 = as<arma::mat>(result1["fit"]);
-    // m5: estimate ife
-    YY = YY_adj(YYY - fit1 - fit2 - fit3 - fit4, FE - fit1, I, use_weight, W);
+
+    YY = YY_adj(YYY - fit1 - fit3 - FE, fit2, I, use_weight, W);
+    result2 = gamma_part(YY, Z, zzinv);
+    fit2 = as<arma::mat>(result2["fit"]);
+
+    YY = YY_adj(YYY - fit1 - fit2 - FE, fit3, I, use_weight, W);
+    result3 = kappa_part(YY, F, ffinv);
+    fit3 = as<arma::mat>(result3["fit"]);
+
+    YY = YY_adj(YYY - fit1 - fit2 - fit3 - fit5, FE - fit5, I, use_weight, W);
+    result4 = fixed_effects_part(YY, force, X_sfe, sfe_index_cache);
+    fit4 = as<arma::mat>(result4["fit"]);
+
+    YY = YY_adj(YYY - fit1 - fit2 - fit3 - fit4, FE - fit4, I, use_weight, W);
     if (use_weight == 1 && stop_burnin == 0) {
       r_burnin = d - niter;
       if (r_burnin <= r) {
@@ -341,7 +339,8 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
       result5 = ife_part(YY, r);
     }
     fit5 = as<arma::mat>(result5["fit"]);
-    FE = fit1 + fit5;
+
+    FE = fit4 + fit5;
     fit = fit1 + fit2 + fit3 + fit4 + fit5;
 
     if (use_weight == 1) {
@@ -361,6 +360,7 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
     fit3_old = fit3;
     fit4_old = fit4;
     fit5_old = fit5;
+
     niter = niter + 1;
   }
   e = FE_adj(Y - fit, I);
@@ -369,12 +369,12 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
   }
 
   List result;
-  result["mu"] = result1["mu"];
-  result["alpha"] = result1["alpha"];
-  result["xi"] = result1["xi"];
+  result["mu"] = result4["mu"];
+  result["alpha"] = result4["alpha"];
+  result["xi"] = result4["xi"];
   result["niter"] = niter;
   result["e"] = e;
-  result["beta"] = result2["beta"];
+  result["beta"] = result1["beta"];
   result["fit"] = fit;
   result["validF"] = validF;
 
@@ -384,7 +384,7 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
   if (use_weight == 1) {
     result["burn_in"] = abs(1 - stop_burnin);
   }
-  result["time_invariant"] = result3["gamma"];
-  result["time_trend"] = result4["kappa"];
+  result["time_invariant"] = result2["gamma"];
+  result["time_trend"] = result3["kappa"];
   return (result);
 }
