@@ -69,8 +69,13 @@ fect <- function(
     degree = 2, # wald = FALSE, # fit test
     sfe = NULL,
     cfe = NULL,
-    time.inv = NULL,
-    time.trend = NULL,
+    Z = NULL,
+    gamma = NULL,
+    Q = NULL,
+    kappa = NULL,
+    Q.type = NULL, # c(1,2,3) or c("linear", "quadratic", "cubic")
+    Zgamma = NULL,
+    kappaQ = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
     fill.missing = FALSE, # whether to balance missing observations
     placeboTest = FALSE, # placebo test
@@ -134,8 +139,13 @@ fect.formula <- function(
     degree = 2, # wald = FALSE,
     sfe = NULL,
     cfe = NULL,
-    time.inv = NULL,
-    time.trend = NULL,
+    Z = NULL,
+    gamma = NULL,
+    Q = NULL,
+    kappa = NULL,
+    Q.type = NULL,
+    Zgamma = NULL,
+    kappaQ = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
     fill.missing = FALSE, # whether to balance missing observations
     placeboTest = FALSE, # placebo test
@@ -231,8 +241,13 @@ fect.formula <- function(
         degree = degree,
         sfe = sfe,
         cfe = cfe,
-        time.inv = time.inv,
-        time.trend = time.trend,
+        Z = Z,
+        gamma = gamma,
+        Q = Q,
+        kappa = kappa,
+        Q.type = Q.type,
+        Zgamma = Zgamma,
+        kappaQ = kappaQ,
         placebo.period = placebo.period,
         placeboTest = placeboTest,
         carryoverTest = carryoverTest,
@@ -298,8 +313,13 @@ fect.default <- function(
     degree = 2, # wald = FALSE,
     sfe = NULL,
     cfe = NULL,
-    time.inv = NULL,
-    time.trend = NULL,
+    Z = NULL,
+    gamma = NULL,
+    Q = NULL,
+    kappa = NULL,
+    Q.type = NULL,
+    Zgamma = NULL,
+    kappaQ = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
     fill.missing = FALSE, # whether to balance missing observations
     placeboTest = FALSE, # placebo test
@@ -325,11 +345,17 @@ fect.default <- function(
         ## warning("Not a data frame.")
     }
     ## index
-    if (length(index) != 2 | sum(index %in% colnames(data)) != 2) {
+    if (
+        (length(index) != 2 | sum(index %in% colnames(data)) != 2) &
+            method != "cife"
+    ) {
         stop(
             "\"index\" option misspecified. Try, for example, index = c(\"unit.id\", \"time\")."
         )
     }
+
+    id <- index[1]
+    time <- index[2]
 
     if (se == 1) {
         if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
@@ -464,6 +490,8 @@ fect.default <- function(
             CV <- FALSE
             method <- "ife"
         } else if (method %in% c("polynomial", "cfe")) {
+            CV <- FALSE
+        } else if (method == "cife") {
             CV <- FALSE
         } else if (method == "both") {
             CV <- TRUE
@@ -744,14 +772,53 @@ fect.default <- function(
     }
 
     if (method == "cife") {
-        if (!is.null(sfe)) {
-            for (sub.sfe in sfe) {
-                if (!sub.sfe %in% names(data)) {
-                    stop("\"sfe\" misspecified.\n")
+        if (length(index) > 2) {
+            for (extra.FE in index[3:length(index)]) {
+                if (!extra.FE %in% names(data)) {
+                    stop("\"index\" misspecified.\n")
                 }
-                if (sub.sfe %in% index) {
-                    stop("\"sfe\" only contains additional fixed effects.\n")
+                if (extra.FE %in% index[1:2]) {
+                    stop("\"index\" misspecified.\n")
                 }
+            }
+        }
+
+        if (!is.null(Q.type)) {
+            if (!is.null(Q)) {
+                stop("\"Q\" and \"Q.type\" cannot be used simultaneously.")
+            }
+            Q <- c()
+            for (i in 1:length(Q.type)) {
+                Q.i <- tolower(as.character(Q.type[i]))
+                if (Q.i == "linear" || Q.i == "1") {
+                    data[, paste(time, "1", sep = ".")] <- data[, time] ** 1
+                    Q <- c(Q, paste(time, "1", sep = "."))
+                } else if (Q.i == "quadratic" || Q.i == "2") {
+                    data[, paste(time, "2", sep = ".")] <- data[, time] ** 2
+                    Q <- c(Q, paste(time, "2", sep = "."))
+                } else if (Q.i == "cubic" || Q.i == "3") {
+                    data[, paste(time, "3", sep = ".")] <- data[, time] ** 3
+                    Q <- c(Q, paste(time, "3", sep = "."))
+                } else {
+                    stop("\"Q.type\" must be in c(1, 2, 3) or c(\"linear\", \"quadratic\", \"cubic\").")
+                }
+            }
+        }
+
+        if (!is.null(Zgamma)) {
+            if (is.null(Z)) {
+                Z = unique(unname(unlist(Zgamma)))
+            }
+            if (is.null(gamma)) {
+                gamma = names(Zgamma)
+            }
+        }
+        if (!is.null(kappaQ)) {
+            if (is.null(Q)) {
+                Q = unique(unname(unlist(kappaQ)))
+            }
+            if (is.null(kappa)) {
+                kappa = names(kappaQ)
             }
         }
     }
@@ -768,9 +835,10 @@ fect.default <- function(
     } else if (method == "cife") {
         all.var <- unique(c(
             index,
-            sfe,
-            time.inv,
-            time.trend,
+            Z,
+            Q,
+            gamma,
+            kappa,
             Y,
             D,
             X,
@@ -784,6 +852,15 @@ fect.default <- function(
     if (na.rm == TRUE) {
         data <- na.omit(data)
     } else {
+        if (length(index) > 2) {
+            for (extra.FE in index[3:length(index)]) {
+                if (sum(is.na(data[, extra.FE])) >= 1) {
+                    stop(
+                        "\"index\" should not have missing values when setting \"na.rm\" to FALSE."
+                    )
+                }
+            }
+        }
         if (
             sum(is.na(data[, D])) >= 1 |
                 sum(is.na(data[, index[1]])) >= 1 |
@@ -893,8 +970,6 @@ fect.default <- function(
         data[, index[2]] <- as.character(data[, index[2]])
     }
 
-    id <- index[1]
-    time <- index[2]
     TT.old <- TT <- length(unique(data[, time]))
     N.old <- N <- length(unique(data[, id]))
     p <- length(Xname)
@@ -967,9 +1042,9 @@ fect.default <- function(
     }
 
     if (method == "cife") {
-        if (!is.null(sfe)) {
-            for (sub.sfe in sfe) {
-                data[, sub.sfe] <- as.numeric(as.factor(data[, sub.sfe]))
+        if (length(index) > 2) {
+            for (extra.FE in index[3:length(index)]) {
+                data[, extra.FE] <- as.numeric(as.factor(data[, extra.FE]))
             }
         }
     }
@@ -1068,7 +1143,18 @@ fect.default <- function(
         }
 
         if (method == "cife") {
-            variable <- unique(c(sfe, time.inv, time.trend, variable))
+            if (length(index) > 2) {
+                variable <- unique(c(
+                    index[3:length(index)],
+                    Z,
+                    Q,
+                    gamma,
+                    kappa,
+                    variable
+                ))
+            } else {
+                variable <- unique(c(Z, Q, gamma, kappa, variable))
+            }
         }
 
         if (!is.null(cl)) {
@@ -1111,7 +1197,6 @@ fect.default <- function(
     if (!is.null(carryover.rm)) {
         if (length(carryover.rm) == 1 & class(carryover.rm)[1] == "numeric") {
             if (carryover.rm > 0) {
-                # print(colnames(data))
                 newT <- c(1:TT)
                 data <- data[order(data[, id], data[, time]), ]
                 tempID <- unique(data[, id])
@@ -1200,10 +1285,6 @@ fect.default <- function(
         })
     }
 
-    ## each unit should have the same group index
-
-    ## message("\nOK2\n")
-
     ## treatment indicator: incorporates reversal treatments
     ## D==1 -> treatment
     D.origin <- D <- matrix(data[, Dname], TT, N)
@@ -1241,26 +1322,112 @@ fect.default <- function(
         }
     }
     data.colnames <- colnames(data)
-    X.sfe <- array(0, dim = c(TT, N, length(sfe)))
-    X.time.inv <- array(0, dim = c(TT, N, length(time.inv)))
-    X.time.trend <- array(0, dim = c(TT, N, length(time.trend)))
+    X.extra.FE <- array(0, dim = c(TT, N, length(index) - 2))
+    X.Z <- array(0, dim = c(TT, N, length(Z)))
+    if (is.null(gamma)) {
+        if (!is.null(Z)) {
+            gamma <- index[2]
+            X.gamma <- array(0, dim = c(TT, N, 1))
+            if (is.null(Zgamma)) {
+                Zgamma <- list()
+                Zgamma[[gamma]] <- Z
+            }
+        } else {
+            gamma <- NULL # Explicitly set gamma to NULL when Z is NULL
+            X.gamma <- array(0, dim = c(TT, N, 0))
+            if (is.null(Zgamma)) {
+                Zgamma <- list()
+            }
+        }
+    } else {
+        if (is.null(Z)) {
+            stop("\"gamma\" cannot be specified while \"Z\" is not specified.")
+        } else {
+            X.gamma <- array(0, dim = c(TT, N, length(gamma)))
+            if (is.null(Zgamma)) {
+                Zgamma <- list()
+                Zgamma[[gamma]] <- Z
+            }
+        }
+    }
+    X.Q <- array(0, dim = c(TT, N, length(Q)))
+    if (is.null(kappa)) {
+        if (!is.null(Q)) {
+            kappa <- index[1]
+            X.kappa <- array(0, dim = c(TT, N, 1))
+            if (is.null(kappaQ)) {
+                kappaQ <- list()
+                kappaQ[[kappa]] <- Q
+            }
+        } else {
+            kappa <- NULL # Explicitly set kappa to NULL when Q is NULL
+            X.kappa <- array(0, dim = c(TT, N, 0))
+            if (is.null(kappaQ)) {
+                kappaQ <- list()
+            }
+        }
+    } else {
+        if (is.null(Q)) {
+            stop("\"kappa\" cannot be specified while \"Q\" is not specified.")
+        } else {
+            X.kappa <- array(0, dim = c(TT, N, length(kappa)))
+            if (is.null(kappaQ)) {
+                kappaQ <- list()
+                kappaQ[[kappa]] <- Q
+            }
+        }
+    }
     if (method == "cife") {
-        if (!is.null(sfe)) {
-            for (i in 1:length(sfe)) {
-                X.sfe[,, i] <- matrix(data[, sfe[i]], TT, N)
+        if (length(index) > 2) {
+            for (i in 1:(length(index) - 2)) {
+                X.extra.FE[,, i] <- matrix(data[, index[i + 2]], TT, N)
             }
         }
 
-        if (!is.null(time.inv)) {
-            for (i in 1:length(time.inv)) {
-                X.time.inv[,, i] <- matrix(data[, time.inv[i]], TT, N)
+        if (!is.null(Z)) {
+            for (i in 1:length(Z)) {
+                X.Z[,, i] <- matrix(data[, Z[i]], TT, N)
             }
         }
 
-        if (!is.null(time.trend)) {
-            for (i in 1:length(time.trend)) {
-                X.time.trend[,, i] <- matrix(data[, time.trend[i]], TT, N)
+        if (!is.null(Q)) {
+            for (i in 1:length(Q)) {
+                X.Q[,, i] <- matrix(data[, Q[i]], TT, N)
             }
+        }
+
+        if (length(gamma) > 1) {
+            for (i in 1:length(gamma)) {
+                X.gamma[,, i] <- matrix(data[, gamma[i]], TT, N)
+            }
+        } else if (length(gamma) == 1) {
+            X.gamma[,, 1] <- matrix(data[, gamma], TT, N)
+        }
+
+        if (length(kappa) > 1) {
+            for (i in 1:length(kappa)) {
+                X.kappa[,, i] <- matrix(data[, kappa[i]], TT, N)
+            }
+        } else if (length(kappa) == 1) {
+            X.kappa[,, 1] <- matrix(data[, kappa], TT, N)
+        }
+
+        Zgamma.id <- list()
+        for (key in names(Zgamma)) {
+            value <- c()
+            for (i in 1:length(Zgamma[[key]])) {
+                value <- c(value, which(Z == Zgamma[[key]][i]))
+            }
+            Zgamma.id[[which(gamma == key)]] <- value
+        }
+
+        kappaQ.id <- list()
+        for (key in names(kappaQ)) {
+            value <- c()
+            for (i in 1:length(kappaQ[[key]])) {
+                value <- c(value, which(Q == kappaQ[[key]][i]))
+            }
+            kappaQ.id[[which(kappa == key)]] <- value
         }
     }
 
@@ -1335,6 +1502,14 @@ fect.default <- function(
                     -rm.id
                 ])
             }
+        }
+        if (method == "cife") {
+            rm.id.diff <- setdiff(1:dim(X.extra.FE)[2], rm.id)
+            X.extra.FE <- X.extra.FE[, rm.id.diff, , drop = FALSE]
+            X.Z <- X.Z[, rm.id.diff, , drop = FALSE]
+            X.Q <- X.Q[, rm.id.diff, , drop = FALSE]
+            X.gamma <- X.gamma[, rm.id.diff, , drop = FALSE]
+            X.kappa <- X.kappa[, rm.id.diff, , drop = FALSE]
         }
     }
 
@@ -1548,6 +1723,14 @@ fect.default <- function(
                     ]][, -rm.id.2.pos])
                 }
             }
+            if (method == "cife") {
+                rm.id.2.diff <- setdiff(1:dim(X.extra.FE)[2], rm.id.2.pos)
+                X.extra.FE <- X.extra.FE[, rm.id.2.diff, , drop = FALSE]
+                X.Z <- X.Z[, rm.id.2.diff, , drop = FALSE]
+                X.Q <- X.Q[, rm.id.2.diff, , drop = FALSE]
+                X.gamma <- X.gamma[, rm.id.2.diff, , drop = FALSE]
+                X.kappa <- X.kappa[, rm.id.2.diff, , drop = FALSE]
+            }
         }
     }
 
@@ -1623,6 +1806,14 @@ fect.default <- function(
                         ind.name
                     ]][, -rm.id.3.pos])
                 }
+            }
+            if (method == "cife") {
+                rm.id.3.diff <- setdiff(1:dim(X.extra.FE)[2], rm.id.3.pos)
+                X.extra.FE <- X.extra.FE[, rm.id.3.diff, , drop = FALSE]
+                X.Z <- X.Z[, rm.id.3.diff, , drop = FALSE]
+                X.Q <- X.Q[, rm.id.3.diff, , drop = FALSE]
+                X.gamma <- X.gamma[, rm.id.3.diff, , drop = FALSE]
+                X.kappa <- X.kappa[, rm.id.3.diff, , drop = FALSE]
             }
         }
     }
@@ -1801,9 +1992,13 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
-                    X.sfe = X.sfe,
-                    X.time.inv = X.time.inv,
-                    X.time.trend = X.time.trend,
+                    X.extra.FE = X.extra.FE,
+                    X.Z = X.Z,
+                    X.Q = X.Q,
+                    X.gamma = X.gamma,
+                    X.kappa = X.kappa,
+                    Zgamma.id = Zgamma.id,
+                    kappaQ.id = kappaQ.id,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -1946,9 +2141,13 @@ fect.default <- function(
             degree = degree,
             sfe = sfe,
             cfe = cfe,
-            X.sfe = X.sfe,
-            X.time.inv = X.time.inv,
-            X.time.trend = X.time.trend,
+            X.extra.FE = X.extra.FE,
+            X.Z = X.Z,
+            X.Q = X.Q,
+            X.gamma = X.gamma,
+            X.kappa = X.kappa,
+            Zgamma.id = Zgamma.id,
+            kappaQ.id = kappaQ.id,
             ind.matrix = index.matrix,
             knots = knots,
             criterion = criterion,
@@ -2004,7 +2203,6 @@ fect.default <- function(
         proportion <- 0
     }
     max.count <- max(out$count)
-    # print(pre.periods)
     max.pre.periods <- out$time[which(
         out$count >= max.count * proportion & out$time <= 0
     )]
@@ -2198,6 +2396,13 @@ fect.default <- function(
                     T.on.carry = T.on.carry,
                     method = method,
                     degree = degree,
+                    X.extra.FE = X.extra.FE,
+                    X.Z = X.Z,
+                    X.Q = X.Q,
+                    X.gamma = X.gamma,
+                    X.kappa = X.kappa,
+                    Zgamma.id = Zgamma.id,
+                    kappaQ.id = kappaQ.id,
                     knots = knots,
                     criterion = criterion,
                     CV = 0,

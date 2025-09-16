@@ -43,9 +43,13 @@ fect_boot <- function(
   degree = 2,
   sfe = NULL,
   cfe = NULL,
-  X.sfe = NULL,
-  X.time.inv = NULL,
-  X.time.trend = NULL,
+  X.extra.FE = NULL,
+  X.Z = NULL,
+  X.Q = NULL,
+  X.gamma = NULL,
+  X.kappa = NULL,
+  Zgamma.id = NULL,
+  kappaQ.id = NULL,
   ind.matrix = NULL,
   knots = NULL,
   criterion = "mspe",
@@ -261,9 +265,13 @@ fect_boot <- function(
           X = X,
           D = D,
           W = W,
-          X.sfe = X.sfe,
-          X.time.inv = X.time.inv,
-          X.time.trend = X.time.trend,
+          X.extra.FE = X.extra.FE,
+          X.Z = X.Z,
+          X.Q = X.Q,
+          X.gamma = X.gamma,
+          X.kappa = X.kappa,
+          Zgamma.id = Zgamma.id,
+          kappaQ.id = kappaQ.id,
           I = I,
           II = II,
           T.on = T.on,
@@ -1233,7 +1241,7 @@ fect_boot <- function(
       if (!is.null(W)) {
         W.boot <- W[, boot.id]
       }
-      
+
       # Adjust X.sfe, X.time.inv, X.time.trend for jackknife
       X.sfe.boot <- NULL
       X.time.inv.boot <- NULL
@@ -1433,9 +1441,13 @@ fect_boot <- function(
               X = X.boot,
               D = D.boot,
               W = W.boot,
-              X.sfe = X.sfe.boot,
-              X.time.inv = X.time.inv.boot,
-              X.time.trend = X.time.trend.boot,
+              X.extra.FE = X.extra.FE,
+              X.Z = X.Z,
+              X.Q = X.Q,
+              X.gamma = X.gamma,
+              X.kappa = X.kappa,
+              Zgamma.id = Zgamma.id,
+              kappaQ.id = kappaQ.id,
               I = I.boot,
               II = II[, boot.id],
               T.on = T.on[, boot.id],

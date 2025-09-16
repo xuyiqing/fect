@@ -5,8 +5,9 @@
 /* Complex Interactive Fixed Effects: ub */
 // [[Rcpp::export]]
 List complex_inter_fe_ub(
-    arma::mat Y, arma::mat Y0, arma::cube X_covariates, arma::cube X_sfe,
-    arma::cube X_time_inv, arma::cube X_time_trend, arma::mat I, arma::mat W,
+    arma::mat Y, arma::mat Y0, arma::cube X_covariates, arma::cube X_extra_FE,
+    arma::cube X_Z, arma::cube X_Q, arma::cube X_gamma, arma::cube X_kappa,
+    Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, arma::mat I, arma::mat W,
     arma::mat beta0,
     int r, // r > 0, the outcome has a factor-type fixed effect; r = 0 else
     int force, double tol = 1e-5, int max_iter = 1000) {
@@ -91,8 +92,9 @@ List complex_inter_fe_ub(
   } else {
     invXX = XXinv(XX); // compute (X'X)^{-1}, outside beta iteration
   }
-  List cife = cife_iter(XX, invXX, X_sfe, X_time_inv, X_time_trend,
-                        YY, Y0, I, W, beta0, force, r, tol, max_iter);
+  List cife =
+      cife_iter(XX, invXX, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id,
+                kappaQ_id, YY, Y0, I, W, beta0, force, r, tol, max_iter);
 
   mu = as<double>(cife["mu"]);
   beta = as<arma::mat>(cife["beta"]);
@@ -194,7 +196,7 @@ List complex_inter_fe_ub(
   output["IC"] = IC;
   output["PC"] = PC;
   output["validX"] = validX;
-  output["time_invariant"] = cife["time_invariant"];
-  output["time_trend"] = cife["time_trend"];
+  output["gamma"] = cife["gamma"];
+  output["kappa"] = cife["kappa"];
   return (output);
 }

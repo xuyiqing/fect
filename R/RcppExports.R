@@ -81,36 +81,36 @@ inter_fe_d_ub <- function(Y, Y_fit0, FE0, X, I, r, force, mniter = 5000L, w = 1.
     .Call(`_fect_inter_fe_d_ub`, Y, Y_fit0, FE0, X, I, r, force, mniter, w, tol)
 }
 
-complex_inter_fe_ub <- function(Y, Y0, X_covariates, X_sfe, X_time_inv, X_time_trend, I, W, beta0, r, force, tol = 1e-5, max_iter = 1000L) {
-    .Call(`_fect_complex_inter_fe_ub`, Y, Y0, X_covariates, X_sfe, X_time_inv, X_time_trend, I, W, beta0, r, force, tol, max_iter)
+complex_inter_fe_ub <- function(Y, Y0, X_covariates, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, I, W, beta0, r, force, tol = 1e-5, max_iter = 1000L) {
+    .Call(`_fect_complex_inter_fe_ub`, Y, Y0, X_covariates, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, I, W, beta0, r, force, tol, max_iter)
 }
 
 YY_adj <- function(YYYY, EEE, I, use_weight, W) {
     .Call(`_fect_YY_adj`, YYYY, EEE, I, use_weight, W)
 }
 
-Demean <- function(E, force, X_sfe, sfe_index_cache) {
-    .Call(`_fect_Demean`, E, force, X_sfe, sfe_index_cache)
+Demean <- function(E, force, X_extra_FE, extra_FE_index_cache) {
+    .Call(`_fect_Demean`, E, force, X_extra_FE, extra_FE_index_cache)
 }
 
-fixed_effects_part <- function(E, force, X_sfe, sfe_index_cache) {
-    .Call(`_fect_fixed_effects_part`, E, force, X_sfe, sfe_index_cache)
+fixed_effects_part <- function(E, force, X_extra_FE, extra_FE_index_cache) {
+    .Call(`_fect_fixed_effects_part`, E, force, X_extra_FE, extra_FE_index_cache)
 }
 
-Gamma <- function(E, Z, zzinv) {
-    .Call(`_fect_Gamma`, E, Z, zzinv)
+Gamma <- function(E, Z, zzinv, gamma_t_group) {
+    .Call(`_fect_Gamma`, E, Z, zzinv, gamma_t_group)
 }
 
-gamma_part <- function(E, Z, zzinv) {
-    .Call(`_fect_gamma_part`, E, Z, zzinv)
+gamma_part <- function(E, Z, zzinv, gamma_t_group) {
+    .Call(`_fect_gamma_part`, E, Z, zzinv, gamma_t_group)
 }
 
-Kappa <- function(E, F, ffinv) {
-    .Call(`_fect_Kappa`, E, F, ffinv)
+Kappa <- function(E, Q, qqinv, kappa_i_group) {
+    .Call(`_fect_Kappa`, E, Q, qqinv, kappa_i_group)
 }
 
-kappa_part <- function(E, F, ffinv) {
-    .Call(`_fect_kappa_part`, E, F, ffinv)
+kappa_part <- function(E, Q, qqinv, kappa_i_group) {
+    .Call(`_fect_kappa_part`, E, Q, qqinv, kappa_i_group)
 }
 
 Beta <- function(X, xxinv, E) {
@@ -129,8 +129,8 @@ ife_part <- function(E, r) {
     .Call(`_fect_ife_part`, E, r)
 }
 
-cife_iter <- function(XX, xxinv, X_sfe, X_time_inv, X_time_trend, Y, Y0, I, W, beta0, force, r, tolerate, max_iter = 1000L) {
-    .Call(`_fect_cife_iter`, XX, xxinv, X_sfe, X_time_inv, X_time_trend, Y, Y0, I, W, beta0, force, r, tolerate, max_iter)
+cife_iter <- function(XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter = 1000L) {
+    .Call(`_fect_cife_iter`, XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter)
 }
 
 Y_demean <- function(Y, force) {

@@ -1,7 +1,8 @@
 #include "fect.h"
 
 // [[Rcpp::export]]
-arma::mat YY_adj(arma::mat YYYY, arma::mat EEE, arma::mat I, int use_weight, arma::mat W) {
+arma::mat YY_adj(arma::mat YYYY, arma::mat EEE, arma::mat I, int use_weight,
+                 arma::mat W) {
   arma::mat YY = YYYY;
   if (use_weight == 1) {
     YY = wE_adj(YYYY, EEE, W, I); // e step: expeactation
@@ -13,10 +14,11 @@ arma::mat YY_adj(arma::mat YYYY, arma::mat EEE, arma::mat I, int use_weight, arm
 
 /* unbalanced panel: response demean function */
 // [[Rcpp::export]]
-List Demean(arma::mat E, int force, arma::cube X_sfe, std::vector<std::vector<arma::uvec>> sfe_index_cache) {
+List Demean(arma::mat E, int force, arma::cube X_extra_FE,
+            std::vector<std::vector<arma::uvec>> extra_FE_index_cache) {
   int T = E.n_rows;
   int N = E.n_cols;
-  int p_sfe = X_sfe.n_slices;
+  int p_extra_FE = X_extra_FE.n_slices;
   double mu = 0;
   arma::mat alpha_E(N, 1, arma::fill::zeros);
   arma::mat xi_E(T, 1, arma::fill::zeros);
@@ -48,18 +50,18 @@ List Demean(arma::mat E, int force, arma::cube X_sfe, std::vector<std::vector<ar
     E = E - repmat(alpha_E.t(), T, 1) - repmat(xi_E, 1, N) + mu;
   }
 
-  if (p_sfe > 0) {
-    for (int i = 0; i < p_sfe; i++) {
-      arma::mat sfe_mean(T, N, arma::fill::zeros);
-      for (unsigned int g = 0; g < sfe_index_cache[i].size(); g++) {
-        arma::uvec idx = sfe_index_cache[i][g];
+  if (p_extra_FE > 0) {
+    for (int i = 0; i < p_extra_FE; i++) {
+      arma::mat extra_FE_mean(T, N, arma::fill::zeros);
+      for (unsigned int g = 0; g < extra_FE_index_cache[i].size(); g++) {
+        arma::uvec idx = extra_FE_index_cache[i][g];
         if (idx.n_elem == 0)
           continue;
         double m = arma::mean(E.elem(idx));
-        sfe_mean.elem(idx).fill(m);
+        extra_FE_mean.elem(idx).fill(m);
       }
-      fit = fit + sfe_mean;
-      E = E - sfe_mean;
+      fit = fit + extra_FE_mean;
+      E = E - extra_FE_mean;
     }
   }
 
@@ -79,26 +81,51 @@ List Demean(arma::mat E, int force, arma::cube X_sfe, std::vector<std::vector<ar
 }
 
 // [[Rcpp::export]]
-List fixed_effects_part(arma::mat E, int force, arma::cube X_sfe, std::vector<std::vector<arma::uvec>> sfe_index_cache) {
+List fixed_effects_part(
+    arma::mat E, int force, arma::cube X_extra_FE,
+    std::vector<std::vector<arma::uvec>> extra_FE_index_cache) {
   List result;
-  result = Demean(E, force, X_sfe, sfe_index_cache);
+  result = Demean(E, force, X_extra_FE, extra_FE_index_cache);
   return (result);
 }
 
 // [[Rcpp::export]]
-arma::mat Gamma(const arma::mat E,const arma::mat Z, const arma::mat zzinv) {
+arma::mat Gamma(const arma::mat E, const arma::mat Z, const arma::mat zzinv,
+                arma::uvec gamma_t_group) {
   const int T = E.n_rows;
-  arma::mat gamma(Z.n_cols, T, arma::fill::zeros); // p x T
+  const int N = E.n_cols;
+  const int p = Z.n_cols;
+  arma::uvec uniq = arma::unique(gamma_t_group);
+  const int G = uniq.n_elem;
+
+  arma::mat sumE(G, N, arma::fill::zeros);
+  arma::ivec cnt(G, arma::fill::zeros);
   for (int t = 0; t < T; ++t) {
-    arma::vec y_t = E.row(t).t();                 // N x 1
-    gamma.col(t)  = zzinv * (Z.t() * y_t);       // p x 1
+    int g = static_cast<int>(gamma_t_group(t));
+    sumE.row(g) += E.row(t);
+    cnt(g)++;
   }
-  return gamma; // p x T  return zeta;
+
+  arma::mat gamma_group(p, G, arma::fill::zeros); // p x G
+  for (int g = 0; g < G; ++g) {
+    if (cnt(g) == 0)
+      continue;
+    arma::vec y_bar = (sumE.row(g) / double(cnt(g))).t(); // N x 1
+    gamma_group.col(g) = zzinv * (Z.t() * y_bar);         // p x 1
+  }
+
+  arma::mat gamma(p, T, arma::fill::zeros);
+  for (int t = 0; t < T; ++t) {
+    int g = static_cast<int>(gamma_t_group(t));
+    gamma.col(t) = gamma_group.col(g);
+  }
+  return gamma; // p x T
 }
 
 // [[Rcpp::export]]
-List gamma_part(arma::mat E, arma::mat Z, arma::mat zzinv) {
-  arma::mat gamma = Gamma(E, Z, zzinv);
+List gamma_part(arma::mat E, arma::mat Z, arma::mat zzinv,
+                arma::uvec gamma_t_group) {
+  arma::mat gamma = Gamma(E, Z, zzinv, gamma_t_group);
 
   arma::mat fit = (Z * gamma).t();
 
@@ -112,16 +139,44 @@ List gamma_part(arma::mat E, arma::mat Z, arma::mat zzinv) {
 }
 
 // [[Rcpp::export]]
-arma::mat Kappa(const arma::mat E,const arma::mat F, const arma::mat ffinv) {
-  arma::mat kappa = E.t() * F.t() * ffinv;
-  return kappa; // N x p_time_trend
+arma::mat Kappa(const arma::mat E, const arma::mat Q, const arma::mat qqinv,
+                arma::uvec kappa_i_group) {
+  const int T = E.n_rows;
+  const int N = E.n_cols;
+  const int q = Q.n_rows;
+  const arma::uvec uniq = arma::unique(kappa_i_group);
+  const int G = uniq.n_elem;
+
+  arma::mat sumE(T, G, arma::fill::zeros);
+  arma::ivec cnt(G, arma::fill::zeros);
+  for (int i = 0; i < N; ++i) {
+    int g = static_cast<int>(kappa_i_group(i));
+    sumE.col(g) += E.col(i);
+    cnt(g)++;
+  }
+
+  arma::mat kappa_group(G, q, arma::fill::zeros);
+  for (int g = 0; g < G; ++g) {
+    if (cnt(g) == 0)
+      continue;
+    arma::vec ybar = sumE.col(g) / double(cnt(g));   // T x 1
+    kappa_group.row(g) = (ybar.t() * Q.t()) * qqinv; // 1 x q
+  }
+
+  arma::mat kappa(N, q, arma::fill::zeros);
+  for (int i = 0; i < N; ++i) {
+    int g = static_cast<int>(kappa_i_group(i));
+    kappa.row(i) = kappa_group.row(g);
+  }
+  return kappa;
 }
 
 // [[Rcpp::export]]
-List kappa_part(arma::mat E, arma::mat F, arma::mat ffinv) {
-  arma::mat kappa = Kappa(E, F, ffinv);
+List kappa_part(arma::mat E, arma::mat Q, arma::mat qqinv,
+                arma::uvec kappa_i_group) {
+  arma::mat kappa = Kappa(E, Q, qqinv, kappa_i_group);
 
-  arma::mat fit = (kappa * F).t();
+  arma::mat fit = (kappa * Q).t();
 
   E = E - fit;
 
@@ -209,19 +264,23 @@ List ife_part(arma::mat E, int r) {
 
 /* Obtain cife; */
 // [[Rcpp::export]]
-List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
-               arma::cube X_time_inv,
-               arma::cube X_time_trend, 
-               arma::mat Y,
-               arma::mat Y0, arma::mat I, arma::mat W, arma::mat beta0,
-               int force, int r, double tolerate, int max_iter = 1000) {
+List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_extra_FE,
+               arma::cube X_Z, arma::cube X_Q, arma::cube X_gamma,
+               arma::cube X_kappa, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id,
+               arma::mat Y, arma::mat Y0, arma::mat I, arma::mat W,
+               arma::mat beta0, int force, int r, double tolerate,
+               int max_iter = 1000) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   int p = XX.n_slices;
+  int p_gamma = X_gamma.n_slices;
+  int p_kappa = X_kappa.n_slices;
   double dif = 1.0;
   double dif1 = 1.0;
   double dif2 = 1.0;
+  double dif2_tol = 0.0;
   double dif3 = 1.0;
+  double dif3_tol = 0.0;
   double dif4 = 1.0;
   double dif5 = 1.0;
   int niter = 0;
@@ -246,22 +305,33 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
   arma::mat YYY = Y;
 
   List result1;
-  List result2;
-  List result3;
+  std::vector<List> result2(p_gamma);
+  std::vector<List> result3(p_kappa);
   List result4;
   List result5;
+
   arma::mat fit(T, N, arma::fill::zeros);
   arma::mat fit_old(T, N, arma::fill::ones);
+
   arma::mat fit1(T, N, arma::fill::zeros);
   arma::mat fit1_old(T, N, arma::fill::ones);
-  arma::mat fit2(T, N, arma::fill::zeros);
-  arma::mat fit2_old(T, N, arma::fill::ones);
-  arma::mat fit3(T, N, arma::fill::zeros);
-  arma::mat fit3_old(T, N, arma::fill::ones);
+
+  arma::cube fit2(T, N, p_gamma, arma::fill::zeros);
+  arma::mat fit2sum = arma::sum(fit2, 2);
+  arma::mat fit2leftsum(T, N, arma::fill::zeros);
+  arma::cube fit2_old(T, N, p_gamma, arma::fill::ones);
+
+  arma::cube fit3(T, N, p_kappa, arma::fill::zeros);
+  arma::mat fit3sum = arma::sum(fit3, 2);
+  arma::mat fit3leftsum(T, N, arma::fill::zeros);
+  arma::cube fit3_old(T, N, p_kappa, arma::fill::ones);
+
   arma::mat fit4(T, N, arma::fill::zeros);
   arma::mat fit4_old(T, N, arma::fill::ones);
+
   arma::mat fit5(T, N, arma::fill::zeros);
   arma::mat fit5_old(T, N, arma::fill::ones);
+
   arma::mat FE(T, N, arma::fill::zeros);
 
   fit = Y0;
@@ -270,31 +340,86 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
     fit1 = fit1 + XX.slice(i) * beta0(i);
   }
 
-  FE = fit - fit1 - fit2 - fit3; // fit4 + fit5
+  FE = fit - fit1 - fit2sum - fit3sum; // fit4 + fit5
 
-  int N_time_inv = X_time_inv.n_cols;
-  int p_time_inv = X_time_inv.n_slices;
+  int N_time_inv = X_Z.n_cols;
+  int p_time_inv = X_Z.n_slices;
   arma::mat Z(N_time_inv, p_time_inv, arma::fill::zeros);
   for (int k = 0; k < p_time_inv; ++k) {
-    Z.col(k) = X_time_inv.slice(k).row(0).t();
+    Z.col(k) = X_Z.slice(k).row(0).t();
   }
-  arma::mat zzinv = arma::inv_sympd(Z.t() * Z);
 
-  const int T_time_trend = X_time_trend.n_rows;
-  const int p_time_trend = X_time_trend.n_slices;
-  arma::mat F(p_time_trend, T_time_trend, arma::fill::zeros);
+  std::vector<arma::uvec> gamma_t_group(p_gamma);
+  std::vector<arma::uvec> Zgamma_id_raw(p_gamma);
+  std::vector<arma::mat> zzinv(p_gamma);
+  for (int k = 0; k < p_gamma; ++k) {
+    arma::uvec raw_labels(T);
+    for (int t = 0; t < T; ++t) {
+      raw_labels(t) = static_cast<unsigned int>(X_gamma(t, 0, k));
+    }
+
+    arma::uvec uniq = arma::unique(raw_labels);
+    arma::uvec mapped(T);
+    for (int t = 0; t < T; ++t) {
+      arma::uvec pos = arma::find(uniq == raw_labels(t), 1);
+      unsigned int idx =
+          (pos.n_elem > 0) ? static_cast<unsigned int>(pos(0)) : 0u;
+      mapped(t) = idx;
+    }
+    gamma_t_group[k] = std::move(mapped);
+
+    Rcpp::IntegerVector v = Zgamma_id[k];
+    arma::uvec raw = Rcpp::as<arma::uvec>(v);
+    raw.transform([](arma::uword x) { return x > 0 ? x - 1 : 0; });
+    Zgamma_id_raw[k] = std::move(raw);
+
+    zzinv[k] = arma::inv_sympd(Z.cols(Zgamma_id_raw[k]).t() *
+                               Z.cols(Zgamma_id_raw[k]));
+  }
+
+  int T_time_trend = X_Q.n_rows;
+  int p_time_trend = X_Q.n_slices;
+  arma::mat Q(p_time_trend, T_time_trend, arma::fill::zeros);
   for (int k = 0; k < p_time_trend; ++k) {
-    F.row(k) = X_time_trend.slice(k).col(0).t();
+    Q.row(k) = X_Q.slice(k).col(0).t();
   }
-  arma::mat ffinv = arma::inv_sympd(F * F.t());
 
-  int p_sfe = X_sfe.n_slices;
-  std::vector<std::vector<arma::uvec>> sfe_index_cache;
-  sfe_index_cache.resize(p_sfe);
+  std::vector<arma::uvec> kappa_i_group(p_kappa);
+  std::vector<arma::uvec> kappaQ_id_raw(p_kappa);
+  std::vector<arma::mat> qqinv(p_kappa);
+  for (int k = 0; k < p_kappa; ++k) {
+    arma::uvec raw_labels(N);
+    for (int i = 0; i < N; ++i) {
+      raw_labels(i) = static_cast<unsigned int>(X_kappa(0, i, k));
+    }
 
-  if (p_sfe > 0) {
-    for (int i = 0; i < p_sfe; i++) {
-      arma::mat lab = X_sfe.slice(i);
+    arma::uvec uniq = arma::unique(raw_labels);
+    arma::uvec mapped(N);
+    for (int i = 0; i < N; ++i) {
+      arma::uvec pos = arma::find(uniq == raw_labels(i), 1);
+      unsigned int idx =
+          (pos.n_elem > 0) ? static_cast<unsigned int>(pos(0)) : 0u;
+      mapped(i) = idx;
+    }
+    kappa_i_group[k] = std::move(mapped);
+
+    Rcpp::IntegerVector v = kappaQ_id[k];
+    arma::uvec raw = Rcpp::as<arma::uvec>(v);
+    raw.transform([](arma::uword x) { return x > 0 ? x - 1 : 0; });
+    kappaQ_id_raw[k] = std::move(raw);
+
+    // qqinv should be (Q Q^T)^{-1} with Q having shape (q x T)
+    qqinv[k] = arma::inv_sympd(Q.rows(kappaQ_id_raw[k]) *
+                               Q.rows(kappaQ_id_raw[k]).t());
+  }
+
+  int p_extra_FE = X_extra_FE.n_slices;
+  std::vector<std::vector<arma::uvec>> extra_FE_index_cache;
+  extra_FE_index_cache.resize(p_extra_FE);
+
+  if (p_extra_FE > 0) {
+    for (int i = 0; i < p_extra_FE; i++) {
+      arma::mat lab = X_extra_FE.slice(i);
       arma::vec uniq = arma::unique(arma::vectorise(lab));
       std::vector<arma::uvec> idx_list;
       idx_list.reserve(uniq.n_elem);
@@ -304,31 +429,45 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
           idx_list.push_back(idx);
         }
       }
-      sfe_index_cache[i] = idx_list;
+      extra_FE_index_cache[i] = idx_list;
     }
   }
 
   int stop_burnin = 0;
-  while ((dif > tolerate || dif1 > tolerate || dif2 > tolerate ||
-          dif3 > tolerate || dif4 > tolerate || dif5 > tolerate) &&
-         niter <= max_iter) {
+  while (((dif > tolerate) || (dif1 > tolerate) || dif2_tol || dif3_tol ||
+          (dif4 > tolerate) || (dif5 > tolerate)) &&
+         (niter <= max_iter)) {
     YYY = E_adj(Y, fit, I);
-    result1 = beta_part(YYY - fit2 - fit3 - FE, XX, xxinv, W, use_weight);
+    result1 = beta_part(YYY - fit2sum - fit3sum - FE, XX, xxinv, W, use_weight);
     fit1 = as<arma::mat>(result1["fit"]);
 
-    YY = YY_adj(YYY - fit1 - fit3 - FE, fit2, I, use_weight, W);
-    result2 = gamma_part(YY, Z, zzinv);
-    fit2 = as<arma::mat>(result2["fit"]);
+    for (int k = 0; k < p_gamma; ++k) {
+      fit2leftsum = fit2sum - fit2.slice(k);
+      YY = YY_adj(YYY - fit1 - fit3sum - FE - fit2leftsum, fit2.slice(k), I,
+                  use_weight, W);
+      result2[k] =
+          gamma_part(YY, Z.cols(Zgamma_id_raw[k]), zzinv[k], gamma_t_group[k]);
+      fit2.slice(k) = as<arma::mat>(result2[k]["fit"]);
+      fit2sum = arma::sum(fit2, 2);
+    }
 
-    YY = YY_adj(YYY - fit1 - fit2 - FE, fit3, I, use_weight, W);
-    result3 = kappa_part(YY, F, ffinv);
-    fit3 = as<arma::mat>(result3["fit"]);
+    for (int k = 0; k < p_kappa; ++k) {
+      fit3leftsum = fit3sum - fit3.slice(k);
+      YY = YY_adj(YYY - fit1 - fit3leftsum - FE - fit2sum, fit3.slice(k), I,
+                  use_weight, W);
+      result3[k] =
+          kappa_part(YY, Q.rows(kappaQ_id_raw[k]), qqinv[k], kappa_i_group[k]);
+      fit3.slice(k) = as<arma::mat>(result3[k]["fit"]);
+      fit3sum = arma::sum(fit3, 2);
+    }
 
-    YY = YY_adj(YYY - fit1 - fit2 - fit3 - fit5, FE - fit5, I, use_weight, W);
-    result4 = fixed_effects_part(YY, force, X_sfe, sfe_index_cache);
+    YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit5, FE - fit5, I, use_weight,
+                W);
+    result4 = fixed_effects_part(YY, force, X_extra_FE, extra_FE_index_cache);
     fit4 = as<arma::mat>(result4["fit"]);
 
-    YY = YY_adj(YYY - fit1 - fit2 - fit3 - fit4, FE - fit4, I, use_weight, W);
+    YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit4, FE - fit4, I, use_weight,
+                W);
     if (use_weight == 1 && stop_burnin == 0) {
       r_burnin = d - niter;
       if (r_burnin <= r) {
@@ -341,7 +480,7 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
     fit5 = as<arma::mat>(result5["fit"]);
 
     FE = fit4 + fit5;
-    fit = fit1 + fit2 + fit3 + fit4 + fit5;
+    fit = fit1 + fit2sum + fit3sum + fit4 + fit5;
 
     if (use_weight == 1) {
       dif = arma::norm(W % (fit - fit_old), "fro") /
@@ -349,11 +488,25 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
     } else {
       dif = arma::norm(fit - fit_old, "fro") / arma::norm(fit_old, "fro");
     }
+
     dif1 = arma::norm(fit1 - fit1_old, "fro") / arma::norm(fit1_old, "fro");
-    dif2 = arma::norm(fit2 - fit2_old, "fro") / arma::norm(fit2_old, "fro");
-    dif3 = arma::norm(fit3 - fit3_old, "fro") / arma::norm(fit3_old, "fro");
+
+    dif2_tol = 0.0;
+    for (int k = 0; k < p_gamma; ++k) {
+      dif2 = arma::norm(fit2.slice(k) - fit2_old.slice(k), "fro") /
+             arma::norm(fit2_old.slice(k), "fro");
+      dif2_tol = dif2_tol || (dif2 > tolerate);
+    }
+
+    for (int k = 0; k < p_kappa; ++k) {
+      dif3 = arma::norm(fit3.slice(k) - fit3_old.slice(k), "fro") /
+             arma::norm(fit3_old.slice(k), "fro");
+      dif3_tol = dif3_tol || (dif3 > tolerate);
+    }
+
     dif4 = arma::norm(fit4 - fit4_old, "fro") / arma::norm(fit4_old, "fro");
     dif5 = arma::norm(fit5 - fit5_old, "fro") / arma::norm(fit5_old, "fro");
+
     fit_old = fit;
     fit1_old = fit1;
     fit2_old = fit2;
@@ -381,10 +534,19 @@ List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_sfe,
   result["lambda"] = result5["lambda"];
   result["factor"] = result5["factor"];
   result["VNT"] = result5["VNT"];
+
   if (use_weight == 1) {
     result["burn_in"] = abs(1 - stop_burnin);
   }
-  result["time_invariant"] = result2["gamma"];
-  result["time_trend"] = result3["kappa"];
+
+  List gamma_list(p_gamma);
+  for (int k = 0; k < p_gamma; ++k)
+    gamma_list[k] = result2[k]["gamma"];
+  result["gamma"] = gamma_list;
+
+  List kappa_list(p_kappa);
+  for (int k = 0; k < p_kappa; ++k)
+    kappa_list[k] = result3[k]["kappa"];
+  result["kappa"] = kappa_list;
   return (result);
 }

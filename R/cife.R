@@ -6,9 +6,15 @@ fect_cife <- function(
     X, # Explanatory variables:  (T*N*p) array
     D, # Indicator for treated unit (tr==1)
     W,
-    X.sfe = NULL, # index for sfe covariates
-    X.time.inv = NULL, # index for time invariant covariates
-    X.time.trend = NULL, # index for time trend covariates
+    X.extra.FE = NULL,
+    X.Z = NULL,
+    X.Q = NULL,
+    X.gamma = NULL,
+    X.kappa = NULL,
+    gamma = NULL,
+    kappa = NULL,
+    Zgamma.id = NULL,
+    kappaQ.id = NULL,
     I,
     II,
     T.on,
@@ -120,9 +126,13 @@ fect_cife <- function(
         YY,
         Y0,
         X,
-        X.sfe,
-        X.time.inv,
-        X.time.trend,
+        X.extra.FE,
+        X.Z,
+        X.Q,
+        X.gamma,
+        X.kappa,
+        Zgamma.id,
+        kappaQ.id,
         II,
         W.use,
         beta0,
@@ -142,9 +152,13 @@ fect_cife <- function(
                 YY,
                 Y0,
                 X,
-                X.sfe,
-                X.time.inv,
-                X.time.trend,
+                X.extra.FE,
+                X.Z,
+                X.Q,
+                X.gamma,
+                X.kappa,
+                Zgamma.id,
+                kappaQ.id,
                 II,
                 W.use,
                 beta0,
@@ -936,8 +950,8 @@ fect_cife <- function(
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
         pre.sd = pre.sd,
-        time.invariant = est.best$time_invariant,
-        time.trend = est.best$time_trend
+        gamma = est.best$gamma,
+        kappa = est.best$kappa
     )
 
     if (binary == 0) {
