@@ -262,9 +262,9 @@ List ife_part(arma::mat E, int r) {
   return (result);
 }
 
-/* Obtain cife; */
+/* Obtain cfe; */
 // [[Rcpp::export]]
-List cife_iter(arma::cube XX, arma::mat xxinv, arma::cube X_extra_FE,
+List cfe_iter(arma::cube XX, arma::mat xxinv, arma::cube X_extra_FE,
                arma::cube X_Z, arma::cube X_Q, arma::cube X_gamma,
                arma::cube X_kappa, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id,
                arma::mat Y, arma::mat Y0, arma::mat I, arma::mat W,

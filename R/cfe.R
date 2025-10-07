@@ -1,7 +1,7 @@
 ###################################################################
-## Complex IFE Model Function
+## Complex FE Model Function
 ###################################################################
-fect_cife <- function(
+fect_cfe <- function(
     Y, # Outcome variable, (T*N) matrix
     X, # Explanatory variables:  (T*N*p) array
     D, # Indicator for treated unit (tr==1)
@@ -122,7 +122,7 @@ fect_cife <- function(
         W.use[which(II == 0)] <- 0
     }
 
-    est.best <- complex_inter_fe_ub(
+    est.best <- complex_fe_ub(
         YY,
         Y0,
         X,
@@ -148,7 +148,7 @@ fect_cife <- function(
         if (r.cv == 0) {
             est.fect <- est.best
         } else {
-            est.fect <- complex_inter_fe_ub(
+            est.fect <- complex_fe_ub(
                 YY,
                 Y0,
                 X,

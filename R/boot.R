@@ -218,7 +218,7 @@ fect_boot <- function(
       if ("try-error" %in% class(out)) {
         stop("\nCannot estimate using full data with MC algorithm.\n")
       }
-    } else if (method %in% c("polynomial", "bspline", "cfe")) {
+    } else if (method %in% c("polynomial", "bspline", "cfe_old")) {
       out <- try(
         fect_polynomial(
           Y = Y,
@@ -258,9 +258,9 @@ fect_boot <- function(
       if ("try-error" %in% class(out)) {
         stop("\nCannot estimate.\n")
       }
-    } else if (method %in% c("cife")) {
+    } else if (method %in% c("cfe")) {
       out <- try(
-        fect_cife(
+        fect_cfe(
           Y = Y,
           X = X,
           D = D,
@@ -945,7 +945,7 @@ fect_boot <- function(
     }
   } else if (
     binary == FALSE &
-      method %in% c("ife", "mc", "polynomial", "bspline", "cfe") &
+      method %in% c("ife", "mc", "polynomial", "bspline", "cfe_old") &
       vartype == "parametric"
   ) {
     message("Parametric Bootstrap \n")
@@ -1064,7 +1064,7 @@ fect_boot <- function(
           ),
           silent = TRUE
         )
-      } else if (method %in% c("polynomial", "bspline", "cfe")) {
+      } else if (method %in% c("polynomial", "bspline", "cfe_old")) {
         boot <- try(
           fect_polynomial(
             Y = Y.boot,
@@ -1255,7 +1255,7 @@ fect_boot <- function(
       if (!is.null(X.time.trend)) {
         X.time.trend.boot <- X.time.trend[, boot.id, , drop = FALSE]
       }
-      if (method == "cfe") {
+      if (method == "cfe_old") {
         ind.matrix.boot <- list()
         for (ind.name in names(ind.matrix)) {
           ind.matrix.boot[[ind.name]] <- as.matrix(ind.matrix[[ind.name]][,
@@ -1434,9 +1434,9 @@ fect_boot <- function(
             ),
             silent = TRUE
           )
-        } else if (method == "cife") {
+        } else if (method == "cfe") {
           boot <- try(
-            fect_cife(
+            fect_cfe(
               Y = Y[, boot.id],
               X = X.boot,
               D = D.boot,
@@ -1477,7 +1477,7 @@ fect_boot <- function(
             ),
             silent = FALSE
           )
-        } else if (method %in% c("polynomial", "bspline", "cfe")) {
+        } else if (method %in% c("polynomial", "bspline", "cfe_old")) {
           boot <- try(
             fect_polynomial(
               Y = Y[, boot.id],
@@ -1581,7 +1581,7 @@ fect_boot <- function(
         "fect_fe",
         "fect_mc",
         "fect_polynomial",
-        "fect_cife",
+        "fect_cfe",
         "get_term",
         "fect_gsynth",
         "initialFit"

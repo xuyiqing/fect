@@ -73,8 +73,8 @@ assumptions.}
 \item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
 \item{knots}{a numeric vector specifying knots for the b-spline.}
 \item{degree}{an integer specifying the polynomial or b-spline degree.}
-\item{sfe}{vector specifying other fixed effects for \code{method="cfe"}.}
-\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
+\item{sfe}{vector specifying other fixed effects for \code{method="cfe_old"}.}
+\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe_old"}.}
 \item{balance.period}{a length-2 vector specifying a time range for a balanced sample.}
 \item{fill.missing}{a logical flag indicating whether to allow missing observations in a balanced sample.}
 \item{placeboTest}{a logical flag indicating whether to perform a placebo test.}

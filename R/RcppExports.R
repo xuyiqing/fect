@@ -81,8 +81,8 @@ inter_fe_d_ub <- function(Y, Y_fit0, FE0, X, I, r, force, mniter = 5000L, w = 1.
     .Call(`_fect_inter_fe_d_ub`, Y, Y_fit0, FE0, X, I, r, force, mniter, w, tol)
 }
 
-complex_inter_fe_ub <- function(Y, Y0, X_covariates, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, I, W, beta0, r, force, tol = 1e-5, max_iter = 1000L) {
-    .Call(`_fect_complex_inter_fe_ub`, Y, Y0, X_covariates, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, I, W, beta0, r, force, tol, max_iter)
+complex_fe_ub <- function(Y, Y0, X_covariates, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, I, W, beta0, r, force, tol = 1e-5, max_iter = 1000L) {
+    .Call(`_fect_complex_fe_ub`, Y, Y0, X_covariates, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, I, W, beta0, r, force, tol, max_iter)
 }
 
 YY_adj <- function(YYYY, EEE, I, use_weight, W) {
@@ -129,8 +129,8 @@ ife_part <- function(E, r) {
     .Call(`_fect_ife_part`, E, r)
 }
 
-cife_iter <- function(XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter = 1000L) {
-    .Call(`_fect_cife_iter`, XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter)
+cfe_iter <- function(XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter = 1000L) {
+    .Call(`_fect_cfe_iter`, XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter)
 }
 
 Y_demean <- function(Y, force) {

@@ -1,10 +1,10 @@
 #include "fect.h"
 
-// core cife model function
+// core cfe model function
 
-/* Complex Interactive Fixed Effects: ub */
+/* Complex Fixed Effects: ub */
 // [[Rcpp::export]]
-List complex_inter_fe_ub(
+List complex_fe_ub(
     arma::mat Y, arma::mat Y0, arma::cube X_covariates, arma::cube X_extra_FE,
     arma::cube X_Z, arma::cube X_Q, arma::cube X_gamma, arma::cube X_kappa,
     Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, arma::mat I, arma::mat W,
@@ -92,28 +92,28 @@ List complex_inter_fe_ub(
   } else {
     invXX = XXinv(XX); // compute (X'X)^{-1}, outside beta iteration
   }
-  List cife =
-      cife_iter(XX, invXX, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id,
+  List cfe =
+      cfe_iter(XX, invXX, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id,
                 kappaQ_id, YY, Y0, I, W, beta0, force, r, tol, max_iter);
 
-  mu = as<double>(cife["mu"]);
-  beta = as<arma::mat>(cife["beta"]);
-  U = as<arma::mat>(cife["e"]);
-  fit = as<arma::mat>(cife["fit"]);
+  mu = as<double>(cfe["mu"]);
+  beta = as<arma::mat>(cfe["beta"]);
+  U = as<arma::mat>(cfe["e"]);
+  fit = as<arma::mat>(cfe["fit"]);
   if (use_weight == 1) {
-    burn_in = as<int>(cife["burn_in"]);
+    burn_in = as<int>(cfe["burn_in"]);
   }
-  factor = as<arma::mat>(cife["factor"]);
-  lambda = as<arma::mat>(cife["lambda"]);
-  VNT = as<arma::mat>(cife["VNT"]);
+  factor = as<arma::mat>(cfe["factor"]);
+  lambda = as<arma::mat>(cfe["lambda"]);
+  VNT = as<arma::mat>(cfe["VNT"]);
 
   if (force == 1 || force == 3) {
-    alpha = as<arma::mat>(cife["alpha"]);
+    alpha = as<arma::mat>(cfe["alpha"]);
   }
   if (force == 2 || force == 3) {
-    xi = as<arma::mat>(cife["xi"]);
+    xi = as<arma::mat>(cfe["xi"]);
   }
-  niter = as<int>(cife["niter"]);
+  niter = as<int>(cfe["niter"]);
 
   /* sigma2 and IC */
   // number of estimated parameters
@@ -196,7 +196,7 @@ List complex_inter_fe_ub(
   output["IC"] = IC;
   output["PC"] = PC;
   output["validX"] = validX;
-  output["gamma"] = cife["gamma"];
-  output["kappa"] = cife["kappa"];
+  output["gamma"] = cfe["gamma"];
+  output["kappa"] = cfe["kappa"];
   return (output);
 }
