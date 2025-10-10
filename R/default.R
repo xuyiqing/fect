@@ -74,8 +74,8 @@ fect <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL, # c(1,2,3) or c("linear", "quadratic", "cubic")
-    Zgamma = NULL,
-    kappaQ = NULL,
+    Z.list = NULL,
+    Q.list = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
     fill.missing = FALSE, # whether to balance missing observations
     placeboTest = FALSE, # placebo test
@@ -144,8 +144,8 @@ fect.formula <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL,
-    Zgamma = NULL,
-    kappaQ = NULL,
+    Z.list = NULL,
+    Q.list = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
     fill.missing = FALSE, # whether to balance missing observations
     placeboTest = FALSE, # placebo test
@@ -246,8 +246,8 @@ fect.formula <- function(
         Q = Q,
         kappa = kappa,
         Q.type = Q.type,
-        Zgamma = Zgamma,
-        kappaQ = kappaQ,
+        Z.list = Z.list,
+        Q.list = Q.list,
         placebo.period = placebo.period,
         placeboTest = placeboTest,
         carryoverTest = carryoverTest,
@@ -318,8 +318,8 @@ fect.default <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL,
-    Zgamma = NULL,
-    kappaQ = NULL,
+    Z.list = NULL,
+    Q.list = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
     fill.missing = FALSE, # whether to balance missing observations
     placeboTest = FALSE, # placebo test
@@ -352,6 +352,18 @@ fect.default <- function(
         stop(
             "\"index\" option misspecified. Try, for example, index = c(\"unit.id\", \"time\")."
         )
+    }
+
+    if (!is.null(Z.list)) {
+        Zgamma <- setNames(as.list(names(Z.list)), unlist(Z.list))
+    } else {
+        Zgamma <- NULL
+    }
+
+    if (!is.null(Q.list)) {
+        kappaQ <- setNames(as.list(names(Q.list)), unlist(Q.list))
+    } else {
+        kappaQ <- NULL
     }
 
     id <- index[1]
@@ -807,7 +819,8 @@ fect.default <- function(
 
         if (!is.null(Zgamma)) {
             if (is.null(Z)) {
-                Z = unique(unname(unlist(Zgamma)))
+                stop("\"Z\" is not specified while \"Zgamma\" is specified.")
+                # Z = unique(unname(unlist(Zgamma)))
             }
             if (is.null(gamma)) {
                 gamma = names(Zgamma)
@@ -815,7 +828,8 @@ fect.default <- function(
         }
         if (!is.null(kappaQ)) {
             if (is.null(Q)) {
-                Q = unique(unname(unlist(kappaQ)))
+                stop("\"Q\" is not specified while \"kappaQ\" is specified.")
+                # Q = unique(unname(unlist(kappaQ)))
             }
             if (is.null(kappa)) {
                 kappa = names(kappaQ)
