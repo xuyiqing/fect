@@ -74,8 +74,8 @@ fect <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL, # c(1,2,3) or c("linear", "quadratic", "cubic")
-    Z.list = NULL,
-    Q.list = NULL,
+    Z.param = NULL,
+    Q.param = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
     fill.missing = FALSE, # whether to balance missing observations
     placeboTest = FALSE, # placebo test
@@ -144,8 +144,8 @@ fect.formula <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL,
-    Z.list = NULL,
-    Q.list = NULL,
+    Z.param = NULL,
+    Q.param = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
     fill.missing = FALSE, # whether to balance missing observations
     placeboTest = FALSE, # placebo test
@@ -246,8 +246,8 @@ fect.formula <- function(
         Q = Q,
         kappa = kappa,
         Q.type = Q.type,
-        Z.list = Z.list,
-        Q.list = Q.list,
+        Z.param = Z.param,
+        Q.param = Q.param,
         placebo.period = placebo.period,
         placeboTest = placeboTest,
         carryoverTest = carryoverTest,
@@ -318,8 +318,8 @@ fect.default <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL,
-    Z.list = NULL,
-    Q.list = NULL,
+    Z.param = NULL,
+    Q.param = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
     fill.missing = FALSE, # whether to balance missing observations
     placeboTest = FALSE, # placebo test
@@ -354,14 +354,14 @@ fect.default <- function(
         )
     }
 
-    if (!is.null(Z.list)) {
-        Zgamma <- setNames(as.list(names(Z.list)), unlist(Z.list))
+    if (!is.null(Z.param)) {
+        Zgamma <- setNames(as.list(names(Z.param)), unlist(Z.param))
     } else {
         Zgamma <- NULL
     }
 
-    if (!is.null(Q.list)) {
-        kappaQ <- setNames(as.list(names(Q.list)), unlist(Q.list))
+    if (!is.null(Q.param)) {
+        kappaQ <- setNames(as.list(names(Q.param)), unlist(Q.param))
     } else {
         kappaQ <- NULL
     }
@@ -445,7 +445,16 @@ fect.default <- function(
     ## method
     if (
         !method %in%
-            c("fe", "ife", "mc", "both", "polynomial", "cfe_old", "gsynth", "cfe")
+            c(
+                "fe",
+                "ife",
+                "mc",
+                "both",
+                "polynomial",
+                "cfe_old",
+                "gsynth",
+                "cfe"
+            )
     ) {
         stop(
             "\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"polynomial\",\"cfe\")."
@@ -604,7 +613,8 @@ fect.default <- function(
         }
     } else {
         if (
-            !method %in% c("gsynth", "ife", "mc", "polynomial", "cfe_old", "cfe")
+            !method %in%
+                c("gsynth", "ife", "mc", "polynomial", "cfe_old", "cfe")
         ) {
             stop(
                 "\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"polynomial\", \"cfe\")."
@@ -803,16 +813,18 @@ fect.default <- function(
             for (i in 1:length(Q.type)) {
                 Q.i <- tolower(as.character(Q.type[i]))
                 if (Q.i == "linear" || Q.i == "1") {
-                    data[, paste(time, "1", sep = ".")] <- data[, time] ** 1
+                    data[, paste(time, "1", sep = ".")] <- data[, time]**1
                     Q <- c(Q, paste(time, "1", sep = "."))
                 } else if (Q.i == "quadratic" || Q.i == "2") {
-                    data[, paste(time, "2", sep = ".")] <- data[, time] ** 2
+                    data[, paste(time, "2", sep = ".")] <- data[, time]**2
                     Q <- c(Q, paste(time, "2", sep = "."))
                 } else if (Q.i == "cubic" || Q.i == "3") {
-                    data[, paste(time, "3", sep = ".")] <- data[, time] ** 3
+                    data[, paste(time, "3", sep = ".")] <- data[, time]**3
                     Q <- c(Q, paste(time, "3", sep = "."))
                 } else {
-                    stop("\"Q.type\" must be in c(1, 2, 3) or c(\"linear\", \"quadratic\", \"cubic\").")
+                    stop(
+                        "\"Q.type\" must be in c(1, 2, 3) or c(\"linear\", \"quadratic\", \"cubic\")."
+                    )
                 }
             }
         }
