@@ -3743,7 +3743,7 @@ plot.fect <- function(
     ylab_final <- if (is.null(ylab)) "Treatment Effect" else ylab
 
     # --- Create the Plot ---
-    p <- ggplot(data_combined, aes_string(x = x_var_name))
+    p <- ggplot(data_combined, aes(x = .data[[x_var_name]]))
 
     if (theme.bw == TRUE) {
       p <- p + theme_bw()

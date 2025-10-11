@@ -1242,19 +1242,6 @@ fect_boot <- function(
         W.boot <- W[, boot.id]
       }
 
-      # Adjust X.sfe, X.time.inv, X.time.trend for jackknife
-      X.sfe.boot <- NULL
-      X.time.inv.boot <- NULL
-      X.time.trend.boot <- NULL
-      if (!is.null(X.sfe)) {
-        X.sfe.boot <- X.sfe[, boot.id, , drop = FALSE]
-      }
-      if (!is.null(X.time.inv)) {
-        X.time.inv.boot <- X.time.inv[, boot.id, , drop = FALSE]
-      }
-      if (!is.null(X.time.trend)) {
-        X.time.trend.boot <- X.time.trend[, boot.id, , drop = FALSE]
-      }
       if (method == "cfe_old") {
         ind.matrix.boot <- list()
         for (ind.name in names(ind.matrix)) {
