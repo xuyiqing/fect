@@ -1347,8 +1347,11 @@ fect.default <- function(
             }
         }
     }
+
     data.colnames <- colnames(data)
+
     X.extra.FE <- array(0, dim = c(TT, N, length(index) - 2))
+
     X.Z <- array(0, dim = c(TT, N, length(Z)))
     if (is.null(gamma)) {
         if (!is.null(Z)) {
@@ -1376,6 +1379,7 @@ fect.default <- function(
             }
         }
     }
+
     X.Q <- array(0, dim = c(TT, N, length(Q)))
     if (is.null(kappa)) {
         if (!is.null(Q)) {
@@ -1403,6 +1407,7 @@ fect.default <- function(
             }
         }
     }
+
     if (method == "cfe") {
         if (length(index) > 2) {
             for (i in 1:(length(index) - 2)) {
@@ -1455,6 +1460,9 @@ fect.default <- function(
             }
             kappaQ.id[[which(kappa == key)]] <- value
         }
+    } else {
+        Zgamma.id <- list()
+        kappaQ.id <- list()
     }
 
     ## ----------------------------------------------------------- ##

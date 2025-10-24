@@ -1992,15 +1992,6 @@ fect_boot <- function(
     }
 
     # --- Helper Functions ---
-    find_first <- function(vec, min_val = 1) {
-      if (!is.numeric(vec)) {
-        vec_num <- suppressWarnings(as.numeric(as.character(vec)))
-      } else {
-        vec_num <- vec
-      }
-      idx <- which(vec_num >= min_val & !is.na(vec_num))
-      if (length(idx) == 0) return(NA_integer_) else return(min(idx))
-    }
     calculate_first_treatment <- function(D_mat, N_val) {
       if (N_val == 0) {
         return(integer(0))
@@ -2011,7 +2002,23 @@ fect_boot <- function(
       if (!is.numeric(D_mat)) {
         mode(D_mat) <- "numeric"
       }
-      apply(D_mat, 2, find_first, min_val = 1)
+      # Vectorized: first index per column where D >= 1 (ignoring NAs),
+      # identical to apply(D_mat, 2, find_first, min_val = 1)
+      Tn <- nrow(D_mat)
+      if (is.null(Tn) || Tn == 0L) {
+        return(rep(NA_integer_, ncol(D_mat)))
+      }
+      cond <- !is.na(D_mat) & D_mat >= 1
+      has_true <- colSums(cond) > 0L
+      if (!any(has_true)) {
+        return(rep(NA_integer_, ncol(D_mat)))
+      }
+      score_mat <- matrix(Tn + 1L - seq_len(Tn), nrow = Tn, ncol = ncol(D_mat))
+      score_mat <- score_mat * as.integer(cond)
+      first_idx <- max.col(t(score_mat), ties.method = "first")
+      out_idx <- rep(NA_integer_, ncol(D_mat))
+      out_idx[has_true] <- first_idx[has_true]
+      out_idx
     }
 
     # --- Determine Treatment Timing and Type ---
@@ -2183,27 +2190,49 @@ fect_boot <- function(
           ) +
             1
 
-          for (e_idx in seq_along(event_times_range)) {
-            e <- event_times_range[e_idx]
-            potential_mask <- (event_time_matrix_b == e)
-            potential_mask[is.na(potential_mask)] <- FALSE
-            if (!any(potential_mask)) {
-              next
-            }
+          # Vectorized aggregation across all event times while preserving
+          # identical selection semantics and element order
+          evt_vec <- as.vector(event_time_matrix_b)
+          valid_evt <- !is.na(evt_vec)
+          D_vec <- as.vector(D_b)
+          Y_vec <- as.vector(Y_b)
+          Yct_vec <- as.vector(Yct_b)
 
-            if (e <= 0) {
-              final_mask <- potential_mask
+          lvl <- event_times_range
+          lvl_chr <- as.character(lvl)
+
+          # Indices for all observations at each event time (e can be <= 0 or > 0)
+          idx_all_list <- split(
+            which(valid_evt),
+            factor(evt_vec[valid_evt], levels = lvl)
+          )
+          # Indices for treated-period observations when e > 0 (D == 1)
+          idx_d1_list <- split(
+            which(valid_evt & D_vec == 1),
+            factor(evt_vec[valid_evt & D_vec == 1], levels = lvl)
+          )
+
+          tr_col <- rep(NA_real_, length(lvl))
+          cf_col <- rep(NA_real_, length(lvl))
+          for (e_i in seq_along(lvl)) {
+            e_val <- lvl[e_i]
+            if (e_val <= 0) {
+              idx_use <- idx_all_list[[lvl_chr[e_i]]]
+              if (!is.null(idx_use) && length(idx_use) > 0L) {
+                tr_col[e_i] <- mean(Y_vec[idx_use], na.rm = TRUE)
+                cf_col[e_i] <- mean(Yct_vec[idx_use], na.rm = TRUE)
+              }
             } else {
-              final_mask <- potential_mask & (D_b == 1)
-              final_mask[is.na(final_mask)] <- FALSE
+              idx_use <- idx_d1_list[[lvl_chr[e_i]]]
+              if (!is.null(idx_use) && length(idx_use) > 0L) {
+                tr_col[e_i] <- mean(Y_vec[idx_use], na.rm = TRUE)
+                cf_col[e_i] <- mean(Yct_vec[idx_use], na.rm = TRUE)
+              }
             }
-            if (!any(final_mask)) {
-              next
-            }
-
-            event_repl_tr[e_idx, b] <- mean(Y_b[final_mask], na.rm = TRUE)
-            event_repl_cf[e_idx, b] <- mean(Yct_b[final_mask], na.rm = TRUE)
           }
+
+          event_repl_tr[, b] <- tr_col
+          event_repl_cf[, b] <- cf_col
         }
       }
 
