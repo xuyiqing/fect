@@ -15,15 +15,16 @@ install.packages("fect")
 ```
 
 We recommend users to install the most up-to-date, stable version of **fect** from Github using:
+
 ```{r eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
 devtools::install_github("xuyiqing/fect")
 ```
 
 We fix bugs in the `dev` branch before merging into the main branch; therefore, it is often more up to date.
+
 ```{r eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
 devtools::install_github("xuyiqing/fect@dev")
 ```
-
 
 After installation, check **fect** version to make sure the package is up-to-date.
 
@@ -49,7 +50,7 @@ install_all <- function(packages) {
   }
 }
 packages <- c("abind", "doParallel", "doRNG", "fixest", "foreach", "future", 
-              "GGally", "ggplot2", "grid", "gridExtra", "Mass", 
+              "GGally", "ggplot2", "grid", "gridExtra", "MASS", 
               "panelView", "Rcpp")
 install_all(packages)
 ```

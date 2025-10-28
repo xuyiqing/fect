@@ -7,7 +7,7 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 *Inputs for* `fect(methods = "___")`
 
 | **Method** | **Model for** $\hat{Y}(0)$ | **References** |
-|--------------------|--------------------------------|--------------------|
+|------------------------|------------------------|------------------------|
 | **fe** | Standard two-way fixed effects model | Liu, Wang & Xu (2022), Borusyak, Jaravel & Spiess (2024) |
 | **ife** | Interactive fixed effects model | Gobillon & Magnac (2016), Xu (2017) |
 | **mc** | Matrix completion method | Athey et al. (2021) |
@@ -20,7 +20,7 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 *Inputs for* `plot(fect_object, type = "___")`
 
 | **Type** | **Description** | **Applicable Methods** |
-|-------------------|------------------------------|-----------------------|
+|------------------------|------------------------|------------------------|
 | **box** | Box plot of ATT by period. | fe, ife, mc, gsynth, polynomial, cfe |
 | **calendar** | CATT by calendar time. | fe, ife, mc, gsynth, polynomial, cfe |
 | **heterogenous** or **hte** | CATT by a covariate. | fe, ife, mc, gsynth, polynomial, cfe |
@@ -40,7 +40,7 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 *Inputs for* `fect(...)`
 
 | Input | **Description** | **Applicable Methods** |
-|-------------------|---------------------------------|--------------------|
+|------------------------|------------------------|------------------------|
 | `loo` | Leave-one-period-out goodness-of-fit test (`TRUE/FALSE`). | fe, ife, mc, gsynth |
 | `carryoverTest` | Tests for carryover effects in post-treatment periods (`TRUE/FALSE`). | fe, ife, mc |
 | `carryover.period` | Range of post-treatment periods for the carryover test (vector). | fe, ife, mc |
@@ -81,7 +81,7 @@ A check mark (✓) indicates that the method requires or accepts the input.
 ### Important Options
 
 | **Input** | **Options** | **Applicable Methods** |
-|:-------------------------|:---------------------------|:------------------|
+|:-----------------------|:-----------------------|:-----------------------|
 | `force` | Fixed effects structure: "none", "unit", "time", "two-way" (default) | fe, ife, mc, poly, cfe, gsynth |
 | `vartype` (when `method = "gsynth"`) | Uncertainty estimator: "parametric" (default), "bootstrap", "jackknife" | gsynth |
 | `vartype` (otherwise) | Uncertainty estimator: "bootstrap" (default), "jackknife" | fe, ife, mc, polynomial, cfe |
@@ -102,7 +102,7 @@ A check mark (✓) indicates that the method requires or accepts the input.
 -   **fect** includes several built-in values for optional arguments that often require an integer or boolean input. All boolean arguments (such as `parallel`, `se`, or `CV`) are set to `FALSE` by default to speed up computation. Below is a complementary table listing parameters that require numeric inputs.
 
 | **Inputs** | **Description** | **Default** |
-|:-----------------:|:---------------------------------|:-----------------:|
+|:--:|:---|:--:|
 | `degree` | The degree of the interacted fixed effects(int) | 2 |
 | `nboots` | Number of bootstrap runs (int) | 200 |
 | `k` | Sets the number of cross-validation rounds(int) | 10 |

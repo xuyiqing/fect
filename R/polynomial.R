@@ -115,7 +115,7 @@ fect_polynomial <- function(Y, # Outcome variable, (T*N) matrix
     sf <- NULL
     cf <- NULL
 
-    if (method == "cfe") {
+    if (method == "cfe_old") {
         vindex <- cbind(rep(1:N, each = TT), rep(1:TT, N)) ## id time
         if (force == 1) {
             sf <- 1

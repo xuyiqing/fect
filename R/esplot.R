@@ -684,11 +684,11 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     }
     p <- p +
       geom_ribbon(
-        data = data_base, aes_string(x = Period, ymin = CI.lower, ymax = CI.upper),
+        data = data_base, aes(x = .data[[Period]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
         fill = color, alpha = 0.2, inherit.aes = FALSE, na.rm = TRUE,
         color =  ifelse(ci.outline, grDevices::adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)), NA)) +
       geom_line(
-        data = data_base, aes_string(x = Period, y = Estimate),
+        data = data_base, aes(x = .data[[Period]], y = .data[[Estimate]]),
         linewidth = est.lwidth, color = color, inherit.aes = FALSE, na.rm = TRUE)
     if (show.points) {
       idx_int_points <- abs(as.numeric(data_base[[Period]]) - round(as.numeric(data_base[[Period]]))) < 1e-8 & !is.na(data_base[[Estimate]])
@@ -696,7 +696,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
 
       if(nrow(data_base_int) > 0) {
         p <- p + geom_point(
-          data = data_base_int, aes_string(x = Period, y = Estimate),
+          data = data_base_int, aes(x = .data[[Period]], y = .data[[Estimate]]),
           size = est.pointsize, color = color, inherit.aes = FALSE, na.rm = TRUE)
       }
     }
@@ -707,20 +707,20 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
         sub.data <- plot_data[idx_sub_data, ]
 
         if(nrow(sub.data) > 0){
-          p <- p + geom_ribbon(data = sub.data, aes_string(x = Period, ymin = CI.lower, ymax = CI.upper), inherit.aes = FALSE, na.rm = TRUE, fill = sub_color, alpha = 0.2, color =  ifelse(ci.outline, grDevices::adjustcolor(sub_color, offset = c(0.3,0.3,0.3,0)), NA)) +
-            geom_line(data = sub.data, aes_string(x = Period, y = Estimate), inherit.aes = FALSE, na.rm = TRUE, color = sub_color, linewidth = est.lwidth)
+          p <- p + geom_ribbon(data = sub.data, aes(x = .data[[Period]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]), inherit.aes = FALSE, na.rm = TRUE, fill = sub_color, alpha = 0.2, color =  ifelse(ci.outline, grDevices::adjustcolor(sub_color, offset = c(0.3,0.3,0.3,0)), NA)) +
+            geom_line(data = sub.data, aes(x = .data[[Period]], y = .data[[Estimate]]), inherit.aes = FALSE, na.rm = TRUE, color = sub_color, linewidth = est.lwidth)
           if(show.points){
             idx_sub_data_int <- abs(as.numeric(sub.data[[Period]]) - round(as.numeric(sub.data[[Period]]))) < 1e-8 & !is.na(sub.data[[Estimate]])
             sub.data.int <- sub.data[idx_sub_data_int, ]
 
-            if(nrow(sub.data.int) > 0) p <- p + geom_point(data = sub.data.int, aes_string(x = Period, y = Estimate), size = est.pointsize, color = sub_color, inherit.aes = FALSE, na.rm = TRUE)
+            if(nrow(sub.data.int) > 0) p <- p + geom_point(data = sub.data.int, aes(x = .data[[Period]], y = .data[[Estimate]]), size = est.pointsize, color = sub_color, inherit.aes = FALSE, na.rm = TRUE)
           }
         }
       }
     }
   } else { # Not connected
     p <- p + geom_pointrange(
-      aes_string(x = Period, y = Estimate, ymin = CI.lower, ymax = CI.upper),
+      aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
       lwd = est.lwidth, color = color, fill = color, fatten = est.pointsize, na.rm = TRUE)
 
     if (!is.null(highlight.periods) && length(highlight.periods) > 0) {
@@ -732,7 +732,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
 
         if(nrow(sub_data_point) > 0) {
           p <- p + geom_pointrange(
-            data = sub_data_point, aes_string(x = Period, y = Estimate, ymin = CI.lower, ymax = CI.upper),
+            data = sub_data_point, aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
             lwd = est.lwidth, color = hp_color, fill = hp_color, fatten = est.pointsize, inherit.aes = FALSE, na.rm = TRUE)
         }
       }

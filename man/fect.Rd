@@ -20,6 +20,9 @@ assumptions.}
             f.threshold = 0.5, tost.threshold = NULL,
             knots = NULL, degree = 2,
             sfe = NULL, cfe = NULL,
+            Z = NULL, gamma = NULL, Q = NULL, kappa = NULL, 
+            Q.type = NULL, # c(1,2,3) or c("linear", "quadratic", "cubic")
+            Z.param = NULL, Q.param = NULL,
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,
             carryoverTest = FALSE, carryover.period = NULL, carryover.rm = NULL,
@@ -73,8 +76,15 @@ assumptions.}
 \item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
 \item{knots}{a numeric vector specifying knots for the b-spline.}
 \item{degree}{an integer specifying the polynomial or b-spline degree.}
-\item{sfe}{vector specifying other fixed effects for \code{method="cfe"}.}
-\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
+\item{sfe}{vector specifying other fixed effects for \code{method="cfe_old"}.}
+\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe_old"}.}
+\item{Z}{a vector specifying the time-invariant covariates for the Z matrix.}
+\item{gamma}{a vector specifying the time-varying covariates for the gamma matrix.}
+\item{Q}{a vector specifying the time-varying covariates for the Q matrix.}
+\item{kappa}{a vector specifying the time-invariant covariates for the kappa matrix.}
+\item{Q.type}{a vector specifying the type of Q matrix.}
+\item{Z.param}{a list specifying the parameters for the Z matrix.}
+\item{Q.param}{a list specifying the parameters for the Q matrix.}
 \item{balance.period}{a length-2 vector specifying a time range for a balanced sample.}
 \item{fill.missing}{a logical flag indicating whether to allow missing observations in a balanced sample.}
 \item{placeboTest}{a logical flag indicating whether to perform a placebo test.}

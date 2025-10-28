@@ -45,6 +45,7 @@ Using the current version of **fect**, we can apply several different methods to
 The two-way fixed effects counterfactual estimator (FEct) is also independently proposed by @BJS2024 and @gardnertwo, who refer to it as the "imputation method" and "two-stage DID," respectively.
 
 ### Estimation
+
 We estimate the average treatment effect on the treated (ATT) using the following information: the outcome variable $Y$, binary treatment variable $D$, two observed covariates $X_{1}$ and $X_{2}$, and the unit and time indicators $id$ and $time$, respectively.
 
 The first variable on the right hand side of the formula is the treatment indicator $D$; the rest of the right-hand-side variables serve as controls. The `index` option specifies the unit and time indicators. The `force` option ("none", "unit", "time", and "two-way") specifies the additive component(s) of the fixed effects included in the model. The default option is "two-way" (including both unit and time fixed effects).
@@ -55,6 +56,7 @@ out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 ```
 
 ### Visualization
+
 We can use the `plot` function to visualize the estimation results. By default, the `plot` function produces a "gap" plot -- as if we type `plot(out.fect, type = "gap")` --- which visualizes the estimated period-wise ATT (dynamic treatment effects). For your reference, the true population average effects in `simdata` go from 1 to 3 from the 1st to the 10th post-treatment period.
 
 The bar plot at the bottom of the plot shows the number of treated units for each time period. The options `cex.main`, `cex.lab`, `cex.axis`, and `cex.text` adjust the font sizes of the title, axis labels, axis numbers, and in-graph text, respectively.
@@ -68,16 +70,14 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
 
 The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power.
 
-The graph is a **ggplot2** object; user can conveniently use the `ggsave` (preferred) function to export the resulting plot. See [Chapter @sec-plots] for more visualization options. 
+The graph is a **ggplot2** object; user can conveniently use the `ggsave` (preferred) function to export the resulting plot. See [Chapter @sec-plots] for more visualization options.
 
-### Uncertainty estimates 
+### Uncertainty estimates
 
 The package can produce uncertainty estimates when `se = TRUE`. One can use the non-parametric bootstrap procedure by setting `vartype = "bootstrap"`. Note that it only works well when the number of units is relatively large and many units in the data set experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
 
-Alternatively, users can obtain uncertainty estimates using the jackknife method by specifying `vartype = "jackknife"`. The algorithm obtains standard errors by iteratively dropping one unit (the entire time-series) from the dataset.
-
 ::: {.callout-note appearance="simple"}
-Parallel computing will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
+**Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
 :::
 
 ```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
@@ -86,6 +86,14 @@ out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
   cores = 8, parallel = TRUE, nboots = 1000)
 ```
 
+::: {.callout-note appearance="simple"}
+**Clustering.**
+
+-   By default, `fect()` uses cluster-bootstrap at the `unit` level when `se = TRUE`, that is `vartype = "bootstrap"`. The uncertainty estimates thus account for arbitrary serial correlation within a unit over time—commonly understood as being "clustered" at the unit level. In the example above, the unit is `id`, hence, by default, `cl = "id"`.
+-   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level. In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset.
+-   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option.
+:::
+
 The `plot()` function can visualize the estimated period-wise ATTs as well as their uncertainty estimates. `stats = "F.p"` shows the p-value for the F test of no-pretrend (more details below).
 
 ```{r fect_plot_nse, fig.width = 6, fig.height = 4.5}
@@ -93,7 +101,8 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")
 ```
 
-### Save estiamtes 
+### Save estiamtes
+
 Users can use the `print` function to take a look at a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. Specifically, `est.avg` and `est.avg.unit` show the ATT averaged over all periods -- the former weights each treated observation equally while the latter weights each treated unit equally. `est.beta` reports the coefficients of the time-varying covariates. `est.att` reports the average treatment effect on the treated (ATT) by period. Treatment effect estimates from each bootstrap run is stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
 
 ```{r}
@@ -110,7 +119,7 @@ out.fect$est.beta
 
 ### Leave-on-out approach
 
-@li2025benchmarking show that in some applications, pre-trend estimates based on in-sample model fit can lead to the mistaken belief that no pre-trend exists, even when a non-parallel pre-trend is present. A simple fix is to use a leave-one-out method by setting `loo = TRUE` to obtain these estimates, although it is significantly more time-consuming. 
+@li2025benchmarking show that in some applications, pre-trend estimates based on in-sample model fit can lead to the mistaken belief that no pre-trend exists, even when a non-parallel pre-trend is present. A simple fix is to use a leave-one-out method by setting `loo = TRUE` to obtain these estimates, although it is significantly more time-consuming.
 
 ::: {.callout-note appearance="simple"}
 We recommend setting `loo = TRUE` when (i) the event-study plot is intended as a critical piece of evidence to support the parallel trends assumption, which is often the case, or (ii) when implementing an equivalence test for the pre-trend estimates. For more discussion on the LOO pre-trend test, see [here](#loo-pre-trend-test)
@@ -118,14 +127,16 @@ We recommend setting `loo = TRUE` when (i) the event-study plot is intended as a
 Our most preferred test, however, is the sensitivity analysis discussed in [Chapter @sec-panel-sens], which combines out-of-sample placebo estimates with post-treatment ATT estimates.
 :::
 
-We can implement the leave-one-out pre-trend test by setting `loo = TRUE`. 
+We can implement the leave-one-out pre-trend test by setting `loo = TRUE`.
+
 ```{r fect_loo, eval=TRUE, cache = TRUE, message = FALSE}
 out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
   method = "fe", force = "two-way", se = TRUE, loo = TRUE,
   cores = 8, parallel = TRUE, nboots = 200)
 ```
 
-The event study plot utilizing leave-one-out for pretreatment estimates is shown below. This graph is fairly similar to the graphics we presented earlier without using leave-one-out. However, this is not always true. 
+The event study plot utilizing leave-one-out for pretreatment estimates is shown below. This graph is fairly similar to the graphics we presented earlier without using leave-one-out. However, this is not always true.
+
 ```{r, fig.width = 6, fig.height = 4.5}
 plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO", 
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
@@ -247,6 +258,7 @@ plot(out.ife, type = "calendar", xlim = c(1, 35))
 ### CATT by a covariate
 
 By setting `type = "hte"` or `type = "heterogeneous`, we can also plot the HTE by arbitrary covariates that are unaffected by the treatment. As before, the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively. The red dashed line represents the ATT. The histogram at the bottom of the figure illustrates the distribution of the covariates, and can be turned off using `show.count = FALSE`. In our simulated case, the effect size is unrelated to the values of covariate `X1`.
+
 ```{r hte_X1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.ife, type = "hte", covariate = "X1")
 ```
@@ -260,7 +272,8 @@ out.ife.X3 <- fect(Y ~ D + X1 + X2 + X3, data = simdata, index = c("id","time"),
                    cores = 8, nboots = 1000, parallel = TRUE)
 ```
 
-As expected, there is not much effect heterogeneity along `X3`. In the resulting figure, we can also assign labels to the discrete values in the moderator. 
+As expected, there is not much effect heterogeneity along `X3`. In the resulting figure, we can also assign labels to the discrete values in the moderator.
+
 ```{r, fig.width = 6, fig.height = 4.5}
 plot(out.ife.X3, type="hte", covariate = "X3", 
      xlab = "", ylab = "Effet of D on Y",
@@ -268,7 +281,7 @@ plot(out.ife.X3, type="hte", covariate = "X3",
      ylim = c(-2, 6))
 ```
 
-Our next update will accommodate time-invariant covariates and allow users to explore effect heterogeneity around them. 
+Our next update will accommodate time-invariant covariates and allow users to explore effect heterogeneity around them.
 
 ------------------------------------------------------------------------
 
@@ -350,7 +363,7 @@ plot(out.mc, type = "equiv", ylim = c(-4,4),
 
 From the above plots, we see that FEct fails both tests; IFEct passes both tests using a conventional test size (5%); and MC fails the F tests, but passes the TOST (equivalence) test. Hence, we may conclude that IFEct is a more suitable model.
 
-### LOO pre-trend test
+### LOO pre-trend test {#loo-pre-trend-test}
 
 Instead of using estimated ATTs for periods prior to the treatment to test for pre-trends, we recommend users employ a leave-one-out (LOO) approach (`loo = TRUE`) to consecutively hide one pretreatment period (relative to the timing of the treatment) and repeatedly estimate the pseudo treatment effects for that pretreatment period. The LOO approach can be understood as an extension of the placebo test. It has the benefit of providing users with a more holistic view of whether the identifying assumptions likely hold. However, as the program needs to conduct uncertainty estimates for each turn, it is much more time-consuming than the original one.
 

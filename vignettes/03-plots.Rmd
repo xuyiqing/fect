@@ -189,7 +189,7 @@ plot(out,
 
 ### Count Histogram Customization
 
-The count histogram on the bottom of the graph shows the number of observed units in each period. To customize its color, outline color, and opacity, we can use the `count.color`, `count.outline.color`, and `count.alpha` options, respectively.
+The count histogram on the bottom of the graph shows the number of treated units in each period. To customize its color, outline color, and opacity, we can use the `count.color`, `count.outline.color`, and `count.alpha` options, respectively.
 
 ```{r count-histogram-customization}
 plot(out, 
