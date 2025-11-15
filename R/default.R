@@ -738,6 +738,41 @@ fect.default <- function(
         if (!group %in% names(data)) {
             stop("\"group\" misspecified.\n")
         }
+        ## warn if group coincides with unit id but some units never treated
+        if (!is.null(index) && length(index) >= 1 && group == index[1]) {
+            if (!is.null(D) && D %in% names(data)) {
+                id.vec <- data[, index[1]]
+                d.vec <- data[, D]
+                ## treat anything different from 0/NA as treated
+                if (is.factor(d.vec) || is.character(d.vec)) {
+                    d.numeric <- suppressWarnings(as.numeric(as.character(d.vec)))
+                } else {
+                    d.numeric <- suppressWarnings(as.numeric(d.vec))
+                }
+                if (all(is.na(d.numeric))) {
+                    d.numeric <- suppressWarnings(as.numeric(d.vec))
+                }
+                treated.flag <- ifelse(is.na(d.numeric), 0, d.numeric != 0)
+                treat.count <- tapply(treated.flag, id.vec, function(x) sum(x, na.rm = TRUE))
+                never.tr <- names(treat.count)[is.na(treat.count) | treat.count == 0]
+                if (length(never.tr) > 0) {
+                    sample.ids <- head(never.tr, 3)
+                    warning(
+                        paste0(
+                            "The \"group\" option is set to the unit identifier (",
+                            group,
+                            "), but ",
+                            length(never.tr),
+                            " unit(s) never receive treatment (e.g., ",
+                            paste(sample.ids, collapse = ", "),
+                            "). ",
+                            "Consider omitting the \"group\" option or using a cohort indicator instead."
+                        ),
+                        call. = FALSE
+                    )
+                }
+            }
+        }
     }
 
     if (!is.null(cl)) {
