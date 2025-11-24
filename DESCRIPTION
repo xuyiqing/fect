@@ -21,6 +21,7 @@ Imports:
     ggplot2 (>= 2.1.0), 
     GGally (>= 1.0.1),
     doParallel (>= 1.0.10), 
+    doFuture, 
     foreach (>= 1.4.3), 
     abind (>= 1.4-0),
     MASS, 

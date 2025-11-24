@@ -1939,6 +1939,8 @@ fect.default <- function(
     ## Register clusters
     ## -------------------------------##
 
+    old.future.plan <- NULL
+
     if ((se == TRUE | permute == TRUE) & parallel == FALSE) {
         ## set seed
         if (is.null(seed) == FALSE) {
@@ -1954,8 +1956,9 @@ fect.default <- function(
         if (is.null(cores) == TRUE) {
             cores <- min(detectCores() - 2, 8) # default to 8 cores if not specified
         }
-        para.clusters <- future::makeClusterPSOCK(cores)
-        registerDoParallel(para.clusters)
+        old.future.plan <- future::plan()
+        future::plan(future::multisession, workers = cores)
+        doFuture::registerDoFuture()
         if (is.null(seed) == FALSE) {
             registerDoRNG(seed)
         }
@@ -2589,9 +2592,8 @@ fect.default <- function(
         permute.result <- list(permute.att.avg = out.permute, p = permute.p)
     }
 
-    if ((se == TRUE | permute) & parallel == TRUE) {
-        stopCluster(para.clusters)
-        # closeAllConnections()
+    if (!is.null(old.future.plan)) {
+        future::plan(old.future.plan)
     }
 
     ## message("\nOK4\n")
