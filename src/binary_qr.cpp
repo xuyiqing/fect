@@ -9,12 +9,12 @@
 
 /* inter fe model for binary outcome */
 // [[Rcpp::export]]
-List inter_fe_d_qr(arma::mat Y,
-                   arma::mat Y_fit0, // initial fit using ols
-                   arma::mat FE0, // initial fixed effects
-                   arma::mat factor0, // initial factor
-                   arma::mat xi0, // initial time fe
-                   arma::cube X,
+List inter_fe_d_qr(const arma::mat& Y,
+                   const arma::mat& Y_fit0, // initial fit using ols
+                   const arma::mat& FE0, // initial fixed effects
+                   const arma::mat& factor0, // initial factor
+                   const arma::mat& xi0, // initial time fe
+                   const arma::cube& X,
                    int r,
                    int force,
                    int mniter = 5000,
@@ -171,13 +171,13 @@ List inter_fe_d_qr(arma::mat Y,
 
 /* inter fe model for binary outcome: unbalanced panel */
 // [[Rcpp::export]]
-List inter_fe_d_qr_ub(arma::mat Y, 
-                      arma::mat Y_fit0, // initial fit using ols
-                      arma::mat FE0, // initial fixed effects
-                      arma::mat factor0, // initial factor
-                      arma::mat xi0, // initial time fe
-                      arma::cube X,
-                      arma::mat I,
+List inter_fe_d_qr_ub(const arma::mat& Y, 
+                      const arma::mat& Y_fit0, // initial fit using ols
+                      const arma::mat& FE0, // initial fixed effects
+                      const arma::mat& factor0, // initial factor
+                      const arma::mat& xi0, // initial time fe
+                      const arma::cube& X,
+                      const arma::mat& I,
                       int r,
                       int force, 
                       int mniter = 5000,
@@ -305,11 +305,16 @@ List inter_fe_d_qr_ub(arma::mat Y,
   // if ( validX == 1 ) {
     beta = beta * pow(s_mo,0.5) ;
     Y_fit = FE ; 
-    X.insert_slices(0, I0) ;
+    
+    // Create temporary X with intercept for final fit calculation
+    arma::cube X_temp = X;
+    X_temp.insert_slices(0, I0);
+    
     for (int i = 0; i < p; i++) {
-      Y_fit = Y_fit + X.slice(i) * beta(i) ;
+      Y_fit = Y_fit + X_temp.slice(i) * beta(i) ;
     }
-    X.shed_slice(0) ;
+    // X.shed_slice(0) ; // Not needed as X_temp is local
+    
     output["mu"] = beta(0, 0) ;
     if (p > 1) {
       beta.shed_row(0) ;

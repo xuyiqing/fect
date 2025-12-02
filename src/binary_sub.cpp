@@ -4,7 +4,7 @@
 
 /* Obtain factors and loadings by QR decomposition */
 // [[Rcpp::export]]
-List qr_factor (arma::mat F, arma::mat L) {
+List qr_factor (const arma::mat& F, const arma::mat& L) {
   
   int T = F.n_rows ;
   int N = L.n_rows ;
@@ -46,7 +46,7 @@ List qr_factor (arma::mat F, arma::mat L) {
 
 /* I a T*1 vector */
 // [[Rcpp::export]]
-arma::mat IND (arma::mat I) {
+arma::mat IND (const arma::mat& I) {
   int T = I.n_rows ;
   int n = (int) arma::accu(I) ;
   arma::mat ind(n, 1, arma::fill::zeros) ;
@@ -63,9 +63,9 @@ arma::mat IND (arma::mat I) {
 
 /* for a given unit or period */
 // [[Rcpp::export]]
-List subfe (arma::mat Y, 
-            arma::mat X, 
-            arma::mat I,
+List subfe (const arma::mat& Y, 
+            const arma::mat& X, 
+            const arma::mat& I,
             int intercept) {
 
   int r = X.n_cols ;
@@ -97,9 +97,9 @@ List subfe (arma::mat Y,
 
 /* for all units */
 // [[Rcpp::export]]
-List l_ub (arma::mat Y, 
-           arma::mat F, 
-           arma::mat I,
+List l_ub (const arma::mat& Y, 
+           const arma::mat& F, 
+           const arma::mat& I,
            int r,
            int force) {
 
@@ -179,9 +179,9 @@ List l_ub (arma::mat Y,
 
 /* for all periods */
 // [[Rcpp::export]]
-List f_ub (arma::mat Y, 
-           arma::mat L, 
-           arma::mat I,
+List f_ub (const arma::mat& Y, 
+           const arma::mat& L, 
+           const arma::mat& I,
            int r,
            int force) {
 
@@ -258,13 +258,14 @@ List f_ub (arma::mat Y,
 
 /* factor analysis: mu add ife*/
 // [[Rcpp::export]]
-List fe (arma::mat E,
-         arma::mat F_old,
-         arma::mat xi_old,
+List fe (const arma::mat& E,
+         const arma::mat& F_old_in,
+         const arma::mat& xi_old,
          int force,
          int r
         ) {
-
+  
+  arma::mat F_old = F_old_in;
   int T = E.n_rows ; 
   int N = E.n_cols ;
 
@@ -456,10 +457,10 @@ List fe (arma::mat E,
 
 /* factor analysis: mu add ife, unbalanced */
 // [[Rcpp::export]]
-List fe_ub (arma::mat E,
-            arma::mat I,
-            arma::mat F_old,
-            arma::mat xi_old,
+List fe_ub (const arma::mat& E,
+            const arma::mat& I,
+            const arma::mat& F_old,
+            const arma::mat& xi_old,
             int force,
             int r
            ) {

@@ -4,7 +4,7 @@
 
 /* unbalanced panel: response demean function */
 // [[Rcpp::export]]
-List Y_demean(arma::mat Y, int force) {
+List Y_demean(const arma::mat& Y, int force) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   double mu_Y = 0;
@@ -48,7 +48,7 @@ List Y_demean(arma::mat Y, int force) {
 /* Weighted Demean Outcome Matrix*/
 /* return fixed effects */
 // [[Rcpp::export]]
-List Y_wdemean(arma::mat Y, arma::mat W, int force) {
+List Y_wdemean(const arma::mat& Y, const arma::mat& W, int force) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   double mu_Y = 0;
@@ -93,7 +93,7 @@ List Y_wdemean(arma::mat Y, arma::mat W, int force) {
 
 /* estimate additive fe for unbalanced panel, without covariates */
 // [[Rcpp::export]]
-List fe_add(arma::mat alpha_Y, arma::mat xi_Y, double mu_Y, int T, int N,
+List fe_add(const arma::mat& alpha_Y, const arma::mat& xi_Y, double mu_Y, int T, int N,
             int force) {
   arma::mat FE_ad(T, N, arma::fill::zeros);
   double mu = 0;
@@ -132,7 +132,7 @@ List fe_add(arma::mat alpha_Y, arma::mat xi_Y, double mu_Y, int T, int N,
 
 /* Obtain factors and loading given error */
 // [[Rcpp::export]]
-List panel_factor(arma::mat E, int r) {
+List panel_factor(const arma::mat& E, int r) {
   int T = E.n_rows;
   int N = E.n_cols;
   arma::mat factor(T, r, arma::fill::zeros);
@@ -176,7 +176,7 @@ List panel_factor(arma::mat E, int r) {
 
 /* Obtain interactive fe directly */
 // [[Rcpp::export]]
-arma::mat panel_FE(arma::mat E, double lambda, int hard) {
+arma::mat panel_FE(const arma::mat& E, double lambda, int hard) {
   int T = E.n_rows;
   int N = E.n_cols;
   int r = T;
@@ -214,7 +214,7 @@ arma::mat panel_FE(arma::mat E, double lambda, int hard) {
 
 /* factor analysis: mu add ife*/
 // [[Rcpp::export]]
-List ife(arma::mat E, int force,
+List ife(const arma::mat& E, int force,
          int mc, // whether pac or mc method
          int r, int hard, double lambda) {
   int T = E.n_rows;
