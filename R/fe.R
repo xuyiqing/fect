@@ -7,6 +7,8 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
                     W,
                     I,
                     II,
+                    cm = FALSE,
+                    II.cm = NULL,
                     T.on,
                     T.off = NULL,
                     T.on.carry = NULL,
@@ -52,9 +54,6 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         X <- array(0, dim = c(1, 1, 0))
     }
 
-    ## replicate data
-    YY <- Y
-    YY[which(II == 0)] <- 0 ## reset to 0
 
     D.c <- apply(D, 2, function(vec) {
         cumsum(vec)
@@ -75,63 +74,87 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
             data.ini[, (3 + i)] <- c(X[, , i])
         }
     }
-    ## observed Y0 indicator:
-    initialOut <- Y0 <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
-    oci <- which(c(II) == 1)
-    if (binary == FALSE) {
-        if (!is.null(W)) {
-            initialOut <- initialFit(data = data.ini, force = force, w = c(W), oci = oci)
-        } else {
-            initialOut <- initialFit(data = data.ini, force = force, w = NULL, oci = oci)
-        }
-        Y0 <- initialOut$Y0
-        beta0 <- initialOut$beta0
-        if (p > 0 && sum(is.na(beta0)) > 0) {
-            beta0[which(is.na(beta0))] <- 0
-        }
-
-        ## ini.res <- initialOut$res
-    } else {
-        initialOut <- BiInitialFit(data = data.ini, QR = QR, r = r.cv, force = force, oci = oci)
-        Y0 <- initialOut$Y0
-        beta0 <- initialOut$beta0
-        FE0 <- initialOut$FE0
-        if (QR == 1) {
-            xi0 <- initialOut$xi0
-            factor0 <- initialOut$factor0
-        }
-    }
-
-    ## -------------------------------##
-    ## ----------- Main Algorithm ----------- ##
-    ## -------------------------------##
 
     validX <- 1 ## no multi-colinearity
-    est.fect <- NULL
 
-    if (is.null(W)) {
-        W.use <- as.matrix(0)
-    } else {
-        W.use <- W
-        W.use[which(II == 0)] <- 0
-    }
+    calculate_estimation <- function(data.ini, Y, II, W, binary, QR, force, r.cv, tol, max.iteration, oci_override = NULL) {
+        ## observed Y0 indicator:
+        initialOut <- Y0 <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
 
-    if (binary == FALSE) {
-        est.best <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r.cv, force = force, tol, max.iteration)
-        if (boot == FALSE) {
-            if (r.cv == 0) {
-                est.fect <- est.best
+        oci <- if (is.null(oci_override)) which(c(II) == 1) else oci_override
+        if (binary == FALSE) {
+            if (!is.null(W)) {
+                initialOut <- initialFit(data = data.ini, force = force, w = c(W), oci = oci)
             } else {
-                est.fect <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force = force, tol, max.iteration)
+                initialOut <- initialFit(data = data.ini, force = force, w = NULL, oci = oci)
+            }
+            Y0 <- initialOut$Y0
+            beta0 <- initialOut$beta0
+            if (p > 0 && sum(is.na(beta0)) > 0) {
+                beta0[which(is.na(beta0))] <- 0
+            }
+
+            ## ini.res <- initialOut$res
+        } else {
+            initialOut <- BiInitialFit(data = data.ini, QR = QR, r = r.cv, force = force, oci = oci)
+            Y0 <- initialOut$Y0
+            beta0 <- initialOut$beta0
+            FE0 <- initialOut$FE0
+            if (QR == 1) {
+                xi0 <- initialOut$xi0
+                factor0 <- initialOut$factor0
             }
         }
-    } else {
-        if (QR == FALSE) {
-            est.best <- inter_fe_d_ub(YY, Y0, FE0, X, II, r.cv, force, tol = tol)
+        
+        ## -------------------------------##
+        ## ----------- Main Algorithm ----------- ##
+        ## -------------------------------##
+
+        est.fect <- NULL
+
+        if (is.null(W)) {
+            W.use <- as.matrix(0)
         } else {
-            est.best <- inter_fe_d_qr_ub(YY, Y0, FE0, factor0, xi0, X, II, r.cv, force, tol = tol)
+            W.use <- W
+            W.use[which(II == 0)] <- 0
         }
+
+        YY <- Y
+        YY[which(II == 0)] <- 0 ## reset to 0
+
+        if (binary == FALSE) {
+            est.best <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r.cv, force = force, tol, max.iteration)
+            if (boot == FALSE) {
+                if (r.cv == 0) {
+                    est.fect <- est.best
+                } else {
+                    est.fect <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force = force, tol, max.iteration)
+                }
+            }
+        } else {
+            if (QR == FALSE) {
+                est.best <- inter_fe_d_ub(YY, Y0, FE0, X, II, r.cv, force, tol = tol)
+            } else {
+                est.best <- inter_fe_d_qr_ub(YY, Y0, FE0, factor0, xi0, X, II, r.cv, force, tol = tol)
+            }
+        }
+    
+        return(list(est.best = est.best, est.fect = est.fect))
     }
+
+    estimation.D0 <- calculate_estimation(data.ini, Y, II, W, binary, QR, force, r.cv, tol, max.iteration)
+    est.best <- estimation.D0$est.best
+    est.fect <- estimation.D0$est.fect
+
+    if (cm == TRUE) {
+        estimation.D1 <- calculate_estimation(
+            data.ini, Y, II.cm, W, binary, QR, force, r.cv, tol, max.iteration,
+            # initialize using all observed outcomes to avoid NA predictions for unseen FE levels
+            oci_override = which(c(I) == 1)
+        )
+        est.best.cm <- estimation.D1$est.best
+    }
+
     validX <- est.best$validX
     validF <- ifelse(r.cv > 0, 1, 0)
 
@@ -893,5 +916,10 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
             group.output = group.output
         ))
     }
+
+    if (cm == TRUE) {
+        out <- c(out, list(est.cm = est.best.cm))
+    }
+
     return(out)
 } ## fe functions ends.

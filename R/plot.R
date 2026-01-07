@@ -105,6 +105,7 @@ plot.fect <- function(
     status.background.color = NULL,
     covariate = NULL,
     covariate.labels = NULL,
+    cm = FALSE,
     ...) {
 
   if (!missing(vis)) {
@@ -3097,15 +3098,78 @@ plot.fect <- function(
     D.missing[which(D == 0)] <- NA
     D.missing.vec <- as.vector(D.missing)
 
-    eff.vec <- as.vector(x$eff)
     X.vec <- as.vector(x[names(x) == "X"][2]$X[, , which(x$X == covariate)])
-
-    eff.vec <- eff.vec[which(!is.na(D.missing.vec))]
     X.vec <- X.vec[which(!is.na(D.missing.vec))]
-
     j <- order(X.vec)
-    eff.vec <- eff.vec[j]
     X.vec <- X.vec[j]
+
+    if (cm == FALSE) {
+      eff.vec <- as.vector(x$eff)
+      eff.vec <- eff.vec[which(!is.na(D.missing.vec))]
+      eff.vec <- eff.vec[j]
+    } else {
+      if (is.null(x$est.cm)) {
+        stop("Cannot compute heterogeneous effects with cm=TRUE: `est.cm` not found in the fect object.\n",
+             "Please run `fect(..., cm=TRUE)`.\n")
+      }
+
+      # Treated cell indices in vectorized (column-major) order
+      tr.pos <- which(!is.na(D.missing.vec))
+
+      # Full covariate array (T x N x p) stored as the 2nd `X` entry
+      X.full <- x[names(x) == "X"][2]$X
+      cov.idx <- which(x$X == covariate)[1]
+      if (length(cov.idx) == 0) {
+        stop("Cannot find the requested covariate in x$X.\n")
+      }
+
+      calc_g <- function(est.obj, X.arr) {
+        TT <- dim(X.arr)[1]
+        N <- dim(X.arr)[2]
+        p <- dim(X.arr)[3]
+
+        mu <- if (!is.null(est.obj$mu)) as.numeric(est.obj$mu) else 0
+        g <- matrix(mu, TT, N)
+
+        if (!is.null(est.obj$alpha)) {
+          alpha <- as.numeric(est.obj$alpha)
+          g <- g + matrix(rep(alpha, each = TT), TT, N)
+        }
+        if (!is.null(est.obj$xi)) {
+          xi <- as.numeric(est.obj$xi)
+          g <- g + matrix(rep(xi, times = N), TT, N)
+        }
+
+        if (p > 0 && !is.null(est.obj$beta)) {
+          beta <- as.numeric(est.obj$beta)
+          for (kk in seq_len(p)) {
+            if (!is.na(beta[kk])) {
+              g <- g + X.arr[, , kk] * beta[kk]
+            }
+          }
+        }
+        return(g)
+      }
+
+      # Compute \hat{theta}(m) for each unique m (= xv) by plugging m into the
+      # selected covariate slice, then averaging g1-g0 over treated cells.
+      X.unique <- unique(X.vec)
+      theta.unique <- sapply(X.unique, function(xv) {
+        X.mod <- X.full
+        X.mod[, , cov.idx] <- xv
+
+        g1 <- calc_g(x$est.cm, X.mod)
+        g0 <- calc_g(x$est, X.mod)
+        diff.vec <- as.vector(g1 - g0)[tr.pos]
+
+        mean(diff.vec, na.rm = TRUE)
+      })
+
+      # Map back to observation-level vector aligned with sorted X.vec
+      eff.vec <- as.numeric(theta.unique[match(X.vec, X.unique)])
+    }
+
+    # print(eff.vec)  # debug
     
     if (length(unique(X.vec)) <= 4) {
       p <- ggplot()

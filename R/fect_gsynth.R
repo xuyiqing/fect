@@ -4,6 +4,8 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
                         W,
                         I,
                         II,
+                        cm=FALSE,
+                        II.cm=NULL,
                         T.on,
                         T.off = NULL,
                         T.on.carry = NULL,
