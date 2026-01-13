@@ -334,6 +334,159 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// YY_adj
+arma::mat YY_adj(arma::mat YYYY, arma::mat EEE, arma::mat I, int use_weight, arma::mat W);
+RcppExport SEXP _fect_YY_adj(SEXP YYYYSEXP, SEXP EEESEXP, SEXP ISEXP, SEXP use_weightSEXP, SEXP WSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type YYYY(YYYYSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type EEE(EEESEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type I(ISEXP);
+    Rcpp::traits::input_parameter< int >::type use_weight(use_weightSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type W(WSEXP);
+    rcpp_result_gen = Rcpp::wrap(YY_adj(YYYY, EEE, I, use_weight, W));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Demean
+List Demean(arma::mat E, int force, arma::cube X_extra_FE, std::vector<std::vector<arma::uvec>> extra_FE_index_cache);
+RcppExport SEXP _fect_Demean(SEXP ESEXP, SEXP forceSEXP, SEXP X_extra_FESEXP, SEXP extra_FE_index_cacheSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type E(ESEXP);
+    Rcpp::traits::input_parameter< int >::type force(forceSEXP);
+    Rcpp::traits::input_parameter< arma::cube >::type X_extra_FE(X_extra_FESEXP);
+    Rcpp::traits::input_parameter< std::vector<std::vector<arma::uvec>> >::type extra_FE_index_cache(extra_FE_index_cacheSEXP);
+    rcpp_result_gen = Rcpp::wrap(Demean(E, force, X_extra_FE, extra_FE_index_cache));
+    return rcpp_result_gen;
+END_RCPP
+}
+// fixed_effects_part
+List fixed_effects_part(arma::mat E, int force, arma::cube X_extra_FE, std::vector<std::vector<arma::uvec>> extra_FE_index_cache);
+RcppExport SEXP _fect_fixed_effects_part(SEXP ESEXP, SEXP forceSEXP, SEXP X_extra_FESEXP, SEXP extra_FE_index_cacheSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type E(ESEXP);
+    Rcpp::traits::input_parameter< int >::type force(forceSEXP);
+    Rcpp::traits::input_parameter< arma::cube >::type X_extra_FE(X_extra_FESEXP);
+    Rcpp::traits::input_parameter< std::vector<std::vector<arma::uvec>> >::type extra_FE_index_cache(extra_FE_index_cacheSEXP);
+    rcpp_result_gen = Rcpp::wrap(fixed_effects_part(E, force, X_extra_FE, extra_FE_index_cache));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Gamma
+arma::mat Gamma(const arma::mat E, const arma::mat Z, const arma::mat zzinv, arma::uvec gamma_t_group);
+RcppExport SEXP _fect_Gamma(SEXP ESEXP, SEXP ZSEXP, SEXP zzinvSEXP, SEXP gamma_t_groupSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat >::type E(ESEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type zzinv(zzinvSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type gamma_t_group(gamma_t_groupSEXP);
+    rcpp_result_gen = Rcpp::wrap(Gamma(E, Z, zzinv, gamma_t_group));
+    return rcpp_result_gen;
+END_RCPP
+}
+// gamma_part
+List gamma_part(arma::mat E, arma::mat Z, arma::mat zzinv, arma::uvec gamma_t_group);
+RcppExport SEXP _fect_gamma_part(SEXP ESEXP, SEXP ZSEXP, SEXP zzinvSEXP, SEXP gamma_t_groupSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type E(ESEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type zzinv(zzinvSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type gamma_t_group(gamma_t_groupSEXP);
+    rcpp_result_gen = Rcpp::wrap(gamma_part(E, Z, zzinv, gamma_t_group));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Kappa
+arma::mat Kappa(const arma::mat E, const arma::mat Q, const arma::mat qqinv, arma::uvec kappa_i_group);
+RcppExport SEXP _fect_Kappa(SEXP ESEXP, SEXP QSEXP, SEXP qqinvSEXP, SEXP kappa_i_groupSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat >::type E(ESEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type Q(QSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type qqinv(qqinvSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type kappa_i_group(kappa_i_groupSEXP);
+    rcpp_result_gen = Rcpp::wrap(Kappa(E, Q, qqinv, kappa_i_group));
+    return rcpp_result_gen;
+END_RCPP
+}
+// kappa_part
+List kappa_part(arma::mat E, arma::mat Q, arma::mat qqinv, arma::uvec kappa_i_group);
+RcppExport SEXP _fect_kappa_part(SEXP ESEXP, SEXP QSEXP, SEXP qqinvSEXP, SEXP kappa_i_groupSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type E(ESEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Q(QSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type qqinv(qqinvSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type kappa_i_group(kappa_i_groupSEXP);
+    rcpp_result_gen = Rcpp::wrap(kappa_part(E, Q, qqinv, kappa_i_group));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Beta
+arma::mat Beta(arma::cube X, arma::mat xxinv, arma::mat E);
+RcppExport SEXP _fect_Beta(SEXP XSEXP, SEXP xxinvSEXP, SEXP ESEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::cube >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type xxinv(xxinvSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type E(ESEXP);
+    rcpp_result_gen = Rcpp::wrap(Beta(X, xxinv, E));
+    return rcpp_result_gen;
+END_RCPP
+}
+// WBeta
+arma::mat WBeta(arma::cube X, arma::mat xwxinv, arma::mat w, arma::mat E);
+RcppExport SEXP _fect_WBeta(SEXP XSEXP, SEXP xwxinvSEXP, SEXP wSEXP, SEXP ESEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::cube >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type xwxinv(xwxinvSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type w(wSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type E(ESEXP);
+    rcpp_result_gen = Rcpp::wrap(WBeta(X, xwxinv, w, E));
+    return rcpp_result_gen;
+END_RCPP
+}
+// beta_part
+List beta_part(arma::mat E, arma::cube XX, arma::mat xxinv, arma::mat W, int use_weight);
+RcppExport SEXP _fect_beta_part(SEXP ESEXP, SEXP XXSEXP, SEXP xxinvSEXP, SEXP WSEXP, SEXP use_weightSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type E(ESEXP);
+    Rcpp::traits::input_parameter< arma::cube >::type XX(XXSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type xxinv(xxinvSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type W(WSEXP);
+    Rcpp::traits::input_parameter< int >::type use_weight(use_weightSEXP);
+    rcpp_result_gen = Rcpp::wrap(beta_part(E, XX, xxinv, W, use_weight));
+    return rcpp_result_gen;
+END_RCPP
+}
+// ife_part
+List ife_part(arma::mat E, int r);
+RcppExport SEXP _fect_ife_part(SEXP ESEXP, SEXP rSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type E(ESEXP);
+    Rcpp::traits::input_parameter< int >::type r(rSEXP);
+    rcpp_result_gen = Rcpp::wrap(ife_part(E, r));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cfe_iter
 List cfe_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::cube& X_extra_FE, const arma::cube& X_Z, const arma::cube& X_Q, const arma::cube& X_gamma, const arma::cube& X_kappa, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, const arma::mat& beta0, int force, int r, double tolerate, int max_iter);
 RcppExport SEXP _fect_cfe_iter(SEXP XXSEXP, SEXP xxinvSEXP, SEXP X_extra_FESEXP, SEXP X_ZSEXP, SEXP X_QSEXP, SEXP X_gammaSEXP, SEXP X_kappaSEXP, SEXP Zgamma_idSEXP, SEXP kappaQ_idSEXP, SEXP YSEXP, SEXP Y0SEXP, SEXP ISEXP, SEXP WSEXP, SEXP beta0SEXP, SEXP forceSEXP, SEXP rSEXP, SEXP tolerateSEXP, SEXP max_iterSEXP) {
@@ -624,6 +777,17 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fect_inter_fe_d", (DL_FUNC) &_fect_inter_fe_d, 9},
     {"_fect_inter_fe_d_ub", (DL_FUNC) &_fect_inter_fe_d_ub, 10},
     {"_fect_complex_fe_ub", (DL_FUNC) &_fect_complex_fe_ub, 17},
+    {"_fect_YY_adj", (DL_FUNC) &_fect_YY_adj, 5},
+    {"_fect_Demean", (DL_FUNC) &_fect_Demean, 4},
+    {"_fect_fixed_effects_part", (DL_FUNC) &_fect_fixed_effects_part, 4},
+    {"_fect_Gamma", (DL_FUNC) &_fect_Gamma, 4},
+    {"_fect_gamma_part", (DL_FUNC) &_fect_gamma_part, 4},
+    {"_fect_Kappa", (DL_FUNC) &_fect_Kappa, 4},
+    {"_fect_kappa_part", (DL_FUNC) &_fect_kappa_part, 4},
+    {"_fect_Beta", (DL_FUNC) &_fect_Beta, 3},
+    {"_fect_WBeta", (DL_FUNC) &_fect_WBeta, 4},
+    {"_fect_beta_part", (DL_FUNC) &_fect_beta_part, 5},
+    {"_fect_ife_part", (DL_FUNC) &_fect_ife_part, 2},
     {"_fect_cfe_iter", (DL_FUNC) &_fect_cfe_iter, 18},
     {"_fect_Y_demean", (DL_FUNC) &_fect_Y_demean, 2},
     {"_fect_Y_wdemean", (DL_FUNC) &_fect_Y_wdemean, 3},
