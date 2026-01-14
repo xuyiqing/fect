@@ -1539,6 +1539,17 @@ fect.default <- function(
     }
 
     if (length(rm.id) > 0) {
+        n.keep <- length(rem.id)
+        if (n.keep <= 10) {
+            pct.keep <- round(100 * n.keep / N, 1)
+            message(paste0(
+                "After dropping units (max.missing/min.T0): retained ",
+                pct.keep, "% of units.\n"
+            ))
+        }
+    }
+
+    if (length(rm.id) > 0) {
         X.old <- X
         if (p > 0) {
             X <- array(0, dim = c(TT, (N - length(rm.id)), p))
