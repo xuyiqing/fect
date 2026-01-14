@@ -73,7 +73,8 @@ fect <- function(
     gamma = NULL,
     Q = NULL,
     kappa = NULL,
-    Q.type = NULL, # c(1,2,3) or c("linear", "quadratic", "cubic")
+    Q.type = NULL, # c(1,2,3,"bspline") or c("linear", "quadratic", "cubic", "bspline")
+    Q.bspline.degree = NULL, # used only when Q.type includes "bspline"
     Z.param = NULL,
     Q.param = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
@@ -144,6 +145,7 @@ fect.formula <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL,
+    Q.bspline.degree = NULL,
     Z.param = NULL,
     Q.param = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
@@ -246,6 +248,7 @@ fect.formula <- function(
         Q = Q,
         kappa = kappa,
         Q.type = Q.type,
+        Q.bspline.degree = Q.bspline.degree,
         Z.param = Z.param,
         Q.param = Q.param,
         placebo.period = placebo.period,
@@ -318,6 +321,7 @@ fect.default <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL,
+    Q.bspline.degree = NULL,
     Z.param = NULL,
     Q.param = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
@@ -845,7 +849,7 @@ fect.default <- function(
                 stop("\"Q\" and \"Q.type\" cannot be used simultaneously.")
             }
             Q <- c()
-            for (i in 1:length(Q.type)) {
+            for (i in seq_along(Q.type)) {
                 Q.i <- tolower(as.character(Q.type[i]))
                 if (Q.i == "linear" || Q.i == "1") {
                     data[, paste(time, "1", sep = ".")] <- data[, time]**1
@@ -856,9 +860,36 @@ fect.default <- function(
                 } else if (Q.i == "cubic" || Q.i == "3") {
                     data[, paste(time, "3", sep = ".")] <- data[, time]**3
                     Q <- c(Q, paste(time, "3", sep = "."))
+                } else if (Q.i == "bspline" || Q.i == "b" || Q.i == "bs") {
+                    time.raw <- data[, time]
+                    time.num <- suppressWarnings(as.numeric(as.character(time.raw)))
+                    if (all(is.na(time.num))) {
+                        ## fallback: use ordered time index if not numeric
+                        time.num <- as.numeric(factor(time.raw, levels = sort(unique(time.raw))))
+                    }
+                    n.t <- length(unique(time.num))
+                    if (n.t < 2) {
+                        stop("\"Q.type='bspline'\" requires at least 2 distinct time values.")
+                    }
+                    if (is.null(Q.bspline.degree)) {
+                        degree.bs <- min(3, n.t - 1)
+                    } else {
+                        degree.bs <- suppressWarnings(as.integer(Q.bspline.degree))
+                        if (length(degree.bs) != 1 || is.na(degree.bs)) {
+                            stop("\"Q.bspline.degree\" must be a single numeric/integer value.")
+                        }
+                        degree.bs <- min(max(1L, degree.bs), n.t - 1L)
+                    }
+                    df.bs <- max(degree.bs + 1, min(degree.bs + 2, n.t))
+                    bs.mat <- splines::bs(time.num, df = df.bs, degree = degree.bs, intercept = FALSE)
+                    bs.names <- paste0(time, ".bs", seq_len(ncol(bs.mat)))
+                    for (j in seq_len(ncol(bs.mat))) {
+                        data[, bs.names[j]] <- bs.mat[, j]
+                    }
+                    Q <- c(Q, bs.names)
                 } else {
                     stop(
-                        "\"Q.type\" must be in c(1, 2, 3) or c(\"linear\", \"quadratic\", \"cubic\")."
+                        "\"Q.type\" must be in c(1, 2, 3, \"bspline\") or c(\"linear\", \"quadratic\", \"cubic\", \"bspline\")."
                     )
                 }
             }
