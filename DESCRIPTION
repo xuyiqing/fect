@@ -30,6 +30,7 @@ Imports:
     fixest, 
     doRNG,
     future, 
+    parallelly,
     mvtnorm,
     dplyr,
     future.apply,
