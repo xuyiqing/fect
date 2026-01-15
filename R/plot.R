@@ -58,6 +58,7 @@ plot.fect <- function(
     shade.post = FALSE,
     start0 = FALSE,
     return.test = FALSE,
+    return.data = FALSE,
     balance = NULL,
     weight = NULL,
     lcolor = NULL,
@@ -106,6 +107,51 @@ plot.fect <- function(
     covariate = NULL,
     covariate.labels = NULL,
     ...) {
+
+  rbind_fill_fect_plot <- function(...) {
+    dfs <- list(...)
+    dfs <- dfs[!vapply(dfs, is.null, logical(1))]
+    if (length(dfs) == 0) return(data.frame())
+    if (length(dfs) == 1) return(as.data.frame(dfs[[1]]))
+    all_cols <- unique(unlist(lapply(dfs, names)))
+    dfs_aligned <- lapply(dfs, function(d) {
+      d <- as.data.frame(d)
+      missing_cols <- setdiff(all_cols, names(d))
+      if (length(missing_cols) > 0) {
+        for (nm in missing_cols) d[[nm]] <- NA
+      }
+      d <- d[, all_cols, drop = FALSE]
+      d
+    })
+    do.call(rbind, dfs_aligned)
+  }
+
+  maybe_print_fect_plot <- function(p) {
+    if (is.null(p)) return(invisible(NULL))
+    if (!inherits(p, "ggplot")) return(invisible(NULL))
+    # Avoid opening a new device in non-interactive contexts (e.g. R CMD check),
+    # which can create unwanted files like Rplots.pdf.
+    has_device <- FALSE
+    try(has_device <- (grDevices::dev.cur() != 1L), silent = TRUE)
+    if (isTRUE(interactive()) || isTRUE(has_device)) {
+      suppressWarnings(print(p))
+    }
+    invisible(NULL)
+  }
+
+  finalize_plot_return <- function(p, data = NULL, test.out = NULL) {
+    if (isTRUE(return.data)) {
+      maybe_print_fect_plot(p)
+      out <- list(p = p, data = data)
+      if (isTRUE(return.test)) out$test.out <- test.out
+      class(out) <- c("fect_plot_return", "list")
+      return(out)
+    }
+    if (isTRUE(return.test)) {
+      return(list(p = p, test.out = test.out))
+    }
+    return(p)
+  }
 
   if (!missing(vis)) {
     warning("'vis' is deprecated and will be removed in future versions.", call. = FALSE)
@@ -493,6 +539,10 @@ plot.fect <- function(
           }
         }
         # suppressWarnings(print(p))
+        if (isTRUE(return.data)) {
+          data$plot_type <- "loadings"
+          return(finalize_plot_return(p, data = data, test.out = test.out))
+        }
         return(p)
       }
     }
@@ -620,6 +670,10 @@ plot.fect <- function(
           p <- p + coord_cartesian(ylim = ylim)
         }
         # suppressWarnings(print(p))
+        if (isTRUE(return.data)) {
+          data$plot_type <- "factors"
+          return(finalize_plot_return(p, data = data, test.out = test.out))
+        }
         return(p)
       }
     }
@@ -2070,6 +2124,51 @@ plot.fect <- function(
       p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
     }
     if (exists("set.fill")) rm(set.fill)
+
+    if (isTRUE(return.data)) {
+      plot_data <- list()
+      if (exists("data_plot_main", inherits = FALSE)) {
+        tmp <- as.data.frame(data_plot_main)
+        tmp$plot_type <- "counterfactual"
+        plot_data$main_lines <- tmp
+      }
+      if (exists("main_lines_data_plot", inherits = FALSE)) {
+        tmp <- as.data.frame(main_lines_data_plot)
+        tmp$plot_type <- "counterfactual"
+        plot_data$main_lines <- tmp
+      }
+      if (exists("avg_tr_data_plot", inherits = FALSE)) {
+        tmp <- as.data.frame(avg_tr_data_plot)
+        tmp$plot_type <- "counterfactual"
+        plot_data$avg_tr <- tmp
+      }
+      if (exists("avg_co_data_plot", inherits = FALSE)) {
+        tmp <- as.data.frame(avg_co_data_plot)
+        tmp$plot_type <- "counterfactual"
+        plot_data$avg_co <- tmp
+      }
+      if (exists("raw_tr_data_plot", inherits = FALSE) && !is.null(raw_tr_data_plot)) {
+        tmp <- as.data.frame(raw_tr_data_plot)
+        tmp$plot_type <- "counterfactual"
+        plot_data$raw_treated <- tmp
+      }
+      if (exists("data_band_plot", inherits = FALSE)) {
+        tmp <- as.data.frame(data_band_plot)
+        tmp$plot_type <- "counterfactual"
+        plot_data$treated_band <- tmp
+      }
+      if (exists("ci_data_filtered", inherits = FALSE) && !is.null(ci_data_filtered) && nrow(ci_data_filtered) > 0) {
+        tmp <- as.data.frame(ci_data_filtered)
+        tmp$plot_type <- "counterfactual"
+        plot_data$ci <- tmp
+      }
+      if (exists("counts_for_plot_df", inherits = FALSE) && !is.null(counts_for_plot_df) && nrow(counts_for_plot_df) > 0) {
+        tmp <- as.data.frame(counts_for_plot_df)
+        tmp$plot_type <- "counterfactual"
+        plot_data$count_bars <- tmp
+      }
+      return(finalize_plot_return(p, data = plot_data, test.out = test.out))
+    }
     return(p)
   }
 
@@ -2888,6 +2987,30 @@ plot.fect <- function(
 
       p <- p + theme(legend.position = "bottom")
     }
+
+    if (isTRUE(return.data)) {
+      if (!exists("data_es", inherits = FALSE)) {
+        stop("Internal error: plotting data not available for this plot type.")
+      }
+      plot_data <- list()
+
+      plot_est <- as.data.frame(data_es)
+      plot_est$plot_type <- type
+      plot_data$estimate <- plot_est
+
+      if (!is.null(data2) && is.data.frame(data2) && nrow(data2) > 0) {
+        plot_bounds <- data.frame(
+          Period = data2$time,
+          bound = data2$bound,
+          bound_type = data2$type,
+          bound_id = data2$id
+        )
+        plot_bounds$plot_type <- type
+        plot_data$bound <- plot_bounds
+      }
+
+      return(finalize_plot_return(p, data = plot_data, test.out = test.out))
+    }
   }
 
   if (type == "calendar") {
@@ -3068,6 +3191,24 @@ plot.fect <- function(
       axis.text.y = element_text(size = cex.axis),
       plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
     )
+
+    if (isTRUE(return.data)) {
+      plot_data <- list()
+      df_point <- as.data.frame(d1)
+      df_point$time <- TTT
+      df_point$plot_type <- "calendar"
+      plot_data$point <- df_point
+      df_fit <- as.data.frame(d2)
+      df_fit$time <- TTT.2
+      df_fit$plot_type <- "calendar"
+      plot_data$fit <- df_fit
+      if (exists("data.toplot", inherits = FALSE) && is.data.frame(data.toplot) && nrow(data.toplot) > 0) {
+        tmp <- as.data.frame(data.toplot)
+        tmp$plot_type <- "calendar"
+        plot_data$count_bars <- tmp
+      }
+      return(finalize_plot_return(p, data = plot_data, test.out = test.out))
+    }
   }
 
   if (type == "heterogeneous") {
@@ -3313,6 +3454,31 @@ plot.fect <- function(
       axis.text.y = element_text(size = cex.axis),
       plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
     )
+
+    if (isTRUE(return.data)) {
+      plot_data <- list()
+      if (exists("data_disc", inherits = FALSE)) {
+        tmp <- as.data.frame(data_disc)
+        tmp$plot_type <- "heterogeneous"
+        plot_data$discrete <- tmp
+      }
+      if (exists("data_counts", inherits = FALSE)) {
+        tmp <- as.data.frame(data_counts)
+        tmp$plot_type <- "heterogeneous"
+        plot_data$count_bars <- tmp
+      }
+      if (exists("X.vec", inherits = FALSE) && exists("y_hat", inherits = FALSE)) {
+        tmp <- data.frame(x = X.vec, fit = y_hat, lower = y_hat_lower, upper = y_hat_upper)
+        tmp$plot_type <- "heterogeneous"
+        plot_data$smooth <- tmp
+      }
+      if (exists("data.toplot", inherits = FALSE) && is.data.frame(data.toplot) && nrow(data.toplot) > 0) {
+        tmp <- as.data.frame(data.toplot)
+        tmp$plot_type <- "heterogeneous"
+        plot_data$hist_rects <- tmp
+      }
+      return(finalize_plot_return(p, data = plot_data, test.out = test.out))
+    }
   }
 
   if (type == "box") {
@@ -3488,6 +3654,21 @@ plot.fect <- function(
       p <- p + scale_x_discrete(limits = levels, breaks = xticklabels.all, labels = labels)
     } else {
       p <- p + scale_x_discrete(limits = levels)
+    }
+
+    if (isTRUE(return.data)) {
+      plot_data <- data.use
+      if (isTRUE(start0)) {
+        period_group <- ifelse(plot_data$time < 0, "pre", "post")
+      } else {
+        period_group <- ifelse(plot_data$time <= 0, "pre", "post")
+      }
+      count_group <- ifelse(plot_data$count >= 10, "high_count", "low_count")
+      plot_data$period_group <- period_group
+      plot_data$count_group <- count_group
+      plot_data$group <- paste(period_group, count_group, sep = "_")
+      plot_data$plot_type <- "box"
+      return(finalize_plot_return(p, data = plot_data, test.out = test.out))
     }
   }
 
@@ -3688,6 +3869,11 @@ plot.fect <- function(
     if (length(all) >= 3) {
       p <- p + guides(fill = guide_legend(nrow = 2, byrow = TRUE))
     }
+
+    if (isTRUE(return.data)) {
+      data$plot_type <- "status"
+      return(finalize_plot_return(p, data = data, test.out = test.out))
+    }
   } else if (type == "sens") {
     # Determine plot-specific variables based on the 'restrict' option
     sens_data_obj <- NULL
@@ -3785,6 +3971,12 @@ plot.fect <- function(
         face = "bold",
       )
     )
+
+    if (isTRUE(return.data)) {
+      plot_data <- as.data.frame(data_combined)
+      plot_data$plot_type <- "sens"
+      return(finalize_plot_return(p, data = plot_data, test.out = test.out))
+    }
   } else if (type == "sens_es") {
     if (restrict == "rm") {
       if (is.null(x$sensitivity.rm) || is.null(x$sensitivity.rm$periods)) {
@@ -3808,6 +4000,18 @@ plot.fect <- function(
           min(c(fect.output.p$CI.lower, dte_output$lb)) * 1.3,
           max(c(fect.output.p$CI.upper, dte_output$ub)) * 1.3
         )
+      }
+      plot_data_sens_es <- NULL
+      if (isTRUE(return.data)) {
+        att_df <- as.data.frame(fect.output.p)
+        att_df$plot_type <- "sens_es"
+        att_df$restrict <- restrict
+
+        bounds_df <- as.data.frame(dte_output)
+        bounds_df$plot_type <- "sens_es"
+        bounds_df$restrict <- restrict
+
+        plot_data_sens_es <- list(att = att_df, bounds = bounds_df)
       }
       p <- esplot(
         fect.output.p,
@@ -3865,6 +4069,10 @@ plot.fect <- function(
           legend.position.inside = c(0.02, 0.98),
           legend.justification = c("left", "top")
         )
+
+      if (isTRUE(return.data)) {
+        return(finalize_plot_return(p, data = plot_data_sens_es, test.out = test.out))
+      }
     } else if (restrict == "sm") {
       if (is.null(x$sensitivity.smooth) || is.null(x$sensitivity.smooth$periods)) {
         stop("No period-by-period Smoothness data found in x$sensitivity.smooth$periods.")
@@ -3887,6 +4095,18 @@ plot.fect <- function(
           min(c(fect.output.p$CI.lower, dte_output$lb)) * 1.3,
           max(c(fect.output.p$CI.upper, dte_output$ub)) * 1.3
         )
+      }
+      plot_data_sens_es <- NULL
+      if (isTRUE(return.data)) {
+        att_df <- as.data.frame(fect.output.p)
+        att_df$plot_type <- "sens_es"
+        att_df$restrict <- restrict
+
+        bounds_df <- as.data.frame(dte_output)
+        bounds_df$plot_type <- "sens_es"
+        bounds_df$restrict <- restrict
+
+        plot_data_sens_es <- list(att = att_df, bounds = bounds_df)
       }
       p <- esplot(
         fect.output.p,
@@ -3944,6 +4164,10 @@ plot.fect <- function(
           legend.position.inside = c(0.02, 0.98),
           legend.justification = c("left", "top")
         )
+
+      if (isTRUE(return.data)) {
+        return(finalize_plot_return(p, data = plot_data_sens_es, test.out = test.out))
+      }
     }
   } else if (type == "cumul") {
     if (is.null(x$effect.est.att)) {
@@ -3951,6 +4175,11 @@ plot.fect <- function(
     }
     if (is.null(main)) {
       main <- "Estimated Cumulative Treatment Effects"
+    }
+    plot_data_cumul <- NULL
+    if (isTRUE(return.data)) {
+      plot_data_cumul <- as.data.frame(x$effect.est.att)
+      plot_data_cumul$plot_type <- "cumul"
     }
     p <- esplot(
       x$effect.est.att,
@@ -3987,6 +4216,9 @@ plot.fect <- function(
       connected = connected,
       only.post = TRUE,
     )
+    if (isTRUE(return.data)) {
+      return(finalize_plot_return(p, data = plot_data_cumul, test.out = test.out))
+    }
   }
 
   if (!is.null(xbreaks)) {
@@ -4005,16 +4237,9 @@ plot.fect <- function(
     p <- p + theme(axis.text.y = element_text(angle = yangle))
   }
 
-  if (return.test == TRUE) {
-    return(list(p = p, test.out = test.out))
-  } else {
-    return(p)
-  }
-
-  # suppressWarnings(print(p))
-  if (return.test == TRUE) {
-    return(list(p = p, test.out = test.out))
-  } else {
-    return(p)
-  }
+  # Return value is unified via finalize_plot_return():
+  # - default: ggplot
+  # - return.test=TRUE: list(p=..., test.out=...)
+  # - return.data=TRUE: list(p=..., data=..., [test.out])
+  return(finalize_plot_return(p, data = NULL, test.out = test.out))
 }

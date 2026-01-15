@@ -60,6 +60,7 @@
     shade.post = FALSE,
     start0 = FALSE,
     return.test = FALSE,
+    return.data = FALSE,
     balance = NULL,
     weight = NULL,
     lcolor = NULL,
@@ -169,6 +170,7 @@
   \item{shade.post}{Logical; if \code{FALSE} (default). If \code{TRUE}, shades post-treatment periods in certain plots. For counterfactual plots, if \code{NULL} (the default for the argument is \code{FALSE}), it effectively becomes \code{TRUE} internally unless explicitly set to \code{FALSE}.}
   \item{start0}{Logical; if \code{TRUE} (default is \code{FALSE}), re-indexes the first post-treatment period as 0 in event-time plots (gap, equiv, exit). The period before treatment becomes -1.}
   \item{return.test}{Logical; if \code{TRUE} (default is \code{FALSE}), returns a list containing the plot object and relevant test statistics instead of just the plot.}
+  \item{return.data}{Logical; if \code{TRUE} (default is \code{FALSE}), returns a data frame with the data used to construct the plot instead of returning a plot object. If \code{return.test=TRUE} as well, returns a list with \code{data} and \code{test.out}.}
   \item{balance}{Logical or \code{NULL} (default); if \code{TRUE}, uses a "balance sample" (if available from the \code{fect} object, e.g., from setting \code{balanced.sample = TRUE} in \code{fect}) for plotting.}
   \item{weight}{Logical or \code{NULL} (default); if \code{TRUE}, applies weighting (if available from the \code{fect} object, e.g., from providing weights in \code{fect}) to the estimates being plotted.}
   \item{lcolor}{Character vector of length 1 or 2, or \code{NULL} (default). If \code{NULL}, uses a default color (e.g., \code{"#AAAAAA70"} if \code{theme.bw=TRUE}, else \code{"white"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
@@ -230,9 +232,15 @@
   The function heavily relies on \code{ggplot2} for plotting and \code{esplot} for event-study style visualizations.
 }
 \value{
-  A \code{ggplot2} object representing the plot. If \code{return.test=TRUE}, a list containing:
+  By default, a \code{ggplot2} object representing the plot.
+
+  If \code{return.data=TRUE}, returns a list containing:
   \item{p}{The \code{ggplot2} object.}
+  \item{data}{A named list of data frames containing the data used to construct each layer of the plot (no extra all-NA columns are added).}
+  If \code{return.test=TRUE} as well, the list also contains:
   \item{test.out}{A list or data frame containing relevant test statistics (such as F-tests, equivalence p-values, placebo test p-values, etc.), if applicable to the plot type and options chosen.}
+
+  If \code{return.test=TRUE} and \code{return.data=FALSE}, returns a list containing \code{p} and \code{test.out}.
 }
 \author{
   Licheng Liu, Ye Wang, Yiqing Xu, Ziyi Liu, Rivka Lipkovitz
