@@ -15,9 +15,21 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-latest, r: "release", use_public_rspm: true, pkg_type: "", tmpdir: ${{ runner.temp }} }
-          - { os: macos-latest, r: "release", use_public_rspm: false, pkg_type: "source", tmpdir: ${{ github.workspace }}/.tmp }
-          - { os: windows-latest, r: "release", use_public_rspm: true, pkg_type: "binary", tmpdir: ${{ runner.temp }} }
+          - os: ubuntu-latest
+            r: "release"
+            use_public_rspm: true
+            pkg_type: ""
+            tmpdir: ${{ runner.temp }}
+          - os: macos-latest
+            r: "release"
+            use_public_rspm: false
+            pkg_type: "source"
+            tmpdir: ${{ github.workspace }}/.tmp
+          - os: windows-latest
+            r: "release"
+            use_public_rspm: true
+            pkg_type: "binary"
+            tmpdir: ${{ runner.temp }}
 
     env:
       R_KEEP_PKG_SOURCE: yes
