@@ -55,6 +55,25 @@ jobs:
           # Use CRAN on macOS to ensure binaries are available.
           use-public-rspm: ${{ matrix.config.use_public_rspm }}
 
+      - name: Preinstall future (retry)
+        shell: Rscript {0}
+        run: |
+          pkg <- "future"
+          if (!requireNamespace(pkg, quietly = TRUE)) {
+            repos <- c(CRAN = "https://cloud.r-project.org")
+            type <- "source"
+            for (i in 1:3) {
+              try({
+                install.packages(pkg, repos = repos, type = type)
+              }, silent = TRUE)
+              if (requireNamespace(pkg, quietly = TRUE)) break
+              Sys.sleep(10 * i)
+            }
+            if (!requireNamespace(pkg, quietly = TRUE)) {
+              stop("Failed to install 'future' after retries")
+            }
+          }
+
       - name: Setup R dependencies (attempt 1)
         id: deps1
         uses: r-lib/actions/setup-r-dependencies@v2
