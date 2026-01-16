@@ -24,6 +24,9 @@ jobs:
       _R_CHECK_CRAN_INCOMING_REMOTE_: false
       _R_CHECK_FORCE_SUGGESTS_: false
       RGL_USE_NULL: true
+      # Keep temp files in a writeable workspace path (macOS runner can be flaky
+      # with default temp locations when pak reads cached archives).
+      TMPDIR: ${{ github.workspace }}/.tmp
       # Put pak/pkgcache download cache in a known, cleanable place.
       # (Use workspace path; `runner.temp` is not a supported context.)
       PKGCACHE_DIR: ${{ github.workspace }}/.pkgcache
@@ -33,6 +36,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Create temp/cache dirs
+        shell: bash
+        run: |
+          mkdir -p "${TMPDIR}" "${PKGCACHE_DIR}"
       - name: Clean precompiled objects
         shell: bash
         run: |
