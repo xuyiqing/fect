@@ -19,7 +19,7 @@ jobs:
             r: "release"
             use_public_rspm: true
             pkg_type: ""
-          - os: macos-15-intel
+          - os: macos-latest
             r: "release"
             use_public_rspm: true
             pkg_type: "binary"
@@ -43,6 +43,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Set TMPDIR (macOS only)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "TMPDIR=${GITHUB_WORKSPACE}/.tmp" >> "$GITHUB_ENV"
+          mkdir -p "${GITHUB_WORKSPACE}/.tmp"
       - name: Create temp/cache dirs
         shell: bash
         run: |
@@ -63,13 +69,12 @@ jobs:
           use-public-rspm: ${{ matrix.config.use_public_rspm }}
 
       - name: Preinstall future (retry)
-        if: runner.os != 'macOS'
         shell: Rscript {0}
         run: |
           pkg <- "future"
           if (!requireNamespace(pkg, quietly = TRUE)) {
             repos <- c(CRAN = "https://cloud.r-project.org")
-            type <- "source"
+            type <- if (Sys.info()[["sysname"]] == "Darwin") "source" else "binary"
             for (i in 1:3) {
               try({
                 install.packages(pkg, repos = repos, type = type)
