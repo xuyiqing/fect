@@ -15,15 +15,16 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-latest, r: "release", use_public_rspm: true }
-          - { os: macos-latest, r: "release", use_public_rspm: false }
-          - { os: windows-latest, r: "release", use_public_rspm: true }
+          - { os: ubuntu-latest, r: "release", use_public_rspm: true, pkg_type: "" }
+          - { os: macos-latest, r: "release", use_public_rspm: false, pkg_type: "source" }
+          - { os: windows-latest, r: "release", use_public_rspm: true, pkg_type: "binary" }
 
     env:
       R_KEEP_PKG_SOURCE: yes
       _R_CHECK_CRAN_INCOMING_REMOTE_: false
       _R_CHECK_FORCE_SUGGESTS_: false
       RGL_USE_NULL: true
+      R_PKG_TYPE: ${{ matrix.config.pkg_type }}
       # Keep temp files in a writeable workspace path (macOS runner can be flaky
       # with default temp locations when pak reads cached archives).
       TMPDIR: ${{ github.workspace }}/.tmp
@@ -86,7 +87,6 @@ jobs:
             any::rcmdcheck
             any::devtools
             lzy318/HonestDiDFEct
-            local::.
           needs: check
 
       - name: Clear pak lockfile/cache (for retry)
@@ -105,7 +105,6 @@ jobs:
             any::rcmdcheck
             any::devtools
             lzy318/HonestDiDFEct
-            local::.
           needs: check
 
       - name: Install HonestDiDFEct via devtools
