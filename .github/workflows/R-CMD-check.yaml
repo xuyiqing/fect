@@ -19,10 +19,10 @@ jobs:
             r: "release"
             use_public_rspm: true
             pkg_type: ""
-          - os: macos-latest
+          - os: macos-13
             r: "release"
-            use_public_rspm: false
-            pkg_type: "source"
+            use_public_rspm: true
+            pkg_type: "binary"
           - os: windows-latest
             r: "release"
             use_public_rspm: true
@@ -43,12 +43,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set TMPDIR (macOS only)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          echo "TMPDIR=${GITHUB_WORKSPACE}/.tmp" >> "$GITHUB_ENV"
-          mkdir -p "${GITHUB_WORKSPACE}/.tmp"
       - name: Create temp/cache dirs
         shell: bash
         run: |
@@ -121,24 +115,6 @@ jobs:
             lzy318/HonestDiDFEct
           needs: check
 
-      - name: Setup R dependencies (macOS, source)
-        if: runner.os == 'macOS'
-        shell: Rscript {0}
-        run: |
-          options(repos = c(CRAN = "https://cloud.r-project.org"))
-          if (!requireNamespace("remotes", quietly = TRUE)) {
-            install.packages("remotes", type = "source")
-          }
-          if (!requireNamespace("rcmdcheck", quietly = TRUE)) {
-            install.packages("rcmdcheck", type = "source")
-          }
-          if (!requireNamespace("devtools", quietly = TRUE)) {
-            install.packages("devtools", type = "source")
-          }
-          remotes::install_deps(dependencies = TRUE, upgrade = "never", type = "source")
-          if (!requireNamespace("HonestDiDFEct", quietly = TRUE)) {
-            remotes::install_github("lzy318/HonestDiDFEct", upgrade = "never")
-          }
 
       - name: Install HonestDiDFEct via devtools
         shell: Rscript {0}
