@@ -19,7 +19,7 @@ jobs:
             r: "release"
             use_public_rspm: true
             pkg_type: ""
-          - os: macos-13
+          - os: macos-15-intel
             r: "release"
             use_public_rspm: true
             pkg_type: "binary"
