@@ -760,7 +760,7 @@ fect.default <- function(
                 treat.count <- tapply(treated.flag, id.vec, function(x) sum(x, na.rm = TRUE))
                 never.tr <- names(treat.count)[is.na(treat.count) | treat.count == 0]
                 if (length(never.tr) > 0) {
-                    sample.ids <- head(never.tr, 3)
+                    sample.ids <- utils::head(never.tr, 3)
                     warning(
                         paste0(
                             "The \"group\" option is set to the unit identifier (",

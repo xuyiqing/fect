@@ -2,7 +2,7 @@ Package: fect
 Type: Package
 Title: Fixed Effects Counterfactual Estimators
 Version: 2.1.0
-Date: 2025-10-10
+Date: 2026-01-15
 Authors@R: 
     c(person("Licheng", "Liu", , "lichengl@stanford.edu", role = c("aut")), 
       person("Ziyi", "Liu", , "zyliu2023@berkeley.edu", role = c("aut")),
@@ -11,6 +11,8 @@ Authors@R:
       person("Tianzhu", "Qin", , "tianzhu@stanford.edu", role = c("aut")),
       person("Shiyun", "Hu", , "hushiyun@pku.edu.cn", role = c("aut")),
       person("Rivka", "Lipkovitz", , "rivkal@mit.edu", role = c("aut")))
+Author: Licheng Liu [aut], Ziyi Liu [aut], Ye Wang [aut], Yiqing Xu [aut, cre],
+    Tianzhu Qin [aut], Shiyun Hu [aut], Rivka Lipkovitz [aut]
 Maintainer: Yiqing Xu <yiqingxu@stanford.edu>
 Description: Provides tools for estimating causal effects in panel data using counterfactual methods, as well as other modern DID estimators. It is designed for causal panel analysis with binary treatments under the parallel trends assumption. The package supports scenarios where treatments can switch on and off and allows for limited carryover effects. It includes several imputation estimators, such as Gsynth (Xu 2017), linear factor models, and the matrix completion method. Detailed methodology is described in Liu, Wang, and Xu (2024) <doi:10.48550/arXiv.2107.00856> and Chiu et al. (2025) <doi:10.48550/arXiv.2309.15983>. Optionally integrates with the "HonestDiDFEct" package for sensitivity analyses compatible with imputation estimators. "HonestDiDFEct" is not on CRAN but can be obtained from <https://github.com/lzy318/HonestDiDFEct>.
 URL: https://yiqingxu.org/packages/fect/, https://github.com/xuyiqing/fect

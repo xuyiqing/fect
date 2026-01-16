@@ -41,6 +41,9 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
+          # Bump this to invalidate old dependency caches
+          # (useful if pak/pkgcache cache gets corrupted in CI).
+          cache-version: 2
           extra-packages: |
             any::rcmdcheck
             any::devtools

@@ -157,9 +157,9 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
             r.cv <- 0
             message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
             if (!0 %in% I.co) {
-                est.co.best <- inter_fe(Y.co, X.co, 0, force = force, beta0 = beta0, tol, max.iteration)
+                est.co.best <- inter_fe(Y.co, X.co, 0, force = force, beta0_in = beta0, tol, max.iteration)
             } else {
-                est.co.best <- inter_fe_ub(Y.co, Y0.co, X.co, I.co, W = W.use, beta0, 0, force = force, tol, max.iteration)
+                est.co.best <- inter_fe_ub(Y.co, Y0.co, X.co, I.co, W_in = W.use, beta0, 0, force = force, tol, max.iteration)
             }
         } else {
             r.old <- r ## save the minimal number of factors
@@ -176,11 +176,11 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
                 if (!0 %in% I.co) {
                     est.co <- inter_fe(
                         Y = Y.co, X = X.co, r,
-                        force = force, beta0 = beta0, tol, max.iteration
+                        force = force, beta0_in = beta0, tol, max.iteration
                     )
                 } else {
                     est.co <- inter_fe_ub(
-                        Y = Y.co, Y0 = Y0.co, X = X.co, I = I.co, W = W.use,
+                        Y = Y.co, Y0 = Y0.co, X = X.co, I = I.co, W_in = W.use,
                         beta0, r, force = force, tol, max.iteration
                     )
                 }
@@ -354,10 +354,10 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
 
     if (!0 %in% I.co) {
         est.co.best <- inter_fe(Y.co, X.co, r.cv,
-            force = force, beta0 = beta0, tol, max.iteration
+            force = force, beta0_in = beta0, tol, max.iteration
         )
     } else {
-        est.co.best <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W = W.use, beta0, r.cv, force = force, tol, max.iteration)
+        est.co.best <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W_in = W.use, beta0, r.cv, force = force, tol, max.iteration)
     }
 
     if (boot == FALSE) {
@@ -366,10 +366,10 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
         } else {
             if (!0 %in% I.co) {
                 est.co.fect <- inter_fe(Y.co, X.co, 0,
-                    force = force, beta0 = beta0, tol, max.iteration
+                    force = force, beta0_in = beta0, tol, max.iteration
                 )
             } else {
-                est.co.fect <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W = W.use, beta0, 0, force = force, tol, max.iteration)
+                est.co.fect <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W_in = W.use, beta0, 0, force = force, tol, max.iteration)
             }
         }
     }
