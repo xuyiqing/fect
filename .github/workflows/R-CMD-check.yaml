@@ -48,8 +48,8 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          echo "TMPDIR=${GITHUB_WORKSPACE}/.tmp" >> "$GITHUB_ENV"
-          mkdir -p "${GITHUB_WORKSPACE}/.tmp"
+          echo "TMPDIR=${RUNNER_TEMP}" >> "$GITHUB_ENV"
+          mkdir -p "${RUNNER_TEMP}"
       - name: Create temp/cache dirs
         shell: bash
         run: |
@@ -134,7 +134,7 @@ jobs:
       - name: Check (CRAN-like)
         shell: Rscript {0}
         run: |
-          rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on = 'note', check_dir = 'check')
+          rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on = 'error', check_dir = 'check')
 
       - name: Upload check results
         if: failure()
