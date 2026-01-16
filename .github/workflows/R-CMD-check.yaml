@@ -69,25 +69,6 @@ jobs:
           # Use CRAN on macOS to ensure binaries are available.
           use-public-rspm: ${{ matrix.config.use_public_rspm }}
 
-      - name: Preinstall future (retry)
-        shell: Rscript {0}
-        run: |
-          pkg <- "future"
-          if (!requireNamespace(pkg, quietly = TRUE)) {
-            repos <- c(CRAN = "https://cloud.r-project.org")
-            type <- if (Sys.info()[["sysname"]] == "Darwin") "source" else "binary"
-            for (i in 1:3) {
-              try({
-                install.packages(pkg, repos = repos, type = type)
-              }, silent = TRUE)
-              if (requireNamespace(pkg, quietly = TRUE)) break
-              Sys.sleep(10 * i)
-            }
-            if (!requireNamespace(pkg, quietly = TRUE)) {
-              stop("Failed to install 'future' after retries")
-            }
-          }
-
       - name: Setup R dependencies (attempt 1)
         if: runner.os != 'macOS'
         id: deps1
@@ -127,6 +108,24 @@ jobs:
         run: |
           if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes', repos='https://cloud.r-project.org')
           if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) remotes::install_github('lzy318/HonestDiDFEct', upgrade='never')
+
+      - name: Ensure rcmdcheck is installed
+        shell: Rscript {0}
+        run: |
+          if (!requireNamespace("rcmdcheck", quietly = TRUE)) {
+            repos <- c(CRAN = "https://cloud.r-project.org")
+            type <- if (Sys.info()[["sysname"]] == "Darwin") "source" else "binary"
+            for (i in 1:3) {
+              try({
+                install.packages("rcmdcheck", repos = repos, type = type)
+              }, silent = TRUE)
+              if (requireNamespace("rcmdcheck", quietly = TRUE)) break
+              Sys.sleep(10 * i)
+            }
+            if (!requireNamespace("rcmdcheck", quietly = TRUE)) {
+              stop("Failed to install 'rcmdcheck' after retries")
+            }
+          }
 
       - name: Session info
         shell: Rscript {0}
