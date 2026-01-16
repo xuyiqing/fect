@@ -19,17 +19,14 @@ jobs:
             r: "release"
             use_public_rspm: true
             pkg_type: ""
-            tmpdir: ${{ runner.temp }}
           - os: macos-latest
             r: "release"
             use_public_rspm: false
             pkg_type: "source"
-            tmpdir: ${{ github.workspace }}/.tmp
           - os: windows-latest
             r: "release"
             use_public_rspm: true
             pkg_type: "binary"
-            tmpdir: ${{ runner.temp }}
 
     env:
       R_KEEP_PKG_SOURCE: yes
@@ -37,9 +34,6 @@ jobs:
       _R_CHECK_FORCE_SUGGESTS_: false
       RGL_USE_NULL: true
       R_PKG_TYPE: ${{ matrix.config.pkg_type }}
-      # Keep temp files in a writeable workspace path (macOS runner can be flaky
-      # with default temp locations when pak reads cached archives).
-      TMPDIR: ${{ matrix.config.tmpdir }}
       # Put pak/pkgcache download cache in a known, cleanable place.
       # (Use workspace path; `runner.temp` is not a supported context.)
       PKGCACHE_DIR: ${{ github.workspace }}/.pkgcache
@@ -49,10 +43,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Set TMPDIR (macOS only)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "TMPDIR=${GITHUB_WORKSPACE}/.tmp" >> "$GITHUB_ENV"
+          mkdir -p "${GITHUB_WORKSPACE}/.tmp"
       - name: Create temp/cache dirs
         shell: bash
         run: |
-          mkdir -p "${TMPDIR}" "${PKGCACHE_DIR}"
+          mkdir -p "${PKGCACHE_DIR}"
       - name: Clean precompiled objects
         shell: bash
         run: |
