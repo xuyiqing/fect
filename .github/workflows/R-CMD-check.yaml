@@ -15,9 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-latest, r: "release", use_public_rspm: true, pkg_type: "" }
-          - { os: macos-latest, r: "release", use_public_rspm: false, pkg_type: "source" }
-          - { os: windows-latest, r: "release", use_public_rspm: true, pkg_type: "binary" }
+          - { os: ubuntu-latest, r: "release", use_public_rspm: true, pkg_type: "", tmpdir: ${{ runner.temp }} }
+          - { os: macos-latest, r: "release", use_public_rspm: false, pkg_type: "source", tmpdir: ${{ github.workspace }}/.tmp }
+          - { os: windows-latest, r: "release", use_public_rspm: true, pkg_type: "binary", tmpdir: ${{ runner.temp }} }
 
     env:
       R_KEEP_PKG_SOURCE: yes
@@ -27,7 +27,7 @@ jobs:
       R_PKG_TYPE: ${{ matrix.config.pkg_type }}
       # Keep temp files in a writeable workspace path (macOS runner can be flaky
       # with default temp locations when pak reads cached archives).
-      TMPDIR: ${{ github.workspace }}/.tmp
+      TMPDIR: ${{ matrix.config.tmpdir }}
       # Put pak/pkgcache download cache in a known, cleanable place.
       # (Use workspace path; `runner.temp` is not a supported context.)
       PKGCACHE_DIR: ${{ github.workspace }}/.pkgcache
@@ -57,6 +57,7 @@ jobs:
           use-public-rspm: ${{ matrix.config.use_public_rspm }}
 
       - name: Preinstall future (retry)
+        if: runner.os != 'macOS'
         shell: Rscript {0}
         run: |
           pkg <- "future"
@@ -76,6 +77,7 @@ jobs:
           }
 
       - name: Setup R dependencies (attempt 1)
+        if: runner.os != 'macOS'
         id: deps1
         uses: r-lib/actions/setup-r-dependencies@v2
         continue-on-error: true
@@ -106,6 +108,25 @@ jobs:
             any::devtools
             lzy318/HonestDiDFEct
           needs: check
+
+      - name: Setup R dependencies (macOS, source)
+        if: runner.os == 'macOS'
+        shell: Rscript {0}
+        run: |
+          options(repos = c(CRAN = "https://cloud.r-project.org"))
+          if (!requireNamespace("remotes", quietly = TRUE)) {
+            install.packages("remotes", type = "source")
+          }
+          if (!requireNamespace("rcmdcheck", quietly = TRUE)) {
+            install.packages("rcmdcheck", type = "source")
+          }
+          if (!requireNamespace("devtools", quietly = TRUE)) {
+            install.packages("devtools", type = "source")
+          }
+          remotes::install_deps(dependencies = TRUE, upgrade = "never", type = "source")
+          if (!requireNamespace("HonestDiDFEct", quietly = TRUE)) {
+            remotes::install_github("lzy318/HonestDiDFEct", upgrade = "never")
+          }
 
       - name: Install HonestDiDFEct via devtools
         shell: Rscript {0}
