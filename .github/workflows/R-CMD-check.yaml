@@ -34,6 +34,7 @@ jobs:
       _R_CHECK_FORCE_SUGGESTS_: false
       RGL_USE_NULL: true
       R_PKG_TYPE: ${{ matrix.config.pkg_type }}
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       # Put pak/pkgcache download cache in a known, cleanable place.
       # (Use workspace path; `runner.temp` is not a supported context.)
       PKGCACHE_DIR: ${{ github.workspace }}/.pkgcache
