@@ -24,6 +24,9 @@ jobs:
       _R_CHECK_CRAN_INCOMING_REMOTE_: false
       _R_CHECK_FORCE_SUGGESTS_: false
       RGL_USE_NULL: true
+      # Force pak/pkgdepends to single-worker installs to avoid sporadic
+      # "cannot open the connection" errors when reading cached archives.
+      R_PROFILE_USER: ${{ github.workspace }}/.github/.Rprofile
 
     steps:
       - uses: actions/checkout@v4
