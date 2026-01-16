@@ -4,3 +4,11 @@
 ## Forcing single worker avoids rare cache/archive race conditions in CI.
 options(Ncpus = 1)
 
+# pkgcache (used by pak) download stability knobs
+options(
+  pkgcache_connecttimeout = 60,
+  pkgcache_timeout = 7200,
+  pkgcache_low_speed_limit = 1,
+  pkgcache_low_speed_time = 60
+)
+
