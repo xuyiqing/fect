@@ -70,7 +70,6 @@ jobs:
           use-public-rspm: ${{ matrix.config.use_public_rspm }}
 
       - name: Setup R dependencies (attempt 1)
-        if: runner.os != 'macOS'
         id: deps1
         uses: r-lib/actions/setup-r-dependencies@v2
         continue-on-error: true
