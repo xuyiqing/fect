@@ -290,12 +290,12 @@ interFE.default <- function(formula = NULL, data, # a data frame
     ## estimates
     if (binary == FALSE) {
         if ((!0 %in% I) & (!use_weight)) {
-            out <- inter_fe(Y = Y, X = X, r = r, beta0 = beta0, force = force, max_iter = max_iteration, tol = tol)
+            out <- inter_fe(Y = Y, X = X, r = r, beta0_in = beta0, force = force, max_iter = max_iteration, tol = tol)
         } else {
             if (!use_weight) {
                 W <- as.matrix(0)
             }
-            out <- inter_fe_ub(Y = Y, Y0 = Y0, X = X, I = I, W = W, beta0 = beta0, r = r, force = force, max_iter = max_iteration, tol = tol)
+            out <- inter_fe_ub(Y = Y, Y0 = Y0, X = X, I = I, W_in = W, beta0 = beta0, r = r, force = force, max_iter = max_iteration, tol = tol)
         }
     } else {
         if (QR == FALSE) {
@@ -380,7 +380,7 @@ interFE.default <- function(formula = NULL, data, # a data frame
                 if ((!0 %in% I) & (!use_weight)) {
                     inter.out <- try(inter_fe(
                         Y = Y.boot, X = X.boot, r = r, tol = tol,
-                        force = force, beta0 = beta0, max_iter = max_iteration
+                        force = force, beta0_in = beta0, max_iter = max_iteration
                     ), silent = TRUE)
                 } else {
                     if (!use_weight) {
@@ -388,7 +388,7 @@ interFE.default <- function(formula = NULL, data, # a data frame
                     }
                     Y0.boot <- Y0[, smp]
                     inter.out <- try(inter_fe_ub(
-                        Y = Y.boot, Y0 = Y0.boot, X = X.boot, I = I.boot, W = W.boot, tol = tol,
+                        Y = Y.boot, Y0 = Y0.boot, X = X.boot, I = I.boot, W_in = W.boot, tol = tol,
                         beta0 = beta0, r = r, force = force, max_iter = max_iteration
                     ), silent = TRUE)
                 }

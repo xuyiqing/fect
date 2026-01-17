@@ -21,7 +21,8 @@ assumptions.}
             knots = NULL, degree = 2,
             sfe = NULL, cfe = NULL,
             Z = NULL, gamma = NULL, Q = NULL, kappa = NULL, 
-            Q.type = NULL, # c(1,2,3) or c("linear", "quadratic", "cubic")
+            Q.type = NULL,
+            Q.bspline.degree = NULL,
             Z.param = NULL, Q.param = NULL,
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,
@@ -83,6 +84,7 @@ assumptions.}
 \item{Q}{a vector specifying the time-varying covariates for the Q matrix.}
 \item{kappa}{a vector specifying the time-invariant covariates for the kappa matrix.}
 \item{Q.type}{a vector specifying the type of Q matrix.}
+\item{Q.bspline.degree}{an integer specifying the degree used when \code{Q.type} includes \code{"bspline"} in \code{method="cfe"}. If NULL, a default degree is chosen based on the number of distinct time values.}
 \item{Z.param}{a list specifying the parameters for the Z matrix.}
 \item{Q.param}{a list specifying the parameters for the Q matrix.}
 \item{balance.period}{a length-2 vector specifying a time range for a balanced sample.}

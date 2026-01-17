@@ -264,12 +264,13 @@ List ife_part(arma::mat E, int r) {
 
 /* Obtain cfe; */
 // [[Rcpp::export]]
-List cfe_iter(arma::cube XX, arma::mat xxinv, arma::cube X_extra_FE,
-               arma::cube X_Z, arma::cube X_Q, arma::cube X_gamma,
-               arma::cube X_kappa, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id,
-               arma::mat Y, arma::mat Y0, arma::mat I, arma::mat W,
-               arma::mat beta0, int force, int r, double tolerate,
-               int max_iter = 1000) {
+List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
+              const arma::cube& X_extra_FE, const arma::cube& X_Z,
+              const arma::cube& X_Q, const arma::cube& X_gamma,
+              const arma::cube& X_kappa, Rcpp::List Zgamma_id,
+              Rcpp::List kappaQ_id, const arma::mat& Y, const arma::mat& Y0,
+              const arma::mat& I, const arma::mat& W, const arma::mat& beta0,
+              int force, int r, double tolerate, int max_iter) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   int p = XX.n_slices;

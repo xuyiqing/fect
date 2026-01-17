@@ -4,7 +4,7 @@
 
 /* Obtain additive fe for ub data; assume r=0, without covar */
 // [[Rcpp::export]]
-List fe_ad_iter(arma::mat Y, arma::mat Y0, arma::mat I, arma::mat W, int force,
+List fe_ad_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, int force,
                 double tolerate, int max_iter = 500) {
 
   int T = Y.n_rows;
@@ -88,8 +88,8 @@ List fe_ad_iter(arma::mat Y, arma::mat Y0, arma::mat I, arma::mat W, int force,
 
 /* Obtain additive fe for ub data; assume r=0, with covariates */
 // [[Rcpp::export]]
-List fe_ad_covar_iter(arma::cube XX, arma::mat xxinv, arma::mat Y, arma::mat Y0,
-                      arma::mat I, arma::mat beta0, arma::mat W, int force,
+List fe_ad_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::mat& Y, const arma::mat& Y0,
+                      const arma::mat& I, const arma::mat& beta0, const arma::mat& W, int force,
                       double tolerate, int max_iter = 500) {
   int T = Y.n_rows;
   int N = Y.n_cols;
@@ -191,7 +191,7 @@ List fe_ad_covar_iter(arma::cube XX, arma::mat xxinv, arma::mat Y, arma::mat Y0,
 
 /* Obtain additive fe for ub data; assume r>0 but p=0*/
 // [[Rcpp::export]]
-List fe_ad_inter_iter(arma::mat Y, arma::mat Y0, arma::mat I, arma::mat W,
+List fe_ad_inter_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W,
                       int force,
                       int mc, // whether pca or mc method
                       int r, int hard, double lambda, double tolerate,
@@ -313,9 +313,9 @@ List fe_ad_inter_iter(arma::mat Y, arma::mat Y0, arma::mat I, arma::mat W,
 
 /* Obtain additive fe for ub data; assume r>0 p>0*/
 // [[Rcpp::export]]
-List fe_ad_inter_covar_iter(arma::cube XX, arma::mat xxinv, arma::mat Y,
-                            arma::mat Y0, arma::mat I, arma::mat W,
-                            arma::mat beta0, int force,
+List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::mat& Y,
+                            const arma::mat& Y0, const arma::mat& I, const arma::mat& W,
+                            const arma::mat& beta0, int force,
                             int mc, // whether pca or mc method
                             int r, int hard, double lambda, double tolerate,
                             int max_iter = 1000) {
@@ -485,8 +485,8 @@ List fe_ad_inter_covar_iter(arma::cube XX, arma::mat xxinv, arma::mat Y,
 
 /* Main iteration for beta */
 // [[Rcpp::export]]
-List beta_iter(arma::cube X, arma::mat xxinv, arma::mat Y, int r,
-               double tolerate, arma::mat beta0, int max_iter) {
+List beta_iter(const arma::cube& X, const arma::mat& xxinv, const arma::mat& Y, int r,
+               double tolerate, const arma::mat& beta0, int max_iter) {
 
   /* beta.new: computed beta under iteration with error precision=tolerate
    factor: estimated factor

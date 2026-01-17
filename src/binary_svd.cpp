@@ -8,10 +8,10 @@
 
 /* inter fe model for binary outcome */
 // [[Rcpp::export]]
-List inter_fe_d (arma::mat Y,
-                 arma::mat Y_fit0, // initial fit using ols
-                 arma::mat FE0, // initial fixed effects 
-                 arma::cube X,
+List inter_fe_d (const arma::mat& Y,
+                 const arma::mat& Y_fit0, // initial fit using ols
+                 const arma::mat& FE0, // initial fixed effects 
+                 const arma::cube& X,
                  int r,
                  int force,
                  int mniter = 5000,
@@ -149,11 +149,11 @@ List inter_fe_d (arma::mat Y,
 
 /* inter fe model for binary outcome: unbalanced panel */
 // [[Rcpp::export]]
-List inter_fe_d_ub (arma::mat Y, 
-                    arma::mat Y_fit0, // initial fit using ols
-                    arma::mat FE0, // initial fixed effects
-                    arma::cube X,
-                    arma::mat I,
+List inter_fe_d_ub (const arma::mat& Y, 
+                    const arma::mat& Y_fit0, // initial fit using ols
+                    const arma::mat& FE0, // initial fixed effects
+                    const arma::cube& X,
+                    const arma::mat& I,
                     int r,
                     int force, 
                     int mniter = 5000,

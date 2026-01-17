@@ -4,8 +4,9 @@
 
 /* Interactive Fixed Effects */
 // [[Rcpp::export]]
-List inter_fe(arma::mat Y, arma::cube X, int r, int force, arma::mat beta0,
+List inter_fe(const arma::mat& Y, const arma::cube& X, int r, int force, const arma::mat& beta0_in,
               double tol = 1e-5, int max_iter = 500) {
+  arma::mat beta0 = beta0_in;
   /* Dimensions */
   int b_r = beta0.n_rows;
   int T = Y.n_rows;
@@ -283,11 +284,12 @@ List inter_fe(arma::mat Y, arma::cube X, int r, int force, arma::mat beta0,
 /* Interactive Fixed Effects: ub */
 // [[Rcpp::export]]
 List inter_fe_ub(
-    arma::mat Y, arma::mat Y0, arma::cube X, arma::mat I, arma::mat W,
-    arma::mat beta0,
+    const arma::mat& Y, const arma::mat& Y0, const arma::cube& X, const arma::mat& I, const arma::mat& W_in,
+    const arma::mat& beta0,
     int r, // r > 0, the outcome has a factor-type fixed effect; r = 0 else
     int force, double tol = 1e-5, int max_iter = 1000) {
 
+  arma::mat W = W_in;
   /* Dimensions */
   int T = Y.n_rows;
   int N = Y.n_cols;

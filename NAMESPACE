@@ -5,10 +5,8 @@ importFrom("stats", "na.omit", "quantile", "sd", "var", "cov", "pchisq", "lm",
 "as.formula", "median", "pnorm", "predict", "qnorm", "reshape",
 "dnorm", "pf", "rbinom", "loess", "aggregate", "pt", "qt", "setNames", "time")
 importFrom("foreach","foreach","%dopar%")
-importFrom("doParallel","registerDoParallel")
 importFrom("parallel", "detectCores", "stopCluster", "makeCluster")
 importFrom("doRNG","registerDoRNG")
-importFrom("future","makeClusterPSOCK")
 importFrom("MASS", "ginv")
 importFrom("utils", "setTxtProgressBar", "txtProgressBar")
 importFrom("ggplot2", "ggplot_build", "geom_boxplot", "geom_density", "geom_tile",
@@ -49,6 +47,7 @@ S3method("fect", "default")
 S3method("fect", "formula")
 S3method("print", "fect")
 S3method("plot", "fect")
+S3method("print", "fect_plot_return")
 S3method("interFE", "default")
 S3method("interFE", "formula")
 S3method("print", "interFE")

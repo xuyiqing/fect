@@ -862,12 +862,21 @@ fect_boot <- function(
       if (p > 0) {
         X.boot <- X[, id.boot, , drop = FALSE]
       }
-      D.boot <- out$D[, id.boot]
-      I.boot <- out$I[, id.boot]
-      II.boot <- out$II[, id.boot]
+      D.boot <- out$D[, id.boot, drop = FALSE]
+      I.boot <- out$I[, id.boot, drop = FALSE]
+      II.boot <- out$II[, id.boot, drop = FALSE]
       W.boot <- NULL
       if (!is.null(W)) {
         W.boot <- NULL
+      }
+      boot.group <- NULL
+      if (!is.null(group)) {
+        if (is.matrix(group) || length(dim(group)) == 2) {
+          boot.group <- group[, id.boot, drop = FALSE]
+        } else {
+          # Fallback: if group is a length-N vector, align it to boot.id
+          boot.group <- group[id.boot]
+        }
       }
       synth.out <- try(
         fect_gsynth(
@@ -901,7 +910,7 @@ fect_boot <- function(
           tol = tol,
           max.iteration = max.iteration,
           group.level = group.level,
-          group = group
+          group = boot.group
         ),
         silent = TRUE
       )

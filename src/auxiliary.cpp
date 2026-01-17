@@ -4,13 +4,13 @@
 
 
 /* cross product */
-arma::mat crossprod (arma::mat x, arma::mat y) {
+arma::mat crossprod (const arma::mat& x, const arma::mat& y) {
   return(x.t() * y);
 }
 
 /* Expectation :E if Iij==0, Eij=FEij */
-arma::mat E_adj (arma::mat E, arma::mat FE,
-                 arma::mat I) {
+arma::mat E_adj (const arma::mat& E, const arma::mat& FE,
+                 const arma::mat& I) {
   int T = E.n_rows ;
   int N = E.n_cols ;
   arma::mat EE = E ;
@@ -26,8 +26,8 @@ arma::mat E_adj (arma::mat E, arma::mat FE,
 
 /* Expectation Step :E if Iij==0, Eij=FEij with Weights */
 // [[Rcpp::export]]
-arma::mat wE_adj (arma::mat E, arma::mat FE, arma::mat W,
-                  arma::mat I) {
+arma::mat wE_adj (const arma::mat& E, const arma::mat& FE, const arma::mat& W,
+                  const arma::mat& I) {
   int T = E.n_rows ;
   int N = E.n_cols ;
   arma::mat EE = E ;
@@ -46,7 +46,7 @@ arma::mat wE_adj (arma::mat E, arma::mat FE, arma::mat W,
 
 
 /* reset FEij=0 if Iij==0 */
-arma::mat FE_adj (arma::mat FE, arma::mat I) {
+arma::mat FE_adj (const arma::mat& FE, const arma::mat& I) {
   int T = FE.n_rows ;
   int N = FE.n_cols ;
   arma::mat FEE = FE ;
@@ -61,7 +61,7 @@ arma::mat FE_adj (arma::mat FE, arma::mat I) {
 }
 
 /* drop values if Iij == 1 */
-arma::mat FE_missing (arma::mat FE, arma::mat I) {
+arma::mat FE_missing (const arma::mat& FE, const arma::mat& I) {
   int T = FE.n_rows ;
   int N = FE.n_cols ;
   arma::mat FEE = FE ;
@@ -78,7 +78,7 @@ arma::mat FE_missing (arma::mat FE, arma::mat I) {
 /* ------------------- 2. Only for Probit ----------------------- */
         /* ------------------------------------------ */
 
-arma::mat subr (arma::mat X, arma::mat ind) {
+arma::mat subr (const arma::mat& X, const arma::mat& ind) {
   int N = X.n_cols ;
   int t = ind.n_rows ;
   arma::mat subX(t, N, arma::fill::zeros) ;
@@ -90,7 +90,7 @@ arma::mat subr (arma::mat X, arma::mat ind) {
 }
 
 /* compute M in the EM algorithm for probit model */
-arma::mat M_gen (arma::mat Y_fit, arma::mat Y) {
+arma::mat M_gen (const arma::mat& Y_fit, const arma::mat& Y) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   arma::mat M(T, N, arma::fill::zeros);
@@ -110,7 +110,7 @@ arma::mat M_gen (arma::mat Y_fit, arma::mat Y) {
 }
 
 /* compute M in the EM algorithm for probit model for ub data */
-arma::mat M_gen_ub (arma::mat Y_fit, arma::mat Y, arma::mat I) {
+arma::mat M_gen_ub (const arma::mat& Y_fit, const arma::mat& Y, const arma::mat& I) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   arma::mat M(T, N, arma::fill::zeros);
@@ -132,7 +132,7 @@ arma::mat M_gen_ub (arma::mat Y_fit, arma::mat Y, arma::mat I) {
 }
 
 /* calculate alpha in px */
-double alpha_hat (arma::mat res, arma::mat v) {
+double alpha_hat (const arma::mat& res, const arma::mat& v) {
   int T = res.n_rows;
   int N = res.n_cols;
   arma::mat vhat(T, N, arma::fill::zeros);
@@ -159,7 +159,7 @@ double S (double a, double b, double w) {
 }
 
 /* calculate gamma_hat in mopx */
-double gamma_hat (arma::mat res, arma::mat V) {
+double gamma_hat (const arma::mat& res, const arma::mat& V) {
   int T = res.n_rows;
   int N = res.n_cols;
   arma::mat gam(T,N, arma::fill::zeros);
@@ -174,7 +174,7 @@ double gamma_hat (arma::mat res, arma::mat V) {
 }
 
 /* calculate gamma_hat in mopx; unbalanced */
-double gamma_hat_ub (arma::mat res, arma::mat V, arma::mat I) {
+double gamma_hat_ub (const arma::mat& res, const arma::mat& V, const arma::mat& I) {
   int T = res.n_rows;
   int N = res.n_cols;
   arma::mat gam(T, N, arma::fill::zeros);
@@ -192,7 +192,7 @@ double gamma_hat_ub (arma::mat res, arma::mat V, arma::mat I) {
 
 
 /* calculate v in px */
-arma::mat V (arma::mat Y, arma::mat Y_fit) {
+arma::mat V (const arma::mat& Y, const arma::mat& Y_fit) {
   int T = Y.n_rows ;
   int N = Y.n_cols ;
   arma::mat Vij(T, N, arma::fill::zeros) ;
@@ -216,7 +216,7 @@ arma::mat V (arma::mat Y, arma::mat Y_fit) {
 }
 
 /* calculate v in px; unbalanced */
-arma::mat V_ub (arma::mat Y, arma::mat Y_fit, arma::mat I) {
+arma::mat V_ub (const arma::mat& Y, const arma::mat& Y_fit, const arma::mat& I) {
   int T = Y.n_rows ;
   int N = Y.n_cols ;
   arma::mat Vij(T, N, arma::fill::ones) ;
@@ -246,7 +246,7 @@ arma::mat V_ub (arma::mat Y, arma::mat Y_fit, arma::mat I) {
 
 /* probit: log likelihood: sum */
 // [[Rcpp::export]]
-double loglh (arma::mat Y_fit, arma::mat Y) {
+double loglh (const arma::mat& Y_fit, const arma::mat& Y) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   arma::mat lh(T, N, arma::fill::zeros);
@@ -266,7 +266,7 @@ double loglh (arma::mat Y_fit, arma::mat Y) {
 
 /* probit: log likelihood: sum unbalanced case */
 // [[Rcpp::export]]
-double loglh_ub (arma::mat Y_fit, arma::mat Y, arma::mat I) {
+double loglh_ub (const arma::mat& Y_fit, const arma::mat& Y, const arma::mat& I) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   arma::mat lh(T, N, arma::fill::zeros);
@@ -288,7 +288,7 @@ double loglh_ub (arma::mat Y_fit, arma::mat Y, arma::mat I) {
 
 /* adjust unbalanced data */
 // [[Rcpp::export]]
-arma::mat data_ub_adj (arma::mat I_data, arma::mat data) {
+arma::mat data_ub_adj (const arma::mat& I_data, const arma::mat& data) {
   int count = I_data.n_rows ;
   //int total = data.n_rows ;
   int nov = data.n_cols ;
@@ -306,7 +306,7 @@ arma::mat data_ub_adj (arma::mat I_data, arma::mat data) {
 
 /* Three dimensional matrix inverse */
 // [[Rcpp::export]]
-arma::mat XXinv (arma::cube X) { 
+arma::mat XXinv (const arma::cube& X) { 
   int p = X.n_slices ;
   arma::mat xx(p, p) ;
   for (int k = 0; k < p; k++) {
@@ -325,7 +325,7 @@ arma::mat XXinv (arma::cube X) {
 /* weighted inverse*/
 /* X: T*N*p; W:T*N */
 // [[Rcpp::export]]
-arma::mat wXXinv (arma::cube X, arma::mat w) { 
+arma::mat wXXinv (const arma::cube& X, const arma::mat& w) { 
   int p = X.n_slices ;
   arma::mat w_sr = pow(w,0.5) ;
   arma::mat xx(p, p) ;
@@ -345,8 +345,8 @@ arma::mat wXXinv (arma::cube X, arma::mat w) {
 
 /* Obtain beta given interactive fe */
 // [[Rcpp::export]]
-arma::mat panel_beta (arma::cube X, arma::mat xxinv,
-                      arma::mat Y, arma::mat FE) {
+arma::mat panel_beta (const arma::cube& X, const arma::mat& xxinv,
+                      const arma::mat& Y, const arma::mat& FE) {
   int p = X.n_slices ; 
   arma::mat xy(p, 1, arma::fill::zeros) ;
   for (int k = 0; k < p; k++) {
@@ -357,8 +357,8 @@ arma::mat panel_beta (arma::cube X, arma::mat xxinv,
 
 /* Obtain beta given interactive fe using weighted regression */
 // [[Rcpp::export]]
-arma::mat wpanel_beta (arma::cube X, arma::mat xwxinv, arma::mat w,
-                       arma::mat Y, arma::mat FE) {
+arma::mat wpanel_beta (const arma::cube& X, const arma::mat& xwxinv, const arma::mat& w,
+                       const arma::mat& Y, const arma::mat& FE) {
   int p = X.n_slices ; 
   arma::mat xwy(p, 1, arma::fill::zeros) ;
   arma::mat w_sr = pow(w,0.5) ;
@@ -371,7 +371,7 @@ arma::mat wpanel_beta (arma::cube X, arma::mat xwxinv, arma::mat w,
 
 /* Obtain OLS panel estimate */
 // [[Rcpp::export]]
-arma::mat panel_est (arma::cube X, arma::mat Y, arma::mat MF) {
+arma::mat panel_est (const arma::cube& X, const arma::mat& Y, const arma::mat& MF) {
   int p = X.n_slices ;
   arma::mat xx(p, p, arma::fill::zeros);
   arma::mat xy(p, 1, arma::fill::zeros);

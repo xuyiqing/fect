@@ -73,7 +73,8 @@ fect <- function(
     gamma = NULL,
     Q = NULL,
     kappa = NULL,
-    Q.type = NULL, # c(1,2,3) or c("linear", "quadratic", "cubic")
+    Q.type = NULL, # c(1,2,3,"bspline") or c("linear", "quadratic", "cubic", "bspline")
+    Q.bspline.degree = NULL, # used only when Q.type includes "bspline"
     Z.param = NULL,
     Q.param = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
@@ -144,6 +145,7 @@ fect.formula <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL,
+    Q.bspline.degree = NULL,
     Z.param = NULL,
     Q.param = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
@@ -246,6 +248,7 @@ fect.formula <- function(
         Q = Q,
         kappa = kappa,
         Q.type = Q.type,
+        Q.bspline.degree = Q.bspline.degree,
         Z.param = Z.param,
         Q.param = Q.param,
         placebo.period = placebo.period,
@@ -318,6 +321,7 @@ fect.default <- function(
     Q = NULL,
     kappa = NULL,
     Q.type = NULL,
+    Q.bspline.degree = NULL,
     Z.param = NULL,
     Q.param = NULL,
     balance.period = NULL, # the pre and post periods for balanced samples
@@ -738,6 +742,41 @@ fect.default <- function(
         if (!group %in% names(data)) {
             stop("\"group\" misspecified.\n")
         }
+        ## warn if group coincides with unit id but some units never treated
+        if (!is.null(index) && length(index) >= 1 && group == index[1]) {
+            if (!is.null(D) && D %in% names(data)) {
+                id.vec <- data[, index[1]]
+                d.vec <- data[, D]
+                ## treat anything different from 0/NA as treated
+                if (is.factor(d.vec) || is.character(d.vec)) {
+                    d.numeric <- suppressWarnings(as.numeric(as.character(d.vec)))
+                } else {
+                    d.numeric <- suppressWarnings(as.numeric(d.vec))
+                }
+                if (all(is.na(d.numeric))) {
+                    d.numeric <- suppressWarnings(as.numeric(d.vec))
+                }
+                treated.flag <- ifelse(is.na(d.numeric), 0, d.numeric != 0)
+                treat.count <- tapply(treated.flag, id.vec, function(x) sum(x, na.rm = TRUE))
+                never.tr <- names(treat.count)[is.na(treat.count) | treat.count == 0]
+                if (length(never.tr) > 0) {
+                    sample.ids <- utils::head(never.tr, 3)
+                    warning(
+                        paste0(
+                            "The \"group\" option is set to the unit identifier (",
+                            group,
+                            "), but ",
+                            length(never.tr),
+                            " unit(s) never receive treatment (e.g., ",
+                            paste(sample.ids, collapse = ", "),
+                            "). ",
+                            "Consider omitting the \"group\" option or using a cohort indicator instead."
+                        ),
+                        call. = FALSE
+                    )
+                }
+            }
+        }
     }
 
     if (!is.null(cl)) {
@@ -810,7 +849,7 @@ fect.default <- function(
                 stop("\"Q\" and \"Q.type\" cannot be used simultaneously.")
             }
             Q <- c()
-            for (i in 1:length(Q.type)) {
+            for (i in seq_along(Q.type)) {
                 Q.i <- tolower(as.character(Q.type[i]))
                 if (Q.i == "linear" || Q.i == "1") {
                     data[, paste(time, "1", sep = ".")] <- data[, time]**1
@@ -821,9 +860,36 @@ fect.default <- function(
                 } else if (Q.i == "cubic" || Q.i == "3") {
                     data[, paste(time, "3", sep = ".")] <- data[, time]**3
                     Q <- c(Q, paste(time, "3", sep = "."))
+                } else if (Q.i == "bspline" || Q.i == "b" || Q.i == "bs") {
+                    time.raw <- data[, time]
+                    time.num <- suppressWarnings(as.numeric(as.character(time.raw)))
+                    if (all(is.na(time.num))) {
+                        ## fallback: use ordered time index if not numeric
+                        time.num <- as.numeric(factor(time.raw, levels = sort(unique(time.raw))))
+                    }
+                    n.t <- length(unique(time.num))
+                    if (n.t < 2) {
+                        stop("\"Q.type='bspline'\" requires at least 2 distinct time values.")
+                    }
+                    if (is.null(Q.bspline.degree)) {
+                        degree.bs <- min(3, n.t - 1)
+                    } else {
+                        degree.bs <- suppressWarnings(as.integer(Q.bspline.degree))
+                        if (length(degree.bs) != 1 || is.na(degree.bs)) {
+                            stop("\"Q.bspline.degree\" must be a single numeric/integer value.")
+                        }
+                        degree.bs <- min(max(1L, degree.bs), n.t - 1L)
+                    }
+                    df.bs <- max(degree.bs + 1, min(degree.bs + 2, n.t))
+                    bs.mat <- splines::bs(time.num, df = df.bs, degree = degree.bs, intercept = FALSE)
+                    bs.names <- paste0(time, ".bs", seq_len(ncol(bs.mat)))
+                    for (j in seq_len(ncol(bs.mat))) {
+                        data[, bs.names[j]] <- bs.mat[, j]
+                    }
+                    Q <- c(Q, bs.names)
                 } else {
                     stop(
-                        "\"Q.type\" must be in c(1, 2, 3) or c(\"linear\", \"quadratic\", \"cubic\")."
+                        "\"Q.type\" must be in c(1, 2, 3, \"bspline\") or c(\"linear\", \"quadratic\", \"cubic\", \"bspline\")."
                     )
                 }
             }
@@ -1504,6 +1570,17 @@ fect.default <- function(
     }
 
     if (length(rm.id) > 0) {
+        n.keep <- length(rem.id)
+        if (n.keep <= 10) {
+            pct.keep <- round(100 * n.keep / N, 1)
+            message(paste0(
+                "After dropping units (max.missing/min.T0): retained ",
+                pct.keep, "% of units.\n"
+            ))
+        }
+    }
+
+    if (length(rm.id) > 0) {
         X.old <- X
         if (p > 0) {
             X <- array(0, dim = c(TT, (N - length(rm.id)), p))
@@ -1904,6 +1981,8 @@ fect.default <- function(
     ## Register clusters
     ## -------------------------------##
 
+    old.future.plan <- NULL
+
     if ((se == TRUE | permute == TRUE) & parallel == FALSE) {
         ## set seed
         if (is.null(seed) == FALSE) {
@@ -1919,8 +1998,9 @@ fect.default <- function(
         if (is.null(cores) == TRUE) {
             cores <- min(detectCores() - 2, 8) # default to 8 cores if not specified
         }
-        para.clusters <- future::makeClusterPSOCK(cores)
-        registerDoParallel(para.clusters)
+        old.future.plan <- future::plan()
+        future::plan(future::multisession, workers = cores)
+        doFuture::registerDoFuture()
         if (is.null(seed) == FALSE) {
             registerDoRNG(seed)
         }
@@ -2554,9 +2634,8 @@ fect.default <- function(
         permute.result <- list(permute.att.avg = out.permute, p = permute.p)
     }
 
-    if ((se == TRUE | permute) & parallel == TRUE) {
-        stopCluster(para.clusters)
-        # closeAllConnections()
+    if (!is.null(old.future.plan)) {
+        future::plan(old.future.plan)
     }
 
     ## message("\nOK4\n")

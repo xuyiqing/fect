@@ -5,13 +5,14 @@
 /* Complex Fixed Effects: ub */
 // [[Rcpp::export]]
 List complex_fe_ub(
-    arma::mat Y, arma::mat Y0, arma::cube X_covariates, arma::cube X_extra_FE,
-    arma::cube X_Z, arma::cube X_Q, arma::cube X_gamma, arma::cube X_kappa,
-    Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, arma::mat I, arma::mat W,
-    arma::mat beta0,
+    const arma::mat& Y, const arma::mat& Y0, const arma::cube& X_covariates, const arma::cube& X_extra_FE,
+    const arma::cube& X_Z, const arma::cube& X_Q, const arma::cube& X_gamma, const arma::cube& X_kappa,
+    Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, const arma::mat& I, const arma::mat& W_in,
+    const arma::mat& beta0,
     int r, // r > 0, the outcome has a factor-type fixed effect; r = 0 else
     int force, double tol = 1e-5, int max_iter = 1000) {
 
+  arma::mat W = W_in;
   /* Dimensions */
   int T = Y.n_rows;
   int N = Y.n_cols;
