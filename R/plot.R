@@ -3292,13 +3292,26 @@ plot.fect <- function(
       }
 
     } else {
-      plx <- predict(loess(eff.vec ~ X.vec), se = T)
-      se <- stats::qt(0.975, plx$df) * plx$se
-      y_hat <- plx$fit
-      y_hat_lower <- y_hat - se
-      y_hat_upper <- y_hat + se
+      # Continuous covariate: smooth with loess and show 95% CI ribbon.
+      # NOTE: predict(loess, se=TRUE) returns `se.fit` (not `se`).
+      # Also guard against NA/Inf values in the covariate/effects.
+      df_hte <- cbind.data.frame(X.vec = X.vec, eff.vec = eff.vec)
+      df_hte <- df_hte[is.finite(df_hte$X.vec) & is.finite(df_hte$eff.vec), , drop = FALSE]
+      if (nrow(df_hte) < 2) {
+        stop("Not enough non-missing observations to plot heterogeneous effects for the requested covariate.\n")
+      }
 
-      p <- ggplot()
+      lo_fit <- stats::loess(eff.vec ~ X.vec, data = df_hte)
+      plx <- stats::predict(lo_fit, newdata = df_hte$X.vec, se = TRUE)
+      se <- stats::qt(0.975, plx$df) * plx$se.fit
+      df_hte$y_hat <- as.numeric(plx$fit)
+      df_hte$y_hat_lower <- df_hte$y_hat - se
+      df_hte$y_hat_upper <- df_hte$y_hat + se
+
+      # Keep X.vec aligned for the histogram/count overlay below
+      X.vec <- df_hte$X.vec
+
+      p <- ggplot(df_hte, aes(x = .data$X.vec))
       ## xlab and ylab
       p <- p + xlab(xlab) + ylab(ylab)
 
@@ -3312,10 +3325,19 @@ plot.fect <- function(
         p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
       }
 
+<<<<<<< HEAD
       p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
       p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, linewidth = 0)
       p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
       p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, linewidth = 1.1)
+=======
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+      p <- p + geom_ribbon(aes(ymin = .data$y_hat_lower, ymax = .data$y_hat_upper),
+        color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, size = 0
+      )
+      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(y = .data$y_hat), color = heterogeneous.color, size = 1.1)
+>>>>>>> 07ca7e4adbcb47b83d5a6222fc073057117ab7d8
 
       ## title
       if (is.null(main) == TRUE) {
@@ -3366,7 +3388,12 @@ plot.fect <- function(
           max_idx <- which.max(counts)
           max_count_pos <- (bin_xmin[max_idx] + bin_xmax[max_idx]) / 2
           p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+<<<<<<< HEAD
             data = data.toplot, fill = count.color, linewidth = 0.3, alpha = count.alpha, color = count.outline.color
+=======
+            data = data.toplot, inherit.aes = FALSE,
+            fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+>>>>>>> 07ca7e4adbcb47b83d5a6222fc073057117ab7d8
           )
           p <- p + annotate("text",
             x = max_count_pos,
