@@ -3325,19 +3325,10 @@ plot.fect <- function(
         p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
       }
 
-<<<<<<< HEAD
       p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
       p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, linewidth = 0)
       p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
       p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, linewidth = 1.1)
-=======
-      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
-      p <- p + geom_ribbon(aes(ymin = .data$y_hat_lower, ymax = .data$y_hat_upper),
-        color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, size = 0
-      )
-      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(y = .data$y_hat), color = heterogeneous.color, size = 1.1)
->>>>>>> 07ca7e4adbcb47b83d5a6222fc073057117ab7d8
 
       ## title
       if (is.null(main) == TRUE) {
@@ -3388,12 +3379,7 @@ plot.fect <- function(
           max_idx <- which.max(counts)
           max_count_pos <- (bin_xmin[max_idx] + bin_xmax[max_idx]) / 2
           p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-<<<<<<< HEAD
             data = data.toplot, fill = count.color, linewidth = 0.3, alpha = count.alpha, color = count.outline.color
-=======
-            data = data.toplot, inherit.aes = FALSE,
-            fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
->>>>>>> 07ca7e4adbcb47b83d5a6222fc073057117ab7d8
           )
           p <- p + annotate("text",
             x = max_count_pos,
