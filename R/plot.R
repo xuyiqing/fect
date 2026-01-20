@@ -105,6 +105,7 @@ plot.fect <- function(
     status.background.color = NULL,
     covariate = NULL,
     covariate.labels = NULL,
+    pretreatment = FALSE,
     cm = FALSE,
     ...) {
 
@@ -3097,15 +3098,25 @@ plot.fect <- function(
     D.missing <- x$D.dat
     D.missing[which(D == 0)] <- NA
     D.missing.vec <- as.vector(D.missing)
+    t.on.vec <- as.vector(x$T.on)
+
+    if (isTRUE(pretreatment)) {
+      keep.pos <- which(!is.na(t.on.vec) & t.on.vec <= 0)
+      if (length(keep.pos) == 0) {
+        stop("No pretreatment units are available for heterogeneous effects.\n")
+      }
+    } else {
+      keep.pos <- which(!is.na(D.missing.vec))
+    }
 
     X.vec <- as.vector(x[names(x) == "X"][2]$X[, , which(x$X == covariate)])
-    X.vec <- X.vec[which(!is.na(D.missing.vec))]
+    X.vec <- X.vec[keep.pos]
     j <- order(X.vec)
     X.vec <- X.vec[j]
 
     if (cm == FALSE) {
       eff.vec <- as.vector(x$eff)
-      eff.vec <- eff.vec[which(!is.na(D.missing.vec))]
+      eff.vec <- eff.vec[keep.pos]
       eff.vec <- eff.vec[j]
     } else {
       if (is.null(x$est.cm)) {
@@ -3114,7 +3125,7 @@ plot.fect <- function(
       }
 
       # Treated cell indices in vectorized (column-major) order
-      tr.pos <- which(!is.na(D.missing.vec))
+      tr.pos <- keep.pos
 
       # Full covariate array (T x N x p) stored as the 2nd `X` entry
       X.full <- x[names(x) == "X"][2]$X
@@ -3169,6 +3180,12 @@ plot.fect <- function(
       eff.vec <- as.numeric(theta.unique[match(X.vec, X.unique)])
     }
 
+    if (isTRUE(pretreatment)) {
+      att.avg.use <- mean(eff.vec, na.rm = TRUE)
+    } else {
+      att.avg.use <- x$att.avg
+    }
+
     # print(eff.vec)  # debug
     
     if (length(unique(X.vec)) <= 4) {
@@ -3214,8 +3231,8 @@ plot.fect <- function(
       )
 
       ## core geoms (even spacing because x is factor)
-      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
-      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
+      p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
       # nicer CI + mean: thick error bars + solid point
       p <- p + geom_linerange(
         aes(x = x, ymin = .data$lower, ymax = .data$upper),
@@ -3295,10 +3312,10 @@ plot.fect <- function(
         p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
       }
 
-      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
-      p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, size = 0)
-      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, size = 1.1)
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
+      p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, linewidth = 0)
+      p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, linewidth = 1.1)
 
       ## title
       if (is.null(main) == TRUE) {
@@ -3349,7 +3366,7 @@ plot.fect <- function(
           max_idx <- which.max(counts)
           max_count_pos <- (bin_xmin[max_idx] + bin_xmax[max_idx]) / 2
           p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-            data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+            data = data.toplot, fill = count.color, linewidth = 0.3, alpha = count.alpha, color = count.outline.color
           )
           p <- p + annotate("text",
             x = max_count_pos,

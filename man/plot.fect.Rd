@@ -107,6 +107,7 @@
     status.background.color = NULL,
     covariate = NULL,
     covariate.labels = NULL,
+    pretreatment = FALSE,
     ...
 )
 }
@@ -216,6 +217,7 @@
   \item{status.background.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default background color for status plots (e.g., \code{"gray90"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{covariate}{Character string or \code{NULL} (default). If \code{NULL}, uses a default covariate for heterogeneous plots (e.g., \code{"X"} for the base style). The \code{preset} argument may define a different covariate. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{covariate.labels}{Character vector or \code{NULL} (default). If \code{NULL}, uses a default covariate labels for heterogeneous plots (e.g., \code{"X1"} for the base style). The \code{preset} argument may define a different covariate labels. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{pretreatment}{Logical; if \code{TRUE}, restricts heterogeneous effect plots (\code{type = "heterogeneous"}) to pretreatment observations for treated units (event time \code{<= 0}). Default is \code{FALSE}.}
   \item{...}{Additional graphical parameters passed to internal plotting routines, primarily those accepted by \code{esplot} for event study style plots (gap, equiv, exit, sens_es, cumul).}
 }
 \details{
