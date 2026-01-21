@@ -105,6 +105,8 @@ plot.fect <- function(
     status.background.color = NULL,
     covariate = NULL,
     covariate.labels = NULL,
+    covariate.value = NULL,
+    covariate.value.range = FALSE,
     pretreatment = FALSE,
     cm = FALSE,
     ...) {
@@ -796,6 +798,7 @@ plot.fect <- function(
   }
 
   if (type == "calendar") {
+    calendar_att_avg <- x$att.avg
     stats <- "none"
   }
 
@@ -2235,6 +2238,10 @@ plot.fect <- function(
       ylab <- NULL
     }
 
+ 
+
+ 
+
 
 
 
@@ -2454,6 +2461,8 @@ plot.fect <- function(
 
 
     # height of the histogram
+    att.avg.use <- x$att.avg
+
     if (CI == FALSE) {
       message("Uncertainty estimates not available.\n")
       if (length(ylim) != 0) {
@@ -2893,6 +2902,111 @@ plot.fect <- function(
   }
 
   if (type == "calendar") {
+    if (!is.null(covariate.value)) {
+      if (!is.character(covariate) || length(covariate) != 1 || covariate == "") {
+        stop("Please provide a single covariate name via `covariate` for calendar plots.\n")
+      }
+      if (!covariate %in% x$X) {
+        stop("`covariate` must be one of `x$X` for calendar plots.\n")
+      }
+      X.arr <- NULL
+      X.cands <- x[names(x) == "X"]
+      if (length(X.cands) >= 2) {
+        X.arr <- X.cands[2]$X
+      } else if (is.array(x$X)) {
+        X.arr <- x$X
+      }
+      if (is.null(X.arr) || length(dim(X.arr)) != 3) {
+        stop("Cannot locate covariate array in `x` for calendar plots.\n")
+      }
+
+      mod.idx <- which(x$X == covariate)[1]
+      M <- X.arr[, , mod.idx]
+
+      if (isTRUE(covariate.value.range)) {
+        if (!is.numeric(covariate.value) || length(covariate.value) != 2) {
+          stop("`covariate.value` must be numeric length 2 when `covariate.value.range = TRUE`.\n")
+        }
+        mod.keep <- M >= min(covariate.value) & M <= max(covariate.value)
+      } else {
+        mod.keep <- M %in% covariate.value
+      }
+
+      D.sub <- x$D.dat
+      D.sub[which(D.sub == 0)] <- NA
+      D.sub[!mod.keep] <- NA
+
+      eff.calendar <- apply(x$eff * D.sub, 1, mean, na.rm = TRUE)
+      N.calendar <- apply(!is.na(x$eff * D.sub), 1, sum)
+      if (sum(N.calendar, na.rm = TRUE) == 0 || all(is.na(eff.calendar))) {
+        stop("No treated observations match the requested `covariate.value` filter.\n")
+      }
+      T.calendar <- seq_len(dim(D.sub)[1])
+
+      if (sum(!is.na(eff.calendar)) > 1) {
+        loess.fit <- suppressWarnings(try(loess(eff.calendar ~ T.calendar, weights = N.calendar), silent = TRUE))
+        if ("try-error" %in% class(loess.fit)) {
+          eff.calendar.fit <- eff.calendar
+          se.fit <- rep(NA_real_, length(eff.calendar))
+        } else {
+          pred.fit <- stats::predict(loess.fit, newdata = T.calendar, se = TRUE)
+          eff.calendar.fit <- as.numeric(pred.fit$fit)
+          se.fit <- as.numeric(pred.fit$se.fit)
+        }
+      } else {
+        eff.calendar.fit <- eff.calendar
+        se.fit <- rep(NA_real_, length(eff.calendar))
+      }
+
+      calendar_time <- NULL
+      if (!is.null(x$rawtime)) {
+        calendar_time <- x$rawtime
+      } else {
+        calendar_time <- T.calendar
+      }
+
+      x$eff.calendar <- cbind(eff.calendar, count = N.calendar)
+      x$eff.calendar.fit <- cbind(eff.calendar.fit, count = N.calendar)
+      rownames(x$eff.calendar) <- as.character(calendar_time)
+      rownames(x$eff.calendar.fit) <- as.character(calendar_time)
+      x$N.calendar <- N.calendar
+
+      se.calendar <- apply(x$eff * D.sub, 1, function(v) {
+        v <- v[!is.na(v)]
+        n <- length(v)
+        if (n <= 1) return(NA_real_)
+        stats::sd(v) / sqrt(n)
+      })
+      df.calendar <- pmax(N.calendar - 1, 1)
+      ci.level <- if (!is.null(plot.ci) && plot.ci %in% c("0.9", "90")) 0.9 else 0.95
+      crit.calendar <- stats::qt(1 - (1 - ci.level) / 2, df.calendar)
+      ci.lower <- eff.calendar - crit.calendar * se.calendar
+      ci.upper <- eff.calendar + crit.calendar * se.calendar
+      ci.fit.lower <- eff.calendar.fit - crit.calendar * se.fit
+      ci.fit.upper <- eff.calendar.fit + crit.calendar * se.fit
+
+      x$est.eff.calendar <- cbind(
+        "ATT-calendar" = eff.calendar,
+        "S.E." = se.calendar,
+        "CI.lower" = ci.lower,
+        "CI.upper" = ci.upper,
+        "count" = N.calendar
+      )
+      x$est.eff.calendar.fit <- cbind(
+        "ATT-calendar Fitted" = eff.calendar.fit,
+        "S.E." = se.fit,
+        "CI.lower" = ci.fit.lower,
+        "CI.upper" = ci.fit.upper,
+        "count" = N.calendar
+      )
+      rownames(x$est.eff.calendar) <- as.character(calendar_time)
+      rownames(x$est.eff.calendar.fit) <- as.character(calendar_time)
+
+      if (sum(N.calendar, na.rm = TRUE) > 0) {
+        calendar_att_avg <- sum(eff.calendar * N.calendar, na.rm = TRUE) / sum(N.calendar[!is.na(eff.calendar)], na.rm = TRUE)
+      }
+    }
+
     CI <- NULL
     if (is.null(x$est.eff.calendar) == TRUE) {
       CI <- FALSE
@@ -2919,6 +3033,7 @@ plot.fect <- function(
       ylab <- NULL
     }
 
+    att.avg.use <- calendar_att_avg
 
     if (CI == FALSE) {
       message("Uncertainty estimates not available.\n")
@@ -2935,11 +3050,11 @@ plot.fect <- function(
       d2 <- data.2 <- as.matrix(x$eff.calendar.fit[which(!is.na(x$eff.calendar.fit[, 1])), ])
       if (dim(d1)[2] == 1) {
         d1 <- data.1 <- t(d1)
-        rownames(d1) <- rownames(data.1) <- rownames(x$eff.calendar)[which(!is.na(x$est.eff.calendar[, 1]))]
+        rownames(d1) <- rownames(data.1) <- rownames(x$eff.calendar)[which(!is.na(x$eff.calendar[, 1]))]
       }
       if (dim(d2)[2] == 1) {
         d2 <- data.2 <- t(d2)
-        rownames(d2) <- rownames(data.2) <- rownames(x$eff.calendar.fit)[which(!is.na(x$est.eff.calendar.fit[, 1]))]
+        rownames(d2) <- rownames(data.2) <- rownames(x$eff.calendar.fit)[which(!is.na(x$eff.calendar.fit[, 1]))]
       }
     } else {
       if (is.null(x$est.eff.calendar)) {
@@ -2979,19 +3094,19 @@ plot.fect <- function(
     }
 
     # horizontal 0 line
-    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
 
     TTT <- as.numeric(rownames(data.1))
     TTT.2 <- as.numeric(rownames(data.2))
 
     if (CI == FALSE) {
-      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
+      p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
       p <- p + geom_point(aes(x = TTT, y = d1[, 1]), color = "gray50", fill = "gray50", alpha = 1, size = 1.2)
     } else {
-      p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, size = 0)
-      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
+      p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, linewidth = 0)
+      p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
       p <- p + geom_pointrange(aes(x = TTT, y = d1[, 1], ymin = d1[, 3], ymax = d1[, 4]), color = "gray50", fill = "gray50", alpha = 1, size = 0.6)
     }
 
@@ -3014,9 +3129,15 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- mean(TTT[which.max(d1[, "count"])])
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-        data = data.toplot, inherit.aes = FALSE,
-        fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+      p <- p + geom_rect(
+        aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+        data = data.toplot,
+        inherit.aes = FALSE,
+        fill = count.color,
+        size = 0.3,
+        alpha = count.alpha,
+        color = count.outline.color,
+        linewidth = 0.3
       )
       p <- p + annotate("text",
         x = max.count.pos - 0.02 * T.gap,
