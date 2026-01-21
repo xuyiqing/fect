@@ -3014,7 +3014,10 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- mean(TTT[which.max(d1[, "count"])])
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+        data = data.toplot, inherit.aes = FALSE,
+        fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+      )
       p <- p + annotate("text",
         x = max.count.pos - 0.02 * T.gap,
         y = max(data.toplot$ymax) + 0.2 * rect.length,
@@ -3272,10 +3275,13 @@ plot.fect <- function(
           count = counts
         )
         p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-          data = data_counts, fill = count.color, color = count.outline.color, alpha = count.alpha, linewidth = 0.2
+          data = data_counts, inherit.aes = FALSE,
+          fill = count.color, color = count.outline.color, alpha = count.alpha, linewidth = 0.2
         )
         p <- p + geom_text(aes(x = .data$xcenter, y = .data$ymax + 0.12 * count_bar_space_height, label = .data$count),
-                           data = data_counts, size = cex.text * 0.85, hjust = 0.5, vjust = 0.5, color = "#444444")
+          data = data_counts, inherit.aes = FALSE,
+          size = cex.text * 0.85, hjust = 0.5, vjust = 0.5, color = "#444444"
+        )
         if (!is.null(covariate.labels)) {
           p <- p + scale_x_discrete(labels = covariate.labels)
         } else {
@@ -3379,7 +3385,8 @@ plot.fect <- function(
           max_idx <- which.max(counts)
           max_count_pos <- (bin_xmin[max_idx] + bin_xmax[max_idx]) / 2
           p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-            data = data.toplot, fill = count.color, linewidth = 0.3, alpha = count.alpha, color = count.outline.color
+            data = data.toplot, inherit.aes = FALSE,
+            fill = count.color, linewidth = 0.3, alpha = count.alpha, color = count.outline.color
           )
           p <- p + annotate("text",
             x = max_count_pos,
@@ -3543,7 +3550,10 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- data.count[which.max(data.count[, 2]), 1][1] - min(data.count[, 1]) + 1
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+        data = data.toplot, inherit.aes = FALSE,
+        fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+      )
       p <- p + annotate("text",
         x = max.count.pos - 0.02 * T.gap,
         y = max(data.toplot$ymax) + 0.1 * rect.length,
