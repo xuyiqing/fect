@@ -1143,6 +1143,8 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
         ## main results
         method = method,
         Y.ct = Y.ct,
+        Y.tr.cnt = Y.ct.tr,
+        Y.ct.cnt = Y.ct.co,
         Y.ct.full = Y.ct.full,
         Y = Y,
         D = D,
