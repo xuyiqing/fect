@@ -105,7 +105,7 @@ List fe_ad_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::
   }
 
   arma::mat beta(p, 1, arma::fill::zeros);
-  if (beta0.n_rows == p) {
+  if (p >= 0 && beta0.n_rows == static_cast<arma::uword>(p)) {
     beta = beta0;
   }
 
@@ -341,7 +341,7 @@ List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const 
   }
 
   arma::mat beta(p, 1, arma::fill::zeros);
-  if (beta0.n_rows == p) {
+  if (p >= 0 && beta0.n_rows == static_cast<arma::uword>(p)) {
     beta = beta0;
   }
   double mu = 0;

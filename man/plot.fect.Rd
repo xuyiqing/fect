@@ -109,7 +109,9 @@
     covariate.labels = NULL,
     covariate.value = NULL,
     covariate.value.range = FALSE,
+    relative.time = FALSE,
     pretreatment = FALSE,
+    num.pretreatment = 3,
     ...
 )
 }
@@ -221,7 +223,9 @@
   \item{covariate.labels}{Character vector or \code{NULL} (default). If \code{NULL}, uses a default covariate labels for heterogeneous plots (e.g., \code{"X1"} for the base style). The \code{preset} argument may define a different covariate labels. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{covariate.value}{Optional value filter for calendar plots. When \code{type = "calendar"}, supply a value or a vector of values to restrict to treated observations whose covariate (specified via \code{covariate}) falls within the given set. A length-2 numeric vector is treated as a set unless \code{covariate.value.range = TRUE}.}
   \item{covariate.value.range}{Logical; if \code{TRUE}, interpret \code{covariate.value} (must be numeric length 2) as a range \code{[min, max]} for calendar plots. Default is \code{FALSE}.}
-  \item{pretreatment}{Logical; if \code{TRUE}, restricts heterogeneous effect plots (\code{type = "heterogeneous"}) to pretreatment observations for treated units (event time \code{<= 0}). Default is \code{FALSE}.}
+  \item{relative.time}{Logical; if \code{TRUE} and \code{type = "calendar"}, aggregates effects by event time defined in \code{x$T.on} (time since treatment onset) rather than by calendar time. Default is \code{FALSE}.}
+  \item{pretreatment}{Logical; if \code{TRUE}, restricts heterogeneous effect plots (\code{type = "heterogeneous"}) to the last \code{num.pretreatment} event-time periods up to 0 (i.e., \code{-(K-1), ..., -1, 0}). Default is \code{FALSE}.}
+  \item{num.pretreatment}{Integer; used only when \code{pretreatment = TRUE} in heterogeneous plots. Controls how many event-time periods up to 0 are used (e.g., 3 uses \code{-2,-1,0}; 5 uses \code{-4,-3,-2,-1,0}). Default is \code{3}.}
   \item{...}{Additional graphical parameters passed to internal plotting routines, primarily those accepted by \code{esplot} for event study style plots (gap, equiv, exit, sens_es, cumul).}
 }
 \details{
