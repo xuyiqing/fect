@@ -12,3 +12,9 @@ options(
   pkgcache_low_speed_time = 60
 )
 
+# Allow workflow to override package type (e.g., force source on macOS).
+pkg_type <- Sys.getenv("R_PKG_TYPE", unset = "")
+if (nzchar(pkg_type)) {
+  options(pkgType = pkg_type)
+}
+
