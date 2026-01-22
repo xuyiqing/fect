@@ -849,24 +849,28 @@ fect.default <- function(
                 stop("\"Q\" and \"Q.type\" cannot be used simultaneously.")
             }
             Q <- c()
+            time.raw <- data[, time]
+            if (is.factor(time.raw)) {
+                time.num <- suppressWarnings(as.numeric(as.character(time.raw)))
+            } else {
+                time.num <- suppressWarnings(as.numeric(time.raw))
+            }
+            if (all(is.na(time.num))) {
+                ## fallback: use ordered time index if not numeric
+                time.num <- as.numeric(factor(time.raw, levels = sort(unique(time.raw))))
+            }
             for (i in seq_along(Q.type)) {
                 Q.i <- tolower(as.character(Q.type[i]))
                 if (Q.i == "linear" || Q.i == "1") {
-                    data[, paste(time, "1", sep = ".")] <- data[, time]**1
+                    data[, paste(time, "1", sep = ".")] <- time.num**1
                     Q <- c(Q, paste(time, "1", sep = "."))
                 } else if (Q.i == "quadratic" || Q.i == "2") {
-                    data[, paste(time, "2", sep = ".")] <- data[, time]**2
+                    data[, paste(time, "2", sep = ".")] <- time.num**2
                     Q <- c(Q, paste(time, "2", sep = "."))
                 } else if (Q.i == "cubic" || Q.i == "3") {
-                    data[, paste(time, "3", sep = ".")] <- data[, time]**3
+                    data[, paste(time, "3", sep = ".")] <- time.num**3
                     Q <- c(Q, paste(time, "3", sep = "."))
                 } else if (Q.i == "bspline" || Q.i == "b" || Q.i == "bs") {
-                    time.raw <- data[, time]
-                    time.num <- suppressWarnings(as.numeric(as.character(time.raw)))
-                    if (all(is.na(time.num))) {
-                        ## fallback: use ordered time index if not numeric
-                        time.num <- as.numeric(factor(time.raw, levels = sort(unique(time.raw))))
-                    }
                     n.t <- length(unique(time.num))
                     if (n.t < 2) {
                         stop("\"Q.type='bspline'\" requires at least 2 distinct time values.")
@@ -1502,11 +1506,25 @@ fect.default <- function(
         }
 
         if (length(kappa) > 1) {
-            for (i in 1:length(kappa)) {
-                X.kappa[,, i] <- matrix(data[, kappa[i]], TT, N)
+            for (i in seq_along(kappa)) {
+                kappa.val <- data[, kappa[i]]
+                if (!is.numeric(kappa.val)) {
+                    kappa.val <- suppressWarnings(as.numeric(as.character(kappa.val)))
+                    if (all(is.na(kappa.val))) {
+                        kappa.val <- as.numeric(factor(data[, kappa[i]]))
+                    }
+                }
+                X.kappa[,, i] <- matrix(kappa.val, TT, N)
             }
         } else if (length(kappa) == 1) {
-            X.kappa[,, 1] <- matrix(data[, kappa], TT, N)
+            kappa.val <- data[, kappa]
+            if (!is.numeric(kappa.val)) {
+                kappa.val <- suppressWarnings(as.numeric(as.character(kappa.val)))
+                if (all(is.na(kappa.val))) {
+                    kappa.val <- as.numeric(factor(data[, kappa]))
+                }
+            }
+            X.kappa[,, 1] <- matrix(kappa.val, TT, N)
         }
 
         Zgamma.id <- list()
