@@ -1690,6 +1690,15 @@ fect.default <- function(
             }
         }
 
+
+        if (method == "cfe") {
+            X.extra.FE <- X.extra.FE[-which(I.use == 0), , , drop = FALSE]
+            X.Z <- X.Z[-which(I.use == 0), , , drop = FALSE]
+            X.Q <- X.Q[-which(I.use == 0), , , drop = FALSE]
+            X.gamma <- X.gamma[-which(I.use == 0), , , drop = FALSE]
+            X.kappa <- X.kappa[-which(I.use == 0), , , drop = FALSE]
+        }
+
         X.old <- X
         if (p > 0) {
             X <- array(0, dim = c(TT, (N - length(rm.id)), p))
@@ -1728,7 +1737,7 @@ fect.default <- function(
         T.on.carry[which(T.on.carry <= 0)] <- NA ## only keep carryover effect
     }
     rm(D1, D2)
-    calendar.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
+    # calendar.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
 
     ## 3.1 balance samples
     ## for balance group, add group indicator
