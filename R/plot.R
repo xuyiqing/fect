@@ -2948,14 +2948,19 @@ plot.fect <- function(
       if (!all(dim(mod_keep) == dim(x$T.on))) {
         stop("Dimension mismatch: cannot apply `covariate.value` filter to `x$T.on`.\n")
       }
+      if (is.null(x$D.dat) || !all(dim(x$D.dat) == dim(x$T.on))) {
+        stop("`relative.time = TRUE` requires `x$D.dat` aligned with `x$T.on` for calendar plots.\n")
+      }
 
       keep_mask <- mod_keep & !is.na(x$T.on) & !is.na(x$eff)
       rel_vec <- as.numeric(x$T.on[keep_mask])
       eff_vec <- as.numeric(x$eff[keep_mask])
+      d_vec <- as.numeric(x$D.dat[keep_mask])
 
-      ok <- is.finite(rel_vec) & is.finite(eff_vec)
+      ok <- is.finite(rel_vec) & is.finite(eff_vec) & !is.na(d_vec)
       rel_vec <- rel_vec[ok]
       eff_vec <- eff_vec[ok]
+      d_vec <- d_vec[ok]
 
       if (length(eff_vec) == 0) {
         stop("No observations are available for `relative.time = TRUE` under the requested filter.\n")
@@ -2976,19 +2981,48 @@ plot.fect <- function(
         stop("No observations match the requested filter under `relative.time = TRUE`.\n")
       }
 
-      if (sum(!is.na(eff.calendar)) > 1) {
-        loess.fit <- suppressWarnings(try(loess(eff.calendar ~ rel_vals, weights = N.calendar), silent = TRUE))
-        if ("try-error" %in% class(loess.fit)) {
-          eff.calendar.fit <- eff.calendar
-          se.fit <- rep(NA_real_, length(eff.calendar))
-        } else {
-          pred.fit <- stats::predict(loess.fit, newdata = rel_vals, se = TRUE)
-          eff.calendar.fit <- as.numeric(pred.fit$fit)
-          se.fit <- as.numeric(pred.fit$se.fit)
+      treated_mask <- d_vec > 0
+      control_mask <- d_vec == 0
+
+      rel_vals_tr <- sort(unique(rel_vec[treated_mask]))
+      rel_vals_ct <- sort(unique(rel_vec[control_mask]))
+
+      eff_tr <- vapply(rel_vals_tr, function(k) mean(eff_vec[treated_mask & rel_vec == k], na.rm = TRUE), numeric(1))
+      eff_ct <- vapply(rel_vals_ct, function(k) mean(eff_vec[control_mask & rel_vec == k], na.rm = TRUE), numeric(1))
+
+      N_tr <- vapply(rel_vals_tr, function(k) sum(!is.na(eff_vec[treated_mask & rel_vec == k])), numeric(1))
+      N_ct <- vapply(rel_vals_ct, function(k) sum(!is.na(eff_vec[control_mask & rel_vec == k])), numeric(1))
+
+      fit_group <- function(rel_vals_g, eff_g, N_g) {
+        if (length(eff_g) <= 1) {
+          return(list(fit = eff_g, se = rep(NA_real_, length(eff_g))))
         }
-      } else {
-        eff.calendar.fit <- eff.calendar
-        se.fit <- rep(NA_real_, length(eff.calendar))
+        loess.fit <- suppressWarnings(try(loess(eff_g ~ rel_vals_g, weights = N_g), silent = TRUE))
+        if ("try-error" %in% class(loess.fit)) {
+          return(list(fit = eff_g, se = rep(NA_real_, length(eff_g))))
+        }
+        pred.fit <- stats::predict(loess.fit, newdata = rel_vals_g, se = TRUE)
+        list(fit = as.numeric(pred.fit$fit), se = as.numeric(pred.fit$se.fit))
+      }
+
+      eff.calendar.fit <- rep(NA_real_, length(rel_vals))
+      se.fit <- rep(NA_real_, length(rel_vals))
+      N.fit <- rep(NA_real_, length(rel_vals))
+
+      if (length(rel_vals_tr) > 0) {
+        fit_tr <- fit_group(rel_vals_tr, eff_tr, N_tr)
+        idx_tr <- match(rel_vals_tr, rel_vals)
+        eff.calendar.fit[idx_tr] <- fit_tr$fit
+        se.fit[idx_tr] <- fit_tr$se
+        N.fit[idx_tr] <- N_tr
+      }
+
+      if (length(rel_vals_ct) > 0) {
+        fit_ct <- fit_group(rel_vals_ct, eff_ct, N_ct)
+        idx_ct <- match(rel_vals_ct, rel_vals)
+        eff.calendar.fit[idx_ct] <- fit_ct$fit
+        se.fit[idx_ct] <- fit_ct$se
+        N.fit[idx_ct] <- N_ct
       }
 
       calendar_time <- rel_vals
@@ -2998,8 +3032,48 @@ plot.fect <- function(
       crit.calendar <- stats::qt(1 - (1 - ci.level) / 2, df.calendar)
       ci.lower <- eff.calendar - crit.calendar * se.calendar
       ci.upper <- eff.calendar + crit.calendar * se.calendar
-      ci.fit.lower <- eff.calendar.fit - crit.calendar * se.fit
-      ci.fit.upper <- eff.calendar.fit + crit.calendar * se.fit
+      df.fit <- pmax(N.fit - 1, 1)
+      crit.fit <- stats::qt(1 - (1 - ci.level) / 2, df.fit)
+      ci.fit.lower <- eff.calendar.fit - crit.fit * se.fit
+      ci.fit.upper <- eff.calendar.fit + crit.fit * se.fit
+
+      make_fit_group_df <- function(rel_vals_g, fit_g, se_g, N_g, group_label) {
+        if (length(rel_vals_g) == 0) {
+          return(NULL)
+        }
+        df_g <- pmax(N_g - 1, 1)
+        crit_g <- stats::qt(1 - (1 - ci.level) / 2, df_g)
+        data.frame(
+          time = rel_vals_g,
+          fit = fit_g,
+          se = se_g,
+          ci.lower = fit_g - crit_g * se_g,
+          ci.upper = fit_g + crit_g * se_g,
+          count = N_g,
+          group = group_label
+        )
+      }
+
+      fit_group_df <- rbind(
+        make_fit_group_df(
+          rel_vals_tr,
+          if (length(rel_vals_tr) > 0) fit_tr$fit else numeric(0),
+          if (length(rel_vals_tr) > 0) fit_tr$se else numeric(0),
+          N_tr,
+          "treated"
+        ),
+        make_fit_group_df(
+          rel_vals_ct,
+          if (length(rel_vals_ct) > 0) fit_ct$fit else numeric(0),
+          if (length(rel_vals_ct) > 0) fit_ct$se else numeric(0),
+          N_ct,
+          "control"
+        )
+      )
+      if (!is.null(fit_group_df) && nrow(fit_group_df) > 0) {
+        x$eff.calendar.fit.group <- fit_group_df[, c("time", "fit", "count", "group")]
+        x$est.eff.calendar.fit.group <- fit_group_df
+      }
 
       x$eff.calendar <- cbind(eff.calendar, count = N.calendar)
       x$eff.calendar.fit <- cbind(eff.calendar.fit, count = N.calendar)
@@ -3228,12 +3302,41 @@ plot.fect <- function(
 
     if (CI == FALSE) {
       p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
+      if (isTRUE(relative.time) && !is.null(x$eff.calendar.fit.group)) {
+        fit_data <- x$eff.calendar.fit.group
+        p <- p + geom_line(
+          data = fit_data,
+          aes(x = time, y = fit, group = group),
+          color = calendar.color,
+          linewidth = 1.1
+        )
+      } else {
+        p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
+      }
       p <- p + geom_point(aes(x = TTT, y = d1[, 1]), color = "gray50", fill = "gray50", alpha = 1, size = 1.2)
     } else {
-      p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, linewidth = 0)
-      p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
+      if (isTRUE(relative.time) && !is.null(x$est.eff.calendar.fit.group)) {
+        fit_data <- x$est.eff.calendar.fit.group
+        p <- p + geom_ribbon(
+          data = fit_data,
+          aes(x = time, ymin = ci.lower, ymax = ci.upper, group = group),
+          color = calendar.cicolor,
+          fill = calendar.cicolor,
+          alpha = 0.5,
+          linewidth = 0
+        )
+        p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+        p <- p + geom_line(
+          data = fit_data,
+          aes(x = time, y = fit, group = group),
+          color = calendar.color,
+          linewidth = 1.1
+        )
+      } else {
+        p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, linewidth = 0)
+        p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+        p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
+      }
       p <- p + geom_pointrange(aes(x = TTT, y = d1[, 1], ymin = d1[, 3], ymax = d1[, 4]), color = "gray50", fill = "gray50", alpha = 1, size = 0.6)
     }
 
