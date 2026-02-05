@@ -885,7 +885,8 @@ plot.fect <- function(
     maintext <- if (isTRUE(relative.time)) "CATT by Relative Time" else "CATT by Calendar Time"
     ytitle <- paste("Effect on", x$Y)
   } else if (type == "heterogeneous") {
-    maintext <- paste("CATT by", covariate)
+    covariate_label <- if (is.character(covariate) && length(covariate) == 1 && covariate != "") covariate else "M"
+    maintext <- paste("CATT by", covariate_label)
     ytitle <- paste("Effect on", x$Y)
   } else if (type == "box") {
     maintext <- "Individual Treatment Effects"
@@ -3535,16 +3536,26 @@ plot.fect <- function(
   if (type == "heterogeneous") {
     Xs <- x[names(x) == "X"][[2]]
 
-    if ((is.null(covariate) == TRUE) && ((dim(Xs) > 2) && (dim(Xs)[3] > 1))) {
+    covariate_is_custom <- is.matrix(covariate) || is.data.frame(covariate) ||
+      (is.numeric(covariate) && length(covariate) == TT * N)
+    covariate_name <- if (is.character(covariate) && length(covariate) == 1 && covariate != "") covariate else NULL
+
+    if (!covariate_is_custom && is.null(covariate_name) && ((dim(Xs) > 2) && (dim(Xs)[3] > 1))) {
       stop("Please provide a covariate to plot heterogeneous effects.\n")
     }
 
-    if ((is.null(covariate) == FALSE) && (!covariate %in% x$X)) {
+    if (!covariate_is_custom && !is.null(covariate_name) && (!covariate_name %in% x$X)) {
       stop("Please provide a valid covariate to plot heterogeneous effects.\n")
+    }
+    if (!covariate_is_custom && is.null(covariate_name)) {
+      covariate_name <- x$X[1]
+    }
+    if (!covariate_is_custom && !is.null(covariate_name)) {
+      maintext <- paste("CATT by", covariate_name)
     }
 
     if (is.null(xlab) == TRUE) {
-      xlab <- covariate
+      xlab <- if (!is.null(covariate_name)) covariate_name else "M"
     } else if (xlab == "") {
       xlab <- NULL
     }
@@ -3578,7 +3589,24 @@ plot.fect <- function(
       keep.pos <- which(!is.na(D.missing.vec))
     }
 
-    X.vec <- as.vector(x[names(x) == "X"][2]$X[, , which(x$X == covariate)])
+    if (covariate_is_custom) {
+      if (is.data.frame(covariate)) {
+        covariate <- as.matrix(covariate)
+      }
+      if (is.matrix(covariate)) {
+        if (!all(dim(covariate) == c(TT, N))) {
+          stop("Custom covariate must have dimension T x N to match the fect object.\n")
+        }
+        X.vec <- as.vector(covariate)
+      } else {
+        if (length(covariate) != TT * N) {
+          stop("Custom covariate must have length T*N to match the fect object.\n")
+        }
+        X.vec <- as.vector(covariate)
+      }
+    } else {
+      X.vec <- as.vector(x[names(x) == "X"][2]$X[, , which(x$X == covariate_name)])
+    }
     X.vec <- X.vec[keep.pos]
     j <- order(X.vec)
     X.vec <- X.vec[j]
@@ -3592,13 +3620,16 @@ plot.fect <- function(
         stop("Cannot compute heterogeneous effects with cm=TRUE: `est.cm` not found in the fect object.\n",
              "Please run `fect(..., cm=TRUE)`.\n")
       }
+      if (covariate_is_custom) {
+        stop("Custom covariate is not supported with `cm = TRUE`.\n")
+      }
 
       # Treated cell indices in vectorized (column-major) order
       tr.pos <- keep.pos
 
       # Full covariate array (T x N x p) stored as the 2nd `X` entry
       X.full <- x[names(x) == "X"][2]$X
-      cov.idx <- which(x$X == covariate)[1]
+      cov.idx <- which(x$X == covariate_name)[1]
       if (length(cov.idx) == 0) {
         stop("Cannot find the requested covariate in x$X.\n")
       }
