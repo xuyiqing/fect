@@ -14,6 +14,7 @@
     highlight = NULL,
     plot.ci = NULL,
     show.points = TRUE,
+    loess.fit = TRUE,
     show.group = NULL,
     bound = NULL,
     show.count = TRUE,
@@ -127,6 +128,7 @@
   \item{plot.ci}{Specifies the confidence interval to be plotted. Options include:
     \code{"0.9"}, \code{"0.95"}, or \code{"none"}. Default is \code{NULL}, which is context-dependent (e.g., "0.95" for gap plots, "0.9" for equivalence plots, "none" if no CIs are available in the \code{fect} object).}
   \item{show.points}{Logical; if \code{TRUE} (default), shows point estimates on event study style plots (e.g., gap, equiv, exit plots).}
+  \item{loess.fit}{Logical; if \code{TRUE} (default), uses loess smoothing for calendar and heterogeneous plots. When \code{FALSE}, no loess fit (or ribbon) is added.}
   \item{show.group}{Optional character string or \code{NULL} (default); if specified, plots results for a particular subgroup defined in the \code{fect} call.}
   \item{bound}{Which bounds to display in bounding/equivalence tests:
     \code{"none"} (default for most plots), \code{"min"} (minimal effect bound), \code{"equiv"} (equivalence range), or \code{"both"} (default for \code{type="equiv"}).}
