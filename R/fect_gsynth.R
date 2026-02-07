@@ -213,7 +213,9 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
                         U.tr <- U.tr - X.tr[, , j] * beta[j]
                     }
                 }
-                U.tr <- U.tr - matrix(est.co$mu, TT, Ntr) ## grand mean
+                if (force != 0) {
+                    U.tr <- U.tr - matrix(est.co$mu, TT, Ntr) ## grand mean
+                }
                 if (force %in% c(2, 3)) {
                     U.tr <- U.tr - matrix(est.co$xi, TT, Ntr, byrow = FALSE)
                 }

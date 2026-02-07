@@ -43,12 +43,18 @@ List inter_fe(const arma::mat& Y, const arma::cube& X, int r, int force, const a
   arma::cube XX = X;
 
   /* grand mean */
-  mu_Y = accu(YY) / obs;
-  YY = YY - mu_Y;
+  mu_Y = 0;
   if (p > 0) {
-    for (int i = 0; i < p; i++) {
-      mu_X(i, 0) = accu(XX.slice(i)) / obs;
-      XX.slice(i) = XX.slice(i) - mu_X(i, 0);
+    mu_X.zeros();
+  }
+  if (force != 0) {
+    mu_Y = accu(YY) / obs;
+    YY = YY - mu_Y;
+    if (p > 0) {
+      for (int i = 0; i < p; i++) {
+        mu_X(i, 0) = accu(XX.slice(i)) / obs;
+        XX.slice(i) = XX.slice(i) - mu_X(i, 0);
+      }
     }
   }
 
