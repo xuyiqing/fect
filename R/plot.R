@@ -3268,9 +3268,16 @@ plot.fect <- function(
       CI <- TRUE
     }
     if (!is.null(provided_xlim)) {
-      x$est.eff.calendar <- x$est.eff.calendar[which(rownames(x$est.eff.calendar) >= min(provided_xlim) & rownames(x$est.eff.calendar) <= max(provided_xlim)), ]
+      # IMPORTANT: rownames are character; comparing them to numeric xlim will do
+      # lexicographic comparisons and can drop valid points (e.g., "-2" > "-10").
+      # Convert to numeric event/calenadar time before filtering.
+      tt_cal <- suppressWarnings(as.numeric(rownames(x$est.eff.calendar)))
+      keep_cal <- which(is.finite(tt_cal) & tt_cal >= min(provided_xlim) & tt_cal <= max(provided_xlim))
+      x$est.eff.calendar <- x$est.eff.calendar[keep_cal, , drop = FALSE]
       if (use_loess && !is.null(x$est.eff.calendar.fit)) {
-        x$est.eff.calendar.fit <- x$est.eff.calendar.fit[which(rownames(x$est.eff.calendar.fit) >= min(provided_xlim) & rownames(x$est.eff.calendar.fit) <= max(provided_xlim)), ]
+        tt_fit <- suppressWarnings(as.numeric(rownames(x$est.eff.calendar.fit)))
+        keep_fit <- which(is.finite(tt_fit) & tt_fit >= min(provided_xlim) & tt_fit <= max(provided_xlim))
+        x$est.eff.calendar.fit <- x$est.eff.calendar.fit[keep_fit, , drop = FALSE]
       }
     }
     if (plot.ci == "none") {
@@ -3476,10 +3483,11 @@ plot.fect <- function(
       )
 
       # If ylim was not user-specified, extend the plot downward to make room for the indicator band.
+      # IMPORTANT: don't add coord_cartesian() here; we'll apply xlim/ylim once below.
       if (is.null(ylim) || length(ylim) == 0) {
         final_yrange_min <- min(current_plot_yrange[1], rect_min_val)
         final_yrange_max <- current_plot_yrange[2]
-        p <- p + coord_cartesian(ylim = c(final_yrange_min, final_yrange_max))
+        ylim <- c(final_yrange_min, final_yrange_max)
       }
     }
 
@@ -3490,9 +3498,12 @@ plot.fect <- function(
       p <- p + ggtitle(main)
     }
 
-    ## ylim
-    if (is.null(ylim) == FALSE) {
-      p <- p + coord_cartesian(ylim = ylim)
+    ## axis limits
+    # NOTE: In ggplot2, adding coord_cartesian() multiple times will replace the
+    # previous coordinate system. So we must set xlim/ylim together to avoid
+    # xlim overriding ylim (or vice versa).
+    if (is.null(ylim) == FALSE || is.null(xlim) == FALSE) {
+      p <- p + coord_cartesian(xlim = xlim, ylim = ylim)
     }
 
     if (length(TTT) <= 10) {
@@ -3513,10 +3524,7 @@ plot.fect <- function(
     #         }
     #     }
     # }
-    ## xlim
-    if (is.null(xlim) == FALSE) {
-      p <- p + coord_cartesian(xlim = xlim)
-    }
+    # xlim handled together with ylim above
 
 
     p <- p + theme(
@@ -3786,12 +3794,11 @@ plot.fect <- function(
         }
       }
 
-      if (is.null(ylim) == FALSE) {
-        p <- p + coord_cartesian(ylim = ylim)
-      }
-
-      if (is.null(xlim) == FALSE) {
-        p <- p + coord_cartesian(xlim = xlim)
+      # NOTE: In ggplot2, adding coord_cartesian() multiple times will replace the
+      # previous coordinate system. So we must set xlim/ylim together to avoid
+      # xlim overriding ylim (or vice versa).
+      if (is.null(ylim) == FALSE || is.null(xlim) == FALSE) {
+        p <- p + coord_cartesian(xlim = xlim, ylim = ylim)
       }
 
     } else {
@@ -3846,13 +3853,9 @@ plot.fect <- function(
         p <- p + ggtitle(main)
       }
 
-      ## ylim
-      if (is.null(ylim) == FALSE) {
-        p <- p + coord_cartesian(ylim = ylim)
-      }
-
-      if (is.null(xlim) == FALSE) {
-        p <- p + coord_cartesian(xlim = xlim)
+      ## axis limits (set together; see note above)
+      if (is.null(ylim) == FALSE || is.null(xlim) == FALSE) {
+        p <- p + coord_cartesian(xlim = xlim, ylim = ylim)
       }
 
       if (show.count == TRUE) {
@@ -3899,7 +3902,8 @@ plot.fect <- function(
           if (is.null(ylim)) {
             final_yrange_min <- min(current_plot_yrange[1], rect_min_val)
             final_yrange_max <- current_plot_yrange[2]
-            p <- p + coord_cartesian(ylim = c(final_yrange_min, final_yrange_max))
+            # Preserve xlim if it was supplied; otherwise the new coord would drop it.
+            p <- p + coord_cartesian(xlim = xlim, ylim = c(final_yrange_min, final_yrange_max))
           }
         }
       }
