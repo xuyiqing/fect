@@ -26,6 +26,38 @@ basic_ci_alpha <- function(theta, boots, alpha) {
   ci_mat
 }
 
+# Reduce closure payload before parallel export by keeping only symbols
+# that the function body actually references from its local frame.
+trim_closure_env <- function(fun) {
+  if (!is.function(fun)) {
+    return(fun)
+  }
+
+  old_env <- environment(fun)
+  if (is.null(old_env) || identical(old_env, emptyenv())) {
+    return(fun)
+  }
+
+  globals <- codetools::findGlobals(fun, merge = FALSE)
+  needed <- unique(c(globals$variables, globals$functions))
+  if (length(needed) == 0) {
+    return(fun)
+  }
+
+  env_names <- ls(old_env, all.names = TRUE)
+  keep <- intersect(needed, env_names)
+  if (length(keep) == 0) {
+    return(fun)
+  }
+
+  new_env <- new.env(parent = parent.env(old_env))
+  for (nm in keep) {
+    assign(nm, get(nm, envir = old_env, inherits = FALSE), envir = new_env)
+  }
+  environment(fun) <- new_env
+  fun
+}
+
 fect_boot <- function(
   Y,
   X,
@@ -1569,6 +1601,7 @@ fect_boot <- function(
   }
 
   ## computing
+  one.nonpara <- trim_closure_env(one.nonpara)
   if (parallel == TRUE) {
     boot.out <- foreach(
       j = 1:nboots,
