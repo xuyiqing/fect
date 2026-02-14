@@ -208,6 +208,7 @@ BiInitialFit <- function(data, ## long form data
 
     N <- length(unique(data[, 2]))
     T <- length(unique(data[, 3]))
+    r <- min(r, T, N)
     p <- dim(data)[2] - 3
 
     x <- x.sub <- NULL

@@ -370,7 +370,9 @@ fect_boot <- function(
         cv.nobs = cv.nobs
       )
 
-      # method <- out$method
+      if (!is.null(out$method)) {
+        method <- out$method
+      }
     } else {
       out <- fect_binary_cv(
         Y = Y,
@@ -390,7 +392,9 @@ fect_boot <- function(
         group.level = group.level,
         group = group
       )
-      # method <- "ife"
+      if (!is.null(out$method)) {
+        method <- out$method
+      }
     }
   }
 
@@ -800,6 +804,7 @@ fect_boot <- function(
         .multicombine = TRUE,
         .export = c("fect_gsynth", "initialFit"),
         .packages = c("fect", "mvtnorm", "fixest"),
+        .options.future = list(seed = TRUE),
         .inorder = FALSE
       ) %dopar%
         {
@@ -854,6 +859,11 @@ fect_boot <- function(
         }
       }
       id.boot <- c(id.tr, fake.co)
+      r.boot <- out$r.cv
+      if (!is.null(r.boot) && length(r.boot) == 1 && !is.na(r.boot)) {
+        n.unit.boot <- length(id.boot)
+        r.boot <- min(r.boot, TT, n.unit.boot)
+      }
 
       ## get the error for the treated and control
       error.tr.boot <- matrix(NA, TT, Ntr)
@@ -1275,6 +1285,11 @@ fect_boot <- function(
         boot.id <- boot.id[-num]
       }
 
+      r.boot <- 0
+      if (!is.null(out$r.cv) && length(out$r.cv) >= 1 && !is.na(out$r.cv[1])) {
+        r.boot <- min(as.numeric(out$r.cv[1]), TT, length(boot.id))
+      }
+
       X.boot <- X[, boot.id, , drop = FALSE]
       D.boot <- D[, boot.id]
       I.boot <- I[, boot.id]
@@ -1341,6 +1356,7 @@ fect_boot <- function(
           carryover.period.boot <- carryover.period
         }
 
+        boot <- NULL
         if (method == "gsynth") {
           boot <- try(
             fect_gsynth(
@@ -1355,7 +1371,7 @@ fect_boot <- function(
               CV = 0,
               T.on.balance = T.on.balance[, boot.id],
               balance.period = balance.period,
-              r = out$r.cv,
+              r = r.boot,
               binary = binary,
               QR = QR,
               force = force,
@@ -1395,7 +1411,7 @@ fect_boot <- function(
               T.on.carry = T.on.carry[, boot.id],
               T.on.balance = T.on.balance[, boot.id],
               balance.period = balance.period,
-              r.cv = out$r.cv,
+              r.cv = r.boot,
               binary = binary,
               QR = QR,
               force = force,
@@ -1483,7 +1499,7 @@ fect_boot <- function(
               T.on.carry = T.on.carry[, boot.id],
               T.on.balance = T.on.balance[, boot.id],
               balance.period = balance.period,
-              r.cv = out$r.cv,
+              r.cv = r.boot,
               binary = binary,
               QR = QR,
               force = force,
@@ -1503,7 +1519,7 @@ fect_boot <- function(
               time.on.seq = time.on,
               time.off.seq = time.off
             ),
-            silent = FALSE
+            silent = TRUE
           )
         } else if (method %in% c("polynomial", "bspline", "cfe_old")) {
           boot <- try(
@@ -1551,6 +1567,9 @@ fect_boot <- function(
           )
         }
 
+        if (is.null(boot)) {
+          stop(paste0("Unsupported bootstrap method: ", method))
+        }
         if ("try-error" %in% class(boot)) {
           boot0 <- list(
             att.avg = NA,
@@ -1615,7 +1634,8 @@ fect_boot <- function(
         "fect_gsynth",
         "initialFit"
       ),
-      .packages = c("fect", "mvtnorm", "fixest")
+      .packages = c("fect", "mvtnorm", "fixest"),
+      .options.future = list(seed = TRUE)
     ) %dopar%
       {
         return(one.nonpara(boot.seq[j]))

@@ -1,4 +1,5 @@
 #include "fect.h"
+#include <algorithm>
 
 // functions for fixed effects
 
@@ -135,10 +136,22 @@ List fe_add(const arma::mat& alpha_Y, const arma::mat& xi_Y, double mu_Y, int T,
 List panel_factor(const arma::mat& E, int r) {
   int T = E.n_rows;
   int N = E.n_cols;
-  arma::mat factor(T, r, arma::fill::zeros);
-  arma::mat lambda(N, r, arma::fill::zeros);
+  int r_use = std::min(r, std::min(T, N));
+  if (r_use < 0) {
+    r_use = 0;
+  }
+  arma::mat factor(T, r_use, arma::fill::zeros);
+  arma::mat lambda(N, r_use, arma::fill::zeros);
   arma::mat FE(T, N, arma::fill::zeros);
-  arma::mat VNT(r, r, arma::fill::zeros);
+  arma::mat VNT(r_use, r_use, arma::fill::zeros);
+  if (r_use == 0) {
+    List result;
+    result["lambda"] = lambda;
+    result["factor"] = factor;
+    result["VNT"] = VNT;
+    result["FE"] = FE;
+    return (result);
+  }
   arma::mat U;
   arma::vec s;
   arma::mat V;
@@ -150,9 +163,9 @@ List panel_factor(const arma::mat& E, int r) {
     VNT = diagmat(s.tail_rows(r)) ;*/
     arma::mat EE = E * E.t() / (N * T);
     arma::svd(U, s, V, EE);
-    factor = U.head_cols(r) * sqrt(double(T));
+    factor = U.head_cols(r_use) * sqrt(double(T));
     lambda = E.t() * factor / T;
-    VNT = diagmat(s.head_rows(r));
+    VNT = diagmat(s.head_rows(r_use));
   } else {
     /*arma::mat EE = E.t() * E / (N * T) ;
     arma::eig_sym(s, U, EE) ;
@@ -161,9 +174,9 @@ List panel_factor(const arma::mat& E, int r) {
     VNT = diagmat(s.tail_rows(r)) ;*/
     arma::mat EE = E.t() * E / (N * T);
     svd(U, s, V, EE);
-    lambda = U.head_cols(r) * sqrt(double(N));
+    lambda = U.head_cols(r_use) * sqrt(double(N));
     factor = E * lambda / N;
-    VNT = diagmat(s.head_rows(r));
+    VNT = diagmat(s.head_rows(r_use));
   }
   FE = factor * lambda.t();
   List result;

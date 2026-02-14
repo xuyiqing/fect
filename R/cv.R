@@ -1533,5 +1533,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         ))
     }
 
+    # Keep the selected concrete method for downstream bootstrap/inference.
+    out <- c(out, list(method = method))
+
     return(out)
 } ## cross-validation function ends

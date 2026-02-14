@@ -240,12 +240,20 @@ List beta_part(arma::mat E, arma::cube XX, arma::mat xxinv, arma::mat W,
 List ife_part(arma::mat E, int r) {
   int T = E.n_rows;
   int N = E.n_cols;
+  int d = T <= N ? T : N;
+  int r_use = r;
+  if (r_use < 0) {
+    r_use = 0;
+  }
+  if (r_use > d) {
+    r_use = d;
+  }
 
   List pf;
-  arma::mat F(T, r, arma::fill::zeros);
-  arma::mat L(N, r, arma::fill::zeros);
-  arma::mat VNT(r, r);
-  pf = panel_factor(E, r);
+  arma::mat F(T, r_use, arma::fill::zeros);
+  arma::mat L(N, r_use, arma::fill::zeros);
+  arma::mat VNT(r_use, r_use);
+  pf = panel_factor(E, r_use);
   F = as<arma::mat>(pf["factor"]);
   L = as<arma::mat>(pf["lambda"]);
   VNT = as<arma::mat>(pf["VNT"]);
@@ -293,6 +301,12 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
     d = T;
   } else {
     d = N;
+  }
+  if (r < 0) {
+    r = 0;
+  }
+  if (r > d) {
+    r = d;
   }
 
   if (Y.n_rows == W.n_rows && Y.n_cols == W.n_cols) {
@@ -473,6 +487,9 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
       r_burnin = d - niter;
       if (r_burnin <= r) {
         r_burnin = r;
+      }
+      if (r_burnin > d) {
+        r_burnin = d;
       }
       result5 = ife_part(YY, r_burnin);
     } else {

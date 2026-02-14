@@ -68,6 +68,7 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
     Ntr <- length(tr)
     co <- which(D.sum == 0)
     Nco <- length(co)
+    r <- min(r, TT, Nco)
 
     I.tr <- as.matrix(I[, tr]) ## maybe only 1 treated unit
     I.co <- I[, co]

@@ -56,6 +56,7 @@ fect_cfe <- function(
     ## unit id and time
     TT <- dim(Y)[1]
     N <- dim(Y)[2]
+    r.cv <- min(r.cv, TT, N)
     if (is.null(X) == FALSE) {
         p <- dim(X)[3]
     } else {
