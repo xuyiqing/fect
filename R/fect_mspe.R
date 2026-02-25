@@ -157,7 +157,7 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
 }
 
 
-fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_rep = 1) {
+fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_mask_y0 = NULL, hide_n = 20, seed = NULL, n_rep = 1) {
     if (!is.null(seed)) set.seed(seed)
     hide_n_given <- !missing(hide_n)
     .is_fect_output <- function(obj) {
@@ -185,6 +185,7 @@ fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, 
         stop("`hide_mask` must be NULL, matrix, or vector length TT*N.")
     }
     .as_matrix <- function(mask, TT, N) {
+        if (is.null(mask)) return(NULL)
         if (is.matrix(mask)) {
             if (all(dim(mask) == c(TT, N))) return(mask)
             if (all(dim(mask) == c(N, TT))) return(t(mask))
@@ -223,21 +224,27 @@ fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, 
 
     mask_mat <- .as_mask(hide_mask, TT, N)
     if (is.null(mask_mat)) {
-        stop("For fect_mspe_sim, provide `hide_mask` with treated Y0 values and zeros elsewhere.")
+        stop("For fect_mspe_sim, provide `hide_mask` as a 0/1 matrix.")
     }
-    hm <- .as_matrix(hide_mask, TT, N)
-    long_val <- hm[cbind(rr, cc)]
-    cand_rows <- which(valid_map & !is.na(long_val) & long_val != 0)
+    y0_template <- .as_matrix(hide_mask_y0, TT, N)
+    if (is.null(y0_template)) {
+        y0_template <- matrix(NA_real_, nrow = TT, ncol = N)
+        y0_template[cbind(rr[valid_map], cc[valid_map])] <- as.numeric(data_ref[valid_map, "Y0"])
+    }
+    long_mask <- as.logical(mask_mat[cbind(rr, cc)])
+    long_val <- y0_template[cbind(rr, cc)]
+    cand_rows <- which(valid_map & long_mask & !is.na(long_val))
     if (length(cand_rows) == 0) {
-        stop("No non-zero entries found in `hide_mask` after id/time alignment.")
+        stop("No valid hide positions with non-missing Y0 values.")
     }
-    hide_rows <- if (!is.null(hide_n) && hide_n < length(cand_rows)) {
+    hide_rows <- if (hide_n_given && hide_n < length(cand_rows)) {
         sample(cand_rows, hide_n)
     } else {
         cand_rows
     }
     mask_mat <- matrix(FALSE, nrow = TT, ncol = N)
     mask_mat[cbind(rr[hide_rows], cc[hide_rows])] <- TRUE
+    actual_mat <- matrix(NA_real_, nrow = TT, ncol = N)
     actual_mat[cbind(rr[hide_rows], cc[hide_rows])] <- as.numeric(long_val[hide_rows])
 
     records <- data.frame(
