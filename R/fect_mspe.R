@@ -96,10 +96,9 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
             x_arr <- .get_last_X_array(out_i, TT, N)
             if (is.null(y_true) || is.null(d_mat)) stop("Each out.fect must provide Y and D matrices.")
 
-            f_vars <- all.vars(out_i$call$formula)
-            y_col <- f_vars[1]
-            d_col <- f_vars[2]
-            x_cols <- if (length(f_vars) > 2) f_vars[3:length(f_vars)] else character(0)
+            y_col <- ".__Y__"
+            d_col <- ".__D__"
+            x_cols <- if (!is.null(x_arr)) paste0(".__X__", seq_len(dim(x_arr)[3])) else character(0)
 
             data_long <- data.frame(
                 id = rep(out_i$id, each = TT),
