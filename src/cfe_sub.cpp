@@ -352,7 +352,11 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
   fit = Y0;
   fit_old = fit;
   for (int i = 0; i < p; i++) {
-    fit1 = fit1 + XX.slice(i) * beta0(i);
+    double beta_init = 0.0;
+    if (i < static_cast<int>(beta0.n_elem)) {
+      beta_init = beta0(i);
+    }
+    fit1 = fit1 + XX.slice(i) * beta_init;
   }
 
   FE = fit - fit1 - fit2sum - fit3sum; // fit4 + fit5

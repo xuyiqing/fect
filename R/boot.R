@@ -1479,17 +1479,22 @@ fect_boot <- function(
             silent = TRUE
           )
         } else if (method == "cfe") {
+          X.extra.FE.boot <- X.extra.FE[, boot.id, , drop = FALSE]
+          X.Z.boot <- X.Z[, boot.id, , drop = FALSE]
+          X.Q.boot <- X.Q[, boot.id, , drop = FALSE]
+          X.gamma.boot <- X.gamma[, boot.id, , drop = FALSE]
+          X.kappa.boot <- X.kappa[, boot.id, , drop = FALSE]
           boot <- try(
             fect_cfe(
               Y = Y[, boot.id],
               X = X.boot,
               D = D.boot,
               W = W.boot,
-              X.extra.FE = X.extra.FE,
-              X.Z = X.Z,
-              X.Q = X.Q,
-              X.gamma = X.gamma,
-              X.kappa = X.kappa,
+              X.extra.FE = X.extra.FE.boot,
+              X.Z = X.Z.boot,
+              X.Q = X.Q.boot,
+              X.gamma = X.gamma.boot,
+              X.kappa = X.kappa.boot,
               Zgamma.id = Zgamma.id,
               kappaQ.id = kappaQ.id,
               I = I.boot,

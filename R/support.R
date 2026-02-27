@@ -85,6 +85,40 @@ get_term <- function(d,
 ## regressions for initial values
 ###################################
 
+align_beta0 <- function(beta_raw, p) {
+    if (p <= 0) {
+        return(matrix(0, 1, 0))
+    }
+
+    beta_raw <- as.numeric(beta_raw)
+    beta_names <- names(beta_raw)
+    beta_full <- rep(0, p)
+    filled <- rep(FALSE, p)
+    used_raw <- rep(FALSE, length(beta_raw))
+
+    if (!is.null(beta_names)) {
+        for (j in seq_along(beta_raw)) {
+            nm <- beta_names[j]
+            idx <- suppressWarnings(as.integer(sub(".*?(\\d+)$", "\\1", nm)))
+            if (!is.na(idx) && idx >= 1 && idx <= p && !used_raw[j]) {
+                beta_full[idx] <- beta_raw[j]
+                filled[idx] <- TRUE
+                used_raw[j] <- TRUE
+            }
+        }
+    }
+
+    remaining_pos <- which(!filled)
+    remaining_raw <- which(!used_raw)
+    if (length(remaining_pos) > 0 && length(remaining_raw) > 0) {
+        nfill <- min(length(remaining_pos), length(remaining_raw))
+        beta_full[remaining_pos[seq_len(nfill)]] <- beta_raw[remaining_raw[seq_len(nfill)]]
+    }
+
+    beta_full[which(is.na(beta_full))] <- 0
+    return(as.matrix(beta_full))
+}
+
 initialFit <- function(data, ## long form data
                        force,
                        w = NULL,
@@ -140,10 +174,7 @@ initialFit <- function(data, ## long form data
             }
             coef <- lm.fit$coefficients
             mu <- coef[1]
-            beta0 <- as.matrix(coef[2:length(coef)])
-            if (sum(is.na(beta0)) > 0) {
-                beta0[which(is.na(beta0))] <- 0
-            }
+            beta0 <- align_beta0(coef[2:length(coef)], p)
             y0 <- mu + x %*% beta0
             Y0 <- matrix(y0, T, N)
             ## res <- as.matrix(lm.fit$residuals)
@@ -183,9 +214,7 @@ initialFit <- function(data, ## long form data
         # y0 <- suppressWarnings(predict(lm.fit, x = x, ind = ind))
         Y0 <- matrix(y0, T, N)
         if (p > 0) {
-            beta0 <- lm.fit$coefficients
-            names(beta0) <- NULL
-            beta0 <- as.matrix(beta0)
+            beta0 <- align_beta0(lm.fit$coefficients, p)
         }
     }
 
