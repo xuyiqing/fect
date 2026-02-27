@@ -218,6 +218,15 @@ initialFit <- function(data, ## long form data
         }
     }
 
+    bad.Y0 <- !is.finite(Y0)
+    if (sum(bad.Y0) > 0) {
+        mu.fill <- mean(as.numeric(y.sub), na.rm = TRUE)
+        if (!is.finite(mu.fill)) {
+            mu.fill <- 0
+        }
+        Y0[bad.Y0] <- mu.fill
+    }
+
     result <- list(Y0 = Y0, beta0 = beta0)
     return(result)
 }

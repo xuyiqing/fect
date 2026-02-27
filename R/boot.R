@@ -854,7 +854,7 @@ fect_boot <- function(
       ## boostrap ID
       repeat {
         fake.co <- sample(id.co, Nco, replace = TRUE)
-        if (sum(apply(as.matrix(I[, fake.co]), 1, sum) >= 1) == TT) {
+        if (sum(apply(as.matrix(II[, fake.co]), 1, sum) >= 1) == TT) {
           break
         }
       }
@@ -1209,14 +1209,14 @@ fect_boot <- function(
                 fake.co <- sample(co, Nco, replace = TRUE)
                 fake.tr <- sample(tr, Ntr, replace = TRUE)
                 boot.id <- c(fake.tr, fake.co)
-                if (sum(apply(as.matrix(I[, boot.id]), 1, sum) >= 1) == TT) {
+                if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                   break
                 }
               }
             } else {
               repeat {
                 boot.id <- sample(tr, Ntr, replace = TRUE)
-                if (sum(apply(as.matrix(I[, boot.id]), 1, sum) >= 1) == TT) {
+                if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                   break
                 }
               }
@@ -1229,7 +1229,7 @@ fect_boot <- function(
                   fake.tr <- sample(tr, Ntr, replace = TRUE)
                   fake.rev <- sample(rev, Nrev, replace = TRUE)
                   boot.id <- c(fake.rev, fake.tr, fake.co)
-                  if (sum(apply(as.matrix(I[, boot.id]), 1, sum) >= 1) == TT) {
+                  if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
                   }
                 }
@@ -1238,7 +1238,7 @@ fect_boot <- function(
                   fake.tr <- sample(tr, Ntr, replace = TRUE)
                   fake.rev <- sample(rev, Nrev, replace = TRUE)
                   boot.id <- c(fake.rev, fake.tr)
-                  if (sum(apply(as.matrix(I[, boot.id]), 1, sum) >= 1) == TT) {
+                  if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
                   }
                 }
@@ -1249,14 +1249,14 @@ fect_boot <- function(
                   fake.co <- sample(co, Nco, replace = TRUE)
                   fake.rev <- sample(rev, Nrev, replace = TRUE)
                   boot.id <- c(fake.rev, fake.co)
-                  if (sum(apply(as.matrix(I[, boot.id]), 1, sum) >= 1) == TT) {
+                  if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
                   }
                 }
               } else {
                 repeat {
                   boot.id <- sample(rev, Nrev, replace = TRUE)
-                  if (sum(apply(as.matrix(I[, boot.id]), 1, sum) >= 1) == TT) {
+                  if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
                   }
                 }
@@ -1626,27 +1626,193 @@ fect_boot <- function(
 
   ## computing
   one.nonpara <- trim_closure_env(one.nonpara)
+  make_boot_na <- function() {
+    list(
+      att.avg = NA,
+      att = rep(NA_real_, length(time.on)),
+      count = rep(NA_real_, length(time.on)),
+      beta = if (p > 0) rep(NA_real_, p) else NA,
+      att.off = if (hasRevs == 1) rep(NA_real_, length(time.off)) else NA,
+      count.off = if (hasRevs == 1) rep(NA_real_, length(time.off)) else NA,
+      eff.calendar = rep(NA_real_, TT),
+      eff.calendar.fit = rep(NA_real_, TT),
+      att.placebo = NA,
+      att.avg.unit = NA,
+      att.carryover = NA,
+      group.att = NA,
+      marginal = NA,
+      carry.att = if (!is.null(T.on.carry)) rep(NA_real_, length(carry.att)) else NA,
+      group.output = list(),
+      balance.att = if (!is.null(balance.period)) rep(NA_real_, length(balance.att)) else NA,
+      balance.att.placebo = NA,
+      balance.count = if (!is.null(balance.period)) rep(NA_real_, length(balance.att)) else NA,
+      balance.avg.att = NA,
+      balance.time = if (!is.null(balance.period)) balance.time else NA,
+      att.avg.W = NA,
+      att.on.W = if (!is.null(W)) rep(NA_real_, length(time.on.W)) else NA,
+      count.on.W = if (!is.null(W)) rep(NA_real_, length(time.on.W)) else NA,
+      time.on.W = if (!is.null(W)) time.on.W else NA,
+      att.placebo.W = NA,
+      att.off.W = if (!is.null(W) && hasRevs == 1) rep(NA_real_, length(time.off.W)) else NA,
+      count.off.W = if (!is.null(W) && hasRevs == 1) rep(NA_real_, length(time.off.W)) else NA,
+      time.off.W = if (!is.null(W) && hasRevs == 1) time.off.W else NA,
+      att.carryover.W = NA,
+      eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+      D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+      I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+      boot.id = NULL
+    )
+  }
   if (parallel == TRUE) {
-    boot.out <- foreach(
-      j = 1:nboots,
-      .inorder = FALSE,
-      .export = c(
-        "fect_fe",
-        "fect_mc",
-        "fect_polynomial",
-        "fect_cfe",
-        "get_term",
-        "fect_gsynth",
-        "initialFit"
-      ),
-      .packages = c("fect", "mvtnorm", "fixest"),
-      .options.future = list(seed = TRUE)
-    ) %dopar%
+    old_rng_misuse <- getOption("doFuture.rng.onMisuse")
+    options(doFuture.rng.onMisuse = "ignore")
+    on.exit(options(doFuture.rng.onMisuse = old_rng_misuse), add = TRUE)
+
+    quiet_nonpara <- function(j) {
+      suppressMessages(suppressWarnings(one.nonpara(boot.seq[j])))
+    }
+
+    run_dopar_retry <- function(idx, workers) {
+      cl <- parallel::makePSOCKcluster(workers)
+      on.exit({
+        try(parallel::stopCluster(cl), silent = TRUE)
+        try(doFuture::registerDoFuture(), silent = TRUE)
+      }, add = TRUE)
+      doParallel::registerDoParallel(cl)
+      foreach(
+        j = idx,
+        .inorder = TRUE,
+        .errorhandling = "pass",
+        .export = c(
+          "fect_fe",
+          "fect_mc",
+          "fect_polynomial",
+          "fect_cfe",
+          "get_term",
+          "fect_gsynth",
+          "initialFit"
+        ),
+        .packages = c("fect", "mvtnorm", "fixest")
+      ) %dopar%
+        {
+          return(quiet_nonpara(j))
+        }
+    }
+
+    boot.out <- tryCatch(
       {
-        return(one.nonpara(boot.seq[j]))
+        foreach(
+          j = 1:nboots,
+          .inorder = FALSE,
+          .errorhandling = "pass",
+          .export = c(
+            "fect_fe",
+            "fect_mc",
+            "fect_polynomial",
+            "fect_cfe",
+            "get_term",
+            "fect_gsynth",
+            "initialFit"
+          ),
+          .packages = c("fect", "mvtnorm", "fixest"),
+          .options.future = list(seed = TRUE)
+        ) %dopar%
+          {
+            return(quiet_nonpara(j))
+          }
+      },
+      error = function(e) {
+        if (!requireNamespace("doParallel", quietly = TRUE)) {
+          stop(e)
+        }
+        warning(
+          paste0(
+            "Future backend failed (",
+            conditionMessage(e),
+            "). Retrying with doParallel backend."
+          )
+        )
+        workers <- cores
+        if (is.null(workers) || !is.numeric(workers) || length(workers) != 1 || is.na(workers)) {
+          workers <- max(1L, min(parallel::detectCores() - 2L, 8L))
+        }
+        workers <- max(1L, as.integer(workers))
+        run_dopar_retry(1:nboots, workers)
+      }
+    )
+
+    failed.idx <- which(vapply(boot.out, inherits, logical(1), "error"))
+    if (length(failed.idx) > 0 && requireNamespace("doParallel", quietly = TRUE)) {
+      warning(
+        paste0(
+          "Retrying ",
+          length(failed.idx),
+          " failed bootstrap iterations with doParallel backend."
+        )
+      )
+      retry.workers <- cores
+      if (is.null(retry.workers) || !is.numeric(retry.workers) || length(retry.workers) != 1 || is.na(retry.workers)) {
+        retry.workers <- max(1L, min(parallel::detectCores() - 2L, 8L))
+      }
+      retry.workers <- max(1L, min(as.integer(retry.workers), length(failed.idx)))
+
+      # Retry with decreasing worker counts to avoid socket fragility in some IDE sessions.
+      worker.plan <- unique(c(
+        retry.workers,
+        max(1L, retry.workers %/% 2L),
+        2L,
+        1L
+      ))
+      pending <- failed.idx
+      for (w in worker.plan) {
+        if (length(pending) == 0) {
+          break
+        }
+        w.use <- max(1L, min(w, length(pending)))
+        retry.out <- tryCatch(
+          run_dopar_retry(pending, w.use),
+          error = function(e) {
+            warning(
+              paste0(
+                "doParallel retry failed with ",
+                w.use,
+                " worker(s): ",
+                conditionMessage(e)
+              )
+            )
+            vector("list", length(pending))
+          }
+        )
+        for (k in seq_along(pending)) {
+          if (!is.null(retry.out[[k]]) && !inherits(retry.out[[k]], "error")) {
+            boot.out[[pending[k]]] <- retry.out[[k]]
+          }
+        }
+        pending <- pending[vapply(boot.out[pending], inherits, logical(1), "error")]
       }
 
+      # Last resort: fill any remaining failures directly to preserve finite SE.
+      if (length(pending) > 0) {
+        warning(
+          paste0(
+            "Final local retry for ",
+            length(pending),
+            " iteration(s) after parallel socket errors."
+          )
+        )
+        for (j in pending) {
+          boot.out[[j]] <- quiet_nonpara(j)
+        }
+      }
+    }
+
     for (j in 1:nboots) {
+      if (inherits(boot.out[[j]], "error")) {
+        warning(
+          paste0("Bootstrap iteration ", j, " failed in parallel worker: ", conditionMessage(boot.out[[j]]))
+        )
+        boot.out[[j]] <- make_boot_na()
+      }
       att.avg.boot[, j] <- boot.out[[j]]$att.avg
       att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
       att.boot[, j] <- boot.out[[j]]$att
