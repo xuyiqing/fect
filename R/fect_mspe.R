@@ -1,6 +1,21 @@
 fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_rep = 1) {
     if (!is.null(seed)) set.seed(seed)
     hide_n_given <- !missing(hide_n)
+    .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj) {
+        formula_env <- environment(out_obj$call$formula)
+        if (is.null(formula_env)) formula_env <- parent.frame()
+        call_args <- as.list(out_obj$call)[-1]
+        rerun_args <- list(
+            formula = formula_obj,
+            data = data_obj,
+            index = index_obj
+        )
+        arg_names <- setdiff(names(call_args), c("", "formula", "data", "index"))
+        for (nm in arg_names) {
+            rerun_args[[nm]] <- eval(call_args[[nm]], envir = formula_env, enclos = parent.frame())
+        }
+        rerun_args
+    }
     .is_fect_output <- function(obj) {
         is.list(obj) && !is.null(obj$Y.ct.full)
     }
@@ -125,13 +140,12 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
             data_hidden[[y_col]][long_mask] <- NA_real_
 
             formula_obj <- stats::reformulate(c(d_col, x_cols), response = y_col)
-            rerun_args <- list(
-                formula = formula_obj,
-                data = data_hidden,
-                index = c("id", "time")
+            rerun_args <- .build_rerun_args(
+                out_obj = out_i,
+                formula_obj = formula_obj,
+                data_obj = data_hidden,
+                index_obj = c("id", "time")
             )
-            if (!is.null(out_i$call$method)) rerun_args$method <- eval(out_i$call$method, parent.frame())
-            if (!is.null(out_i$call$r)) rerun_args$r <- eval(out_i$call$r, parent.frame())
 
             out_new <- do.call(fect::fect, rerun_args)
             fits[[i]] <- out_new
@@ -294,9 +308,14 @@ fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_mask_y0 = NULL, hide_
             data_hidden[hide_rows_i, y_col_i] <- NA_real_
 
             formula_obj <- stats::reformulate(c(d_col_i, x_cols_i), response = y_col_i)
+            formula_env_i <- environment(out_i$call$formula)
+            if (is.null(formula_env_i)) formula_env_i <- parent.frame()
+            call_args_i <- as.list(out_i$call)[-1]
             rerun_args <- list(formula = formula_obj, data = data_hidden, index = idx_i)
-            if (!is.null(out_i$call$method)) rerun_args$method <- eval(out_i$call$method, parent.frame())
-            if (!is.null(out_i$call$r)) rerun_args$r <- eval(out_i$call$r, parent.frame())
+            arg_names_i <- setdiff(names(call_args_i), c("", "formula", "data", "index"))
+            for (nm in arg_names_i) {
+                rerun_args[[nm]] <- eval(call_args_i[[nm]], envir = formula_env_i, enclos = parent.frame())
+            }
 
             out_new <- do.call(fect::fect, rerun_args)
             fits[[i]] <- out_new
