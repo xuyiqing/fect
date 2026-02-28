@@ -1,9 +1,10 @@
 fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_rep = 1) {
     if (!is.null(seed)) set.seed(seed)
     hide_n_given <- !missing(hide_n)
-    .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj) {
+    caller_env <- parent.frame()
+    .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj, caller_env) {
         formula_env <- environment(out_obj$call$formula)
-        if (is.null(formula_env)) formula_env <- parent.frame()
+        if (is.null(formula_env)) formula_env <- caller_env
         call_args <- as.list(out_obj$call)[-1]
         rerun_args <- list(
             formula = formula_obj,
@@ -12,7 +13,7 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
         )
         arg_names <- setdiff(names(call_args), c("", "formula", "data", "index"))
         for (nm in arg_names) {
-            rerun_args[[nm]] <- eval(call_args[[nm]], envir = formula_env, enclos = parent.frame())
+            rerun_args[[nm]] <- eval(call_args[[nm]], envir = formula_env, enclos = caller_env)
         }
         rerun_args
     }
@@ -144,7 +145,8 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
                 out_obj = out_i,
                 formula_obj = formula_obj,
                 data_obj = data_hidden,
-                index_obj = c("id", "time")
+                index_obj = c("id", "time"),
+                caller_env = caller_env
             )
 
             out_new <- do.call(fect::fect, rerun_args)
@@ -177,6 +179,7 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
 fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_mask_y0 = NULL, hide_n = 20, seed = NULL, n_rep = 1) {
     if (!is.null(seed)) set.seed(seed)
     hide_n_given <- !missing(hide_n)
+    caller_env <- parent.frame()
     .is_fect_output <- function(obj) {
         is.list(obj) && !is.null(obj$Y.ct.full) && !is.null(obj$call)
     }
@@ -309,12 +312,12 @@ fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_mask_y0 = NULL, hide_
 
             formula_obj <- stats::reformulate(c(d_col_i, x_cols_i), response = y_col_i)
             formula_env_i <- environment(out_i$call$formula)
-            if (is.null(formula_env_i)) formula_env_i <- parent.frame()
+            if (is.null(formula_env_i)) formula_env_i <- caller_env
             call_args_i <- as.list(out_i$call)[-1]
             rerun_args <- list(formula = formula_obj, data = data_hidden, index = idx_i)
             arg_names_i <- setdiff(names(call_args_i), c("", "formula", "data", "index"))
             for (nm in arg_names_i) {
-                rerun_args[[nm]] <- eval(call_args_i[[nm]], envir = formula_env_i, enclos = parent.frame())
+                rerun_args[[nm]] <- eval(call_args_i[[nm]], envir = formula_env_i, enclos = caller_env)
             }
 
             out_new <- do.call(fect::fect, rerun_args)
