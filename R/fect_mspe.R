@@ -31,17 +31,6 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
         NULL
     }
 
-    .get_last_X_array <- function(out_obj, TT, N) {
-        idx <- which(names(out_obj) == "X")
-        if (length(idx) == 0) return(NULL)
-        for (k in rev(idx)) {
-            obj <- out_obj[[k]]
-            d <- dim(obj)
-            if (!is.null(d) && length(d) == 3 && d[1] == TT && d[2] == N) return(obj)
-        }
-        NULL
-    }
-
     .as_mask <- function(mask, TT, N) {
         if (is.null(mask)) return(NULL)
         if (is.matrix(mask)) {
@@ -109,51 +98,46 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
             out_i <- out_list[[i]]
             y_true <- .get_last_matrix(out_i, "Y", TT, N)
             d_mat <- .get_last_matrix(out_i, "D", TT, N)
-            x_arr <- .get_last_X_array(out_i, TT, N)
             if (is.null(y_true) || is.null(d_mat)) stop("Each out.fect must provide Y and D matrices.")
-
-            y_col <- ".__Y__"
-            d_col <- ".__D__"
-            x_cols <- if (!is.null(x_arr) && dim(x_arr)[3] > 0) {
-                paste0(".__X__", seq_len(dim(x_arr)[3]))
-            } else {
-                character(0)
-            }
-
-            data_long <- data.frame(
-                id = rep(out_i$id, each = TT),
-                time = rep(out_i$rawtime, N),
-                stringsAsFactors = FALSE
+            formula_env_i <- environment(out_i$call$formula)
+            if (is.null(formula_env_i)) formula_env_i <- caller_env
+            data_i <- eval(out_i$call$data, envir = formula_env_i, enclos = caller_env)
+            idx_i <- eval(out_i$call$index, envir = formula_env_i, enclos = caller_env)
+            formula_obj_i <- tryCatch(
+                eval(out_i$call$formula, envir = formula_env_i, enclos = caller_env),
+                error = function(e) NULL
             )
-            data_long[[y_col]] <- as.numeric(c(y_true))
-            data_long[[d_col]] <- as.numeric(c(d_mat))
-            if (length(x_cols) > 0) {
-                if (is.null(x_arr) || length(dim(x_arr)) != 3 || dim(x_arr)[3] < length(x_cols)) {
-                    stop("X array in out.fect is not compatible with formula covariates.")
-                }
-                for (j in seq_along(x_cols)) {
-                    data_long[[x_cols[j]]] <- as.numeric(c(x_arr[, , j]))
-                }
+            if (!inherits(formula_obj_i, "formula")) {
+                formula_obj_i <- stats::reformulate(c(out_i$D, out_i$X), response = out_i$Y)
+            }
+            f_vars <- all.vars(formula_obj_i)
+            y_col_i <- f_vars[1]
+
+            rr_i <- match(data_i[[idx_i[2]]], out_i$rawtime)
+            cc_i <- match(data_i[[idx_i[1]]], out_i$id)
+            long_mask_i <- !is.na(rr_i) & !is.na(cc_i) &
+                as.logical(mask_mat[cbind(rr_i, cc_i)])
+            hide_rows_i <- which(long_mask_i)
+            if (length(hide_rows_i) == 0) {
+                stop("No valid hide positions mapped to source data rows.")
             }
 
-            long_mask <- as.vector(mask_mat)
-            data_hidden <- data_long
-            data_hidden[[y_col]][long_mask] <- NA_real_
+            data_hidden <- data_i
+            data_hidden[hide_rows_i, y_col_i] <- NA_real_
 
-            formula_obj <- stats::reformulate(c(d_col, x_cols), response = y_col)
             rerun_args <- .build_rerun_args(
                 out_obj = out_i,
-                formula_obj = formula_obj,
+                formula_obj = formula_obj_i,
                 data_obj = data_hidden,
-                index_obj = c("id", "time"),
+                index_obj = idx_i,
                 caller_env = caller_env
             )
 
             out_new <- do.call(fect::fect, rerun_args)
             fits[[i]] <- out_new
 
-            pred <- out_new$Y.ct.full[mask_mat]
-            actual <- y_true[mask_mat]
+            pred <- out_new$Y.ct.full[cbind(rr_i[hide_rows_i], cc_i[hide_rows_i])]
+            actual <- y_true[cbind(rr_i[hide_rows_i], cc_i[hide_rows_i])]
             err <- pred - actual
             records <- rbind(
                 records,
