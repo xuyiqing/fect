@@ -1,4 +1,12 @@
-fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_rep = 1) {
+fect_mspe <- function(
+    out.fect,
+    hide_mask = NULL,
+    hide_n = 20,
+    seed = NULL,
+    n_rep = 1,
+    pre.trend = TRUE,
+    pre.trend.n = 2
+) {
     if (!is.null(seed)) set.seed(seed)
     hide_n_given <- !missing(hide_n)
     caller_env <- parent.frame()
@@ -44,6 +52,21 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
         stop("`hide_mask` must be NULL, a matrix, or a vector of length TT*N.")
     }
 
+    .pre_trend_candidates <- function(d_mat, y_mat, n_last) {
+        cand <- integer(0)
+        if (!isTRUE(n_last > 0)) return(cand)
+        for (j in seq_len(ncol(d_mat))) {
+            treated_idx <- which(d_mat[, j] == 1)
+            if (length(treated_idx) == 0) next
+            first_treat <- min(treated_idx)
+            pre_idx <- which(d_mat[, j] == 0 & !is.na(y_mat[, j]) & seq_len(nrow(d_mat)) < first_treat)
+            if (length(pre_idx) == 0) next
+            keep_idx <- tail(pre_idx, min(n_last, length(pre_idx)))
+            cand <- c(cand, keep_idx + (j - 1) * nrow(d_mat))
+        }
+        unique(cand)
+    }
+
     out_list <- if (.is_fect_output(out.fect)) list(out.fect) else out.fect
     if (!is.list(out_list) || length(out_list) == 0 ||
         !all(vapply(out_list, .is_fect_output, logical(1)))) {
@@ -59,6 +82,14 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
     y_ref <- .get_last_matrix(ref, "Y", TT, N)
     d_ref <- .get_last_matrix(ref, "D", TT, N)
     if (is.null(y_ref) || is.null(d_ref)) stop("`out.fect` must contain matrix Y and D.")
+    if (!is.logical(pre.trend) || length(pre.trend) != 1 || is.na(pre.trend)) {
+        stop("`pre.trend` must be TRUE or FALSE.")
+    }
+    if (!is.numeric(pre.trend.n) || length(pre.trend.n) != 1 || is.na(pre.trend.n) ||
+        pre.trend.n < 1) {
+        stop("`pre.trend.n` must be a positive number.")
+    }
+    pre.trend.n <- as.integer(pre.trend.n)
 
     mask_base <- .as_mask(hide_mask, TT, N)
     records <- data.frame(
@@ -75,7 +106,14 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
     for (rep_id in seq_len(n_rep)) {
         mask_mat <- mask_base
         if (is.null(mask_mat)) {
-            cand <- which(d_ref == 0 & !is.na(y_ref))
+            if (isTRUE(pre.trend)) {
+                cand <- .pre_trend_candidates(d_ref, y_ref, pre.trend.n)
+            } else {
+                cand <- integer(0)
+            }
+            if (length(cand) == 0) {
+                cand <- which(d_ref == 0 & !is.na(y_ref))
+            }
             pick <- sample(cand, min(hide_n, length(cand)))
             mask_mat <- matrix(FALSE, nrow = TT, ncol = N)
             mask_mat[pick] <- TRUE
@@ -136,8 +174,14 @@ fect_mspe <- function(out.fect, hide_mask = NULL, hide_n = 20, seed = NULL, n_re
             out_new <- do.call(fect::fect, rerun_args)
             fits[[i]] <- out_new
 
-            pred <- out_new$Y.ct.full[cbind(rr_i[hide_rows_i], cc_i[hide_rows_i])]
-            actual <- y_true[cbind(rr_i[hide_rows_i], cc_i[hide_rows_i])]
+            rr_new <- match(data_i[[idx_i[2]]][hide_rows_i], out_new$rawtime)
+            cc_new <- match(data_i[[idx_i[1]]][hide_rows_i], out_new$id)
+            valid_pred <- !is.na(rr_new) & !is.na(cc_new)
+            if (!any(valid_pred)) {
+                stop("No hidden positions remain comparable after rerun; try smaller `hide_n` or `pre.trend.n`.")
+            }
+            pred <- out_new$Y.ct.full[cbind(rr_new[valid_pred], cc_new[valid_pred])]
+            actual <- y_true[cbind(rr_i[hide_rows_i][valid_pred], cc_i[hide_rows_i][valid_pred])]
             err <- pred - actual
             records <- rbind(
                 records,
@@ -307,8 +351,14 @@ fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_mask_y0 = NULL, hide_
             out_new <- do.call(fect::fect, rerun_args)
             fits[[i]] <- out_new
 
-            pred <- out_new$Y.ct.full[cbind(rr_i[hide_rows_i], cc_i[hide_rows_i])]
-            actual <- actual_mat_rep[cbind(rr_i[hide_rows_i], cc_i[hide_rows_i])]
+            rr_new <- match(data_i[[idx_i[2]]][hide_rows_i], out_new$rawtime)
+            cc_new <- match(data_i[[idx_i[1]]][hide_rows_i], out_new$id)
+            valid_pred <- !is.na(rr_new) & !is.na(cc_new)
+            if (!any(valid_pred)) {
+                stop("No hidden positions remain comparable after rerun; try smaller `hide_n` or adjust the hide mask.")
+            }
+            pred <- out_new$Y.ct.full[cbind(rr_new[valid_pred], cc_new[valid_pred])]
+            actual <- actual_mat_rep[cbind(rr_i[hide_rows_i][valid_pred], cc_i[hide_rows_i][valid_pred])]
             err <- pred - actual
             records <- rbind(
                 records,
