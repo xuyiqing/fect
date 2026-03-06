@@ -520,6 +520,7 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
       dif2_tol = dif2_tol || (dif2 > tolerate);
     }
 
+    dif3_tol = 0.0;
     for (int k = 0; k < p_kappa; ++k) {
       dif3 = arma::norm(fit3.slice(k) - fit3_old.slice(k), "fro") /
              arma::norm(fit3_old.slice(k), "fro");
