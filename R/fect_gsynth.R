@@ -94,10 +94,10 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
 
     if (is.null(W)) {
         W.use <- as.matrix(0)
-    } 
-    # else {
-    #     stop("Gsynth doesn't suppoort weighted outcome model in this version.\n")
-    # }
+    } else {
+        W.use <- as.matrix(W[, co, drop = FALSE])
+        W.use[which(II.co == 0)] <- 0
+    }
 
     if (!0 %in% I.tr) {
         ## a (TT*Ntr) matrix, time dimension: before treatment
@@ -128,7 +128,11 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
         ## observed Y0 indicator:
         initialOut <- Y0.co <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
         oci <- which(c(II.co) == 1)
-        initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+        if (is.null(W)) {
+            initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+        } else {
+            initialOut <- initialFit(data = data.ini, force = force, w = c(W.use), oci = oci)
+        }
         Y0.co <- initialOut$Y0
         beta0 <- initialOut$beta0
         if (p > 0 && sum(is.na(beta0)) > 0) {
