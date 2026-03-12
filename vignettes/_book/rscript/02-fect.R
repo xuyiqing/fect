@@ -227,9 +227,9 @@ out_jack <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
 plot(effect(out_jack))
 
 simdata[,"FE3"] <- sample(c(1,2,3,4,5), size = dim(simdata)[1], replace = TRUE)
-out.cfe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
+out.cfe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time","FE3"),
   method = "cfe", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200,
-  sfe = c("FE3"), cfe = list(c("id","time")))
+  Q.type = "linear")
 plot(out.cfe)
 
 out.poly <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 

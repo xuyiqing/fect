@@ -520,19 +520,17 @@ plot(effect(out_jack))
 
 The counterfacutal/imputation estimator framework can be extended to more settings.
 
-**Complex Fixed Effects.** When there exists more dimensions of fixed effects in addition to the unit and time fixed effects, we can resort to the **"cfe"** (complex fixed effects) estimator to impute the counterfactual based on a linear model with multiple levels of fixed effects.
+**Complex Fixed Effects.** When there exist more dimensions of fixed effects in addition to the unit and time fixed effects, we can resort to the **"cfe"** (complex fixed effects) estimator to impute the counterfactual based on a linear model with multiple levels of fixed effects. The CFE method also supports time-invariant covariates with time-varying coefficients (`Z`/`gamma`), unit-specific loadings on known time trends (`Q`/`kappa` or `Q.type`), and interactive fixed effects (`r`). For a detailed tutorial, see [Chapter @sec-cfe].
 
 Note, **fect** allows the method to run without requiring a baseline two-way fixed effects model. That is, users do not need to set `force = "two-way"` to impute.
 
-It accepts two options: `sfe` specifies simple (additive) fixed effects in addition to the unit and time fixed effects and `cfe` receives a *list* object and each component in the list is a vector of length 2.
-
-The value of the first element of each component is the name of `group` variable for which fixed effects are to be estimated (e.g. unit names); the value of the second element is the name of a regressor (e.g., a time trend). For example, we can estimate a model with an additional fixed effects **FE3** along with a unit-specific time trend.
+Additional additive fixed effects are specified via the `index` argument (elements beyond the first two). For example, we can estimate a model with an additional fixed effect **FE3** along with a unit-specific time trend via `Q.type`:
 
 ```{r simdata_cfe, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide', fig.width = 6, fig.height = 4.5}
 simdata[,"FE3"] <- sample(c(1,2,3,4,5), size = dim(simdata)[1], replace = TRUE)
-out.cfe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
+out.cfe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time","FE3"),
   method = "cfe", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200,
-  sfe = c("FE3"), cfe = list(c("id","time")))
+  Q.type = "linear")
 plot(out.cfe)
 ```
 

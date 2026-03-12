@@ -14,6 +14,7 @@ book:
     - 04-gsynth.Rmd
     - 05-panel.Rmd
     - 06-sens.Rmd
+    - 07-cfe.Rmd
     - aa-cheatsheet.Rmd
     - references.qmd
   

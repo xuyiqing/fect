@@ -42,8 +42,8 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 | Input | **Description** | **Applicable Methods** |
 |------------------------|------------------------|------------------------|
 | `loo` | Leave-one-period-out goodness-of-fit test (`TRUE/FALSE`). | fe, ife, mc, gsynth |
-| `carryoverTest` | Tests for carryover effects in post-treatment periods (`TRUE/FALSE`). | fe, ife, mc |
-| `carryover.period` | Range of post-treatment periods for the carryover test (vector). | fe, ife, mc |
+| `carryoverTest` | Tests for carryover effects in post-treatment periods (`TRUE/FALSE`). | fe, ife, mc, cfe |
+| `carryover.period` | Range of post-treatment periods for the carryover test (vector). | fe, ife, mc, cfe |
 | `permute` | Permutation test (`TRUE/FALSE`). | fe, ife, mc, gsynth |
 | `m` | Block length for permutation test (`m=2` by default). | fe, ife, mc, gsynth |
 | `CV` | Cross-validation for factor-based methods. | ife, mc, gsynth |
@@ -61,8 +61,11 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | `X` (covariates) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `data` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `index` (unit & time IDs) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `sfe` (simple additive FEs) | – | – | – | – | – | ✓ |
-| `cfe` (complex FEs) | – | – | – | – | – | ✓ |
+| `sfe` (simple additive FEs, legacy) | – | – | – | – | – | ✓ (cfe_old) |
+| `cfe` (complex FEs, legacy) | – | – | – | – | – | ✓ (cfe_old) |
+| `Z` (time-invariant covariates) | – | – | – | – | – | ✓ |
+| `Q` (known time trends) | – | – | – | – | – | ✓ |
+| `Q.type` (auto time trends) | – | – | – | – | – | ✓ |
 
 ### Optional Inputs
 
@@ -74,9 +77,14 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | `force` (FE structure) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `lambda`(Hyper-parameter sequence) | – | – | ✓ | ✓ | – | – |
 | `nlambda`(Length of hyper-parameter sequence) | – | – | ✓ | ✓ | – | – |
-| `r` (# factor) | – | ✓ | – | ✓ | – | – |
+| `r` (# factor) | – | ✓ | – | ✓ | – | ✓ |
 | `k` ( \# cross-validation rounds) | – | ✓ | ✓ | ✓ | – | – |
 | `degree` (degree of the interacted fixed effects) | – | – | – | – | ✓ | – |
+| `gamma` (time grouping for Z) | – | – | – | – | – | ✓ |
+| `kappa` (unit grouping for Q) | – | – | – | – | – | ✓ |
+| `Z.param` (Z block assignment) | – | – | – | – | – | ✓ |
+| `Q.param` (Q block assignment) | – | – | – | – | – | ✓ |
+| `Q.bspline.degree` (B-spline degree) | – | – | – | – | – | ✓ |
 
 ### Important Options
 
@@ -95,7 +103,9 @@ A check mark (✓) indicates that the method requires or accepts the input.
 
 -   Factor-based methods (`ife`, `gsynth`) can use `r`and `k` for factor selection and cross validation. We can implement a similar process using `mc` or `gsynth` with `lambda` and`nlambda`.
 
--   `carryoverTest` and `loo` are available in `fe`, `ife`, `mc`, `polynomial`, and `cfe` but not in `gsynth`.
+-   `carryoverTest` is available in `fe`, `ife`, `mc`, `polynomial`, and `cfe` but not in `gsynth`. `loo` is available in `fe`, `ife`, `mc`, and `gsynth`.
+
+-   The **cfe** method supports additional parameters: `Z`/`gamma` for time-invariant covariates with time-varying coefficients, `Q`/`kappa` (or `Q.type`) for unit-specific time trends, extra additive fixed effects via `index[3:]`, and interactive fixed effects via `r`. See [Chapter @sec-cfe] for details.
 
 -   `force` allows various levels of fixed effects (`"none"`, `"unit"`, `"time"`, `"two-way"`).
 

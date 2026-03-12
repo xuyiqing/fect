@@ -69,6 +69,9 @@ The user guide is structured into the following chapters:
 -   [Chapter @sec-panel-sens]\
     This chapter introduces the sensitivity analysis for the counterfactual estimators.
 
+-   [Chapter @sec-cfe]\
+    This chapter provides a dedicated tutorial for the Complex Fixed Effects (CFE) estimator, which supports multi-level fixed effects, time-invariant covariates with time-varying coefficients, unit-specific time trends, and interactive fixed effects.
+
 -   [Chapter @sec-cheatsheet]\
     The final chapter summarizes the core inputs required for implementing the six methods, along with options for plotting and diagnostics.
 
