@@ -466,8 +466,9 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
                   use_weight, W);
       result2[k] =
           gamma_part(YY, Z.cols(Zgamma_id_raw[k]), zzinv[k], gamma_t_group[k]);
-      fit2.slice(k) = as<arma::mat>(result2[k]["fit"]);
-      fit2sum = arma::sum(fit2, 2);
+      arma::mat fit2_new = as<arma::mat>(result2[k]["fit"]);
+      fit2sum += fit2_new - fit2.slice(k);
+      fit2.slice(k) = fit2_new;
     }
 
     for (int k = 0; k < p_kappa; ++k) {
@@ -476,8 +477,9 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
                   use_weight, W);
       result3[k] =
           kappa_part(YY, Q.rows(kappaQ_id_raw[k]), qqinv[k], kappa_i_group[k]);
-      fit3.slice(k) = as<arma::mat>(result3[k]["fit"]);
-      fit3sum = arma::sum(fit3, 2);
+      arma::mat fit3_new = as<arma::mat>(result3[k]["fit"]);
+      fit3sum += fit3_new - fit3.slice(k);
+      fit3.slice(k) = fit3_new;
     }
 
     YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit5, FE - fit5, I, use_weight,
