@@ -37,17 +37,25 @@ vignettes/_book/**
 # knitr and R markdown default cache directories
 /*_cache/
 /cache/
+vignettes/cache/
+vignettes/figure/
 
 # Temporary files created by R markdown
 *.utf8.md
 *.knit.md
+vignettes/*.md
+!vignettes/README.md
+
+# Compiled code
+src/*.o
+src/*.so
+src/*.dll
+
+# OS files
 .DS_Store
 
 docs
 
-man/.DS_Store
-.DS_Store
-.DS_Store
 .RData
 
 check/
