@@ -171,7 +171,7 @@ fect_mspe <- function(
                 caller_env = caller_env
             )
 
-            out_new <- do.call(fect::fect, rerun_args)
+            out_new <- do.call(fect, rerun_args)
             fits[[i]] <- out_new
 
             rr_new <- match(data_i[[idx_i[2]]][hide_rows_i], out_new$rawtime)
@@ -348,7 +348,7 @@ fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_mask_y0 = NULL, hide_
                 rerun_args[[nm]] <- eval(call_args_i[[nm]], envir = formula_env_i, enclos = caller_env)
             }
 
-            out_new <- do.call(fect::fect, rerun_args)
+            out_new <- do.call(fect, rerun_args)
             fits[[i]] <- out_new
 
             rr_new <- match(data_i[[idx_i[2]]][hide_rows_i], out_new$rawtime)
