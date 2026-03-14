@@ -1,3 +1,9 @@
+# fect 2.1.1
+
+* Added `codetools` to Imports in DESCRIPTION (required by `trim_closure_env()` in `boot.R`)
+* Added `importFrom("utils", "tail")` to NAMESPACE (used in `fect_mspe.R`)
+* Bumped version to 2.1.1 and updated Date field for CRAN submission
+
 # fect 2.0.4
 
 * Add new plot `type = "hte"`
