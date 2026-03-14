@@ -266,8 +266,8 @@ fect_cfe <- function(
         ## ini.res <- ini.res * norm.para[1]
         if (boot == FALSE) {
             est.fect$fit <- est.fect$fit * norm.para[1]
+            est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
         }
-        est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
     }
 
     ## 0. relevant parameters

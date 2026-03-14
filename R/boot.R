@@ -1734,7 +1734,8 @@ fect_boot <- function(
         )
         workers <- cores
         if (is.null(workers) || !is.numeric(workers) || length(workers) != 1 || is.na(workers)) {
-          workers <- max(1L, min(parallel::detectCores() - 2L, 8L))
+          raw_cores <- parallelly::availableCores(omit = 2L)
+          workers <- max(1L, min(raw_cores, 8L))
         }
         workers <- max(1L, as.integer(workers))
         run_dopar_retry(1:nboots, workers)
@@ -1752,7 +1753,8 @@ fect_boot <- function(
       )
       retry.workers <- cores
       if (is.null(retry.workers) || !is.numeric(retry.workers) || length(retry.workers) != 1 || is.na(retry.workers)) {
-        retry.workers <- max(1L, min(parallel::detectCores() - 2L, 8L))
+        raw_cores <- parallelly::availableCores(omit = 2L)
+        retry.workers <- max(1L, min(raw_cores, 8L))
       }
       retry.workers <- max(1L, min(as.integer(retry.workers), length(failed.idx)))
 

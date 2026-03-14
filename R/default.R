@@ -2023,7 +2023,7 @@ fect.default <- function(
             set.seed(seed)
         }
         if (is.null(cores) == TRUE) {
-            cores <- min(detectCores() - 2, 4) # cap workers for better socket stability
+            cores <- max(1L, min(parallelly::availableCores(omit = 2L), 4L))
         }
         old.future.plan <- future::plan()
         future::plan(future::multisession, workers = cores)
