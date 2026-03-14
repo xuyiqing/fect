@@ -134,8 +134,8 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
         est.best$fit <- est.best$fit * norm.para[1]
         if (boot == FALSE) {
             est.fect$fit <- est.fect$fit * norm.para[1]
+            est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
         }
-        est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
     }
 
     ## 0. revelant parameters
