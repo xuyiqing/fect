@@ -42,6 +42,139 @@ make_staggered_data <- function(N = 40, TT = 20, Ntr = 15, tau = 3.0,
   data.frame(id = id_vec, time = time_vec, Y = Y_vec, D = D_vec)
 }
 
+## DGP with factor structure for comparisons needing r > 0
+make_factor_data <- function(N = 100, TT = 30, Ntr = 30, tau = 3.0,
+                              r = 2, seed = 42) {
+  set.seed(seed)
+  F_mat <- matrix(rnorm(TT * r), TT, r)
+  L_mat <- matrix(rnorm(N * r), N, r)
+  alpha_i <- rnorm(N, 0, 1)
+  xi_t <- rnorm(TT, 0, 0.5)
+
+  T0_vec <- rep(Inf, N)
+  if (Ntr > 0) {
+    T0_vec[1:Ntr] <- sample(round(TT * 0.4):round(TT * 0.7), Ntr,
+                             replace = TRUE)
+  }
+
+  Y_vec <- D_vec <- numeric(N * TT)
+  id_vec <- time_vec <- integer(N * TT)
+  idx <- 1
+  for (i in 1:N) {
+    for (t in 1:TT) {
+      treated <- (t >= T0_vec[i])
+      D_vec[idx] <- as.integer(treated)
+      Y_vec[idx] <- alpha_i[i] + xi_t[t] +
+        sum(F_mat[t, ] * L_mat[i, ]) +
+        tau * D_vec[idx] + rnorm(1, 0, 0.5)
+      id_vec[idx] <- i
+      time_vec[idx] <- t
+      idx <- idx + 1
+    }
+  }
+
+  data.frame(id = id_vec, time = time_vec, Y = Y_vec, D = D_vec)
+}
+
+## ========================================================
+## PHASE 6: em parameter and gsynth reroute
+## ========================================================
+
+test_that("Phase 6a: gsynth and ife+nevertreated produce identical ATT", {
+  skip_on_cran()
+  df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+
+  set.seed(100)
+  out_gs <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "gsynth", r = 2, CV = FALSE, se = FALSE,
+    force = "two-way", parallel = FALSE
+  )))
+
+  set.seed(100)
+  out_ife <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "ife", r = 2, CV = FALSE, se = FALSE,
+    force = "two-way", factors.from = "nevertreated",
+    parallel = FALSE
+  )))
+
+  expect_equal(out_gs$att.avg, out_ife$att.avg,
+               info = "gsynth and ife+nevertreated must be the same estimator")
+})
+
+test_that("Phase 6b: em=FALSE + factors.from='notyettreated' errors", {
+  skip_on_cran()
+  df <- make_staggered_data(N = 40, Ntr = 15)
+
+  expect_error(
+    fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r = 2, CV = FALSE, se = FALSE,
+      factors.from = "notyettreated", em = FALSE,
+      parallel = FALSE
+    ),
+    regexp = "em.*FALSE|notyettreated.*em"
+  )
+})
+
+test_that("Phase 6c: method='gsynth' auto-sets em=FALSE in output", {
+  skip_on_cran()
+  df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "gsynth", r = 2, CV = FALSE, se = FALSE,
+    force = "two-way", parallel = FALSE
+  )))
+
+  expect_false(out$em)
+})
+
+test_that("Phase 6d: method='ife' defaults em=TRUE in output", {
+  skip_on_cran()
+  df <- make_staggered_data(N = 40, Ntr = 15)
+
+  out <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "ife", r = 0, CV = FALSE, se = FALSE,
+    parallel = FALSE
+  )))
+
+  expect_true(out$em)
+})
+
+test_that("Phase 6e: ife+nevertreated and ife+notyettreated both close to true tau", {
+  skip_on_cran()
+  df <- make_factor_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
+
+  set.seed(100)
+  out_nyt <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "ife", r = 2, CV = FALSE, se = FALSE,
+    force = "two-way", factors.from = "notyettreated",
+    parallel = FALSE
+  )))
+
+  set.seed(100)
+  out_nt <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "ife", r = 2, CV = FALSE, se = FALSE,
+    force = "two-way", factors.from = "nevertreated",
+    parallel = FALSE
+  )))
+
+  ## Both should be within 1.0 of true tau=3.0 (loose bound)
+  expect_true(abs(out_nyt$att.avg - 3.0) < 1.0,
+              info = paste("notyettreated ATT:", out_nyt$att.avg))
+  expect_true(abs(out_nt$att.avg - 3.0) < 1.0,
+              info = paste("nevertreated ATT:", out_nt$att.avg))
+
+  ## They need not be equal — different predictive routines
+  cat(sprintf("\n  [info] notyettreated ATT=%.4f  nevertreated ATT=%.4f  diff=%.4f\n",
+              out_nyt$att.avg, out_nt$att.avg, out_nyt$att.avg - out_nt$att.avg))
+})
+
 ## ========================================================
 ## PHASE 1: factors.from parameter
 ## ========================================================

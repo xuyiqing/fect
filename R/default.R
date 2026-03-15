@@ -36,6 +36,7 @@ fect <- function(
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
     factors.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # number of factors
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
@@ -108,6 +109,7 @@ fect.formula <- function(
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
     factors.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # nubmer of factors
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
@@ -212,6 +214,7 @@ fect.formula <- function(
         index = index,
         force = force,
         factors.from = factors.from,
+        em = em,
         r = r,
         lambda = lambda,
         nlambda = nlambda,
@@ -286,6 +289,7 @@ fect.default <- function(
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
     factors.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # nubmer of factors
     lambda = NULL, ## mc method: regularization parameter
     nlambda = 0,
@@ -476,11 +480,18 @@ fect.default <- function(
              "Matrix completion does not use explicit factor estimation.")
     }
 
+    ## em=FALSE requires a complete estimation sample
+    if (isFALSE(em) && factors.from == "notyettreated") {
+        stop("\"em = FALSE\" is not compatible with \"factors.from = 'notyettreated'\". ",
+             "The not-yet-treated estimation sample has missing data by construction.")
+    }
+
     ## gsynth always uses never-treated units only
     if (method == "gsynth") {
         if (factors.from == "notyettreated") {
             factors.from <- "nevertreated"
         }
+        em <- FALSE
     }
 
     if (is.null(min.T0)) {
@@ -1576,8 +1587,8 @@ fect.default <- function(
     T0 <- apply(II, 2, sum)
     T0.min <- min(T0)
 
-    if (factors.from == "nevertreated" && method != "gsynth") {
-        ## Compute cumulative treatment indicator (once treated, always treated for this purpose)
+    if (factors.from == "nevertreated") {
+        ## Validate: enough never-treated units for factor estimation
         D.cum <- apply(D, 2, function(vec) { cummax(vec) })
         D.unit.sum <- colSums(D.cum)
         co.never <- which(D.unit.sum == 0)
@@ -1591,10 +1602,12 @@ fect.default <- function(
                          r + 1, " for r = ", r, "."))
         }
 
-        ## Zero out II for all non-never-treated units
-        ## This means only never-treated units contribute to factor estimation
-        ever.treated <- setdiff(1:ncol(II), co.never)
-        II[, ever.treated] <- 0
+        if (!method %in% c("gsynth", "ife")) {
+            ## Zero out II for methods that don't do their own co/tr split
+            ## (gsynth and ife+nevertreated route to fect_gsynth which splits internally)
+            ever.treated <- setdiff(1:ncol(II), co.never)
+            II[, ever.treated] <- 0
+        }
     }
 
     # Unbalance Check
@@ -2140,7 +2153,37 @@ fect.default <- function(
             }
         } else {
             ## non-binary case
-            if (method == "ife") {
+            if (method == "ife" && factors.from == "nevertreated") {
+                ## nevertreated: route to fect_gsynth (the nevertreated estimator)
+                out <- fect_gsynth(
+                    Y = Y,
+                    D = D,
+                    X = X,
+                    W = W,
+                    I = I,
+                    II = II,
+                    T.on = T.on,
+                    T.off = T.off,
+                    r = r,
+                    CV = 0,
+                    T.on.balance = T.on.balance,
+                    balance.period = balance.period,
+                    binary = binary,
+                    QR = QR,
+                    force = force,
+                    hasRevs = hasRevs,
+                    tol = tol,
+                    max.iteration = max.iteration,
+                    boot = 0,
+                    norm.para = norm.para,
+                    placeboTest = placeboTest,
+                    placebo.period = placebo.period,
+                    carryoverTest = carryoverTest,
+                    carryover.period = carryover.period,
+                    group.level = g.level,
+                    group = G
+                )
+            } else if (method == "ife") {
                 out <- fect_fe(
                     Y = Y,
                     D = D,
@@ -2889,7 +2932,8 @@ fect.default <- function(
             unit.type = unit.type,
             obs.missing = obs.missing,
             obs.missing.balance = obs.missing.balance,
-            factors.from = factors.from
+            factors.from = factors.from,
+            em = em
         ),
         out
     )
