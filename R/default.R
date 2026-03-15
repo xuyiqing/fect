@@ -459,7 +459,6 @@ fect.default <- function(
                 "mc",
                 "both",
                 "polynomial",
-                "cfe_old",
                 "gsynth",
                 "cfe"
             )
@@ -501,7 +500,7 @@ fect.default <- function(
         if (method %in% c("ife", "mc", "both", "gsynth", "cfe")) {
             min.T0 <- 5
         }
-        if (method %in% c("polynomial", "cfe_old")) {
+        if (method %in% c("polynomial")) {
             min.T0 <- 2
         }
     } else {
@@ -518,7 +517,7 @@ fect.default <- function(
             method <- "ife"
         } else if (method == "cfe") {
             CV <- FALSE
-        } else if (method %in% c("polynomial", "cfe_old")) {
+        } else if (method %in% c("polynomial")) {
             CV <- FALSE
         } else if (method == "both") {
             CV <- TRUE
@@ -543,7 +542,7 @@ fect.default <- function(
             r <- 0
             CV <- FALSE
             method <- "ife"
-        } else if (method %in% c("polynomial", "cfe_old")) {
+        } else if (method %in% c("polynomial")) {
             CV <- FALSE
         } else if (method == "cfe") {
             CV <- FALSE
@@ -647,7 +646,7 @@ fect.default <- function(
     } else {
         if (
             !method %in%
-                c("gsynth", "ife", "mc", "polynomial", "cfe_old", "cfe")
+                c("gsynth", "ife", "mc", "polynomial", "cfe")
         ) {
             stop(
                 "\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"polynomial\", \"cfe\")."
@@ -655,7 +654,7 @@ fect.default <- function(
         }
     }
 
-    if (method %in% c("polynomial", "cfe_old")) {
+    if (method %in% c("polynomial")) {
         if (permute == 1) {
             message("Cannot do permutation test.\n")
             permute <- 0
@@ -820,48 +819,6 @@ fect.default <- function(
         }
     }
 
-    if (method == "cfe_old") {
-        warning("method = \"cfe_old\" is deprecated. Use method = \"cfe\" instead.",
-                call. = FALSE)
-        if (is.null(sfe) & is.null(cfe)) {
-            message(
-                "No additional sfe and cfe, use the \"fe\" estimator by default.\n"
-            )
-            r <- 0
-            CV <- FALSE
-            method <- "ife"
-        }
-    }
-
-    if (method == "cfe_old") {
-        if (!is.null(sfe)) {
-            for (sub.sfe in sfe) {
-                if (!sub.sfe %in% names(data)) {
-                    stop("\"sfe\" misspecified.\n")
-                }
-                if (sub.sfe %in% index) {
-                    stop("\"sfe\" only contains additional fixed effects.\n")
-                }
-            }
-        }
-
-        if (!is.null(cfe)) {
-            if (!is.list(cfe)) {
-                stop("\"cfe\" should be a list.\n")
-            }
-
-            for (sub.cfe in cfe) {
-                for (sub.sub.cfe in sub.cfe) {
-                    if (!sub.sub.cfe %in% names(data)) {
-                        stop("\"cfe\" misspecified.\n")
-                    }
-                }
-                if (sub.cfe[1] == index[1] & sub.cfe[2] %in% X) {
-                    stop(paste0("Should remove ", sub.cfe[2], " from X.\n"))
-                }
-            }
-        }
-    }
 
     if (method == "cfe") {
         if (length(index) > 2) {
@@ -950,15 +907,12 @@ fect.default <- function(
         }
     }
 
-    if (method != "cfe_old" & method != "cfe") {
+    if (method != "cfe") {
         if (!is.null(group)) {
             data <- data[, unique(c(index, Y, D, X, W, group, cl))]
         } else {
             data <- data[, unique(c(index, Y, D, X, W, cl))] ## some variables may not be used
         }
-    } else if (method == "cfe_old") {
-        all.var <- unique(c(index, sfe, unlist(cfe), Y, D, X, W, group, cl))
-        data <- data[, all.var]
     } else if (method == "cfe") {
         all.var <- unique(c(
             index,
@@ -996,17 +950,6 @@ fect.default <- function(
             stop(
                 "\"D\" or \"index\" should not have missing values when setting \"na.rm\" to FALSE."
             )
-        }
-        if (method == "cfe_old") {
-            if (!is.null(sfe)) {
-                for (sub.sfe in sfe) {
-                    if (sum(is.na(data[, sub.sfe])) >= 1) {
-                        stop(
-                            "Variables in \"sfe\" should not have missing values when setting \"na.rm\" to FALSE."
-                        )
-                    }
-                }
-            }
         }
     }
 
@@ -1154,20 +1097,6 @@ fect.default <- function(
         max.missing <- TT
     }
 
-    if (method == "cfe_old") {
-        if (!is.null(sfe)) {
-            for (sub.sfe in sfe) {
-                data[, sub.sfe] <- as.numeric(as.factor(data[, sub.sfe]))
-            }
-        }
-
-        if (!is.null(cfe)) {
-            for (sub.cfe in cfe) {
-                data[, sub.cfe[1]] <- as.numeric(as.factor(data[, sub.cfe[1]]))
-            }
-        }
-    }
-
     if (method == "cfe") {
         if (length(index) > 2) {
             for (extra.FE in index[3:length(index)]) {
@@ -1263,10 +1192,6 @@ fect.default <- function(
 
         if (!is.null(W)) {
             variable <- c(variable, Wname)
-        }
-
-        if (method == "cfe_old") {
-            variable <- unique(c(sfe, unlist(cfe), variable))
         }
 
         if (method == "cfe") {
@@ -1426,28 +1351,6 @@ fect.default <- function(
     }
 
     index.matrix <- list()
-    if (method == "cfe_old") {
-        if (!is.null(sfe)) {
-            for (sub.sfe in sfe) {
-                data[, sub.sfe] <- as.numeric(as.factor(data[, sub.sfe]))
-                sub.sfe.matrix <- matrix(data[, sub.sfe], TT, N)
-                index.matrix[[sub.sfe]] <- sub.sfe.matrix
-            }
-        }
-
-        if (!is.null(cfe)) {
-            for (sub.cfe in cfe) {
-                sub.cfe.matrix <- matrix(
-                    as.numeric(as.factor(data[, sub.cfe[1]])),
-                    TT,
-                    N
-                )
-                index.matrix[[sub.cfe[1]]] <- sub.cfe.matrix
-                sub.cfe.matrix <- matrix(data[, sub.cfe[2]], TT, N)
-                index.matrix[[sub.cfe[2]]] <- sub.cfe.matrix
-            }
-        }
-    }
 
     data.colnames <- colnames(data)
 
@@ -1680,13 +1583,6 @@ fect.default <- function(
         if (!is.null(W)) {
             W <- as.matrix(W[, -rm.id])
         }
-        if (method == "cfe_old") {
-            for (ind.name in names(index.matrix)) {
-                index.matrix[[ind.name]] <- as.matrix(index.matrix[[ind.name]][,
-                    -rm.id
-                ])
-            }
-        }
         if (method == "cfe") {
             rm.id.diff <- setdiff(1:dim(X.extra.FE)[2], rm.id)
             X.extra.FE <- X.extra.FE[, rm.id.diff, , drop = FALSE]
@@ -1736,15 +1632,6 @@ fect.default <- function(
         if (!is.null(cl)) {
             cl <- cl[-which(I.use == 0), ]
         }
-
-        if (method == "cfe_old") {
-            for (ind.name in names(index.matrix)) {
-                index.matrix[[ind.name]] <- as.matrix(index.matrix[[ind.name]][
-                    -which(I.use == 0),
-                ])
-            }
-        }
-
 
         if (method == "cfe") {
             X.extra.FE <- X.extra.FE[-which(I.use == 0), , , drop = FALSE]
@@ -1909,13 +1796,6 @@ fect.default <- function(
                 cl <- as.matrix(cl[, -rm.id.2.pos])
             }
 
-            if (method == "cfe_old") {
-                for (ind.name in names(index.matrix)) {
-                    index.matrix[[ind.name]] <- as.matrix(index.matrix[[
-                        ind.name
-                    ]][, -rm.id.2.pos])
-                }
-            }
             if (method == "cfe") {
                 rm.id.2.diff <- setdiff(1:dim(X.extra.FE)[2], rm.id.2.pos)
                 X.extra.FE <- X.extra.FE[, rm.id.2.diff, , drop = FALSE]
@@ -1992,13 +1872,6 @@ fect.default <- function(
             }
             if (!is.null(cl)) {
                 cl <- as.matrix(cl[, -rm.id.3.pos])
-            }
-            if (method == "cfe_old") {
-                for (ind.name in names(index.matrix)) {
-                    index.matrix[[ind.name]] <- as.matrix(index.matrix[[
-                        ind.name
-                    ]][, -rm.id.3.pos])
-                }
             }
             if (method == "cfe") {
                 rm.id.3.diff <- setdiff(1:dim(X.extra.FE)[2], rm.id.3.pos)
@@ -2304,7 +2177,7 @@ fect.default <- function(
                     group.level = g.level,
                     group = G
                 )
-            } else if (method %in% c("polynomial", "cfe_old")) {
+            } else if (method %in% c("polynomial")) {
                 if (method == "polynomial") {
                     warning("method = \"polynomial\" is deprecated. Use method = \"cfe\" instead.",
                             call. = FALSE)
@@ -2346,7 +2219,7 @@ fect.default <- function(
                 stop("\nCannot estimate.\n")
             }
             # only for polynomial methods
-            if (method %in% c("polynomial", "cfe_old")) {
+            if (method %in% c("polynomial")) {
                 I <- out$I
                 II <- out$II
             }
@@ -2412,7 +2285,7 @@ fect.default <- function(
             keep.sims = keep.sims
         )
 
-        if (method %in% c("polynomial", "cfe_old")) {
+        if (method %in% c("polynomial")) {
             I <- out$I
             II <- out$II
         }

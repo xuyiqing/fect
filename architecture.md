@@ -342,9 +342,7 @@ graph TD
 
 - The `method = "cfe"` pathway is the newest and most complex estimator, supporting extra additive fixed effects (`sfe`/`cfe` arguments), time-invariant covariates with time-grouped coefficients (`Z`/`gamma`), unit-specific time trends (`Q`/`kappa` with polynomial or B-spline basis), and latent factors. The R-side `fect_cfe()` includes input validation guards (dimension checks, binary D validation, convergence warnings) that the older estimators lack.
 
-- The `method = "cfe_old"` pathway routes through `fect_polynomial()`, which uses `fixest::feols()` for polynomial/B-spline time trends. This is a legacy pathway retained for backward compatibility.
-
-- The `fect_gsynth()` function implements the estimator from Xu (2017) within the fect framework. Unlike `fect_fe()`, it performs its own internal cross-validation loop for factor count selection.
+- The `fect_gsynth()` function implements the nevertreated predictive routine from Xu (2017) within the fect framework. It estimates factors from never-treated units only, then projects counterfactuals onto treated units. Unlike `fect_fe()`, it performs its own internal cross-validation loop for factor count selection.
 
 - `did_wrapper()` provides a bridge to external DID packages (`did`, `DIDmultiplegtDYN`), producing event-study data frames compatible with `esplot()`.
 

@@ -115,72 +115,7 @@ fect_polynomial <- function(Y, # Outcome variable, (T*N) matrix
     sf <- NULL
     cf <- NULL
 
-    if (method == "cfe_old") {
-        vindex <- cbind(rep(1:N, each = TT), rep(1:TT, N)) ## id time
-        if (force == 1) {
-            sf <- 1
-        } else if (force == 2) {
-            sf <- 2
-        } else {
-            sf <- c(1, 2)
-        }
-
-        ## simple fixed effects
-        for (ind.name in names(ind.matrix)) {
-            vindex <- cbind(vindex, matrix(ind.matrix[[ind.name]], ncol = 1))
-        }
-
-        ind.name <- c("forceid", "forcetime", names(ind.matrix))
-        ind.index <- c(1:(2 + length(names(ind.matrix))))
-        colnames(vindex) <- names(ind.index) <- ind.name
-
-        if (p > 0) {
-            data.reg <- cbind.data.frame(vy, vx, vindex)
-            formula.reg <- paste0("vy~", paste(paste0("x.", c(1:p)), collapse = "+"), "|")
-        } else {
-            data.reg <- cbind.data.frame(vy, vindex)
-            formula.reg <- paste0("vy~1|")
-        }
-
-        if (force == 1) {
-            formula.reg <- paste0(formula.reg, "forceid")
-        } else if (force == 2) {
-            formula.reg <- paste0(formula.reg, "forcetime")
-        } else if (force == 3) {
-            formula.reg <- paste0(formula.reg, "forceid+forcetime")
-        }
-
-
-        if (!is.null(sfe)) {
-            formula.reg <- paste0(formula.reg, "+", paste(sfe, collapse = "+"))
-        }
-
-        if (!is.null(cfe)) {
-            for (sub.cfe in cfe) {
-                sub.cf <- paste0(sub.cfe[1], "[", sub.cfe[2], "]")
-                formula.reg <- paste0(formula.reg, "+", sub.cf)
-            }
-        }
-        formula.reg <- as.formula(formula.reg)
-        if (use_weight == 0) {
-            est.best <- suppressWarnings(invisible(feols(
-                fml = formula.reg,
-                data = data.reg[oci, ],
-                fixef.rm = "none"
-            )))
-        } else {
-            est.best <- suppressWarnings(invisible(feols(
-                fml = formula.reg,
-                data = data.reg[oci, ],
-                weights = c(W.use)[oci],
-                fixef.rm = "none"
-            )))
-        }
-
-
-        yfit <- suppressWarnings(predict(est.best, newdata = data.reg))
-        data.reg <- NULL
-    } else if (method == "polynomial") {
+    if (method == "polynomial") {
         vindex <- cbind(rep(1:N, each = TT), rep(1:TT, N)) ## id time
         for (i in 1:degree) {
             vindex <- cbind(vindex, rep((1:TT)^i, N))

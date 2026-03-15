@@ -129,12 +129,3 @@ out.cfe.c <- fect(Y ~ D + X1 + X2, data = simdata,
 plot(out.cfe.c, type = "exit", ylim = c(-2.5, 4.5),
      cex.text = 0.8, main = "Carryover Test (CFE)")
 
-##########################
-# Legacy interface comparison
-##########################
-out.legacy <- fect(Y ~ D + X1 + X2, data = simdata,
-  index = c("id", "time"),
-  method = "cfe_old", force = "two-way",
-  sfe = c("FE3"), cfe = list(c("id", "time")),
-  se = TRUE, parallel = TRUE, nboots = 200)
-plot(out.legacy, main = "Legacy CFE Interface (cfe_old)")

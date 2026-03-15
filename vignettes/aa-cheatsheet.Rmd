@@ -61,8 +61,8 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | `X` (covariates) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `data` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `index` (unit & time IDs) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `sfe` (simple additive FEs, legacy) | – | – | – | – | – | ✓ (cfe_old) |
-| `cfe` (complex FEs, legacy) | – | – | – | – | – | ✓ (cfe_old) |
+| `sfe` (simple additive FEs) | – | – | – | – | – | ✓ |
+| `cfe` (complex FEs) | – | – | – | – | – | ✓ |
 | `Z` (time-invariant covariates) | – | – | – | – | – | ✓ |
 | `Q` (known time trends) | – | – | – | – | – | ✓ |
 | `Q.type` (auto time trends) | – | – | – | – | – | ✓ |

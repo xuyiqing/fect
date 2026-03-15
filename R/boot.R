@@ -250,7 +250,7 @@ fect_boot <- function(
       if ("try-error" %in% class(out)) {
         stop("\nCannot estimate using full data with MC algorithm.\n")
       }
-    } else if (method %in% c("polynomial", "bspline", "cfe_old")) {
+    } else if (method %in% c("polynomial", "bspline")) {
       out <- try(
         fect_polynomial(
           Y = Y,
@@ -1047,7 +1047,7 @@ fect_boot <- function(
     }
   } else if (
     binary == FALSE &
-      method %in% c("ife", "mc", "polynomial", "bspline", "cfe_old") &
+      method %in% c("ife", "mc", "polynomial", "bspline") &
       vartype == "parametric"
   ) {
     message("Parametric Bootstrap \n")
@@ -1166,7 +1166,7 @@ fect_boot <- function(
           ),
           silent = TRUE
         )
-      } else if (method %in% c("polynomial", "bspline", "cfe_old")) {
+      } else if (method %in% c("polynomial", "bspline")) {
         boot <- try(
           fect_polynomial(
             Y = Y.boot,
@@ -1347,15 +1347,6 @@ fect_boot <- function(
       W.boot <- NULL
       if (!is.null(W)) {
         W.boot <- W[, boot.id]
-      }
-
-      if (method == "cfe_old") {
-        ind.matrix.boot <- list()
-        for (ind.name in names(ind.matrix)) {
-          ind.matrix.boot[[ind.name]] <- as.matrix(ind.matrix[[ind.name]][,
-            boot.id
-          ])
-        }
       }
 
       if (
@@ -1577,7 +1568,7 @@ fect_boot <- function(
             ),
             silent = TRUE
           )
-        } else if (method %in% c("polynomial", "bspline", "cfe_old")) {
+        } else if (method %in% c("polynomial", "bspline")) {
           boot <- try(
             fect_polynomial(
               Y = Y[, boot.id],

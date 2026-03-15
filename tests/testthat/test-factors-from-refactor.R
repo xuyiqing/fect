@@ -457,20 +457,6 @@ test_that("Phase 4a: method='polynomial' produces deprecation warning", {
   )
 })
 
-test_that("Phase 4b: method='cfe_old' produces deprecation warning", {
-  skip_on_cran()
-  df <- make_staggered_data(N = 40, Ntr = 15)
-
-  expect_warning(
-    fect::fect(
-      Y ~ D, data = df, index = c("id", "time"),
-      method = "cfe_old",
-      se = FALSE, parallel = FALSE
-    ),
-    regexp = "deprecat|cfe"
-  )
-})
-
 ## ========================================================
 ## PHASE 5: input validation and safety guards
 ## ========================================================

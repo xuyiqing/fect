@@ -69,7 +69,7 @@ plot(out.cfe.basic, main = "CFE with Additional Fixed Effect",
 ```
 
 ::: {.callout-note appearance="simple"}
-Unlike the legacy `cfe_old` interface (which used `sfe` and `cfe` arguments), the current `method = "cfe"` puts additional fixed effects in `index` and uses `Z`/`Q`/`gamma`/`kappa` for the richer covariate structure. The old interface (`sfe`/`cfe`) remains available but is no longer recommended.
+The `method = "cfe"` interface puts additional fixed effects in `index` and uses `Z`/`Q`/`gamma`/`kappa` for the richer covariate structure.
 :::
 
 ------------------------------------------------------------------------
@@ -278,33 +278,6 @@ out <- fect(Y ~ D, data = mydata,
   gamma = c("era1", "era2"),
   Z.param = list(era1 = "baseline_gdp", era2 = "baseline_pop"))
 ```
-
-------------------------------------------------------------------------
-
-## Comparison with the legacy interface
-
-An earlier interface (internally `method = "cfe_old"`) used `sfe` and `cfe` arguments for additional fixed effects and unit-specific trends. It is still accessible but no longer recommended.
-
-::: {.callout-warning appearance="simple"}
-The `sfe` and `cfe` arguments only work with the legacy code path (`method = "cfe_old"`, or equivalently `method = "polynomial"`). If you use `method = "cfe"` with `sfe`/`cfe`, those arguments will be **silently ignored**. Use `index` for extra fixed effects and `Q.type`/`Z`/`Q` for the richer covariate structure.
-:::
-
-```{r legacy_cfe, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide', fig.width = 6, fig.height = 4.5}
-# Legacy interface (still supported via "cfe_old")
-out.legacy <- fect(Y ~ D + X1 + X2, data = simdata,
-  index = c("id", "time"),
-  method = "cfe_old", force = "two-way",
-  sfe = c("FE3"), cfe = list(c("id", "time")),
-  se = TRUE, parallel = TRUE, nboots = 200)
-plot(out.legacy, main = "Legacy CFE Interface (cfe_old)")
-```
-
-The new `method = "cfe"` interface is recommended because:
-
-1.  `Q.type` auto-generates polynomial and B-spline time bases.
-2.  `Z`/`gamma` and `Q`/`kappa` give explicit control over the covariate structure.
-3.  Additional fixed effects are specified directly in `index`.
-4.  Block assignments via `Z.param`/`Q.param` allow fine-grained control.
 
 ------------------------------------------------------------------------
 

@@ -77,8 +77,8 @@ assumptions.}
 \item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
 \item{knots}{a numeric vector specifying knots for the b-spline.}
 \item{degree}{an integer specifying the polynomial or b-spline degree.}
-\item{sfe}{vector specifying other fixed effects for \code{method="cfe_old"}.}
-\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe_old"}.}
+\item{sfe}{vector specifying other fixed effects for \code{method="cfe"}.}
+\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
 \item{Z}{a vector specifying the time-invariant covariates for the Z matrix.}
 \item{gamma}{a vector specifying the time-varying covariates for the gamma matrix.}
 \item{Q}{a vector specifying the time-varying covariates for the Q matrix.}
