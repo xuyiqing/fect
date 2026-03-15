@@ -810,6 +810,8 @@ fect.default <- function(
     }
 
     if (method == "cfe_old") {
+        warning("method = \"cfe_old\" is deprecated. Use method = \"cfe\" instead.",
+                call. = FALSE)
         if (is.null(sfe) & is.null(cfe)) {
             message(
                 "No additional sfe and cfe, use the \"fe\" estimator by default.\n"
@@ -2262,10 +2264,6 @@ fect.default <- function(
             } else if (method %in% c("polynomial", "cfe_old")) {
                 if (method == "polynomial") {
                     warning("method = \"polynomial\" is deprecated. Use method = \"cfe\" instead.",
-                            call. = FALSE)
-                }
-                if (method == "cfe_old") {
-                    warning("method = \"cfe_old\" is deprecated. Use method = \"cfe\" instead.",
                             call. = FALSE)
                 }
                 out <- fect_polynomial(

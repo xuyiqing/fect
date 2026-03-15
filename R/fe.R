@@ -784,6 +784,7 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         Y = Y,
         X = X,
         eff = eff,
+        eff.tr = eff[, tr],
         I = I,
         II = II,
         att.avg = att.avg,

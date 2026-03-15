@@ -993,6 +993,7 @@ fect_cfe <- function(
         Y = Y,
         X = X,
         eff = eff,
+        eff.tr = eff[, tr],
         I = I,
         II = II,
         att.avg = att.avg,
