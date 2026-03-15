@@ -35,6 +35,7 @@ fect <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
+    factors.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
     r = 0, # number of factors
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
@@ -106,6 +107,7 @@ fect.formula <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
+    factors.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
     r = 0, # nubmer of factors
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
@@ -209,6 +211,7 @@ fect.formula <- function(
         fill.missing = fill.missing,
         index = index,
         force = force,
+        factors.from = factors.from,
         r = r,
         lambda = lambda,
         nlambda = nlambda,
@@ -282,6 +285,7 @@ fect.default <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
+    factors.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
     r = 0, # nubmer of factors
     lambda = NULL, ## mc method: regularization parameter
     nlambda = 0,
@@ -377,13 +381,9 @@ fect.default <- function(
         if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
             stop("\"vartype\" option misspecified.")
         }
-        if (
-            vartype == "parametric" &&
-                method %in%
-                    c("fe", "ife", "mc", "both", "polynomial", "cfe_old", "cfe")
-        ) {
+        if (vartype == "parametric" && method %in% c("mc", "both")) {
             stop(
-                "The \"parametric\" option is only available for the \"gsynth\" method."
+                "The \"parametric\" option is not available for the \"mc\" or \"both\" methods."
             )
         }
     }
@@ -463,6 +463,24 @@ fect.default <- function(
         stop(
             "\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"polynomial\",\"cfe\")."
         )
+    }
+
+    ## validate factors.from
+    if (!factors.from %in% c("notyettreated", "nevertreated")) {
+        stop("\"factors.from\" must be \"notyettreated\" or \"nevertreated\".")
+    }
+
+    ## mc does not use explicit factor estimation
+    if (method == "mc" && factors.from == "nevertreated") {
+        stop("\"factors.from = 'nevertreated'\" is not supported for the \"mc\" method. ",
+             "Matrix completion does not use explicit factor estimation.")
+    }
+
+    ## gsynth always uses never-treated units only
+    if (method == "gsynth") {
+        if (factors.from == "notyettreated") {
+            factors.from <- "nevertreated"
+        }
     }
 
     if (is.null(min.T0)) {
@@ -1553,6 +1571,27 @@ fect.default <- function(
     II <- I
     II[which(D == 1)] <- 0 ## regard treated values as missing
 
+    if (factors.from == "nevertreated") {
+        ## Compute cumulative treatment indicator (once treated, always treated for this purpose)
+        D.cum <- apply(D, 2, function(vec) { cummax(vec) })
+        D.unit.sum <- colSums(D.cum)
+        co.never <- which(D.unit.sum == 0)
+
+        if (length(co.never) == 0) {
+            stop("\"factors.from\" is set to \"nevertreated\" but no never-treated units found in the data.")
+        }
+        if (length(co.never) < r + 1) {
+            stop(paste0("\"factors.from\" is set to \"nevertreated\" but only ",
+                         length(co.never), " never-treated units found. Need at least ",
+                         r + 1, " for r = ", r, "."))
+        }
+
+        ## Zero out II for all non-never-treated units
+        ## This means only never-treated units contribute to factor estimation
+        ever.treated <- setdiff(1:ncol(II), co.never)
+        II[, ever.treated] <- 0
+    }
+
     # Unbalance Check
     ## 1. remove units that have too control status
     T0 <- apply(II, 2, sum)
@@ -2220,6 +2259,14 @@ fect.default <- function(
                     group = G
                 )
             } else if (method %in% c("polynomial", "cfe_old")) {
+                if (method == "polynomial") {
+                    warning("method = \"polynomial\" is deprecated. Use method = \"cfe\" instead.",
+                            call. = FALSE)
+                }
+                if (method == "cfe_old") {
+                    warning("method = \"cfe_old\" is deprecated. Use method = \"cfe\" instead.",
+                            call. = FALSE)
+                }
                 out <- fect_polynomial(
                     Y = Y,
                     D = D,
@@ -2842,7 +2889,8 @@ fect.default <- function(
             carryover.period = carryover.period,
             unit.type = unit.type,
             obs.missing = obs.missing,
-            obs.missing.balance = obs.missing.balance
+            obs.missing.balance = obs.missing.balance,
+            factors.from = factors.from
         ),
         out
     )

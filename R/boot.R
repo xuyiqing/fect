@@ -699,7 +699,7 @@ fect_boot <- function(
       }
     }
   } else if (
-    binary == FALSE & method %in% c("gsynth") & vartype == "parametric"
+    binary == FALSE & method %in% c("gsynth", "ife", "cfe") & vartype == "parametric"
   ) {
     message("Parametric Bootstrap \n")
     sum.D <- colSums(out$D)
@@ -758,26 +758,77 @@ fect_boot <- function(
       #                             force = force, r = out$r.cv, CV = 0,
       #                             tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
 
-      synth.out <- try(
-        fect_gsynth(
-          Y = Y.pseudo,
-          X = X.pseudo,
-          D = D.pseudo,
-          W = NULL,
-          I = I.id.pseudo,
-          II = II.id.pseudo,
-          T.on = T.on.pseudo,
-          hasRevs = hasRevs,
-          force = force,
-          r = out$r.cv,
-          CV = 0,
-          tol = tol,
-          max.iteration = max.iteration,
-          norm.para = norm.para,
-          boot = 1
-        ),
-        silent = TRUE
-      )
+      if (method == "gsynth") {
+        synth.out <- try(
+          fect_gsynth(
+            Y = Y.pseudo,
+            X = X.pseudo,
+            D = D.pseudo,
+            W = NULL,
+            I = I.id.pseudo,
+            II = II.id.pseudo,
+            T.on = T.on.pseudo,
+            hasRevs = hasRevs,
+            force = force,
+            r = out$r.cv,
+            CV = 0,
+            tol = tol,
+            max.iteration = max.iteration,
+            norm.para = norm.para,
+            boot = 1
+          ),
+          silent = TRUE
+        )
+      } else if (method %in% c("ife", "cfe")) {
+        if (method == "cfe") {
+          synth.out <- try(
+            fect_cfe(
+              Y = Y.pseudo,
+              X = X.pseudo,
+              D = D.pseudo,
+              W = NULL,
+              X.extra.FE = X.extra.FE,
+              X.Z = X.Z,
+              X.Q = X.Q,
+              X.gamma = X.gamma,
+              X.kappa = X.kappa,
+              Zgamma.id = Zgamma.id,
+              kappaQ.id = kappaQ.id,
+              I = I.id.pseudo,
+              II = II.id.pseudo,
+              T.on = T.on.pseudo,
+              hasRevs = hasRevs,
+              force = force,
+              r.cv = out$r.cv,
+              tol = tol,
+              max.iteration = max.iteration,
+              norm.para = norm.para,
+              boot = 1
+            ),
+            silent = TRUE
+          )
+        } else {
+          synth.out <- try(
+            fect_fe(
+              Y = Y.pseudo,
+              X = X.pseudo,
+              D = D.pseudo,
+              W = NULL,
+              I = I.id.pseudo,
+              II = II.id.pseudo,
+              T.on = T.on.pseudo,
+              hasRevs = hasRevs,
+              force = force,
+              r.cv = out$r.cv,
+              tol = tol,
+              max.iteration = max.iteration,
+              norm.para = norm.para,
+              boot = 1
+            ),
+            silent = TRUE
+          )
+        }
+      }
 
       if ("try-error" %in% class(synth.out)) {
         return(matrix(NA, TT, Ntr))
@@ -802,7 +853,7 @@ fect_boot <- function(
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
         .multicombine = TRUE,
-        .export = c("fect_gsynth", "initialFit"),
+        .export = c("fect_gsynth", "fect_fe", "fect_cfe", "initialFit"),
         .packages = c("fect", "mvtnorm", "fixest"),
         .options.future = list(seed = TRUE),
         .inorder = FALSE
