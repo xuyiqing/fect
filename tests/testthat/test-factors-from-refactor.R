@@ -418,3 +418,18 @@ test_that("Phase 5e: output records factors.from in return object", {
   expect_true("factors.from" %in% names(out))
   expect_equal(out$factors.from, "nevertreated")
 })
+
+test_that("Phase 5f: factors.from='nevertreated' + method='both' errors", {
+  skip_on_cran()
+  df <- make_staggered_data(N = 40, Ntr = 15)
+
+  expect_error(
+    fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "both", CV = FALSE, se = FALSE,
+      factors.from = "nevertreated",
+      parallel = FALSE
+    ),
+    regexp = "both"
+  )
+})

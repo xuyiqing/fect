@@ -63,7 +63,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         WW[which(II == 0)] <- 0 ## reset to 0
     }
     t.on <- c(T.on)
-    T0.min <- min(apply(II, 2, sum))
+    II.colsums <- apply(II, 2, sum)
+    T0.min <- min(II.colsums[II.colsums > 0])
 
     D.c <- apply(D, 2, function(vec) {
         cumsum(vec)

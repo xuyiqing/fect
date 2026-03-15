@@ -471,8 +471,8 @@ fect.default <- function(
     }
 
     ## mc does not use explicit factor estimation
-    if (method == "mc" && factors.from == "nevertreated") {
-        stop("\"factors.from = 'nevertreated'\" is not supported for the \"mc\" method. ",
+    if (method %in% c("mc", "both") && factors.from == "nevertreated") {
+        stop("\"factors.from = 'nevertreated'\" is not supported for the \"mc\" or \"both\" methods. ",
              "Matrix completion does not use explicit factor estimation.")
     }
 
@@ -1571,7 +1571,10 @@ fect.default <- function(
     II <- I
     II[which(D == 1)] <- 0 ## regard treated values as missing
 
-    if (factors.from == "nevertreated") {
+    T0 <- apply(II, 2, sum)
+    T0.min <- min(T0)
+
+    if (factors.from == "nevertreated" && method != "gsynth") {
         ## Compute cumulative treatment indicator (once treated, always treated for this purpose)
         D.cum <- apply(D, 2, function(vec) { cummax(vec) })
         D.unit.sum <- colSums(D.cum)
@@ -1594,8 +1597,6 @@ fect.default <- function(
 
     # Unbalance Check
     ## 1. remove units that have too control status
-    T0 <- apply(II, 2, sum)
-    T0.min <- min(T0)
 
     if (sum(T0[which(apply(D, 2, sum) > 0)] >= min.T0) == 0) {
         stop(
@@ -2020,7 +2021,7 @@ fect.default <- function(
         }
     }
 
-    if (min(apply(II, 2, sum)) == 0) {
+    if (factors.from != "nevertreated" && min(apply(II, 2, sum)) == 0) {
         if (placeboTest == 1) {
             stop(
                 "Some units do not have any observations. Please set a smaller range for placebo period."
