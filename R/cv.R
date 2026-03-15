@@ -173,10 +173,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             message("Criterion: PC\n")
         }
 
-        ## for gsynth, use the cross-validation function in fect_gsynth
+        ## for gsynth, use the cross-validation function in fect_nevertreated
         if (method == "gsynth") {
             message("Interactive fixed effects model...\n")
-            out <- fect_gsynth(
+            out <- fect_nevertreated(
                 Y = Y, D = D, X = X, W = W, I = I, II = II,
                 T.on = T.on, T.off = T.off,
                 T.on.balance = T.on.balance,

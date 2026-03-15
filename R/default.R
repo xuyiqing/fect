@@ -1493,7 +1493,7 @@ fect.default <- function(
 
         if (!method %in% c("gsynth", "ife")) {
             ## Zero out II for methods that don't do their own co/tr split
-            ## (gsynth and ife+nevertreated route to fect_gsynth which splits internally)
+            ## (gsynth and ife+nevertreated route to fect_nevertreated which splits internally)
             ever.treated <- setdiff(1:ncol(II), co.never)
             II[, ever.treated] <- 0
         }
@@ -2008,8 +2008,8 @@ fect.default <- function(
         } else {
             ## non-binary case
             if (method == "ife" && factors.from == "nevertreated") {
-                ## nevertreated: route to fect_gsynth (the nevertreated estimator)
-                out <- fect_gsynth(
+                ## nevertreated: route to fect_nevertreated (the nevertreated estimator)
+                out <- fect_nevertreated(
                     Y = Y,
                     D = D,
                     X = X,
@@ -2103,7 +2103,7 @@ fect.default <- function(
                     group = G
                 )
             } else if (method == "gsynth") {
-                out <- fect_gsynth(
+                out <- fect_nevertreated(
                     Y = Y,
                     D = D,
                     X = X,

@@ -160,7 +160,7 @@ fect_boot <- function(
   ## estimation
   if (CV == 0) {
     if (method == "gsynth") {
-      out <- fect_gsynth(
+      out <- fect_nevertreated(
         Y = Y,
         X = X,
         D = D,
@@ -713,14 +713,14 @@ fect_boot <- function(
       }
 
       ## output
-      # synth.out <- try(fect_gsynth(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
+      # synth.out <- try(fect_nevertreated(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
       #                             I = I.id.pseudo, II = II.id.pseudo,
       #                             force = force, r = out$r.cv, CV = 0,
       #                             tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
 
       if (method == "gsynth") {
         synth.out <- try(
-          fect_gsynth(
+          fect_nevertreated(
             Y = Y.pseudo,
             X = X.pseudo,
             D = D.pseudo,
@@ -813,7 +813,7 @@ fect_boot <- function(
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
         .multicombine = TRUE,
-        .export = c("fect_gsynth", "fect_fe", "fect_cfe", "initialFit"),
+        .export = c("fect_nevertreated", "fect_fe", "fect_cfe", "initialFit"),
         .packages = c("fect", "mvtnorm", "fixest"),
         .options.future = list(seed = TRUE),
         .inorder = FALSE
@@ -932,7 +932,7 @@ fect_boot <- function(
         }
       }
       synth.out <- try(
-        fect_gsynth(
+        fect_nevertreated(
           Y = Y.boot,
           X = X.boot,
           D = D.boot,
@@ -1317,7 +1317,7 @@ fect_boot <- function(
         boot <- NULL
         if (method == "gsynth") {
           boot <- try(
-            fect_gsynth(
+            fect_nevertreated(
               Y = Y[, boot.id],
               X = X.boot,
               D = D.boot,
@@ -1602,7 +1602,7 @@ fect_boot <- function(
           "fect_mc",
           "fect_cfe",
           "get_term",
-          "fect_gsynth",
+          "fect_nevertreated",
           "initialFit"
         ),
         .packages = c("fect", "mvtnorm", "fixest")
@@ -1623,7 +1623,7 @@ fect_boot <- function(
             "fect_mc",
               "fect_cfe",
             "get_term",
-            "fect_gsynth",
+            "fect_nevertreated",
             "initialFit"
           ),
           .packages = c("fect", "mvtnorm", "fixest"),

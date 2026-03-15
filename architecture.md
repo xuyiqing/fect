@@ -25,7 +25,7 @@ graph TD
         E1["fe.R"]
         E2["cfe.R"]
         E3["mc.R"]
-        E4["fect_gsynth.R"]
+        E4["fect_nevertreated.R"]
     end
 
     subgraph Inference["Inference & Validation"]
@@ -115,7 +115,7 @@ graph TD
 | `R/fe.R` | Estimator | FE and IFE estimator; computes counterfactuals, ATT, dynamic effects, cohort effects, calendar effects | `fect_fe()` (internal) | no |
 | `R/cfe.R` | Estimator | Complex FE estimator; supports extra additive FEs, Z/gamma, Q/kappa, latent factors | `fect_cfe()` (internal) | no |
 | `R/mc.R` | Estimator | Matrix completion estimator with nuclear norm regularization | `fect_mc()` (internal) | no |
-| `R/fect_gsynth.R` | Estimator | Generalized synthetic control (Xu 2017); separate CV for factor selection | `fect_gsynth()` (internal) | no |
+| `R/fect_nevertreated.R` | Estimator | Generalized synthetic control (Xu 2017); separate CV for factor selection | `fect_nevertreated()` (internal) | no |
 | `R/boot.R` | Inference | Parametric and wild bootstrap, jackknife; parallel execution via future/doFuture | `fect_boot()` (internal) | no |
 | `R/cv.R` | Inference | Cross-validation for r (factors) or lambda (regularization); MSPE/PC criterion | `fect_cv()` (internal) | no |
 | `R/cv_binary.R` | Inference | Cross-validation for binary probit models | `fect_binary_cv()` (internal) | no |
@@ -167,7 +167,7 @@ graph TD
     R1_route --> fect_mc["fect_mc()"]
 
     fect_default --> R2_route{" "}
-    R2_route --> fect_gsynth["fect_gsynth()"]
+    R2_route --> fect_nevertreated["fect_nevertreated()"]
 
     fect_default --> R3_route{" "}
     R3_route --> fect_cv["fect_cv()"]
@@ -211,8 +211,8 @@ graph TD
 
     fect_mc["fect_mc()"] --> inter_fe_mc["inter_fe_mc() C++"]
 
-    fect_gsynth["fect_gsynth()"] --> inter_fe_ub
-    fect_gsynth --> fect_cv["fect_cv()"]
+    fect_nevertreated["fect_nevertreated()"] --> inter_fe_ub
+    fect_nevertreated --> fect_cv["fect_cv()"]
 
     complex_fe_ub --> cfe_iter["cfe_iter() C++"]
 
@@ -244,9 +244,9 @@ graph TD
 | `fect_fe()` | `fe.R` | `fect.default()`, `fect_boot()` | `initialFit()`, `inter_fe_ub()` | no | FE/IFE estimator; computes counterfactuals, ATT, dynamic/cohort/calendar effects |
 | `fect_cfe()` | `cfe.R` | `fect.default()`, `fect_boot()` | `initialFit()`, `complex_fe_ub()` | no | CFE estimator; handles extra FEs, Z/gamma, Q/kappa, latent factors via block coordinate descent |
 | `fect_mc()` | `mc.R` | `fect.default()`, `fect_boot()` | `inter_fe_mc()` | no | Matrix completion estimator with nuclear norm penalty |
-| `fect_gsynth()` | `fect_gsynth.R` | `fect.default()`, `fect_boot()` | `inter_fe_ub()`, `fect_cv()` | no | Generalized synthetic control with own CV for factor count |
-| `fect_boot()` | `boot.R` | `fect.default()` | `fect_fe()`, `fect_cfe()`, `fect_mc()`, `fect_gsynth()` | no | Bootstrap/jackknife inference; parallel via future/doFuture |
-| `fect_cv()` | `cv.R` | `fect.default()`, `fect_gsynth()` | `inter_fe_ub()`, `inter_fe_mc()` | no | Cross-validation for r (IFE) or lambda (MC) |
+| `fect_nevertreated()` | `fect_nevertreated.R` | `fect.default()`, `fect_boot()` | `inter_fe_ub()`, `fect_cv()` | no | Generalized synthetic control with own CV for factor count |
+| `fect_boot()` | `boot.R` | `fect.default()` | `fect_fe()`, `fect_cfe()`, `fect_mc()`, `fect_nevertreated()` | no | Bootstrap/jackknife inference; parallel via future/doFuture |
+| `fect_cv()` | `cv.R` | `fect.default()`, `fect_nevertreated()` | `inter_fe_ub()`, `inter_fe_mc()` | no | Cross-validation for r (IFE) or lambda (MC) |
 | `fect_binary_cv()` | `cv_binary.R` | `fect.default()` | `inter_fe_d_ub()`, `inter_fe_d_qr_ub()` | no | Cross-validation for binary probit IFE models |
 | `fect_test()` | `fittest.R` | `fect.default()` | `fect_fe()`, `fect_mc()` | no | Wild bootstrap F-test for pre-treatment fit |
 | `diagtest()` | `diagtest.R` | `fect.default()`, `plot.fect()` | (self-contained) | no | F-test and TOST equivalence tests for pre-trend, placebo, carryover |
@@ -263,7 +263,7 @@ graph TD
 | `get.cohort()` | `getcohort.R` | user | (self-contained) | no | Constructs cohort/event-time variables from panel data |
 | `initialFit()` | `support.R` | `fect_fe()`, `fect_cfe()` | `feols()` (fixest) | no | Initial OLS fit to obtain starting values for iterative estimators |
 | `BiInitialFit()` | `support.R` | `fect_fe()` | `feols()` (fixest) | no | Initial fit for binary probit models |
-| `inter_fe_ub()` | `ife.cpp` | `fect_fe()`, `fect_gsynth()`, `fect_cv()` | `panel_factor()`, `fe_ad_inter_iter()` | no | C++ IFE solver for unbalanced panels; EM-style alternating estimation |
+| `inter_fe_ub()` | `ife.cpp` | `fect_fe()`, `fect_nevertreated()`, `fect_cv()` | `panel_factor()`, `fe_ad_inter_iter()` | no | C++ IFE solver for unbalanced panels; EM-style alternating estimation |
 | `complex_fe_ub()` | `cfe.cpp` | `fect_cfe()` | `cfe_iter()` | no | C++ CFE solver; block coordinate descent over multiple FE components |
 | `inter_fe_mc()` | `mc.cpp` | `fect_mc()`, `fect_cv()` | `panel_FE()` | no | C++ MC solver; iterates soft-thresholding with FE demeaning |
 | `inter_fe()` | `ife.cpp` | `interFE()` | `panel_factor()`, `beta_iter()` | no | C++ IFE solver for balanced panels |
@@ -316,7 +316,7 @@ graph TD
 
 - **Method-dispatch hub**: `fect.default()` is the central orchestrator (~2900 lines). It routes to one of five estimator families based on the `method` argument, then uniformly handles bootstrap inference, cross-validation, diagnostic tests, and output assembly regardless of the chosen estimator.
 
-- **Shared estimator contract**: All estimators (`fect_fe`, `fect_cfe`, `fect_mc`, `fect_gsynth`) accept a common interface (Y, X, D, W, I, II matrices plus control parameters) and return a common output structure (Y.ct, eff, att.avg, att.on, time.on, etc.). This allows `fect_boot()` to call any estimator polymorphically during resampling.
+- **Shared estimator contract**: All estimators (`fect_fe`, `fect_cfe`, `fect_mc`, `fect_nevertreated`) accept a common interface (Y, X, D, W, I, II matrices plus control parameters) and return a common output structure (Y.ct, eff, att.avg, att.on, time.on, etc.). This allows `fect_boot()` to call any estimator polymorphically during resampling.
 
 - **Initial value strategy**: Before iterative estimation, `initialFit()` uses `fixest::feols()` to compute initial regression values (Y0, beta0), providing warm starts for the C++ EM iterations and improving convergence.
 
@@ -338,7 +338,7 @@ graph TD
 
 - The `method = "cfe"` pathway is the newest and most complex estimator, supporting extra additive fixed effects (`sfe`/`cfe` arguments), time-invariant covariates with time-grouped coefficients (`Z`/`gamma`), unit-specific time trends (`Q`/`kappa` with polynomial or B-spline basis), and latent factors. The R-side `fect_cfe()` includes input validation guards (dimension checks, binary D validation, convergence warnings) that the older estimators lack.
 
-- The `fect_gsynth()` function implements the nevertreated predictive routine from Xu (2017) within the fect framework. It estimates factors from never-treated units only, then projects counterfactuals onto treated units. Unlike `fect_fe()`, it performs its own internal cross-validation loop for factor count selection.
+- The `fect_nevertreated()` function implements the nevertreated predictive routine from Xu (2017) within the fect framework. It estimates factors from never-treated units only, then projects counterfactuals onto treated units. Unlike `fect_fe()`, it performs its own internal cross-validation loop for factor count selection.
 
 - `did_wrapper()` provides a bridge to external DID packages (`did`, `DIDmultiplegtDYN`), producing event-study data frames compatible with `esplot()`.
 
