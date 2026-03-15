@@ -458,13 +458,12 @@ fect.default <- function(
                 "ife",
                 "mc",
                 "both",
-                "polynomial",
                 "gsynth",
                 "cfe"
             )
     ) {
         stop(
-            "\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"polynomial\",\"cfe\")."
+            "\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"cfe\")."
         )
     }
 
@@ -500,9 +499,6 @@ fect.default <- function(
         if (method %in% c("ife", "mc", "both", "gsynth", "cfe")) {
             min.T0 <- 5
         }
-        if (method %in% c("polynomial")) {
-            min.T0 <- 2
-        }
     } else {
         if (min.T0 <= 0) {
             stop("\"min.T0\" option should be larger than 0.\n")
@@ -516,8 +512,6 @@ fect.default <- function(
             CV <- FALSE
             method <- "ife"
         } else if (method == "cfe") {
-            CV <- FALSE
-        } else if (method %in% c("polynomial")) {
             CV <- FALSE
         } else if (method == "both") {
             CV <- TRUE
@@ -542,8 +536,6 @@ fect.default <- function(
             r <- 0
             CV <- FALSE
             method <- "ife"
-        } else if (method %in% c("polynomial")) {
-            CV <- FALSE
         } else if (method == "cfe") {
             CV <- FALSE
         } else if (method == "both") {
@@ -646,20 +638,14 @@ fect.default <- function(
     } else {
         if (
             !method %in%
-                c("gsynth", "ife", "mc", "polynomial", "cfe")
+                c("gsynth", "ife", "mc", "cfe")
         ) {
             stop(
-                "\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"polynomial\", \"cfe\")."
+                "\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"cfe\")."
             )
         }
     }
 
-    if (method %in% c("polynomial")) {
-        if (permute == 1) {
-            message("Cannot do permutation test.\n")
-            permute <- 0
-        }
-    }
 
     if (permute == 1) {
         if (placeboTest == TRUE) {
@@ -1607,11 +1593,6 @@ fect.default <- function(
                 )
             }
         }
-        if (method %in% c("polynomial")) {
-            message(
-                "\nThere are not any observations at some periods. Estimation results may not be reliable. Please use time fixed effects.\n"
-            )
-        }
         TT <- TT - sum(I.use == 0)
         time.uni <- time.uni[-which(I.use == 0)]
 
@@ -2177,51 +2158,10 @@ fect.default <- function(
                     group.level = g.level,
                     group = G
                 )
-            } else if (method %in% c("polynomial")) {
-                if (method == "polynomial") {
-                    warning("method = \"polynomial\" is deprecated. Use method = \"cfe\" instead.",
-                            call. = FALSE)
-                }
-                out <- fect_polynomial(
-                    Y = Y,
-                    D = D,
-                    X = X,
-                    W = W,
-                    I = I,
-                    II = II,
-                    T.on = T.on,
-                    T.on.carry = T.on.carry,
-                    T.on.balance = T.on.balance,
-                    balance.period = balance.period,
-                    T.off = T.off,
-                    method = method,
-                    degree = degree,
-                    sfe = sfe,
-                    cfe = cfe,
-                    ind.matrix = index.matrix,
-                    knots = knots,
-                    force = force,
-                    hasRevs = hasRevs,
-                    tol = tol,
-                    max.iteration = max.iteration,
-                    boot = 0,
-                    placeboTest = placeboTest,
-                    placebo.period = placebo.period,
-                    carryoverTest = carryoverTest,
-                    carryover.period = carryover.period,
-                    norm.para = norm.para,
-                    group.level = g.level,
-                    group = G
-                )
             }
 
             if ("try-error" %in% class(out)) {
                 stop("\nCannot estimate.\n")
-            }
-            # only for polynomial methods
-            if (method %in% c("polynomial")) {
-                I <- out$I
-                II <- out$II
             }
         }
     } else {
@@ -2285,10 +2225,6 @@ fect.default <- function(
             keep.sims = keep.sims
         )
 
-        if (method %in% c("polynomial")) {
-            I <- out$I
-            II <- out$II
-        }
     }
 
     if ((out$validX == 0) & (p != 0)) {

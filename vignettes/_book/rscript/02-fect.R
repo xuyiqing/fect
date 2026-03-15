@@ -232,10 +232,6 @@ out.cfe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time","FE3"),
   Q.type = "linear")
 plot(out.cfe)
 
-out.poly <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
-  method = "polynomial", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200,
-  degree = 2)
-plot(out.poly)
 
 plot(out.ife, show.count = FALSE)
 

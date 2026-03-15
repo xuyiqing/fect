@@ -250,46 +250,6 @@ fect_boot <- function(
       if ("try-error" %in% class(out)) {
         stop("\nCannot estimate using full data with MC algorithm.\n")
       }
-    } else if (method %in% c("polynomial", "bspline")) {
-      out <- try(
-        fect_polynomial(
-          Y = Y,
-          D = D,
-          X = X,
-          W = W,
-          I = I,
-          II = II,
-          T.on = T.on,
-          T.on.carry = T.on.carry,
-          T.on.balance = T.on.balance,
-          balance.period = balance.period,
-          T.off = T.off,
-          method = method,
-          degree = degree,
-          knots = knots,
-          force = force,
-          sfe = sfe,
-          cfe = cfe,
-          ind.matrix = ind.matrix,
-          hasRevs = hasRevs,
-          tol = tol,
-          max.iteration = max.iteration,
-          boot = 0,
-          placeboTest = placeboTest,
-          placebo.period = placebo.period,
-          carryover.period = carryover.period,
-          carryoverTest = carryoverTest,
-          norm.para = norm.para,
-          group.level = group.level,
-          group = group
-        ),
-        silent = TRUE
-      )
-      # I.report <- out$I
-      # II.report <- out$II
-      if ("try-error" %in% class(out)) {
-        stop("\nCannot estimate.\n")
-      }
     } else if (method %in% c("cfe")) {
       out <- try(
         fect_cfe(
@@ -1047,7 +1007,7 @@ fect_boot <- function(
     }
   } else if (
     binary == FALSE &
-      method %in% c("ife", "mc", "polynomial", "bspline") &
+      method %in% c("ife", "mc") &
       vartype == "parametric"
   ) {
     message("Parametric Bootstrap \n")
@@ -1152,50 +1112,6 @@ fect_boot <- function(
             placeboTest = placeboTest,
             carryover.period = carryover.period,
             carryoverTest = carryoverTest,
-            group.level = group.level,
-            group = group,
-            calendar.enp.seq = target.enp,
-            time.on.seq = time.on,
-            time.off.seq = time.off,
-            time.on.seq.W = time.on.W,
-            time.off.seq.W = time.off.W,
-            time.on.carry.seq = carry.time,
-            time.on.balance.seq = balance.time,
-            time.on.seq.group = group.time.on,
-            time.off.seq.group = group.time.off
-          ),
-          silent = TRUE
-        )
-      } else if (method %in% c("polynomial", "bspline")) {
-        boot <- try(
-          fect_polynomial(
-            Y = Y.boot,
-            D = D,
-            X = X,
-            W = W,
-            I = I,
-            II = II,
-            T.on = T.on,
-            T.off = T.off,
-            T.on.carry = T.on.carry,
-            T.on.balance = T.on.balance,
-            balance.period = balance.period,
-            method = method,
-            degree = degree,
-            knots = knots,
-            force = force,
-            sfe = sfe,
-            cfe = cfe,
-            ind.matrix = ind.matrix,
-            hasRevs = hasRevs,
-            tol = tol,
-            max.iteration = max.iteration,
-            boot = 1,
-            placeboTest = placeboTest,
-            placebo.period = placebo.period,
-            carryover.period = carryover.period,
-            carryoverTest = carryoverTest,
-            norm.para = norm.para,
             group.level = group.level,
             group = group,
             calendar.enp.seq = target.enp,
@@ -1568,50 +1484,6 @@ fect_boot <- function(
             ),
             silent = TRUE
           )
-        } else if (method %in% c("polynomial", "bspline")) {
-          boot <- try(
-            fect_polynomial(
-              Y = Y[, boot.id],
-              X = X.boot,
-              W = W.boot,
-              D = D[, boot.id],
-              I = I[, boot.id],
-              II = II[, boot.id],
-              T.on = T.on[, boot.id],
-              T.off = T.off.boot,
-              T.on.carry = T.on.carry[, boot.id],
-              T.on.balance = T.on.balance[, boot.id],
-              balance.period = balance.period,
-              method = method,
-              degree = degree,
-              sfe = sfe,
-              cfe = cfe,
-              ind.matrix = ind.matrix.boot,
-              knots = knots,
-              force = force,
-              hasRevs = hasRevs,
-              tol = tol,
-              max.iteration = max.iteration,
-              boot = 1,
-              norm.para = norm.para,
-              time.on.seq = time.on,
-              calendar.enp.seq = target.enp,
-              time.off.seq = time.off,
-              time.on.seq.W = time.on.W,
-              time.off.seq.W = time.off.W,
-              time.on.carry.seq = carry.time,
-              time.on.balance.seq = balance.time,
-              placebo.period = placebo.period.boot,
-              carryoverTest = carryoverTest,
-              carryover.period = carryover.period.boot,
-              placeboTest = placeboTest,
-              group.level = group.level,
-              group = boot.group,
-              time.on.seq.group = group.time.on,
-              time.off.seq.group = group.time.off
-            ),
-            silent = TRUE
-          )
         }
 
         if (is.null(boot)) {
@@ -1728,7 +1600,6 @@ fect_boot <- function(
         .export = c(
           "fect_fe",
           "fect_mc",
-          "fect_polynomial",
           "fect_cfe",
           "get_term",
           "fect_gsynth",
@@ -1750,8 +1621,7 @@ fect_boot <- function(
           .export = c(
             "fect_fe",
             "fect_mc",
-            "fect_polynomial",
-            "fect_cfe",
+              "fect_cfe",
             "get_term",
             "fect_gsynth",
             "initialFit"

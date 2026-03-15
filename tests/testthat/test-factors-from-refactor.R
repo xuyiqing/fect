@@ -5,7 +5,7 @@
 ##   Phase 1: factors.from parameter (notyettreated / nevertreated)
 ##   Phase 2: gsynth merged into ife via factors.from
 ##   Phase 3: parametric bootstrap unlocked for ife/cfe
-##   Phase 4: polynomial deprecated → routed to cfe
+##   Phase 4: polynomial removed (superseded by cfe)
 ##   Phase 5: input validation and safety guards
 ##
 ## Tests are written BEFORE implementation. Each test will fail
@@ -440,22 +440,9 @@ test_that("Phase 3d: vartype='parametric' still errors for method='mc'", {
 })
 
 ## ========================================================
-## PHASE 4: polynomial deprecated → routed to cfe
+## PHASE 4: polynomial removed (superseded by cfe)
 ## ========================================================
-
-test_that("Phase 4a: method='polynomial' produces deprecation warning", {
-  skip_on_cran()
-  df <- make_staggered_data(N = 40, Ntr = 15)
-
-  expect_warning(
-    fect::fect(
-      Y ~ D, data = df, index = c("id", "time"),
-      method = "polynomial", degree = 2,
-      se = FALSE, parallel = FALSE
-    ),
-    regexp = "deprecat|cfe"  ## warning should mention deprecation or cfe
-  )
-})
+## Phase 4a test removed: method="polynomial" no longer exists.
 
 ## ========================================================
 ## PHASE 5: input validation and safety guards

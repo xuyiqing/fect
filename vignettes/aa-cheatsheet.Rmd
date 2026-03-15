@@ -11,7 +11,6 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 | **fe** | Standard two-way fixed effects model | Liu, Wang & Xu (2022), Borusyak, Jaravel & Spiess (2024) |
 | **ife** | Interactive fixed effects model | Gobillon & Magnac (2016), Xu (2017) |
 | **mc** | Matrix completion method | Athey et al. (2021) |
-| **polynomial** | Two-way fixed effects model with unit-specific trends | – |
 | **cfe** | "Complex" or multi-level fixed effects | – |
 | **gsynth** | Interactive fixed effects model | Xu (2017) |
 
@@ -21,19 +20,19 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 
 | **Type** | **Description** | **Applicable Methods** |
 |------------------------|------------------------|------------------------|
-| **box** | Box plot of ATT by period. | fe, ife, mc, gsynth, polynomial, cfe |
-| **calendar** | CATT by calendar time. | fe, ife, mc, gsynth, polynomial, cfe |
-| **heterogenous** or **hte** | CATT by a covariate. | fe, ife, mc, gsynth, polynomial, cfe |
+| **box** | Box plot of ATT by period. | fe, ife, mc, gsynth, cfe |
+| **calendar** | CATT by calendar time. | fe, ife, mc, gsynth, cfe |
+| **heterogenous** or **hte** | CATT by a covariate. | fe, ife, mc, gsynth, cfe |
 | **counterfactual** or **ct** | Observed vs. imputed outcome for treated units. | fe, ife, mc, gsynth |
-| **equiv** | Pretreatment residuals with equivalence intervals. | fe, ife, mc, gsynth, polynomial, cfe |
-| **exit** | Period-wise ATT relative to treatment exit. | fe, ife, mc, polynomial, cfe |
+| **equiv** | Pretreatment residuals with equivalence intervals. | fe, ife, mc, gsynth, cfe |
+| **exit** | Period-wise ATT relative to treatment exit. | fe, ife, mc, cfe |
 | **factors** | Estimated factors (factor-based methods). | ife, gsynth |
-| **gap** or **es** | Event-study plot: ATT by pre- and post-treatment periods. | fe, ife, mc, gsynth, polynomial, cfe |
+| **gap** or **es** | Event-study plot: ATT by pre- and post-treatment periods. | fe, ife, mc, gsynth, cfe |
 | **loadings** | Estimated factor loadings (factor-based methods). | ife, gsynth |
-| **status** | Treatment status by period for all units. | fe, ife, mc, gsynth, polynomial, cfe |
-| **sens** | Rambachan & Roth (2023) sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, polynomial, cfe |
-| **sens_es** | Event-study sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, polynomial, cfe |
-| **cumul** | Cumulative treatment effects over time. | `effect()` function applied to fe, ife, mc, gsynth, polynomial, cfe |
+| **status** | Treatment status by period for all units. | fe, ife, mc, gsynth, cfe |
+| **sens** | Rambachan & Roth (2023) sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, cfe |
+| **sens_es** | Event-study sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, cfe |
+| **cumul** | Cumulative treatment effects over time. | `effect()` function applied to fe, ife, mc, gsynth, cfe |
 
 ## Tests as Options
 
@@ -54,56 +53,55 @@ A check mark (✓) indicates that the method requires or accepts the input.
 
 ### Required Inputs
 
-| **Input** | **fe** | **ife** | **mc** | **gsynth** | **polynomial** | cfe |
-|-----------|:---------:|:---------:|:---------:|:---------:|:---------:|:---------:|
-| `Y` (outcome) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `D` (treatment) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `X` (covariates) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `data` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `index` (unit & time IDs) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `sfe` (simple additive FEs) | – | – | – | – | – | ✓ |
-| `cfe` (complex FEs) | – | – | – | – | – | ✓ |
-| `Z` (time-invariant covariates) | – | – | – | – | – | ✓ |
-| `Q` (known time trends) | – | – | – | – | – | ✓ |
-| `Q.type` (auto time trends) | – | – | – | – | – | ✓ |
+| **Input** | **fe** | **ife** | **mc** | **gsynth** | **cfe** |
+|-----------|:---------:|:---------:|:---------:|:---------:|:---------:|
+| `Y` (outcome) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `D` (treatment) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `X` (covariates) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `data` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `index` (unit & time IDs) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `sfe` (simple additive FEs) | – | – | – | – | ✓ |
+| `cfe` (complex FEs) | – | – | – | – | ✓ |
+| `Z` (time-invariant covariates) | – | – | – | – | ✓ |
+| `Q` (known time trends) | – | – | – | – | ✓ |
+| `Q.type` (auto time trends) | – | – | – | – | ✓ |
 
 ### Optional Inputs
 
-| **Input** | **fe** | **ife** | **mc** | **gsynth** | **polynomial** | **cfe** |
-|:----------|:----------|:---------:|:---------:|:---------:|:---------:|:---------:|
-| `W` (weight) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `se` (uncertainty) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `nboots` (# bootstrap reps) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `force` (FE structure) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `lambda`(Hyper-parameter sequence) | – | – | ✓ | ✓ | – | – |
-| `nlambda`(Length of hyper-parameter sequence) | – | – | ✓ | ✓ | – | – |
-| `r` (# factor) | – | ✓ | – | ✓ | – | ✓ |
-| `k` ( \# cross-validation rounds) | – | ✓ | ✓ | ✓ | – | – |
-| `degree` (degree of the interacted fixed effects) | – | – | – | – | ✓ | – |
-| `gamma` (time grouping for Z) | – | – | – | – | – | ✓ |
-| `kappa` (unit grouping for Q) | – | – | – | – | – | ✓ |
-| `Z.param` (Z block assignment) | – | – | – | – | – | ✓ |
-| `Q.param` (Q block assignment) | – | – | – | – | – | ✓ |
-| `Q.bspline.degree` (B-spline degree) | – | – | – | – | – | ✓ |
+| **Input** | **fe** | **ife** | **mc** | **gsynth** | **cfe** |
+|:----------|:----------|:---------:|:---------:|:---------:|:---------:|
+| `W` (weight) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `se` (uncertainty) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `nboots` (# bootstrap reps) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `force` (FE structure) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `lambda`(Hyper-parameter sequence) | – | – | ✓ | ✓ | – |
+| `nlambda`(Length of hyper-parameter sequence) | – | – | ✓ | ✓ | – |
+| `r` (# factor) | – | ✓ | – | ✓ | ✓ |
+| `k` ( \# cross-validation rounds) | – | ✓ | ✓ | ✓ | – |
+| `gamma` (time grouping for Z) | – | – | – | – | ✓ |
+| `kappa` (unit grouping for Q) | – | – | – | – | ✓ |
+| `Z.param` (Z block assignment) | – | – | – | – | ✓ |
+| `Q.param` (Q block assignment) | – | – | – | – | ✓ |
+| `Q.bspline.degree` (B-spline degree) | – | – | – | – | ✓ |
 
 ### Important Options
 
 | **Input** | **Options** | **Applicable Methods** |
 |:-----------------------|:-----------------------|:-----------------------|
-| `force` | Fixed effects structure: "none", "unit", "time", "two-way" (default) | fe, ife, mc, poly, cfe, gsynth |
+| `force` | Fixed effects structure: "none", "unit", "time", "two-way" (default) | fe, ife, mc, cfe, gsynth |
 | `vartype` (when `method = "gsynth"`) | Uncertainty estimator: "parametric" (default), "bootstrap", "jackknife" | gsynth |
-| `vartype` (otherwise) | Uncertainty estimator: "bootstrap" (default), "jackknife" | fe, ife, mc, polynomial, cfe |
-| `criterion` | Model selection criterion: "mspe" (default), "gmspe", "moment", "pc". | ife, mc, polynomial, cfe, gsynth |
+| `vartype` (otherwise) | Uncertainty estimator: "bootstrap" (default), "jackknife" | fe, ife, mc, cfe |
+| `criterion` | Model selection criterion: "mspe" (default), "gmspe", "moment", "pc". | ife, mc, cfe, gsynth |
 
 ## Notes
 
 -   Most methods share core inputs (`Y`, `D`, `X`, `data`, `index`).
 
--   Method `polynomial` and `cfe` allow either "jackknife" or "bootstrap" for uncertainty estimates.
+-   Method `cfe` allows either "jackknife" or "bootstrap" for uncertainty estimates.
 
 -   Factor-based methods (`ife`, `gsynth`) can use `r`and `k` for factor selection and cross validation. We can implement a similar process using `mc` or `gsynth` with `lambda` and`nlambda`.
 
--   `carryoverTest` is available in `fe`, `ife`, `mc`, `polynomial`, and `cfe` but not in `gsynth`. `loo` is available in `fe`, `ife`, `mc`, and `gsynth`.
+-   `carryoverTest` is available in `fe`, `ife`, `mc`, and `cfe` but not in `gsynth`. `loo` is available in `fe`, `ife`, `mc`, and `gsynth`.
 
 -   The **cfe** method supports additional parameters: `Z`/`gamma` for time-invariant covariates with time-varying coefficients, `Q`/`kappa` (or `Q.type`) for unit-specific time trends, extra additive fixed effects via `index[3:]`, and interactive fixed effects via `r`. See [Chapter @sec-cfe] for details.
 
@@ -113,7 +111,6 @@ A check mark (✓) indicates that the method requires or accepts the input.
 
 | **Inputs** | **Description** | **Default** |
 |:--:|:---|:--:|
-| `degree` | The degree of the interacted fixed effects(int) | 2 |
 | `nboots` | Number of bootstrap runs (int) | 200 |
 | `k` | Sets the number of cross-validation rounds(int) | 10 |
 | `r` | Sets the number of factors | 0; c(0,5) when CV |

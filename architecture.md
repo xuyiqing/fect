@@ -26,7 +26,6 @@ graph TD
         E2["cfe.R"]
         E3["mc.R"]
         E4["fect_gsynth.R"]
-        E5["polynomial.R"]
     end
 
     subgraph Inference["Inference & Validation"]
@@ -117,7 +116,6 @@ graph TD
 | `R/cfe.R` | Estimator | Complex FE estimator; supports extra additive FEs, Z/gamma, Q/kappa, latent factors | `fect_cfe()` (internal) | no |
 | `R/mc.R` | Estimator | Matrix completion estimator with nuclear norm regularization | `fect_mc()` (internal) | no |
 | `R/fect_gsynth.R` | Estimator | Generalized synthetic control (Xu 2017); separate CV for factor selection | `fect_gsynth()` (internal) | no |
-| `R/polynomial.R` | Estimator | Polynomial/B-spline time trends with fixest; legacy CFE pathway | `fect_polynomial()` (internal) | no |
 | `R/boot.R` | Inference | Parametric and wild bootstrap, jackknife; parallel execution via future/doFuture | `fect_boot()` (internal) | no |
 | `R/cv.R` | Inference | Cross-validation for r (factors) or lambda (regularization); MSPE/PC criterion | `fect_cv()` (internal) | no |
 | `R/cv_binary.R` | Inference | Cross-validation for binary probit models | `fect_binary_cv()` (internal) | no |
@@ -170,7 +168,6 @@ graph TD
 
     fect_default --> R2_route{" "}
     R2_route --> fect_gsynth["fect_gsynth()"]
-    R2_route --> fect_polynomial["fect_polynomial()"]
 
     fect_default --> R3_route{" "}
     R3_route --> fect_cv["fect_cv()"]
@@ -248,8 +245,7 @@ graph TD
 | `fect_cfe()` | `cfe.R` | `fect.default()`, `fect_boot()` | `initialFit()`, `complex_fe_ub()` | no | CFE estimator; handles extra FEs, Z/gamma, Q/kappa, latent factors via block coordinate descent |
 | `fect_mc()` | `mc.R` | `fect.default()`, `fect_boot()` | `inter_fe_mc()` | no | Matrix completion estimator with nuclear norm penalty |
 | `fect_gsynth()` | `fect_gsynth.R` | `fect.default()`, `fect_boot()` | `inter_fe_ub()`, `fect_cv()` | no | Generalized synthetic control with own CV for factor count |
-| `fect_polynomial()` | `polynomial.R` | `fect.default()`, `fect_boot()` | `feols()` (fixest) | no | Polynomial/B-spline time trend estimator via fixest regression |
-| `fect_boot()` | `boot.R` | `fect.default()` | `fect_fe()`, `fect_cfe()`, `fect_mc()`, `fect_gsynth()`, `fect_polynomial()` | no | Bootstrap/jackknife inference; parallel via future/doFuture |
+| `fect_boot()` | `boot.R` | `fect.default()` | `fect_fe()`, `fect_cfe()`, `fect_mc()`, `fect_gsynth()` | no | Bootstrap/jackknife inference; parallel via future/doFuture |
 | `fect_cv()` | `cv.R` | `fect.default()`, `fect_gsynth()` | `inter_fe_ub()`, `inter_fe_mc()` | no | Cross-validation for r (IFE) or lambda (MC) |
 | `fect_binary_cv()` | `cv_binary.R` | `fect.default()` | `inter_fe_d_ub()`, `inter_fe_d_qr_ub()` | no | Cross-validation for binary probit IFE models |
 | `fect_test()` | `fittest.R` | `fect.default()` | `fect_fe()`, `fect_mc()` | no | Wild bootstrap F-test for pre-treatment fit |
@@ -320,7 +316,7 @@ graph TD
 
 - **Method-dispatch hub**: `fect.default()` is the central orchestrator (~2900 lines). It routes to one of five estimator families based on the `method` argument, then uniformly handles bootstrap inference, cross-validation, diagnostic tests, and output assembly regardless of the chosen estimator.
 
-- **Shared estimator contract**: All estimators (`fect_fe`, `fect_cfe`, `fect_mc`, `fect_gsynth`, `fect_polynomial`) accept a common interface (Y, X, D, W, I, II matrices plus control parameters) and return a common output structure (Y.ct, eff, att.avg, att.on, time.on, etc.). This allows `fect_boot()` to call any estimator polymorphically during resampling.
+- **Shared estimator contract**: All estimators (`fect_fe`, `fect_cfe`, `fect_mc`, `fect_gsynth`) accept a common interface (Y, X, D, W, I, II matrices plus control parameters) and return a common output structure (Y.ct, eff, att.avg, att.on, time.on, etc.). This allows `fect_boot()` to call any estimator polymorphically during resampling.
 
 - **Initial value strategy**: Before iterative estimation, `initialFit()` uses `fixest::feols()` to compute initial regression values (Y0, beta0), providing warm starts for the C++ EM iterations and improving convergence.
 

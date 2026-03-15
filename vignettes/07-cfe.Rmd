@@ -76,7 +76,7 @@ The `method = "cfe"` interface puts additional fixed effects in `index` and uses
 
 ## Unit-specific time trends via `Q.type`
 
-A common use case is to allow unit-specific time trends. The `Q.type` option automatically generates polynomial or B-spline time bases and estimates unit-specific loadings on them.
+A common use case is to allow unit-specific time trends. The `Q.type` option automatically generates time bases (linear, quadratic, cubic, or B-spline) and estimates unit-specific loadings on them.
 
 ### Linear time trend
 

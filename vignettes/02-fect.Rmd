@@ -40,7 +40,7 @@ panelview(Y ~ D, data = simdata, index = c("id","time"),
 
 ## The imputation estimator (FEct)
 
-Using the current version of **fect**, we can apply several different methods to make counterfactual predictions and estimate treatment effects by specifying the `method` option: `"fe"` (two-way fixed effects, default), `"ife"` (interactive fixed effects), `"mc"` (matrix completion method), `"cfe"` (complex fixed effects), and `"polynomial"` (fixed effects with group-specific time trends). First, we illustrate the main syntax of **fect** using the `"fe"` method.
+Using the current version of **fect**, we can apply several different methods to make counterfactual predictions and estimate treatment effects by specifying the `method` option: `"fe"` (two-way fixed effects, default), `"ife"` (interactive fixed effects), `"mc"` (matrix completion method), and `"cfe"` (complex fixed effects). First, we illustrate the main syntax of **fect** using the `"fe"` method.
 
 The two-way fixed effects counterfactual estimator (FEct) is also independently proposed by @BJS2024 and @gardnertwo, who refer to it as the "imputation method" and "two-stage DID," respectively.
 
@@ -532,17 +532,6 @@ out.cfe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time","FE3"),
   method = "cfe", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200,
   Q.type = "linear")
 plot(out.cfe)
-```
-
-**Polynomial.** Sometimes researchers may want to include unit-specific time trends in the model estimated using non-treated data. We can set `method = "polynomial"` to achieve this.
-
-In addition, By setting `degree = 2`, we can estimate the ATT based on a linear model with unit and time fixed effects, along with a unit-specific quadratic time trend. Similar to **cfe** estimator, a two-way fixed effects model, while encouraged, is not required.
-
-```{r simdata_poly, eval=TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide', fig.width = 6, fig.height = 4.5}
-out.poly <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
-  method = "polynomial", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200,
-  degree = 2)
-plot(out.poly)
 ```
 
 ------------------------------------------------------------------------

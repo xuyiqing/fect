@@ -56,7 +56,7 @@ assumptions.}
 \item{binary}{This version doesn't support this option.}
 \item{QR}{This version doesn't support this option.}
 \item{method}{a string specifying which imputation algorithm will be used.
-  \code{"fe"}, \code{"ife"}, \code{"mc"}, \code{"polynomial"}, \code{"bspline"},
+  \code{"fe"}, \code{"ife"}, \code{"mc"},
   \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
 \item{vartype}{a string specifying the type of variance estimator, e.g. \code{"bootstrap"}.}
@@ -75,8 +75,8 @@ assumptions.}
 \item{pre.periods}{a vector specifying the range of pre-treatment periods used for the goodness-of-fit test.}
 \item{f.threshold}{a numeric threshold for an F-test in equivalence testing. Default \code{0.5}.}
 \item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
-\item{knots}{a numeric vector specifying knots for the b-spline.}
-\item{degree}{an integer specifying the polynomial or b-spline degree.}
+\item{knots}{a numeric vector specifying knots (currently unused; reserved for future use).}
+\item{degree}{an integer specifying the degree (currently unused; reserved for future use).}
 \item{sfe}{vector specifying other fixed effects for \code{method="cfe"}.}
 \item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
 \item{Z}{a vector specifying the time-invariant covariates for the Z matrix.}
