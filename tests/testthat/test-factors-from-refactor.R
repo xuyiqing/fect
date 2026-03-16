@@ -1562,9 +1562,107 @@ test_that("Phase 3a-I8: ATT accuracy check under bootstrap (cfe+nevertreated, em
   expect_true(abs(out$att.avg - 3.0) < 1.0,
               info = paste("ATT:", out$att.avg, "should be near 3.0"))
   ## CI should cover the true value
-  ci_lower <- out$est.att.avg[, "CI.lower"]
-  ci_upper <- out$est.att.avg[, "CI.upper"]
+  ci_lower <- out$est.avg[, "CI.lower"]
+  ci_upper <- out$est.avg[, "CI.upper"]
   expect_true(ci_lower < 3.0 & ci_upper > 3.0,
               info = paste("95% CI [", ci_lower, ",", ci_upper,
                            "] should cover true tau=3.0"))
+})
+
+test_that("Phase 3a-I9: quantile.CI=TRUE bias-corrected reflection CI (cfe+nevertreated)", {
+  skip_on_cran()
+  df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
+    factors.from = "nevertreated",
+    se = TRUE, vartype = "bootstrap", nboots = 20,
+    quantile.CI = TRUE,
+    parallel = TRUE, cores = 2, seed = 123
+  )))
+
+  expect_false(is.null(out$est.att),
+               info = "est.att should not be NULL")
+  expect_true("CI.lower" %in% colnames(out$est.att),
+              info = "est.att should have CI.lower column")
+  expect_true("CI.upper" %in% colnames(out$est.att),
+              info = "est.att should have CI.upper column")
+  expect_true(any(!is.na(out$est.att[, "CI.lower"])),
+              info = "At least some CI.lower values should be non-NA")
+  expect_false(is.null(out$est.avg),
+               info = "est.avg should not be NULL")
+  expect_true("CI.lower" %in% colnames(out$est.avg),
+              info = "est.avg should have CI.lower column")
+  expect_true("CI.upper" %in% colnames(out$est.avg),
+              info = "est.avg should have CI.upper column")
+  ci_lower <- out$est.avg[, "CI.lower"]
+  ci_upper <- out$est.avg[, "CI.upper"]
+  expect_true(ci_lower < 3.0 & ci_upper > 3.0,
+              info = paste("Quantile CI [", ci_lower, ",", ci_upper,
+                           "] should cover true tau=3.0"))
+})
+
+test_that("Phase 3a-I10: em=TRUE vs em=FALSE identical for nevertreated (ife)", {
+  skip_on_cran()
+  df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+
+  run_em <- function(em_val) {
+    suppressWarnings(suppressMessages(fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r = 2, CV = FALSE, force = "two-way",
+      factors.from = "nevertreated", em = em_val,
+      se = FALSE
+    )))
+  }
+
+  out1 <- run_em(TRUE)
+  out2 <- run_em(FALSE)
+
+  expect_equal(out1$att.avg, out2$att.avg, tolerance = 1e-10,
+               info = "em=TRUE and em=FALSE should give identical att.avg for nevertreated")
+})
+
+test_that("Phase 3a-I11: unbalanced data forces _ub/EM path in draw.error() bootstrap", {
+  skip_on_cran()
+
+  ## IFE on unbalanced data
+  df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+  set.seed(999)
+  n_drop <- floor(nrow(df) * 0.05)
+  drop_idx <- sample(seq_len(nrow(df)), n_drop, replace = FALSE)
+  df_ub <- df[-drop_idx, ]
+
+  out_ife <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df_ub, index = c("id", "time"),
+    method = "ife", r = 2, CV = FALSE, force = "two-way",
+    factors.from = "nevertreated",
+    se = TRUE, vartype = "bootstrap", nboots = 15,
+    parallel = TRUE, cores = 2, seed = 123
+  )))
+
+  expect_false(is.na(out_ife$att.avg),
+               info = "IFE unbalanced: att.avg should not be NA")
+  expect_true(any(!is.na(out_ife$est.att[, "S.E."])),
+              info = "IFE unbalanced: SE estimates should not all be NA")
+
+  ## CFE on unbalanced data
+  df2 <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+  set.seed(999)
+  n_drop2 <- floor(nrow(df2) * 0.05)
+  drop_idx2 <- sample(seq_len(nrow(df2)), n_drop2, replace = FALSE)
+  df2_ub <- df2[-drop_idx2, ]
+
+  out_cfe <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df2_ub, index = c("id", "time"),
+    method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
+    factors.from = "nevertreated",
+    se = TRUE, vartype = "bootstrap", nboots = 15,
+    parallel = TRUE, cores = 2, seed = 123
+  )))
+
+  expect_false(is.na(out_cfe$att.avg),
+               info = "CFE unbalanced: att.avg should not be NA")
+  expect_true(any(!is.na(out_cfe$est.att[, "S.E."])),
+              info = "CFE unbalanced: SE estimates should not all be NA")
 })
