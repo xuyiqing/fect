@@ -1389,3 +1389,182 @@ test_that("Phase 3a-H5: treatment reversals", {
     parallel = FALSE
   ))))
 })
+
+## ========================================================
+## PHASE 3a-I: Parametric bootstrap under nevertreated
+## with em=TRUE / em=FALSE for both cfe and ife
+## Uses parallel computing with controlled seeds (doRNG)
+## ========================================================
+
+test_that("Phase 3a-I1: ife+nevertreated parametric bootstrap, em=TRUE, parallel", {
+  skip_on_cran()
+  df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "ife", r = 2, CV = FALSE, force = "two-way",
+    factors.from = "nevertreated", em = TRUE,
+    se = TRUE, vartype = "bootstrap", nboots = 20,
+    parallel = TRUE, cores = 2, seed = 123
+  )))
+
+  expect_false(is.na(out$att.avg),
+               info = "att.avg should not be NA")
+  expect_false(is.null(out$est.att),
+               info = "est.att should not be NULL")
+  expect_true(any(!is.na(out$est.att[, "S.E."])),
+              info = "SE estimates should not all be NA")
+})
+
+test_that("Phase 3a-I2: ife+nevertreated parametric bootstrap, em=FALSE, parallel", {
+  skip_on_cran()
+  df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "ife", r = 2, CV = FALSE, force = "two-way",
+    factors.from = "nevertreated", em = FALSE,
+    se = TRUE, vartype = "bootstrap", nboots = 20,
+    parallel = TRUE, cores = 2, seed = 123
+  )))
+
+  expect_false(is.na(out$att.avg),
+               info = "att.avg should not be NA")
+  expect_false(is.null(out$est.att),
+               info = "est.att should not be NULL")
+  expect_true(any(!is.na(out$est.att[, "S.E."])),
+              info = "SE estimates should not all be NA")
+})
+
+test_that("Phase 3a-I3: cfe+nevertreated parametric bootstrap, em=TRUE, parallel", {
+  skip_on_cran()
+  df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
+    factors.from = "nevertreated", em = TRUE,
+    se = TRUE, vartype = "bootstrap", nboots = 20,
+    parallel = TRUE, cores = 2, seed = 123
+  )))
+
+  expect_false(is.na(out$att.avg),
+               info = "att.avg should not be NA")
+  expect_false(is.null(out$est.att),
+               info = "est.att should not be NULL")
+  expect_true(any(!is.na(out$est.att[, "S.E."])),
+              info = "SE estimates should not all be NA")
+})
+
+test_that("Phase 3a-I4: cfe+nevertreated parametric bootstrap, em=FALSE, parallel", {
+  skip_on_cran()
+  df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
+    factors.from = "nevertreated", em = FALSE,
+    se = TRUE, vartype = "bootstrap", nboots = 20,
+    parallel = TRUE, cores = 2, seed = 123
+  )))
+
+  expect_false(is.na(out$att.avg),
+               info = "att.avg should not be NA")
+  expect_false(is.null(out$est.att),
+               info = "est.att should not be NULL")
+  expect_true(any(!is.na(out$est.att[, "S.E."])),
+              info = "SE estimates should not all be NA")
+})
+
+test_that("Phase 3a-I5: bootstrap reproducibility with same seed (ife+nevertreated)", {
+  skip_on_cran()
+  df <- make_factor_data(N = 80, TT = 20, Ntr = 25, tau = 3.0, r = 2, seed = 42)
+
+  run_boot <- function(s) {
+    suppressWarnings(suppressMessages(fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r = 2, CV = FALSE, force = "two-way",
+      factors.from = "nevertreated", em = TRUE,
+      se = TRUE, vartype = "bootstrap", nboots = 10,
+      parallel = TRUE, cores = 2, seed = s
+    )))
+  }
+
+  out1 <- run_boot(999)
+  out2 <- run_boot(999)
+
+  expect_equal(out1$att.avg, out2$att.avg,
+               info = "Same seed should give identical att.avg")
+  expect_equal(out1$est.att[, "S.E."], out2$est.att[, "S.E."],
+               info = "Same seed should give identical SE")
+})
+
+test_that("Phase 3a-I6: bootstrap reproducibility with same seed (cfe+nevertreated)", {
+  skip_on_cran()
+  df <- make_cfe_z_data(N = 80, TT = 20, Ntr = 25, tau = 3.0, r = 2, seed = 42)
+
+  run_boot <- function(s) {
+    suppressWarnings(suppressMessages(fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
+      factors.from = "nevertreated", em = TRUE,
+      se = TRUE, vartype = "bootstrap", nboots = 10,
+      parallel = TRUE, cores = 2, seed = s
+    )))
+  }
+
+  out1 <- run_boot(999)
+  out2 <- run_boot(999)
+
+  expect_equal(out1$att.avg, out2$att.avg,
+               info = "Same seed should give identical att.avg")
+  expect_equal(out1$est.att[, "S.E."], out2$est.att[, "S.E."],
+               info = "Same seed should give identical SE")
+})
+
+test_that("Phase 3a-I7: different seeds give different bootstrap SE (ife+nevertreated)", {
+  skip_on_cran()
+  df <- make_factor_data(N = 80, TT = 20, Ntr = 25, tau = 3.0, r = 2, seed = 42)
+
+  run_boot <- function(s) {
+    suppressWarnings(suppressMessages(fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r = 2, CV = FALSE, force = "two-way",
+      factors.from = "nevertreated", em = TRUE,
+      se = TRUE, vartype = "bootstrap", nboots = 10,
+      parallel = TRUE, cores = 2, seed = s
+    )))
+  }
+
+  out1 <- run_boot(111)
+  out2 <- run_boot(222)
+
+  ## Point estimate should be the same (not seed-dependent)
+  expect_equal(out1$att.avg, out2$att.avg, tolerance = 1e-10,
+               info = "Point estimate should not depend on bootstrap seed")
+  ## SE should differ (different bootstrap draws)
+  expect_false(identical(out1$est.att[, "S.E."], out2$est.att[, "S.E."]),
+               info = "Different seeds should give different SE draws")
+})
+
+test_that("Phase 3a-I8: ATT accuracy check under bootstrap (cfe+nevertreated, em=TRUE)", {
+  skip_on_cran()
+  df <- make_cfe_z_data(N = 150, TT = 30, Ntr = 50, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
+    factors.from = "nevertreated", em = TRUE,
+    se = TRUE, vartype = "bootstrap", nboots = 20,
+    parallel = TRUE, cores = 2, seed = 123
+  )))
+
+  expect_true(abs(out$att.avg - 3.0) < 1.0,
+              info = paste("ATT:", out$att.avg, "should be near 3.0"))
+  ## CI should cover the true value
+  ci_lower <- out$est.att.avg[, "CI.lower"]
+  ci_upper <- out$est.att.avg[, "CI.upper"]
+  expect_true(ci_lower < 3.0 & ci_upper > 3.0,
+              info = paste("95% CI [", ci_lower, ",", ci_upper,
+                           "] should cover true tau=3.0"))
+})

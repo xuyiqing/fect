@@ -4,7 +4,7 @@
 2026-03-15 (updated)
 
 ## Status
-COMPLETE through Phase 3a — CFE bifurcation in `fect_nevertreated` implemented with block coordinate descent, all 92 tests pass. draw.error() subsetting bug fixed.
+COMPLETE through Phase 3a — CFE bifurcation in `fect_nevertreated` committed (`c0cab63`, pushed to `cfe`). Block coordinate descent, 92 tests pass. Next: Category I bootstrap tests.
 
 ---
 
@@ -21,7 +21,7 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 | 5 | Input validation guards (invalid values, mc/both+nevertreated, em+notyettreated, insufficient units) | **Done** (`cafb66d`) |
 | 6 | `em` parameter + reroute ife+nevertreated → `fect_nevertreated` | **Done** (`37d516b`) |
 | 7 | Rename `fect_gsynth` → `fect_nevertreated` | **Done** (`fa9baf2`) |
-| 3a | CFE bifurcation in `fect_nevertreated`: method param, `complex_fe_ub` solver, three-layer projection, block coordinate descent, boot.R fixes, 36 new tests | **Done** (uncommitted on `tianzhu`) |
+| 3a | CFE bifurcation in `fect_nevertreated`: method param, `complex_fe_ub` solver, three-layer projection, block coordinate descent, boot.R fixes, 36 new tests | **Done** (`c0cab63`, pushed to `cfe`) |
 
 ---
 
@@ -29,8 +29,8 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 - **Repo**: xuyiqing/fect
 - **Branch**: `cfe`
 - **Local path**: `~/GitHub/fect`
-- **Working branch**: `tianzhu` (Phase 3a changes uncommitted)
-- **Prior HEAD**: `fa9baf2` (Rename fect_gsynth to fect_nevertreated)
+- **Working branch**: `tianzhu`
+- **Prior HEAD**: `c0cab63` (Phase 3a CFE bifurcation)
 
 ### Commit history (oldest → newest)
 | Commit | Description |
@@ -44,6 +44,7 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 | `953da8a` | Remove all method='polynomial' and 'bspline' code paths |
 | `25cd5f8` | Move handoff notes to log/ directory |
 | `fa9baf2` | Rename fect_gsynth to fect_nevertreated |
+| `c0cab63` | Phase 3a: CFE bifurcation in fect_nevertreated with BCD, 3-layer projection, boot.R fixes |
 
 ---
 
@@ -149,6 +150,38 @@ When `method="gsynth"`, lines 488-493 auto-set `factors.from="nevertreated"` and
 
 ---
 
+## Open items
+
+### Bootstrap test suite (Category I) — PLANNED
+
+Systematic testing of parametric bootstrap under `factors.from="nevertreated"` for both ife and cfe.
+
+**Key finding**: `em` parameter is irrelevant for nevertreated. `fect_nevertreated` does NOT accept `em`; the C++ solvers it calls (`inter_fe_ub`, `complex_fe_ub`) do not take `em` either. `em` only affects `inter_fe` (balanced-data solver). So em=TRUE vs em=FALSE produces identical results under nevertreated. The original plan for 4 combos (ife×em, cfe×em) collapses to 2 (ife vs cfe) plus an em-no-op sanity check.
+
+**Bootstrap CI construction** (already in boot.R):
+- `quantile.CI=FALSE` (default): normal approximation `att ± SE × z_{α/2}`
+- `quantile.CI=TRUE`: bias-corrected reflection CI `2θ̂ - q_{1-α/2, α/2}` (flips quantile indices, pivots around 2θ̂)
+- P-values: proportion-based (`get.pvalue()`) when quantile.CI=TRUE, normal CDF when FALSE
+
+**Parallel RNG**: `doFuture` backend + `doRNG::registerDoRNG(seed)` → L'Ecuyer-CMRG independent streams. `.options.future = list(seed = TRUE)`.
+
+| Test | What it checks |
+|------|---------------|
+| I1 | `ife+nevertreated`, balanced, `se=TRUE`, parallel — runs without error, SE not NA |
+| I2 | `cfe+nevertreated`, balanced, `se=TRUE`, parallel — runs without error, SE not NA |
+| I3 | Seed reproducibility: same seed → same SE (ife+nevertreated) |
+| I4 | Different seeds → different SE |
+| I5 | `quantile.CI=TRUE` — bias-corrected CI works for nevertreated |
+| I6 | ATT accuracy + CI coverage (true effect=0 for fake-treated control) |
+| I7 | `em=TRUE` vs `em=FALSE` gives identical results for nevertreated (confirms em is no-op) |
+| I8 | **Unbalanced data**: randomly drop ~5-10% obs from both treated and control, forcing `_ub`/EM path inside `draw.error()`. IFE: `inter_fe_ub` (EM) instead of `inter_fe` (direct). CFE: `complex_fe_ub` with actual missing entries. Verify bootstrap completes and SEs are reasonable. |
+
+### Balanced vs unbalanced routing in fect_nevertreated
+
+The IFE path has a balanced/unbalanced fork: `!0 %in% I.co` → `inter_fe` (direct solver) vs `inter_fe_ub` (EM-based). When test I8 drops observations, `I.co` will contain zeros, forcing the `_ub` path. This tests a code route that balanced data never exercises under nevertreated.
+
+The CFE path always uses `complex_fe_ub` (no balanced shortcut), but missing entries change the EM behavior internally.
+
 ## Nice-to-have (non-blocking)
 
 - ~~Add test for CFE parametric bootstrap with Z/Q/sfe parameters~~ **Done** (tests F1-F3)
@@ -204,20 +237,52 @@ Same leave-one-out structure as IFE nevertreated. For each candidate r, run `com
 
 ### Phased Approach
 
-**Phase 3a**: Implement CFE bifurcation in `fect_nevertreated` — **DONE** (uncommitted on `tianzhu`)
-- Added `method` parameter and 7 CFE params to signature (line 39)
-- Added CFE array co/tr subsetting via `.split_array` helper (lines 106-162)
-- Added Type A/B extra FE classification with validation (stop if missing levels)
-- Added `complex_fe_ub` solver path with CV loop (lines 641-1002)
-- Added Layer 1 subtraction (mu, xi, beta, gamma, Type-B extra FE) in projection
-- Added Layer 2 block coordinate descent for unit-specific parameters (lines 1065-1285):
-  - Iterates alpha, kappa, Type-A FE, and lambda jointly to convergence
-  - When `r.cv > 0`, alpha is embedded in augmented factor matrix (avoids double subtraction)
-  - Convergence: max |change| < 1e-8, typically 2-5 iterations
-- Added dispatch in `default.R` for `cfe + nevertreated` (SE and non-SE paths)
-- Fixed `boot.R` draw.error() subsetting for all 5 CFE arrays
-- Added 7 helper functions: `.estimate_kappa_fit`, `.estimate_alpha`, `.estimate_typeA_fit`, `.estimate_lambda_fit`, `.reconstruct_gamma_fit_tr`, `.reconstruct_kappa_fit`, `.extract_and_apply_typeB_fe`
-- 36 new tests (92 total assertions), all pass
+**Phase 3a**: Implement CFE bifurcation in `fect_nevertreated` — **DONE** (`c0cab63`, pushed to `cfe`)
+
+#### R/fect_nevertreated.R changes
+- **Signature** (line 39): Added 8 params: `method="ife"`, `X.extra.FE`, `X.Z`, `X.Q`, `X.gamma`, `X.kappa`, `Zgamma.id`, `kappaQ.id`
+- **CFE array subsetting** (lines 106-162): co/tr splitting for all 5 CFE arrays via `.split_array`. Type A/B extra FE classification with validation (stop if treated levels missing from controls)
+- **Method bifurcation** (line 186): Existing IFE wrapped in `if (method == "ife")`, new `else if (method == "cfe")` block at line 641
+- **CFE path** (lines 641-1002): `initialFit()` always called (even balanced), CV loop with `complex_fe_ub`, final fit, `est.co.fect` for equivalence test, three-layer projection
+- **Layer 2 BCD** (lines ~1065-1285): Block coordinate descent over alpha, kappa, Type-A FE, lambda. Key: when `has_factor && has_alpha`, alpha embedded in augmented `F.hat.aug = [F, 1]` — `lambda_fit` already contains alpha, so separate `alpha_mat` NOT subtracted (`alpha_in_lambda` flag). Convergence: max|change| < 1e-8, typically 2-5 iters
+- **r=0 path**: alpha.tr estimation parallel to IFE r=0 path
+- **Method string** (line 1788): CFE outputs `"cfe"` not `"gsynth"`
+- **Output** (line 1837): Added `gamma`, `kappa` fields
+- **7 helper functions** (lines ~1940-2100): `.estimate_kappa_fit`, `.estimate_alpha`, `.estimate_typeA_fit`, `.estimate_lambda_fit`, `.reconstruct_gamma_fit_tr`, `.reconstruct_kappa_fit`, `.extract_and_apply_typeB_fe`
+
+#### R/default.R changes
+- **II zeroing** (line 1494): Added `(method == "cfe" && factors.from == "nevertreated")` — II NOT pre-zeroed for cfe+nevertreated
+- **SE==FALSE dispatch** (line 2070): `cfe+nevertreated` branch BEFORE existing `cfe` branch → `fect_nevertreated(..., method="cfe")`
+- **SE==TRUE dispatch** (line 2266): Added `factors.from = factors.from` to `fect_boot()` call
+
+#### R/boot.R changes
+- **Signature** (line 118): Added `factors.from = "notyettreated"` param
+- **Initial estimation** (line 254): `cfe+nevertreated` branch → `fect_nevertreated(..., method="cfe")`
+- **draw.error() subsetting** (lines 760-786): CFE array subsetting for all 5 arrays before dispatch
+- **draw.error() dispatch** (lines 788-840): `ife+nevertreated` → `fect_nevertreated(..., method="ife")`, `cfe+nevertreated` → `fect_nevertreated(..., method="cfe")`, existing `cfe` path uses subsetted arrays
+- **Parallel export** (line 912): Added `.reconstruct_gamma_fit_tr`, `.reconstruct_kappa_fit`, `.extract_and_apply_typeB_fe`
+
+#### Key design decisions
+1. `complex_fe_ub` returns sigma2/IC/PC/residuals/validX directly (verified from C++ `cfe.cpp` lines 195-199) — no post-hoc computation needed
+2. CFE path always calls `initialFit` (matching `fect_cfe` pattern) — ensures Y0.co available
+3. Type-B FE extraction: `est.co$fit - fit_no_fe.co` → group means → apply to treated
+4. CV loop: same leave-one-out as IFE, kappa NOT subtracted in CV (MSPE primarily sensitive to r)
+5. Gamma/kappa reconstruction: map group labels to coefficient rows, compute Z*gamma or Q*kappa
+
+#### Deviations from spec
+1. No post-hoc sigma2/IC/PC — `complex_fe_ub` returns them
+2. Field name `est.co.best$residuals` not `$e`
+3. Helper functions are dot-prefixed at file scope (accessible from boot.R parallel workers)
+4. `fect_cv` (cv.R) NOT updated for `cfe+nevertreated` — known gap
+
+#### Post-implementation fixes
+1. **`.reconstruct_kappa_fit` dimension mismatch**: 3D array guard — if `length(dim()) == 3`, extract `[,,1]`
+2. **Sequential estimation bias → BCD**: Single-pass estimation caused kappa error ~0.22. Replaced with block coordinate descent (converges in 2-5 iters)
+3. **Alpha double subtraction**: `F.hat.aug = [F, 1]` means `lambda_fit` contains alpha. Subtracting separate `alpha_mat` caused divergence (~1e17). Fixed with `alpha_in_lambda` flag
+
+#### Tests
+- 36 new tests (92 total), all pass
+- Categories A-H covering solver equivalence, specification equivalence, accuracy, validation, output, bootstrap, CV, edge cases
 
 **Phase 3b**: Merge IFE into CFE (only after Phase 3a validates)
 - Verify test E0: `complex_fe_ub` with empty CFE ≡ `inter_fe_ub`
@@ -387,4 +452,14 @@ Extend `fect_nevertreated` to accept cfe as the estimator, completing the separa
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `tianzhu`). Phase 3a (CFE bifurcation in `fect_nevertreated`) is implemented and tested (92/92 pass) but uncommitted. The key addition: `method="cfe"` + `factors.from="nevertreated"` now routes through `fect_nevertreated` using `complex_fe_ub` on never-treated controls, with a three-layer projection and block coordinate descent for treated unit-specific parameters. The draw.error() subsetting bug is fixed. Next step is Phase 3b (merge IFE into CFE) or commit + ship. Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.
+> I'm working on the fect R package (`~/GitHub/fect`, branch `tianzhu`). Phase 3a (CFE bifurcation in `fect_nevertreated`) is implemented and committed (`c0cab63`, pushed to `cfe` branch). The key addition: `method="cfe"` + `factors.from="nevertreated"` now routes through `fect_nevertreated` using `complex_fe_ub` on never-treated controls, with a three-layer projection and block coordinate descent for treated unit-specific parameters. 92/92 tests pass.
+>
+> **Next step**: Implement and run the Category I bootstrap test suite (8 tests, see "Open items" above). Key points for implementation:
+>
+> 1. `em` is a no-op for nevertreated — `fect_nevertreated` doesn't accept it, `inter_fe_ub`/`complex_fe_ub` don't take it. Test I7 confirms this.
+> 2. Test I8 is critical: randomly drop ~5-10% of observations to force the `_ub`/EM path inside `draw.error()`. This exercises `inter_fe_ub` (EM) for IFE and `complex_fe_ub` with actual missing entries for CFE — a route that balanced data never hits.
+> 3. CI construction is already implemented in boot.R: `quantile.CI=FALSE` → normal approx, `quantile.CI=TRUE` → bias-corrected reflection CI with flipped quantiles. Test I5 covers this.
+> 4. Use `doFuture` + `doRNG::registerDoRNG(seed)` for reproducible parallel RNG. Tests I3-I4 verify seed behavior.
+> 5. After bootstrap tests pass, proceed to Phase 3b (merge IFE into CFE).
+>
+> Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.
