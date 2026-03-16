@@ -4,7 +4,7 @@
 2026-03-15 (updated)
 
 ## Status
-COMPLETE through Phase 3a + Category I bootstrap tests — all committed and pushed to `cfe`. 125/125 tests pass. Next: Phase 3b (merge IFE into CFE).
+COMPLETE through Phase 3a + Category I bootstrap tests + CV gap fix + r=0 invariance test — all committed and pushed to `cfe`. 131/131 tests pass. Next: compare cv.R vs fect_mspe.R, Quarto book update, then Phase 3b.
 
 ---
 
@@ -47,6 +47,9 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 | `c0cab63` | Phase 3a: CFE bifurcation in fect_nevertreated with BCD, 3-layer projection, boot.R fixes |
 | `97818bd` | docs: update handoff with Phase 3a details and Category I test plan |
 | `5136a03` | test: add Category I bootstrap tests (I9-I11) and fix est.avg field name |
+| `8d69239` | docs: update handoff with Category I completion and Phase 3b roadmap |
+| `e5f098e` | test: add r=0 invariance test (I12) for factors.from parameter |
+| `4cfe25c` | feat: fix CV routing for cfe+nevertreated via fect_cv delegation |
 
 ---
 
@@ -172,7 +175,7 @@ All 11 Category I tests pass (125/125 total). Covers:
 ## Nice-to-have (non-blocking)
 
 - ~~Add test for CFE parametric bootstrap with Z/Q/sfe parameters~~ **Done** (tests F1-F3)
-- Add test for r=0 invariance (factors.from should have no effect when r=0)
+- ~~Add test for r=0 invariance (factors.from should have no effect when r=0)~~ **Done** (`e5f098e`) — test I12 confirms ATT difference <1e-2 at r=0 (solver divergence ~0.003-0.007 is structural, not a bug)
 - Verify parallel=TRUE works with the updated .export list
 
 ---
@@ -415,7 +418,11 @@ Catches: corner cases with small panels, single units, no covariates, reversals.
 
 3. **Numerical equivalence in Phase 3b**: `complex_fe_ub` and `inter_fe_ub` use different iteration strategies. Small numerical differences are possible even with identical inputs. Tests A1-A3 use tolerance ~0.1 for ATT comparison. Phase 3b should tighten this after verifying empty-CFE equivalence.
 
-4. **fect_cv gap** (new): `fect_cv` in cv.R does not handle `cfe+nevertreated`. With `se=TRUE, CV=TRUE`, CV routes through `fect_cv` which sends `cfe` to `fect_cfe` (notyettreated). The internal CV loop in `fect_nevertreated` handles the `se=FALSE` path correctly.
+4. ~~**fect_cv gap**~~ **FIXED** (`4cfe25c`): `fect_cv` now delegates `cfe+nevertreated` to `fect_nevertreated(..., method="cfe", CV=TRUE)`, mirroring the existing gsynth pattern. Changes: R/default.R (relax CV=FALSE), R/cv.R (add params + delegation block), R/boot.R (forward params), R/fect_nevertreated.R (unname r.cv fix). 131/131 tests pass.
+
+5. **CFE CV r-selection** (new): CFE CV selects r=0 on data with true r=2 (N=200, Nco=170), while IFE CV correctly selects r=2 on the same data. Pre-existing behavior in `fect_nevertreated`'s CFE CV loop — `complex_fe_ub` may absorb factor structure into other components.
+
+6. **cv.R vs fect_mspe.R comparison** (new): User requested comparing and potentially consolidating these two cross-validation functions. `fect_cv` (1570 lines) is internal CV for factor number selection during estimation; `fect_mspe` (382 lines) is post-estimation MSPE validation (hide-and-refit). Different purposes but may share logic.
 
 ---
 
@@ -439,14 +446,13 @@ Extend `fect_nevertreated` to accept cfe as the estimator, completing the separa
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). Phase 3a (CFE bifurcation) and Category I bootstrap tests are complete. 125/125 tests pass (`5136a03`, pushed to `cfe`).
+> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). Phase 3a, Category I bootstrap tests, r=0 invariance test, and CV gap fix are all complete. 131/131 tests pass (`4cfe25c`, pushed to `cfe`).
 >
-> **Next step**: Phase 3b — merge IFE into CFE path inside `fect_nevertreated`.
+> **Open tasks** (in priority order):
 >
-> 1. Verify test E0: `complex_fe_ub` with empty CFE arrays ≡ `inter_fe_ub` on same data
-> 2. Verify test E4: `ife+nevertreated` ≡ `cfe+nevertreated` (no extras)
-> 3. Only then: replace `inter_fe_ub` calls with `complex_fe_ub` in `fect_nevertreated`
-> 4. Re-run full test suite to confirm no regressions
-> 5. Also open: `fect_cv` gap (cv.R doesn't handle `cfe+nevertreated`)
+> 1. **Compare cv.R vs fect_mspe.R** — user wants to explore consolidation. `fect_cv` (internal CV for r-selection) vs `fect_mspe` (post-estimation hide-and-refit MSPE). Different purposes but may share logic.
+> 2. **CFE CV r-selection bug** — CFE CV selects r=0 on data with true r=2 while IFE CV correctly selects r=2. Pre-existing in `fect_nevertreated`'s CFE CV loop (lines 679-879). `complex_fe_ub` may absorb factors into other components.
+> 3. **Quarto book update** — vignettes don't document `factors.from`, `em`, or gsynth≡ife+nevertreated. 6 chapters need updates (aa-cheatsheet, 02-fect, 04-gsynth, 07-cfe, 01-start, index.qmd).
+> 4. **Phase 3b** — merge IFE into CFE (verify E0/E4 equivalence, replace `inter_fe_ub` with `complex_fe_ub`).
 >
 > Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.
