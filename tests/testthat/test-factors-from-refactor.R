@@ -1688,3 +1688,26 @@ test_that("Phase 3a-I12: r=0 invariance — factors.from is a no-op when r=0", {
   expect_equal(out_nyt$att.avg, out_nt$att.avg, tolerance = 1e-2,
                info = "factors.from should be a no-op when r=0: att.avg must match")
 })
+
+## ========================================================
+## CV routing for cfe+nevertreated (REQ-cv-gap-001)
+## ========================================================
+
+test_that("cfe+nevertreated CV selects r and runs without error", {
+  skip_on_cran()
+  df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "cfe", r = c(0, 3), CV = TRUE, se = FALSE,
+    factors.from = "nevertreated",
+    force = "two-way", parallel = FALSE
+  )))
+
+  expect_s3_class(out, "fect")
+  expect_true(is.numeric(out$r.cv), info = "r.cv should be set by CV")
+  expect_true(out$r.cv >= 0 && out$r.cv <= 3,
+              info = paste("r.cv should be in [0,3], got:", out$r.cv))
+  expect_true(is.numeric(out$att.avg))
+  expect_true(!is.na(out$att.avg))
+})

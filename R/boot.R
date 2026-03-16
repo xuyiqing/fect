@@ -372,7 +372,15 @@ fect_boot <- function(
         group = group,
         cv.prop = cv.prop,
         cv.treat = cv.treat,
-        cv.nobs = cv.nobs
+        cv.nobs = cv.nobs,
+        factors.from = factors.from,
+        X.extra.FE = X.extra.FE,
+        X.Z = X.Z,
+        X.Q = X.Q,
+        X.gamma = X.gamma,
+        X.kappa = X.kappa,
+        Zgamma.id = Zgamma.id,
+        kappaQ.id = kappaQ.id
       )
 
       if (!is.null(out$method)) {

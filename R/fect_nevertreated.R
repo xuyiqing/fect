@@ -252,7 +252,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             r.pc <- est.co.pc.best <- NULL
 
             for (i in 1:dim(CV.out)[1]) {
-                r <- CV.out[i, "r"]
+                r <- unname(CV.out[i, "r"])
                 if (!0 %in% I.co) {
                     est.co <- inter_fe(
                         Y = Y.co, X = X.co, r,
@@ -705,7 +705,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             r.pc <- est.co.pc.best <- NULL
 
             for (i in 1:dim(CV.out)[1]) {
-                r <- CV.out[i, "r"]
+                r <- unname(CV.out[i, "r"])
                 est.co <- complex_fe_ub(YY.co, Y0.co, X.co,
                     X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                     Zgamma.id, kappaQ.id,

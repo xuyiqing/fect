@@ -512,7 +512,15 @@ fect.default <- function(
             CV <- FALSE
             method <- "ife"
         } else if (method == "cfe") {
-            CV <- FALSE
+            if (factors.from == "nevertreated") {
+                if (length(r) == 1) {
+                    CV <- FALSE
+                } else if (length(r) > 1) {
+                    CV <- TRUE
+                }
+            } else {
+                CV <- FALSE
+            }
         } else if (method == "both") {
             CV <- TRUE
             if (length(r) == 1 & r == 0) {
@@ -537,7 +545,9 @@ fect.default <- function(
             CV <- FALSE
             method <- "ife"
         } else if (method == "cfe") {
-            CV <- FALSE
+            if (factors.from != "nevertreated") {
+                CV <- FALSE
+            }
         } else if (method == "both") {
             CV <- TRUE
         }
@@ -1981,7 +1991,15 @@ fect.default <- function(
                     max.iteration = max.iteration,
                     norm.para = norm.para,
                     group.level = g.level,
-                    group = G
+                    group = G,
+                    factors.from = factors.from,
+                    X.extra.FE = X.extra.FE,
+                    X.Z = X.Z,
+                    X.Q = X.Q,
+                    X.gamma = X.gamma,
+                    X.kappa = X.kappa,
+                    Zgamma.id = Zgamma.id,
+                    kappaQ.id = kappaQ.id
                 )
             } else {
                 out <- fect_binary_cv(

@@ -31,7 +31,15 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     max.iteration = 1000,
                     norm.para = NULL,
                     group.level = NULL,
-                    group = NULL) {
+                    group = NULL,
+                    factors.from = "notyettreated",
+                    X.extra.FE = NULL,
+                    X.Z = NULL,
+                    X.Q = NULL,
+                    X.gamma = NULL,
+                    X.kappa = NULL,
+                    Zgamma.id = NULL,
+                    kappaQ.id = NULL) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -186,6 +194,27 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 tol = tol, boot = 0,
                 norm.para = norm.para,
                 group.level = group.level, group = group
+            )
+            return(out)
+        }
+
+        ## for cfe with nevertreated, use the cross-validation function in fect_nevertreated
+        if (method == "cfe" && factors.from == "nevertreated") {
+            message("CFE model with nevertreated factors...\n")
+            out <- fect_nevertreated(
+                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                T.on = T.on, T.off = T.off,
+                T.on.balance = T.on.balance,
+                balance.period = balance.period,
+                r = r, r.end = r.end, CV = TRUE,
+                force = force, hasRevs = hasRevs,
+                tol = tol, boot = 0,
+                norm.para = norm.para,
+                group.level = group.level, group = group,
+                method = "cfe",
+                X.extra.FE = X.extra.FE, X.Z = X.Z, X.Q = X.Q,
+                X.gamma = X.gamma, X.kappa = X.kappa,
+                Zgamma.id = Zgamma.id, kappaQ.id = kappaQ.id
             )
             return(out)
         }
