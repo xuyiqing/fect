@@ -67,7 +67,7 @@ All three share the same estimation architecture and differ only in the richness
 
 ### The Gsynth Wrapper
 
-**`method = "gsynth"` is not a separate estimator.** It is a convenience wrapper that sets defaults appropriate for the original Generalized Synthetic Control method: `factors.from = "nevertreated"`, `em = FALSE`, and auto-selects the number of factors via cross-validation. Internally, it runs the IFE estimator.
+**`method = "gsynth"` is not a separate estimator.** It is a convenience wrapper that sets defaults appropriate for the original Generalized Synthetic Control method: `factors.from = "nevertreated"` and auto-selects the number of factors via cross-validation. Internally, it runs the IFE estimator.
 
 ## Two Research Settings
 
@@ -121,7 +121,7 @@ Any combination of estimator × `factors.from` × inference is valid, subject to
 | No reversal, many treated units ($N_{tr} > 40$) | Either regime; default is fine |
 | No reversal, few treated units ($N_{tr} < 40$) | `factors.from = "nevertreated"` + `vartype = "parametric"` |
 | Only one treated unit ($N_{tr} = 1$) | `factors.from = "nevertreated"` + `vartype = "parametric"` |
-| Want to reproduce the original gsynth | `method = "gsynth"` (or equivalently: `method = "ife"`, `factors.from = "nevertreated"`, `em = FALSE`) |
+| Want to reproduce the original gsynth | `method = "gsynth"` (or equivalently: `method = "ife"`, `factors.from = "nevertreated"`) |
 
 ## Organization
 

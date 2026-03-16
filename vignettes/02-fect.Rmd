@@ -197,7 +197,7 @@ For the IFE method, we need to specify an interval of candidate number of unobse
 
 ::: {.callout-note appearance="simple"}
 ### The `em` parameter
-By default, `em = TRUE` and the EM algorithm is used to estimate the factor model when the estimation sample has missing entries (which is always the case under `factors.from = "notyettreated"`). Setting `em = FALSE` uses direct SVD instead, which requires a complete estimation sample — this is automatically the case when `factors.from = "nevertreated"`. Note: `method = "gsynth"` automatically sets `em = FALSE`.
+By default, `em = TRUE` and the EM algorithm is used to estimate the factor model when the estimation sample has missing entries (which is always the case under `factors.from = "notyettreated"`). When `factors.from = "nevertreated"`, the estimation sample is complete by construction, so the `em` parameter has no effect.
 :::
 
 ```{r simdata_ife, eval=TRUE, cache = TRUE}

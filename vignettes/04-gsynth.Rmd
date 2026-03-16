@@ -12,9 +12,9 @@ Therefore, we recommend setting `method = "gsynth"` in **fect** for scenarios wh
 
 ::: {.callout-important appearance="simple"}
 ### Key Equivalence
-`fect(..., method = "gsynth")` is equivalent to `fect(..., method = "ife", factors.from = "nevertreated", em = FALSE)`.
+`fect(..., method = "gsynth")` is equivalent to `fect(..., method = "ife", factors.from = "nevertreated")`.
 
-Gsynth is not a separate estimator — it is the IFE model estimated using only never-treated controls, without the EM algorithm. The **gsynth** package was developed in the synthetic control research setting, where a small number of treated units are compared against never-treated controls to learn latent time effects.
+Gsynth is not a separate estimator — it is the IFE model estimated using only never-treated controls. The **gsynth** package was developed in the synthetic control research setting, where a small number of treated units are compared against never-treated controls to learn latent time effects.
 :::
 
 ### When to use the never-treated regime
