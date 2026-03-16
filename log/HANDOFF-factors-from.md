@@ -4,7 +4,7 @@
 2026-03-15 (updated)
 
 ## Status
-COMPLETE through Phase 3a — CFE bifurcation in `fect_nevertreated` committed (`c0cab63`, pushed to `cfe`). Block coordinate descent, 92 tests pass. Next: Category I bootstrap tests.
+COMPLETE through Phase 3a + Category I bootstrap tests — all committed and pushed to `cfe`. 125/125 tests pass. Next: Phase 3b (merge IFE into CFE).
 
 ---
 
@@ -45,6 +45,8 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 | `25cd5f8` | Move handoff notes to log/ directory |
 | `fa9baf2` | Rename fect_gsynth to fect_nevertreated |
 | `c0cab63` | Phase 3a: CFE bifurcation in fect_nevertreated with BCD, 3-layer projection, boot.R fixes |
+| `97818bd` | docs: update handoff with Phase 3a details and Category I test plan |
+| `5136a03` | test: add Category I bootstrap tests (I9-I11) and fix est.avg field name |
 
 ---
 
@@ -142,6 +144,8 @@ When `method="gsynth"`, lines 488-493 auto-set `factors.from="nevertreated"` and
 
 **Test results** (Phase 3a): 92/92 pass (36 new tests across categories A-H, plus 56 existing). All accuracy tests (C1-C7) within tolerance. Bootstrap tests (F1-F4) all pass. Edge cases (H1-H5) all handled.
 
+**Test results** (Category I, `5136a03`): 125/125 pass. Added I9-I11 (quantile.CI, em no-op, unbalanced bootstrap). Fixed `est.att.avg` → `est.avg` field name bug in I8 and I9.
+
 ---
 
 ## ~~Remaining bug: draw.error() CFE subsetting~~ FIXED in Phase 3a
@@ -152,35 +156,18 @@ When `method="gsynth"`, lines 488-493 auto-set `factors.from="nevertreated"` and
 
 ## Open items
 
-### Bootstrap test suite (Category I) — PLANNED
+### Bootstrap test suite (Category I) — DONE (`5136a03`)
 
-Systematic testing of parametric bootstrap under `factors.from="nevertreated"` for both ife and cfe.
+All 11 Category I tests pass (125/125 total). Covers:
+- I1-I4: ife/cfe × em=TRUE/FALSE parametric bootstrap (balanced)
+- I5-I6: Seed reproducibility (same seed → same SE; different seeds → different SE)
+- I7: Different seeds, different SE (ife)
+- I8: ATT accuracy + CI coverage (cfe+nevertreated)
+- I9: `quantile.CI=TRUE` bias-corrected reflection CI (cfe+nevertreated)
+- I10: `em=TRUE` vs `em=FALSE` identical for nevertreated (confirms em is no-op)
+- I11: Unbalanced data (5% dropped) forces `_ub`/EM path in `draw.error()` for both IFE and CFE
 
-**Key finding**: `em` parameter is irrelevant for nevertreated. `fect_nevertreated` does NOT accept `em`; the C++ solvers it calls (`inter_fe_ub`, `complex_fe_ub`) do not take `em` either. `em` only affects `inter_fe` (balanced-data solver). So em=TRUE vs em=FALSE produces identical results under nevertreated. The original plan for 4 combos (ife×em, cfe×em) collapses to 2 (ife vs cfe) plus an em-no-op sanity check.
-
-**Bootstrap CI construction** (already in boot.R):
-- `quantile.CI=FALSE` (default): normal approximation `att ± SE × z_{α/2}`
-- `quantile.CI=TRUE`: bias-corrected reflection CI `2θ̂ - q_{1-α/2, α/2}` (flips quantile indices, pivots around 2θ̂)
-- P-values: proportion-based (`get.pvalue()`) when quantile.CI=TRUE, normal CDF when FALSE
-
-**Parallel RNG**: `doFuture` backend + `doRNG::registerDoRNG(seed)` → L'Ecuyer-CMRG independent streams. `.options.future = list(seed = TRUE)`.
-
-| Test | What it checks |
-|------|---------------|
-| I1 | `ife+nevertreated`, balanced, `se=TRUE`, parallel — runs without error, SE not NA |
-| I2 | `cfe+nevertreated`, balanced, `se=TRUE`, parallel — runs without error, SE not NA |
-| I3 | Seed reproducibility: same seed → same SE (ife+nevertreated) |
-| I4 | Different seeds → different SE |
-| I5 | `quantile.CI=TRUE` — bias-corrected CI works for nevertreated |
-| I6 | ATT accuracy + CI coverage (true effect=0 for fake-treated control) |
-| I7 | `em=TRUE` vs `em=FALSE` gives identical results for nevertreated (confirms em is no-op) |
-| I8 | **Unbalanced data**: randomly drop ~5-10% obs from both treated and control, forcing `_ub`/EM path inside `draw.error()`. IFE: `inter_fe_ub` (EM) instead of `inter_fe` (direct). CFE: `complex_fe_ub` with actual missing entries. Verify bootstrap completes and SEs are reasonable. |
-
-### Balanced vs unbalanced routing in fect_nevertreated
-
-The IFE path has a balanced/unbalanced fork: `!0 %in% I.co` → `inter_fe` (direct solver) vs `inter_fe_ub` (EM-based). When test I8 drops observations, `I.co` will contain zeros, forcing the `_ub` path. This tests a code route that balanced data never exercises under nevertreated.
-
-The CFE path always uses `complex_fe_ub` (no balanced shortcut), but missing entries change the EM behavior internally.
+**Bug fixed**: `est.att.avg` → `est.avg` in I8 and I9. The fect output field for aggregate ATT with CI is `est.avg` (from `fect_boot()` at boot.R line 4653), not `est.att.avg`.
 
 ## Nice-to-have (non-blocking)
 
@@ -452,14 +439,14 @@ Extend `fect_nevertreated` to accept cfe as the estimator, completing the separa
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `tianzhu`). Phase 3a (CFE bifurcation in `fect_nevertreated`) is implemented and committed (`c0cab63`, pushed to `cfe` branch). The key addition: `method="cfe"` + `factors.from="nevertreated"` now routes through `fect_nevertreated` using `complex_fe_ub` on never-treated controls, with a three-layer projection and block coordinate descent for treated unit-specific parameters. 92/92 tests pass.
+> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). Phase 3a (CFE bifurcation) and Category I bootstrap tests are complete. 125/125 tests pass (`5136a03`, pushed to `cfe`).
 >
-> **Next step**: Implement and run the Category I bootstrap test suite (8 tests, see "Open items" above). Key points for implementation:
+> **Next step**: Phase 3b — merge IFE into CFE path inside `fect_nevertreated`.
 >
-> 1. `em` is a no-op for nevertreated — `fect_nevertreated` doesn't accept it, `inter_fe_ub`/`complex_fe_ub` don't take it. Test I7 confirms this.
-> 2. Test I8 is critical: randomly drop ~5-10% of observations to force the `_ub`/EM path inside `draw.error()`. This exercises `inter_fe_ub` (EM) for IFE and `complex_fe_ub` with actual missing entries for CFE — a route that balanced data never hits.
-> 3. CI construction is already implemented in boot.R: `quantile.CI=FALSE` → normal approx, `quantile.CI=TRUE` → bias-corrected reflection CI with flipped quantiles. Test I5 covers this.
-> 4. Use `doFuture` + `doRNG::registerDoRNG(seed)` for reproducible parallel RNG. Tests I3-I4 verify seed behavior.
-> 5. After bootstrap tests pass, proceed to Phase 3b (merge IFE into CFE).
+> 1. Verify test E0: `complex_fe_ub` with empty CFE arrays ≡ `inter_fe_ub` on same data
+> 2. Verify test E4: `ife+nevertreated` ≡ `cfe+nevertreated` (no extras)
+> 3. Only then: replace `inter_fe_ub` calls with `complex_fe_ub` in `fect_nevertreated`
+> 4. Re-run full test suite to confirm no regressions
+> 5. Also open: `fect_cv` gap (cv.R doesn't handle `cfe+nevertreated`)
 >
 > Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.
