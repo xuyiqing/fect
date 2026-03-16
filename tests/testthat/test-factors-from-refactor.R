@@ -1666,3 +1666,25 @@ test_that("Phase 3a-I11: unbalanced data forces _ub/EM path in draw.error() boot
   expect_true(any(!is.na(out_cfe$est.att[, "S.E."])),
               info = "CFE unbalanced: SE estimates should not all be NA")
 })
+
+test_that("Phase 3a-I12: r=0 invariance — factors.from is a no-op when r=0", {
+  skip_on_cran()
+  df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 0, seed = 42)
+
+  out_nyt <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "ife", r = 0, CV = FALSE, force = "two-way",
+    factors.from = "notyettreated",
+    se = FALSE
+  )))
+
+  out_nt <- suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "ife", r = 0, CV = FALSE, force = "two-way",
+    factors.from = "nevertreated",
+    se = FALSE
+  )))
+
+  expect_equal(out_nyt$att.avg, out_nt$att.avg, tolerance = 1e-2,
+               info = "factors.from should be a no-op when r=0: att.avg must match")
+})
