@@ -122,8 +122,54 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 
 ## Open items
 
-### Compare cv.R vs fect_mspe.R
-User requested comparing and potentially consolidating these two functions. `fect_cv` (1570 lines) is internal CV for factor number selection; `fect_mspe` (382 lines) is post-estimation MSPE validation (hide-and-refit). Different purposes but may share logic.
+### ~~Compare cv.R vs fect_mspe.R~~ RESOLVED — no consolidation
+**Finding**: `fect_cv` (1570 lines, internal CV for r/λ selection) and `fect_mspe` (382 lines, post-estimation hide-and-refit) operate at different abstraction levels and share zero reusable code. `fect_cv` calls C++ directly (`inter_fe_ub`, `inter_fe_mc`), manipulates the II indicator matrix, and searches a hyperparameter grid. `fect_mspe` operates on user-facing `fect` output objects, sets Y to NA, and re-runs the full R pipeline. No consolidation needed.
+
+### Refactor fect_mspe.R (NEW — approved plan)
+`fect_mspe` and `fect_mspe_sim` share the hide→refit→score pattern but duplicate ~200 lines of code (helpers, loop, scoring). Refactor into shared core + thin wrappers.
+
+**Architecture**:
+```
+# file-scope shared helpers (defined once, not copy-pasted)
+.is_fect_output()
+.get_last_matrix()
+.as_mask()
+.build_rerun_args()
+
+# shared core
+._refit_and_score(out_list, mask_mat, actual_mat, hide_n, n_rep, control.only, ...)
+  → for each rep: hide Y at masked positions → do.call(fect) → compare pred vs actual → RMSE/Bias
+
+# thin wrappers (own the masking strategy, delegate scoring to core)
+fect_mspe(out.fect, hide_mask, hide_n, seed, n_rep,
+          pre.trend, pre.trend.n, control.only=TRUE)
+  → mask via: random control / pre-trend / user-provided
+  → actual = observed Y matrix
+  → calls ._refit_and_score()
+
+fect_mspe_sim(out.fect, hide_mask, hide_mask_y0, hide_n, seed, n_rep,
+              control.only=TRUE)
+  → mask from user input
+  → actual = Y0 matrix
+  → calls ._refit_and_score()
+```
+
+**Consistency improvements**:
+1. **Unified signature pattern** — both take same base args `(out.fect, hide_mask, hide_n, seed, n_rep)`, plus strategy-specific params
+2. **Explicit ground truth** — `fect_mspe` uses observed Y, `fect_mspe_sim` uses Y0; both pass `actual_mat` to shared core
+3. **Single `.build_rerun_args()`** — `fect_mspe_sim` currently duplicates this inline (lines 341-349)
+4. **`control.only=TRUE` param** — both default to masking only `D==0` cells; `fect_mspe_sim` currently skips this filter, which could bite users
+5. **Single formula recovery path** — use `.build_rerun_args()` in both (tries `eval(call$formula)`, falls back to `reformulate`)
+
+**Masking strategies preserved**:
+| Strategy | Wrapper | How |
+|---|---|---|
+| Random control | `fect_mspe`, `pre.trend=FALSE` | Sample from `D==0` cells |
+| Pre-trend | `fect_mspe`, `pre.trend=TRUE` | Last `n` pre-treatment periods of treated units |
+| User mask | both, `hide_mask` arg | User-supplied matrix, filtered by `D==0` when `control.only=TRUE` |
+| Sim mask | `fect_mspe_sim` | External mask + Y0 ground truth |
+
+**Prerequisite**: .as_mask() bug fix (already done — `028beca`).
 
 ### ~~CFE CV r-selection issue~~ RESOLVED
 **Finding**: The CFE CV algorithm is correct. The original test was misspecified -- it used `make_cfe_z_data` (DGP with Z*gamma) but did not pass `Z = "Z"` to `fect()`. Without Z, factors absorb the unmodeled Z*gamma interaction (a rank-1 component), inflating r.cv by ~1. With Z properly specified, CFE CV correctly selects r=2 with clear MSPE U-shape (minimum at true r). Fixed test + added 3 new tests. 135/135 pass. See `log/2026-03-16-cfe-cv-rselect-fix.md` for full process record.
@@ -140,8 +186,8 @@ User requested comparing and potentially consolidating these two functions. `fec
 3. ~~`att.cumu()` relationship to `effect()` needs clarification~~ **Done** (`5460b13`) — 23 tests; att.cumu works on aggregate ATT time series (x$att), effect() works on unit-level matrices (x$eff, requires keep.sims=TRUE)
 4. ~~Verify parallel=TRUE works with the updated .export list~~ **Done** — .export entries are redundant when .packages=c("fect") loads namespace; no change needed
 
-### fect_mspe_sim .as_mask() bug (NEW)
-**Pre-existing bug** in `R/fect_mspe.R` line 226: `.as_mask()` uses `as.logical(mask)` which strips matrix dimensions, returning a flat vector instead of TT×N matrix. This breaks downstream `cbind(rr, cc)` matrix indexing. The function is non-functional for its primary use case. Fix: replace `return(as.logical(mask))` with `return(matrix(as.logical(mask), nrow=TT, ncol=N))` (and similarly for the N×TT transpose path).
+### ~~fect_mspe_sim .as_mask() bug~~ FIXED (`028beca`)
+Both copies of `.as_mask()` (in `fect_mspe` and `fect_mspe_sim`) fixed: `as.logical(mask)` → `matrix(as.logical(mask), nrow=TT, ncol=N)` to preserve matrix dimensions. Will be eliminated entirely by the refactor above (single shared helper).
 
 ### Nice-to-have
 - ~~Add test for CFE parametric bootstrap with Z/Q/sfe parameters~~ **Done** (F1-F3)
@@ -209,10 +255,9 @@ When `method="cfe"` + `factors.from="nevertreated"`, dispatch routes to `fect_ne
 >
 > **Open tasks** (in priority order):
 >
-> 1. **Compare cv.R vs fect_mspe.R** — user wants to explore consolidation. `fect_cv` (internal CV for r-selection) vs `fect_mspe` (post-estimation hide-and-refit MSPE). Different purposes but may share logic.
-> 2. **Fix fect_mspe_sim .as_mask() bug** — `as.logical(mask)` strips matrix dimensions at line 226 of fect_mspe.R. Function is non-functional for its primary use case. Then add positive-path tests.
-> 3. **Phase 3b** — merge IFE into CFE (verify E0/E4 equivalence, replace `inter_fe_ub` with `complex_fe_ub`).
+> 1. **Refactor fect_mspe.R** — extract shared core from `fect_mspe` and `fect_mspe_sim` (hide→refit→score), unify signatures, add `control.only=TRUE` param, deduplicate helpers. Plan approved — see "Refactor fect_mspe.R" in open items.
+> 2. **Phase 3b** — merge IFE into CFE (verify E0/E4 equivalence, replace `inter_fe_ub` with `complex_fe_ub`).
 >
-> **Resolved**: CFE CV r-selection issue, test gaps (53 new tests added), parallel .export verification.
+> **Resolved**: CFE CV r-selection issue, test gaps (53 new tests), parallel .export (no change needed), cv.R vs fect_mspe.R comparison (no consolidation), .as_mask() bug fix.
 >
 > Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.

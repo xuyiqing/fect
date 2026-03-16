@@ -42,8 +42,8 @@ fect_mspe <- function(
     .as_mask <- function(mask, TT, N) {
         if (is.null(mask)) return(NULL)
         if (is.matrix(mask)) {
-            if (all(dim(mask) == c(TT, N))) return(as.logical(mask))
-            if (all(dim(mask) == c(N, TT))) return(as.logical(t(mask)))
+            if (all(dim(mask) == c(TT, N))) return(matrix(as.logical(mask), nrow = TT, ncol = N))
+            if (all(dim(mask) == c(N, TT))) return(matrix(as.logical(t(mask)), nrow = TT, ncol = N))
             stop("`hide_mask` must be TT x N or N x TT.")
         }
         if (is.vector(mask) && length(mask) == TT * N) {
@@ -223,8 +223,8 @@ fect_mspe_sim <- function(out.fect, hide_mask = NULL, hide_mask_y0 = NULL, hide_
     .as_mask <- function(mask, TT, N) {
         if (is.null(mask)) return(NULL)
         if (is.matrix(mask)) {
-            if (all(dim(mask) == c(TT, N))) return(as.logical(mask))
-            if (all(dim(mask) == c(N, TT))) return(as.logical(t(mask)))
+            if (all(dim(mask) == c(TT, N))) return(matrix(as.logical(mask), nrow = TT, ncol = N))
+            if (all(dim(mask) == c(N, TT))) return(matrix(as.logical(t(mask)), nrow = TT, ncol = N))
             stop("`hide_mask` must be TT x N or N x TT.")
         }
         if (is.vector(mask) && length(mask) == TT * N) {
