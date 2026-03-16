@@ -114,7 +114,8 @@ fect_boot <- function(
   group.level = NULL,
   group = NULL,
   dis = 0,
-  keep.sims = FALSE
+  keep.sims = FALSE,
+  factors.from = "notyettreated"
 ) {
   na.pos <- NULL
   TT <- dim(Y)[1]
@@ -249,6 +250,50 @@ fect_boot <- function(
       )
       if ("try-error" %in% class(out)) {
         stop("\nCannot estimate using full data with MC algorithm.\n")
+      }
+    } else if (method == "cfe" && factors.from == "nevertreated") {
+      out <- try(
+        fect_nevertreated(
+          Y = Y,
+          X = X,
+          D = D,
+          W = W,
+          I = I,
+          II = II,
+          T.on = T.on,
+          T.off = T.off,
+          CV = 0,
+          T.on.balance = T.on.balance,
+          balance.period = balance.period,
+          r = r,
+          binary = binary,
+          QR = QR,
+          force = force,
+          hasRevs = hasRevs,
+          tol = tol,
+          max.iteration = max.iteration,
+          boot = 0,
+          norm.para = norm.para,
+          placebo.period = placebo.period,
+          placeboTest = placeboTest,
+          carryover.period = carryover.period,
+          carryoverTest = carryoverTest,
+          group.level = group.level,
+          group = group,
+          method = "cfe",
+          X.extra.FE = X.extra.FE,
+          X.Z = X.Z,
+          X.Q = X.Q,
+          X.gamma = X.gamma,
+          X.kappa = X.kappa,
+          Zgamma.id = Zgamma.id,
+          kappaQ.id = kappaQ.id
+        ),
+        silent = TRUE
+      )
+      if ("try-error" %in% class(out)) {
+        print(out)
+        stop("\nCannot estimate.\n")
       }
     } else if (method %in% c("cfe")) {
       out <- try(
@@ -712,13 +757,35 @@ fect_boot <- function(
         X.pseudo <- X[, id.pseudo, , drop = FALSE]
       }
 
-      ## output
-      # synth.out <- try(fect_nevertreated(Y = Y.pseudo, X = X.pseudo, D = D.pseudo,
-      #                             I = I.id.pseudo, II = II.id.pseudo,
-      #                             force = force, r = out$r.cv, CV = 0,
-      #                             tol = tol, norm.para = norm.para, boot = 1), silent = TRUE)
+      ## Subset CFE arrays to pseudo-sample indices
+      X.extra.FE.pseudo <- if (!is.null(X.extra.FE) && length(dim(X.extra.FE)) == 3 && dim(X.extra.FE)[2] > 0) {
+          X.extra.FE[, id.pseudo, , drop = FALSE]
+      } else {
+          X.extra.FE
+      }
+      X.Z.pseudo <- if (!is.null(X.Z) && length(dim(X.Z)) == 3 && dim(X.Z)[2] > 0) {
+          X.Z[, id.pseudo, , drop = FALSE]
+      } else {
+          X.Z
+      }
+      X.Q.pseudo <- if (!is.null(X.Q) && length(dim(X.Q)) == 3 && dim(X.Q)[2] > 0) {
+          X.Q[, id.pseudo, , drop = FALSE]
+      } else {
+          X.Q
+      }
+      X.gamma.pseudo <- if (!is.null(X.gamma) && length(dim(X.gamma)) == 3 && dim(X.gamma)[2] > 0) {
+          X.gamma[, id.pseudo, , drop = FALSE]
+      } else {
+          X.gamma
+      }
+      X.kappa.pseudo <- if (!is.null(X.kappa) && length(dim(X.kappa)) == 3 && dim(X.kappa)[2] > 0) {
+          X.kappa[, id.pseudo, , drop = FALSE]
+      } else {
+          X.kappa
+      }
 
-      if (method == "gsynth") {
+      ## output
+      if (method == "gsynth" || (method == "ife" && factors.from == "nevertreated")) {
         synth.out <- try(
           fect_nevertreated(
             Y = Y.pseudo,
@@ -739,6 +806,35 @@ fect_boot <- function(
           ),
           silent = TRUE
         )
+      } else if (method == "cfe" && factors.from == "nevertreated") {
+        synth.out <- try(
+          fect_nevertreated(
+            Y = Y.pseudo,
+            X = X.pseudo,
+            D = D.pseudo,
+            W = NULL,
+            I = I.id.pseudo,
+            II = II.id.pseudo,
+            T.on = T.on.pseudo,
+            hasRevs = hasRevs,
+            force = force,
+            r = out$r.cv,
+            CV = 0,
+            tol = tol,
+            max.iteration = max.iteration,
+            norm.para = norm.para,
+            boot = 1,
+            method = "cfe",
+            X.extra.FE = X.extra.FE.pseudo,
+            X.Z = X.Z.pseudo,
+            X.Q = X.Q.pseudo,
+            X.gamma = X.gamma.pseudo,
+            X.kappa = X.kappa.pseudo,
+            Zgamma.id = Zgamma.id,
+            kappaQ.id = kappaQ.id
+          ),
+          silent = TRUE
+        )
       } else if (method %in% c("ife", "cfe")) {
         if (method == "cfe") {
           synth.out <- try(
@@ -747,11 +843,11 @@ fect_boot <- function(
               X = X.pseudo,
               D = D.pseudo,
               W = NULL,
-              X.extra.FE = X.extra.FE,
-              X.Z = X.Z,
-              X.Q = X.Q,
-              X.gamma = X.gamma,
-              X.kappa = X.kappa,
+              X.extra.FE = X.extra.FE.pseudo,
+              X.Z = X.Z.pseudo,
+              X.Q = X.Q.pseudo,
+              X.gamma = X.gamma.pseudo,
+              X.kappa = X.kappa.pseudo,
               Zgamma.id = Zgamma.id,
               kappaQ.id = kappaQ.id,
               I = I.id.pseudo,
@@ -813,7 +909,9 @@ fect_boot <- function(
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
         .multicombine = TRUE,
-        .export = c("fect_nevertreated", "fect_fe", "fect_cfe", "initialFit"),
+        .export = c("fect_nevertreated", "fect_fe", "fect_cfe", "initialFit",
+                     ".reconstruct_gamma_fit_tr", ".reconstruct_kappa_fit",
+                     ".extract_and_apply_typeB_fe"),
         .packages = c("fect", "mvtnorm", "fixest"),
         .options.future = list(seed = TRUE),
         .inorder = FALSE

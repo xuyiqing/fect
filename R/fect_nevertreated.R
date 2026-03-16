@@ -34,7 +34,17 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         group.level = NULL,
                         group = NULL,
                         time.on.seq.group = NULL,
-                        time.off.seq.group = NULL) {
+                        time.off.seq.group = NULL,
+                        ## CFE-specific parameters (new)
+                        method = "ife",           ## "ife" (existing) or "cfe" (new)
+                        X.extra.FE = NULL,        ## TT x N x n_extra array
+                        X.Z = NULL,               ## TT x N x n_z array
+                        X.Q = NULL,               ## TT x N x n_q array
+                        X.gamma = NULL,           ## TT x N x n_gamma array
+                        X.kappa = NULL,           ## TT x N x n_kappa array
+                        Zgamma.id = NULL,         ## list mapping gamma groups to Z columns
+                        kappaQ.id = NULL          ## list mapping kappa groups to Q columns
+                        ) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -92,6 +102,66 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
+    ## ---- CFE array subsetting (co/tr split) ----
+    if (method == "cfe") {
+        ## helper to split a TT x N x k array into co/tr slices
+        .split_array <- function(arr, co_idx, tr_idx, TT, Nco, Ntr) {
+            if (!is.null(arr) && length(dim(arr)) == 3 && dim(arr)[3] > 0) {
+                list(co = arr[, co_idx, , drop = FALSE],
+                     tr = arr[, tr_idx, , drop = FALSE])
+            } else {
+                list(co = array(0, dim = c(TT, Nco, 0)),
+                     tr = array(0, dim = c(TT, Ntr, 0)))
+            }
+        }
+        efe.split  <- .split_array(X.extra.FE, co, tr, TT, Nco, Ntr)
+        X.extra.FE.co <- efe.split$co;  X.extra.FE.tr <- efe.split$tr
+        xz.split   <- .split_array(X.Z, co, tr, TT, Nco, Ntr)
+        X.Z.co <- xz.split$co;  X.Z.tr <- xz.split$tr
+        xq.split   <- .split_array(X.Q, co, tr, TT, Nco, Ntr)
+        X.Q.co <- xq.split$co;  X.Q.tr <- xq.split$tr
+        xg.split   <- .split_array(X.gamma, co, tr, TT, Nco, Ntr)
+        X.gamma.co <- xg.split$co;  X.gamma.tr <- xg.split$tr
+        xk.split   <- .split_array(X.kappa, co, tr, TT, Nco, Ntr)
+        X.kappa.co <- xk.split$co;  X.kappa.tr <- xk.split$tr
+
+        ## ---- Extra FE Type A/B classification ----
+        n_extra <- dim(X.extra.FE.co)[3]
+        fe_type <- character(0)
+        typeA_idx <- integer(0)
+        typeB_idx <- integer(0)
+
+        if (n_extra > 0) {
+            fe_type <- character(n_extra)
+            for (k in 1:n_extra) {
+                co_levels <- unique(X.extra.FE[1, co, k])
+                tr_levels <- unique(X.extra.FE[1, tr, k])
+                overlap <- intersect(co_levels, tr_levels)
+                if (length(overlap) == 0) {
+                    fe_type[k] <- "A"
+                } else {
+                    fe_type[k] <- "B"
+                    missing <- setdiff(tr_levels, co_levels)
+                    if (length(missing) > 0) {
+                        stop(paste0("Extra fixed effect dimension ", k,
+                             " has levels in treated units not found in controls: ",
+                             paste(missing, collapse = ", "),
+                             ". Cannot estimate from controls."))
+                    }
+                }
+            }
+            typeA_idx <- which(fe_type == "A")
+            typeB_idx <- which(fe_type == "B")
+        }
+
+        ## Build co-only Type-B FE array for complex_fe_ub
+        if (length(typeB_idx) > 0) {
+            X.extra.FE.co.B <- X.extra.FE.co[, , typeB_idx, drop = FALSE]
+        } else {
+            X.extra.FE.co.B <- array(0, dim = c(TT, Nco, 0))
+        }
+    }
+
     if (is.null(W)) {
         W.use <- as.matrix(0)
     } else {
@@ -112,6 +182,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     id.tr.pre.v <- rep(id, each = TT)[which(pre.v == 1)] ## vectorized pre-treatment grouping variable for the treated
     time.pre <- split(rep(time, Ntr)[which(pre.v == 1)], id.tr.pre.v) ## a list of pre-treatment periods
     sameT0 <- length(unique(T0)) == 1
+
+  if (method == "ife") {
+    ## ====================================================================
+    ## IFE PATH (existing code, unchanged)
+    ## ====================================================================
 
     beta0 <- matrix(0, p, 1)
     # initial fit using Y.co
@@ -562,6 +637,681 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             eff.r0[which(I.tr == 0)] <- 0
         }
     } ## missing data will be adjusted to NA finally
+
+  } else if (method == "cfe") {
+    ## ====================================================================
+    ## CFE PATH (new code)
+    ## ====================================================================
+
+    ## ---- Validate sufficient control units ----
+    if (Nco < 2) {
+        stop("Too few never-treated (control) units for CFE estimation. ",
+             "At least 2 control units are required, but only ", Nco, " found.")
+    }
+
+    ## ---- Initial fit for co-only data ----
+    beta0 <- matrix(0, p, 1)
+    data.ini <- matrix(NA, Nco * TT, (p + 3))
+    data.ini[, 1] <- c(Y.co)
+    data.ini[, 2] <- rep(1:Nco, each = TT)
+    data.ini[, 3] <- rep(1:TT, Nco)
+    if (p > 0) {
+        for (i in 1:p) {
+            data.ini[, (3 + i)] <- c(X.co[, , i])
+        }
+    }
+    initialOut <- Y0.co <- NULL
+    oci <- which(c(II.co) == 1)
+    if (is.null(W)) {
+        initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+    } else {
+        initialOut <- initialFit(data = data.ini, force = force, w = c(W.use), oci = oci)
+    }
+    Y0.co <- initialOut$Y0
+    beta0 <- initialOut$beta0
+    if (p > 0 && sum(is.na(beta0)) > 0) {
+        beta0[which(is.na(beta0))] <- 0
+    }
+
+    validX <- 1
+
+    ## ---- CV loop for CFE ----
+    if (CV == TRUE) {
+        ## starting r
+        if ((r > (T0.min - 1) & force %in% c(0, 2)) | (r > (T0.min - 2) & force %in% c(1, 3))) {
+            message("r is too big compared with T0; reset to 0.")
+            r <- 0
+        }
+        if (force %in% c(0, 2)) {
+            r.max <- max(min((T0.min - 1), r.end), 0)
+        } else {
+            r.max <- max(min((T0.min - 2), r.end), 0)
+        }
+
+        if (r.max == 0) {
+            r.cv <- 0
+            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
+            est.co.best <- complex_fe_ub(YY.co, Y0.co, X.co,
+                X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
+                Zgamma.id, kappaQ.id,
+                II.co, W.use, beta0, 0, force = force, tol, max.iteration)
+        } else {
+            r.old <- r
+            message("Cross-validating ...", "\r")
+            CV.out <- matrix(NA, (r.max - r.old + 1), 5)
+            colnames(CV.out) <- c("r", "sigma2", "IC", "PC", "MSPE")
+            CV.out[, "r"] <- c(r.old:r.max)
+            CV.out[, "MSPE"] <- CV.out[, "PC"] <- 1e10
+            r.pc <- est.co.pc.best <- NULL
+
+            for (i in 1:dim(CV.out)[1]) {
+                r <- CV.out[i, "r"]
+                est.co <- complex_fe_ub(YY.co, Y0.co, X.co,
+                    X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
+                    Zgamma.id, kappaQ.id,
+                    II.co, W.use, beta0, r, force = force, tol, max.iteration)
+
+                if (p > 0) {
+                    na.pos <- is.nan(est.co$beta)
+                    beta <- est.co$beta
+                    beta[is.nan(est.co$beta)] <- 0
+                }
+
+                if (is.null(norm.para)) {
+                    sigma2 <- est.co$sigma2
+                    IC <- est.co$IC
+                    PC <- est.co$PC
+                } else {
+                    sigma2 <- est.co$sigma2 * (norm.para[1]^2)
+                    IC <- est.co$IC - log(est.co$sigma2) + log(sigma2)
+                    PC <- est.co$PC * (norm.para[1]^2)
+                }
+
+                ## Build U.tr: subtract Layer 1 from Y.tr
+                if (r != 0) {
+                    F.hat <- as.matrix(est.co$factor)
+                    if (force %in% c(1, 3)) {
+                        F.hat <- cbind(F.hat, rep(1, TT))
+                    }
+                }
+                U.tr <- Y.tr
+                if (p > 0) {
+                    for (j in 1:p) {
+                        U.tr <- U.tr - X.tr[, , j] * beta[j]
+                    }
+                }
+                if (force != 0) {
+                    U.tr <- U.tr - matrix(est.co$mu, TT, Ntr)
+                }
+                if (force %in% c(2, 3)) {
+                    U.tr <- U.tr - matrix(est.co$xi, TT, Ntr, byrow = FALSE)
+                }
+
+                ## Subtract gamma for treated (Layer 1)
+                if (!is.null(est.co$gamma) && length(est.co$gamma) > 0) {
+                    for (k_g in seq_along(est.co$gamma)) {
+                        gamma.fit.tr.k <- .reconstruct_gamma_fit_tr(
+                            est.co$gamma[[k_g]], X.Z.tr, X.gamma.tr[, , k_g, drop = FALSE],
+                            Zgamma.id[[k_g]], TT, Ntr)
+                        U.tr <- U.tr - gamma.fit.tr.k
+                    }
+                }
+
+                ## Subtract Type-B extra FE for treated (Layer 1)
+                if (length(typeB_idx) > 0) {
+                    typeB.fit.tr <- .extract_and_apply_typeB_fe(
+                        est.co, X.co, X.extra.FE.co.B, X.extra.FE.tr,
+                        typeB_idx, X.Z.co, X.gamma.co, X.Q.co, X.kappa.co,
+                        Zgamma.id, kappaQ.id,
+                        TT, Nco, Ntr, p, r, force)
+                    U.tr <- U.tr - typeB.fit.tr
+                }
+
+                if (0 %in% I.tr) {
+                    U.tr[which(I.tr == 0)] <- 0
+                }
+
+                U.sav <- U.tr
+
+                ## Leave-one-out CV (same structure as IFE)
+                sum.e2 <- num.y <- 0
+                for (lv in unique(unlist(time.pre))) {
+                    U.tr <- U.sav
+                    if (max(T0) == T0.min & (!0 %in% I.tr)) {
+                        U.lv <- as.matrix(U.tr[setdiff(c(1:T0.min), lv), ])
+                    } else {
+                        U.tr.pre.v <- as.vector(U.tr)[which(pre.v == 1)]
+                        U.tr.pre <- split(U.tr.pre.v, id.tr.pre.v)
+                        if (!0 %in% I.tr) {
+                            U.lv <- lapply(U.tr.pre, function(vec) {
+                                return(vec[-lv])
+                            })
+                        } else {
+                            for (i.tr in 1:Ntr) {
+                                U.tmp <- U.tr.pre[[i.tr]]
+                                U.tr.pre[[i.tr]] <- U.tmp[!time.pre[[i.tr]] == lv]
+                            }
+                            U.lv <- U.tr.pre
+                        }
+                    }
+
+                    if (r == 0) {
+                        if (force %in% c(1, 3)) {
+                            if (max(T0) == T0.min & (!0 %in% I.tr)) {
+                                alpha.tr.lv <- colMeans(U.lv)
+                                U.tr <- U.tr - matrix(alpha.tr.lv, TT, Ntr, byrow = TRUE)
+                            } else {
+                                alpha.tr.lv <- sapply(U.lv, mean)
+                                U.tr <- U.tr - matrix(alpha.tr.lv, TT, Ntr, byrow = TRUE)
+                            }
+                        }
+                        e <- U.tr[which(time == lv), ]
+                    } else {
+                        F.lv <- as.matrix(F.hat[which(time != lv), ])
+                        if (max(T0) == T0.min & (!0 %in% I.tr)) {
+                            F.lv.pre <- F.hat[setdiff(c(1:T0.min), lv), ]
+                            lambda.lv <- try(
+                                solve(t(F.lv.pre) %*% F.lv.pre) %*% t(F.lv.pre) %*% U.lv,
+                                silent = TRUE
+                            )
+                            if ("try-error" %in% class(lambda.lv)) {
+                                break
+                            }
+                        } else {
+                            if (!0 %in% I.tr) {
+                                lambda.lv <- try(as.matrix(sapply(U.lv, function(vec) {
+                                    F.lv.pre <- as.matrix(F.lv[1:length(vec), ])
+                                    l.lv.tr <- solve(t(F.lv.pre) %*% F.lv.pre) %*% t(F.lv.pre) %*% vec
+                                    return(l.lv.tr)
+                                })), silent = TRUE)
+                                if ("try-error" %in% class(lambda.lv)) {
+                                    break
+                                } else {
+                                    if ((r == 1) & (force %in% c(0, 2))) {
+                                        lambda.lv <- t(lambda.lv)
+                                    }
+                                }
+                            } else {
+                                if (force %in% c(1, 3)) {
+                                    lambda.lv <- matrix(NA, (r + 1), Ntr)
+                                } else {
+                                    lambda.lv <- matrix(NA, r, Ntr)
+                                }
+                                test <- try(
+                                    for (i.tr in 1:Ntr) {
+                                        F.lv.pre <- as.matrix(F.hat[setdiff(time.pre[[i.tr]], lv), ])
+                                        lambda.lv[, i.tr] <- solve(t(F.lv.pre) %*% F.lv.pre) %*%
+                                            t(F.lv.pre) %*% as.matrix(U.lv[[i.tr]])
+                                    },
+                                    silent = TRUE
+                                )
+                                if ("try-error" %in% class(test)) {
+                                    break
+                                }
+                            }
+                        }
+                        lambda.lv <- t(lambda.lv)
+                        e <- U.tr[which(time == lv), ] - c(F.hat[which(time == lv), ] %*% t(lambda.lv))
+                    }
+                    if (sameT0 == FALSE | 0 %in% I.tr) {
+                        e <- e[which(pre[which(time == lv), ] == TRUE)]
+                    }
+                    sum.e2 <- sum.e2 + t(e) %*% e
+                    num.y <- num.y + length(e)
+                } ## end of leave-one-out
+
+                MSPE <- ifelse(num.y == 0, Inf, sum.e2 / num.y)
+                if (!is.null(norm.para)) {
+                    MSPE <- MSPE * (norm.para[1]^2)
+                }
+
+                if ((min(CV.out[, "MSPE"]) - MSPE) > tol * min(CV.out[, "MSPE"])) {
+                    est.co.best <- est.co
+                    r.cv <- r
+                } else {
+                    if (r == r.cv + 1) message("*")
+                }
+
+                if (PC < min(CV.out[, "PC"])) {
+                    r.pc <- r
+                    est.co.pc.best <- est.co
+                }
+                CV.out[i, 2:5] <- c(sigma2, IC, PC, MSPE)
+                message("r = ", r, "; sigma2 = ",
+                    sprintf("%.5f", sigma2), "; IC = ",
+                    sprintf("%.5f", IC), "; PC = ",
+                    sprintf("%.5f", PC), "; MSPE = ",
+                    sprintf("%.5f", MSPE),
+                    sep = ""
+                )
+            } ## end of CV loop
+
+            MSPE.best <- min(CV.out[, "MSPE"])
+            if (r > (T0.min - 1)) {
+                message(" (r hits maximum)")
+            }
+            message("\n r* = ", r.cv, sep = "")
+            message("\n")
+        }
+    } else {
+        r.cv <- r
+        r.min <- r.max <- r
+    }
+
+    ## ---- Final fit with selected r.cv ----
+    est.co.best <- complex_fe_ub(YY.co, Y0.co, X.co,
+        X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
+        Zgamma.id, kappaQ.id,
+        II.co, W.use, beta0, r.cv, force = force, tol, max.iteration)
+
+    ## Convergence check
+    if (!is.null(est.co.best$niter) && est.co.best$niter >= max.iteration) {
+        warning(paste0("CFE optimization did not converge within ", max.iteration,
+            " iterations. Results may be unreliable."))
+    }
+
+    est.co.fect <- NULL
+    if (boot == FALSE) {
+        if (r.cv == 0) {
+            est.co.fect <- est.co.best
+        } else {
+            est.co.fect <- complex_fe_ub(YY.co, Y0.co, X.co,
+                X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
+                Zgamma.id, kappaQ.id,
+                II.co, W.use, beta0, 0, force = force, tol, max.iteration)
+        }
+    }
+
+    validX <- est.co.best$validX
+    validF <- ifelse(r.cv > 0, 1, 0)
+
+    ## ---- Three-Layer Projection ----
+    ## Layer 1: subtract shared parameters from Y.tr
+    U.tr.r0 <- U.tr <- Y.tr
+    if (p > 0) {
+        beta <- est.co.best$beta
+        if (est.co.best$validX == 0) {
+            beta <- matrix(0, p, 1)
+        } else {
+            beta <- est.co.best$beta
+            beta[is.nan(est.co.best$beta)] <- 0
+        }
+        for (j in 1:p) {
+            U.tr <- U.tr - X.tr[, , j] * beta[j]
+        }
+        if (boot == FALSE) {
+            beta.r0 <- est.co.fect$beta
+            if (est.co.fect$validX == 0) {
+                beta.r0 <- matrix(0, p, 1)
+            } else {
+                beta.r0 <- est.co.fect$beta
+                beta.r0[is.nan(est.co.fect$beta)] <- 0
+            }
+            for (j in 1:p) {
+                U.tr.r0 <- U.tr.r0 - X.tr[, , j] * beta.r0[j]
+            }
+        }
+    } else {
+        beta <- NA
+        beta.r0 <- NA
+    }
+
+    mu <- est.co.best$mu
+    U.tr <- U.tr - matrix(mu, TT, Ntr)
+    Y.fe.bar <- rep(mu, TT)
+
+    if (boot == FALSE) {
+        mu.r0 <- est.co.fect$mu
+        U.tr.r0 <- U.tr.r0 - matrix(mu.r0, TT, Ntr)
+        Y.fe.bar.r0 <- rep(mu.r0, TT)
+    }
+
+    if (force %in% c(2, 3)) {
+        xi <- est.co.best$xi
+        U.tr <- U.tr - matrix(c(xi), TT, Ntr, byrow = FALSE)
+        Y.fe.bar <- Y.fe.bar + xi
+        if (boot == FALSE) {
+            xi.r0 <- est.co.fect$xi
+            U.tr.r0 <- U.tr.r0 - matrix(c(xi.r0), TT, Ntr, byrow = FALSE)
+            Y.fe.bar.r0 <- Y.fe.bar.r0 + xi.r0
+        }
+    }
+
+    ## Subtract gamma for treated (Layer 1)
+    if (!is.null(est.co.best$gamma) && length(est.co.best$gamma) > 0) {
+        for (k_g in seq_along(est.co.best$gamma)) {
+            gamma.fit.tr.k <- .reconstruct_gamma_fit_tr(
+                est.co.best$gamma[[k_g]], X.Z.tr, X.gamma.tr[, , k_g, drop = FALSE],
+                Zgamma.id[[k_g]], TT, Ntr)
+            U.tr <- U.tr - gamma.fit.tr.k
+        }
+    }
+
+    ## Subtract Type-B extra FE for treated (Layer 1)
+    if (length(typeB_idx) > 0) {
+        typeB.fit.tr <- .extract_and_apply_typeB_fe(
+            est.co.best, X.co, X.extra.FE.co.B, X.extra.FE.tr,
+            typeB_idx, X.Z.co, X.gamma.co, X.Q.co, X.kappa.co,
+            Zgamma.id, kappaQ.id,
+            TT, Nco, Ntr, p, r.cv, force)
+        U.tr <- U.tr - typeB.fit.tr
+    }
+
+    ## Layer 2: estimate alpha, kappa, Type-A FE, lambda from pre-treatment
+    ## Save Layer 1 residuals (before any Layer 2 subtractions)
+    U.tr.L1 <- U.tr
+
+    has_kappa <- !is.null(est.co.best$kappa) && length(est.co.best$kappa) > 0
+
+    ## --- Helper: compute kappa_fit (TT x Ntr) from current residuals ---
+    .estimate_kappa_fit <- function(U.cur) {
+        kappa_fit <- matrix(0, TT, Ntr)
+        if (!has_kappa) return(kappa_fit)
+        for (k_k in seq_along(est.co.best$kappa)) {
+            q_cols <- kappaQ.id[[k_k]]
+            kappa_groups <- X.kappa.tr[1, , k_k]
+            unique_kgroups <- sort(unique(kappa_groups))
+            for (g_idx in seq_along(unique_kgroups)) {
+                g <- unique_kgroups[g_idx]
+                units_in_group <- which(kappa_groups == g)
+                Q.pre.list <- list()
+                U.pre.list <- list()
+                for (i_idx in seq_along(units_in_group)) {
+                    ii <- units_in_group[i_idx]
+                    pre_t <- which(pre[, ii])
+                    if (length(pre_t) > 0) {
+                        Q.mat <- matrix(0, length(pre_t), length(q_cols))
+                        for (jj in seq_along(q_cols)) {
+                            Q.mat[, jj] <- X.Q.tr[pre_t, ii, q_cols[jj]]
+                        }
+                        Q.pre.list[[length(Q.pre.list) + 1]] <- Q.mat
+                        U.pre.list[[length(U.pre.list) + 1]] <- U.cur[pre_t, ii]
+                    }
+                }
+                if (length(U.pre.list) > 0) {
+                    Q.pre.all <- do.call(rbind, Q.pre.list)
+                    U.pre.all <- unlist(U.pre.list)
+                    if (length(U.pre.all) > length(q_cols)) {
+                        kappa.hat <- try(solve(t(Q.pre.all) %*% Q.pre.all) %*%
+                            t(Q.pre.all) %*% U.pre.all, silent = TRUE)
+                        if (!"try-error" %in% class(kappa.hat)) {
+                            for (ii in units_in_group) {
+                                Q.full <- matrix(0, TT, length(q_cols))
+                                for (jj in seq_along(q_cols)) {
+                                    Q.full[, jj] <- X.Q.tr[, ii, q_cols[jj]]
+                                }
+                                kappa_fit[, ii] <- kappa_fit[, ii] + Q.full %*% kappa.hat
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return(kappa_fit)
+    }
+
+    ## --- Helper: compute alpha (Ntr x 1) from current residuals ---
+    .estimate_alpha <- function(U.cur) {
+        if (!force %in% c(1, 3)) return(matrix(0, Ntr, 1))
+        if (max(T0) == T0.min & (!0 %in% I.tr)) {
+            return(as.matrix(colMeans(U.cur[1:T0.min, ])))
+        } else {
+            U.pre.v <- as.vector(U.cur)[which(pre.v == 1)]
+            U.pre.l <- split(U.pre.v, id.tr.pre.v)
+            return(as.matrix(sapply(U.pre.l, mean)))
+        }
+    }
+
+    ## --- Helper: estimate Type-A extra FE fit (TT x Ntr) from residuals ---
+    .estimate_typeA_fit <- function(U.cur) {
+        fe_fit <- matrix(0, TT, Ntr)
+        if (length(typeA_idx) == 0) return(fe_fit)
+        for (k_a in typeA_idx) {
+            labels.tr <- X.extra.FE.tr[1, , k_a]
+            unique_levels <- sort(unique(labels.tr))
+            for (g in unique_levels) {
+                units_in_level <- which(labels.tr == g)
+                pre_vals <- c()
+                for (ii in units_in_level) {
+                    pre_t <- which(pre[, ii])
+                    pre_vals <- c(pre_vals, U.cur[pre_t, ii])
+                }
+                if (length(pre_vals) > 0) {
+                    fe_mean <- mean(pre_vals)
+                    for (ii in units_in_level) {
+                        fe_fit[, ii] <- fe_fit[, ii] + fe_mean
+                    }
+                }
+            }
+        }
+        return(fe_fit)
+    }
+
+    ## --- Helper: estimate lambda fit (TT x Ntr) from residuals ---
+    ## When force %in% c(1,3), F.hat.aug includes intercept column;
+    ## alpha is embedded as the last column of lambda.
+    ## Returns list(fit = TT x Ntr, lambda = Ntr x ncol(F.hat.aug))
+    .estimate_lambda_fit <- function(U.cur, F.hat.aug) {
+        ncol_f <- ncol(F.hat.aug)
+        if (max(T0) == T0.min & (!0 %in% I.tr)) {
+            F.pre <- F.hat.aug[1:T0.min, , drop = FALSE]
+            U.pre <- as.matrix(U.cur[1:T0.min, ])
+            lam <- try(solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.pre,
+                       silent = TRUE)
+            if ("try-error" %in% class(lam)) {
+                return(list(fit = matrix(0, TT, Ntr),
+                            lambda = matrix(0, Ntr, ncol_f), ok = FALSE))
+            }
+        } else if (!0 %in% I.tr) {
+            lam <- try(as.matrix(sapply(seq_len(Ntr), function(j) {
+                pre_t <- which(pre[, j])
+                F.pre <- as.matrix(F.hat.aug[pre_t, , drop = FALSE])
+                solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.cur[pre_t, j]
+            })), silent = TRUE)
+            if ("try-error" %in% class(lam)) {
+                return(list(fit = matrix(0, TT, Ntr),
+                            lambda = matrix(0, Ntr, ncol_f), ok = FALSE))
+            }
+            if (ncol_f == 1) lam <- t(lam)
+        } else {
+            lam <- matrix(NA, ncol_f, Ntr)
+            test <- try(
+                for (i.tr in 1:Ntr) {
+                    F.pre <- as.matrix(F.hat.aug[time.pre[[i.tr]], , drop = FALSE])
+                    lam[, i.tr] <- solve(t(F.pre) %*% F.pre) %*%
+                        t(F.pre) %*% as.matrix(U.cur[time.pre[[i.tr]], i.tr])
+                }, silent = TRUE)
+            if ("try-error" %in% class(test)) {
+                return(list(fit = matrix(0, TT, Ntr),
+                            lambda = matrix(0, Ntr, ncol_f), ok = FALSE))
+            }
+        }
+        lam_mat <- t(lam)  ## Ntr x ncol_f
+        fit <- F.hat.aug %*% t(lam_mat)  ## TT x Ntr
+        return(list(fit = fit, lambda = lam_mat, ok = TRUE))
+    }
+
+    ## ============================================================
+    ## Block coordinate descent: jointly estimate all unit-specific
+    ## parameters (alpha, kappa, Type-A FE, lambda) from
+    ## pre-treatment residuals. Mirrors C++ cfe_iter logic.
+    ## ============================================================
+    has_alpha  <- force %in% c(1, 3)
+    has_typeA  <- length(typeA_idx) > 0
+    has_factor <- r.cv > 0
+
+    ## Build augmented factor matrix (factors + intercept for alpha)
+    F.hat.aug <- NULL
+    if (has_factor) {
+        F.hat.aug <- as.matrix(est.co.best$factor)
+        if (has_alpha) F.hat.aug <- cbind(F.hat.aug, rep(1, TT))
+    }
+
+    ## Initialize all component fits to zero
+    ## NOTE: When has_factor && has_alpha, alpha is embedded in lambda_fit
+    ## (via the augmented intercept column in F.hat.aug). In that case,
+    ## alpha_mat is NOT used in residual computation to avoid double subtraction.
+    ## alpha_mat is only used when has_alpha && !has_factor.
+    alpha_mat  <- matrix(0, TT, Ntr)   ## alpha broadcast to TT x Ntr
+    kappa_fit  <- matrix(0, TT, Ntr)
+    typeA_fit  <- matrix(0, TT, Ntr)
+    lambda_fit <- matrix(0, TT, Ntr)   ## F %*% t(lambda), includes alpha when augmented
+    alpha.tr   <- matrix(0, Ntr, 1)
+    lambda.tr  <- NULL
+    lambda.co  <- NULL
+
+    ## When has_factor && has_alpha, alpha lives inside lambda_fit.
+    ## alpha_mat is separate only when !has_factor.
+    alpha_in_lambda <- has_factor && has_alpha
+
+    n_components <- has_kappa + has_typeA + (has_factor || has_alpha)
+
+    if (n_components >= 2) {
+        ## Multiple components: iterate to convergence
+        max_iter_bcd <- 100
+        tol_bcd <- 1e-8
+
+        for (iter_bcd in 1:max_iter_bcd) {
+            old_kappa  <- kappa_fit
+            old_typeA  <- typeA_fit
+            old_alpha  <- alpha_mat
+            old_lambda <- lambda_fit
+
+            ## Step 1: estimate kappa from residual
+            if (has_kappa) {
+                if (alpha_in_lambda) {
+                    resid <- U.tr.L1 - typeA_fit - lambda_fit
+                } else {
+                    resid <- U.tr.L1 - alpha_mat - typeA_fit - lambda_fit
+                }
+                kappa_fit <- .estimate_kappa_fit(resid)
+            }
+
+            ## Step 2: estimate Type-A FE from residual
+            if (has_typeA) {
+                if (alpha_in_lambda) {
+                    resid <- U.tr.L1 - kappa_fit - lambda_fit
+                } else {
+                    resid <- U.tr.L1 - alpha_mat - kappa_fit - lambda_fit
+                }
+                typeA_fit <- .estimate_typeA_fit(resid)
+            }
+
+            ## Step 3: estimate alpha (+lambda if r.cv > 0)
+            if (has_factor) {
+                ## alpha embedded in augmented F.hat → lambda_fit includes alpha
+                resid <- U.tr.L1 - kappa_fit - typeA_fit
+                result <- .estimate_lambda_fit(resid, F.hat.aug)
+                if (!result$ok) {
+                    return(list(att = rep(NA, TT), att.avg = NA,
+                                beta = matrix(NA, p, 1)))
+                }
+                lambda_fit <- result$fit
+                lambda.tr <- result$lambda
+                if (has_alpha) {
+                    alpha.tr <- as.matrix(lambda.tr[, ncol(F.hat.aug), drop = FALSE])
+                    ## Do NOT update alpha_mat — alpha is inside lambda_fit
+                }
+            } else if (has_alpha) {
+                resid <- U.tr.L1 - kappa_fit - typeA_fit
+                alpha.tr <- .estimate_alpha(resid)
+                alpha_mat <- matrix(alpha.tr, TT, Ntr, byrow = TRUE)
+            }
+
+            ## Check convergence of all components
+            delta <- max(
+                max(abs(kappa_fit  - old_kappa)),
+                max(abs(typeA_fit  - old_typeA)),
+                if (alpha_in_lambda) 0 else max(abs(alpha_mat - old_alpha)),
+                max(abs(lambda_fit - old_lambda))
+            )
+            if (delta < tol_bcd) break
+        }
+    } else {
+        ## Single component (or none): one-pass estimation
+        if (has_kappa) {
+            kappa_fit <- .estimate_kappa_fit(U.tr.L1)
+        }
+        if (has_factor) {
+            resid <- U.tr.L1 - kappa_fit - typeA_fit
+            result <- .estimate_lambda_fit(resid, F.hat.aug)
+            if (!result$ok) {
+                return(list(att = rep(NA, TT), att.avg = NA,
+                            beta = matrix(NA, p, 1)))
+            }
+            lambda_fit <- result$fit
+            lambda.tr <- result$lambda
+            if (has_alpha) {
+                alpha.tr <- as.matrix(lambda.tr[, ncol(F.hat.aug), drop = FALSE])
+            }
+        } else if (has_alpha) {
+            resid <- U.tr.L1 - kappa_fit - typeA_fit
+            alpha.tr <- .estimate_alpha(resid)
+            alpha_mat <- matrix(alpha.tr, TT, Ntr, byrow = TRUE)
+        }
+        if (has_typeA) {
+            if (alpha_in_lambda) {
+                resid <- U.tr.L1 - kappa_fit - lambda_fit
+            } else {
+                resid <- U.tr.L1 - alpha_mat - kappa_fit - lambda_fit
+            }
+            typeA_fit <- .estimate_typeA_fit(resid)
+        }
+    }
+
+    ## Final residual = treatment effect
+    if (alpha_in_lambda) {
+        ## alpha is inside lambda_fit — don't subtract alpha_mat
+        U.tr <- U.tr.L1 - kappa_fit - typeA_fit - lambda_fit
+    } else {
+        U.tr <- U.tr.L1 - alpha_mat - kappa_fit - typeA_fit - lambda_fit
+    }
+    eff <- U.tr
+
+    ## Extract clean lambda.tr (remove alpha column if embedded)
+    if (has_factor && has_alpha && !is.null(lambda.tr)) {
+        alpha.tr <- as.matrix(lambda.tr[, ncol(F.hat.aug), drop = FALSE])
+        lambda.tr <- lambda.tr[, 1:r.cv, drop = FALSE]
+    } else if (has_factor && !is.null(lambda.tr)) {
+        ## lambda.tr already clean
+    } else {
+        lambda.tr <- NULL
+    }
+    lambda.co <- if (has_factor) est.co.best$lambda else NULL
+
+    ## Implied weights
+    if (has_factor && boot == 0 && !is.null(lambda.tr)) {
+        inv.tr <- try(ginv(t(as.matrix(lambda.tr))), silent = TRUE)
+        if (!"try-error" %in% class(inv.tr)) {
+            wgt.implied <- t(inv.tr %*% t(as.matrix(est.co.best$lambda)))
+        }
+    }
+
+    ## r=0 path (for equivalence test baseline — uses FE-only model)
+    if (force %in% c(1, 3)) {
+        if (boot == FALSE) {
+            if ((max(T0) == T0.min) & (!0 %in% I.tr)) {
+                alpha.tr.r0 <- as.matrix(colMeans(as.matrix(U.tr.r0[1:T0.min, ])))
+            } else {
+                U.tr.pre.v.r0 <- as.vector(U.tr.r0)[which(pre.v == 1)]
+                U.tr.pre.r0 <- split(U.tr.pre.v.r0, id.tr.pre.v)
+                alpha.tr.r0 <- as.matrix(sapply(U.tr.pre.r0, mean))
+            }
+            U.tr.r0 <- U.tr.r0 - matrix(alpha.tr.r0, TT, Ntr, byrow = TRUE)
+        }
+    }
+    if (boot == FALSE) {
+        eff.r0 <- U.tr.r0
+    }
+
+    if (0 %in% I.tr) {
+        eff[which(I.tr == 0)] <- 0
+        if (boot == FALSE) {
+            eff.r0[which(I.tr == 0)] <- 0
+        }
+    }
+
+  } ## end of method bifurcation
 
     ## -------------------------------##
     ## Summarize
@@ -1141,7 +1891,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
-    method <- ifelse(r.cv > 0, "gsynth", "fe")
+    if (method == "cfe") {
+        method <- ifelse(r.cv > 0, "cfe", "fe")
+    } else {
+        method <- ifelse(r.cv > 0, "gsynth", "fe")
+    }
 
     ## -------------------------------##
     ##            Storage            ##
@@ -1186,7 +1940,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         eff.calendar.fit = eff.calendar.fit,
         eff.pre = eff.pre,
         eff.pre.equiv = eff.pre.equiv,
-        pre.sd = pre.sd
+        pre.sd = pre.sd,
+        gamma = est.co.best$gamma,
+        kappa = est.co.best$kappa
     )
 
 
@@ -1287,4 +2043,166 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         ))
     }
     return(out)
+}
+
+
+## ====================================================================
+## Helper functions for CFE nevertreated path
+## ====================================================================
+
+## Reconstruct gamma fitted values for treated units using co-estimated gamma
+## gamma_coef: coefficient matrix from C++ Gamma(), n_groups x n_z_per_gamma
+## X.Z.tr: TT x Ntr x n_z array
+## gamma_groups_mat: TT x Ntr x 1 array (or TT x Ntr matrix via drop)
+## z_cols: integer vector of which Z columns belong to this gamma
+## Returns: TT x Ntr matrix
+.reconstruct_gamma_fit_tr <- function(gamma_coef, X.Z.tr, gamma_groups_arr,
+                                       z_cols, TT, Ntr) {
+    ## gamma_groups_arr: TT x Ntr x 1 array (from X.gamma.tr[,,k,drop=FALSE])
+    ## extract the TT x Ntr matrix
+    if (length(dim(gamma_groups_arr)) == 3) {
+        gamma_groups_mat <- gamma_groups_arr[, , 1, drop = FALSE]
+        dim(gamma_groups_mat) <- dim(gamma_groups_mat)[1:2]
+    } else {
+        gamma_groups_mat <- gamma_groups_arr
+    }
+    if (is.null(dim(gamma_groups_mat))) {
+        gamma_groups_mat <- matrix(gamma_groups_mat, nrow = TT, ncol = Ntr)
+    }
+    gamma_groups <- gamma_groups_mat[, 1]  ## all units share same time grouping
+    unique_groups <- sort(unique(gamma_groups))
+
+    fit <- matrix(0, TT, Ntr)
+
+    ## Extract Z values for treated (time-invariant, take t=1)
+    Z.tr.sub <- matrix(0, Ntr, length(z_cols))
+    for (j in seq_along(z_cols)) {
+        Z.tr.sub[, j] <- X.Z.tr[1, , z_cols[j]]
+    }
+
+    for (g_idx in seq_along(unique_groups)) {
+        t_in_group <- which(gamma_groups == unique_groups[g_idx])
+        if (g_idx <= nrow(gamma_coef)) {
+            coef_g <- gamma_coef[g_idx, , drop = FALSE]  ## 1 x n_z
+            contribution <- Z.tr.sub %*% t(coef_g)  ## Ntr x 1
+            for (tt in t_in_group) {
+                fit[tt, ] <- c(contribution)
+            }
+        }
+    }
+    return(fit)
+}
+
+## Reconstruct kappa fitted values
+## kappa_coef: coefficient matrix from C++ Kappa()
+## X.Q: TT x N x n_q array
+## kappa_groups_mat: from X.kappa[,,k] -- unit-level grouping
+## q_cols: integer vector
+## Returns: TT x N matrix
+.reconstruct_kappa_fit <- function(kappa_coef, X.Q, kappa_groups_mat, q_cols, TT, N) {
+    ## kappa_coef: q x N matrix from C++ Kappa().t() — each column is a unit's
+    ## kappa coefficients (q basis dimensions); units in the same group share
+    ## identical columns.
+    ## kappa_groups_mat may be a TT x N x 1 array (from X.kappa[,,k,drop=FALSE])
+    ## extract the TT x N matrix
+    if (length(dim(kappa_groups_mat)) == 3) {
+        kappa_groups_mat <- kappa_groups_mat[, , 1, drop = FALSE]
+        dim(kappa_groups_mat) <- dim(kappa_groups_mat)[1:2]
+    }
+    if (is.null(dim(kappa_groups_mat))) {
+        kappa_groups_mat <- matrix(kappa_groups_mat, nrow = TT, ncol = N)
+    }
+    kappa_groups <- kappa_groups_mat[1, ]  ## N-length, unit grouping
+    unique_groups <- sort(unique(kappa_groups))
+
+    ## Ensure kappa_coef is a matrix (handles q=1 case)
+    kappa_coef <- as.matrix(kappa_coef)
+
+    fit <- matrix(0, TT, N)
+    for (g_idx in seq_along(unique_groups)) {
+        g <- unique_groups[g_idx]
+        units_in_group <- which(kappa_groups == g)
+        ## Extract kappa coefficients for this group from any unit in the group
+        ## kappa_coef is q x N; column = unit's coefficients
+        rep_unit <- units_in_group[1]
+        if (rep_unit <= ncol(kappa_coef)) {
+            kappa_g <- kappa_coef[, rep_unit, drop = FALSE]  ## q x 1
+            ## Q basis values (time-varying)
+            Q.basis <- matrix(0, TT, length(q_cols))
+            for (j in seq_along(q_cols)) {
+                Q.basis[, j] <- X.Q[, units_in_group[1], q_cols[j]]
+            }
+            contribution <- Q.basis %*% kappa_g  ## TT x 1
+            for (ii in units_in_group) {
+                fit[, ii] <- c(contribution)
+            }
+        }
+    }
+    return(fit)
+}
+
+## Extract Type-B FE from co estimation and apply to treated
+## Returns: TT x Ntr matrix of Type-B FE fitted values for treated
+.extract_and_apply_typeB_fe <- function(est.co, X.co, X.extra.FE.co.B,
+                                         X.extra.FE.tr, typeB_idx,
+                                         X.Z.co, X.gamma.co, X.Q.co, X.kappa.co,
+                                         Zgamma.id, kappaQ.id,
+                                         TT, Nco, Ntr, p, r, force) {
+    ## Reconstruct non-FE fit for co
+    beta <- est.co$beta
+    if (!is.null(beta) && any(is.nan(beta))) beta[is.nan(beta)] <- 0
+
+    fit_no_fe.co <- matrix(est.co$mu, TT, Nco)
+    if (force %in% c(1, 3))
+        fit_no_fe.co <- fit_no_fe.co + matrix(c(est.co$alpha), TT, Nco, byrow = TRUE)
+    if (force %in% c(2, 3))
+        fit_no_fe.co <- fit_no_fe.co + matrix(c(est.co$xi), TT, Nco, byrow = FALSE)
+    if (p > 0 && !is.null(beta)) {
+        for (j in 1:p) fit_no_fe.co <- fit_no_fe.co + X.co[, , j] * beta[j]
+    }
+    ## Add gamma for co
+    if (!is.null(est.co$gamma) && length(est.co$gamma) > 0) {
+        for (k_g in seq_along(est.co$gamma)) {
+            gamma.fit.co.k <- .reconstruct_gamma_fit_tr(
+                est.co$gamma[[k_g]], X.Z.co,
+                X.gamma.co[, , k_g, drop = FALSE],
+                Zgamma.id[[k_g]], TT, Nco)
+            fit_no_fe.co <- fit_no_fe.co + gamma.fit.co.k
+        }
+    }
+    ## Add kappa for co
+    if (!is.null(est.co$kappa) && length(est.co$kappa) > 0) {
+        for (k_k in seq_along(est.co$kappa)) {
+            kappa.fit.co.k <- .reconstruct_kappa_fit(
+                est.co$kappa[[k_k]], X.Q.co,
+                X.kappa.co[, , k_k, drop = FALSE],
+                kappaQ.id[[k_k]], TT, Nco)
+            fit_no_fe.co <- fit_no_fe.co + kappa.fit.co.k
+        }
+    }
+    ## Add factors for co
+    if (r > 0 && !is.null(est.co$factor)) {
+        fit_no_fe.co <- fit_no_fe.co + est.co$factor %*% t(est.co$lambda)
+    }
+
+    fe_fit.co <- est.co$fit - fit_no_fe.co  ## TT x Nco: extra FE contribution
+
+    ## For each Type-B FE dimension, compute group means and apply to treated
+    typeB.fit.tr <- matrix(0, TT, Ntr)
+    for (k_b_idx in seq_along(typeB_idx)) {
+        k <- typeB_idx[k_b_idx]
+        labels.co <- X.extra.FE.co.B[1, , k_b_idx]
+        labels.tr <- X.extra.FE.tr[1, , k]
+        levels.all <- sort(unique(labels.co))
+
+        for (g in levels.all) {
+            co_mask <- which(labels.co == g)
+            tr_mask <- which(labels.tr == g)
+            if (length(tr_mask) > 0 && length(co_mask) > 0) {
+                fe_val <- mean(fe_fit.co[, co_mask])
+                typeB.fit.tr[, tr_mask] <- typeB.fit.tr[, tr_mask] + fe_val
+            }
+        }
+    }
+    return(typeB.fit.tr)
 }

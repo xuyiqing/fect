@@ -82,6 +82,7 @@ graph TD
     E2 --> C2
     E3 --> C3
     E4 --> C1
+    E4 --> C2
     I1 --> E1
     I1 --> E2
     I1 --> E3
@@ -101,13 +102,13 @@ graph TD
     C3 --> C7
 ```
 
-> One unified diagram grouping all R and C++ modules into six layers. Edges show real dependency/call relationships between modules. See the Module Reference table below for binary_*.cpp, fe_sub.cpp, and other modules not shown in the diagram to keep it readable.
+> One unified diagram grouping all R and C++ modules into six layers. Edges show real dependency/call relationships between modules. Phase 3a added E4→C2 edge (fect_nevertreated now calls complex_fe_ub for CFE path). See the Module Reference table below for binary_*.cpp, fe_sub.cpp, and other modules not shown.
 
 ### Module Reference
 
 | Module / File | Layer | Purpose | Key Exports | Changed |
 | --- | --- | --- | --- | --- |
-| `R/default.R` | API | Main entry point; formula parsing, input validation, data reshaping, method dispatch, normalization, bootstrap orchestration, diagnostics | `fect()`, `fect.formula()`, `fect.default()` | no |
+| `R/default.R` | API | Main entry point; formula parsing, input validation, data reshaping, method dispatch, normalization, bootstrap orchestration, diagnostics | `fect()`, `fect.formula()`, `fect.default()` | **yes** |
 | `R/interFE.R` | API | Standalone interactive fixed effects estimator for complete panels | `interFE()`, `interFE.formula()`, `interFE.default()` | no |
 | `R/did_wrapper.R` | API | Unified wrapper for external DID estimators (did, DIDmultiplegtDYN) with event-study output | `did_wrapper()` | no |
 | `R/fect_mspe.R` | API | Mean squared prediction error diagnostics; hides treated periods and re-estimates | `fect_mspe()`, `fect_mspe_sim()` | no |
@@ -115,8 +116,8 @@ graph TD
 | `R/fe.R` | Estimator | FE and IFE estimator; computes counterfactuals, ATT, dynamic effects, cohort effects, calendar effects | `fect_fe()` (internal) | no |
 | `R/cfe.R` | Estimator | Complex FE estimator; supports extra additive FEs, Z/gamma, Q/kappa, latent factors | `fect_cfe()` (internal) | no |
 | `R/mc.R` | Estimator | Matrix completion estimator with nuclear norm regularization | `fect_mc()` (internal) | no |
-| `R/fect_nevertreated.R` | Estimator | Generalized synthetic control (Xu 2017); separate CV for factor selection | `fect_nevertreated()` (internal) | no |
-| `R/boot.R` | Inference | Parametric and wild bootstrap, jackknife; parallel execution via future/doFuture | `fect_boot()` (internal) | no |
+| `R/fect_nevertreated.R` | Estimator | Nevertreated predictive routine for IFE and CFE; co-only estimation with three-layer projection and block coordinate descent for treated parameters | `fect_nevertreated()` (internal) | **yes** |
+| `R/boot.R` | Inference | Parametric and wild bootstrap, jackknife; parallel execution via future/doFuture | `fect_boot()` (internal) | **yes** |
 | `R/cv.R` | Inference | Cross-validation for r (factors) or lambda (regularization); MSPE/PC criterion | `fect_cv()` (internal) | no |
 | `R/cv_binary.R` | Inference | Cross-validation for binary probit models | `fect_binary_cv()` (internal) | no |
 | `R/fittest.R` | Inference | Wild bootstrap goodness-of-fit test for pre-trends | `fect_test()` (internal) | no |
@@ -195,7 +196,7 @@ graph TD
     fect_mspe --> fect
 ```
 
-> Traces from public entry points through R-side orchestration. Diamond nodes represent method dispatch branch points. Standalone API functions (interFE, plot.fect, etc.) shown with their outgoing calls. No nodes changed in this run.
+> Traces from public entry points through R-side orchestration. Diamond nodes represent method dispatch branch points. Standalone API functions (interFE, plot.fect, etc.) shown with their outgoing calls. Updated in Phase 3a run.
 
 ### Estimator-to-C++ Detail
 
@@ -212,6 +213,7 @@ graph TD
     fect_mc["fect_mc()"] --> inter_fe_mc["inter_fe_mc() C++"]
 
     fect_nevertreated["fect_nevertreated()"] --> inter_fe_ub
+    fect_nevertreated --> complex_fe_ub
     fect_nevertreated --> fect_cv["fect_cv()"]
 
     complex_fe_ub --> cfe_iter["cfe_iter() C++"]
@@ -232,7 +234,7 @@ graph TD
     fect_cv --> inter_fe_mc
 ```
 
-> Traces from each R estimator to its C++ solver functions. Shows internal C++ call chains down to leaf subroutines. No nodes changed in this run.
+> Traces from each R estimator to its C++ solver functions. Shows internal C++ call chains down to leaf subroutines. Updated in Phase 3a run.
 
 ### Function Reference
 
@@ -240,12 +242,12 @@ graph TD
 | --- | --- | --- | --- | --- | --- |
 | `fect()` | `default.R` | user | `fect.formula()`, `fect.default()` | no | Generic entry point; dispatches on formula vs. direct arguments |
 | `fect.formula()` | `default.R` | `fect()` | `fect.default()` | no | Parses formula, extracts Y/D/X variable names, delegates |
-| `fect.default()` | `default.R` | `fect.formula()`, user | `initialFit()`, estimators, `fect_cv()`, `fect_boot()`, `fect_test()`, `diagtest()`, `fect_permu()` | no | Core orchestrator: validates inputs, reshapes long-to-wide, normalizes, dispatches estimator and inference |
+| `fect.default()` | `default.R` | `fect.formula()`, user | `initialFit()`, estimators, `fect_cv()`, `fect_boot()`, `fect_test()`, `diagtest()`, `fect_permu()` | **yes** | Core orchestrator: validates inputs, reshapes long-to-wide, normalizes, dispatches estimator and inference. Added `cfe+nevertreated` dispatch branch and `factors.from` passthrough to `fect_boot()` |
 | `fect_fe()` | `fe.R` | `fect.default()`, `fect_boot()` | `initialFit()`, `inter_fe_ub()` | no | FE/IFE estimator; computes counterfactuals, ATT, dynamic/cohort/calendar effects |
 | `fect_cfe()` | `cfe.R` | `fect.default()`, `fect_boot()` | `initialFit()`, `complex_fe_ub()` | no | CFE estimator; handles extra FEs, Z/gamma, Q/kappa, latent factors via block coordinate descent |
 | `fect_mc()` | `mc.R` | `fect.default()`, `fect_boot()` | `inter_fe_mc()` | no | Matrix completion estimator with nuclear norm penalty |
-| `fect_nevertreated()` | `fect_nevertreated.R` | `fect.default()`, `fect_boot()` | `inter_fe_ub()`, `fect_cv()` | no | Generalized synthetic control with own CV for factor count |
-| `fect_boot()` | `boot.R` | `fect.default()` | `fect_fe()`, `fect_cfe()`, `fect_mc()`, `fect_nevertreated()` | no | Bootstrap/jackknife inference; parallel via future/doFuture |
+| `fect_nevertreated()` | `fect_nevertreated.R` | `fect.default()`, `fect_boot()` | `inter_fe_ub()`, `complex_fe_ub()`, `fect_cv()` | **yes** | Nevertreated predictive routine for IFE and CFE; method bifurcation, three-layer projection, block coordinate descent for treated parameters |
+| `fect_boot()` | `boot.R` | `fect.default()` | `fect_fe()`, `fect_cfe()`, `fect_mc()`, `fect_nevertreated()` | **yes** | Bootstrap/jackknife inference; parallel via future/doFuture. Added `cfe+nevertreated` bootstrap dispatch and CFE array subsetting |
 | `fect_cv()` | `cv.R` | `fect.default()`, `fect_nevertreated()` | `inter_fe_ub()`, `inter_fe_mc()` | no | Cross-validation for r (IFE) or lambda (MC) |
 | `fect_binary_cv()` | `cv_binary.R` | `fect.default()` | `inter_fe_d_ub()`, `inter_fe_d_qr_ub()` | no | Cross-validation for binary probit IFE models |
 | `fect_test()` | `fittest.R` | `fect.default()` | `fect_fe()`, `fect_mc()` | no | Wild bootstrap F-test for pre-treatment fit |
@@ -304,7 +306,7 @@ graph TD
     FectObj --> EffectOut["effect() / att.cumu()"]
 ```
 
-> Vertical flowchart showing the data pipeline from user input through estimation, inference, and output. Diamond nodes represent decision points where the pipeline branches. No nodes changed in this run.
+> Vertical flowchart showing the data pipeline from user input through estimation, inference, and output. Diamond nodes represent decision points where the pipeline branches. Updated in Phase 3a run.
 
 ---
 
@@ -338,7 +340,7 @@ graph TD
 
 - The `method = "cfe"` pathway is the newest and most complex estimator, supporting extra additive fixed effects (`sfe`/`cfe` arguments), time-invariant covariates with time-grouped coefficients (`Z`/`gamma`), unit-specific time trends (`Q`/`kappa` with polynomial or B-spline basis), and latent factors. The R-side `fect_cfe()` includes input validation guards (dimension checks, binary D validation, convergence warnings) that the older estimators lack.
 
-- The `fect_nevertreated()` function implements the nevertreated predictive routine from Xu (2017) within the fect framework. It estimates factors from never-treated units only, then projects counterfactuals onto treated units. Unlike `fect_fe()`, it performs its own internal cross-validation loop for factor count selection.
+- The `fect_nevertreated()` function implements the nevertreated predictive routine within the fect framework. It estimates all shared parameters from never-treated control units only (via `inter_fe_ub` for IFE or `complex_fe_ub` for CFE), then projects counterfactuals onto treated units using a three-layer scheme: Layer 1 subtracts shared parameters (mu, xi, beta, gamma, Type-B FE, factors), Layer 2 estimates unit-specific treated parameters (alpha, kappa, Type-A FE, lambda) via block coordinate descent, and Layer 3 computes treatment effects as residuals. Unlike `fect_fe()`, it performs its own internal cross-validation loop for factor count selection.
 
 - `did_wrapper()` provides a bridge to external DID packages (`did`, `DIDmultiplegtDYN`), producing event-study data frames compatible with `esplot()`.
 

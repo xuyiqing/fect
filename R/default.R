@@ -1491,9 +1491,10 @@ fect.default <- function(
                          r + 1, " for r = ", r, "."))
         }
 
-        if (!method %in% c("gsynth", "ife")) {
+        if (!(method %in% c("gsynth", "ife") ||
+              (method == "cfe" && factors.from == "nevertreated"))) {
             ## Zero out II for methods that don't do their own co/tr split
-            ## (gsynth and ife+nevertreated route to fect_nevertreated which splits internally)
+            ## (gsynth, ife+nevertreated, cfe+nevertreated route to fect_nevertreated which splits internally)
             ever.treated <- setdiff(1:ncol(II), co.never)
             II[, ever.treated] <- 0
         }
@@ -2066,6 +2067,45 @@ fect.default <- function(
                     group.level = g.level,
                     group = G
                 )
+            } else if (method == "cfe" && factors.from == "nevertreated") {
+                ## cfe + nevertreated: route to fect_nevertreated with method="cfe"
+                out <- fect_nevertreated(
+                    Y = Y,
+                    D = D,
+                    X = X,
+                    W = W,
+                    I = I,
+                    II = II,
+                    T.on = T.on,
+                    T.off = T.off,
+                    r = r,
+                    CV = 0,
+                    T.on.balance = T.on.balance,
+                    balance.period = balance.period,
+                    binary = binary,
+                    QR = QR,
+                    force = force,
+                    hasRevs = hasRevs,
+                    tol = tol,
+                    max.iteration = max.iteration,
+                    boot = 0,
+                    norm.para = norm.para,
+                    placeboTest = placeboTest,
+                    placebo.period = placebo.period,
+                    carryoverTest = carryoverTest,
+                    carryover.period = carryover.period,
+                    group.level = g.level,
+                    group = G,
+                    ## CFE-specific parameters
+                    method = "cfe",
+                    X.extra.FE = X.extra.FE,
+                    X.Z = X.Z,
+                    X.Q = X.Q,
+                    X.gamma = X.gamma,
+                    X.kappa = X.kappa,
+                    Zgamma.id = Zgamma.id,
+                    kappaQ.id = kappaQ.id
+                )
             } else if (method == "cfe") {
                 out <- fect_cfe(
                     Y = Y,
@@ -2222,7 +2262,8 @@ fect.default <- function(
             cores = cores,
             group.level = g.level,
             group = G,
-            keep.sims = keep.sims
+            keep.sims = keep.sims,
+            factors.from = factors.from
         )
 
     }
