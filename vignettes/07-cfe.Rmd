@@ -1,6 +1,6 @@
 # Complex Fixed Effects (CFE) {#sec-cfe}
 
-This chapter provides a dedicated tutorial for the **Complex Fixed Effects (CFE)** estimator in **fect**. Download the R code used in this chapter [here](rscript/07-cfe.R). The CFE method generalizes the standard two-way fixed effects counterfactual estimator by allowing additional model components: extra additive fixed effects, time-invariant covariates with time-grouped coefficients, unit-specific loadings on known time trends, and interactive fixed effects via latent factors.
+This chapter provides a dedicated tutorial for the **Complex Fixed Effects (CFE)** estimator in **fect**. The CFE method generalizes the standard two-way fixed effects counterfactual estimator by allowing additional model components: extra additive fixed effects, time-invariant covariates with time-grouped coefficients, unit-specific loadings on known time trends, and interactive fixed effects via latent factors.
 
 ```{r echo = FALSE}
 set.seed(1234)

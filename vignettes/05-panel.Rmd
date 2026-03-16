@@ -8,7 +8,6 @@ editor:
 
 This chapter, authored by Ziyi Liu and Yiqing Xu, complements @CLLX2025 ([paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf), [slides](https://yiqingxu.org/papers/english/2023_panel/CLLX_slides.pdf)).
 Rivka Lipkovitz also contributes to this tutorial.
-Download the R code used in this chapter [here](rscript/05-panel.R).
 
 ------------------------------------------------------------------------
 
