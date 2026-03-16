@@ -1697,17 +1697,68 @@ test_that("cfe+nevertreated CV selects r and runs without error", {
   skip_on_cran()
   df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
-  out <- suppressWarnings(suppressMessages(fect::fect(
+  out <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = df, index = c("id", "time"),
-    method = "cfe", r = c(0, 3), CV = TRUE, se = FALSE,
+    method = "cfe", Z = "Z", r = c(0, 3), CV = TRUE, se = FALSE,
     factors.from = "nevertreated",
-    force = "two-way", parallel = FALSE
+    force = "two-way", parallel = TRUE, cores = 10
   )))
 
   expect_s3_class(out, "fect")
   expect_true(is.numeric(out$r.cv), info = "r.cv should be set by CV")
-  expect_true(out$r.cv >= 0 && out$r.cv <= 3,
-              info = paste("r.cv should be in [0,3], got:", out$r.cv))
+  expect_true(out$r.cv >= 1 && out$r.cv <= 3,
+              info = paste("r.cv should be >= 1 for DGP with r=2, got:", out$r.cv))
   expect_true(is.numeric(out$att.avg))
   expect_true(!is.na(out$att.avg))
+})
+
+## ========================================================
+## CFE CV r-selection accuracy tests (REQ-cfe-cv-rselect-001)
+## ========================================================
+
+test_that("cfe+nevertreated+Z CV correctly selects r=2", {
+  skip_on_cran()
+  df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "cfe", Z = "Z", r = c(0, 5), CV = TRUE, se = FALSE,
+    factors.from = "nevertreated",
+    force = "two-way", parallel = TRUE, cores = 10
+  )))
+
+  expect_equal(out$r.cv, 2,
+               info = paste("r.cv should be 2 for DGP with r=2, got:", out$r.cv))
+  expect_true(abs(out$att.avg - 3.0) < 0.5,
+              info = paste("ATT should be close to 3.0, got:", out$att.avg))
+})
+
+test_that("cfe+nevertreated+Z CV correctly selects r=0 on zero-factor data", {
+  skip_on_cran()
+  df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 0, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "cfe", Z = "Z", r = c(0, 5), CV = TRUE, se = FALSE,
+    factors.from = "nevertreated",
+    force = "two-way", parallel = TRUE, cores = 10
+  )))
+
+  expect_equal(out$r.cv, 0,
+               info = paste("r.cv should be 0 for DGP with r=0, got:", out$r.cv))
+})
+
+test_that("cfe+nevertreated CV selects r=2 on factor-only data (no Z in DGP)", {
+  skip_on_cran()
+  df <- make_factor_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
+
+  out <- suppressWarnings(suppressMessages(fect(
+    Y ~ D, data = df, index = c("id", "time"),
+    method = "cfe", r = c(0, 5), CV = TRUE, se = FALSE,
+    factors.from = "nevertreated",
+    force = "two-way", parallel = TRUE, cores = 10
+  )))
+
+  expect_equal(out$r.cv, 2,
+               info = paste("r.cv should be 2 for DGP with r=2, got:", out$r.cv))
 })

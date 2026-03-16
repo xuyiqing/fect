@@ -4,7 +4,7 @@
 2026-03-16 (updated)
 
 ## Status
-COMPLETE through Phase 3a + Category I bootstrap tests + CV gap fix + r=0 invariance test + Quarto book update — all committed and pushed to `cfe`. 131/131 tests pass. Quarto book renders (10/10 chapters).
+COMPLETE through Phase 3a + Category I bootstrap tests + CV gap fix + r=0 invariance test + Quarto book update + CFE CV r-selection fix — all committed and pushed to `cfe`. 135/135 tests pass. Quarto book renders (10/10 chapters).
 
 ---
 
@@ -26,6 +26,7 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 | — | r=0 invariance test (I12) | **Done** (`e5f098e`) |
 | — | CV routing fix for cfe+nevertreated | **Done** (`4cfe25c`) |
 | — | Quarto book: two research settings, chapter reorder, factors.from/em docs | **Done** (`219510d`, `0fa790c`, `fd2abd3`) |
+| — | CFE CV r-selection: diagnosed as test misspecification (missing Z="Z"), fixed test + added 3 new tests | **Done** (REQ-cfe-cv-rselect-001) |
 
 ---
 
@@ -62,7 +63,7 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 
 ## Test results
 
-**131/131 tests pass** (`test-factors-from-refactor.R`, 1714 lines)
+**135/135 tests pass** (`test-factors-from-refactor.R`)
 
 | Category | Tests | What |
 |----------|-------|------|
@@ -122,8 +123,8 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 ### Compare cv.R vs fect_mspe.R
 User requested comparing and potentially consolidating these two functions. `fect_cv` (1570 lines) is internal CV for factor number selection; `fect_mspe` (382 lines) is post-estimation MSPE validation (hide-and-refit). Different purposes but may share logic.
 
-### CFE CV r-selection issue
-CFE CV selects r=0 on data with true r=2 (N=200, Nco=170), while IFE CV correctly selects r=2 on the same data. Pre-existing behavior in `fect_nevertreated`'s CFE CV loop (lines 679-879). `complex_fe_ub` may absorb factor structure into other CFE components (gamma, kappa, extra FE), making the MSPE criterion insensitive to r.
+### ~~CFE CV r-selection issue~~ RESOLVED
+**Finding**: The CFE CV algorithm is correct. The original test was misspecified -- it used `make_cfe_z_data` (DGP with Z*gamma) but did not pass `Z = "Z"` to `fect()`. Without Z, factors absorb the unmodeled Z*gamma interaction (a rank-1 component), inflating r.cv by ~1. With Z properly specified, CFE CV correctly selects r=2 with clear MSPE U-shape (minimum at true r). Fixed test + added 3 new tests. 135/135 pass. See `log/2026-03-16-cfe-cv-rselect-fix.md` for full process record.
 
 ### Phase 3b: Merge IFE into CFE
 - Verify test E0: `complex_fe_ub` with empty CFE arrays ≡ `inter_fe_ub`
@@ -199,13 +200,14 @@ When `method="cfe"` + `factors.from="nevertreated"`, dispatch routes to `fect_ne
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). All code changes and Quarto book updates are complete. 131/131 tests pass, 10/10 chapters render. HEAD: `fd2abd3`.
+> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). All code changes and Quarto book updates are complete. 135/135 tests pass, 10/10 chapters render.
 >
 > **Open tasks** (in priority order):
 >
 > 1. **Compare cv.R vs fect_mspe.R** — user wants to explore consolidation. `fect_cv` (internal CV for r-selection) vs `fect_mspe` (post-estimation hide-and-refit MSPE). Different purposes but may share logic.
-> 2. **CFE CV r-selection issue** — CFE CV selects r=0 on data with true r=2 while IFE CV correctly selects r=2. Pre-existing in `fect_nevertreated`'s CFE CV loop. `complex_fe_ub` may absorb factors into other components.
-> 3. **Test gaps** — fect_mspe/fect_mspe_sim have no tests; esplot has basic tests only; att.cumu needs clarification.
-> 4. **Phase 3b** — merge IFE into CFE (verify E0/E4 equivalence, replace `inter_fe_ub` with `complex_fe_ub`).
+> 2. **Test gaps** — fect_mspe/fect_mspe_sim have no tests; esplot has basic tests only; att.cumu needs clarification.
+> 3. **Phase 3b** — merge IFE into CFE (verify E0/E4 equivalence, replace `inter_fe_ub` with `complex_fe_ub`).
+>
+> **Resolved**: CFE CV r-selection issue (was test misspecification, not algorithm bug).
 >
 > Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.
