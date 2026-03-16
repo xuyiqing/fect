@@ -44,6 +44,29 @@ Using the current version of **fect**, we can apply several different methods to
 
 The two-way fixed effects counterfactual estimator (FEct) is also independently proposed by @BJS2024 and @gardnertwo, who refer to it as the "imputation method" and "two-stage DID," respectively.
 
+### Two estimation regimes {#fect-regimes}
+
+The `factors.from` parameter determines which observations are used to estimate the factor model. See the [introduction](index.qmd#two-estimation-regimes) for full details. Here we briefly demonstrate both regimes on `simdata`.
+
+The **default regime** (`factors.from = "notyettreated"`) uses all not-yet-treated observations via the EM algorithm. This is the regime used by all examples in this chapter:
+
+```{r regime_nyt, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.nyt <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+                method = "ife", force = "two-way", CV = TRUE, r = c(0, 5))
+```
+
+The **never-treated regime** (`factors.from = "nevertreated"`) uses only never-treated controls. It is ideal for settings without treatment reversal:
+
+```{r regime_nt, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.nt <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+               method = "ife", factors.from = "nevertreated",
+               force = "two-way", CV = TRUE, r = c(0, 5))
+```
+
+::: {.callout-note appearance="simple"}
+Since `simdata` contains treatment reversals, the never-treated regime may not be the best choice here — it is shown for illustration only. For a dataset without reversals, see [Chapter @sec-gsynth] which uses `simgsynth`.
+:::
+
 ### Estimation
 
 We estimate the average treatment effect on the treated (ATT) using the following information: the outcome variable $Y$, binary treatment variable $D$, two observed covariates $X_{1}$ and $X_{2}$, and the unit and time indicators $id$ and $time$, respectively.
@@ -54,6 +77,11 @@ The first variable on the right hand side of the formula is the treatment indica
 out.fect <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                  method = "fe", force = "two-way")
 ```
+
+::: {.callout-tip appearance="simple"}
+### Estimation parameters
+The key parameters that control the **model** are: `method` (estimator choice), `force` (fixed effects structure), `r` (number of factors), `factors.from` (estimation sample), and `em` (EM algorithm). These determine how $\hat{Y}(0)$ is imputed.
+:::
 
 ### Visualization
 
@@ -71,6 +99,11 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
 The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power.
 
 The graph is a **ggplot2** object; user can conveniently use the `ggsave` (preferred) function to export the resulting plot. See [Chapter @sec-plots] for more visualization options.
+
+::: {.callout-tip appearance="simple"}
+### Inference parameters
+The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These do not affect point estimates.
+:::
 
 ### Uncertainty estimates
 
@@ -101,7 +134,7 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")
 ```
 
-### Save estiamtes
+### Save estimates
 
 Users can use the `print` function to take a look at a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. Specifically, `est.avg` and `est.avg.unit` show the ATT averaged over all periods -- the former weights each treated observation equally while the latter weights each treated unit equally. `est.beta` reports the coefficients of the time-varying covariates. `est.att` reports the average treatment effect on the treated (ATT) by period. Treatment effect estimates from each bootstrap run is stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
 
@@ -162,6 +195,11 @@ We can also remove triplets in the fitting procedure but only include the middle
 
 For the IFE method, we need to specify an interval of candidate number of unobserved factors in option `r` like `r=c(0,5)`. When cross-validation is switched off, the first element in `r` will be set as the number of factors. Below we use the MSPE criterion and search the number of factors from 0 to 5.
 
+::: {.callout-note appearance="simple"}
+### The `em` parameter
+By default, `em = TRUE` and the EM algorithm is used to estimate the factor model when the estimation sample has missing entries (which is always the case under `factors.from = "notyettreated"`). Setting `em = FALSE` uses direct SVD instead, which requires a complete estimation sample — this is automatically the case when `factors.from = "nevertreated"`. Note: `method = "gsynth"` automatically sets `em = FALSE`.
+:::
+
 ```{r simdata_ife, eval=TRUE, cache = TRUE}
 out.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"), 
           force = "two-way", method = "ife", CV = TRUE, r = c(0, 5), 
@@ -191,7 +229,7 @@ print(out.mc)
 plot(out.mc, main = "Estimated ATT (MC)")
 ```
 
-## Weighitng treatment effects
+## Weighting treatment effects
 
 After obtaining the individual treatment effects using one of the counterfactual estimators, we can weight these estimates using a constructed balanced treated sample or other user-supplied weighting schemes.
 
@@ -467,9 +505,14 @@ In the above plot, the three periods in blue are droppred from the first-stage e
 
 Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. - Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
 
+::: {.callout-note appearance="simple"}
+The example below uses `method = "ife"` with `factors.from = "nevertreated"`, which is equivalent to `method = "gsynth"` (see [Chapter @sec-gsynth]). We use the explicit form here for clarity.
+:::
+
 ```{r effect, cache = TRUE}
 out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
-                        method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+                        method = "ife", factors.from = "nevertreated",
+                        force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'bootstrap',
                         parallel = FALSE, keep.sims=TRUE)
 cumu.out <- effect(out)

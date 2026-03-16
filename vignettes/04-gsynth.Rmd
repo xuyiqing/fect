@@ -10,6 +10,24 @@ Gsynth was originally implemented in the **gsynth** package but has now been ful
 
 Therefore, we recommend setting `method = "gsynth"` in **fect** for scenarios where the treatment does not reverse (or is coded accordingly) and the number of treated units is small .
 
+::: {.callout-important appearance="simple"}
+### Key Equivalence
+`fect(..., method = "gsynth")` is equivalent to `fect(..., method = "ife", factors.from = "nevertreated", em = FALSE)`.
+
+Gsynth is not a separate estimator — it is the IFE model estimated using only never-treated controls, without the EM algorithm. The **gsynth** package was developed in the synthetic control research setting, where a small number of treated units are compared against never-treated controls to learn latent time effects.
+:::
+
+### When to use the never-treated regime
+
+Use `factors.from = "nevertreated"` (or equivalently `method = "gsynth"`) when:
+
+-   The treatment does **not** reverse (block or staggered adoption only).
+-   The number of treated units is **small**, including $N_{tr} = 1$.
+-   You want **parametric bootstrap** (`vartype = "parametric"`) for uncertainty estimation — this is particularly useful with few treated units.
+-   You do **not** want pre-treatment data from treated units to influence factor estimation — this improves computational speed and stability.
+
+In contrast, the default regime (`factors.from = "notyettreated"`, used in [Chapter @sec-fect]) accommodates treatment reversal and uses EM to estimate factors from all not-yet-treated observations.
+
 We will use two datasets, `simgsynth` and `turnout`, to perform analyses in block and staggered DID settings. First, we load the two datasets: `simgsynth` and `turnout`:
 
 ```{r echo = FALSE}
@@ -244,8 +262,8 @@ Here, we apply these two methods to the simulated dataset `simgsynth` and compar
 For the `ife` method, we need to specify an interval of candidate number of unobserved factors in option r like `r=c(0,5)`. When cross-validation is switched off, the first element in r will be set as the number of factors. Below we use the MSPE criterion and search the number of factors from 0 to 5.
 
 ```{r sim_ife, cache = TRUE, message = FALSE}
-out.ife <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"), 
-          force = "two-way", method = "ife", CV = TRUE, r = c(0, 5), 
+out.ife <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+          force = "two-way", method = "ife", CV = TRUE, r = c(0, 5),
           se = TRUE, nboots = 200, parallel = TRUE)
 ```
 
@@ -260,9 +278,9 @@ plot(out.ife, main = "Estimated ATT (EM)")
 To implement the MC method, a sequence of candidate tuning parameters must be specified. For example, users can set `lambda = c(1, 0.8, 0.6, 0.4, 0.2, 0.05)`. If `lambda` is not specified, **fect** uses an algorithm to automatically generate a set of candidate tuning parameters based on the outcome variable. Users can adjust the number of tuning parameters with `nlambda`, which defaults to `nlambda = 10`.
 
 ```{r sim_mc, cache = TRUE}
-out.mc <- fect(Y ~ D + X1 + X2, data = simgsynth, 
-               index = c("id","time"), 
-                force = "two-way", method = "mc", CV = TRUE, 
+out.mc <- fect(Y ~ D + X1 + X2, data = simgsynth,
+               index = c("id","time"),
+                force = "two-way", method = "mc", CV = TRUE,
                 se = TRUE, nboots = 200, parallel = TRUE)
 
 ```

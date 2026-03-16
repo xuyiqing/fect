@@ -212,6 +212,37 @@ plot(out.cfe.full,
 
 ------------------------------------------------------------------------
 
+## CFE with the never-treated regime
+
+The CFE estimator also supports `factors.from = "nevertreated"`, which restricts factor estimation to never-treated controls only. This is useful in staggered adoption settings without treatment reversal where you want the richer CFE model (e.g., unit-specific time trends) but prefer the never-treated estimation approach.
+
+When using `factors.from = "nevertreated"` with CFE, cross-validation (`CV = TRUE`) can select the optimal number of latent factors from the never-treated sample.
+
+We demonstrate this on `simgsynth`, which has no treatment reversals:
+
+```{r cfe_nevertreated, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.cfe.nt <- fect(Y ~ D + X1 + X2, data = simgsynth,
+  index = c("id", "time"),
+  method = "cfe", force = "two-way",
+  factors.from = "nevertreated",
+  Q.type = "linear",
+  r = c(0, 5), CV = TRUE,
+  se = TRUE, parallel = TRUE, nboots = 200)
+```
+
+```{r cfe_nevertreated_plot, fig.width = 6, fig.height = 4.5}
+plot(out.cfe.nt,
+     main = "CFE with Never-Treated Regime",
+     ylab = "Effect of D on Y",
+     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+```
+
+::: {.callout-note appearance="simple"}
+Unlike `method = "gsynth"` (which auto-sets `factors.from = "nevertreated"`), `method = "cfe"` defaults to `factors.from = "notyettreated"`. You must explicitly set `factors.from = "nevertreated"` when using CFE in the never-treated regime.
+:::
+
+------------------------------------------------------------------------
+
 ## Diagnostic tests
 
 All diagnostic tests available for other estimators work with CFE as well.
@@ -313,3 +344,37 @@ The CFE estimator uses an EM-style block coordinate descent procedure:
 7.  **Convergence**: Stop when the relative Frobenius norm change in each block and globally falls below `tol`.
 
 This procedure is implemented in C++ (`src/cfe.cpp`) for computational efficiency.
+
+------------------------------------------------------------------------
+
+## Model comparison with fect_mspe()
+
+The `fect_mspe()` function helps compare different model specifications by computing the mean squared prediction error (MSPE) on held-out observations. This is useful for determining which model — or which set of CFE components — best predicts the untreated outcomes.
+
+`fect_mspe()` takes a fitted `fect` object and re-estimates the model after hiding some post-treatment observations, then computes the prediction error on those hidden observations.
+
+```{r cfe_mspe, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+# Fit two CFE variants for comparison
+out.cfe.lin <- fect(Y ~ D + X1 + X2, data = simgsynth,
+  index = c("id", "time"),
+  method = "cfe", force = "two-way",
+  Q.type = "linear",
+  se = FALSE)
+
+out.cfe.quad <- fect(Y ~ D + X1 + X2, data = simgsynth,
+  index = c("id", "time"),
+  method = "cfe", force = "two-way",
+  Q.type = c("linear", "quadratic"),
+  se = FALSE)
+```
+
+```{r cfe_mspe_compare, eval=TRUE, cache = TRUE}
+mspe.lin <- fect_mspe(out.cfe.lin, hide_n = 20, n_rep = 3, seed = 1234)
+mspe.quad <- fect_mspe(out.cfe.quad, hide_n = 20, n_rep = 3, seed = 1234)
+cat("Linear MSPE:", mspe.lin$mspe, "\n")
+cat("Quadratic MSPE:", mspe.quad$mspe, "\n")
+```
+
+::: {.callout-note appearance="simple"}
+`hide_n` controls how many post-treatment observations are hidden for evaluation. `n_rep` controls the number of repetitions (each with a different random mask). A smaller MSPE indicates better out-of-sample prediction.
+:::

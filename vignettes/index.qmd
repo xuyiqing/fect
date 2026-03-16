@@ -47,6 +47,82 @@ Therefore, we recommend setting `method = "gsynth"` in **fect** for scenarios wh
 
 Moving forward, I will discontinue maintaining **gsynth** and focus on adding more functionalities to **fect**.
 
+## Estimator Families
+
+The **fect** package provides two families of counterfactual estimators:
+
+### The IFE Family (Interactive Fixed Effects)
+
+The core estimator family models untreated potential outcomes using additive fixed effects plus latent interactive fixed effects (factors × loadings):
+
+-   **`method = "ife"`** — Interactive fixed effects with $r \geq 0$ latent factors. When $r = 0$, this reduces to the standard two-way fixed effects (TWFE) imputation estimator.
+-   **`method = "fe"`** — Convenience alias for `method = "ife"` with $r = 0$. Equivalent to TWFE.
+-   **`method = "cfe"`** — Complex fixed effects: extends IFE with additional known structure — time-invariant covariates with time-grouped coefficients ($Z\gamma$), unit-specific loadings on known time trends ($Q\kappa$), and extra additive fixed effects.
+
+All three share the same estimation architecture and differ only in the richness of the model specification.
+
+### Matrix Completion (MC)
+
+-   **`method = "mc"`** — A separate family that imputes treated counterfactuals via nuclear norm minimization (matrix completion) without explicitly estimating a factor structure.
+
+### The Gsynth Wrapper
+
+**`method = "gsynth"` is not a separate estimator.** It is a convenience wrapper that sets defaults appropriate for the original Generalized Synthetic Control method: `factors.from = "nevertreated"`, `em = FALSE`, and auto-selects the number of factors via cross-validation. Internally, it runs the IFE estimator.
+
+## Two Research Settings
+
+A **fect** analysis is shaped by two key choices that reflect two distinct research settings: how counterfactual outcomes are estimated, and how inference is conducted.
+
+### Setting 1: Estimation — Synth vs. DID (`factors.from`)
+
+The `factors.from` parameter controls which observations are used to estimate the latent factors. This choice reflects a fundamental bifurcation in research design:
+
+-   **Synthetic control setting** (`factors.from = "nevertreated"`): Uses only never-treated controls to learn latent time effects, then projects these to treated units. This is the setting in which the **gsynth** package was originally developed — it was designed for cases with a small number of treated units and sufficient never-treated controls.
+-   **DID/TWFE setting** (`factors.from = "notyettreated"`, default): Generalizes to imputing the treated counterfactual using all not-yet-treated observations (never-treated + pre-treatment of treated), employing the EM algorithm. This accommodates treatment reversal and leverages more data.
+
+| | `"notyettreated"` (default) | `"nevertreated"` |
+|:---|:---|:---|
+| **Estimation sample** | All not-yet-treated observations (never-treated + pre-treatment of treated) | Never-treated units only; factors projected to treated units |
+| **EM compatible** | Yes (by construction, to impute treated $Y(0)$) | Yes (only when there is missing data in the control panel) |
+| **Data requirements** | — | Sufficient never-treated units; no treatment reversal |
+| **Gsynth wrapper** | — | Sets this as default |
+
+### Setting 2: Inference
+
+The bifurcation between the synth and DID research settings also affects inference. The choice of inference method depends on the size of the treatment group:
+
+-   **Synth setting** (small $N_{tr}$): Parametric bootstrap (`vartype = "parametric"`) is appropriate — it uses a two-stage procedure analogous to conformal inference that works even with $N_{tr} = 1$. This was the inference approach developed alongside **gsynth**.
+-   **DID setting** (large $N$): Nonparametric bootstrap (`vartype = "bootstrap"`) or jackknife (`vartype = "jackknife"`) require a sufficiently large treatment group (e.g., $N_{tr} > 40$) for reliable standard errors.
+
+| | Synth Setting | DID Setting |
+|:---|:---|:---|
+| **Regime** | Small $N_{tr}$, sufficient $N_{co}$ | Large $N$, $N_{tr}$ grows with $N$ |
+| **Inference** | Parametric bootstrap | Nonparametric bootstrap or jackknife |
+
+### Crossing Both Axes
+
+Any combination of estimator × `factors.from` × inference is valid, subject to:
+
+-   **Parametric bootstrap** requires explicit factor structure → `mc` is blocked.
+-   **`factors.from = "nevertreated"`** requires sufficient never-treated units + no treatment reversal.
+
+| Estimator | `factors.from` | Parametric bootstrap | Nonparametric / Jackknife |
+|:---|:---|:---|:---|
+| ife ($r \geq 1$) | either | Yes | Yes |
+| fe (ife, $r = 0$) | either | Yes | Yes |
+| cfe | either | Yes | Yes |
+| mc | `"notyettreated"` only | No | Yes |
+
+### Which Settings Should I Use?
+
+| Scenario | Recommended Settings |
+|:---------|:---------------------|
+| Treatment switches on and off | `factors.from = "notyettreated"` (default) |
+| No reversal, many treated units ($N_{tr} > 40$) | Either regime; default is fine |
+| No reversal, few treated units ($N_{tr} < 40$) | `factors.from = "nevertreated"` + `vartype = "parametric"` |
+| Only one treated unit ($N_{tr} = 1$) | `factors.from = "nevertreated"` + `vartype = "parametric"` |
+| Want to reproduce the original gsynth | `method = "gsynth"` (or equivalently: `method = "ife"`, `factors.from = "nevertreated"`, `em = FALSE`) |
+
 ## Organization
 
 The user guide is structured into the following chapters:
@@ -55,13 +131,13 @@ The user guide is structured into the following chapters:
     This chapter covers installation instructions and introduces the datasets.
 
 -   [Chapter @sec-fect]\
-    This chapter explains how to apply the five estimators and diagnostic tests available in previous versions of **fect**.
+    This chapter explains how to apply the five estimators and diagnostic tests available in previous versions of **fect**. It also introduces the two estimation regimes (`factors.from`) and separates estimation from inference options.
 
 -   [Chapter @sec-plots]\
     In this chapter, we explore various plotting options available in **fect**.
 
 -   [Chapter @sec-gsynth]\
-    This chapter provides a step-by-step guide to implementing all the functionalities of the original **gsynth** R package using **fect**.
+    This chapter shows how to use the never-treated estimation regime (Gsynth), which is equivalent to IFE with `factors.from = "nevertreated"`.
 
 -   [Chapter @sec-panel]\
     This chapter facilitates the application of various new DID estimators.

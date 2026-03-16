@@ -414,3 +414,51 @@ plot(out, type = "calendar", main = "The Effect of Coethnic Mobilization")
 plot(out.hh, type = "calendar", xlim = c(1995, 2009),
      main = "The Effect of Indirect Democracy")
 ```
+
+------------------------------------------------------------------------
+
+## esplot(): Standalone Event Study Plots
+
+The `esplot()` function creates event study plots directly from a data frame, without requiring a fitted `fect` object. This is useful when you have pre-computed ATT estimates (e.g., from another package or from manual calculations) and want to produce publication-quality event study figures using the same styling as **fect** plots.
+
+### Basic usage
+
+`esplot()` expects a data frame with columns for the time period, the point estimate, and optionally confidence interval bounds and observation counts. By default, it looks for columns named `"ATT"`, `"CI.lower"`, and `"CI.upper"`.
+
+```{r esplot_basic, fig.width = 6, fig.height = 4.5}
+# Create example data from a fect result
+es_data <- data.frame(
+  Time = as.numeric(rownames(out$est.att)),
+  ATT = out$est.att[, "ATT"],
+  CI.lower = out$est.att[, "CI.lower"],
+  CI.upper = out$est.att[, "CI.upper"]
+)
+
+esplot(es_data, Period = "Time",
+       main = "Event Study Plot with esplot()",
+       ylab = "Estimated ATT",
+       xlab = "Periods Since Treatment")
+```
+
+### Connected line style
+
+Setting `connected = TRUE` displays the estimates as a connected line with a confidence band:
+
+```{r esplot_connected, fig.width = 6, fig.height = 4.5}
+esplot(es_data, Period = "Time",
+       connected = TRUE,
+       main = "Connected Event Study Plot",
+       ylab = "Estimated ATT")
+```
+
+### Highlighting specific periods
+
+The `highlight.periods` argument highlights specific time periods in the plot, which is useful for drawing attention to placebo or treatment periods:
+
+```{r esplot_highlight, fig.width = 6, fig.height = 4.5}
+esplot(es_data, Period = "Time",
+       highlight.periods = c(-2, -1, 0),
+       highlight.colors = c("orange", "orange", "red"),
+       main = "Highlighting Key Periods",
+       ylab = "Estimated ATT")
+```

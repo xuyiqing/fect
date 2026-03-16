@@ -71,6 +71,8 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | **Input** | **fe** | **ife** | **mc** | **gsynth** | **cfe** |
 |:----------|:----------|:---------:|:---------:|:---------:|:---------:|
 | `W` (weight) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `factors.from` (estimation sample) | – | ✓ | ✓ | ✓ | ✓ |
+| `em` (EM algorithm) | – | ✓ | – | – | ✓ |
 | `se` (uncertainty) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `nboots` (# bootstrap reps) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `force` (FE structure) | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -89,6 +91,8 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | **Input** | **Options** | **Applicable Methods** |
 |:-----------------------|:-----------------------|:-----------------------|
 | `force` | Fixed effects structure: "none", "unit", "time", "two-way" (default) | fe, ife, mc, cfe, gsynth |
+| `factors.from` | Estimation sample: "notyettreated" (default), "nevertreated". When "nevertreated", only never-treated controls estimate factors. `method = "gsynth"` auto-sets to "nevertreated". | ife, mc, cfe, gsynth |
+| `em` | EM algorithm: `TRUE` (default), `FALSE`. Required `TRUE` for "notyettreated"; auto-set to `FALSE` by `method = "gsynth"`. | ife, cfe |
 | `vartype` (when `method = "gsynth"`) | Uncertainty estimator: "parametric" (default), "bootstrap", "jackknife" | gsynth |
 | `vartype` (otherwise) | Uncertainty estimator: "bootstrap" (default), "jackknife" | fe, ife, mc, cfe |
 | `criterion` | Model selection criterion: "mspe" (default), "gmspe", "moment", "pc". | ife, mc, cfe, gsynth |
@@ -118,5 +122,18 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | `nlambda` | Length of hyper-parameter sequence | 10 |
 
 -   With an integer input for `nlambda`, **fect** can randomly generate appropriate hyper-parameter sequence.
+
+## Utility Functions
+
+In addition to the main `fect()` function, the package provides several utility functions:
+
+| **Function** | **Description** | **Key Arguments** |
+|:-------------|:----------------|:------------------|
+| `esplot()` | Standalone event study plot from a data frame. Does not require a `fect` object. | `data`, `Period`, `Estimate`, `CI.lower`, `CI.upper`, `connected`, `highlight.periods` |
+| `fect_mspe()` | Model comparison via mean squared prediction error on held-out observations. | `out.fect`, `hide_n`, `n_rep`, `seed`, `pre.trend` |
+| `fect_mspe_sim()` | MSPE comparison for simulated data with known counterfactuals. | `out.fect`, `hide_n`, `n_rep`, `seed` |
+| `get.cohort()` | Generate cohort indicators based on treatment timing. | `data`, `D`, `index`, `entry.time`, `start0` |
+| `att.cumu()` | Compute cumulative treatment effects over a specified period range. | `x` (fect object), `period`, `weighted`, `type` |
+| `effect()` | Compute cumulative or subgroup-averaged treatment effects. Requires `keep.sims = TRUE` in `fect()`. | `x` (fect object), `cumu`, `id`, `period`, `plot` |
 
 Enjoy using **fect**!
