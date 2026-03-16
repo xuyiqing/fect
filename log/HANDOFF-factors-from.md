@@ -4,7 +4,7 @@
 2026-03-16 (updated)
 
 ## Status
-COMPLETE through Phase 3a + Category I bootstrap tests + CV gap fix + r=0 invariance test + Quarto book update + CFE CV r-selection fix — all committed and pushed to `cfe`. 135/135 tests pass. Quarto book renders (10/10 chapters).
+COMPLETE through Phase 3a + Category I bootstrap tests + CV gap fix + r=0 invariance test + Quarto book update + CFE CV r-selection fix + utility function tests — all committed and pushed to `cfe`. 261/261 tests pass (208 existing + 53 new). Quarto book renders (10/10 chapters).
 
 ---
 
@@ -27,6 +27,7 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 | — | CV routing fix for cfe+nevertreated | **Done** (`4cfe25c`) |
 | — | Quarto book: two research settings, chapter reorder, factors.from/em docs | **Done** (`219510d`, `0fa790c`, `fd2abd3`) |
 | — | CFE CV r-selection: diagnosed as test misspecification (missing Z="Z"), fixed test + added 3 new tests | **Done** (REQ-cfe-cv-rselect-001) |
+| — | Utility function tests: fect_mspe, esplot, att.cumu, effect (53 new tests) | **Done** (`5460b13`) |
 
 ---
 
@@ -34,7 +35,7 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 - **Repo**: xuyiqing/fect
 - **Branch**: `cfe`
 - **Local path**: `~/GitHub/fect`
-- **HEAD**: `fd2abd3`
+- **HEAD**: `5460b13`
 
 ### Commit history (oldest → newest)
 | Commit | Description |
@@ -58,12 +59,13 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 | `219510d` | docs: Quarto book — two research settings, factors.from, esplot, fect_mspe |
 | `0fa790c` | docs: remove em=FALSE from gsynth equivalence (em is no-op for nevertreated) |
 | `fd2abd3` | docs: reorder chapters, integrate two research settings, remove dead R script links |
+| `5460b13` | test: add utility function tests for fect_mspe, esplot, att.cumu, effect |
 
 ---
 
 ## Test results
 
-**135/135 tests pass** (`test-factors-from-refactor.R`)
+**261/261 tests pass** (208 in `test-factors-from-refactor.R` + 53 in `test-utility-functions.R`)
 
 | Category | Tests | What |
 |----------|-------|------|
@@ -132,16 +134,19 @@ User requested comparing and potentially consolidating these two functions. `fec
 - Only then: replace `inter_fe_ub` calls with `complex_fe_ub` in `fect_nevertreated`
 - Re-run full test suite to confirm no regressions
 
-### Test gaps discovered from book review
-1. `fect_mspe()` and `fect_mspe_sim()` have no tests
-2. `esplot()` only has basic invocation tests
-3. `att.cumu()` relationship to `effect()` needs clarification
-4. Verify parallel=TRUE works with the updated .export list
+### ~~Test gaps discovered from book review~~ RESOLVED
+1. ~~`fect_mspe()` and `fect_mspe_sim()` have no tests~~ **Done** (`5460b13`) — 18 tests for fect_mspe; 2 input validation tests for fect_mspe_sim (positive path blocked by .as_mask() bug, see below)
+2. ~~`esplot()` only has basic invocation tests~~ **Done** (`5460b13`) — 10 tests covering connected, SE-derived CI, show.count, highlight, fill.gap, start0, only.pre/post
+3. ~~`att.cumu()` relationship to `effect()` needs clarification~~ **Done** (`5460b13`) — 23 tests; att.cumu works on aggregate ATT time series (x$att), effect() works on unit-level matrices (x$eff, requires keep.sims=TRUE)
+4. ~~Verify parallel=TRUE works with the updated .export list~~ **Done** — .export entries are redundant when .packages=c("fect") loads namespace; no change needed
+
+### fect_mspe_sim .as_mask() bug (NEW)
+**Pre-existing bug** in `R/fect_mspe.R` line 226: `.as_mask()` uses `as.logical(mask)` which strips matrix dimensions, returning a flat vector instead of TT×N matrix. This breaks downstream `cbind(rr, cc)` matrix indexing. The function is non-functional for its primary use case. Fix: replace `return(as.logical(mask))` with `return(matrix(as.logical(mask), nrow=TT, ncol=N))` (and similarly for the N×TT transpose path).
 
 ### Nice-to-have
 - ~~Add test for CFE parametric bootstrap with Z/Q/sfe parameters~~ **Done** (F1-F3)
 - ~~Add test for r=0 invariance~~ **Done** (I12)
-- Verify parallel=TRUE works with the updated .export list
+- ~~Verify parallel=TRUE works with the updated .export list~~ **Done** (no change needed)
 
 ---
 
@@ -200,14 +205,14 @@ When `method="cfe"` + `factors.from="nevertreated"`, dispatch routes to `fect_ne
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). All code changes and Quarto book updates are complete. 135/135 tests pass, 10/10 chapters render.
+> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). All code changes and Quarto book updates are complete. 261/261 tests pass, 10/10 chapters render.
 >
 > **Open tasks** (in priority order):
 >
 > 1. **Compare cv.R vs fect_mspe.R** — user wants to explore consolidation. `fect_cv` (internal CV for r-selection) vs `fect_mspe` (post-estimation hide-and-refit MSPE). Different purposes but may share logic.
-> 2. **Test gaps** — fect_mspe/fect_mspe_sim have no tests; esplot has basic tests only; att.cumu needs clarification.
+> 2. **Fix fect_mspe_sim .as_mask() bug** — `as.logical(mask)` strips matrix dimensions at line 226 of fect_mspe.R. Function is non-functional for its primary use case. Then add positive-path tests.
 > 3. **Phase 3b** — merge IFE into CFE (verify E0/E4 equivalence, replace `inter_fe_ub` with `complex_fe_ub`).
 >
-> **Resolved**: CFE CV r-selection issue (was test misspecification, not algorithm bug).
+> **Resolved**: CFE CV r-selection issue, test gaps (53 new tests added), parallel .export verification.
 >
 > Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.
