@@ -245,11 +245,18 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             r.old <- r ## save the minimal number of factors
 
             message("Cross-validating ...", "\r")
-            CV.out <- matrix(NA, (r.max - r.old + 1), 5)
-            colnames(CV.out) <- c("r", "sigma2", "IC", "PC", "MSPE")
+            score_names <- c("MSPE", "WMSPE", "GMSPE", "WGMSPE",
+                             "MAD", "Moment", "GMoment", "RMSE", "Bias")
+            CV.out <- matrix(NA, (r.max - r.old + 1), 4 + length(score_names))
+            colnames(CV.out) <- c("r", "sigma2", "IC", "PC", score_names)
             CV.out[, "r"] <- c(r.old:r.max)
-            CV.out[, "MSPE"] <- CV.out[, "PC"] <- 1e10
+            CV.out[, score_names] <- 1e10
+            CV.out[, "PC"] <- 1e10
             r.pc <- est.co.pc.best <- NULL
+
+            crit_col <- switch(criterion,
+                mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE", wgmspe = "WGMSPE",
+                mad = "MAD", moment = "Moment", gmoment = "GMoment", "MSPE")
 
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
@@ -306,7 +313,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
                 U.sav <- U.tr
 
-                sum.e2 <- num.y <- 0
+                resid_all <- c()
                 for (lv in unique(unlist(time.pre))) {
                     U.tr <- U.sav
                     if (max(T0) == T0.min & (!0 %in% I.tr)) {
@@ -388,18 +395,19 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     if (sameT0 == FALSE | 0 %in% I.tr) {
                         e <- e[which(pre[which(time == lv), ] == TRUE)]
                     }
-                    ## sum up
-                    sum.e2 <- sum.e2 + t(e) %*% e
-                    num.y <- num.y + length(e)
+                    ## accumulate residuals
+                    resid_all <- c(resid_all, e)
                 } ## end of leave-one-out
 
-                MSPE <- ifelse(num.y == 0, Inf, sum.e2 / num.y)
-                if (!is.null(norm.para)) {
-                    MSPE <- MSPE * (norm.para[1]^2)
+                if (length(resid_all) == 0) {
+                    scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
+                                MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                } else {
+                    scores <- .score_residuals(resid_all, norm.para = norm.para)
                 }
 
-                if ((min(CV.out[, "MSPE"]) - MSPE) > tol * min(CV.out[, "MSPE"])) {
-                    ## at least 5% improvement for MPSE
+                if ((min(CV.out[, crit_col]) - scores[crit_col]) > tol * min(CV.out[, crit_col])) {
+                    ## at least tol improvement for selected criterion
                     est.co.best <- est.co ## interFE result with the best r
                     r.cv <- r
                 } else {
@@ -410,12 +418,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     r.pc <- r
                     est.co.pc.best <- est.co
                 }
-                CV.out[i, 2:5] <- c(sigma2, IC, PC, MSPE)
+                CV.out[i, 2:4] <- c(sigma2, IC, PC)
+                CV.out[i, score_names] <- scores[score_names]
                 message("r = ", r, "; sigma2 = ",
                     sprintf("%.5f", sigma2), "; IC = ",
                     sprintf("%.5f", IC), "; PC = ",
                     sprintf("%.5f", PC), "; MSPE = ",
-                    sprintf("%.5f", MSPE),
+                    sprintf("%.5f", scores["MSPE"]),
                     sep = ""
                 )
             } ## end of while: search for r_star over
@@ -698,11 +707,18 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         } else {
             r.old <- r
             message("Cross-validating ...", "\r")
-            CV.out <- matrix(NA, (r.max - r.old + 1), 5)
-            colnames(CV.out) <- c("r", "sigma2", "IC", "PC", "MSPE")
+            score_names <- c("MSPE", "WMSPE", "GMSPE", "WGMSPE",
+                             "MAD", "Moment", "GMoment", "RMSE", "Bias")
+            CV.out <- matrix(NA, (r.max - r.old + 1), 4 + length(score_names))
+            colnames(CV.out) <- c("r", "sigma2", "IC", "PC", score_names)
             CV.out[, "r"] <- c(r.old:r.max)
-            CV.out[, "MSPE"] <- CV.out[, "PC"] <- 1e10
+            CV.out[, score_names] <- 1e10
+            CV.out[, "PC"] <- 1e10
             r.pc <- est.co.pc.best <- NULL
+
+            crit_col <- switch(criterion,
+                mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE", wgmspe = "WGMSPE",
+                mad = "MAD", moment = "Moment", gmoment = "GMoment", "MSPE")
 
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
@@ -774,7 +790,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 U.sav <- U.tr
 
                 ## Leave-one-out CV (same structure as IFE)
-                sum.e2 <- num.y <- 0
+                resid_all <- c()
                 for (lv in unique(unlist(time.pre))) {
                     U.tr <- U.sav
                     if (max(T0) == T0.min & (!0 %in% I.tr)) {
@@ -856,16 +872,18 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     if (sameT0 == FALSE | 0 %in% I.tr) {
                         e <- e[which(pre[which(time == lv), ] == TRUE)]
                     }
-                    sum.e2 <- sum.e2 + t(e) %*% e
-                    num.y <- num.y + length(e)
+                    ## accumulate residuals
+                    resid_all <- c(resid_all, e)
                 } ## end of leave-one-out
 
-                MSPE <- ifelse(num.y == 0, Inf, sum.e2 / num.y)
-                if (!is.null(norm.para)) {
-                    MSPE <- MSPE * (norm.para[1]^2)
+                if (length(resid_all) == 0) {
+                    scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
+                                MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                } else {
+                    scores <- .score_residuals(resid_all, norm.para = norm.para)
                 }
 
-                if ((min(CV.out[, "MSPE"]) - MSPE) > tol * min(CV.out[, "MSPE"])) {
+                if ((min(CV.out[, crit_col]) - scores[crit_col]) > tol * min(CV.out[, crit_col])) {
                     est.co.best <- est.co
                     r.cv <- r
                 } else {
@@ -876,12 +894,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     r.pc <- r
                     est.co.pc.best <- est.co
                 }
-                CV.out[i, 2:5] <- c(sigma2, IC, PC, MSPE)
+                CV.out[i, 2:4] <- c(sigma2, IC, PC)
+                CV.out[i, score_names] <- scores[score_names]
                 message("r = ", r, "; sigma2 = ",
                     sprintf("%.5f", sigma2), "; IC = ",
                     sprintf("%.5f", IC), "; PC = ",
                     sprintf("%.5f", PC), "; MSPE = ",
-                    sprintf("%.5f", MSPE),
+                    sprintf("%.5f", scores["MSPE"]),
                     sep = ""
                 )
             } ## end of CV loop

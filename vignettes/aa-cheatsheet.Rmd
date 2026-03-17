@@ -131,7 +131,6 @@ In addition to the main `fect()` function, the package provides several utility 
 |:-------------|:----------------|:------------------|
 | `esplot()` | Standalone event study plot from a data frame. Does not require a `fect` object. | `data`, `Period`, `Estimate`, `CI.lower`, `CI.upper`, `connected`, `highlight.periods` |
 | `fect_mspe()` | Model comparison via mean squared prediction error on held-out observations. | `out.fect`, `hide_n`, `n_rep`, `seed`, `pre.trend` |
-| `fect_mspe_sim()` | MSPE comparison for simulated data with known counterfactuals. | `out.fect`, `hide_n`, `n_rep`, `seed` |
 | `get.cohort()` | Generate cohort indicators based on treatment timing. | `data`, `D`, `index`, `entry.time`, `start0` |
 | `att.cumu()` | Compute cumulative treatment effects over a specified period range. | `x` (fect object), `period`, `weighted`, `type` |
 | `effect()` | Compute cumulative or subgroup-averaged treatment effects. Requires `keep.sims = TRUE` in `fect()`. | `x` (fect object), `cumu`, `id`, `period`, `plot` |

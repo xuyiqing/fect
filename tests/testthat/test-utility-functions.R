@@ -1,5 +1,5 @@
 ## ---------------------------------------------------------------
-## Tests for utility functions: fect_mspe, fect_mspe_sim,
+## Tests for utility functions: fect_mspe,
 ## esplot (parameter variations), att.cumu, and effect.
 ## ---------------------------------------------------------------
 
@@ -56,23 +56,6 @@ out_norev <- suppressWarnings(suppressMessages(
     nboots    = 20,
     keep.sims = TRUE,
     parallel  = FALSE
-  )
-))
-
-## Augment simdata with Y0 (true counterfactual) for fect_mspe_sim
-simdata_y0 <- simdata
-simdata_y0$Y0 <- simdata_y0$Y - simdata_y0$eff * simdata_y0$D
-
-out_y0 <- suppressWarnings(suppressMessages(
-  fect::fect(
-    Y ~ D + X1 + X2,
-    data    = simdata_y0,
-    index   = c("id", "time"),
-    method  = "ife",
-    r       = 1,
-    CV      = FALSE,
-    se      = FALSE,
-    parallel = FALSE
   )
 ))
 
@@ -144,43 +127,7 @@ test_that("fect_mspe returns correct structure and values", {
 
 
 ## -----------------------------------------------------------------
-## 2. fect_mspe_sim
-## -----------------------------------------------------------------
-test_that("fect_mspe_sim validates Y0 requirement", {
-
-  TT <- nrow(out_y0$Y.ct.full)
-  N  <- ncol(out_y0$Y.ct.full)
-
-  ## Build hide_mask from control cells
-  D_idx <- which(names(out_y0) == "D")
-  D_mat <- NULL
-  for (k in rev(D_idx)) {
-    obj <- out_y0[[k]]
-    if (is.matrix(obj) && all(dim(obj) == c(TT, N))) { D_mat <- obj; break }
-  }
-  hide_mask <- matrix(0, TT, N)
-  hide_mask[D_mat == 0] <- 1
-
-  ## Error without Y0 column in source data
-  expect_error(
-    suppressWarnings(suppressMessages(
-      fect_mspe_sim(out_base, hide_mask = hide_mask, hide_n = 5, seed = 42)
-    )),
-    "Y0"
-  )
-
-  ## Error without hide_mask (fect_mspe_sim requires it)
-  expect_error(
-    suppressWarnings(suppressMessages(
-      fect_mspe_sim(out_y0, hide_n = 5, seed = 42)
-    )),
-    "hide_mask"
-  )
-})
-
-
-## -----------------------------------------------------------------
-## 3. esplot parameter variations
+## 2. esplot parameter variations
 ## -----------------------------------------------------------------
 test_that("esplot handles parameter variations correctly", {
 

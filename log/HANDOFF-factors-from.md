@@ -4,7 +4,7 @@
 2026-03-16 (updated)
 
 ## Status
-COMPLETE through Phase 3a + Category I bootstrap tests + CV gap fix + r=0 invariance test + Quarto book update + CFE CV r-selection fix + utility function tests — all committed and pushed to `cfe`. 261/261 tests pass (208 existing + 53 new). Quarto book renders (10/10 chapters).
+Score unification Phase 1 COMPLETE — `.score_residuals()` extracted, wired into fect_cv (IFE+MC), fect_nevertreated (IFE+CFE), and fect_mspe. 135/135 tests pass (84 new score-unify + 51 utility). Phase 2 (cv.method unification + fect_mspe simplification) planned but not yet implemented. All on `cfe` branch.
 
 ---
 
@@ -122,54 +122,173 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 
 ## Open items
 
-### ~~Compare cv.R vs fect_mspe.R~~ RESOLVED — no consolidation
-**Finding**: `fect_cv` (1570 lines, internal CV for r/λ selection) and `fect_mspe` (382 lines, post-estimation hide-and-refit) operate at different abstraction levels and share zero reusable code. `fect_cv` calls C++ directly (`inter_fe_ub`, `inter_fe_mc`), manipulates the II indicator matrix, and searches a hyperparameter grid. `fect_mspe` operates on user-facing `fect` output objects, sets Y to NA, and re-runs the full R pipeline. No consolidation needed.
+### Unify fect_cv and fect_mspe scoring/masking (NEW — approved plan)
 
-### Refactor fect_mspe.R (NEW — approved plan)
-`fect_mspe` and `fect_mspe_sim` share the hide→refit→score pattern but duplicate ~200 lines of code (helpers, loop, scoring). Refactor into shared core + thin wrappers.
+**Problem**: `fect_cv` (internal, automatic model selection) and `fect_mspe` (user-facing, manual model comparison) both do hide→predict→score, but use incompatible masking and scoring. A user comparing models with `fect_mspe` gets different answers than `fect_cv` would give for the same data, because:
+- Different masking (cv.sample with donut/min.T0 vs simple random)
+- Different scoring (8 criteria vs RMSE+Bias only)
+- Different weight handling (W supported vs not)
+- Different normalization (norm.para vs none)
 
-**Architecture**:
-```
-# file-scope shared helpers (defined once, not copy-pasted)
-.is_fect_output()
-.get_last_matrix()
-.as_mask()
-.build_rerun_args()
+**Principle**: Everything accessible through `fect_cv` should also be accessible through `fect_mspe`, and vice versa.
 
-# shared core
-._refit_and_score(out_list, mask_mat, actual_mat, hide_n, n_rep, control.only, ...)
-  → for each rep: hide Y at masked positions → do.call(fect) → compare pred vs actual → RMSE/Bias
+#### Layer 1: Shared scoring function
 
-# thin wrappers (own the masking strategy, delegate scoring to core)
-fect_mspe(out.fect, hide_mask, hide_n, seed, n_rep,
-          pre.trend, pre.trend.n, control.only=TRUE)
-  → mask via: random control / pre-trend / user-provided
-  → actual = observed Y matrix
-  → calls ._refit_and_score()
-
-fect_mspe_sim(out.fect, hide_mask, hide_mask_y0, hide_n, seed, n_rep,
-              control.only=TRUE)
-  → mask from user input
-  → actual = Y0 matrix
-  → calls ._refit_and_score()
+```r
+.score_residuals(resid, weights = NULL, time_index = NULL,
+                 count_weights = NULL, norm.para = NULL)
+# Returns named list:
+#   MSPE, WMSPE, GMSPE, WGMSPE, MAD, Moment, GMoment, RMSE, Bias
 ```
 
-**Consistency improvements**:
-1. **Unified signature pattern** — both take same base args `(out.fect, hide_mask, hide_n, seed, n_rep)`, plus strategy-specific params
-2. **Explicit ground truth** — `fect_mspe` uses observed Y, `fect_mspe_sim` uses Y0; both pass `actual_mat` to shared core
-3. **Single `.build_rerun_args()`** — `fect_mspe_sim` currently duplicates this inline (lines 341-349)
-4. **`control.only=TRUE` param** — both default to masking only `D==0` cells; `fect_mspe_sim` currently skips this filter, which could bite users
-5. **Single formula recovery path** — use `.build_rerun_args()` in both (tries `eval(call$formula)`, falls back to `reformulate`)
+- `resid`: vector of (pred - actual)
+- `weights`: observation-level weights (W matrix values), NULL = unweighted
+- `time_index`: relative time labels per residual (for moment/weighted criteria)
+- `count_weights`: period-level weights (from `count.T.cv`), NULL = uniform
+- `norm.para`: normalization vector, NULL = no normalization
 
-**Masking strategies preserved**:
-| Strategy | Wrapper | How |
+Currently in `fect_cv`: scoring logic is inline (lines 396-484, repeated for MC at ~700+). Extract once, call from both.
+
+Currently in `fect_mspe`: only `sqrt(mean(err^2))` and `mean(err)`. Replace with `.score_residuals()`, expose `criterion` param to user.
+
+#### Layer 2: Shared masking options
+
+| Strategy | Currently in | Expose in | How |
+|---|---|---|---|
+| `cv.sample` (donut, min.T0, cv.treat, cv.nobs) | `fect_cv` only | `fect_mspe` | Add `mask.method = "cv.sample"` option |
+| Random from D==0 | `fect_mspe` only | `fect_cv` (not needed — cv.sample subsumes) | Already there |
+| Pre-trend (last n pre-treatment periods) | `fect_mspe` only | Could add to `fect_cv` | Low priority |
+| User-provided mask | `fect_mspe` only | Keep in `fect_mspe` | Post-hoc use case |
+| k-fold structure | `fect_cv` only | `fect_mspe` | Add `k` param for k-fold CV mode |
+
+#### Layer 3: Updated `fect_mspe` signature
+
+```r
+fect_mspe <- function(
+    out.fect,                    # fect output or list of outputs
+    hide_mask   = NULL,          # user-provided mask (TT×N)
+    hide_n      = 20,            # number of obs to hide per rep
+    seed        = NULL,
+    n_rep       = 1,
+    # --- masking strategy ---
+    mask.method = "random",      # "random" | "pre.trend" | "cv.sample" | "user"
+    pre.trend.n = 2,             # for mask.method="pre.trend"
+    cv.treat    = TRUE,          # for mask.method="cv.sample"
+    cv.nobs     = 3,             # for mask.method="cv.sample"
+    cv.donut    = 1,             # for mask.method="cv.sample"
+    cv.prop     = 0.1,           # for mask.method="cv.sample"
+    min.T0      = 5,             # for mask.method="cv.sample"
+    k           = 5,             # for mask.method="cv.sample" (k-fold)
+    # --- scoring ---
+    criterion   = "mspe",        # any of: mspe, wmspe, gmspe, wgmspe, mad, moment, gmoment
+    W           = NULL,          # observation weights
+    norm.para   = NULL,          # normalization
+    # --- ground truth ---
+    actual      = NULL,          # TT×N ground truth matrix (default: observed Y)
+    control.only = TRUE          # mask only D==0 cells?
+)
+```
+
+#### Layer 4: Refactor `fect_cv` to use shared scoring
+
+Replace inline scoring blocks (lines 396-484 for IFE, ~700+ for MC) with calls to `.score_residuals()`. This is a pure refactor — no behavior change, just deduplication. `fect_cv` keeps its own masking (`cv.sample` + k-fold + `initialFit` per fold) and hyperparameter grid search.
+
+#### Execution order
+
+1. **Extract `.score_residuals()`** from `fect_cv` inline code → new file `R/score.R` (or top of `R/cv.R`)
+2. **Wire `fect_cv` to use it** — replace inline scoring, verify identical CV results
+3. **Wire `fect_mspe` to use it** — add `criterion` param, replace RMSE/Bias-only scoring
+4. **Add `mask.method="cv.sample"` to `fect_mspe`** — reuse `cv.sample()` function
+5. **Add W and norm.para support to `fect_mspe`**
+6. **Tests**: verify `fect_mspe(mask.method="cv.sample", criterion="mspe")` produces scores consistent with `fect_cv`'s internal CV scores on the same data
+
+#### Phase 1 status: COMPLETE (uncommitted)
+
+Steps 1-6 are done. `.score_residuals()` is in R/score.R. fect_cv (IFE+MC blocks), fect_nevertreated (IFE+CFE blocks), and fect_mspe all use it. 84 new tests pass. Also fixed: gmoment storage bug in cv.R line 590, criterion input validation, cv.sample subscript mapping. `fect_mspe_sim` deleted.
+
+#### Phase 2: cv.method unification + simplification (TODO)
+
+**Design is approved** — see `log/cv-comparison-table.md` for the full comparison table.
+
+**Changes needed:**
+
+**A. Add `cv.method` parameter to all three functions**
+
+Replace `cv.treat` (boolean) and `mask.method` (string) with a single `cv.method` parameter:
+
+```r
+cv.method = c("all_units", "treated_units", "loo")
+```
+
+| Function | Valid values | Default |
 |---|---|---|
-| Random control | `fect_mspe`, `pre.trend=FALSE` | Sample from `D==0` cells |
-| Pre-trend | `fect_mspe`, `pre.trend=TRUE` | Last `n` pre-treatment periods of treated units |
-| User mask | both, `hide_mask` arg | User-supplied matrix, filtered by `D==0` when `control.only=TRUE` |
-| Sim mask | `fect_mspe_sim` | External mask + Y0 ground truth |
+| `fect_cv` | `"all_units"`, `"treated_units"` | `"all_units"` |
+| `fect_nevertreated` | `"treated_units"`, `"all_units"`, `"loo"` | `"treated_units"` |
+| `fect_mspe` | `"all_units"`, `"treated_units"` | `"all_units"` |
 
-**Prerequisite**: .as_mask() bug fix (already done — `028beca`).
+- `"all_units"`: cv.sample from all units' control obs (current `cv.treat=FALSE`)
+- `"treated_units"`: cv.sample from eventually-treated units' pre-treatment obs (current `cv.treat=TRUE`)
+- `"loo"`: leave-one-period-out on treated pre-treatment (current LOO in fect_nevertreated only)
+
+**Implementation in fect_cv**: Map `cv.method` to `cv.treat` internally: `"all_units"` → `cv.treat=FALSE`, `"treated_units"` → `cv.treat=TRUE`. Remove `cv.treat` from the public signature (keep as internal variable). Update `default.R` call sites to pass `cv.method` instead of `cv.treat`.
+
+**Implementation in fect_nevertreated**: Current LOO code stays as-is for `cv.method="loo"`. For `"all_units"` and `"treated_units"`, add cv.sample masking (call `cv.sample()` on II.co or treated pre-treatment obs). The cv.sample infrastructure already exists in fect_mspe — adapt it.
+
+**Implementation in fect_mspe**: Replace `mask.method` with `cv.method`. Remove `"random"`, `"pre.trend"`, `"user"` options. Map `"all_units"` → `cv.treat=FALSE` in cv.sample call, `"treated_units"` → `cv.treat=TRUE`.
+
+**B. Simplify fect_mspe — remove these params:**
+- `mask.method` → replaced by `cv.method`
+- `pre.trend`, `pre.trend.n` → removed (LOO covers this concept)
+- `hide_mask` → removed (user-provided mask not needed)
+- `actual` → removed (fect_mspe_sim use case gone)
+- `control.only` → removed (always mask D==0)
+- `n_rep` → removed (k-fold provides averaging)
+
+**Simplified fect_mspe signature:**
+```r
+fect_mspe <- function(
+    out.fect,
+    seed      = NULL,
+    cv.method = "all_units",   # "all_units" or "treated_units"
+    criterion = "mspe",
+    W         = NULL,
+    norm.para = NULL,
+    k         = 5,
+    cv.prop   = 0.1,
+    cv.nobs   = 3,
+    cv.donut  = 1,
+    min.T0    = 5
+)
+```
+
+**C. Hardcode 1% selection rule in fect_nevertreated**
+
+Change `> tol * min(CV.out[, crit_col])` to `> 0.01 * min(CV.out[, crit_col])` in both IFE and CFE CV blocks. fect_cv already uses 0.01.
+
+**D. Add W and count.T.cv to fect_nevertreated CV scoring**
+
+- W: `W.use` is already available in the CV block. For LOO: extract `W.tr = W[, tr]`, pass matching weights per residual to `.score_residuals()`. For cv.sample on controls: extract weights at held-out positions.
+- count.T.cv: build period-level weights from `T.on` (already in function signature). Compute `count.T.cv` using the same logic as fect_cv (normalize obs count per relative time period). Pass to `.score_residuals()`.
+
+**E. Update default.R call sites**
+
+`default.R` calls `fect_cv(... cv.treat=cv.treat ...)` in multiple places. Update to pass `cv.method` instead. Search for all `cv.treat` references in default.R.
+
+**F. Update tests**
+
+- Update `test-score-unify.R`: replace `mask.method` references with `cv.method`
+- Remove tests for random/pre-trend/user masking
+- Add tests for `cv.method="treated_units"` in fect_nevertreated
+- Verify backward compatibility: old `cv.treat=TRUE` still works during deprecation period (or hard-remove)
+
+**Execution order for Phase 2:**
+1. Add `cv.method` to `fect_cv`, map internally to `cv.treat`, update `default.R`
+2. Add `cv.method` to `fect_nevertreated`, add cv.sample masking for `"all_units"` and `"treated_units"`
+3. Hardcode 1% rule in `fect_nevertreated`
+4. Add W and count.T.cv to `fect_nevertreated` `.score_residuals()` calls
+5. Simplify `fect_mspe` — strip params, replace `mask.method` with `cv.method`
+6. Update tests
+7. Run full suite, verify no regressions
 
 ### ~~CFE CV r-selection issue~~ RESOLVED
 **Finding**: The CFE CV algorithm is correct. The original test was misspecified -- it used `make_cfe_z_data` (DGP with Z*gamma) but did not pass `Z = "Z"` to `fect()`. Without Z, factors absorb the unmodeled Z*gamma interaction (a rank-1 component), inflating r.cv by ~1. With Z properly specified, CFE CV correctly selects r=2 with clear MSPE U-shape (minimum at true r). Fixed test + added 3 new tests. 135/135 pass. See `log/2026-03-16-cfe-cv-rselect-fix.md` for full process record.
@@ -251,13 +370,27 @@ When `method="cfe"` + `factors.from="nevertreated"`, dispatch routes to `fect_ne
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). All code changes and Quarto book updates are complete. 261/261 tests pass, 10/10 chapters render.
+> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). Score unification Phase 1 is complete — `.score_residuals()` is extracted and wired into all three CV functions. 135/135 tests pass (84 score-unify + 51 utility). Phase 2 needs implementation.
+>
+> **UNCOMMITTED CHANGES** on branch `cfe` — commit before starting new work:
+> - `R/score.R` (NEW) — shared `.score_residuals()` function
+> - `R/cv.R` — refactored to use `.score_residuals()`, gmoment bug fix
+> - `R/fect_mspe.R` — major refactor with criterion, mask.method, W, norm.para, cv.sample support (needs further simplification in Phase 2)
+> - `R/fect_nevertreated.R` — wired to `.score_residuals()`, criterion selection
+> - `tests/testthat/test-score-unify.R` (NEW) — 84 tests
+> - `tests/testthat/test-utility-functions.R` — removed fect_mspe_sim tests
+> - `NAMESPACE` — removed fect_mspe_sim export
+> - `man/fect_mspe_sim.Rd` — deleted
+> - `architecture.md` — updated
+> - `vignettes/aa-cheatsheet.Rmd` — removed fect_mspe_sim
+> - `log/` — updated handoff, new log entries, cv-comparison-table
 >
 > **Open tasks** (in priority order):
 >
-> 1. **Refactor fect_mspe.R** — extract shared core from `fect_mspe` and `fect_mspe_sim` (hide→refit→score), unify signatures, add `control.only=TRUE` param, deduplicate helpers. Plan approved — see "Refactor fect_mspe.R" in open items.
+> 1. **Score unification Phase 2: cv.method + simplification** — implement `cv.method` parameter (`"all_units"`, `"treated_units"`, `"loo"`), simplify fect_mspe (remove random/pre-trend/user/actual/control.only/n_rep), hardcode 1% selection rule, add W/count.T.cv to nevertreated. See `log/cv-comparison-table.md` for the approved design and `HANDOFF-factors-from.md` "Phase 2" section for implementation details.
 > 2. **Phase 3b** — merge IFE into CFE (verify E0/E4 equivalence, replace `inter_fe_ub` with `complex_fe_ub`).
 >
-> **Resolved**: CFE CV r-selection issue, test gaps (53 new tests), parallel .export (no change needed), cv.R vs fect_mspe.R comparison (no consolidation), .as_mask() bug fix.
+> **Resolved**: Score unification Phase 1, CFE CV r-selection issue, test gaps, parallel .export, cv.R vs fect_mspe.R comparison, .as_mask() bug fix, fect_mspe_sim deleted.
 >
 > Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.
+> Read `~/GitHub/fect/log/cv-comparison-table.md` for the approved CV design table.
