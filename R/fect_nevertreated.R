@@ -288,6 +288,155 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE", wgmspe = "WGMSPE",
                 mad = "MAD", moment = "Moment", gmoment = "GMoment", "MSPE")
 
+            ## ---- cv.sample pre-computation (IFE) ---- ##
+            if (cv.method != "loo" && r.max > 0) {
+                if (cv.method == "all_units") {
+                    rm.count.co <- floor(sum(II.co) * cv.prop)
+                    if (rm.count.co == 0) {
+                        message("cv.prop too small for control panel; falling back to LOO.")
+                        cv.method <- "loo"
+                    } else {
+                        D.co.fake <- matrix(0, TT, Nco)
+                        oci.co <- which(c(II.co) == 1)
+                        ## Ensure data.ini exists (balanced IFE case skips its creation)
+                        if (!exists("data.ini", inherits = FALSE) || is.null(data.ini)) {
+                            data.ini <- matrix(NA, Nco * TT, (p + 3))
+                            data.ini[, 1] <- c(Y.co)
+                            data.ini[, 2] <- rep(1:Nco, each = TT)
+                            data.ini[, 3] <- rep(1:TT, Nco)
+                            if (p > 0) {
+                                for (i.tmp in 1:p) {
+                                    data.ini[, (3 + i.tmp)] <- c(X.co[, , i.tmp])
+                                }
+                            }
+                        }
+                        rmCV <- list()
+                        ociCV <- list()
+                        estCV <- list()
+                        Y0CV.co <- array(NA, dim = c(TT, Nco, k))
+                        if (p > 0) {
+                            beta0CV.co <- array(NA, dim = c(p, 1, k))
+                        } else {
+                            beta0CV.co <- array(0, dim = c(1, 0, k))
+                        }
+                        flag.cv <- 0
+                        for (i.cv in 1:k) {
+                            cv.n <- 0
+                            repeat {
+                                cv.n <- cv.n + 1
+                                get.cv <- cv.sample(II.co, D.co.fake,
+                                    count = rm.count.co,
+                                    cv.count = cv.nobs,
+                                    cv.treat = FALSE,
+                                    cv.donut = cv.donut)
+                                cv.id <- get.cv$cv.id
+                                II.co.cv <- II.co
+                                II.co.cv[cv.id] <- 0
+                                II.co.cv.valid <- II.co
+                                II.co.cv.valid[cv.id] <- -1
+                                con1 <- sum(apply(II.co.cv, 1, sum) >= 1) == TT
+                                con2 <- sum(apply(II.co.cv, 2, sum) >= min.T0) == Nco
+                                if (con1 && con2) break
+                                if (cv.n >= 200) {
+                                    flag.cv <- 1
+                                    keep.1 <- which(apply(II.co.cv, 1, sum) < 1)
+                                    keep.2 <- which(apply(II.co.cv, 2, sum) < min.T0)
+                                    II.co.cv[keep.1, ] <- II.co[keep.1, ]
+                                    II.co.cv[, keep.2] <- II.co[, keep.2]
+                                    II.co.cv.valid[keep.1, ] <- II.co[keep.1, ]
+                                    II.co.cv.valid[, keep.2] <- II.co[, keep.2]
+                                    cv.id <- which(II.co.cv.valid != II.co)
+                                    break
+                                }
+                            }
+                            rmCV[[i.cv]] <- cv.id
+                            ociCV[[i.cv]] <- setdiff(oci.co, cv.id)
+                            if (cv.n < 200) {
+                                estCV[[i.cv]] <- get.cv$est.id
+                            } else {
+                                cv.diff <- setdiff(get.cv$cv.id, cv.id)
+                                estCV[[i.cv]] <- setdiff(get.cv$est.id, cv.diff)
+                            }
+                            if (is.null(W)) {
+                                initialOutCv <- initialFit(data = data.ini, force = force, oci = ociCV[[i.cv]])
+                            } else {
+                                initialOutCv <- initialFit(data = data.ini, force = force, w = c(W.use), oci = ociCV[[i.cv]])
+                            }
+                            Y0CV.co[, , i.cv] <- initialOutCv$Y0
+                            if (p > 0) {
+                                beta0cv <- initialOutCv$beta0
+                                if (sum(is.na(beta0cv)) > 0) {
+                                    beta0cv[which(is.na(beta0cv))] <- 0
+                                }
+                                beta0CV.co[, , i.cv] <- beta0cv
+                            }
+                        }
+                        if (flag.cv == 1) {
+                            message("Some control units have too few observations. Removed automatically in CV.\n")
+                        }
+                    }
+                } else if (cv.method == "treated_units") {
+                    rm.count.tr <- floor(sum(pre) * cv.prop)
+                    if (rm.count.tr == 0) {
+                        message("cv.prop too small for treated pre-treatment panel; falling back to LOO.")
+                        cv.method <- "loo"
+                    } else {
+                        D.tr.fake <- matrix(0, TT, Ntr)
+                        rmCV.tr <- list()
+                        estCV.tr <- list()
+                        flag.cv <- 0
+                        for (i.cv in 1:k) {
+                            cv.n <- 0
+                            repeat {
+                                cv.n <- cv.n + 1
+                                get.cv <- cv.sample(pre, D.tr.fake,
+                                    count = rm.count.tr,
+                                    cv.count = cv.nobs,
+                                    cv.treat = FALSE,
+                                    cv.donut = cv.donut)
+                                cv.id <- get.cv$cv.id
+                                pre.cv <- pre
+                                pre.cv[cv.id] <- 0
+                                con1 <- TRUE
+                                pre.rows <- which(rowSums(pre) > 0)
+                                if (length(pre.rows) > 0) {
+                                    con1 <- all(rowSums(pre.cv[pre.rows, , drop = FALSE]) >= 1)
+                                }
+                                con2 <- all(colSums(pre.cv) >= min(min.T0, 2))
+                                if (con1 && con2) break
+                                if (cv.n >= 200) {
+                                    flag.cv <- 1
+                                    pre.cv.valid <- pre
+                                    pre.cv.valid[cv.id] <- -1
+                                    keep.1 <- pre.rows[rowSums(pre.cv[pre.rows, , drop = FALSE]) < 1]
+                                    keep.2 <- which(colSums(pre.cv) < min(min.T0, 2))
+                                    if (length(keep.1) > 0) {
+                                        pre.cv[keep.1, ] <- pre[keep.1, ]
+                                        pre.cv.valid[keep.1, ] <- pre[keep.1, ]
+                                    }
+                                    if (length(keep.2) > 0) {
+                                        pre.cv[, keep.2] <- pre[, keep.2]
+                                        pre.cv.valid[, keep.2] <- pre[, keep.2]
+                                    }
+                                    cv.id <- which(pre.cv.valid != pre)
+                                    break
+                                }
+                            }
+                            rmCV.tr[[i.cv]] <- cv.id
+                            if (cv.n < 200) {
+                                estCV.tr[[i.cv]] <- get.cv$est.id
+                            } else {
+                                cv.diff <- setdiff(get.cv$cv.id, cv.id)
+                                estCV.tr[[i.cv]] <- setdiff(get.cv$est.id, cv.diff)
+                            }
+                        }
+                        if (flag.cv == 1) {
+                            message("Some treated units have too few pre-treatment observations. Removed automatically in CV.\n")
+                        }
+                    }
+                }
+            }
+
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
                 if (!0 %in% I.co) {
@@ -318,6 +467,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     PC <- est.co$PC * (norm.para[1]^2)
                 }
 
+              if (cv.method == "loo") {
+                ## ---- LOO CV (existing code) ---- ##
                 if (r != 0) {
                     F.hat <- as.matrix(est.co$factor)
                     if (force %in% c(1, 3)) {
@@ -475,6 +626,134 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         norm.para = norm.para
                     )
                 }
+
+              } else if (cv.method == "all_units") {
+                ## ---- cv.sample "all_units" IFE CV ---- ##
+                all_resid <- c()
+                all_time_idx <- c()
+                all_obs_w <- c()
+                for (ii in 1:k) {
+                    II.co.cv <- II.co
+                    II.co.cv[rmCV[[ii]]] <- 0
+                    YY.co.cv <- YY.co
+                    YY.co.cv[rmCV[[ii]]] <- 0
+                    if (!is.null(W)) {
+                        W.cv <- W.use
+                        W.cv[rmCV[[ii]]] <- 0
+                    } else {
+                        W.cv <- as.matrix(0)
+                    }
+                    ## Always use inter_fe_ub: masking creates an unbalanced panel
+                    est.cv.fit <- inter_fe_ub(
+                        YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co, II.co.cv,
+                        W.cv, as.matrix(beta0CV.co[,,ii]),
+                        r, force, tol, max.iteration
+                    )$fit
+                    resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
+                    all_resid <- c(all_resid, resid_ii)
+                    if (!is.null(W)) {
+                        all_obs_w <- c(all_obs_w, W.use[estCV[[ii]]])
+                    }
+                    all_time_idx <- c(all_time_idx, rep("Control", length(resid_ii)))
+                }
+                if (length(all_resid) == 0) {
+                    scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
+                                MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                } else {
+                    scores <- .score_residuals(
+                        all_resid,
+                        obs_weights = if (!is.null(W)) all_obs_w else NULL,
+                        time_index = all_time_idx,
+                        count_weights = count.T.cv,
+                        norm.para = NULL
+                    )
+                }
+
+              } else {
+                ## ---- cv.sample "treated_units" IFE CV ---- ##
+                if (r != 0) {
+                    F.hat <- as.matrix(est.co$factor)
+                    if (force %in% c(1, 3)) {
+                        F.hat <- cbind(F.hat, rep(1, TT))
+                    }
+                }
+                U.tr <- Y.tr
+                if (p > 0) {
+                    for (j in 1:p) {
+                        U.tr <- U.tr - X.tr[, , j] * beta[j]
+                    }
+                }
+                if (force != 0) {
+                    U.tr <- U.tr - matrix(est.co$mu, TT, Ntr)
+                }
+                if (force %in% c(2, 3)) {
+                    U.tr <- U.tr - matrix(est.co$xi, TT, Ntr, byrow = FALSE)
+                }
+                if (0 %in% I.tr) {
+                    U.tr[which(I.tr == 0)] <- 0
+                }
+
+                all_resid <- c()
+                all_time_idx <- c()
+                all_obs_w <- c()
+                for (ii in 1:k) {
+                    pre.cv <- pre
+                    pre.cv[rmCV.tr[[ii]]] <- 0
+
+                    if (r == 0) {
+                        if (force %in% c(1, 3)) {
+                            alpha.cv <- rep(0, Ntr)
+                            for (j in 1:Ntr) {
+                                pre_t <- which(pre.cv[, j] == 1)
+                                if (length(pre_t) > 0) alpha.cv[j] <- mean(U.tr[pre_t, j])
+                            }
+                            fitted.cv <- matrix(alpha.cv, TT, Ntr, byrow = TRUE)
+                        } else {
+                            fitted.cv <- matrix(0, TT, Ntr)
+                        }
+                    } else {
+                        fitted.cv <- matrix(0, TT, Ntr)
+                        for (j in 1:Ntr) {
+                            pre_t <- which(pre.cv[, j] == 1)
+                            if (length(pre_t) >= ncol(F.hat)) {
+                                F.pre <- as.matrix(F.hat[pre_t, , drop = FALSE])
+                                lam <- try(solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.tr[pre_t, j],
+                                           silent = TRUE)
+                                if (!"try-error" %in% class(lam)) {
+                                    fitted.cv[, j] <- F.hat %*% lam
+                                }
+                            }
+                        }
+                    }
+
+                    resid_ii <- U.tr[estCV.tr[[ii]]] - fitted.cv[estCV.tr[[ii]]]
+                    all_resid <- c(all_resid, resid_ii)
+
+                    if (!is.null(T.on)) {
+                        T.on.tr <- T.on[, tr, drop = FALSE]
+                        idx_ii <- as.character(T.on.tr[estCV.tr[[ii]]])
+                        idx_ii[is.na(idx_ii)] <- "Control"
+                        all_time_idx <- c(all_time_idx, idx_ii)
+                    }
+
+                    if (!is.null(W.tr)) {
+                        all_obs_w <- c(all_obs_w, W.tr[estCV.tr[[ii]]])
+                    }
+                }
+                if (length(all_resid) == 0) {
+                    scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
+                                MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                } else {
+                    scores <- .score_residuals(
+                        all_resid,
+                        obs_weights = if (!is.null(W.tr)) all_obs_w else NULL,
+                        time_index = if (length(all_time_idx) > 0) all_time_idx else NULL,
+                        count_weights = count.T.cv,
+                        norm.para = norm.para
+                    )
+                }
+
+              } ## end cv.method branching
 
                 if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
                     ## at least 1% improvement for selected criterion
@@ -790,6 +1069,143 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE", wgmspe = "WGMSPE",
                 mad = "MAD", moment = "Moment", gmoment = "GMoment", "MSPE")
 
+            ## ---- cv.sample pre-computation (CFE) ---- ##
+            if (cv.method != "loo" && r.max > 0) {
+                if (cv.method == "all_units") {
+                    rm.count.co <- floor(sum(II.co) * cv.prop)
+                    if (rm.count.co == 0) {
+                        message("cv.prop too small for control panel; falling back to LOO.")
+                        cv.method <- "loo"
+                    } else {
+                        D.co.fake <- matrix(0, TT, Nco)
+                        oci.co <- which(c(II.co) == 1)
+                        rmCV <- list()
+                        ociCV <- list()
+                        estCV <- list()
+                        Y0CV.co <- array(NA, dim = c(TT, Nco, k))
+                        if (p > 0) {
+                            beta0CV.co <- array(NA, dim = c(p, 1, k))
+                        } else {
+                            beta0CV.co <- array(0, dim = c(1, 0, k))
+                        }
+                        flag.cv <- 0
+                        for (i.cv in 1:k) {
+                            cv.n <- 0
+                            repeat {
+                                cv.n <- cv.n + 1
+                                get.cv <- cv.sample(II.co, D.co.fake,
+                                    count = rm.count.co,
+                                    cv.count = cv.nobs,
+                                    cv.treat = FALSE,
+                                    cv.donut = cv.donut)
+                                cv.id <- get.cv$cv.id
+                                II.co.cv <- II.co
+                                II.co.cv[cv.id] <- 0
+                                II.co.cv.valid <- II.co
+                                II.co.cv.valid[cv.id] <- -1
+                                con1 <- sum(apply(II.co.cv, 1, sum) >= 1) == TT
+                                con2 <- sum(apply(II.co.cv, 2, sum) >= min.T0) == Nco
+                                if (con1 && con2) break
+                                if (cv.n >= 200) {
+                                    flag.cv <- 1
+                                    keep.1 <- which(apply(II.co.cv, 1, sum) < 1)
+                                    keep.2 <- which(apply(II.co.cv, 2, sum) < min.T0)
+                                    II.co.cv[keep.1, ] <- II.co[keep.1, ]
+                                    II.co.cv[, keep.2] <- II.co[, keep.2]
+                                    II.co.cv.valid[keep.1, ] <- II.co[keep.1, ]
+                                    II.co.cv.valid[, keep.2] <- II.co[, keep.2]
+                                    cv.id <- which(II.co.cv.valid != II.co)
+                                    break
+                                }
+                            }
+                            rmCV[[i.cv]] <- cv.id
+                            ociCV[[i.cv]] <- setdiff(oci.co, cv.id)
+                            if (cv.n < 200) {
+                                estCV[[i.cv]] <- get.cv$est.id
+                            } else {
+                                cv.diff <- setdiff(get.cv$cv.id, cv.id)
+                                estCV[[i.cv]] <- setdiff(get.cv$est.id, cv.diff)
+                            }
+                            if (is.null(W)) {
+                                initialOutCv <- initialFit(data = data.ini, force = force, oci = ociCV[[i.cv]])
+                            } else {
+                                initialOutCv <- initialFit(data = data.ini, force = force, w = c(W.use), oci = ociCV[[i.cv]])
+                            }
+                            Y0CV.co[, , i.cv] <- initialOutCv$Y0
+                            if (p > 0) {
+                                beta0cv <- initialOutCv$beta0
+                                if (sum(is.na(beta0cv)) > 0) {
+                                    beta0cv[which(is.na(beta0cv))] <- 0
+                                }
+                                beta0CV.co[, , i.cv] <- beta0cv
+                            }
+                        }
+                        if (flag.cv == 1) {
+                            message("Some control units have too few observations. Removed automatically in CV.\n")
+                        }
+                    }
+                } else if (cv.method == "treated_units") {
+                    rm.count.tr <- floor(sum(pre) * cv.prop)
+                    if (rm.count.tr == 0) {
+                        message("cv.prop too small for treated pre-treatment panel; falling back to LOO.")
+                        cv.method <- "loo"
+                    } else {
+                        D.tr.fake <- matrix(0, TT, Ntr)
+                        rmCV.tr <- list()
+                        estCV.tr <- list()
+                        flag.cv <- 0
+                        for (i.cv in 1:k) {
+                            cv.n <- 0
+                            repeat {
+                                cv.n <- cv.n + 1
+                                get.cv <- cv.sample(pre, D.tr.fake,
+                                    count = rm.count.tr,
+                                    cv.count = cv.nobs,
+                                    cv.treat = FALSE,
+                                    cv.donut = cv.donut)
+                                cv.id <- get.cv$cv.id
+                                pre.cv <- pre
+                                pre.cv[cv.id] <- 0
+                                con1 <- TRUE
+                                pre.rows <- which(rowSums(pre) > 0)
+                                if (length(pre.rows) > 0) {
+                                    con1 <- all(rowSums(pre.cv[pre.rows, , drop = FALSE]) >= 1)
+                                }
+                                con2 <- all(colSums(pre.cv) >= min(min.T0, 2))
+                                if (con1 && con2) break
+                                if (cv.n >= 200) {
+                                    flag.cv <- 1
+                                    pre.cv.valid <- pre
+                                    pre.cv.valid[cv.id] <- -1
+                                    keep.1 <- pre.rows[rowSums(pre.cv[pre.rows, , drop = FALSE]) < 1]
+                                    keep.2 <- which(colSums(pre.cv) < min(min.T0, 2))
+                                    if (length(keep.1) > 0) {
+                                        pre.cv[keep.1, ] <- pre[keep.1, ]
+                                        pre.cv.valid[keep.1, ] <- pre[keep.1, ]
+                                    }
+                                    if (length(keep.2) > 0) {
+                                        pre.cv[, keep.2] <- pre[, keep.2]
+                                        pre.cv.valid[, keep.2] <- pre[, keep.2]
+                                    }
+                                    cv.id <- which(pre.cv.valid != pre)
+                                    break
+                                }
+                            }
+                            rmCV.tr[[i.cv]] <- cv.id
+                            if (cv.n < 200) {
+                                estCV.tr[[i.cv]] <- get.cv$est.id
+                            } else {
+                                cv.diff <- setdiff(get.cv$cv.id, cv.id)
+                                estCV.tr[[i.cv]] <- setdiff(get.cv$est.id, cv.diff)
+                            }
+                        }
+                        if (flag.cv == 1) {
+                            message("Some treated units have too few pre-treatment observations. Removed automatically in CV.\n")
+                        }
+                    }
+                }
+            }
+
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
                 est.co <- complex_fe_ub(YY.co, Y0.co, X.co,
@@ -813,6 +1229,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     PC <- est.co$PC * (norm.para[1]^2)
                 }
 
+              if (cv.method == "loo") {
+                ## ---- LOO CV (existing code) ---- ##
                 ## Build U.tr: subtract Layer 1 from Y.tr
                 if (r != 0) {
                     F.hat <- as.matrix(est.co$factor)
@@ -992,6 +1410,158 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         norm.para = norm.para
                     )
                 }
+
+              } else if (cv.method == "all_units") {
+                ## ---- cv.sample "all_units" CFE CV ---- ##
+                all_resid <- c()
+                all_time_idx <- c()
+                all_obs_w <- c()
+                for (ii in 1:k) {
+                    II.co.cv <- II.co
+                    II.co.cv[rmCV[[ii]]] <- 0
+                    YY.co.cv <- YY.co
+                    YY.co.cv[rmCV[[ii]]] <- 0
+                    if (!is.null(W)) {
+                        W.cv <- W.use
+                        W.cv[rmCV[[ii]]] <- 0
+                    } else {
+                        W.cv <- as.matrix(0)
+                    }
+                    est.cv.co <- complex_fe_ub(
+                        YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co,
+                        X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
+                        Zgamma.id, kappaQ.id,
+                        II.co.cv, W.cv, as.matrix(beta0CV.co[,,ii]),
+                        r, force = force, tol, max.iteration
+                    )
+                    est.cv.fit <- est.cv.co$fit
+                    resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
+                    all_resid <- c(all_resid, resid_ii)
+                    if (!is.null(W)) {
+                        all_obs_w <- c(all_obs_w, W.use[estCV[[ii]]])
+                    }
+                    all_time_idx <- c(all_time_idx, rep("Control", length(resid_ii)))
+                }
+                if (length(all_resid) == 0) {
+                    scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
+                                MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                } else {
+                    scores <- .score_residuals(
+                        all_resid,
+                        obs_weights = if (!is.null(W)) all_obs_w else NULL,
+                        time_index = all_time_idx,
+                        count_weights = count.T.cv,
+                        norm.para = NULL
+                    )
+                }
+
+              } else {
+                ## ---- cv.sample "treated_units" CFE CV ---- ##
+                ## Build U.tr: subtract Layer 1 from Y.tr
+                if (r != 0) {
+                    F.hat <- as.matrix(est.co$factor)
+                    if (force %in% c(1, 3)) {
+                        F.hat <- cbind(F.hat, rep(1, TT))
+                    }
+                }
+                U.tr <- Y.tr
+                if (p > 0) {
+                    for (j in 1:p) {
+                        U.tr <- U.tr - X.tr[, , j] * beta[j]
+                    }
+                }
+                if (force != 0) {
+                    U.tr <- U.tr - matrix(est.co$mu, TT, Ntr)
+                }
+                if (force %in% c(2, 3)) {
+                    U.tr <- U.tr - matrix(est.co$xi, TT, Ntr, byrow = FALSE)
+                }
+
+                ## Subtract gamma for treated (Layer 1)
+                if (!is.null(est.co$gamma) && length(est.co$gamma) > 0) {
+                    for (k_g in seq_along(est.co$gamma)) {
+                        gamma.fit.tr.k <- .reconstruct_gamma_fit_tr(
+                            est.co$gamma[[k_g]], X.Z.tr, X.gamma.tr[, , k_g, drop = FALSE],
+                            Zgamma.id[[k_g]], TT, Ntr)
+                        U.tr <- U.tr - gamma.fit.tr.k
+                    }
+                }
+
+                ## Subtract Type-B extra FE for treated (Layer 1)
+                if (length(typeB_idx) > 0) {
+                    typeB.fit.tr <- .extract_and_apply_typeB_fe(
+                        est.co, X.co, X.extra.FE.co.B, X.extra.FE.tr,
+                        typeB_idx, X.Z.co, X.gamma.co, X.Q.co, X.kappa.co,
+                        Zgamma.id, kappaQ.id,
+                        TT, Nco, Ntr, p, r, force)
+                    U.tr <- U.tr - typeB.fit.tr
+                }
+
+                if (0 %in% I.tr) {
+                    U.tr[which(I.tr == 0)] <- 0
+                }
+
+                all_resid <- c()
+                all_time_idx <- c()
+                all_obs_w <- c()
+                for (ii in 1:k) {
+                    pre.cv <- pre
+                    pre.cv[rmCV.tr[[ii]]] <- 0
+
+                    if (r == 0) {
+                        if (force %in% c(1, 3)) {
+                            alpha.cv <- rep(0, Ntr)
+                            for (j in 1:Ntr) {
+                                pre_t <- which(pre.cv[, j] == 1)
+                                if (length(pre_t) > 0) alpha.cv[j] <- mean(U.tr[pre_t, j])
+                            }
+                            fitted.cv <- matrix(alpha.cv, TT, Ntr, byrow = TRUE)
+                        } else {
+                            fitted.cv <- matrix(0, TT, Ntr)
+                        }
+                    } else {
+                        fitted.cv <- matrix(0, TT, Ntr)
+                        for (j in 1:Ntr) {
+                            pre_t <- which(pre.cv[, j] == 1)
+                            if (length(pre_t) >= ncol(F.hat)) {
+                                F.pre <- as.matrix(F.hat[pre_t, , drop = FALSE])
+                                lam <- try(solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.tr[pre_t, j],
+                                           silent = TRUE)
+                                if (!"try-error" %in% class(lam)) {
+                                    fitted.cv[, j] <- F.hat %*% lam
+                                }
+                            }
+                        }
+                    }
+
+                    resid_ii <- U.tr[estCV.tr[[ii]]] - fitted.cv[estCV.tr[[ii]]]
+                    all_resid <- c(all_resid, resid_ii)
+
+                    if (!is.null(T.on)) {
+                        T.on.tr <- T.on[, tr, drop = FALSE]
+                        idx_ii <- as.character(T.on.tr[estCV.tr[[ii]]])
+                        idx_ii[is.na(idx_ii)] <- "Control"
+                        all_time_idx <- c(all_time_idx, idx_ii)
+                    }
+
+                    if (!is.null(W.tr)) {
+                        all_obs_w <- c(all_obs_w, W.tr[estCV.tr[[ii]]])
+                    }
+                }
+                if (length(all_resid) == 0) {
+                    scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
+                                MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                } else {
+                    scores <- .score_residuals(
+                        all_resid,
+                        obs_weights = if (!is.null(W.tr)) all_obs_w else NULL,
+                        time_index = if (length(all_time_idx) > 0) all_time_idx else NULL,
+                        count_weights = count.T.cv,
+                        norm.para = norm.para
+                    )
+                }
+
+              } ## end cv.method branching
 
                 if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
                     est.co.best <- est.co

@@ -224,7 +224,7 @@ Steps 1-6 are done. `.score_residuals()` is in R/score.R. fect_cv (IFE+MC blocks
 - fect_mspe: .is_fect_output() fixed to check obj$call/Y.dat instead of Y.ct.full; active_rows/active_cols feasibility checks added
 - fect_nevertreated: CV.out now included in return list
 
-**Known limitation**: cv.sample-based CV in fect_nevertreated has parameter infrastructure but the actual loop logic is not yet implemented (LOO path handles all cv.method values). Ready for future implementation.
+**cv.sample CV in fect_nevertreated**: COMPLETE. All three cv.method paths (loo, all_units, treated_units) are fully implemented with cv.sample k-fold masking, re-estimation, and scoring in both IFE and CFE blocks. See `log/2026-03-16-cv-sample-nevertreated.md` for process record and runtime benchmarks.
 
 ### ~~CFE CV r-selection issue~~ RESOLVED
 **Finding**: The CFE CV algorithm is correct. The original test was misspecified -- it used `make_cfe_z_data` (DGP with Z*gamma) but did not pass `Z = "Z"` to `fect()`. Without Z, factors absorb the unmodeled Z*gamma interaction (a rank-1 component), inflating r.cv by ~1. With Z properly specified, CFE CV correctly selects r=2 with clear MSPE U-shape (minimum at true r). Fixed test + added 3 new tests. 135/135 pass. See `log/2026-03-16-cfe-cv-rselect-fix.md` for full process record.
@@ -328,10 +328,10 @@ When `method="cfe"` + `factors.from="nevertreated"`, dispatch routes to `fect_ne
 > **Open tasks** (in priority order):
 >
 > 1. **Phase 3b** — merge IFE into CFE (verify E0/E4 equivalence, replace `inter_fe_ub` with `complex_fe_ub`).
-> 2. **cv.sample CV in fect_nevertreated** — parameter infrastructure is in place but the actual cv.sample loop logic (for cv.method="all_units"/"treated_units") is not yet implemented inside the r-search loop. LOO handles all cv.method values for now.
+> 2. ~~**cv.sample CV in fect_nevertreated**~~ COMPLETE — all three cv.method paths (loo, all_units, treated_units) fully implemented with cv.sample k-fold CV in both IFE and CFE blocks.
 > 3. **fect_mspe + CV=TRUE bug** — fect_mspe throws "No valid residuals" when called on models fitted with CV=TRUE. Workaround: use CV=FALSE.
 >
-> **Resolved**: Score unification Phase 1, Phase 2 (cv.method unification, fect_mspe simplification, 1% rule, W/count.T.cv), CFE CV r-selection issue, test gaps, parallel .export, .as_mask() bug fix, fect_mspe_sim deleted.
+> **Resolved**: Score unification Phase 1, Phase 2 (cv.method unification, fect_mspe simplification, 1% rule, W/count.T.cv), cv.sample k-fold CV in fect_nevertreated (all_units + treated_units fully implemented), CFE CV r-selection issue, test gaps, parallel .export, .as_mask() bug fix, fect_mspe_sim deleted.
 >
 > Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.
 > Read `~/GitHub/fect/log/cv-comparison-table.md` for the approved CV design table.
