@@ -64,65 +64,34 @@ out_norev <- suppressWarnings(suppressMessages(
 ## -----------------------------------------------------------------
 test_that("fect_mspe returns correct structure and values", {
 
-  ## Basic invocation
+  ## Basic invocation (cv.sample-based API — no hide_n / n_rep / hide_mask)
   result <- suppressWarnings(suppressMessages(
-    fect_mspe(out_base, hide_n = 5, seed = 42)
+    fect_mspe(out_base, seed = 42)
   ))
 
   expect_type(result, "list")
-  expect_true(all(c("summary", "records", "hide_mask", "fits") %in% names(result)))
+  expect_true(all(c("summary", "records", "fits", "criterion", "scores") %in% names(result)))
   expect_s3_class(result$summary, "data.frame")
-  expect_true(all(c("Model", "Hidden_N", "RMSE", "Bias") %in% names(result$summary)))
+  expect_true(all(c("Model", "Hidden_N", "RMSE", "Bias", "MSPE") %in% names(result$summary)))
   expect_s3_class(result$records, "data.frame")
-  expect_true(all(c("Rep", "Model", "Hidden_N", "RMSE", "Bias") %in% names(result$records)))
+  expect_true(all(c("Rep", "Model", "Hidden_N", "RMSE", "Bias", "MSPE") %in% names(result$records)))
   expect_true(result$summary$RMSE > 0)
-
-  ## hide_mask is a matrix with correct dimensions
-  TT <- nrow(out_base$Y.ct.full)
-  N  <- ncol(out_base$Y.ct.full)
-  expect_true(is.matrix(result$hide_mask))
-  expect_equal(dim(result$hide_mask), c(TT, N))
 
   ## Reproducibility: same seed => same RMSE
   r1 <- suppressWarnings(suppressMessages(
-    fect_mspe(out_base, hide_n = 5, seed = 42)
+    fect_mspe(out_base, seed = 42)
   ))
   r2 <- suppressWarnings(suppressMessages(
-    fect_mspe(out_base, hide_n = 5, seed = 42)
+    fect_mspe(out_base, seed = 42)
   ))
   expect_equal(r1$summary$RMSE, r2$summary$RMSE, tolerance = 1e-10)
 
   ## Multiple models
   multi <- suppressWarnings(suppressMessages(
-    fect_mspe(list(ife = out_base, ife2 = out_base), hide_n = 5, seed = 42)
+    fect_mspe(list(ife = out_base, ife2 = out_base), seed = 42)
   ))
   expect_equal(nrow(multi$summary), 2)
-  expect_equal(length(multi$fits), 2)
-  expect_true(all(c("ife", "ife2") %in% names(multi$fits)))
-
-  ## Multiple reps
-  mrep <- suppressWarnings(suppressMessages(
-    fect_mspe(out_base, hide_n = 5, n_rep = 2, seed = 123)
-  ))
-  expect_equal(nrow(mrep$records), 2)
-  expect_equal(nrow(mrep$summary), 1)
-
-  ## Custom hide_mask
-  custom_mask <- matrix(FALSE, nrow = TT, ncol = N)
-  ## Pick a few control-cell positions
-  D_idx <- which(names(out_base) == "D")
-  D_mat <- NULL
-  for (k in rev(D_idx)) {
-    obj <- out_base[[k]]
-    if (is.matrix(obj) && all(dim(obj) == c(TT, N))) { D_mat <- obj; break }
-  }
-  ctrl <- which(D_mat == 0, arr.ind = TRUE)
-  if (nrow(ctrl) >= 10) custom_mask[ctrl[1:10, , drop = FALSE]] <- TRUE
-  res_cm <- suppressWarnings(suppressMessages(
-    fect_mspe(out_base, hide_mask = custom_mask, hide_n = 5, seed = 42)
-  ))
-  expect_type(res_cm, "list")
-  expect_true(res_cm$summary$RMSE > 0)
+  expect_true(all(c("ife", "ife2") %in% multi$summary$Model))
 })
 
 

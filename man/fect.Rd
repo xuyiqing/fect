@@ -10,7 +10,7 @@ assumptions.}
             index, force = "two-way",
             factors.from = "notyettreated", em = TRUE,
             r = 0, lambda = NULL, nlambda = 10,
-            CV = NULL, k = 10, cv.prop = 0.1, cv.treat = FALSE,
+            CV = NULL, k = 10, cv.prop = 0.1, cv.method = "all_units",
             cv.nobs = 3, cv.donut = 0, criterion = "mspe",
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
@@ -49,7 +49,7 @@ assumptions.}
 \item{CV}{a logical flag indicating whether cross-validation will be performed to select the optimal number of factors or hyper-parameter in matrix completion algorithm. If \code{r} is not specified, the procedure will search through \code{r = 0} to \code{5}.}
 \item{k}{an integer specifying number of cross-validation rounds. Default is \code{k = 10}.}
 \item{cv.prop}{a numerical value specifying the proportion of testing set compared to sample size during the cross-validation procedure.}
-\item{cv.treat}{a logical flag speficying whether to only use observations of treated units as testing set.}
+\item{cv.method}{a string specifying the cross-validation masking strategy. \code{"all_units"} (default) masks observations across all units; \code{"treated_units"} masks only treated unit observations. For \code{fect_nevertreated}, \code{"loo"} (leave-one-out) is also supported.}
 \item{cv.nobs}{an integer specifying the length of continuous observations within a unit in the testing set. Default is \code{cv.nobs = 3}.}
 \item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}.}
 \item{criterion}{criterion used for model selection. Default is "mspe".

@@ -16,7 +16,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     criterion = "mspe",
                     k = 5, # CV time
                     cv.prop = 0.1,
-                    cv.treat = TRUE,
+                    cv.method = "all_units",
                     cv.nobs = 3,
                     cv.donut = 1,
                     min.T0 = 5,
@@ -43,6 +43,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
+
     placebo.pos <- na.pos <- NULL
     ## unit id and time
     TT <- dim(Y)[1]
@@ -193,7 +194,30 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 force = force, hasRevs = hasRevs,
                 tol = tol, boot = 0,
                 norm.para = norm.para,
-                group.level = group.level, group = group
+                group.level = group.level, group = group,
+                cv.method = cv.method, cv.nobs = cv.nobs,
+                cv.prop = cv.prop, cv.donut = cv.donut,
+                min.T0 = min.T0, k = k, criterion = criterion
+            )
+            return(out)
+        }
+
+        ## for ife with nevertreated, use the cross-validation function in fect_nevertreated
+        if (method == "ife" && factors.from == "nevertreated") {
+            message("IFE model with nevertreated factors...\n")
+            out <- fect_nevertreated(
+                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                T.on = T.on, T.off = T.off,
+                T.on.balance = T.on.balance,
+                balance.period = balance.period,
+                r = r, r.end = r.end, CV = TRUE,
+                force = force, hasRevs = hasRevs,
+                tol = tol, boot = 0,
+                norm.para = norm.para,
+                group.level = group.level, group = group,
+                cv.method = cv.method, cv.nobs = cv.nobs,
+                cv.prop = cv.prop, cv.donut = cv.donut,
+                min.T0 = min.T0, k = k, criterion = criterion
             )
             return(out)
         }
@@ -214,10 +238,17 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 method = "cfe",
                 X.extra.FE = X.extra.FE, X.Z = X.Z, X.Q = X.Q,
                 X.gamma = X.gamma, X.kappa = X.kappa,
-                Zgamma.id = Zgamma.id, kappaQ.id = kappaQ.id
+                Zgamma.id = Zgamma.id, kappaQ.id = kappaQ.id,
+                cv.method = cv.method, cv.nobs = cv.nobs,
+                cv.prop = cv.prop, cv.donut = cv.donut,
+                min.T0 = min.T0, k = k, criterion = criterion
             )
             return(out)
         }
+
+        ## ---- cv.method → cv.treat mapping (after nevertreated delegation) ---- ##
+        cv.method <- match.arg(cv.method, c("all_units", "treated_units"))
+        cv.treat <- (cv.method == "treated_units")
 
         ## ----- ##
         ## ------------- initialize ------------ ##
@@ -290,7 +321,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             }
 
             if (length(cv.id) == 0) {
-                stop("Some units have too few pre-treatment observations. Set a larger \"cv.prop\" or set \"cv.treat\" to FALSE.")
+                stop("Some units have too few pre-treatment observations. Set a larger \"cv.prop\" or set cv.method to \"all_units\".")
             }
 
             rmCV[[i]] <- cv.id

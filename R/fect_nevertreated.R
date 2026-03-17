@@ -11,6 +11,12 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         balance.period = NULL,
                         CV = TRUE,
                         criterion = "mspe",
+                        cv.method = "treated_units",
+                        k = 5,
+                        cv.prop = 0.1,
+                        cv.nobs = 3,
+                        cv.donut = 1,
+                        min.T0 = 5,
                         r = 0, # r.end when CV==TRUE
                         r.end = 3,
                         binary = FALSE,
@@ -169,6 +175,16 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         W.use[which(II.co == 0)] <- 0
     }
 
+    ## ---- cv.method validation ---- ##
+    cv.method <- match.arg(cv.method, c("treated_units", "all_units", "loo"))
+
+    ## ---- W for treated units (scoring) ---- ##
+    if (!is.null(W)) {
+        W.tr <- as.matrix(W[, tr, drop = FALSE])
+    } else {
+        W.tr <- NULL
+    }
+
     if (!0 %in% I.tr) {
         ## a (TT*Ntr) matrix, time dimension: before treatment
         pre <- as.matrix(D[, tr] == 0 & II[, tr] == 1)
@@ -182,6 +198,20 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     id.tr.pre.v <- rep(id, each = TT)[which(pre.v == 1)] ## vectorized pre-treatment grouping variable for the treated
     time.pre <- split(rep(time, Ntr)[which(pre.v == 1)], id.tr.pre.v) ## a list of pre-treatment periods
     sameT0 <- length(unique(T0)) == 1
+
+    ## ---- count.T.cv construction ---- ##
+    count.T.cv <- NULL
+    if (!is.null(T.on)) {
+        t.on.full <- c(T.on)
+        count.T.cv <- table(t.on.full)
+        count.T.cv <- count.T.cv[which(as.numeric(names(count.T.cv)) <= 0)]
+        if (length(count.T.cv) > 0) {
+            count.T.cv <- count.T.cv / mean(count.T.cv)
+            nm <- names(count.T.cv)
+            count.T.cv <- c(count.T.cv, median(count.T.cv))
+            names(count.T.cv) <- c(nm, "Control")
+        }
+    }
 
   if (method == "ife") {
     ## ====================================================================
@@ -403,11 +433,51 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
                 } else {
-                    scores <- .score_residuals(resid_all, norm.para = norm.para)
+                    ## Build time indices for LOO residuals
+                    time_idx_loo <- NULL
+                    obs_w_loo <- NULL
+                    if (!is.null(count.T.cv)) {
+                        time_idx_loo <- c()
+                        for (lv in unique(unlist(time.pre))) {
+                            if (sameT0 == FALSE | 0 %in% I.tr) {
+                                n_resid_lv <- sum(pre[which(time == lv), ] == TRUE)
+                            } else {
+                                n_resid_lv <- Ntr
+                            }
+                            if (n_resid_lv > 0) {
+                                t.on.tr <- T.on[, tr, drop = FALSE]
+                                t.on.lv <- unique(t.on.tr[lv, ])
+                                t.on.lv <- t.on.lv[!is.na(t.on.lv)]
+                                if (length(t.on.lv) > 0) {
+                                    time_idx_loo <- c(time_idx_loo, rep(as.character(t.on.lv[1]), n_resid_lv))
+                                } else {
+                                    time_idx_loo <- c(time_idx_loo, rep("Control", n_resid_lv))
+                                }
+                            }
+                        }
+                    }
+                    if (!is.null(W.tr)) {
+                        obs_w_loo <- c()
+                        for (lv in unique(unlist(time.pre))) {
+                            if (sameT0 == FALSE | 0 %in% I.tr) {
+                                w_lv <- W.tr[lv, which(pre[which(time == lv), ] == TRUE)]
+                            } else {
+                                w_lv <- W.tr[lv, ]
+                            }
+                            obs_w_loo <- c(obs_w_loo, w_lv)
+                        }
+                    }
+                    scores <- .score_residuals(
+                        resid_all,
+                        obs_weights = obs_w_loo,
+                        time_index = time_idx_loo,
+                        count_weights = count.T.cv,
+                        norm.para = norm.para
+                    )
                 }
 
-                if ((min(CV.out[, crit_col]) - scores[crit_col]) > tol * min(CV.out[, crit_col])) {
-                    ## at least tol improvement for selected criterion
+                if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                    ## at least 1% improvement for selected criterion
                     est.co.best <- est.co ## interFE result with the best r
                     r.cv <- r
                 } else {
@@ -880,10 +950,50 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
                 } else {
-                    scores <- .score_residuals(resid_all, norm.para = norm.para)
+                    ## Build time indices for LOO residuals (CFE)
+                    time_idx_loo <- NULL
+                    obs_w_loo <- NULL
+                    if (!is.null(count.T.cv)) {
+                        time_idx_loo <- c()
+                        for (lv in unique(unlist(time.pre))) {
+                            if (sameT0 == FALSE | 0 %in% I.tr) {
+                                n_resid_lv <- sum(pre[which(time == lv), ] == TRUE)
+                            } else {
+                                n_resid_lv <- Ntr
+                            }
+                            if (n_resid_lv > 0) {
+                                t.on.tr <- T.on[, tr, drop = FALSE]
+                                t.on.lv <- unique(t.on.tr[lv, ])
+                                t.on.lv <- t.on.lv[!is.na(t.on.lv)]
+                                if (length(t.on.lv) > 0) {
+                                    time_idx_loo <- c(time_idx_loo, rep(as.character(t.on.lv[1]), n_resid_lv))
+                                } else {
+                                    time_idx_loo <- c(time_idx_loo, rep("Control", n_resid_lv))
+                                }
+                            }
+                        }
+                    }
+                    if (!is.null(W.tr)) {
+                        obs_w_loo <- c()
+                        for (lv in unique(unlist(time.pre))) {
+                            if (sameT0 == FALSE | 0 %in% I.tr) {
+                                w_lv <- W.tr[lv, which(pre[which(time == lv), ] == TRUE)]
+                            } else {
+                                w_lv <- W.tr[lv, ]
+                            }
+                            obs_w_loo <- c(obs_w_loo, w_lv)
+                        }
+                    }
+                    scores <- .score_residuals(
+                        resid_all,
+                        obs_weights = obs_w_loo,
+                        time_index = time_idx_loo,
+                        count_weights = count.T.cv,
+                        norm.para = norm.para
+                    )
                 }
 
-                if ((min(CV.out[, crit_col]) - scores[crit_col]) > tol * min(CV.out[, crit_col])) {
+                if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
                     est.co.best <- est.co
                     r.cv <- r
                 } else {
@@ -1985,6 +2095,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             off.sd = off.sd
         ))
     }
+    ## Include CV.out in the return list when cross-validation was performed
+    if (exists("CV.out", inherits = FALSE)) {
+        out <- c(out, list(CV.out = CV.out))
+    }
+
     if (r.cv > 0) {
         lambda.co <- as.matrix(est.co.best$lambda)
         rownames(lambda.co) <- co

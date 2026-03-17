@@ -43,7 +43,7 @@ fect <- function(
     CV = NULL, # cross-validation
     k = 10, # times of CV
     cv.prop = 0.1, ## proportion of CV counts
-    cv.treat = FALSE, ## cv targeting treated units
+    cv.method = "all_units", ## CV masking strategy
     cv.nobs = 3, ## cv taking consecutive units
     cv.donut = 0, ## cv mspe
     criterion = "mspe", # for ife model: mspe, pc or both
@@ -116,7 +116,7 @@ fect.formula <- function(
     CV = NULL, # cross-validation
     k = 10, # times of CV
     cv.prop = 0.1, ## proportion of CV counts
-    cv.treat = FALSE,
+    cv.method = "all_units",
     cv.nobs = 3,
     cv.donut = 0, ## cv mspe
     criterion = "mspe", # for ife model: mspe, pc or both
@@ -221,7 +221,7 @@ fect.formula <- function(
         CV = CV,
         k = k,
         cv.prop = cv.prop,
-        cv.treat = cv.treat,
+        cv.method = cv.method,
         cv.nobs = cv.nobs,
         cv.donut = cv.donut,
         criterion = criterion,
@@ -296,7 +296,7 @@ fect.default <- function(
     CV = NULL, # cross-validation
     k = 10, # times of CV
     cv.prop = 0.1,
-    cv.treat = TRUE,
+    cv.method = "all_units",
     cv.nobs = 3,
     cv.donut = 1, ## cv mspe
     criterion = "mspe",
@@ -1976,7 +1976,7 @@ fect.default <- function(
                     criterion = criterion,
                     k = k,
                     cv.prop = cv.prop,
-                    cv.treat = cv.treat,
+                    cv.method = cv.method,
                     cv.nobs = cv.nobs,
                     cv.donut = cv.donut,
                     min.T0 = min.T0,
@@ -2012,7 +2012,7 @@ fect.default <- function(
                     T.off = T.off,
                     k = k,
                     cv.prop = cv.prop,
-                    cv.treat = cv.treat,
+                    cv.method = cv.method,
                     cv.nobs = cv.nobs,
                     r = r,
                     r.end = r.end,
@@ -2255,7 +2255,7 @@ fect.default <- function(
             CV = CV,
             k = k,
             cv.prop = cv.prop,
-            cv.treat = cv.treat,
+            cv.method = cv.method,
             cv.nobs = cv.nobs,
             r = r,
             r.end = r.end,
@@ -2506,7 +2506,7 @@ fect.default <- function(
                     CV = 0,
                     k = k,
                     cv.prop = cv.prop,
-                    cv.treat = cv.treat,
+                    cv.method = cv.method,
                     cv.nobs = cv.nobs,
                     r = r.cv,
                     r.end = r.end,

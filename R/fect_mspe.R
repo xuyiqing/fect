@@ -1,50 +1,29 @@
 fect_mspe <- function(
     out.fect,
-    hide_mask   = NULL,
-    hide_n      = 20,
     seed        = NULL,
-    n_rep       = 1,
     ## ----- masking strategy ----- ##
-    pre.trend   = NULL,           # DEPRECATED — use mask.method instead
-    mask.method = NULL,           # "random" | "pre.trend" | "cv.sample" | "user"
-    pre.trend.n = 2,              # for mask.method = "pre.trend" or legacy pre.trend = TRUE
-    cv.treat    = TRUE,           # for mask.method = "cv.sample"
-    cv.nobs     = 3,              # for mask.method = "cv.sample"
-    cv.donut    = 1,              # for mask.method = "cv.sample"
-    cv.prop     = 0.1,            # for mask.method = "cv.sample"
-    min.T0      = 5,              # for mask.method = "cv.sample"
-    k           = 5,              # for mask.method = "cv.sample" (number of folds)
+    cv.method   = "all_units",       # "all_units" or "treated_units"
+    cv.nobs     = 3,
+    cv.donut    = 1,
+    cv.prop     = 0.1,
+    min.T0      = 5,
+    k           = 5,
     ## ----- scoring ----- ##
     criterion   = "mspe",         # "mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment"
     W           = NULL,           # TT x N observation weight matrix, or NULL
     norm.para   = NULL,           # normalization vector, or NULL
-    proportion  = 0,              # proportion cutoff for count.T.cv (same as fect_cv)
-    ## ----- ground truth ----- ##
-    actual      = NULL,           # TT x N ground-truth matrix (default: observed Y)
-    control.only = TRUE           # mask only D==0 cells? FALSE = also mask treated
+    proportion  = 0               # proportion cutoff for count.T.cv (same as fect_cv)
 ) {
     if (!is.null(seed)) set.seed(seed)
-    hide_n_given <- !missing(hide_n)
     caller_env <- parent.frame()
 
     ## ---- validate criterion ---- ##
     valid_criteria <- c("mspe", "wmspe", "gmspe", "wgmspe", "mad", "moment", "gmoment")
     criterion <- match.arg(criterion, valid_criteria)
 
-    ## ---- backward compat for pre.trend ---- ##
-    if (!is.null(pre.trend) && is.null(mask.method)) {
-        mask.method <- if (isTRUE(pre.trend)) "pre.trend" else "random"
-        message("Note: 'pre.trend' is deprecated; use mask.method='",
-                mask.method, "' instead.")
-    } else if (!is.null(pre.trend) && !is.null(mask.method)) {
-        message("Note: both 'pre.trend' and 'mask.method' given; using mask.method='",
-                mask.method, "'.")
-    }
-    if (is.null(mask.method)) {
-        mask.method <- if (!is.null(hide_mask)) "user" else "random"
-    }
-    mask.method <- match.arg(mask.method,
-                             c("random", "pre.trend", "cv.sample", "user"))
+    ## ---- validate cv.method ---- ##
+    cv.method <- match.arg(cv.method, c("all_units", "treated_units"))
+    cv.treat <- (cv.method == "treated_units")
 
     ## ---- helper functions (unchanged) ---- ##
     .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj, caller_env) {
@@ -63,7 +42,7 @@ fect_mspe <- function(
         rerun_args
     }
     .is_fect_output <- function(obj) {
-        is.list(obj) && !is.null(obj$Y.ct.full)
+        is.list(obj) && !is.null(obj$call) && !is.null(obj$Y.dat)
     }
 
     .get_last_matrix <- function(out_obj, nm, TT, N) {
@@ -74,34 +53,6 @@ fect_mspe <- function(
             if (is.matrix(obj) && all(dim(obj) == c(TT, N))) return(obj)
         }
         NULL
-    }
-
-    .as_mask <- function(mask, TT, N) {
-        if (is.null(mask)) return(NULL)
-        if (is.matrix(mask)) {
-            if (all(dim(mask) == c(TT, N))) return(matrix(as.logical(mask), nrow = TT, ncol = N))
-            if (all(dim(mask) == c(N, TT))) return(matrix(as.logical(t(mask)), nrow = TT, ncol = N))
-            stop("`hide_mask` must be TT x N or N x TT.")
-        }
-        if (is.vector(mask) && length(mask) == TT * N) {
-            return(matrix(as.logical(mask), nrow = TT, ncol = N))
-        }
-        stop("`hide_mask` must be NULL, a matrix, or a vector of length TT*N.")
-    }
-
-    .pre_trend_candidates <- function(d_mat, y_mat, n_last) {
-        cand <- integer(0)
-        if (!isTRUE(n_last > 0)) return(cand)
-        for (j in seq_len(ncol(d_mat))) {
-            treated_idx <- which(d_mat[, j] == 1)
-            if (length(treated_idx) == 0) next
-            first_treat <- min(treated_idx)
-            pre_idx <- which(d_mat[, j] == 0 & !is.na(y_mat[, j]) & seq_len(nrow(d_mat)) < first_treat)
-            if (length(pre_idx) == 0) next
-            keep_idx <- tail(pre_idx, min(n_last, length(pre_idx)))
-            cand <- c(cand, keep_idx + (j - 1) * nrow(d_mat))
-        }
-        unique(cand)
     }
 
     ## ---- validate out.fect ---- ##
@@ -115,25 +66,14 @@ fect_mspe <- function(
     }
 
     ref <- out_list[[1]]
-    TT <- nrow(ref$Y.ct.full)
-    N <- ncol(ref$Y.ct.full)
+    ## Y.dat is always present in fect output; Y.ct.full may not be
+    TT <- nrow(ref$Y.dat)
+    N <- ncol(ref$Y.dat)
     y_ref <- .get_last_matrix(ref, "Y", TT, N)
     if (is.null(y_ref) && !is.null(ref$Y.dat)) y_ref <- ref$Y.dat
     d_ref <- .get_last_matrix(ref, "D", TT, N)
     if (is.null(d_ref) && !is.null(ref$D.dat)) d_ref <- ref$D.dat
     if (is.null(y_ref) || is.null(d_ref)) stop("`out.fect` must contain matrix Y and D.")
-
-    ## validate pre.trend.n
-    if (!is.numeric(pre.trend.n) || length(pre.trend.n) != 1 || is.na(pre.trend.n) ||
-        pre.trend.n < 1) {
-        stop("`pre.trend.n` must be a positive number.")
-    }
-    pre.trend.n <- as.integer(pre.trend.n)
-
-    ## validate mask.method = "user" requires hide_mask
-    if (mask.method == "user" && is.null(hide_mask)) {
-        stop("mask.method='user' requires a non-NULL hide_mask.")
-    }
 
     ## validate W dimensions
     if (!is.null(W)) {
@@ -142,19 +82,10 @@ fect_mspe <- function(
         }
     }
 
-    ## validate actual dimensions
-    if (!is.null(actual)) {
-        if (!is.matrix(actual) || nrow(actual) != TT || ncol(actual) != N) {
-            stop("`actual` must be a TT x N matrix.")
-        }
-    }
-
     ## ---- count.T.cv construction ---- ##
     ## Build period-level weights when criterion needs them
     count.T.cv <- NULL
-    needs_period_weights <- criterion %in% c("wmspe", "wgmspe", "moment", "gmoment") ||
-        mask.method == "cv.sample"
-    if (needs_period_weights && !is.null(ref$T.on)) {
+    if (!is.null(ref$T.on)) {
         T_on <- ref$T.on
         count.T.cv <- table(T_on)
         count.T.cv <- count.T.cv[which(as.numeric(names(count.T.cv)) <= 0)]
@@ -169,7 +100,7 @@ fect_mspe <- function(
 
     ## ---- cv.sample masking setup ---- ##
     rmCV <- estCV <- NULL
-    if (mask.method == "cv.sample") {
+    {
         I_mat <- if (!is.null(ref$I.dat)) ref$I.dat else {
             tmp <- .get_last_matrix(ref, "I", TT, N)
             if (is.null(tmp)) matrix(1L, TT, N)
@@ -184,6 +115,16 @@ fect_mspe <- function(
             II_mat[, ever_treated] <- 0
         }
         rm_count <- floor(sum(II_mat) * cv.prop)
+
+        ## For nevertreated, only never-treated columns have observations in
+        ## II_mat.  The feasibility checks (con1/con2) must count only
+        ## rows/columns that carry observations in the *original* II_mat;
+        ## otherwise every fold is deemed infeasible and the 200-iteration
+        ## fallback strips all held-out positions, producing zero residuals.
+        active_rows <- which(rowSums(II_mat) >= 1)
+        active_cols <- which(colSums(II_mat) >= 1)
+        n_active_rows <- length(active_rows)
+        n_active_cols <- length(active_cols)
 
         rmCV <- list()
         estCV <- list()
@@ -201,8 +142,8 @@ fect_mspe <- function(
                 II.cv <- II_mat
                 II.cv[cv.id] <- 0
 
-                con1 <- sum(apply(II.cv, 1, sum) >= 1) == TT
-                con2 <- sum(apply(II.cv, 2, sum) >= min.T0) == N
+                con1 <- sum(rowSums(II.cv[active_rows, , drop = FALSE]) >= 1) == n_active_rows
+                con2 <- sum(colSums(II.cv[, active_cols, drop = FALSE]) >= min.T0) == n_active_cols
 
                 if (con1 && con2) break
                 if (cv.n >= 200) {
@@ -230,7 +171,6 @@ fect_mspe <- function(
     }
 
     ## ---- records data.frame ---- ##
-    mask_base <- .as_mask(hide_mask, TT, N)
     records <- data.frame(
         Rep = integer(0),
         Model = character(0),
@@ -242,53 +182,10 @@ fect_mspe <- function(
         stringsAsFactors = FALSE
     )
     fits_last <- NULL
-    mask_last <- NULL
     scores_last <- NULL
 
-    ## ---- main repetition loop ---- ##
-    for (rep_id in seq_len(n_rep)) {
-
-        ## ---- build mask for this rep ---- ##
-        if (mask.method == "cv.sample") {
-            ## cv.sample masking is per-fold inside the model loop below
-            mask_mat <- NULL
-        } else if (mask.method == "user") {
-            mask_mat <- mask_base
-            if (!is.null(mask_mat) && isTRUE(control.only)) {
-                ## restrict to D==0 cells
-                mask_mat[d_ref == 1] <- FALSE
-            }
-            if (!is.null(mask_mat) && hide_n_given) {
-                cand <- which(mask_mat)
-                pick <- sample(cand, min(hide_n, length(cand)))
-                mask_mat <- matrix(FALSE, nrow = TT, ncol = N)
-                mask_mat[pick] <- TRUE
-            }
-        } else if (mask.method == "pre.trend") {
-            cand <- .pre_trend_candidates(d_ref, y_ref, pre.trend.n)
-            if (length(cand) == 0) {
-                ## fall back to random among D==0
-                if (isTRUE(control.only)) {
-                    cand <- which(d_ref == 0 & !is.na(y_ref))
-                } else {
-                    cand <- which(!is.na(y_ref))
-                }
-            }
-            pick <- sample(cand, min(hide_n, length(cand)))
-            mask_mat <- matrix(FALSE, nrow = TT, ncol = N)
-            mask_mat[pick] <- TRUE
-        } else {
-            ## mask.method == "random"
-            if (isTRUE(control.only)) {
-                cand <- which(d_ref == 0 & !is.na(y_ref))
-            } else {
-                cand <- which(!is.na(y_ref))
-            }
-            pick <- sample(cand, min(hide_n, length(cand)))
-            mask_mat <- matrix(FALSE, nrow = TT, ncol = N)
-            mask_mat[pick] <- TRUE
-        }
-
+    ## ---- cv.sample evaluation (single pass) ---- ##
+    {
         fits <- vector("list", length(out_list))
         names(fits) <- names(out_list)
 
@@ -301,9 +198,6 @@ fect_mspe <- function(
             if (is.null(y_true_i) || is.null(d_mat_i)) {
                 stop("Each out.fect must provide Y and D matrices.")
             }
-
-            ## determine actual values for scoring
-            actual_mat <- if (!is.null(actual)) actual else y_true_i
 
             formula_env_i <- environment(out_i$call$formula)
             if (is.null(formula_env_i)) formula_env_i <- caller_env
@@ -322,8 +216,7 @@ fect_mspe <- function(
             rr_i <- match(data_i[[idx_i[2]]], out_i$rawtime)
             cc_i <- match(data_i[[idx_i[1]]], out_i$id)
 
-            if (mask.method == "cv.sample") {
-                ## ---- cv.sample: accumulate residuals across k folds ---- ##
+            ## ---- cv.sample: accumulate residuals across k folds ---- ##
                 all_resid <- c()
                 all_obs_w <- c()
                 all_time_idx <- c()
@@ -371,9 +264,11 @@ fect_mspe <- function(
                     valid_map <- !is.na(rr_new) & !is.na(cc_new)
 
                     pred_vals <- rep(NA_real_, length(est_pos))
-                    pred_vals[valid_map] <- out_new$Y.ct.full[cbind(rr_new[valid_map], cc_new[valid_map])]
-                    ## actual_mat uses the original coordinate system (always TT x N)
-                    actual_vals <- actual_mat[cbind(est_row, est_col)]
+                    ## Use Y.ct.full if available, fall back to Y.ct
+                    yct_new <- if (!is.null(out_new$Y.ct.full)) out_new$Y.ct.full else out_new$Y.ct
+                    pred_vals[valid_map] <- yct_new[cbind(rr_new[valid_map], cc_new[valid_map])]
+                    ## y_true_i uses the original coordinate system (always TT x N)
+                    actual_vals <- y_true_i[cbind(est_row, est_col)]
                     valid_score <- valid_map & !is.na(pred_vals) & !is.na(actual_vals)
 
                     resid_ii <- pred_vals[valid_score] - actual_vals[valid_score]
@@ -404,78 +299,14 @@ fect_mspe <- function(
                     norm.para = norm.para
                 )
 
-            } else {
-                ## ---- non-cv.sample: single refit with masked data ---- ##
-                long_mask_i <- !is.na(rr_i) & !is.na(cc_i) &
-                    as.logical(mask_mat[cbind(rr_i, cc_i)])
-                hide_rows_i <- which(long_mask_i)
-                if (length(hide_rows_i) == 0) {
-                    stop("No valid hide positions mapped to source data rows.")
-                }
-
-                data_hidden <- data_i
-                data_hidden[hide_rows_i, y_col_i] <- NA_real_
-
-                rerun_args <- .build_rerun_args(
-                    out_obj = out_i,
-                    formula_obj = formula_obj_i,
-                    data_obj = data_hidden,
-                    index_obj = idx_i,
-                    caller_env = caller_env
-                )
-
-                out_new <- do.call(fect, rerun_args)
-                fits[[i]] <- out_new
-
-                rr_new <- match(data_i[[idx_i[2]]][hide_rows_i], out_new$rawtime)
-                cc_new <- match(data_i[[idx_i[1]]][hide_rows_i], out_new$id)
-                valid_pred <- !is.na(rr_new) & !is.na(cc_new)
-                if (!any(valid_pred)) {
-                    stop("No hidden positions remain comparable after rerun; try smaller `hide_n` or `pre.trend.n`.")
-                }
-                pred <- out_new$Y.ct.full[cbind(rr_new[valid_pred], cc_new[valid_pred])]
-                actual_vals <- actual_mat[cbind(
-                    rr_i[hide_rows_i][valid_pred],
-                    cc_i[hide_rows_i][valid_pred]
-                )]
-                resid_vec <- pred - actual_vals
-
-                ## observation weights at evaluation positions
-                obs_w_vec <- NULL
-                if (!is.null(W)) {
-                    obs_w_vec <- W[cbind(
-                        rr_i[hide_rows_i][valid_pred],
-                        cc_i[hide_rows_i][valid_pred]
-                    )]
-                }
-
-                ## time index for moment/gmoment
-                time_idx_vec <- NULL
-                if (!is.null(out_i$T.on)) {
-                    time_idx_vec <- as.character(out_i$T.on[cbind(
-                        rr_i[hide_rows_i][valid_pred],
-                        cc_i[hide_rows_i][valid_pred]
-                    )])
-                    time_idx_vec[which(is.na(time_idx_vec))] <- "Control"
-                }
-
-                scores <- .score_residuals(
-                    resid = resid_vec,
-                    obs_weights = obs_w_vec,
-                    time_index = time_idx_vec,
-                    count_weights = count.T.cv,
-                    norm.para = norm.para
-                )
-            }
-
             scores_last <- scores
 
             records <- rbind(
                 records,
                 data.frame(
-                    Rep = rep_id,
+                    Rep = 1L,
                     Model = names(out_list)[i],
-                    Hidden_N = if (mask.method == "cv.sample") length(all_resid) else sum(valid_pred),
+                    Hidden_N = length(all_resid),
                     MSPE = scores["MSPE"],
                     WMSPE = scores["WMSPE"],
                     GMSPE = scores["GMSPE"],
@@ -491,7 +322,6 @@ fect_mspe <- function(
             )
         }
         fits_last <- fits
-        if (!is.null(mask_mat)) mask_last <- mask_mat
     }
 
     summary <- aggregate(
@@ -501,7 +331,6 @@ fect_mspe <- function(
     list(
         summary = summary,
         records = records,
-        hide_mask = mask_last,
         fits = fits_last,
         criterion = criterion,
         scores = scores_last
