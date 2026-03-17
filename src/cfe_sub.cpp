@@ -566,29 +566,45 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
 
     if (use_weight == 1) {
       dif = arma::norm(W % (fit - fit_old), "fro") /
-            arma::norm(W % (fit_old), "fro");
+            (arma::norm(W % (fit_old), "fro") + 1e-10);
     } else {
-      dif = arma::norm(fit - fit_old, "fro") / arma::norm(fit_old, "fro");
+      dif = arma::norm(fit - fit_old, "fro") /
+            (arma::norm(fit_old, "fro") + 1e-10);
     }
 
-    dif1 = arma::norm(fit1 - fit1_old, "fro") / arma::norm(fit1_old, "fro");
+    // Component-wise convergence: track interactive FE independently
+    // (matches fe_ad_inter_iter pattern in ife_sub.cpp).
+    // When grand mean dominates fit, overall dif can drop below tol
+    // while factors are still poorly converged.
+    if (r > 0) {
+      double norm_inter = arma::norm(fit5_old, "fro");
+      if (norm_inter > 1e-10) {
+        double dif_inter = arma::norm(fit5 - fit5_old, "fro") / norm_inter;
+        if (dif_inter > dif) dif = dif_inter;
+      }
+    }
+
+    dif1 = arma::norm(fit1 - fit1_old, "fro") /
+           (arma::norm(fit1_old, "fro") + 1e-10);
 
     dif2_tol = 0.0;
     for (int k = 0; k < p_gamma; ++k) {
       dif2 = arma::norm(fit2.slice(k) - fit2_old.slice(k), "fro") /
-             arma::norm(fit2_old.slice(k), "fro");
+             (arma::norm(fit2_old.slice(k), "fro") + 1e-10);
       dif2_tol = dif2_tol || (dif2 > tolerate);
     }
 
     dif3_tol = 0.0;
     for (int k = 0; k < p_kappa; ++k) {
       dif3 = arma::norm(fit3.slice(k) - fit3_old.slice(k), "fro") /
-             arma::norm(fit3_old.slice(k), "fro");
+             (arma::norm(fit3_old.slice(k), "fro") + 1e-10);
       dif3_tol = dif3_tol || (dif3 > tolerate);
     }
 
-    dif4 = arma::norm(fit4 - fit4_old, "fro") / arma::norm(fit4_old, "fro");
-    dif5 = arma::norm(fit5 - fit5_old, "fro") / arma::norm(fit5_old, "fro");
+    dif4 = arma::norm(fit4 - fit4_old, "fro") /
+           (arma::norm(fit4_old, "fro") + 1e-10);
+    dif5 = arma::norm(fit5 - fit5_old, "fro") /
+           (arma::norm(fit5_old, "fro") + 1e-10);
 
     fit_old = fit;
     fit1_old = fit1;
@@ -596,6 +612,13 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
     fit3_old = fit3;
     fit4_old = fit4;
     fit5_old = fit5;
+
+    // Stop-burnin: lock in actual r once convergence first reached
+    // during burnin period (matches fe_ad_inter_iter pattern)
+    if (dif <= tolerate && niter <= d && use_weight == 1 &&
+        stop_burnin == 0) {
+      stop_burnin = 1;
+    }
 
     niter = niter + 1;
   }
