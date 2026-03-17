@@ -148,7 +148,7 @@ graph TD
 | `R/getcohort.R` | Utilities | Constructs cohort variables (FirstTreat, Time_to_Treatment) from panel data | `get.cohort()` | no |
 | `R/RcppExports.R` | Utilities | Auto-generated R-side bindings for all C++ functions | (internal) | no |
 | `src/ife.cpp` | C++ | Core IFE solver: `inter_fe()`, `inter_fe_ub()` (unbalanced); EM-style iteration with factor extraction | (internal) | no |
-| `src/ife_sub.cpp` | C++ | IFE subroutines: `fe_ad_iter()`, `fe_ad_inter_iter()`, `beta_iter()`, iterative demeaning | (internal) | no |
+| `src/ife_sub.cpp` | C++ | IFE subroutines: `fe_ad_iter()`, `fe_ad_inter_iter()`, `beta_iter()`, iterative demeaning. Component-wise convergence: tracks interactive FE (factors) independently from total fit. | (internal) | **yes** — component-wise convergence |
 | `src/cfe.cpp` | C++ | CFE solver: `complex_fe_ub()` with block coordinate descent over extra FEs, Z/gamma, Q/kappa, factors | (internal) | no |
 | `src/cfe_sub.cpp` | C++ | CFE iteration subroutine: `cfe_iter()` — with `simple_ife` fallback: delegates to joint `ife()` when no CFE components exist, achieving exact numerical equivalence with `inter_fe_ub` | (internal) | **yes** — joint ife() fallback, alpha/xi guard |
 | `src/fe_sub.cpp` | C++ | FE subroutines: `subfe()` for sub-fixed-effects, `IND()` for indicator matrices | (internal) | no |

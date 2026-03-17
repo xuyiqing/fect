@@ -222,18 +222,36 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     ## or complex_fe_ub for CFE. Eliminates balanced/unbalanced branching
     ## at each call site.
     .estimate_co <- function(Y, Y0, X, I_obs, W_in, beta0_in, r, force,
-                             tol, max.iteration, use_cfe = FALSE) {
+                             tol, max.iteration, use_cfe = FALSE,
+                             center = TRUE) {
+        ## Center Y to improve convergence conditioning:
+        ## removes grand mean from fit so tol applies to variation, not level.
+        mu_init <- 0
+        if (center && 0 %in% I_obs) {
+            ## Only center for unbalanced panels (where EM iterates)
+            mu_init <- sum(Y * I_obs) / sum(I_obs)
+            Y  <- Y - mu_init * I_obs   ## observed positions centered, zeros stay
+            Y0 <- Y0 - mu_init          ## initial fit centered
+        }
+
         if (use_cfe) {
-            complex_fe_ub(Y, Y0, X,
+            out <- complex_fe_ub(Y, Y0, X,
                 X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                 Zgamma.id, kappaQ.id,
                 I_obs, W_in, beta0_in, r, force = force, tol, max.iteration)
         } else if (!0 %in% I_obs) {
-            inter_fe(Y, X, r, force = force, beta0_in = beta0_in, tol, max.iteration)
+            out <- inter_fe(Y, X, r, force = force, beta0_in = beta0_in, tol, max.iteration)
         } else {
-            inter_fe_ub(Y, Y0, X, I_obs, W_in, beta0_in, r,
+            out <- inter_fe_ub(Y, Y0, X, I_obs, W_in, beta0_in, r,
                         force = force, tol, max.iteration)
         }
+
+        ## Undo centering
+        if (mu_init != 0) {
+            out$mu  <- out$mu + mu_init
+            out$fit <- out$fit + mu_init
+        }
+        out
     }
 
   if (method == "ife") {
@@ -273,6 +291,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
     ## cross-validation only for gsynth
     if (CV == TRUE) {
+        ## Two-tier tolerance: CV uses looser tol for r-selection speed,
+        ## final estimation (after CV) uses the user's tol for precision.
+        cv_tol <- max(tol, 1e-3)
+
         ## starting r
         if ((r > (T0.min - 1) & force %in% c(0, 2)) | (r > (T0.min - 2) & force %in% c(1, 3))) {
             message("r is too big compared with T0; reset to 0.")
@@ -289,7 +311,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         if (r.max == 0) {
             r.cv <- 0
             message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
-            est.co.best <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, 0, force, tol, max.iteration)
+            est.co.best <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, 0, force, cv_tol, max.iteration)
         } else {
             r.old <- r ## save the minimal number of factors
 
@@ -484,7 +506,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
-                est.co <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, r, force, tol, max.iteration)
+                est.co <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, r, force, cv_tol, max.iteration)
 
                 if (p > 0) {
                     na.pos <- is.nan(est.co$beta)
@@ -683,7 +705,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         est.cv.fit <- .inter_fe_ub(
                             YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co, II.co.cv,
                             W.cv, as.matrix(beta0CV.co[,,ii]),
-                            r, force, tol, max.iteration
+                            r, force, cv_tol, max.iteration
                         )$fit
                         resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
                         list(resid = resid_ii,
@@ -711,7 +733,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         est.cv.fit <- inter_fe_ub(
                             YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co, II.co.cv,
                             W.cv, as.matrix(beta0CV.co[,,ii]),
-                            r, force, tol, max.iteration
+                            r, force, cv_tol, max.iteration
                         )$fit
                         resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
                         all_resid <- c(all_resid, resid_ii)
@@ -1138,6 +1160,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
     ## ---- CV loop for CFE ----
     if (CV == TRUE) {
+        ## Two-tier tolerance for CFE CV
+        cv_tol <- max(tol, 1e-3)
+
         ## starting r
         if ((r > (T0.min - 1) & force %in% c(0, 2)) | (r > (T0.min - 2) & force %in% c(1, 3))) {
             message("r is too big compared with T0; reset to 0.")
@@ -1155,7 +1180,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             est.co.best <- complex_fe_ub(YY.co, Y0.co, X.co,
                 X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                 Zgamma.id, kappaQ.id,
-                II.co, W.use, beta0, 0, force = force, tol, max.iteration)
+                II.co, W.use, beta0, 0, force = force, cv_tol, max.iteration)
         } else {
             r.old <- r
             message("Cross-validating ...", "\r")
@@ -1336,7 +1361,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 est.co <- complex_fe_ub(YY.co, Y0.co, X.co,
                     X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                     Zgamma.id, kappaQ.id,
-                    II.co, W.use, beta0, r, force = force, tol, max.iteration)
+                    II.co, W.use, beta0, r, force = force, cv_tol, max.iteration)
 
                 if (p > 0) {
                     na.pos <- is.nan(est.co$beta)
@@ -1559,7 +1584,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                             X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                             Zgamma.id, kappaQ.id,
                             II.co.cv, W.cv, as.matrix(beta0CV.co[,,ii]),
-                            r, force = force, tol, max.iteration
+                            r, force = force, cv_tol, max.iteration
                         )
                         est.cv.fit <- est.cv.co$fit
                         resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
@@ -1590,7 +1615,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                             X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                             Zgamma.id, kappaQ.id,
                             II.co.cv, W.cv, as.matrix(beta0CV.co[,,ii]),
-                            r, force = force, tol, max.iteration
+                            r, force = force, cv_tol, max.iteration
                         )
                         est.cv.fit <- est.cv.co$fit
                         resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]

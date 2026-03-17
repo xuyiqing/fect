@@ -46,6 +46,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
     ## Parsing data
     ## -------------------------------##
 
+    ## Two-tier tolerance: CV uses looser tol for r/lambda selection speed,
+    ## final estimation uses the user's tol for precision.
+    cv_tol <- max(tol, 1e-3)
+
     placebo.pos <- na.pos <- NULL
     ## unit id and time
     TT <- dim(Y)[1]
@@ -447,7 +451,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         est.cv.fit <- inter_fe_ub(
                             YY.cv, as.matrix(Y0CV[, , ii]), X, II.cv,
                             W.use2, as.matrix(beta0CV[, , ii]),
-                            r, force, tol, max.iteration
+                            r, force, cv_tol, max.iteration
                         )$fit
                         resid_ii <- YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
                         all_resid <- c(all_resid, resid_ii)
@@ -483,7 +487,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     beta0,
                     r,
                     force,
-                    tol,
+                    cv_tol,
                     max.iteration
                 ) ## overall
                 sigma2 <- est.cv$sigma2
@@ -706,7 +710,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     est.cv.fit <- inter_fe_mc(
                         YY.cv, as.matrix(Y0CV[, , ii]),
                         X, II.cv, W.use2, as.matrix(beta0CV[, , ii]),
-                        1, lambda[i], force, tol, max.iteration
+                        1, lambda[i], force, cv_tol, max.iteration
                     )$fit
                     resid_ii <- YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
                     all_resid <- c(all_resid, resid_ii)
@@ -735,7 +739,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 est.cv <- inter_fe_mc(
                     YY, Y0, X, II, W.use, beta0,
                     1, lambda[i],
-                    force, tol, max.iteration
+                    force, cv_tol, max.iteration
                 ) ## overall
 
                 eff.v.cv <- c(Y - est.cv$fit)[cv.pos]

@@ -110,6 +110,13 @@ Auto-enables for `all_units` when `Nco * TT > 20000` (default `parallel=TRUE` fr
 ### ~~fect_mspe + CV=TRUE bug~~ RESOLVED
 Fixed in `c2db08c`: force `CV=FALSE`, `se=FALSE`, and `r=r.cv` when re-fitting masked data inside fect_mspe.
 
+### Convergence conditioning — COMPLETE (IFE)
+- R centering in `.estimate_co()` removes grand mean before solver — tol applies to variation, not level
+- C++ component-wise convergence in `fe_ad_inter_iter` / `fe_ad_inter_covar_iter` (ife_sub.cpp) — tracks factor convergence independently
+- Two-tier CV tolerance (`cv_tol = max(tol, 1e-3)`) for CV speed
+- Result: tol=1e-3 now gives 43-2249x better component accuracy. Zero speed regression.
+- **TODO**: Apply same C++ component-wise convergence to `cfe_iter` in `cfe_sub.cpp` (CFE path uses BCD with separate dif4/dif5 tracking, but should also track interactive FE independently when CFE components are present)
+
 ### Phase 3b: R wrapper + solver equivalence — COMPLETE
 - `.estimate_co()` wrapper added: dispatches to `inter_fe`/`inter_fe_ub` (IFE) or `complex_fe_ub` (CFE)
 - C++ fix #1: guard alpha/xi access in `cfe_sub.cpp` — prevents crash with empty CFE arrays

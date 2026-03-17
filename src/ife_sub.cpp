@@ -259,11 +259,26 @@ List fe_ad_inter_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& 
     }
     fit = as<arma::mat>(ife_inner["FE"]); // new overall fe
 
+    // Component-wise convergence: max relative change across all components
+    double dif_fit = 0.0;
     if (use_weight == 1) {
-      dif = arma::norm(W % (fit - fit_old), "fro") /
-            arma::norm(W % (fit_old), "fro");
+      dif_fit = arma::norm(W % (fit - fit_old), "fro") /
+                (arma::norm(W % (fit_old), "fro") + 1e-10);
     } else {
-      dif = arma::norm(fit - fit_old, "fro") / arma::norm(fit_old, "fro");
+      dif_fit = arma::norm(fit - fit_old, "fro") /
+                (arma::norm(fit_old, "fro") + 1e-10);
+    }
+    dif = dif_fit;
+    // Check interactive FE convergence separately (may converge slower)
+    if (r > 0 && mc == 0 && ife_inner.containsElementNamed("FE_inter_use")) {
+      arma::mat FE_inter_new = as<arma::mat>(ife_inner["FE_inter_use"]);
+      double norm_inter = arma::norm(FE_inter_use, "fro");
+      if (norm_inter > 1e-10) {
+        double dif_inter = arma::norm(FE_inter_new - FE_inter_use, "fro") /
+                           norm_inter;
+        if (dif_inter > dif) dif = dif_inter;
+      }
+      FE_inter_use = FE_inter_new;
     }
 
     fit_old = fit;
@@ -424,13 +439,28 @@ List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const 
     }
 
     FE = as<arma::mat>(ife_inner["FE"]);
-    fit = covar_fit + FE; // overall fe */
-    // fit_FE_inter_use = as<arma::mat>(ife_inner["FE_inter_use"]);
+    fit = covar_fit + FE; // overall fe
+
+    // Component-wise convergence
+    double dif_fit = 0.0;
     if (use_weight == 1) {
-      dif = arma::norm(W % (fit - fit_old), "fro") /
-            arma::norm(W % (fit_old), "fro");
+      dif_fit = arma::norm(W % (fit - fit_old), "fro") /
+                (arma::norm(W % (fit_old), "fro") + 1e-10);
     } else {
-      dif = arma::norm(fit - fit_old, "fro") / arma::norm(fit_old, "fro");
+      dif_fit = arma::norm(fit - fit_old, "fro") /
+                (arma::norm(fit_old, "fro") + 1e-10);
+    }
+    dif = dif_fit;
+    // Check interactive FE convergence separately
+    if (r > 0 && mc == 0 && ife_inner.containsElementNamed("FE_inter_use")) {
+      arma::mat FE_inter_new = as<arma::mat>(ife_inner["FE_inter_use"]);
+      double norm_inter = arma::norm(FE_inter_use, "fro");
+      if (norm_inter > 1e-10) {
+        double dif_inter = arma::norm(FE_inter_new - FE_inter_use, "fro") /
+                           norm_inter;
+        if (dif_inter > dif) dif = dif_inter;
+      }
+      FE_inter_use = FE_inter_new;
     }
     // dif_FE_inter_use = arma::norm(fit_FE_inter_use - fit_FE_inter_use_old, "fro") / arma::norm(fit_FE_inter_use_old, "fro");
     // fit_FE_inter_use_old = fit_FE_inter_use;
