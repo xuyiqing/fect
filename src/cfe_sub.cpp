@@ -433,6 +433,10 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
   }
 
   int p_extra_FE = X_extra_FE.n_slices;
+  // When no CFE components exist, use joint ife() for FE+factors
+  // to match inter_fe_ub behavior exactly
+  int simple_ife = (p_gamma == 0 && p_kappa == 0 && p_extra_FE == 0) ? 1 : 0;
+
   std::vector<std::vector<arma::uvec>> extra_FE_index_cache;
   extra_FE_index_cache.resize(p_extra_FE);
 
@@ -453,8 +457,9 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
   }
 
   int stop_burnin = 0;
-  while (((dif > tolerate) || (dif1 > tolerate) || dif2_tol || dif3_tol ||
-          (dif4 > tolerate) || (dif5 > tolerate)) &&
+  while (((dif > tolerate) ||
+          (simple_ife ? false : ((dif1 > tolerate) || dif2_tol || dif3_tol ||
+                                 (dif4 > tolerate) || (dif5 > tolerate)))) &&
          (niter <= max_iter)) {
     YYY = E_adj(Y, fit, I);
     result1 = beta_part(YYY - fit2sum - fit3sum - FE, XX, xxinv, W, use_weight);
@@ -482,29 +487,82 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
       fit3.slice(k) = fit3_new;
     }
 
-    YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit5, FE - fit5, I, use_weight,
-                W);
-    result4 = fixed_effects_part(YY, force, X_extra_FE, extra_FE_index_cache);
-    fit4 = as<arma::mat>(result4["fit"]);
-
-    YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit4, FE - fit4, I, use_weight,
-                W);
-    if (use_weight == 1 && stop_burnin == 0) {
-      r_burnin = d - niter;
-      if (r_burnin <= r) {
-        r_burnin = r;
+    if (simple_ife) {
+      // No CFE components: use joint ife() for FE+factors in one shot,
+      // matching fe_ad_inter_iter behavior exactly
+      YY = YY_adj(YYY - fit1, FE, I, use_weight, W);
+      List ife_result;
+      if (use_weight == 1 && stop_burnin == 0) {
+        r_burnin = d - niter;
+        if (r_burnin <= r) {
+          r_burnin = r;
+        }
+        if (r_burnin > d) {
+          r_burnin = d;
+        }
+        ife_result = ife(YY, force, 0, r_burnin, 0, 0);
+      } else {
+        ife_result = ife(YY, force, 0, r, 0, 0);
       }
-      if (r_burnin > d) {
-        r_burnin = d;
+      FE = as<arma::mat>(ife_result["FE"]);
+      // Decompose FE into additive (fit4) and interactive (fit5) for tracking
+      if (r > 0 && ife_result.containsElementNamed("FE_inter_use")) {
+        fit5 = as<arma::mat>(ife_result["FE_inter_use"]);
+        fit4 = FE - fit5;
+      } else {
+        fit4 = FE;
+        fit5.zeros();
       }
-      result5 = ife_part(YY, r_burnin);
+      // Store results for output assembly
+      result4 = List::create(Named("mu") = ife_result["mu"]);
+      if (ife_result.containsElementNamed("alpha")) {
+        result4["alpha"] = ife_result["alpha"];
+      }
+      if (ife_result.containsElementNamed("xi")) {
+        result4["xi"] = ife_result["xi"];
+      }
+      if (ife_result.containsElementNamed("factor")) {
+        result5 = List::create(
+          Named("factor") = ife_result["factor"],
+          Named("lambda") = ife_result["lambda"],
+          Named("VNT") = ife_result["VNT"],
+          Named("fit") = fit5
+        );
+      } else {
+        result5 = List::create(
+          Named("factor") = arma::mat(T, 0),
+          Named("lambda") = arma::mat(N, 0),
+          Named("VNT") = arma::mat(0, 0),
+          Named("fit") = fit5
+        );
+      }
+      fit = fit1 + FE;
     } else {
-      result5 = ife_part(YY, r);
-    }
-    fit5 = as<arma::mat>(result5["fit"]);
+      // Full CFE BCD: separate FE demean + factor extraction
+      YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit5, FE - fit5, I, use_weight,
+                  W);
+      result4 = fixed_effects_part(YY, force, X_extra_FE, extra_FE_index_cache);
+      fit4 = as<arma::mat>(result4["fit"]);
 
-    FE = fit4 + fit5;
-    fit = fit1 + fit2sum + fit3sum + fit4 + fit5;
+      YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit4, FE - fit4, I, use_weight,
+                  W);
+      if (use_weight == 1 && stop_burnin == 0) {
+        r_burnin = d - niter;
+        if (r_burnin <= r) {
+          r_burnin = r;
+        }
+        if (r_burnin > d) {
+          r_burnin = d;
+        }
+        result5 = ife_part(YY, r_burnin);
+      } else {
+        result5 = ife_part(YY, r);
+      }
+      fit5 = as<arma::mat>(result5["fit"]);
+
+      FE = fit4 + fit5;
+      fit = fit1 + fit2sum + fit3sum + fit4 + fit5;
+    }
 
     if (use_weight == 1) {
       dif = arma::norm(W % (fit - fit_old), "fro") /

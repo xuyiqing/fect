@@ -107,31 +107,27 @@ Auto-enables for `all_units` when `Nco * TT > 20000` (default `parallel=TRUE` fr
 
 ## Open items
 
-### fect_mspe + CV=TRUE bug
-`fect_mspe()` throws "No valid residuals collected from cv.sample folds" when called on a model fitted with `CV=TRUE`. The cv.sample feasibility check fails because the re-fit changes the II matrix. Workaround: fit with `CV=FALSE` before passing to `fect_mspe()`.
+### ~~fect_mspe + CV=TRUE bug~~ RESOLVED
+Fixed in `c2db08c`: force `CV=FALSE`, `se=FALSE`, and `r=r.cv` when re-fitting masked data inside fect_mspe.
 
-### Phase 3b: Merge IFE into CFE
-- Verify test E0: `complex_fe_ub` with empty CFE arrays ≡ `inter_fe_ub`
-- Verify test E4: `ife+nevertreated` ≡ `cfe+nevertreated` (no extras)
-- Only then: replace `inter_fe_ub` calls with `complex_fe_ub` in `fect_nevertreated`
-- Re-run full test suite to confirm no regressions
+### Phase 3b: R wrapper + solver equivalence — COMPLETE
+- `.estimate_co()` wrapper added: dispatches to `inter_fe`/`inter_fe_ub` (IFE) or `complex_fe_ub` (CFE)
+- C++ fix #1: guard alpha/xi access in `cfe_sub.cpp` — prevents crash with empty CFE arrays
+- C++ fix #2: joint `ife()` fallback in `cfe_iter` — when no CFE components (Z, Q, gamma, kappa, extra FE all empty), delegates to `ife()` for joint FE+factor estimation instead of separate BCD steps. Achieves **exact numerical equivalence** (`max diff = 0.00`) with `inter_fe_ub` across all `force` values (0,1,2,3), balanced and unbalanced, with and without covariates. Iteration counts also match.
+- **Root cause of prior divergence**: `cfe_iter` decomposed FE+factors into two separate BCD substeps with two imputation calls, while `inter_fe_ub` solved them jointly via `ife()`.
+- **Speed overhead** (complex_fe_ub vs inter_fe_ub, after fix): 2% for N=1000 unbalanced, 7% for N=500 unbalanced. 4-5x for tiny balanced panels (N=100) due to CFE scaffolding.
+- **Decision**: keep wrapper. Merge to single solver is now technically feasible (perfect equivalence) but the 2-7% overhead on typical panels is not justified given zero user-facing benefit.
 
 ---
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). All major refactoring phases are complete and pushed. 259/259 tests pass.
+> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). All refactoring phases complete and pushed.
 >
-> **Recent commits** (all pushed to `cfe`):
-> - `caa456f` — Score unification Phase 1: `.score_residuals()` shared scoring
-> - `eac0187` — Phase 2: `cv.method` unification, fect_mspe simplification, 1% rule
-> - `cea6966` — cv.sample k-fold CV (all_units + treated_units) + parallel auto-threshold
+> **Key architecture**: `.estimate_co()` wrapper dispatches to `inter_fe`/`inter_fe_ub` (IFE) or `complex_fe_ub` (CFE). C++ `cfe_iter` has `simple_ife` fallback — when no CFE components, uses joint `ife()` matching `inter_fe_ub` exactly (0.00 max diff).
 >
-> **Open tasks** (in priority order):
+> **All resolved**: factors.from phases 1-7, CFE bifurcation, score unification (Phase 1+2), cv.method unification, cv.sample k-fold CV, parallel CV auto-threshold, fect_mspe+CV=TRUE fix, Phase 3b wrapper + solver equivalence.
 >
-> 1. **fect_mspe + CV=TRUE bug** — fect_mspe errors on CV-fitted models ("No valid residuals"). Likely cv.sample feasibility issue with re-fit.
-> 2. **Phase 3b** — merge IFE into CFE (verify E0/E4 equivalence, replace `inter_fe_ub` with `complex_fe_ub`).
->
-> **Resolved**: All factors.from phases (1-7), CFE bifurcation (3a), score unification (Phase 1+2), cv.method unification, cv.sample k-fold CV, parallel CV, CFE CV r-selection, test gaps, .as_mask() bug, fect_mspe_sim deleted.
+> **No open tasks on cfe branch.** Next steps would be: merge cfe → master, or additional feature work.
 >
 > Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.

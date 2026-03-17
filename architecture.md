@@ -130,7 +130,7 @@ graph TD
 | `R/fe.R` | Estimator | FE and IFE estimator; computes counterfactuals, ATT, dynamic effects, cohort effects, calendar effects | `fect_fe()` (internal) | no |
 | `R/cfe.R` | Estimator | Complex FE estimator; supports extra additive FEs, Z/gamma, Q/kappa, latent factors | `fect_cfe()` (internal) | no |
 | `R/mc.R` | Estimator | Matrix completion estimator with nuclear norm regularization | `fect_mc()` (internal) | no |
-| `R/fect_nevertreated.R` | Estimator | Nevertreated predictive routine for IFE and CFE; co-only estimation with three-layer projection and block coordinate descent for treated parameters. Accepts `cv.method` with LOO, all_units, treated_units — all three paths fully implemented with cv.sample k-fold CV; hardcoded 1% selection rule; W/count.T.cv passed to scoring | `fect_nevertreated()` (internal) | **yes** — cv.sample k-fold CV for all_units and treated_units |
+| `R/fect_nevertreated.R` | Estimator | Nevertreated predictive routine for IFE and CFE; `.estimate_co()` wrapper dispatches to `inter_fe`/`inter_fe_ub` (IFE) or `complex_fe_ub` (CFE). Three cv.method paths (LOO, all_units, treated_units) with cv.sample k-fold CV and parallel auto-threshold (Nco*TT > 20k). Hardcoded 1% selection rule; W/count.T.cv scoring. | `fect_nevertreated()` (internal) | **yes** — `.estimate_co()` wrapper, parallel CV |
 | `R/boot.R` | Inference | Parametric and wild bootstrap, jackknife; parallel execution via future/doFuture | `fect_boot()` (internal) | **yes** — `cv.treat` replaced with `cv.method` |
 | `R/cv.R` | Inference | Cross-validation for r (factors) or lambda (regularization); delegates nevertreated paths to fect_nevertreated; 7 scoring criteria via `.score_residuals()` | `fect_cv()` (internal) | **yes** — `cv.treat` replaced with `cv.method`, added IFE+nevertreated delegation, cv.method passthrough to nevertreated |
 | `R/cv_binary.R` | Inference | Cross-validation for binary probit models | `fect_binary_cv()` (internal) | **yes** — `cv.treat` replaced with `cv.method` |
@@ -150,7 +150,7 @@ graph TD
 | `src/ife.cpp` | C++ | Core IFE solver: `inter_fe()`, `inter_fe_ub()` (unbalanced); EM-style iteration with factor extraction | (internal) | no |
 | `src/ife_sub.cpp` | C++ | IFE subroutines: `fe_ad_iter()`, `fe_ad_inter_iter()`, `beta_iter()`, iterative demeaning | (internal) | no |
 | `src/cfe.cpp` | C++ | CFE solver: `complex_fe_ub()` with block coordinate descent over extra FEs, Z/gamma, Q/kappa, factors | (internal) | no |
-| `src/cfe_sub.cpp` | C++ | CFE iteration subroutine: `cfe_iter()` | (internal) | no |
+| `src/cfe_sub.cpp` | C++ | CFE iteration subroutine: `cfe_iter()` — with `simple_ife` fallback: delegates to joint `ife()` when no CFE components exist, achieving exact numerical equivalence with `inter_fe_ub` | (internal) | **yes** — joint ife() fallback, alpha/xi guard |
 | `src/fe_sub.cpp` | C++ | FE subroutines: `subfe()` for sub-fixed-effects, `IND()` for indicator matrices | (internal) | no |
 | `src/mc.cpp` | C++ | Matrix completion solver: `inter_fe_mc()` with soft-thresholding of singular values | (internal) | no |
 | `src/auxiliary.cpp` | C++ | Matrix utilities: `crossprod()`, `E_adj()`, `panel_beta()`, `panel_factor()`, `panel_FE()`, `Y_demean()`, `fe_add()` | (internal) | no |
