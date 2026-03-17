@@ -1943,7 +1943,7 @@ fect.default <- function(
             set.seed(seed)
         }
         if (is.null(cores) == TRUE) {
-            cores <- max(1L, min(parallelly::availableCores(omit = 2L), 4L))
+            cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
         }
         old.future.plan <- future::plan()
         future::plan(future::multisession, workers = cores)
@@ -1951,7 +1951,16 @@ fect.default <- function(
         if (is.null(seed) == FALSE) {
             registerDoRNG(seed)
         }
-        message("Parallel computing ...\n")
+        avail <- parallelly::availableCores()
+        msg_line <- sprintf("Parallel computing: using %d of %d available cores.", cores, avail)
+        pad <- strrep(" ", max(0, 56 - nchar(msg_line)))
+        message("\n",
+            " +----------------------------------------------------------+\n",
+            " | ", msg_line, pad, " |\n",
+            " |                                                          |\n",
+            " | To change: set cores = <n> in fect().                    |\n",
+            " | Default: min(available - 2, 8).                          |\n",
+            " +----------------------------------------------------------+\n")
     }
 
     ## -------------------------------##

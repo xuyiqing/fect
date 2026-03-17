@@ -1,0 +1,68 @@
+# Factor-Augmented Approaches {#sec-ife-mc}
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+set.seed(1234)
+library(fect)
+data(fect)
+```
+
+When the parallel trends assumption is violated due to latent common factors with heterogeneous loadings, the FE estimator from [Chapter @sec-fect] is biased. This chapter introduces two methods that account for such latent factors: the **interactive fixed effects** (IFE) method, which explicitly models unit-specific factor loadings, and the **matrix completion** (MC) method, which uses nuclear-norm regularization to recover the low-rank structure of the untreated potential outcomes.
+
+We use `simdata2`, which includes two latent factors ($r = 2$). The FE estimator is biased on this dataset, while IFE and MC recover the correct ATT.
+
+## Interactive fixed effects
+
+In addition to FEct, **fect** supports the interactive fixed effects counterfactual (IFEct) method proposed by @Gobillon2016 and @Xu2017 and the matrix completion (MC) method proposed by @Athey2021---`method = "ife"` and `method = "mc"`, respectively. The EM algorithm is used to impute the counterfactuals of treated observations.
+
+### IFE
+
+For the IFE approach, we need to specify the number of factors using option `r`. By default, the algorithm will select an optimal hyper-parameter via a built-in cross-validation procedure. For a detailed treatment of cross-validation options, see [Chapter @sec-model-selection].
+
+We specify an interval of candidate number of unobserved factors in option `r` like `r=c(0,5)`. When cross-validation is switched off, the first element in `r` will be set as the number of factors. Below we use the MSPE criterion and search the number of factors from 0 to 5.
+
+```{r simdata_ife, eval=TRUE, cache = TRUE}
+out.ife <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id","time"),
+          force = "two-way", method = "ife", CV = TRUE, r = c(0, 5),
+          se = TRUE, cores = 8, nboots = 1000, parallel = TRUE)
+print(out.ife)
+```
+
+The figure below shows the estimated ATT using the IFE method. The cross-validation procedure selects the correct number of factors ($r=2$).
+
+```{r  fig.width = 6, fig.height = 4.5}
+plot(out.ife, main = "Estimated ATT (IFEct)")
+```
+
+### MC
+
+For the MC method, we need to specify the tuning parameter in the penalty term using option `lambda`. If users don't have any prior knowledge to set candidate tuning parameters, a number of candidate tuning parameters can be generated automatically based on the information from the outcome variable. We specify the number in option `nlambda`, e.g. `nlambda = 10`.
+
+```{r simdata_mc, eval=TRUE, cache = TRUE}
+out.mc <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id","time"),
+          force = "two-way", method = "mc", CV = TRUE,
+          se = TRUE, cores = 8, nboots = 1000, parallel = TRUE)
+
+print(out.mc)
+```
+
+```{r fig.width = 6, fig.height = 4.5}
+plot(out.mc, main = "Estimated ATT (MC)")
+```
+
+::: {.callout-note appearance="simple"}
+### The `em` parameter
+By default, `em = TRUE` and the EM algorithm is used to estimate the factor model when the estimation sample has missing entries. This is always the case in the default DID setting (`factors.from = "notyettreated"`), where treated post-treatment cells are unobserved under control. For the never-treated setting, see [Chapter @sec-gsynth].
+:::
+
+------------------------------------------------------------------------
+
+## Quick diagnostic check
+
+We verify the IFE model passes basic pre-trend checks using the equivalence plot:
+
+```{r ife_quick_equiv, eval=TRUE, cache=TRUE, fig.width=6, fig.height=4.5}
+plot(out.ife, type = "equiv", ylim = c(-4, 4),
+     cex.legend = 0.6, main = "Testing Pre-Trend (IFEct)", cex.text = 0.8)
+```
+
+For a comprehensive treatment of diagnostic tests including placebo, carryover, and LOO pre-trend tests, see [Chapter @sec-diagnostics]. For cross-validation details and model selection, see [Chapter @sec-model-selection].

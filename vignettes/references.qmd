@@ -1,3 +1,7 @@
+---
+suppress-bibliography: false
+---
+
 # References {.unnumbered}
 
 ::: {#refs}

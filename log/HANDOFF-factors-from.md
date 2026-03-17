@@ -1,10 +1,10 @@
 # Handoff: factors.from Refactoring (REQ-factors-from-001)
 
 ## Date
-2026-03-16 (updated)
+2026-03-17 (updated)
 
 ## Status
-All major phases COMPLETE and PUSHED to `cfe`. Score unification (Phases 1-2), cv.sample k-fold CV in fect_nevertreated (all three cv.method paths), and parallel CV with auto-threshold are all committed. 259/259 tests pass (215 score-unify including 15 parallel/CRAN-guarded + 44 utility). Phase 3b (merge IFE into CFE) and fect_mspe+CV=TRUE bug remain.
+All phases COMPLETE and PUSHED to `cfe`. CFE convergence conditioning done (component-wise + denominator safety + stop-burnin). 565/565 tests pass (215 score-unify + 44 utility + 98 book-claims + 77 factors-from + 131 others). Quarto book restructured: 13 chapters, all render. Phase 2 (new content for model-selection chapter, factors.from deep dive) pending.
 
 ---
 
@@ -110,12 +110,12 @@ Auto-enables for `all_units` when `Nco * TT > 20000` (default `parallel=TRUE` fr
 ### ~~fect_mspe + CV=TRUE bug~~ RESOLVED
 Fixed in `c2db08c`: force `CV=FALSE`, `se=FALSE`, and `r=r.cv` when re-fitting masked data inside fect_mspe.
 
-### Convergence conditioning — COMPLETE (IFE)
+### Convergence conditioning — COMPLETE (IFE + CFE)
 - R centering in `.estimate_co()` removes grand mean before solver — tol applies to variation, not level
 - C++ component-wise convergence in `fe_ad_inter_iter` / `fe_ad_inter_covar_iter` (ife_sub.cpp) — tracks factor convergence independently
+- C++ component-wise convergence in `cfe_iter` (cfe_sub.cpp) — `max(dif, dif_inter)` for interactive FE, `+1e-10` denominator safety on all convergence ratios, stop-burnin transition (`7b33c98`)
 - Two-tier CV tolerance (`cv_tol = max(tol, 1e-3)`) for CV speed
-- Result: tol=1e-3 now gives 43-2249x better component accuracy. Zero speed regression.
-- **TODO**: Apply same C++ component-wise convergence to `cfe_iter` in `cfe_sub.cpp` (CFE path uses BCD with separate dif4/dif5 tracking, but should also track interactive FE independently when CFE components are present)
+- Result: tol=1e-3 now gives 43-2249x better component accuracy. Zero speed regression (confirmed for both IFE and CFE paths).
 
 ### Phase 3b: R wrapper + solver equivalence — COMPLETE
 - `.estimate_co()` wrapper added: dispatches to `inter_fe`/`inter_fe_ub` (IFE) or `complex_fe_ub` (CFE)
@@ -129,12 +129,16 @@ Fixed in `c2db08c`: force `CV=FALSE`, `se=FALSE`, and `r=r.cv` when re-fitting m
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). All refactoring phases complete and pushed.
+> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). 590/590 tests pass. All code work complete. Currently in Quarto book restructure — user is reviewing.
 >
-> **Key architecture**: `.estimate_co()` wrapper dispatches to `inter_fe`/`inter_fe_ub` (IFE) or `complex_fe_ub` (CFE). C++ `cfe_iter` has `simple_ife` fallback — when no CFE components, uses joint `ife()` matching `inter_fe_ub` exactly (0.00 max diff).
+> **Key architecture**: `.estimate_co()` wrapper dispatches to `inter_fe`/`inter_fe_ub` (IFE) or `complex_fe_ub` (CFE). Component-wise convergence applied to both IFE and CFE paths. Default parallel cores capped at 8 with boxed runtime message.
 >
-> **All resolved**: factors.from phases 1-7, CFE bifurcation, score unification (Phase 1+2), cv.method unification, cv.sample k-fold CV, parallel CV auto-threshold, fect_mspe+CV=TRUE fix, Phase 3b wrapper + solver equivalence.
+> **Plot refactor**: Gap plots now distinguish pre-treatment (gray, dashed in connected mode) from post-treatment (black, solid). New params `pre.color`/`post.color` in both `esplot()` and `plot.fect()`. `esplot()` accepts fect objects directly. Defaults harmonized between the two functions.
 >
-> **No open tasks on cfe branch.** Next steps would be: merge cfe → master, or additional feature work.
+> **Quarto book**: 13 chapters, all render. Restructured: Ch2 (FE/imputation, uses `simdata1`), Ch3 (IFE/MC, uses `simdata2`), Ch4 (CFE), Ch5 (diagnostics), Ch6 (model selection — new, full chapter), Ch7 (plots), Ch8 (gsynth + CFE nevertreated). Nevertreated content removed from Ch2-4. New datasets: `simdata1` (parallel trends), `simdata2` (with factors, = original `simdata`).
 >
-> Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context.
+> **Uncommitted changes**: Everything from today's session. Includes: cfe_sub.cpp convergence fix (already pushed as `7b33c98`), test-book-claims.R (pushed as `7418aa0`), plus plot refactor, core cap, boxed message, all Quarto changes, simdata1/simdata2. Old chapter files (03-plots, 04-gsynth, 05-panel, 06-sens, 07-cfe) still exist — delete after user confirms.
+>
+> **Next steps**: User manual review of rendered book (Phase 3). User may have more Quarto instructions. Commit and push when ready.
+>
+> Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context. See `log/update-20260317.md` for today's session.

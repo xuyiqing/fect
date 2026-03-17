@@ -489,13 +489,22 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             }
             if (cv.method != "loo" && use_parallel == TRUE && k > 1) {
                 if (is.null(cores)) {
-                    cores <- max(1L, min(parallelly::availableCores(omit = 2L), 4L))
+                    cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
                 }
                 old.future.plan <- future::plan()
                 on.exit(future::plan(old.future.plan), add = TRUE)
                 future::plan(future::multisession, workers = cores)
                 doFuture::registerDoFuture()
-                message("Parallel CV with ", cores, " cores ...\n")
+                avail <- parallelly::availableCores()
+                msg_line <- sprintf("Parallel CV: using %d of %d available cores.", cores, avail)
+                pad <- strrep(" ", max(0, 56 - nchar(msg_line)))
+                message("\n",
+                    " +----------------------------------------------------------+\n",
+                    " | ", msg_line, pad, " |\n",
+                    " |                                                          |\n",
+                    " | To change: set cores = <n> in fect().                    |\n",
+                    " | Default: min(available - 2, 8).                          |\n",
+                    " +----------------------------------------------------------+\n")
                 cv_parallel <- TRUE
                 ## capture internal functions for parallel workers
                 .inter_fe_ub <- inter_fe_ub
@@ -1342,13 +1351,22 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             }
             if (cv.method != "loo" && use_parallel == TRUE && k > 1) {
                 if (is.null(cores)) {
-                    cores <- max(1L, min(parallelly::availableCores(omit = 2L), 4L))
+                    cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
                 }
                 old.future.plan <- future::plan()
                 on.exit(future::plan(old.future.plan), add = TRUE)
                 future::plan(future::multisession, workers = cores)
                 doFuture::registerDoFuture()
-                message("Parallel CV with ", cores, " cores ...\n")
+                avail <- parallelly::availableCores()
+                msg_line <- sprintf("Parallel CV: using %d of %d available cores.", cores, avail)
+                pad <- strrep(" ", max(0, 56 - nchar(msg_line)))
+                message("\n",
+                    " +----------------------------------------------------------+\n",
+                    " | ", msg_line, pad, " |\n",
+                    " |                                                          |\n",
+                    " | To change: set cores = <n> in fect().                    |\n",
+                    " | Default: min(available - 2, 8).                          |\n",
+                    " +----------------------------------------------------------+\n")
                 cv_parallel <- TRUE
                 ## capture internal functions for parallel workers
                 .complex_fe_ub <- complex_fe_ub

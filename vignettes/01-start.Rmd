@@ -57,7 +57,7 @@ install_all(packages)
 
 ## Datasets
 
-The **fect** package ships five datasets.
+The **fect** package ships several datasets. All simulated and empirical datasets are loaded together with `data(fect)`.
 
 ```{r message = FALSE, warning = FALSE}
 library(fect)
@@ -65,9 +65,17 @@ data(fect)
 ls()
 ```
 
-Below is a brief explanation of the datasets used in this book:
+### Simulated datasets
 
--   `simdata`: Based on @LWX2022. Used in [Chapter @sec-fect] to demonstrate various counterfactual estimators.\
--   `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-plots] and [Chapter @sec-panel].\
--   `simgsynth` & `turnout`: Based on @Xu2017. Used in [Chapter @sec-gsynth] to demonstrate the never-treated estimation regime (formerly the standalone **gsynth** package, now unified into **fect**).
--   `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-plots], [Chapter @sec-panel] and [Chapter @sec-panel-sens].
+The package includes two simulated panel datasets with 200 units, 35 time periods, and treatment that switches on and off. Both share the same unit fixed effects, time fixed effects, covariates, treatment assignment, and error structure. They differ only in whether latent factors are present:
+
+-   `simdata1`: The parallel trends assumption holds. The outcome is generated from a standard two-way fixed effects model ($Y_{it} = \alpha_i + \xi_t + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \tau_{it} D_{it} + \epsilon_{it}$) with no interactive fixed effects. Used in [Chapter @sec-fect] to demonstrate the imputation estimator.
+-   `simdata2`: The outcome includes two latent factors ($r = 2$), so that the parallel trends assumption is violated and the FE estimator is biased. Used in [Chapter @sec-ife-mc] to demonstrate factor-augmented approaches. This is equivalent to the original `simdata` from @LWX2022.
+
+For backward compatibility, `simdata` remains available and is identical to `simdata2`.
+
+### Empirical datasets
+
+-   `simgsynth` & `turnout`: Based on @Xu2017. Used in [Chapter @sec-gsynth] to demonstrate the never-treated estimation regime.
+-   `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-plots] and [Chapter @sec-panel].
+-   `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-plots], [Chapter @sec-panel], and [Chapter @sec-panel-sens].

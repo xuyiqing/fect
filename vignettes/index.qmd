@@ -52,20 +52,19 @@ This bifurcation also has implications for inference:
 -   In the **synth setting** (small $N_{tr}$, sufficient $N_{co}$), a two-stage parametric bootstrap procedure (`vartype = "parametric"`) provides uncertainty estimates — analogous to conformal inference, it works even with a single treated unit. This was the inference approach developed alongside **gsynth**.
 -   In the **DID setting** (large $N$, $N_{tr}$ grows with $N$), nonparametric bootstrap (`vartype = "bootstrap"`) or jackknife (`vartype = "jackknife"`) provide standard errors, requiring a sufficiently large treatment group (e.g., $N_{tr} > 40$).
 
-### Estimation Strategy: `factors.from`
+### Estimators and Estimation Strategy
 
-In **fect**, the `factors.from` parameter controls which research setting governs estimation:
+The `factors.from` parameter controls which research setting governs estimation. The table below summarizes the available methods and their compatibility:
 
--   `factors.from = "notyettreated"` (default) — the DID setting. Uses all not-yet-treated observations to estimate factors via EM.
--   `factors.from = "nevertreated"` — the synth setting. Uses only never-treated controls.
--   `method = "gsynth"` — a convenience wrapper that sets `factors.from = "nevertreated"` and auto-selects the number of factors. It is equivalent to `method = "ife"` with `factors.from = "nevertreated"`.
+| Method | Description | `factors.from` |
+|:-------|:-----------|:--------------|
+| `"fe"` | Two-way fixed effects (IFE with $r = 0$) | Both |
+| `"ife"` | Interactive fixed effects ($r \geq 0$ latent factors) | Both |
+| `"mc"` | Matrix completion (nuclear norm regularization) | `"notyettreated"` only |
+| `"cfe"` | Complex fixed effects (extends IFE with grouped time coefficients, unit-specific trends, extra FE) | Both |
+| `"gsynth"` | Equivalent to `"ife"` with `factors.from = "nevertreated"` | `"nevertreated"` |
 
-### Estimator Families
-
-The **fect** package provides two families of counterfactual estimators, each compatible with both research settings:
-
--   **The IFE family** (Interactive Fixed Effects): `method = "ife"` ($r \geq 0$ latent factors; $r = 0$ reduces to TWFE), `method = "fe"` (alias for IFE with $r = 0$), and `method = "cfe"` (extends IFE with additional known structure — grouped time coefficients, unit-specific trends, extra fixed effects).
--   **Matrix completion**: `method = "mc"` — imputes counterfactuals via nuclear norm minimization without explicit factor structure. Only compatible with the DID setting (`factors.from = "notyettreated"`).
+The two values of `factors.from` correspond to the two research settings: `"notyettreated"` (default) uses all not-yet-treated observations via EM, while `"nevertreated"` uses only never-treated controls.
 
 ### Which Settings Should I Use?
 
@@ -82,28 +81,37 @@ The **fect** package provides two families of counterfactual estimators, each co
 The user guide is structured into the following chapters:
 
 -   [Chapter @sec-start]\
-    This chapter covers installation instructions and introduces the datasets.
+    Installation instructions and datasets.
 
 -   [Chapter @sec-fect]\
-    This chapter explains how to apply the main estimators and diagnostic tests in **fect**. It introduces the two estimation settings (`factors.from`) and separates estimation from inference options.
+    The fixed effects counterfactual estimator (FEct), including estimation, inference, weighting, and cohort analysis.
+
+-   [Chapter @sec-ife-mc]\
+    Interactive fixed effects (IFE) and matrix completion (MC) methods, the `factors.from` parameter, and the two estimation regimes.
 
 -   [Chapter @sec-cfe]\
-    This chapter provides a dedicated tutorial for the Complex Fixed Effects (CFE) estimator, which extends IFE with multi-level fixed effects, time-invariant covariates with time-varying coefficients, unit-specific time trends, and interactive fixed effects.
+    The complex fixed effects (CFE) estimator: multi-level fixed effects, time-invariant covariates with time-varying coefficients, unit-specific time trends, and interactive fixed effects.
+
+-   [Chapter @sec-diagnostics]\
+    Diagnostic tests: placebo, pre-trend (F test and equivalence), leave-one-out, carryover, and cumulative effects.
+
+-   [Chapter @sec-model-selection]\
+    Cross-validation framework, the `cv.method` parameter, scoring criteria, and post-hoc model comparison via `fect_mspe()`.
 
 -   [Chapter @sec-plots]\
-    In this chapter, we explore various plotting options available in **fect**.
+    Plotting options and customization.
 
 -   [Chapter @sec-gsynth]\
-    This chapter demonstrates the Gsynth program — the synthetic control setting using `factors.from = "nevertreated"` — originally developed in the **gsynth** package.
+    The Gsynth program — the synthetic control setting using `factors.from = "nevertreated"` — originally developed in the **gsynth** package, with CFE extensions.
 
 -   [Chapter @sec-panel]\
-    This chapter facilitates the application of various new DID estimators.
+    Application of various new DID estimators.
 
 -   [Chapter @sec-panel-sens]\
-    This chapter introduces the sensitivity analysis for the counterfactual estimators.
+    Sensitivity analysis for the counterfactual estimators.
 
 -   [Chapter @sec-cheatsheet]\
-    The final chapter summarizes the core inputs required for implementing the six methods, along with options for plotting and diagnostics.
+    Quick reference for methods, parameters, plotting, and diagnostics.
 
 ## Contributors
 
