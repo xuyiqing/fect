@@ -242,6 +242,12 @@ fect_mspe <- function(
                         index_obj = idx_i,
                         caller_env = caller_env
                     )
+                    ## Fix: always re-fit with fixed r (no CV) and no SE
+                    rerun_args$CV <- FALSE
+                    rerun_args$se <- FALSE
+                    if (!is.null(out_i$r.cv)) {
+                        rerun_args$r <- out_i$r.cv
+                    }
                     out_new <- do.call(fect, rerun_args)
 
                     ## collect residuals at estCV positions
