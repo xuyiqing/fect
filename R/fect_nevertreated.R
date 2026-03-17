@@ -215,9 +215,30 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
+    ## ====================================================================
+    ## Solver dispatch wrapper
+    ## ====================================================================
+    ## Dispatches to inter_fe (balanced) / inter_fe_ub (unbalanced) for IFE,
+    ## or complex_fe_ub for CFE. Eliminates balanced/unbalanced branching
+    ## at each call site.
+    .estimate_co <- function(Y, Y0, X, I_obs, W_in, beta0_in, r, force,
+                             tol, max.iteration, use_cfe = FALSE) {
+        if (use_cfe) {
+            complex_fe_ub(Y, Y0, X,
+                X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
+                Zgamma.id, kappaQ.id,
+                I_obs, W_in, beta0_in, r, force = force, tol, max.iteration)
+        } else if (!0 %in% I_obs) {
+            inter_fe(Y, X, r, force = force, beta0_in = beta0_in, tol, max.iteration)
+        } else {
+            inter_fe_ub(Y, Y0, X, I_obs, W_in, beta0_in, r,
+                        force = force, tol, max.iteration)
+        }
+    }
+
   if (method == "ife") {
     ## ====================================================================
-    ## IFE PATH (existing code, unchanged)
+    ## IFE PATH
     ## ====================================================================
 
     beta0 <- matrix(0, p, 1)
@@ -268,11 +289,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         if (r.max == 0) {
             r.cv <- 0
             message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
-            if (!0 %in% I.co) {
-                est.co.best <- inter_fe(Y.co, X.co, 0, force = force, beta0_in = beta0, tol, max.iteration)
-            } else {
-                est.co.best <- inter_fe_ub(Y.co, Y0.co, X.co, I.co, W_in = W.use, beta0, 0, force = force, tol, max.iteration)
-            }
+            est.co.best <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, 0, force, tol, max.iteration)
         } else {
             r.old <- r ## save the minimal number of factors
 
@@ -467,17 +484,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
-                if (!0 %in% I.co) {
-                    est.co <- inter_fe(
-                        Y = Y.co, X = X.co, r,
-                        force = force, beta0_in = beta0, tol, max.iteration
-                    )
-                } else {
-                    est.co <- inter_fe_ub(
-                        Y = Y.co, Y0 = Y0.co, X = X.co, I = I.co, W_in = W.use,
-                        beta0, r, force = force, tol, max.iteration
-                    )
-                }
+                est.co <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, r, force, tol, max.iteration)
 
                 if (p > 0) {
                     na.pos <- is.nan(est.co$beta)
@@ -900,25 +907,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
     est.co.fect <- NULL
 
-    if (!0 %in% I.co) {
-        est.co.best <- inter_fe(Y.co, X.co, r.cv,
-            force = force, beta0_in = beta0, tol, max.iteration
-        )
-    } else {
-        est.co.best <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W_in = W.use, beta0, r.cv, force = force, tol, max.iteration)
-    }
+    est.co.best <- .estimate_co(YY.co, Y0.co, X.co, II.co, W.use, beta0, r.cv, force, tol, max.iteration)
 
     if (boot == FALSE) {
         if (r.cv == 0) {
             est.co.fect <- est.co.best
         } else {
-            if (!0 %in% I.co) {
-                est.co.fect <- inter_fe(Y.co, X.co, 0,
-                    force = force, beta0_in = beta0, tol, max.iteration
-                )
-            } else {
-                est.co.fect <- inter_fe_ub(YY.co, Y0.co, X.co, II.co, W_in = W.use, beta0, 0, force = force, tol, max.iteration)
-            }
+            est.co.fect <- .estimate_co(YY.co, Y0.co, X.co, II.co, W.use, beta0, 0, force, tol, max.iteration)
         }
     }
     validX <- est.co.best$validX

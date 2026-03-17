@@ -548,8 +548,12 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
 
   List result;
   result["mu"] = result4["mu"];
-  result["alpha"] = result4["alpha"];
-  result["xi"] = result4["xi"];
+  if (force == 1 || force == 3) {
+    result["alpha"] = result4["alpha"];
+  }
+  if (force == 2 || force == 3) {
+    result["xi"] = result4["xi"];
+  }
   result["niter"] = niter;
   result["e"] = e;
   result["beta"] = result1["beta"];
