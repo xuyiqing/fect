@@ -49,7 +49,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         X.gamma = NULL,           ## TT x N x n_gamma array
                         X.kappa = NULL,           ## TT x N x n_kappa array
                         Zgamma.id = NULL,         ## list mapping gamma groups to Z columns
-                        kappaQ.id = NULL          ## list mapping kappa groups to Q columns
+                        kappaQ.id = NULL,         ## list mapping kappa groups to Q columns
+                        parallel = TRUE,
+                        cores = NULL
                         ) {
     ## -------------------------------##
     ## Parsing data
@@ -437,6 +439,32 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
             }
 
+            ## ---- Parallel backend setup (IFE CV) ---- ##
+            ## parallel=TRUE (default from fect): auto-enable for all_units
+            ##   when control panel is large enough (Nco*TT > 20000)
+            ## parallel=FALSE: force sequential (user override)
+            if (identical(parallel, FALSE)) {
+                use_parallel <- FALSE
+            } else {
+                use_parallel <- (cv.method == "all_units" && Nco * TT > 20000 && k > 1)
+            }
+            if (cv.method != "loo" && use_parallel == TRUE && k > 1) {
+                if (is.null(cores)) {
+                    cores <- max(1L, min(parallelly::availableCores(omit = 2L), 4L))
+                }
+                old.future.plan <- future::plan()
+                on.exit(future::plan(old.future.plan), add = TRUE)
+                future::plan(future::multisession, workers = cores)
+                doFuture::registerDoFuture()
+                message("Parallel CV with ", cores, " cores ...\n")
+                cv_parallel <- TRUE
+                ## capture internal functions for parallel workers
+                .inter_fe_ub <- inter_fe_ub
+                .complex_fe_ub <- NULL  ## only needed for CFE
+            } else {
+                cv_parallel <- FALSE
+            }
+
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
                 if (!0 %in% I.co) {
@@ -629,32 +657,62 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
               } else if (cv.method == "all_units") {
                 ## ---- cv.sample "all_units" IFE CV ---- ##
-                all_resid <- c()
-                all_time_idx <- c()
-                all_obs_w <- c()
-                for (ii in 1:k) {
-                    II.co.cv <- II.co
-                    II.co.cv[rmCV[[ii]]] <- 0
-                    YY.co.cv <- YY.co
-                    YY.co.cv[rmCV[[ii]]] <- 0
-                    if (!is.null(W)) {
-                        W.cv <- W.use
-                        W.cv[rmCV[[ii]]] <- 0
-                    } else {
-                        W.cv <- as.matrix(0)
+                if (cv_parallel) {
+                    fold_results <- foreach::foreach(
+                        ii = 1:k,
+                        .options.future = list(seed = TRUE),
+                        .inorder = FALSE
+                    ) %dopar% {
+                        II.co.cv <- II.co
+                        II.co.cv[rmCV[[ii]]] <- 0
+                        YY.co.cv <- YY.co
+                        YY.co.cv[rmCV[[ii]]] <- 0
+                        if (!is.null(W)) {
+                            W.cv <- W.use
+                            W.cv[rmCV[[ii]]] <- 0
+                        } else {
+                            W.cv <- as.matrix(0)
+                        }
+                        est.cv.fit <- .inter_fe_ub(
+                            YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co, II.co.cv,
+                            W.cv, as.matrix(beta0CV.co[,,ii]),
+                            r, force, tol, max.iteration
+                        )$fit
+                        resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
+                        list(resid = resid_ii,
+                             time_idx = rep("Control", length(resid_ii)),
+                             obs_w = if (!is.null(W)) W.use[estCV[[ii]]] else NULL)
                     }
-                    ## Always use inter_fe_ub: masking creates an unbalanced panel
-                    est.cv.fit <- inter_fe_ub(
-                        YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co, II.co.cv,
-                        W.cv, as.matrix(beta0CV.co[,,ii]),
-                        r, force, tol, max.iteration
-                    )$fit
-                    resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
-                    all_resid <- c(all_resid, resid_ii)
-                    if (!is.null(W)) {
-                        all_obs_w <- c(all_obs_w, W.use[estCV[[ii]]])
+                    all_resid <- unlist(lapply(fold_results, `[[`, "resid"))
+                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
+                    all_obs_w <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
+                } else {
+                    all_resid <- c()
+                    all_time_idx <- c()
+                    all_obs_w <- c()
+                    for (ii in 1:k) {
+                        II.co.cv <- II.co
+                        II.co.cv[rmCV[[ii]]] <- 0
+                        YY.co.cv <- YY.co
+                        YY.co.cv[rmCV[[ii]]] <- 0
+                        if (!is.null(W)) {
+                            W.cv <- W.use
+                            W.cv[rmCV[[ii]]] <- 0
+                        } else {
+                            W.cv <- as.matrix(0)
+                        }
+                        est.cv.fit <- inter_fe_ub(
+                            YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co, II.co.cv,
+                            W.cv, as.matrix(beta0CV.co[,,ii]),
+                            r, force, tol, max.iteration
+                        )$fit
+                        resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
+                        all_resid <- c(all_resid, resid_ii)
+                        if (!is.null(W)) {
+                            all_obs_w <- c(all_obs_w, W.use[estCV[[ii]]])
+                        }
+                        all_time_idx <- c(all_time_idx, rep("Control", length(resid_ii)))
                     }
-                    all_time_idx <- c(all_time_idx, rep("Control", length(resid_ii)))
                 }
                 if (length(all_resid) == 0) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
@@ -693,51 +751,101 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     U.tr[which(I.tr == 0)] <- 0
                 }
 
-                all_resid <- c()
-                all_time_idx <- c()
-                all_obs_w <- c()
-                for (ii in 1:k) {
-                    pre.cv <- pre
-                    pre.cv[rmCV.tr[[ii]]] <- 0
+                if (cv_parallel) {
+                    fold_results <- foreach::foreach(
+                        ii = 1:k,
+                        .options.future = list(seed = TRUE),
+                        .inorder = FALSE
+                    ) %dopar% {
+                        pre.cv <- pre
+                        pre.cv[rmCV.tr[[ii]]] <- 0
 
-                    if (r == 0) {
-                        if (force %in% c(1, 3)) {
-                            alpha.cv <- rep(0, Ntr)
-                            for (j in 1:Ntr) {
-                                pre_t <- which(pre.cv[, j] == 1)
-                                if (length(pre_t) > 0) alpha.cv[j] <- mean(U.tr[pre_t, j])
+                        if (r == 0) {
+                            if (force %in% c(1, 3)) {
+                                alpha.cv <- rep(0, Ntr)
+                                for (j in 1:Ntr) {
+                                    pre_t <- which(pre.cv[, j] == 1)
+                                    if (length(pre_t) > 0) alpha.cv[j] <- mean(U.tr[pre_t, j])
+                                }
+                                fitted.cv <- matrix(alpha.cv, TT, Ntr, byrow = TRUE)
+                            } else {
+                                fitted.cv <- matrix(0, TT, Ntr)
                             }
-                            fitted.cv <- matrix(alpha.cv, TT, Ntr, byrow = TRUE)
                         } else {
                             fitted.cv <- matrix(0, TT, Ntr)
-                        }
-                    } else {
-                        fitted.cv <- matrix(0, TT, Ntr)
-                        for (j in 1:Ntr) {
-                            pre_t <- which(pre.cv[, j] == 1)
-                            if (length(pre_t) >= ncol(F.hat)) {
-                                F.pre <- as.matrix(F.hat[pre_t, , drop = FALSE])
-                                lam <- try(solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.tr[pre_t, j],
-                                           silent = TRUE)
-                                if (!"try-error" %in% class(lam)) {
-                                    fitted.cv[, j] <- F.hat %*% lam
+                            for (j in 1:Ntr) {
+                                pre_t <- which(pre.cv[, j] == 1)
+                                if (length(pre_t) >= ncol(F.hat)) {
+                                    F.pre <- as.matrix(F.hat[pre_t, , drop = FALSE])
+                                    lam <- try(solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.tr[pre_t, j],
+                                               silent = TRUE)
+                                    if (!"try-error" %in% class(lam)) {
+                                        fitted.cv[, j] <- F.hat %*% lam
+                                    }
                                 }
                             }
                         }
+
+                        resid_ii <- U.tr[estCV.tr[[ii]]] - fitted.cv[estCV.tr[[ii]]]
+                        obs_w_ii <- if (!is.null(W.tr)) W.tr[estCV.tr[[ii]]] else NULL
+                        idx_ii <- NULL
+                        if (!is.null(T.on)) {
+                            T.on.tr <- T.on[, tr, drop = FALSE]
+                            idx_ii <- as.character(T.on.tr[estCV.tr[[ii]]])
+                            idx_ii[is.na(idx_ii)] <- "Control"
+                        }
+                        list(resid = resid_ii, time_idx = idx_ii, obs_w = obs_w_ii)
                     }
+                    all_resid <- unlist(lapply(fold_results, `[[`, "resid"))
+                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
+                    all_obs_w <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
+                } else {
+                    all_resid <- c()
+                    all_time_idx <- c()
+                    all_obs_w <- c()
+                    for (ii in 1:k) {
+                        pre.cv <- pre
+                        pre.cv[rmCV.tr[[ii]]] <- 0
 
-                    resid_ii <- U.tr[estCV.tr[[ii]]] - fitted.cv[estCV.tr[[ii]]]
-                    all_resid <- c(all_resid, resid_ii)
+                        if (r == 0) {
+                            if (force %in% c(1, 3)) {
+                                alpha.cv <- rep(0, Ntr)
+                                for (j in 1:Ntr) {
+                                    pre_t <- which(pre.cv[, j] == 1)
+                                    if (length(pre_t) > 0) alpha.cv[j] <- mean(U.tr[pre_t, j])
+                                }
+                                fitted.cv <- matrix(alpha.cv, TT, Ntr, byrow = TRUE)
+                            } else {
+                                fitted.cv <- matrix(0, TT, Ntr)
+                            }
+                        } else {
+                            fitted.cv <- matrix(0, TT, Ntr)
+                            for (j in 1:Ntr) {
+                                pre_t <- which(pre.cv[, j] == 1)
+                                if (length(pre_t) >= ncol(F.hat)) {
+                                    F.pre <- as.matrix(F.hat[pre_t, , drop = FALSE])
+                                    lam <- try(solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.tr[pre_t, j],
+                                               silent = TRUE)
+                                    if (!"try-error" %in% class(lam)) {
+                                        fitted.cv[, j] <- F.hat %*% lam
+                                    }
+                                }
+                            }
+                        }
 
-                    if (!is.null(T.on)) {
-                        T.on.tr <- T.on[, tr, drop = FALSE]
-                        idx_ii <- as.character(T.on.tr[estCV.tr[[ii]]])
-                        idx_ii[is.na(idx_ii)] <- "Control"
-                        all_time_idx <- c(all_time_idx, idx_ii)
-                    }
+                        resid_ii <- U.tr[estCV.tr[[ii]]] - fitted.cv[estCV.tr[[ii]]]
+                        all_resid <- c(all_resid, resid_ii)
 
-                    if (!is.null(W.tr)) {
-                        all_obs_w <- c(all_obs_w, W.tr[estCV.tr[[ii]]])
+                        if (!is.null(T.on)) {
+                            T.on.tr <- T.on[, tr, drop = FALSE]
+                            idx_ii <- as.character(T.on.tr[estCV.tr[[ii]]])
+                            idx_ii[is.na(idx_ii)] <- "Control"
+                            all_time_idx <- c(all_time_idx, idx_ii)
+                        }
+
+                        if (!is.null(W.tr)) {
+                            all_obs_w <- c(all_obs_w, W.tr[estCV.tr[[ii]]])
+                        }
                     }
                 }
                 if (length(all_resid) == 0) {
@@ -1206,6 +1314,28 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
             }
 
+            ## ---- Parallel backend setup (CFE CV) ---- ##
+            if (identical(parallel, FALSE)) {
+                use_parallel <- FALSE
+            } else {
+                use_parallel <- (cv.method == "all_units" && Nco * TT > 20000 && k > 1)
+            }
+            if (cv.method != "loo" && use_parallel == TRUE && k > 1) {
+                if (is.null(cores)) {
+                    cores <- max(1L, min(parallelly::availableCores(omit = 2L), 4L))
+                }
+                old.future.plan <- future::plan()
+                on.exit(future::plan(old.future.plan), add = TRUE)
+                future::plan(future::multisession, workers = cores)
+                doFuture::registerDoFuture()
+                message("Parallel CV with ", cores, " cores ...\n")
+                cv_parallel <- TRUE
+                ## capture internal functions for parallel workers
+                .complex_fe_ub <- complex_fe_ub
+            } else {
+                cv_parallel <- FALSE
+            }
+
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
                 est.co <- complex_fe_ub(YY.co, Y0.co, X.co,
@@ -1413,34 +1543,68 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
               } else if (cv.method == "all_units") {
                 ## ---- cv.sample "all_units" CFE CV ---- ##
-                all_resid <- c()
-                all_time_idx <- c()
-                all_obs_w <- c()
-                for (ii in 1:k) {
-                    II.co.cv <- II.co
-                    II.co.cv[rmCV[[ii]]] <- 0
-                    YY.co.cv <- YY.co
-                    YY.co.cv[rmCV[[ii]]] <- 0
-                    if (!is.null(W)) {
-                        W.cv <- W.use
-                        W.cv[rmCV[[ii]]] <- 0
-                    } else {
-                        W.cv <- as.matrix(0)
+                if (cv_parallel) {
+                    fold_results <- foreach::foreach(
+                        ii = 1:k,
+                        .options.future = list(seed = TRUE),
+                        .inorder = FALSE
+                    ) %dopar% {
+                        II.co.cv <- II.co
+                        II.co.cv[rmCV[[ii]]] <- 0
+                        YY.co.cv <- YY.co
+                        YY.co.cv[rmCV[[ii]]] <- 0
+                        if (!is.null(W)) {
+                            W.cv <- W.use
+                            W.cv[rmCV[[ii]]] <- 0
+                        } else {
+                            W.cv <- as.matrix(0)
+                        }
+                        est.cv.co <- .complex_fe_ub(
+                            YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co,
+                            X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
+                            Zgamma.id, kappaQ.id,
+                            II.co.cv, W.cv, as.matrix(beta0CV.co[,,ii]),
+                            r, force = force, tol, max.iteration
+                        )
+                        est.cv.fit <- est.cv.co$fit
+                        resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
+                        list(resid = resid_ii,
+                             time_idx = rep("Control", length(resid_ii)),
+                             obs_w = if (!is.null(W)) W.use[estCV[[ii]]] else NULL)
                     }
-                    est.cv.co <- complex_fe_ub(
-                        YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co,
-                        X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
-                        Zgamma.id, kappaQ.id,
-                        II.co.cv, W.cv, as.matrix(beta0CV.co[,,ii]),
-                        r, force = force, tol, max.iteration
-                    )
-                    est.cv.fit <- est.cv.co$fit
-                    resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
-                    all_resid <- c(all_resid, resid_ii)
-                    if (!is.null(W)) {
-                        all_obs_w <- c(all_obs_w, W.use[estCV[[ii]]])
+                    all_resid <- unlist(lapply(fold_results, `[[`, "resid"))
+                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
+                    all_obs_w <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
+                } else {
+                    all_resid <- c()
+                    all_time_idx <- c()
+                    all_obs_w <- c()
+                    for (ii in 1:k) {
+                        II.co.cv <- II.co
+                        II.co.cv[rmCV[[ii]]] <- 0
+                        YY.co.cv <- YY.co
+                        YY.co.cv[rmCV[[ii]]] <- 0
+                        if (!is.null(W)) {
+                            W.cv <- W.use
+                            W.cv[rmCV[[ii]]] <- 0
+                        } else {
+                            W.cv <- as.matrix(0)
+                        }
+                        est.cv.co <- complex_fe_ub(
+                            YY.co.cv, as.matrix(Y0CV.co[,,ii]), X.co,
+                            X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
+                            Zgamma.id, kappaQ.id,
+                            II.co.cv, W.cv, as.matrix(beta0CV.co[,,ii]),
+                            r, force = force, tol, max.iteration
+                        )
+                        est.cv.fit <- est.cv.co$fit
+                        resid_ii <- YY.co[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
+                        all_resid <- c(all_resid, resid_ii)
+                        if (!is.null(W)) {
+                            all_obs_w <- c(all_obs_w, W.use[estCV[[ii]]])
+                        }
+                        all_time_idx <- c(all_time_idx, rep("Control", length(resid_ii)))
                     }
-                    all_time_idx <- c(all_time_idx, rep("Control", length(resid_ii)))
                 }
                 if (length(all_resid) == 0) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
@@ -1501,51 +1665,101 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     U.tr[which(I.tr == 0)] <- 0
                 }
 
-                all_resid <- c()
-                all_time_idx <- c()
-                all_obs_w <- c()
-                for (ii in 1:k) {
-                    pre.cv <- pre
-                    pre.cv[rmCV.tr[[ii]]] <- 0
+                if (cv_parallel) {
+                    fold_results <- foreach::foreach(
+                        ii = 1:k,
+                        .options.future = list(seed = TRUE),
+                        .inorder = FALSE
+                    ) %dopar% {
+                        pre.cv <- pre
+                        pre.cv[rmCV.tr[[ii]]] <- 0
 
-                    if (r == 0) {
-                        if (force %in% c(1, 3)) {
-                            alpha.cv <- rep(0, Ntr)
-                            for (j in 1:Ntr) {
-                                pre_t <- which(pre.cv[, j] == 1)
-                                if (length(pre_t) > 0) alpha.cv[j] <- mean(U.tr[pre_t, j])
+                        if (r == 0) {
+                            if (force %in% c(1, 3)) {
+                                alpha.cv <- rep(0, Ntr)
+                                for (j in 1:Ntr) {
+                                    pre_t <- which(pre.cv[, j] == 1)
+                                    if (length(pre_t) > 0) alpha.cv[j] <- mean(U.tr[pre_t, j])
+                                }
+                                fitted.cv <- matrix(alpha.cv, TT, Ntr, byrow = TRUE)
+                            } else {
+                                fitted.cv <- matrix(0, TT, Ntr)
                             }
-                            fitted.cv <- matrix(alpha.cv, TT, Ntr, byrow = TRUE)
                         } else {
                             fitted.cv <- matrix(0, TT, Ntr)
-                        }
-                    } else {
-                        fitted.cv <- matrix(0, TT, Ntr)
-                        for (j in 1:Ntr) {
-                            pre_t <- which(pre.cv[, j] == 1)
-                            if (length(pre_t) >= ncol(F.hat)) {
-                                F.pre <- as.matrix(F.hat[pre_t, , drop = FALSE])
-                                lam <- try(solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.tr[pre_t, j],
-                                           silent = TRUE)
-                                if (!"try-error" %in% class(lam)) {
-                                    fitted.cv[, j] <- F.hat %*% lam
+                            for (j in 1:Ntr) {
+                                pre_t <- which(pre.cv[, j] == 1)
+                                if (length(pre_t) >= ncol(F.hat)) {
+                                    F.pre <- as.matrix(F.hat[pre_t, , drop = FALSE])
+                                    lam <- try(solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.tr[pre_t, j],
+                                               silent = TRUE)
+                                    if (!"try-error" %in% class(lam)) {
+                                        fitted.cv[, j] <- F.hat %*% lam
+                                    }
                                 }
                             }
                         }
+
+                        resid_ii <- U.tr[estCV.tr[[ii]]] - fitted.cv[estCV.tr[[ii]]]
+                        obs_w_ii <- if (!is.null(W.tr)) W.tr[estCV.tr[[ii]]] else NULL
+                        idx_ii <- NULL
+                        if (!is.null(T.on)) {
+                            T.on.tr <- T.on[, tr, drop = FALSE]
+                            idx_ii <- as.character(T.on.tr[estCV.tr[[ii]]])
+                            idx_ii[is.na(idx_ii)] <- "Control"
+                        }
+                        list(resid = resid_ii, time_idx = idx_ii, obs_w = obs_w_ii)
                     }
+                    all_resid <- unlist(lapply(fold_results, `[[`, "resid"))
+                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
+                    all_obs_w <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
+                } else {
+                    all_resid <- c()
+                    all_time_idx <- c()
+                    all_obs_w <- c()
+                    for (ii in 1:k) {
+                        pre.cv <- pre
+                        pre.cv[rmCV.tr[[ii]]] <- 0
 
-                    resid_ii <- U.tr[estCV.tr[[ii]]] - fitted.cv[estCV.tr[[ii]]]
-                    all_resid <- c(all_resid, resid_ii)
+                        if (r == 0) {
+                            if (force %in% c(1, 3)) {
+                                alpha.cv <- rep(0, Ntr)
+                                for (j in 1:Ntr) {
+                                    pre_t <- which(pre.cv[, j] == 1)
+                                    if (length(pre_t) > 0) alpha.cv[j] <- mean(U.tr[pre_t, j])
+                                }
+                                fitted.cv <- matrix(alpha.cv, TT, Ntr, byrow = TRUE)
+                            } else {
+                                fitted.cv <- matrix(0, TT, Ntr)
+                            }
+                        } else {
+                            fitted.cv <- matrix(0, TT, Ntr)
+                            for (j in 1:Ntr) {
+                                pre_t <- which(pre.cv[, j] == 1)
+                                if (length(pre_t) >= ncol(F.hat)) {
+                                    F.pre <- as.matrix(F.hat[pre_t, , drop = FALSE])
+                                    lam <- try(solve(t(F.pre) %*% F.pre) %*% t(F.pre) %*% U.tr[pre_t, j],
+                                               silent = TRUE)
+                                    if (!"try-error" %in% class(lam)) {
+                                        fitted.cv[, j] <- F.hat %*% lam
+                                    }
+                                }
+                            }
+                        }
 
-                    if (!is.null(T.on)) {
-                        T.on.tr <- T.on[, tr, drop = FALSE]
-                        idx_ii <- as.character(T.on.tr[estCV.tr[[ii]]])
-                        idx_ii[is.na(idx_ii)] <- "Control"
-                        all_time_idx <- c(all_time_idx, idx_ii)
-                    }
+                        resid_ii <- U.tr[estCV.tr[[ii]]] - fitted.cv[estCV.tr[[ii]]]
+                        all_resid <- c(all_resid, resid_ii)
 
-                    if (!is.null(W.tr)) {
-                        all_obs_w <- c(all_obs_w, W.tr[estCV.tr[[ii]]])
+                        if (!is.null(T.on)) {
+                            T.on.tr <- T.on[, tr, drop = FALSE]
+                            idx_ii <- as.character(T.on.tr[estCV.tr[[ii]]])
+                            idx_ii[is.na(idx_ii)] <- "Control"
+                            all_time_idx <- c(all_time_idx, idx_ii)
+                        }
+
+                        if (!is.null(W.tr)) {
+                            all_obs_w <- c(all_obs_w, W.tr[estCV.tr[[ii]]])
+                        }
                     }
                 }
                 if (length(all_resid) == 0) {

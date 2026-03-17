@@ -39,7 +39,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     X.gamma = NULL,
                     X.kappa = NULL,
                     Zgamma.id = NULL,
-                    kappaQ.id = NULL) {
+                    kappaQ.id = NULL,
+                    parallel = FALSE,
+                    cores = NULL) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -197,7 +199,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 group.level = group.level, group = group,
                 cv.method = cv.method, cv.nobs = cv.nobs,
                 cv.prop = cv.prop, cv.donut = cv.donut,
-                min.T0 = min.T0, k = k, criterion = criterion
+                min.T0 = min.T0, k = k, criterion = criterion,
+                parallel = parallel, cores = cores
             )
             return(out)
         }
@@ -217,7 +220,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 group.level = group.level, group = group,
                 cv.method = cv.method, cv.nobs = cv.nobs,
                 cv.prop = cv.prop, cv.donut = cv.donut,
-                min.T0 = min.T0, k = k, criterion = criterion
+                min.T0 = min.T0, k = k, criterion = criterion,
+                parallel = parallel, cores = cores
             )
             return(out)
         }
@@ -241,7 +245,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 Zgamma.id = Zgamma.id, kappaQ.id = kappaQ.id,
                 cv.method = cv.method, cv.nobs = cv.nobs,
                 cv.prop = cv.prop, cv.donut = cv.donut,
-                min.T0 = min.T0, k = k, criterion = criterion
+                min.T0 = min.T0, k = k, criterion = criterion,
+                parallel = parallel, cores = cores
             )
             return(out)
         }

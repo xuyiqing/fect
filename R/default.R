@@ -1999,7 +1999,9 @@ fect.default <- function(
                     X.gamma = X.gamma,
                     X.kappa = X.kappa,
                     Zgamma.id = Zgamma.id,
-                    kappaQ.id = kappaQ.id
+                    kappaQ.id = kappaQ.id,
+                    parallel = parallel,
+                    cores = cores
                 )
             } else {
                 out <- fect_binary_cv(
@@ -2054,7 +2056,9 @@ fect.default <- function(
                     carryoverTest = carryoverTest,
                     carryover.period = carryover.period,
                     group.level = g.level,
-                    group = G
+                    group = G,
+                    parallel = parallel,
+                    cores = cores
                 )
             } else if (method == "ife") {
                 out <- fect_fe(
@@ -2122,7 +2126,9 @@ fect.default <- function(
                     X.gamma = X.gamma,
                     X.kappa = X.kappa,
                     Zgamma.id = Zgamma.id,
-                    kappaQ.id = kappaQ.id
+                    kappaQ.id = kappaQ.id,
+                    parallel = parallel,
+                    cores = cores
                 )
             } else if (method == "cfe") {
                 out <- fect_cfe(
@@ -2187,7 +2193,9 @@ fect.default <- function(
                     carryoverTest = carryoverTest,
                     carryover.period = carryover.period,
                     group.level = g.level,
-                    group = G
+                    group = G,
+                    parallel = parallel,
+                    cores = cores
                 )
             } else if (method == "mc") {
                 out <- fect_mc(
