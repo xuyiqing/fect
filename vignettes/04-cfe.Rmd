@@ -322,9 +322,9 @@ This procedure is implemented in C++ (`src/cfe.cpp`) for computational efficienc
 
 ## Model comparison with fect_mspe()
 
-The `fect_mspe()` function helps compare different model specifications by computing the mean squared prediction error (MSPE) on held-out observations. This is useful for determining which model — or which set of CFE components — best predicts the untreated outcomes.
+After fitting multiple models, `fect_mspe()` provides a unified framework for comparing their out-of-sample prediction accuracy. Unlike the internal CV (which selects a tuning parameter within a single method), `fect_mspe()` compares across methods or specifications. This is useful for determining which model --- or which set of CFE components --- best predicts the untreated outcomes.
 
-`fect_mspe()` takes a fitted `fect` object and re-estimates the model after hiding some post-treatment observations, then computes the prediction error on those hidden observations.
+`fect_mspe()` takes a list of fitted `fect` objects and re-estimates each model after masking some observations, then computes the prediction error on those held-out observations.
 
 ```{r cfe_mspe, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 # Fit two CFE variants for comparison
@@ -347,18 +347,6 @@ print(mspe.out$summary)
 ```
 
 ::: {.callout-note appearance="simple"}
-`fect_mspe()` accepts a list of fitted `fect` objects and compares their out-of-sample prediction accuracy using cross-validated scoring. A smaller MSPE indicates better out-of-sample prediction.
+`fect_mspe()` accepts all the same masking options (`cv.method`, `k`, `cv.prop`, `cv.nobs`, `cv.donut`, `min.T0`) and scoring options (`criterion`) as the internal CV functions. By default, it uses `cv.method = "all_units"`. A smaller MSPE indicates better out-of-sample prediction. The function does not perform model selection automatically --- it reports scores for the user to compare.
 :::
 
-------------------------------------------------------------------------
-
-## Quick diagnostic check
-
-We verify the CFE model passes basic pre-trend checks using the equivalence plot:
-
-```{r cfe_quick_equiv, eval=TRUE, cache=TRUE, fig.width=6, fig.height=4.5}
-plot(out.cfe.linear, type = "equiv", ylim = c(-4, 4),
-     cex.legend = 0.6, main = "Testing Pre-Trend (CFE)", cex.text = 0.8)
-```
-
-For a comprehensive treatment of diagnostic tests including placebo, carryover, and LOO pre-trend tests, see [Chapter @sec-diagnostics]. For model comparison using `fect_mspe()`, see [Chapter @sec-model-selection].

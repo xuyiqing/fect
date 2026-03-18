@@ -92,13 +92,13 @@ Users can also use the `print` function to directly retrieve specific results. H
 
 -   `est.att` reports the average treatment effect on the treated (ATT) by period
 -   `est.avg` shows the ATT averaged over all periods
--   `est.beta` represents the coefficients of the time-varying covariates
+-   `beta` represents the coefficients of the time-varying covariates
 
 ```{r eval = FALSE}
 print(out)
 out$est.att
 out$est.avg
-out$est.beta
+out$beta
 ```
 
 Treatment effect estimates from each bootstrap run is stored in `att.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
@@ -487,3 +487,65 @@ plot(out.mc_ub, main = "Estimated ATT (MC)", ylim = c(-10, 20))
 2.  **Adding Covariates**: Including covariates in the model will significantly slow down the algorithm, as the IFE/MC model requires more time to converge. Users should be aware of this trade-off when incorporating covariates.
 
 3.  **Setting `min.T0`**: Setting `min.T0` to a positive value helps. The algorithm will automatically exclude treated units with too few pre-treatment periods. A larger $T_0$ reduces bias in causal estimates and minimizes the risk of severe extrapolation. When running cross-validation to select the number of factors, `min.T0` must be equal to or greater than (`r.max` + 2). Errors frequently occur when there are too few pre-treatment periods, so ensuring adequate $T_0$ (e.g. setting `min.T0 = 5`) is crucial.
+
+------------------------------------------------------------------------
+
+## Cross-validation in the nevertreated regime
+
+Not all `cv.method` options are available in all settings:
+
+| | `fect_cv` (notyettreated) | nevertreated CV | `fect_mspe` (post-hoc) |
+|:--|:--|:--|:--|
+| `"all_units"` | Default | Available | Default |
+| `"treated_units"` | Available | Default | Available |
+| `"loo"` | --- | Available | --- |
+
+The `"loo"` method is exclusive to the nevertreated regime because it requires factor estimation to be independent of the held-out treated observations. In the nevertreated setting, factors are estimated from control units only, so holding out treated pre-treatment periods does not compromise estimation. In the notyettreated setting, all units contribute to estimation, making LOO less clean; use `"treated_units"` instead.
+
+------------------------------------------------------------------------
+
+## CFE in the nevertreated setting
+
+The nevertreated regime is not limited to the IFE method. The complex fixed effects (CFE) estimator can also be used with `factors.from = "nevertreated"`, combining the nevertreated estimation regime with CFE's richer model structure. This is useful when the data generating process involves not only latent interactive fixed effects but also additional additive fixed effects (e.g., region, industry), unit-specific time trends (via `Q.type`), or time-invariant covariates with time-varying coefficients (`Z`/`gamma`). See [Chapter @sec-cfe] for the full CFE tutorial.
+
+### Example: CFE + nevertreated
+
+```{r cfe_nt_demo, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
+out.cfe.nt <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                   method = "cfe", force = "two-way",
+                   factors.from = "nevertreated",
+                   Q.type = "linear",
+                   se = FALSE, CV = TRUE, r = c(0, 5),
+                   parallel = TRUE)
+```
+
+```{r}
+cat("CFE + nevertreated: r.cv =", out.cfe.nt$r.cv,
+    ", ATT =", round(out.cfe.nt$att.avg, 3), "\n")
+```
+
+::: {.callout-note appearance="simple"}
+Under `factors.from = "nevertreated"`, the CFE estimator uses only never-treated controls for factor estimation — the same principle as gsynth. The additional CFE components (extra FE, time trends, Z/gamma) are estimated on the control panel and projected onto treated units alongside the interactive factors. See [Chapter @sec-cfe] for the full CFE tutorial.
+:::
+
+### Comparing gsynth and CFE + nevertreated
+
+Both approaches share the same estimation regime (never-treated controls only), but CFE adds structural components. Whether the extra flexibility helps depends on the data generating process. If the true model has unit-specific trends or group fixed effects, CFE with nevertreated will outperform plain gsynth. If the true model is pure IFE, the additional CFE parameters add noise without benefit. The `fect_mspe()` function provides a principled comparison:
+
+```{r cfe_nt_vs_gsynth, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
+out.gsynth.comp <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "gsynth", force = "two-way",
+                        r = 2, se = FALSE, CV = FALSE)
+
+out.cfe.nt.comp <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "cfe", force = "two-way",
+                        factors.from = "nevertreated",
+                        r = 2, se = FALSE, CV = FALSE)
+```
+
+```{r cfe_nt_mspe, eval=TRUE, cache=TRUE}
+mspe.comp <- fect_mspe(list(out.gsynth.comp, out.cfe.nt.comp), seed = 1234)
+print(mspe.comp$summary)
+```
+
+Since `simgsynth` follows a pure IFE data generating process, gsynth and CFE with nevertreated should produce similar MSPE, confirming that the additional CFE structure neither helps nor hurts when it is not needed.

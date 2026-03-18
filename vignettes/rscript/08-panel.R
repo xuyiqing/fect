@@ -24,7 +24,7 @@ ls()
 
 
 ##########################
-# From: ./05-panel.Rmd
+# From: ./09-panel.Rmd
 ##########################
 
 # install packages from CRAN

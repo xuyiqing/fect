@@ -4,7 +4,7 @@ In this chapter, we illustrate how to use the **fect** package to implement coun
 
 ## Simulated data
 
-In this chapter, we use `simdata1`, a simulated panel dataset in which the parallel trends assumption holds. The dataset has 200 units, 35 time periods, and treatment that switches on and off. The outcome is generated from a two-way fixed effects model with two covariates:
+In this chapter, we use `simdata1`, a simulated panel dataset in which the parallel trends assumption holds. The dataset has 200 units, 35 time periods, and treatment that switches on and off. The data are simulated with treatment switching on and off, capturing the general case of treatment reversal under strict exogeneity. The outcome is generated from a two-way fixed effects model with two covariates:
 $$Y_{it} = \alpha_i + \xi_t + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \tau_{it} D_{it} + \epsilon_{it}$$
 
 Since there are no latent factors, the `"fe"` method (two-way fixed effects counterfactual estimator) is correctly specified for this DGP. For settings where latent factors are present and the FE estimator is biased, see [Chapter @sec-ife-mc].
@@ -40,7 +40,7 @@ panelview(Y ~ D, data = simdata1, index = c("id","time"),
 
 ------------------------------------------------------------------------
 
-## The imputation estimator (FEct)
+## The FEct estimator
 
 The two-way fixed effects counterfactual estimator (FEct) imputes the counterfactual outcome $\hat{Y}(0)$ for treated observations using a two-way fixed effects model estimated on control observations. It is also independently proposed by @BJS2024 and @gardnertwo, who refer to it as the "imputation method" and "two-stage DID," respectively.
 
@@ -60,60 +60,18 @@ out.fect <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
 The key parameters that control the **model** are: `method` (estimator choice), `force` (fixed effects structure), and `r` (number of factors for IFE/MC methods; see [Chapter @sec-ife-mc]). These determine how $\hat{Y}(0)$ is imputed.
 :::
 
-### Visualization
-
-We can use the `plot` function to visualize the estimation results. By default, the `plot` function produces a "gap" plot -- as if we type `plot(out.fect, type = "gap")` --- which visualizes the estimated period-wise ATT (dynamic treatment effects). For your reference, the true population average effects in `simdata1` go from 1 to 3 from the 1st to the 10th post-treatment period.
-
-The bar plot at the bottom of the plot shows the number of treated units for each time period. The options `cex.main`, `cex.lab`, `cex.axis`, and `cex.text` adjust the font sizes of the title, axis labels, axis numbers, and in-graph text, respectively.
-
-Users can choose to plot only those periods whose **number of treated observations** exceeds a threshold, which is set as a proportion of the largest number of treated observations in a period (the default is `proportion = 0.3`).
+We can use the `plot` function to visualize the estimation results. By default, it produces a "gap" plot --- `plot(out.fect, type = "gap")` --- which shows the estimated period-wise ATT (dynamic treatment effects). The true population average effects in `simdata1` go from 1 to 3 from the 1st to the 10th post-treatment period.
 
 ```{r fect_plot_nose, fig.width = 6, fig.height = 4.5}
-plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y", 
+plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
 ```
 
-The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power.
-
-The graph is a **ggplot2** object; user can conveniently use the `ggsave` (preferred) function to export the resulting plot. See [Chapter @sec-plots] for more visualization options.
-
-::: {.callout-tip appearance="simple"}
-### Inference parameters
-The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These do not affect point estimates.
-:::
-
-### Uncertainty estimates
-
-The package can produce uncertainty estimates when `se = TRUE`. One can use the non-parametric bootstrap procedure by setting `vartype = "bootstrap"`. Note that it only works well when the number of units is relatively large and many units in the data set experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
-
-::: {.callout-note appearance="simple"}
-**Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
-:::
-
-```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.fect <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"), 
-  method = "fe", force = "two-way", se = TRUE, 
-  cores = 8, parallel = TRUE, nboots = 1000)
-```
-
-::: {.callout-note appearance="simple"}
-**Clustering.**
-
--   By default, `fect()` uses cluster-bootstrap at the `unit` level when `se = TRUE`, that is `vartype = "bootstrap"`. The uncertainty estimates thus account for arbitrary serial correlation within a unit over time—commonly understood as being "clustered" at the unit level. In the example above, the unit is `id`, hence, by default, `cl = "id"`.
--   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level. In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset.
--   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option.
-:::
-
-The `plot()` function can visualize the estimated period-wise ATTs as well as their uncertainty estimates. `stats = "F.p"` shows the p-value for the F test of no-pretrend (more details below).
-
-```{r fect_plot_nse, fig.width = 6, fig.height = 4.5}
-plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y", 
-  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")
-```
+In the gap plot, pre-treatment estimates appear in gray while post-treatment estimates appear in black. This visual distinction highlights that pre-treatment "effects" should be near zero if the model is well-specified, while post-treatment effects are the quantities of interest. The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power. See [Chapter @sec-plots] for more visualization options.
 
 ### Save estimates
 
-Users can use the `print` function to take a look at a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. Specifically, `est.avg` and `est.avg.unit` show the ATT averaged over all periods -- the former weights each treated observation equally while the latter weights each treated unit equally. `beta` reports the coefficients of the time-varying covariates. `est.att` reports the average treatment effect on the treated (ATT) by period. Treatment effect estimates from each bootstrap run is stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
+Users can use the `print` function to view a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. Specifically, `est.avg` and `est.avg.unit` show the ATT averaged over all periods -- the former weights each treated observation equally while the latter weights each treated unit equally. `beta` reports the coefficients of the time-varying covariates. `est.att` reports the average treatment effect on the treated (ATT) by period.
 
 ```{r}
 print(out.fect)
@@ -127,12 +85,66 @@ out.fect$est.avg
 out.fect$beta
 ```
 
-### Leave-on-out approach
+------------------------------------------------------------------------
+
+## Visualization and diagnostics
+
+Once we have point estimates, we typically want uncertainty estimates and diagnostic checks before interpreting results. This section covers inference, pre-trend diagnostics, and the leave-one-out approach.
+
+::: {.callout-tip appearance="simple"}
+### Inference parameters
+The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These do not affect point estimates.
+:::
+
+### Inference
+
+The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
+
+::: {.callout-note appearance="simple"}
+**Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
+:::
+
+```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.fect <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+  method = "fe", force = "two-way", se = TRUE,
+  cores = 8, parallel = TRUE, nboots = 1000)
+```
+
+::: {.callout-note appearance="simple"}
+**Clustering.**
+
+-   By default, `fect()` uses cluster-bootstrap at the `unit` level when `se = TRUE`, that is `vartype = "bootstrap"`. The uncertainty estimates thus account for arbitrary serial correlation within a unit over time---commonly understood as being "clustered" at the unit level. In the example above, the unit is `id`, hence, by default, `cl = "id"`.
+-   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level. In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset. This can be particularly useful when the number of treated units is small.
+-   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option.
+:::
+
+The `plot()` function can visualize the estimated period-wise ATTs as well as their uncertainty estimates. `stats = "F.p"` shows the p-value for the F test of no-pretrend.
+
+```{r fect_plot_nse, fig.width = 6, fig.height = 4.5}
+plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
+  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")
+```
+
+### Diagnostics
+
+A basic sanity check is the placebo test: remove some pre-treatment periods from estimation and verify the model does not find spurious effects there.
+
+```{r fect_placebo, eval=TRUE, cache=TRUE, message=FALSE, results='hide', fig.width=6, fig.height=4.5}
+out.fect.placebo <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+  force = "two-way", method = "fe",
+  se = TRUE, cores = 8, nboots = 200, parallel = TRUE,
+  placeboTest = TRUE, placebo.period = c(-2, 0))
+plot(out.fect.placebo, cex.text = 0.8)
+```
+
+Similarly, the carryover test checks whether treatment effects persist after treatment ends. Both tests are covered in detail in [Chapter @sec-ife-mc].
+
+### Leave-one-out approach
 
 @li2025benchmarking show that in some applications, pre-trend estimates based on in-sample model fit can lead to the mistaken belief that no pre-trend exists, even when a non-parallel pre-trend is present. A simple fix is to use a leave-one-out method by setting `loo = TRUE` to obtain these estimates, although it is significantly more time-consuming.
 
 ::: {.callout-note appearance="simple"}
-We recommend setting `loo = TRUE` when (i) the event-study plot is intended as a critical piece of evidence to support the parallel trends assumption, which is often the case, or (ii) when implementing an equivalence test for the pre-trend estimates. For more discussion on the LOO pre-trend test, see [Chapter @sec-diagnostics]
+We recommend setting `loo = TRUE` when (i) the event-study plot is intended as a critical piece of evidence to support the parallel trends assumption, which is often the case, or (ii) when implementing an equivalence test for the pre-trend estimates. For more discussion on the LOO pre-trend test, see [Chapter @sec-ife-mc].
 
 Our most preferred test, however, is the sensitivity analysis discussed in [Chapter @sec-panel-sens], which combines out-of-sample placebo estimates with post-treatment ATT estimates.
 :::
@@ -140,7 +152,7 @@ Our most preferred test, however, is the sensitivity analysis discussed in [Chap
 We can implement the leave-one-out pre-trend test by setting `loo = TRUE`.
 
 ```{r fect_loo, eval=TRUE, cache = TRUE, message = FALSE}
-out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"), 
+out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
   method = "fe", force = "two-way", se = TRUE, loo = TRUE,
   cores = 8, parallel = TRUE, nboots = 200)
 ```
@@ -148,13 +160,23 @@ out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
 The event study plot utilizing leave-one-out for pretreatment estimates is shown below. This graph is fairly similar to the graphics we presented earlier without using leave-one-out. However, this is not always true.
 
 ```{r, fig.width = 6, fig.height = 4.5}
-plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO", 
+plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO",
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+```
+
+### Save estimates
+
+After estimation with `se = TRUE`, bootstrap treatment effect estimates from each run are stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs). Standard errors for the period-wise ATTs are available in the output object alongside the point estimates.
+
+```{r eval = FALSE}
+out.fect$eff.boot
 ```
 
 For IFE and MC methods, see [Chapter @sec-ife-mc].
 
-## Weighting treatment effects
+------------------------------------------------------------------------
+
+## Other estimands
 
 After obtaining the individual treatment effects using one of the counterfactual estimators, we can weight these estimates using a constructed balanced treated sample or other user-supplied weighting schemes.
 
@@ -163,8 +185,8 @@ After obtaining the individual treatment effects using one of the counterfactual
 **fect** also provides the option `balance.period`, which allows the calculation of the average treatment effects only for *treated* units that exhibit complete data in specified pre- and post-treatment periods. For instance, if the option is set to `balance.period = c(-3,4)`, the algorithm will calculate the average treatment effects for units that have at least four consecutive non-missing observations in the pre-treatment periods `(-3, -2, -1, 0)` and at least four consecutive non-missing observations in the post-treatment periods `(1, 2, 3, 4)`. Note that this option does not affect whether a never-treated unit enters estimation.
 
 ```{r simdata_bal, eval=TRUE, cache = TRUE}
-out.bal <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"), 
-  balance.period = c(-3, 4), force = "two-way", method = "ife", 
+out.bal <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+  balance.period = c(-3, 4), force = "two-way", method = "ife",
   CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
 ```
 
@@ -177,17 +199,17 @@ plot(out.bal, main = "Estimated ATT (Balanced Sample)")
 The usual plotting options can be used to adjust the balanced plot as well.
 
 ```{r fig.width = 6, fig.height = 4.5}
-plot(out.bal, main = "Estimated ATT (Balanced Sample)", 
+plot(out.bal, main = "Estimated ATT (Balanced Sample)",
   color = "red", count.color = "blue")
 ```
 
-### Weighted treatment effect
+### User-supplied weights
 
 The package offers the option `W` to calculate the weighted average treatment effects. The weighting variable does not affect the estimation of fixed effects or factors. Only the weighted average treatment effects or weighted dynamic treatment effects are obtained by aggregating the treatment effects using the weight `W`.
 
 ```{r simdata_w, eval=TRUE, cache = TRUE}
 simdata1$Weight <- abs(rnorm(n = dim(simdata1)[1]))
-out.w <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"), 
+out.w <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
   force = "two-way", method = "ife", W = 'Weight',
   CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
 ```
@@ -198,124 +220,13 @@ We can then visualize the weighted dynamic treatment effects using the inbuilt f
 plot(out.w, main = "Estimated Weighted ATT")
 ```
 
-## Effect heterogeneity
-
-We provide several methods for researchers to explore heterogeneous treatment effects (HTE). These work with any method; here we demonstrate with the FE estimator.
-
-### Box plots
-
-One way to understand HTE is to use a series of box plots to visualize the estimated individualistic treatment effects of observations under the treatment condition (by setting `type = "box"`). Although these effects are not identified at the individual observation level, their level of dispersion is informative of treatment effects heterogeneity at different (relative) time periods, as well as model performance.
-
-```{r hte, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = "box", xlim = c(-15, 10))
-```
-
-### CATT by calendar time
-
-Another way to explore HTE is to investigate how the treatment effect evolves over time. In the plot below, the point estimates represents the ATTs by calendar time; the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively; and the red horizontal dashed line represents the ATT (averaged over all time periods).
-
-```{r hte_time, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = "calendar", xlim = c(1, 35))
-```
-
-### CATT by a covariate
-
-By setting `type = "hte"` or `type = "heterogeneous`, we can also plot the HTE by arbitrary covariates that are unaffected by the treatment. As before, the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively. The red dashed line represents the ATT. The histogram at the bottom of the figure illustrates the distribution of the covariates, and can be turned off using `show.count = FALSE`. In our simulated case, the effect size is unrelated to the values of covariate `X1`.
-
-```{r hte_X1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = "hte", covariate = "X1")
-```
-
-We can also plot the CATT when a covariate is discrete. To demonstrate this, we artificially create a moderating variable `X3`, which must be included in the outcome model and then specified in the heterogeneous treatment effect plot.
-
-```{r hte_discrete, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-simdata1$X3 <- sample(1:3, size = nrow(simdata1), replace = TRUE)
-out.fect.X3 <- fect(Y ~ D + X1 + X2 + X3, data = simdata1, index = c("id","time"),
-                   method = "fe", se = TRUE, seed = 123,
-                   cores = 8, nboots = 1000, parallel = TRUE)
-```
-
-As expected, there is not much effect heterogeneity along `X3`. In the resulting figure, we can also assign labels to the discrete values in the moderator.
-
-```{r, fig.width = 6, fig.height = 4.5}
-plot(out.fect.X3, type="hte", covariate = "X3",
-     xlab = "", ylab = "Effet of D on Y",
-     covariate.labels = c("USA", "China", "UK"),
-     ylim = c(-2, 6))
-```
-
-Our next update will accommodate time-invariant covariates and allow users to explore effect heterogeneity around them.
-
-------------------------------------------------------------------------
-
-### Quick diagnostic check
-
-Before proceeding to other estimation methods, we verify the FE model passes basic pre-trend checks. The equivalence plot shows whether pretreatment ATT estimates are close to zero:
-
-```{r fect_quick_equiv, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = "equiv", ylim = c(-4,4),
-     cex.legend = 0.6, main = "Testing Pre-Trend (FEct)", cex.text = 0.8)
-```
-
-For diagnostic tests including placebo, carryover, equivalence tests, and cumulative treatment effects, see [Chapter @sec-diagnostics].
-
-------------------------------------------------------------------------
-
-## Other estimators
-
-The counterfacutal/imputation estimator framework can be extended to more settings.
-
-**Complex Fixed Effects.** When there exist more dimensions of fixed effects in addition to the unit and time fixed effects, we can resort to the **"cfe"** (complex fixed effects) estimator to impute the counterfactual based on a linear model with multiple levels of fixed effects. The CFE method also supports time-invariant covariates with time-varying coefficients (`Z`/`gamma`), unit-specific loadings on known time trends (`Q`/`kappa` or `Q.type`), and interactive fixed effects (`r`). For a detailed tutorial, see [Chapter @sec-cfe].
-
-Note, **fect** allows the method to run without requiring a baseline two-way fixed effects model. That is, users do not need to set `force = "two-way"` to impute.
-
-Additional additive fixed effects are specified via the `index` argument (elements beyond the first two). For example, we can estimate a model with an additional fixed effect **FE3** along with a unit-specific time trend via `Q.type`:
-
-```{r simdata_cfe, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide', fig.width = 6, fig.height = 4.5}
-simdata1[,"FE3"] <- sample(c(1,2,3,4,5), size = dim(simdata1)[1], replace = TRUE)
-out.cfe <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time","FE3"),
-  method = "cfe", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200,
-  Q.type = "linear")
-plot(out.cfe)
-```
-
-------------------------------------------------------------------------
-
-## Other options
-
-We provide a few other options for estimation and visualization.
-
-### More visualization options
-
-The `plot` function shipped in **fect** offers some options that help to improve the visualization.
-
-We can remove the bar plot at the bottom of the plot by setting `show.count = FALSE`
-
-```{r bar_0, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, show.count = FALSE)
-```
-
-By setting the option `type = "counterfactual"`, we visualize the period-wise average treated and counterfactual outcomes with shaded confidence intervals.
-
-```{r point_1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = "counterfactual")
-```
-
-By setting the option `type = "status"`, we can visualize the treatment status of all observations. We only present the label of the time by setting `axis.lab = "time"`.
-
-```{r status_0, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = 'status', axis.lab = "time", cex.axis  = 0.6)
-```
-
-For more visualization options including placebo/carryover status plots, see [Chapter @sec-diagnostics] and [Chapter @sec-plots].
-
 ### Average cohort treatment effect
 
 **fect** allows us to estimate and visualize the ATTs for sub-groups of treated units. For example, it can draw the gap plot for units that adopt the treatment at the same time under staggered adoption, which is defined as "Cohort" in Sun & Abraham (2021). Our simulated dataset is not ideal to demonstrate this functionality because the treatment switches on and off. To improve feasibility, we define a cohort as a group of treated units that first adopt the treatment at the same time.
 
 ```{r simdata_panelview_cohort, fig.width = 6, fig.height = 4.5}
 panelview(Y ~ D, data = simdata1, index = c("id","time"), by.timing = TRUE,
-  axis.lab = "time", xlab = "Time", ylab = "Unit", 
+  axis.lab = "time", xlab = "Time", ylab = "Unit",
   background = "white", main = "Simulated Data: Treatment Status")
 ```
 

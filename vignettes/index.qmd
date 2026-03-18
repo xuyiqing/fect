@@ -92,11 +92,8 @@ The user guide is structured into the following chapters:
 -   [Chapter @sec-cfe]\
     The complex fixed effects (CFE) estimator: multi-level fixed effects, time-invariant covariates with time-varying coefficients, unit-specific time trends, and interactive fixed effects.
 
--   [Chapter @sec-diagnostics]\
-    Diagnostic tests: placebo, pre-trend (F test and equivalence), leave-one-out, carryover, and cumulative effects.
-
--   [Chapter @sec-model-selection]\
-    Cross-validation framework, the `cv.method` parameter, scoring criteria, and post-hoc model comparison via `fect_mspe()`.
+-   [Chapter @sec-hte]\
+    Effect heterogeneity: box plots, calendar-time trends, and covariate-based HTE.
 
 -   [Chapter @sec-plots]\
     Plotting options and customization.

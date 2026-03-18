@@ -21,6 +21,12 @@ In the process, we will present a recommended pipeline for analyzing panel data,
 
 We illustrate these methods with two empirical examples: @HH2019 (without treatment reversals) and @GS2020 (with treatment reversals).
 
+::: {.callout-note appearance="simple"}
+## macOS Users
+
+Some packages in this chapter (e.g., `DIDmultiplegtDYN`) depend on `rgl`, which requires an X11 system. If you encounter graphics-related errors, install [XQuartz](https://www.xquartz.org/), the X11 implementation for macOS, then restart R.
+:::
+
 ## Install Packages
 
 To begin, you will need to install the necessary packages from CRAN and GitHub.
@@ -60,7 +66,8 @@ library(didimputation)
 library(doParallel)
 library(HonestDiD)
 library(HonestDiDFEct)
-library(DIDmultiplegtDYN) # may require XQuartz 
+library(polars)
+library(DIDmultiplegtDYN) # requires polars; may require XQuartz for rgl
 ```
 
 ## No Treatment Reversals

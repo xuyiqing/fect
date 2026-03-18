@@ -1,10 +1,10 @@
 # Handoff: factors.from Refactoring (REQ-factors-from-001)
 
 ## Date
-2026-03-17 (updated)
+2026-03-17 (updated — book cleanup run)
 
 ## Status
-All phases COMPLETE and PUSHED to `cfe`. CFE convergence conditioning done (component-wise + denominator safety + stop-burnin). 565/565 tests pass (215 score-unify + 44 utility + 98 book-claims + 77 factors-from + 131 others). Quarto book restructured: 13 chapters, all render. Phase 2 (new content for model-selection chapter, factors.from deep dive) pending.
+All phases COMPLETE and PUSHED to `cfe`. Book restructure done: 13 chapters consolidated to 12. Diagnostics (old Ch5) dissolved into method chapters. Model Selection (old Ch6) dissolved into method chapters. Effect Heterogeneity promoted to standalone Ch5. esplot() cex multiplier reverted. simdata1/simdata2 registered as package data. 590/590 tests pass (FAIL 0 | WARN 740 | SKIP 0 | PASS 590). Quarto book: 12 chapters, all render, no orphaned files.
 
 ---
 
@@ -39,7 +39,7 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 - **Repo**: xuyiqing/fect
 - **Branch**: `cfe`
 - **Local path**: `~/GitHub/fect`
-- **HEAD**: `cea6966`
+- **HEAD**: `4b5f443` (post book-cleanup builder work; pre-commit)
 
 ### Commit history (oldest → newest)
 | Commit | Description |
@@ -67,12 +67,14 @@ Added `factors.from` and `em` parameters to the `fect` R package, rerouted `ife+
 | `caa456f` | refactor: unify CV scoring with shared .score_residuals() |
 | `eac0187` | refactor: unify cv.method parameter across CV functions (Phase 2) |
 | `cea6966` | feat: cv.sample k-fold CV + parallel support in fect_nevertreated |
+| `4b5f443` | feat: plot pre/post colors, esplot harmonization, book restructure, simdata split |
+| (pending) | docs: book restructure — 13→12 chapters, dissolve diagnostics/model-selection, promote HTE (REQ-book-cleanup) |
 
 ---
 
 ## Test results
 
-**259/259 tests pass** (215 in `test-score-unify.R` + 44 in `test-utility-functions.R`; 77 in `test-factors-from-refactor.R` are CRAN-guarded/skipped)
+**590/590 tests pass** (FAIL 0 | WARN 740 | SKIP 0 | PASS 590). Includes 215 score-unify + 44 utility + 98 book-claims + 77 factors-from + 131 others + 25 additional. Warnings are upstream: ggplot2 `size` deprecation, HonestDiDFEct NaN.
 
 ---
 
@@ -129,16 +131,14 @@ Fixed in `c2db08c`: force `CV=FALSE`, `se=FALSE`, and `r=r.cv` when re-fitting m
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). 590/590 tests pass. All code work complete. Currently in Quarto book restructure — user is reviewing.
+> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). 590/590 tests pass. Book restructure complete.
 >
 > **Key architecture**: `.estimate_co()` wrapper dispatches to `inter_fe`/`inter_fe_ub` (IFE) or `complex_fe_ub` (CFE). Component-wise convergence applied to both IFE and CFE paths. Default parallel cores capped at 8 with boxed runtime message.
 >
-> **Plot refactor**: Gap plots now distinguish pre-treatment (gray, dashed in connected mode) from post-treatment (black, solid). New params `pre.color`/`post.color` in both `esplot()` and `plot.fect()`. `esplot()` accepts fect objects directly. Defaults harmonized between the two functions.
+> **Plot refactor**: Gap plots now distinguish pre-treatment (gray, dashed in connected mode) from post-treatment (black, solid). New params `pre.color`/`post.color` in both `esplot()` and `plot.fect()`. `esplot()` accepts fect objects directly. Defaults harmonized between the two functions. esplot() cex values are raw pt; plot.fect() applies its own multiplier before calling esplot().
 >
-> **Quarto book**: 13 chapters, all render. Restructured: Ch2 (FE/imputation, uses `simdata1`), Ch3 (IFE/MC, uses `simdata2`), Ch4 (CFE), Ch5 (diagnostics), Ch6 (model selection — new, full chapter), Ch7 (plots), Ch8 (gsynth + CFE nevertreated). Nevertreated content removed from Ch2-4. New datasets: `simdata1` (parallel trends), `simdata2` (with factors, = original `simdata`).
+> **Quarto book**: 12 chapters, all render. Structure: 01-start, 02-fect (The Imputation Estimator), 03-ife-mc (Low-Rank Factor Methods), 04-cfe (Complex Fixed Effects), 05-hte (Effect Heterogeneity), 06-plots (Plot Options), 07-gsynth (Gsynth Program), 08-panel (Modern DID Methods), 09-sens (Sensitivity Analysis), aa-cheatsheet, references. R scripts in `rscript/`: 8 scripts (02-09). Diagnostics dissolved into method chapters (Ch2, Ch3, Ch4). Model Selection dissolved into method chapters (Ch3, Ch4, Ch6). HTE promoted from Ch2 section to standalone Ch5. simdata1/simdata2 registered as package data.
 >
-> **Uncommitted changes**: Everything from today's session. Includes: cfe_sub.cpp convergence fix (already pushed as `7b33c98`), test-book-claims.R (pushed as `7418aa0`), plus plot refactor, core cap, boxed message, all Quarto changes, simdata1/simdata2. Old chapter files (03-plots, 04-gsynth, 05-panel, 06-sens, 07-cfe) still exist — delete after user confirms.
+> **Next steps**: Commit book restructure changes and push to cfe. Quarto book render to confirm all chapters build cleanly.
 >
-> **Next steps**: User manual review of rendered book (Phase 3). User may have more Quarto instructions. Commit and push when ready.
->
-> Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context. See `log/update-20260317.md` for today's session.
+> Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context. See `log/2026-03-17-book-restructure.md` for latest run.

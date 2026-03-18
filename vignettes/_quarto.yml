@@ -6,18 +6,18 @@ book:
   sidebar:
     style: docked
     background: light
+    collapse-level: 3
   chapters:
     - index.qmd
     - 01-start.Rmd
     - 02-fect.Rmd
     - 03-ife-mc.Rmd
     - 04-cfe.Rmd
-    - 05-diagnostics.Rmd
-    - 06-model-selection.Rmd
-    - 07-plots.Rmd
-    - 08-gsynth.Rmd
-    - 09-panel.Rmd
-    - 10-sens.Rmd
+    - 05-hte.Rmd
+    - 06-plots.Rmd
+    - 07-gsynth.Rmd
+    - 08-panel.Rmd
+    - 09-sens.Rmd
     - aa-cheatsheet.Rmd
     - references.qmd
 
