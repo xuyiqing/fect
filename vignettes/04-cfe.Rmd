@@ -328,13 +328,13 @@ After fitting multiple models, `fect_mspe()` provides a unified framework for co
 
 ```{r cfe_mspe, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 # Fit two CFE variants for comparison
-out.cfe.lin <- fect(Y ~ D + X1 + X2, data = simdata2,
+out.cfe.lin <- fect(Y ~ D + X1 + X2, data = simdata,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
   Q.type = "linear",
   se = FALSE)
 
-out.cfe.quad <- fect(Y ~ D + X1 + X2, data = simdata2,
+out.cfe.quad <- fect(Y ~ D + X1 + X2, data = simdata,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
   Q.type = c("linear", "quadratic"),

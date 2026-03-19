@@ -69,10 +69,8 @@ ls()
 
 The package includes two simulated panel datasets with 200 units, 35 time periods, and treatment that switches on and off. Both share the same unit fixed effects, time fixed effects, covariates, treatment assignment, and error structure. They differ only in whether latent factors are present:
 
--   `simdata1`: The parallel trends assumption holds. The outcome is generated from a standard two-way fixed effects model ($Y_{it} = \alpha_i + \xi_t + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \tau_{it} D_{it} + \epsilon_{it}$) with no interactive fixed effects. Used in [Chapter @sec-fect] to demonstrate the imputation estimator.
--   `simdata2`: The outcome includes two latent factors ($r = 2$), so that the parallel trends assumption is violated and the FE estimator is biased. Used in [Chapter @sec-ife-mc] to demonstrate factor-augmented approaches. This is equivalent to the original `simdata` from @LWX2022.
-
-For backward compatibility, `simdata` remains available and is identical to `simdata2`.
+-   `simdata`: The main simulated dataset from @LWX2022. The outcome includes two latent factors ($r = 2$), so that the parallel trends assumption is violated and the FE estimator is biased. Used in [Chapter @sec-ife-mc] and [Chapter @sec-cfe] to demonstrate factor-augmented approaches.
+-   `simdata1`: A simplified version of `simdata` in which the latent factors are removed. The parallel trends assumption holds, and the outcome follows a standard two-way fixed effects model ($Y_{it} = \alpha_i + \xi_t + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \tau_{it} D_{it} + \epsilon_{it}$). Used in [Chapter @sec-fect] to demonstrate the imputation estimator.
 
 ### Empirical datasets
 

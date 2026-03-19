@@ -69,36 +69,14 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
 
 In the gap plot, pre-treatment estimates appear in gray while post-treatment estimates appear in black. This visual distinction highlights that pre-treatment "effects" should be near zero if the model is well-specified, while post-treatment effects are the quantities of interest. The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power. See [Chapter @sec-plots] for more visualization options.
 
-### Save estimates
+### Inferences
 
-Users can use the `print` function to view a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. Specifically, `est.avg` and `est.avg.unit` show the ATT averaged over all periods -- the former weights each treated observation equally while the latter weights each treated unit equally. `beta` reports the coefficients of the time-varying covariates. `est.att` reports the average treatment effect on the treated (ATT) by period.
-
-```{r}
-print(out.fect)
-```
-
-To save space, results are not shown here.
-
-```{r eval = FALSE}
-out.fect$est.att
-out.fect$est.avg
-out.fect$beta
-```
-
-------------------------------------------------------------------------
-
-## Visualization and diagnostics
-
-Once we have point estimates, we typically want uncertainty estimates and diagnostic checks before interpreting results. This section covers inference, pre-trend diagnostics, and the leave-one-out approach.
+The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
 
 ::: {.callout-tip appearance="simple"}
 ### Inference parameters
 The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These do not affect point estimates.
 :::
-
-### Inference
-
-The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
 
 ::: {.callout-note appearance="simple"}
 **Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
@@ -125,9 +103,47 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")
 ```
 
-### Diagnostics
+### Exiting the treatment
 
-A basic sanity check is the placebo test: remove some pre-treatment periods from estimation and verify the model does not find spurious effects there.
+**fect** allows the treatment to switch back and forth and provides diagnostic tools for this setting. After the estimation, we can visualize the period-wise ATTs relative to the `exit` of treatments by setting `type = "exit"`. The x-axis is then realigned based on the timing of the treatment's exit, not onset, e.g., 1 represents 1 period after the treatment ends.
+
+```{r exit_fect, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+plot(out.fect, type = "exit", ylim = c(-2.5,4.5), main = "Exit Plot (FEct)")
+```
+
+### Save estimates
+
+Users can use the `print` function to view a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. Specifically, `est.avg` and `est.avg.unit` show the ATT averaged over all periods -- the former weights each treated observation equally while the latter weights each treated unit equally. `beta` reports the coefficients of the time-varying covariates. `est.att` reports the average treatment effect on the treated (ATT) by period.
+
+```{r}
+print(out.fect)
+```
+
+To save space, results are not shown here.
+
+```{r eval = FALSE}
+out.fect$est.att
+out.fect$est.avg
+out.fect$beta
+```
+
+After estimation with `se = TRUE`, bootstrap treatment effect estimates from each run are stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs). Standard errors for the period-wise ATTs are available in the output object alongside the point estimates.
+
+```{r eval = FALSE}
+out.fect$eff.boot
+```
+
+For IFE and MC methods, see [Chapter @sec-ife-mc].
+
+------------------------------------------------------------------------
+
+## Diagnostics
+
+Once we have point estimates and uncertainty estimates, we conduct diagnostic checks before interpreting results. This section covers the placebo test, the carryover test, and the leave-one-out approach.
+
+### Placebo test
+
+We provide a placebo test for a settled model by setting `placeboTest = TRUE`. We specify a range of pretreatment periods as "placebo periods" in option `placebo.period` to remove observations in the specified range for model fitting, and then test whether the estimated ATT in this range is significantly different from zero. Below, we set `c(-2, 0)` as the placebo periods.
 
 ```{r fect_placebo, eval=TRUE, cache=TRUE, message=FALSE, results='hide', fig.width=6, fig.height=4.5}
 out.fect.placebo <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
@@ -137,7 +153,26 @@ out.fect.placebo <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"
 plot(out.fect.placebo, cex.text = 0.8)
 ```
 
-Similarly, the carryover test checks whether treatment effects persist after treatment ends. Both tests are covered in detail in [Chapter @sec-ife-mc].
+For more detail on placebo tests, including IFE and MC examples, see [Chapter @sec-ife-mc].
+
+### Carryover test
+
+The idea of the placebo test can be extended to testing the presence of carryover effects. Instead of hiding a few periods right before the treatment starts, we hide a few periods right after the treatment ends. If carryover effects do not exist, we would expect the average prediction error in those periods to be close to zero.
+
+To perform the carryover test, we set `carryoverTest = TRUE` and specify the range of exit-treatment periods in `carryover.period`. Below, we set `carryover.period = c(1, 3)`. Since `simdata1` is simulated without carryover effects, we expect the test to pass.
+
+```{r fect_carryover, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
+out.fect.carry <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+  force = "two-way", method = "fe",
+  se = TRUE, cores = 8, nboots = 200, parallel = TRUE,
+  carryoverTest = TRUE, carryover.period = c(1, 3))
+```
+
+```{r fect_carryover_plot, eval=TRUE, cache=TRUE, warning=FALSE, fig.width=6, fig.height=4.5}
+plot(out.fect.carry, type = "exit", cex.text = 0.8, main = "Carryover Effects (FEct)")
+```
+
+For more detail on carryover tests with IFE and MC, see [Chapter @sec-ife-mc].
 
 ### Leave-one-out approach
 
@@ -164,15 +199,63 @@ plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO",
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
 ```
 
-### Save estimates
+------------------------------------------------------------------------
 
-After estimation with `se = TRUE`, bootstrap treatment effect estimates from each run are stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs). Standard errors for the period-wise ATTs are available in the output object alongside the point estimates.
+## Cumulative effects
 
-```{r eval = FALSE}
-out.fect$eff.boot
+Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
+
+::: {.callout-note appearance="simple"}
+The example below uses `method = "ife"` with `factors.from = "nevertreated"`, which is equivalent to `method = "gsynth"` (see [Chapter @sec-gsynth]). We use the explicit form here for clarity.
+:::
+
+```{r cumu_effect, cache = TRUE}
+out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "ife", factors.from = "nevertreated",
+                        force = "two-way", CV = TRUE, r = c(0, 5),
+                        se = TRUE, nboots = 200, vartype = 'bootstrap',
+                        parallel = FALSE, keep.sims=TRUE)
+cumu.out <- effect(out)
 ```
 
-For IFE and MC methods, see [Chapter @sec-ife-mc].
+Print and plot cumulative effects
+
+```{r cumu_effect_plot, cache = TRUE}
+print(cumu.out)
+plot(cumu.out)
+```
+
+Users can choose to calculate by-period average effects by setting `cumu=FALSE`.
+
+```{r cumu_effect_byperiod, cache = TRUE}
+effect(out, cumu=FALSE)
+```
+
+Calculate the cumulative effect of certain units at certain periods.
+
+```{r cumu_effect_subset, cache = TRUE}
+effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
+```
+
+`effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
+
+```{r effect-mc, cache = TRUE}
+out_mc <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
+                        se = TRUE, nboots = 200, vartype = 'bootstrap',
+                        parallel = FALSE, keep.sims=TRUE)
+plot(effect(out_mc))
+```
+
+We can also use jackknife instead of bootstrap for inference:
+
+```{r effect-jackknife, cache = TRUE}
+out_jack <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
+                        se = TRUE, nboots = 200, vartype = 'jackknife',
+                        parallel = FALSE, keep.sims=TRUE)
+plot(effect(out_jack))
+```
 
 ------------------------------------------------------------------------
 
@@ -201,23 +284,6 @@ The usual plotting options can be used to adjust the balanced plot as well.
 ```{r fig.width = 6, fig.height = 4.5}
 plot(out.bal, main = "Estimated ATT (Balanced Sample)",
   color = "red", count.color = "blue")
-```
-
-### User-supplied weights
-
-The package offers the option `W` to calculate the weighted average treatment effects. The weighting variable does not affect the estimation of fixed effects or factors. Only the weighted average treatment effects or weighted dynamic treatment effects are obtained by aggregating the treatment effects using the weight `W`.
-
-```{r simdata_w, eval=TRUE, cache = TRUE}
-simdata1$Weight <- abs(rnorm(n = dim(simdata1)[1]))
-out.w <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
-  force = "two-way", method = "ife", W = 'Weight',
-  CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
-```
-
-We can then visualize the weighted dynamic treatment effects using the inbuilt function `plot`, it by default shows the weighted dynamic treatment effects.
-
-```{r fig.width = 6, fig.height = 4.5}
-plot(out.w, main = "Estimated Weighted ATT")
 ```
 
 ### Average cohort treatment effect
@@ -259,6 +325,23 @@ Then one can draw the gap plot for each sub-group. Here we present the gap plot 
 ```{r cohort_plot1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.fe.g, show.group = "Cohort:22",
           xlim = c(-15, 10), ylim = c(-10, 10))
+```
+
+### User-supplied weights
+
+The package offers the option `W` to calculate the weighted average treatment effects. The weighting variable does not affect the estimation of fixed effects or factors. Only the weighted average treatment effects or weighted dynamic treatment effects are obtained by aggregating the treatment effects using the weight `W`.
+
+```{r simdata_w, eval=TRUE, cache = TRUE}
+simdata1$Weight <- abs(rnorm(n = dim(simdata1)[1]))
+out.w <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+  force = "two-way", method = "ife", W = 'Weight',
+  CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
+```
+
+We can then visualize the weighted dynamic treatment effects using the inbuilt function `plot`, it by default shows the weighted dynamic treatment effects.
+
+```{r fig.width = 6, fig.height = 4.5}
+plot(out.w, main = "Estimated Weighted ATT")
 ```
 
 ------------------------------------------------------------------------

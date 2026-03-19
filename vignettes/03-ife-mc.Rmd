@@ -1,4 +1,4 @@
-# Low-Rank Factor Methods {#sec-ife-mc}
+# Factor-Based Methods {#sec-ife-mc}
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 set.seed(1234)
@@ -8,20 +8,18 @@ data(fect)
 
 When the parallel trends assumption is violated due to latent common factors with heterogeneous loadings, the FE estimator from [Chapter @sec-fect] is biased. This chapter introduces two methods that account for such latent factors: the **interactive fixed effects** (IFE) method, which explicitly models unit-specific factor loadings, and the **matrix completion** (MC) method, which uses nuclear-norm regularization to recover the low-rank structure of the untreated potential outcomes.
 
-We use `simdata2`, which includes two latent factors ($r = 2$). The FE estimator is biased on this dataset, while IFE and MC recover the correct ATT.
+We use `simdata`, which includes two latent factors ($r = 2$). The FE estimator is biased on this dataset, while IFE and MC recover the correct ATT.
 
 ## Interactive fixed effects
 
 In addition to FEct, **fect** supports the interactive fixed effects counterfactual (IFEct) method proposed by @Gobillon2016 and @Xu2017 and the matrix completion (MC) method proposed by @Athey2021---`method = "ife"` and `method = "mc"`, respectively. The EM algorithm is used to impute the counterfactuals of treated observations.
-
-### IFE
 
 For the IFE approach, we need to specify the number of factors using option `r`. By default, the algorithm will select an optimal hyper-parameter via a built-in cross-validation procedure (see the Cross-validation section below).
 
 We specify an interval of candidate number of unobserved factors in option `r` like `r=c(0,5)`. When cross-validation is switched off, the first element in `r` will be set as the number of factors. Below we use the MSPE criterion and search the number of factors from 0 to 5.
 
 ```{r simdata_ife, eval=TRUE, cache = TRUE}
-out.ife <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id","time"),
+out.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
           force = "two-way", method = "ife", CV = TRUE, r = c(0, 5),
           se = TRUE, cores = 8, nboots = 1000, parallel = TRUE)
 print(out.ife)
@@ -33,12 +31,14 @@ The figure below shows the estimated ATT using the IFE method. The cross-validat
 plot(out.ife, main = "Estimated ATT (IFEct)")
 ```
 
-### MC
+------------------------------------------------------------------------
+
+## Matrix completion
 
 For the MC method, we need to specify the tuning parameter in the penalty term using option `lambda`. If users don't have any prior knowledge to set candidate tuning parameters, a number of candidate tuning parameters can be generated automatically based on the information from the outcome variable. We specify the number in option `nlambda`, e.g. `nlambda = 10`.
 
 ```{r simdata_mc, eval=TRUE, cache = TRUE}
-out.mc <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id","time"),
+out.mc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
           force = "two-way", method = "mc", CV = TRUE,
           se = TRUE, cores = 8, nboots = 1000, parallel = TRUE)
 
@@ -167,12 +167,12 @@ We provide three types of diagnostic tests: (1) a placebo test, (2) a test for (
 We provide a placebo test for a settled model---hence, cross-validation is not allowed---by setting `placeboTest = TRUE`. We specify a range of pretreatment periods as "placebo periods" in option `placebo.period` to remove observations in the specified range for model fitting, and then test whether the estimated ATT in this range is significantly different from zero. Below, we set `c(-2, 0)` as the placebo periods.
 
 ```{r placebo_ife, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
-out.ife.p <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id", "time"),
+out.ife.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife",  r = 2, CV = 0,
   parallel = TRUE, se = TRUE,
   nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))
 
-out.mc.p <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id", "time"),
+out.mc.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "mc",  lambda = out.mc$lambda.cv,
   CV = 0, parallel = TRUE, se = TRUE,
   nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))
@@ -198,7 +198,30 @@ plot(out.mc.p, cex.text = 0.8, stats = c("placebo.p","equiv.p"),
 
 The results in the placebo test confirm that IFEct is a better model than MC for this particular DGP.
 
-### Tests for (no) pre-trend
+### LOO pre-trend test {#loo-pre-trend-test}
+
+Instead of using estimated ATTs for periods prior to the treatment to test for pre-trends, we recommend users employ a leave-one-out (LOO) approach (`loo = TRUE`) to consecutively hide one pretreatment period (relative to the timing of the treatment) and repeatedly estimate the pseudo treatment effects for that pretreatment period. The LOO approach can be understood as an extension of the placebo test. It has the benefit of providing users with a more holistic view of whether the identifying assumptions likely hold. However, as the program needs to conduct uncertainty estimates for each turn, it is much more time-consuming than the original one.
+
+```{r simdata_ife_loo, eval=FALSE, cache = TRUE, message = FALSE, results = 'hide'}
+out.ife.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+  method = "ife", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200, loo = TRUE)
+out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+  method = "mc", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200, loo = TRUE)
+```
+
+After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the `plot` function.
+
+```{r pretrend_loo_ife, eval = FALSE, cache = TRUE, fig.width = 6, fig.height = 4.5}
+plot(out.ife.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
+     cex.legend = 0.6, main = "Testing Pre-Trend LOO (IFEct)", cex.text = 0.8)
+
+plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
+     cex.legend = 0.6, main = "Testing Pre-Trend LOO (MC)", cex.text = 0.8)
+```
+
+Note that the LOO test usually takes lots of computational power. For our example, we find that the IFE estimator still passes both the F test and the equivalence test based on its LOO pre-trends, while the MC estimator fails both tests.
+
+### Equivalence test
 
 We introduce two statistical tests for the presence of a pre-trend (or the lack thereof). The first test is an $F$ test for zero residual averages in the pretreatment periods. The second test is a two-one-sided $t$ (TOST) test, a type of equivalence tests.
 
@@ -222,54 +245,19 @@ plot(out.mc, type = "equiv", ylim = c(-4,4),
 
 From the above plots, we see that IFEct passes both tests using a conventional test size (5%); and MC fails the F tests, but passes the TOST (equivalence) test. Hence, we may conclude that IFEct is a more suitable model.
 
-### LOO pre-trend test {#loo-pre-trend-test}
-
-Instead of using estimated ATTs for periods prior to the treatment to test for pre-trends, we recommend users employ a leave-one-out (LOO) approach (`loo = TRUE`) to consecutively hide one pretreatment period (relative to the timing of the treatment) and repeatedly estimate the pseudo treatment effects for that pretreatment period. The LOO approach can be understood as an extension of the placebo test. It has the benefit of providing users with a more holistic view of whether the identifying assumptions likely hold. However, as the program needs to conduct uncertainty estimates for each turn, it is much more time-consuming than the original one.
-
-```{r simdata_ife_loo, eval=FALSE, cache = TRUE, message = FALSE, results = 'hide'}
-out.ife.loo <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id","time"),
-  method = "ife", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200, loo = TRUE)
-out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id","time"),
-  method = "mc", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200, loo = TRUE)
-```
-
-After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the `plot` function.
-
-```{r pretrend_loo_ife, eval = FALSE, cache = TRUE, fig.width = 6, fig.height = 4.5}
-plot(out.ife.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
-     cex.legend = 0.6, main = "Testing Pre-Trend LOO (IFEct)", cex.text = 0.8)
-
-plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
-     cex.legend = 0.6, main = "Testing Pre-Trend LOO (MC)", cex.text = 0.8)
-```
-
-Note that the LOO test usually takes lots of computational power. For our example, we find that the IFE estimator still passes both the F test and the equivalence test based on its LOO pre-trends, while the MC estimator fails both tests.
-
-### Exiting the treatment
-
-**fect** allows the treatment to switch back and forth and provides diagnostic tools for this setting. After the estimation, we can visualize the period-wise ATTs relative to the `exit` of treatments by setting `type = "exit"` (one can still draw the classic gap plot by setting `type = "gap"`). The x-axis is then realigned based on the timing of the treatment's exit, not onset, e.g., 1 represents 1 period after the treatment ends.
-
-```{r exit_ife, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.ife, type = "exit", ylim = c(-2.5,4.5), main = "Exit Plot (IFE)")
-```
-
-```{r exit_mc, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.mc, type = "exit", ylim = c(-2.5,4.5), main = "Exit Plot (MC)")
-```
-
 ### Tests for (no) carryover effects
 
 The idea of the placebo test can be extended to testing the presence of carryover effects. Instead of hiding a few periods right before the treatment starts, we hide a few periods right after the treatment ends. If carryover effects do not exist, we would expect the average prediction error in those periods to be close to zero. To perform the carryover test, we set the option `carryoverTest = TRUE`. We can treat a range of exit-treatment periods in option `carryover.period` to remove observations in the specified range for model fitting, and then test whether the estimated ATT in this range is significantly different from zero.
 
-Below, we set `carryover.period = c(1, 3)`. As we deduct the treatment effect from the outcome in `simdata2`, we expect the average prediction error for these removed periods to be close to zero.
+Below, we set `carryover.period = c(1, 3)`. As we deduct the treatment effect from the outcome in `simdata`, we expect the average prediction error for these removed periods to be close to zero.
 
 ```{r carryover_ife, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
-out.ife.c <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id", "time"),
+out.ife.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife", r = 2, CV = 0,
   parallel = TRUE, se = TRUE,
   nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
 
-out.mc.c <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id", "time"),
+out.mc.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "mc",  lambda = out.mc$lambda.cv,
   CV = 0, parallel = TRUE, se = TRUE,
   nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
@@ -289,10 +277,10 @@ plot(out.mc.c, type = "exit", ylim = c(-2.5,4.5),
 
 Once again, the IFE estimator outperforms the other two.
 
-Using real-world data, researchers will likely find that carryover effects exist. If such effects are limited, researchers can consider removing a few periods after the treatment ended for the treated units from the first-stage estimation (using the `carryover.period` option) and re-estimated the model (and re-conduct the test). We provide such an example in the paper. Here, we illustrate the option using `simdata2`.
+Using real-world data, researchers will likely find that carryover effects exist. If such effects are limited, researchers can consider removing a few periods after the treatment ended for the treated units from the first-stage estimation (using the `carryover.period` option) and re-estimated the model (and re-conduct the test). We provide such an example in the paper. Here, we illustrate the option using `simdata`.
 
 ```{r carryover_rm, eval = TRUE, cache = TRUE, message = FALSE, results='hide', fig.width = 6, fig.height = 4.5}
-out.ife.rm.test <- fect(Y ~ D + X1 + X2, data = simdata2, index = c("id", "time"),
+out.ife.rm.test <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife", r = 2, CV = 0,
   parallel = TRUE, se = TRUE,  carryover.rm = 3,
   nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))# remove three periods
@@ -302,60 +290,3 @@ plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(5, 2))
 
 In the above plot, the three periods in blue are droppred from the first-stage estimation of the factor model while the periods in red are reserved for the (no) carryover effects test.
 
-------------------------------------------------------------------------
-
-## Cumulative effects
-
-Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. - Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
-
-::: {.callout-note appearance="simple"}
-The example below uses `method = "ife"` with `factors.from = "nevertreated"`, which is equivalent to `method = "gsynth"` (see [Chapter @sec-gsynth]). We use the explicit form here for clarity.
-:::
-
-```{r cumu_effect, cache = TRUE}
-out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
-                        method = "ife", factors.from = "nevertreated",
-                        force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 200, vartype = 'bootstrap',
-                        parallel = FALSE, keep.sims=TRUE)
-cumu.out <- effect(out)
-```
-
-Print and plot cumulative effects
-
-```{r cumu_effect_plot, cache = TRUE}
-print(cumu.out)
-plot(cumu.out)
-```
-
-Users can choose to calculate by-period average effects by setting `cumu=FALSE`.
-
-```{r cumu_effect_byperiod, cache = TRUE}
-effect(out, cumu=FALSE)
-```
-
-Calculate the cumulative effect of certain units at certain periods.
-
-```{r cumu_effect_subset, cache = TRUE}
-effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
-```
-
-`effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
-
-```{r effect-mc, cache = TRUE}
-out_mc <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
-                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 200, vartype = 'bootstrap',
-                        parallel = FALSE, keep.sims=TRUE)
-plot(effect(out_mc))
-```
-
-We can also use jackknife instead of bootstrap for inference:
-
-```{r effect-jackknife, cache = TRUE}
-out_jack <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
-                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 200, vartype = 'jackknife',
-                        parallel = FALSE, keep.sims=TRUE)
-plot(effect(out_jack))
-```

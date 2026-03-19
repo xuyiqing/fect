@@ -6,7 +6,6 @@ book:
   sidebar:
     style: docked
     background: light
-    collapse-level: 3
   chapters:
     - index.qmd
     - 01-start.Rmd
@@ -20,6 +19,7 @@ book:
     - 09-sens.Rmd
     - aa-cheatsheet.Rmd
     - references.qmd
+    - bb-updates.Rmd
 
 bibliography: references.bib
 
@@ -34,9 +34,7 @@ format:
     code-fold: false
     code-tools: true
     code-link: true
-    toc: true
     toc-depth: 3
-    toc-expand: 2
 
 knitr:
   opts_chunk:

@@ -1,10 +1,10 @@
 # Handoff: factors.from Refactoring (REQ-factors-from-001)
 
 ## Date
-2026-03-17 (updated — book cleanup run)
+2026-03-18 (updated)
 
 ## Status
-All phases COMPLETE and PUSHED to `cfe`. Book restructure done: 13 chapters consolidated to 12. Diagnostics (old Ch5) dissolved into method chapters. Model Selection (old Ch6) dissolved into method chapters. Effect Heterogeneity promoted to standalone Ch5. esplot() cex multiplier reverted. simdata1/simdata2 registered as package data. 590/590 tests pass (FAIL 0 | WARN 740 | SKIP 0 | PASS 590). Quarto book: 12 chapters, all render, no orphaned files.
+All phases COMPLETE. Previous work PUSHED to `cfe`. New uncommitted changes from 2026-03-18: simdata2 removed, Ch2/Ch3 restructured, bb-updates chapter added. 13/13 Quarto chapters render. 590+ tests pass. See `log/update-20260318.md` for details.
 
 ---
 
@@ -131,14 +131,18 @@ Fixed in `c2db08c`: force `CV=FALSE`, `se=FALSE`, and `r=r.cv` when re-fitting m
 
 ## Context for new conversation
 
-> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). 590/590 tests pass. Book restructure complete.
+> I'm working on the fect R package (`~/GitHub/fect`, branch `cfe`). All code work complete. Book restructure complete. 13/13 chapters render.
 >
 > **Key architecture**: `.estimate_co()` wrapper dispatches to `inter_fe`/`inter_fe_ub` (IFE) or `complex_fe_ub` (CFE). Component-wise convergence applied to both IFE and CFE paths. Default parallel cores capped at 8 with boxed runtime message.
 >
-> **Plot refactor**: Gap plots now distinguish pre-treatment (gray, dashed in connected mode) from post-treatment (black, solid). New params `pre.color`/`post.color` in both `esplot()` and `plot.fect()`. `esplot()` accepts fect objects directly. Defaults harmonized between the two functions. esplot() cex values are raw pt; plot.fect() applies its own multiplier before calling esplot().
+> **Plot refactor**: Gap plots now distinguish pre-treatment (gray, dashed in connected mode) from post-treatment (black, solid). New params `pre.color`/`post.color` in both `esplot()` and `plot.fect()`. `esplot()` accepts fect objects directly. Defaults harmonized between the two functions.
 >
-> **Quarto book**: 12 chapters, all render. Structure: 01-start, 02-fect (The Imputation Estimator), 03-ife-mc (Low-Rank Factor Methods), 04-cfe (Complex Fixed Effects), 05-hte (Effect Heterogeneity), 06-plots (Plot Options), 07-gsynth (Gsynth Program), 08-panel (Modern DID Methods), 09-sens (Sensitivity Analysis), aa-cheatsheet, references. R scripts in `rscript/`: 8 scripts (02-09). Diagnostics dissolved into method chapters (Ch2, Ch3, Ch4). Model Selection dissolved into method chapters (Ch3, Ch4, Ch6). HTE promoted from Ch2 section to standalone Ch5. simdata1/simdata2 registered as package data.
+> **Quarto book**: 13 chapters, all render. Structure: 01-start, 02-fect (The Imputation Estimator), 03-ife-mc (Factor-Based Methods), 04-cfe (Complex Fixed Effects), 05-hte (Effect Heterogeneity), 06-plots (Plot Options), 07-gsynth (Gsynth Program), 08-panel (Modern DID Methods), 09-sens (Sensitivity Analysis), aa-cheatsheet, references, bb-updates (Update Log). `simdata2` removed — use `simdata` (with factors) and `simdata1` (no factors). Ch2 now includes: inferences, exit plot, carryover test, cumulative effects, diagnostics. Ch3 restructured: IFE, MC, cross-validation, diagnostics (placebo, LOO, equivalence test, carryover).
 >
-> **Next steps**: Commit book restructure changes and push to cfe. Quarto book render to confirm all chapters build cleanly.
+> **Uncommitted changes**: simdata2 removal, Ch2/Ch3 restructure, bb-updates chapter, index cleanup. See `log/update-20260318.md`.
 >
-> Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context. See `log/2026-03-17-book-restructure.md` for latest run.
+> **Open items**: Old chapter files (03-plots.Rmd, 04-gsynth.Rmd, 05-panel.Rmd, 06-sens.Rmd, 07-cfe.Rmd) may still exist from prior restructure — delete after user confirms. R scripts in `vignettes/rscript/` may need updating for Ch4–Ch9.
+>
+> **Push credentials**: Use openclaw-statsbot GitHub App (App ID 3069502, Installation ID 115716296). PEM at `~/Library/CloudStorage/Dropbox/openclaw/openclaw-statsbot.2026-03-11.private-key.pem`. Generate JWT → installation token → set remote URL with token → push → reset URL.
+>
+> Read `~/GitHub/fect/log/HANDOFF-factors-from.md` for full context. See `log/update-20260318.md` for latest session.
