@@ -1709,7 +1709,10 @@ fect_boot <- function(
           "fect_cfe",
           "get_term",
           "fect_nevertreated",
-          "initialFit"
+          "initialFit",
+          ".reconstruct_gamma_fit_tr",
+          ".reconstruct_kappa_fit",
+          ".extract_and_apply_typeB_fe"
         ),
         .packages = c("fect", "mvtnorm", "fixest")
       ) %dopar%
@@ -1727,10 +1730,13 @@ fect_boot <- function(
           .export = c(
             "fect_fe",
             "fect_mc",
-              "fect_cfe",
+            "fect_cfe",
             "get_term",
             "fect_nevertreated",
-            "initialFit"
+            "initialFit",
+            ".reconstruct_gamma_fit_tr",
+            ".reconstruct_kappa_fit",
+            ".extract_and_apply_typeB_fe"
           ),
           .packages = c("fect", "mvtnorm", "fixest"),
           .options.future = list(seed = TRUE)
