@@ -67,10 +67,16 @@ ls()
 
 ### Simulated datasets
 
-The package includes two simulated panel datasets with 200 units, 35 time periods, and treatment that switches on and off. Both share the same unit fixed effects, time fixed effects, covariates, treatment assignment, and error structure. They differ only in whether latent factors are present:
+The package includes two simulated panel datasets generated from the data-generating process (DGP) in @LWX2022. Both have $N = 200$ units and $T = 35$ time periods. Treatment switches on and off over time (99 of 150 treated units experience at least one reversal), reflecting a general treatment pattern rather than simple staggered adoption.
 
--   `simdata`: The main simulated dataset from @LWX2022. The outcome includes two latent factors ($r = 2$), so that the parallel trends assumption is violated and the FE estimator is biased. Used in [Chapter @sec-ife-mc] and [Chapter @sec-cfe] to demonstrate factor-augmented approaches.
--   `simdata1`: A simplified version of `simdata` in which the latent factors are removed. The parallel trends assumption holds, and the outcome follows a standard two-way fixed effects model ($Y_{it} = \alpha_i + \xi_t + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \tau_{it} D_{it} + \epsilon_{it}$). Used in [Chapter @sec-fect] to demonstrate the imputation estimator.
+The full DGP for `simdata` is:
+$$Y_{it} = \mu + 3\alpha_i + \xi_t + X_{1,it} + 3 X_{2,it} + \lambda_i' f_t + \tau_{it} D_{it} + \varepsilon_{it}$$
+where $\alpha_i \sim N(0,1)$ are unit fixed effects, $\xi_t$ follows an AR(1) process with drift (time fixed effects), $X_{1,it}$ and $X_{2,it} \sim N(0,1)$ are observed covariates with coefficients 1 and 3, $\lambda_i \in \mathbb{R}^2$ are unit-specific factor loadings drawn from $N(0.5, 1)$, $f_t \in \mathbb{R}^2$ are latent time factors (one trending, one white noise), and $\varepsilon_{it} \sim N(0,2)$. The treatment effect is heterogeneous: $\tau_{it} \sim N(0.4 \cdot \text{tr\_cum}_{it}/T,\; 0.2)$, where $\text{tr\_cum}_{it}$ counts cumulative treatment periods. Treatment assignment depends on the latent factors and fixed effects, creating confounding that violates parallel trends. The grand mean is $\mu = 5$.
+
+-   `simdata`: The main simulated dataset. The outcome includes two latent factors ($r = 2$), so the parallel trends assumption is violated and the FE estimator is biased. Used in [Chapter @sec-ife-mc] and [Chapter @sec-cfe] to demonstrate factor-augmented approaches.
+-   `simdata1`: A simplified version of `simdata` in which the latent factor contributions ($\lambda_i' f_t$) are removed from the outcome. The parallel trends assumption holds, and the FE estimator is consistent. Used in [Chapter @sec-fect] to demonstrate the imputation estimator. Treatment assignment, covariates, fixed effects, and errors are identical to `simdata`.
+
+The scripts that generate these datasets from the original @LWX2022 DGP code are in `data-raw/`.
 
 ### Empirical datasets
 

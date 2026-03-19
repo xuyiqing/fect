@@ -1,6 +1,6 @@
 # Welcome! {.unnumbered}
 
-This Quarto book serves as a user manual for the **fect** package in R, which implements counterfactual (imputation) estimators for causal inference with panel data and performs diagnostic tests.
+This Quarto book serves as a user manual for the **fect** package in R, which implements counterfactual (imputation) estimators for causal inference with panel data---without feedback---and performs diagnostic tests.
 
 **fect** covers a series of counterfactual estimators, including the five estimators from the last version and integrating the latest version of the **gsynth** package for the generalized synthetic control method (Gsynth). This Quarto book also facilitates the application of various new difference-in-differences (DID) estimators. For details of these methods, see
 
@@ -28,7 +28,7 @@ There are several reasons why you might consider using counterfactual estimators
 However, these counterfactual estimators come with important limitations:
 
 -   Most rely on some form of the parallel trends assumption or a low-rank structure.\
--   They generally do not accommodate dynamic treatment assignment based on sequential ignorability.\
+-   They generally do not accommodate dynamic treatment assignment given past outcomes or covariates---i.e., "feecback"---based on sequential ignorability.\
 -   Methods for continuous treatments are still underdeveloped and are not currently covered by **fect**.
 
 @CLLX2025 reanalyze 49 published studies in political science and offer justifications for adopting these estimators.
@@ -39,37 +39,46 @@ I have decided to merge the two packages, **gsynth** and **fect**, as **gsynth**
 
 Moving forward, I will discontinue maintaining **gsynth** and focus on adding more functionalities to **fect**.
 
-### Two Research Settings
+## Two Research Settings
 
 The differences between **gsynth** and **fect** reflect a deeper bifurcation in panel data research. There are two distinct research settings, each with its own estimation strategy and inferential approach:
 
-**The synthetic control setting** — traditionally based on using never-treated controls to learn time-varying latent effects, then projecting counterfactuals onto treated units. This was the setting in which **gsynth** was developed (@Xu2017). It is designed for block or staggered adoption *without* treatment reversal, and is particularly suited for a small number of treated units (including $N_{tr} = 1$).
+**The Synth setting** — traditionally based on using never-treated controls to learn time-varying latent effects (this dimension reduction step is optional), then projecting counterfactuals onto treated units via the so-called vertical regression. This was the setting in which **gsynth** was developed -- @Xu2017. It is designed for block or staggered adoption *without* treatment reversal, and is particularly suited for a small number of treated units (including $N_{tr} = 1$).
 
-**The DID/TWFE setting** — generalizes to directly imputing treated counterfactuals by using all not-yet-treated observations (both never-treated and pre-treatment of treated units), employing the EM algorithm when necessary. This accommodates treatment reversal and leverages more data.
+**The DID/TWFE setting** — generalizes to directly imputing treated counterfactuals, typically by using all not-yet-treated observations (both never-treated and pre-treatment of treated units). Therefore, estimators in this setting often learn time effects from both never-treated units and eventually treated units and  employ the EM algorithm when necessary. This accommodates treatment reversal and leverages more data. 
 
 This bifurcation also has implications for inference:
 
--   In the **synth setting** (small $N_{tr}$, sufficient $N_{co}$), a two-stage parametric bootstrap procedure (`vartype = "parametric"`) provides uncertainty estimates — analogous to conformal inference, it works even with a single treated unit. This was the inference approach developed alongside **gsynth**.
--   In the **DID setting** (large $N$, $N_{tr}$ grows with $N$), nonparametric bootstrap (`vartype = "bootstrap"`) or jackknife (`vartype = "jackknife"`) provide standard errors, requiring a sufficiently large treatment group (e.g., $N_{tr} > 40$).
+-   In the Synth setting (small $N_{tr}$, sufficient $N_{co}$), a two-stage parametric bootstrap procedure (`vartype = "parametric"`) provides uncertainty estimates — analogous to conformal inference (we're still working out the exact mathematical link), it works even with a single treated unit. This was the inference approach developed alongside **gsynth**.
+-   In the DID setting (large $N$, $N_{tr}$ grows with $N$), nonparametric bootstrap (`vartype = "bootstrap"`) or jackknife (`vartype = "jackknife"`) provide uncertainty estimates. Both procedures require a sufficiently large treatment group.
 
 ### Estimators and Estimation Strategy
 
-The `factors.from` parameter controls which research setting governs estimation. The table below summarizes the available methods and their compatibility:
+Starting from `v2.2.0`, the `factors.from` parameter controls which research setting governs estimation. The table below summarizes the available methods and their compatibility:
 
 | Method | Description | `factors.from` |
-|:-------|:-----------|:--------------|
+|:-----------------|:-----------------------|:-----------------------------|
 | `"fe"` | Two-way fixed effects (IFE with $r = 0$) | Both |
 | `"ife"` | Interactive fixed effects ($r \geq 0$ latent factors) | Both |
-| `"mc"` | Matrix completion (nuclear norm regularization) | `"notyettreated"` only |
 | `"cfe"` | Complex fixed effects (extends IFE with grouped time coefficients, unit-specific trends, extra FE) | Both |
+| `"mc"` | Matrix completion (nuclear norm regularization) | `"notyettreated"` only |
 | `"gsynth"` | Equivalent to `"ife"` with `factors.from = "nevertreated"` | `"nevertreated"` |
 
-The two values of `factors.from` correspond to the two research settings: `"notyettreated"` (default) uses all not-yet-treated observations via EM, while `"nevertreated"` uses only never-treated controls.
+The two values of `factors.from` correspond to the two research settings: `"notyettreated"` (default) uses all not-yet-treated observations via EM to learn time effects, while `"nevertreated"` uses only never-treated controls.
 
 ### Which Settings Should I Use?
 
+The literature has not reached a consensus, and the issue remains open. The key distinction lies in the estimand: whether it is unit-specific, conditional on the treated unit’s pre-treatment outcomes and covariates, or whether it targets a population parameter, such as the population average treatment effect on the treated (PATT).
+
+In the former case, the synthetic control setting is more appropriate. Inference is predictive and conditions on the pre-treatment outcomes and covariates of both the treated unit and the donor pool, which together serve as $X$. The randomness arises from the unobserved counterfactual post-treatment outcomes, with inference averaging over this uncertainty given the fixed pre-treatment information, based on row exchangeability.
+
+In the latter case, the DID framework targets a super-population estimand. Inference reflects sampling uncertainty over units, for which nonparametric bootstrap or jackknife methods are more appropriate.
+
+We are currently preparing a research note to clarify this distinction.
+
+
 | Scenario | Recommended Settings |
-|:---------|:---------------------|
+|:----------------------|:------------------------------------------------|
 | Treatment switches on and off | `factors.from = "notyettreated"` (default) |
 | No reversal, many treated units ($N_{tr} > 40$) | Either setting; default is fine |
 | No reversal, few treated units ($N_{tr} < 40$) | `factors.from = "nevertreated"` + `vartype = "parametric"` |

@@ -1946,8 +1946,10 @@ fect.default <- function(
             cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
         }
         old.future.plan <- future::plan()
-        future::plan(future::multisession, workers = cores)
-        doFuture::registerDoFuture()
+        suppressWarnings(suppressPackageStartupMessages({
+            future::plan(future::multisession, workers = cores)
+            doFuture::registerDoFuture()
+        }))
         if (is.null(seed) == FALSE) {
             registerDoRNG(seed)
         }

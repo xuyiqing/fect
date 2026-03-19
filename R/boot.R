@@ -913,7 +913,7 @@ fect_boot <- function(
 
     message("\rSimulating errors ...")
     if (parallel == TRUE) {
-      error.tr <- foreach(
+      error.tr <- suppressWarnings(foreach(
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
         .multicombine = TRUE,
@@ -926,7 +926,7 @@ fect_boot <- function(
       ) %dopar%
         {
           return(draw.error())
-        }
+        })
     } else {
       error.tr <- array(NA, dim = c(TT, Ntr, nboots))
       for (j in 1:nboots) {
@@ -1696,10 +1696,10 @@ fect_boot <- function(
       cl <- parallel::makePSOCKcluster(workers)
       on.exit({
         try(parallel::stopCluster(cl), silent = TRUE)
-        try(doFuture::registerDoFuture(), silent = TRUE)
+        try(suppressWarnings(suppressPackageStartupMessages(doFuture::registerDoFuture())), silent = TRUE)
       }, add = TRUE)
       doParallel::registerDoParallel(cl)
-      foreach(
+      suppressWarnings(foreach(
         j = idx,
         .inorder = TRUE,
         .errorhandling = "pass",
@@ -1718,12 +1718,12 @@ fect_boot <- function(
       ) %dopar%
         {
           return(quiet_nonpara(j))
-        }
+        })
     }
 
     boot.out <- tryCatch(
       {
-        foreach(
+        suppressWarnings(foreach(
           j = 1:nboots,
           .inorder = FALSE,
           .errorhandling = "pass",
@@ -1743,7 +1743,7 @@ fect_boot <- function(
         ) %dopar%
           {
             return(quiet_nonpara(j))
-          }
+          })
       },
       error = function(e) {
         if (!requireNamespace("doParallel", quietly = TRUE)) {
