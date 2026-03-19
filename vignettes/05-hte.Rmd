@@ -1,6 +1,6 @@
 # Effect Heterogeneity {#sec-hte}
 
-```{r echo = FALSE, message = FALSE, warning = FALSE}
+```{r setup-hte, echo = FALSE, message = FALSE, warning = FALSE}
 set.seed(1234)
 library(fect)
 data(fect)
@@ -49,7 +49,7 @@ out.fect.X3 <- fect(Y ~ D + X1 + X2 + X3, data = simdata1, index = c("id","time"
 
 As expected, there is not much effect heterogeneity along `X3`. In the resulting figure, we can also assign labels to the discrete values in the moderator.
 
-```{r, fig.width = 6, fig.height = 4.5}
+```{r plot-hte-discrete, fig.width = 6, fig.height = 4.5}
 plot(out.fect.X3, type="hte", covariate = "X3",
      xlab = "", ylab = "Effet of D on Y",
      covariate.labels = c("USA", "China", "UK"),

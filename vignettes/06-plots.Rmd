@@ -21,7 +21,12 @@ In this chapter, we explore various visualization options available in the **fec
     -   `preset`: If `NULL`, will be the default color preset, which is mostly black and white with a bit of color. Other options include `"vibrant"` and `"grayscale"`.\
     -   `cex.main`, `cex.axis`, `cex.lab`, `cex.text`: Adjust text sizes for the title, tick labels, axis labels, and annotations.
 -   **Lines and Bounds:**
-    -   `color` / `est.lwidth`: Define the color and width of main lines.\
+    -   `color`: The master color for estimate lines, points, and CI bands. In gap/exit/equiv plots, `color` sets the **post-treatment** color by default (pre-treatment defaults to gray). To control pre- and post-treatment colors independently, use `pre.color` and `post.color` instead.\
+    -   `pre.color` / `post.color`: Explicitly set the colors for pre- and post-treatment estimates. These override `color` when specified. Default color conventions by plot type:
+        -   **Gap plot**: pre-treatment = gray (in-sample), post-treatment = black (out-of-sample).
+        -   **Exit plot**: pre-exit = black (out-of-sample), post-exit = gray (in-sample).
+        -   **Gap/equiv plot with `loo = TRUE`**: all points = black (all out-of-sample).\
+    -   `est.lwidth` / `est.pointsize`: Width and size of estimate lines and points.\
     -   `lcolor` / `lwidth` / `ltype`: Set the color, width, and line type for the axes. Takes a vector, where the first value is applied the horizontal axis and the second is applied the vertical axis. If only one value is given, both axes will take on the same value.
 
 While these customization options are demonstrated using the default `gap` plot, they can be applied universally, with only a few exceptions.
@@ -64,7 +69,7 @@ out.hh <- fect(nat_rate_ord ~ indirect,
 
 After running the model, we can plot the dynamic treatment effects over (relative) time, including confidence intervals if `se = TRUE` is specified in the estimation. Note that `type = "gap"` is the default option, so we omit it here.
 
-```{r}
+```{r plot-gap-default}
 plot(out) # the effect co-ethnic mobilization
 plot(out.hh) # the effect of indirect democrazy on naturalization rate
 ```
@@ -133,12 +138,12 @@ plot(out.hh,
      main = "Vibrant Preset Colors: Hainmueller and Hangartner (2019)")
 ```
 
-We can change the color of the estimates (and their confidence intervals) using the `color` option.
+We can change the color of the post-treatment estimates (and their confidence intervals) using the `post.color` option. To change the pre-treatment color, use `pre.color`. The `color` option sets both the post-treatment color and CI bands simultaneously.
 
 ```{r preset-vibrant2}
-plot(out.hh, 
+plot(out.hh,
      preset = "vibrant", # Use vibrant colors
-     color = "green4", # Color of the estimates and CIs
+     post.color = "green4", # Color of the post-treatment estimates and CIs
      main = "Change Estimates' Color: Hainmueller and Hangartner (2019)")
 ```
 
@@ -153,8 +158,8 @@ plot(out,
 By default, the estimates are plotted as points. To connect the points with lines, set `connected = TRUE`. The width of the line and size of the points can be adjusted with `est.lwidth` and `est.pointsize`, respectively.
 
 ```{r connected-estimates}
-plot(out, 
-     color = "green4", # color of the estimates and CIs
+plot(out,
+     post.color = "green4", # color of the post-treatment estimates and CIs
      connected = TRUE, # Connect the points with lines
      est.lwidth = 1.2, # Makes the lines thicker
      est.pointsize = 3 # Makes the points larger
@@ -259,14 +264,14 @@ plot(out, type = "counterfactual",
 
 We can also plot cumulative effects by plotting the output of the `effect()` function. Note that this is only well-defined when there are no treatment reversals, that is, all treated units remain treated for the duration of the study. Additionally, we must set `keep.sims = TRUE` to keep the unit-level bootstrap results. We first apply it to `hh2019`.
 
-```{r}
+```{r plot-cumulative-hh}
 plot(effect(out.hh), main = "Cumulative Effect of Indirect Democracy",
      ylab = "Cumulative Effect on Naturalization Rate")
 ```
 
 Since the `gs2020` datset has treatment reversals, we will first subset the units that remained treated throughout the study period. We do this by checking for any instances where the treatment variable changes from 1 to 0 within a unit.
 
-```{r}
+```{r subset-no-reversals}
 # flag units that ever have a 1 to 0 change in d
 rev_flag <- tapply(gs2020[["cand_A_all"]],
                    gs2020[["district_final"]],
@@ -311,20 +316,20 @@ In the equivalence plot (`type = "equiv"`), the equivalence bound is defined by 
 
 The `bound` option has four choices: `"none"`, `"min"`, `"equiv"`, or `"both"`. When set to `"none"`, no bound is displayed.
 
-```{r}
-plot(out, type = "equiv", bound = "equiv", tost.threshold = 0.1, 
+```{r plot-equiv-bound}
+plot(out, type = "equiv", bound = "equiv", tost.threshold = 0.1,
      ylim = c(-0.15, 0.15))
 ```
 
 The `"min"` displays the minimum range bound based on the maximum absolute pre‐treatment residual (e.g., if the largest pre-treatment estimate is 0.3, lines at -0.3 and 0.3).
 
-```{r}
+```{r plot-equiv-min}
 plot(out, type = "equiv", bound = "min", ylim = c(-0.15, 0.15))
 ```
 
 We can plot both the minimum range and the equivalence bound with `bound = "both"`, which is also the default option.
 
-```{r}
+```{r plot-equiv-both}
 plot(out, type = "equiv", tost.threshold = 0.1, ylim = c(-0.15, 0.15))
 ```
 
@@ -360,15 +365,15 @@ The plot shows the estimated "effects" in the pre-treatment periods (placebo eff
 
 We can also change the color of the placebo periods by using the `placebo.color` argument. Colors for many other plot types can also be adjusted in a similar way, including, but not limited to, the carryover and box plots.
 
-```{r}
+```{r plot-placebo-color}
 plot(out_fe_placebo, placebo.color = "green4")
 ```
 
 ## Carryover Effects
 
-One type of plot rarely seen in the empirical literature is how the difference between treatment and control groups evolves after treatment ends. We call it the `"exit"` plot, where the x-axis represents time relative to treatment exit. In contrast, the `"gap"` plot focuses on treatment entry. The `"exit"` plot is essential for assessing potential carryover effects.
+One type of plot rarely seen in the empirical literature is how the difference between treatment and control groups evolves after treatment ends. We call it the `"exit"` plot, where the x-axis represents time relative to treatment exit. In contrast, the `"gap"` plot focuses on treatment entry. The `"exit"` plot is essential for assessing potential carryover effects. In exit plots, the color convention is reversed from gap plots: pre-exit estimates are black (out-of-sample) and post-exit estimates are gray (in-sample).
 
-```{r}
+```{r plot-exit-default}
 plot(out_fe_placebo, type = "exit")
 ```
 
@@ -403,13 +408,13 @@ We provide two ways to visualize treatment effect heterogeneity: a `"box"` plot,
 
 In the box plot, the box in each period represents the range of the middle 50% of the individual effects, while the whiskers show the 2.5%–95% quantiles and the horizontal line represents the median.
 
-```{r}
+```{r plot-box-hte}
 plot(out, type = "box", xlim = c(-12, 3))
 ```
 
 In the calendar plot, the blue ribbon represents a loess fit of the conditional ATT, with 95% confidence intervals.
 
-```{r}
+```{r plot-calendar-hte}
 plot(out, type = "calendar", main = "The Effect of Coethnic Mobilization")
 plot(out.hh, type = "calendar", xlim = c(1995, 2009),
      main = "The Effect of Indirect Democracy")

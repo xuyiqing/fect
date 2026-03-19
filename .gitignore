@@ -27,6 +27,7 @@ vignettes/*_cache/
 vignettes/*_files/
 vignettes/_back/**
 vignettes/_book/**
+vignettes/_book_bak/**
 !vignettes/_book/rscript/
 !vignettes/_book/rscript/*.R
 

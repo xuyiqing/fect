@@ -9,19 +9,19 @@ $$Y_{it} = \alpha_i + \xi_t + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \tau_{it} D_
 
 Since there are no latent factors, the `"fe"` method (two-way fixed effects counterfactual estimator) is correctly specified for this DGP. For settings where latent factors are present and the FE estimator is biased, see [Chapter @sec-ife-mc].
 
-```{r echo = FALSE}
+```{r setup-seed, echo = FALSE}
 set.seed(1234)
 rm(list = ls())
 ```
 
-```{r message = FALSE, warning = FALSE}
+```{r load-packages, message = FALSE, warning = FALSE}
 library(fect)
 data(fect)
 ```
 
 We use the **panelView** package to visualize the treatment and outcome variables:
 
-```{r message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+```{r panelview-treatment, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 library(panelView)
 panelview(Y ~ D, data = simdata1, index = c("id","time"),
   axis.lab = "time", xlab = "Time", ylab = "Unit",
@@ -31,7 +31,7 @@ panelview(Y ~ D, data = simdata1, index = c("id","time"),
 
 In the figure below, blue and gray represent treatment and control conditions.
 
-```{r fig.width = 6, fig.height = 4.5}
+```{r panelview-outcome, fig.width = 6, fig.height = 4.5}
 panelview(Y ~ D, data = simdata1, index = c("id","time"),
   axis.lab = "time", xlab = "Time", ylab = "Unit",
   theme.bw = TRUE, type = "outcome",
@@ -67,7 +67,7 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
 ```
 
-In the gap plot, pre-treatment estimates appear in gray while post-treatment estimates appear in black. This visual distinction highlights that pre-treatment "effects" should be near zero if the model is well-specified, while post-treatment effects are the quantities of interest. The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power. See [Chapter @sec-plots] for more visualization options.
+In the gap plot, pre-treatment estimates appear in gray (in-sample) while post-treatment estimates appear in black (out-of-sample). This visual distinction highlights that pre-treatment "effects" should be near zero if the model is well-specified, while post-treatment effects are the quantities of interest. When `loo = TRUE` is used in the plot call, all points appear in black because both pre- and post-treatment estimates are out-of-sample. The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power. See [Chapter @sec-plots] for more visualization options.
 
 ### Inferences
 
@@ -105,23 +105,23 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
 
 ### Exiting the treatment
 
-**fect** allows the treatment to switch back and forth and provides diagnostic tools for this setting. After the estimation, we can visualize the period-wise ATTs relative to the `exit` of treatments by setting `type = "exit"`. The x-axis is then realigned based on the timing of the treatment's exit, not onset, e.g., 1 represents 1 period after the treatment ends.
+**fect** allows the treatment to switch back and forth and provides diagnostic tools for this setting. After the estimation, we can visualize the period-wise ATTs relative to the `exit` of treatments by setting `type = "exit"`. The x-axis is then realigned based on the timing of the treatment's exit, not onset, e.g., 1 represents 1 period after the treatment ends. In the exit plot, the color convention is reversed: pre-exit estimates appear in black (out-of-sample) and post-exit estimates appear in gray (in-sample).
 
 ```{r exit_fect, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = "exit", ylim = c(-2.5,4.5), main = "Exit Plot (FEct)")
+plot(out.fect, type = "exit", main = "Exit Plot (FEct)")
 ```
 
 ### Save estimates
 
 Users can use the `print` function to view a summary of the estimation results or retrieve relevant statistics by directly accessing the fect object. Specifically, `est.avg` and `est.avg.unit` show the ATT averaged over all periods -- the former weights each treated observation equally while the latter weights each treated unit equally. `beta` reports the coefficients of the time-varying covariates. `est.att` reports the average treatment effect on the treated (ATT) by period.
 
-```{r}
+```{r print-fect}
 print(out.fect)
 ```
 
 To save space, results are not shown here.
 
-```{r eval = FALSE}
+```{r extract-estimates, eval = FALSE}
 out.fect$est.att
 out.fect$est.avg
 out.fect$beta
@@ -129,7 +129,7 @@ out.fect$beta
 
 After estimation with `se = TRUE`, bootstrap treatment effect estimates from each run are stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs). Standard errors for the period-wise ATTs are available in the output object alongside the point estimates.
 
-```{r eval = FALSE}
+```{r extract-bootstrap, eval = FALSE}
 out.fect$eff.boot
 ```
 
@@ -194,7 +194,7 @@ out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
 
 The event study plot utilizing leave-one-out for pretreatment estimates is shown below. This graph is fairly similar to the graphics we presented earlier without using leave-one-out. However, this is not always true.
 
-```{r, fig.width = 6, fig.height = 4.5}
+```{r plot-gap-loo, fig.width = 6, fig.height = 4.5}
 plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO",
   cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
 ```
@@ -275,15 +275,15 @@ out.bal <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
 
 We can then visualize the dynamic treatment effects using the inbuilt function `plot`. By default, it displays the dynamic treatment effects of the "balanced" sample.
 
-```{r fig.width = 6, fig.height = 4.5}
+```{r plot-balanced-att, fig.width = 6, fig.height = 4.5}
 plot(out.bal, main = "Estimated ATT (Balanced Sample)")
 ```
 
 The usual plotting options can be used to adjust the balanced plot as well.
 
-```{r fig.width = 6, fig.height = 4.5}
+```{r plot-balanced-custom, fig.width = 6, fig.height = 4.5}
 plot(out.bal, main = "Estimated ATT (Balanced Sample)",
-  color = "red", count.color = "blue")
+  post.color = "red", count.color = "blue")
 ```
 
 ### Average cohort treatment effect
@@ -340,7 +340,7 @@ out.w <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
 
 We can then visualize the weighted dynamic treatment effects using the inbuilt function `plot`, it by default shows the weighted dynamic treatment effects.
 
-```{r fig.width = 6, fig.height = 4.5}
+```{r plot-weighted-att, fig.width = 6, fig.height = 4.5}
 plot(out.w, main = "Estimated Weighted ATT")
 ```
 

@@ -1,4 +1,4 @@
-# Updates {#sec-updates .unnumbered}
+# Changelog {#sec-changelog .unnumbered}
 
 ## v2.2.0
 

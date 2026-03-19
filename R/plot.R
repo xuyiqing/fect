@@ -351,6 +351,7 @@ plot.fect <- function(
   } else {
     loo <- 0
   }
+
   ## y=0 line type
   if (is.null(lcolor) == TRUE) {
     lcolor <- "white"
@@ -417,6 +418,17 @@ plot.fect <- function(
   }
   if (!is.null(x$effect.est.att)) {
     type <- "cumul"
+  }
+
+  ## Override pre/post colors based on plot type and LOO status
+  ## Gap plot + LOO: all points are out-of-sample, no pre/post distinction needed
+  if (loo == 1 && type %in% c("gap", "equiv") && is.null(pre.color)) {
+    pre.color <- color
+  }
+  ## Exit plot: pre = out-of-sample (black), post = in-sample (gray)
+  if (type == "exit") {
+    if (is.null(pre.color))  pre.color  <- color
+    if (is.null(post.color)) post.color <- "gray50"
   }
 
   type.old <- type
@@ -2759,6 +2771,21 @@ plot.fect <- function(
 
     if (type == "equiv" && is.null(ylim)) {
       ylim <- c(-max(abs(data2$bound)) * 1.4, max(abs(data2$bound)) * 1.4)
+    }
+
+    ## Expand ylim for exit plots: 10% top padding by default, 30% when stats shown
+    if (type == "exit" && is.null(ylim)) {
+      if (CI == TRUE) {
+        y_max <- max(data[, "CI.upper"], na.rm = TRUE)
+        y_min <- min(data[, "CI.lower"], na.rm = TRUE)
+      } else {
+        y_max <- max(data[, "ATT"], na.rm = TRUE)
+        y_min <- min(data[, "ATT"], na.rm = TRUE)
+      }
+      y_range <- y_max - y_min
+      has_stats <- !is.null(stats) && show.stats && !identical(stats, "none")
+      top_pad <- if (has_stats) 0.3 else 0.1
+      ylim <- c(y_min - y_range * 0.05, y_max + y_range * top_pad)
     }
     ## point estimates
     if (classic == 1) {

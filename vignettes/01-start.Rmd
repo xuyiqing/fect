@@ -2,7 +2,7 @@
 
 This chapter provides installation instructions and introduces the datasets used in the tutorial.
 
-```{r echo = FALSE}
+```{r clear-environment, echo = FALSE}
 rm(list = ls())
 ```
 
@@ -10,37 +10,37 @@ rm(list = ls())
 
 To install **fect** from CRAN, run the code chunk below:
 
-```{r eval = FALSE, message = FALSE, warning = FALSE}
+```{r install-cran, eval = FALSE, message = FALSE, warning = FALSE}
 install.packages("fect")
 ```
 
 We recommend users to install the most up-to-date, stable version of **fect** from Github using:
 
-```{r eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
+```{r install-github-main, eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
 devtools::install_github("xuyiqing/fect")
 ```
 
 We fix bugs in the `dev` branch before merging into the main branch; therefore, it is often more up to date.
 
-```{r eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
+```{r install-github-dev, eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
 devtools::install_github("xuyiqing/fect@dev")
 ```
 
 After installation, check **fect** version to make sure the package is up-to-date.
 
-```{r}
+```{r check-version}
 installed.packages()["fect", "Version"]
 ```
 
 **panelView** for panel data visualization is highly recommended and will be used in the tutorial:
 
-```{r eval=FALSE}
+```{r install-panelview, eval=FALSE}
 devtools::install_github('xuyiqing/panelView')
 ```
 
 **fect** depends on the following packages, which should be installed automatically when **fect** is being installed. You can also install them manually.
 
-```{r eval=FALSE}
+```{r install-dependencies, eval=FALSE}
 install_all <- function(packages) {
   installed_pkgs <- installed.packages()[, "Package"]
   for (pkg in packages) {
@@ -59,7 +59,7 @@ install_all(packages)
 
 The **fect** package ships several datasets. All simulated and empirical datasets are loaded together with `data(fect)`.
 
-```{r message = FALSE, warning = FALSE}
+```{r load-data, message = FALSE, warning = FALSE}
 library(fect)
 data(fect)
 ls()

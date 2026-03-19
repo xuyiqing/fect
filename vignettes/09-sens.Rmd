@@ -13,7 +13,7 @@ Below, we illustrate how to apply this sensitivity analysis with **fect**. We fo
 
 To begin, you will need to install the necessary packages from CRAN and GitHub.
 
-```{r message = FALSE, warning = FALSE}
+```{r install-packages, message = FALSE, warning = FALSE}
 # install packages from CRAN
 packages <- c("dplyr", "panelView", "ggplot2") # Removed HonestDiD, doParallel
 install.packages(setdiff(packages, rownames(installed.packages())))  
@@ -31,7 +31,7 @@ if ("HonestDiDFEct" %in% rownames(installed.packages()) == FALSE) {
 
 Load libraries:
 
-```{r message = FALSE, warning = FALSE}
+```{r load-libraries, message = FALSE, warning = FALSE}
 library(dplyr)
 library(fect)
 library(panelView)
@@ -43,7 +43,7 @@ library(HonestDiDFEct) # Required for fect_sens to work
 
 We begin with an empirical example from @HH2019, who investigate the effects of indirect democracy versus direct democracy on naturalization rates in Switzerland using municipality-year panel data from 1991 to 2009. The study finds that switching from direct to indirect democracy increased naturalization rates by an average of 1.22 percentage points (Model 1, Table 1).
 
-```{r message = FALSE, warning = FALSE}
+```{r load-hh2019, message = FALSE, warning = FALSE}
 data(fect)
 data <- hh2019
 head(data)

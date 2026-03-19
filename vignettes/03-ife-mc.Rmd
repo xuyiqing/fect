@@ -1,6 +1,6 @@
 # Factor-Based Methods {#sec-ife-mc}
 
-```{r echo = FALSE, message = FALSE, warning = FALSE}
+```{r setup-ife-mc, echo = FALSE, message = FALSE, warning = FALSE}
 set.seed(1234)
 library(fect)
 data(fect)
@@ -27,7 +27,7 @@ print(out.ife)
 
 The figure below shows the estimated ATT using the IFE method. The cross-validation procedure selects the correct number of factors ($r=2$).
 
-```{r  fig.width = 6, fig.height = 4.5}
+```{r plot-att-ife,  fig.width = 6, fig.height = 4.5}
 plot(out.ife, main = "Estimated ATT (IFEct)")
 ```
 
@@ -45,7 +45,7 @@ out.mc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
 print(out.mc)
 ```
 
-```{r fig.width = 6, fig.height = 4.5}
+```{r plot-att-mc, fig.width = 6, fig.height = 4.5}
 plot(out.mc, main = "Estimated ATT (MC)")
 ```
 
@@ -66,7 +66,7 @@ out.cv <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                se = FALSE, parallel = TRUE)
 ```
 
-```{r}
+```{r print-cv-selected-r}
 cat("Selected r:", out.cv$r.cv, "\n")
 ```
 
@@ -98,7 +98,7 @@ out.tr <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                cv.method = "treated_units", se = FALSE, parallel = TRUE)
 ```
 
-```{r}
+```{r print-cv-method-compare}
 cat("cv.method = 'all_units':     r.cv =", out.all$r.cv, "\n")
 cat("cv.method = 'treated_units': r.cv =", out.tr$r.cv, "\n")
 ```
@@ -140,7 +140,7 @@ out.pc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                criterion = "pc", se = FALSE, parallel = TRUE)
 ```
 
-```{r}
+```{r print-criterion-compare}
 cat("criterion = 'mspe': r.cv =", out.mspe$r.cv, "\n")
 cat("criterion = 'pc':   r.cv =", out.pc$r.cv, "\n")
 ```
@@ -202,28 +202,18 @@ The results in the placebo test confirm that IFEct is a better model than MC for
 
 Instead of using estimated ATTs for periods prior to the treatment to test for pre-trends, we recommend users employ a leave-one-out (LOO) approach (`loo = TRUE`) to consecutively hide one pretreatment period (relative to the timing of the treatment) and repeatedly estimate the pseudo treatment effects for that pretreatment period. The LOO approach can be understood as an extension of the placebo test. It has the benefit of providing users with a more holistic view of whether the identifying assumptions likely hold. However, as the program needs to conduct uncertainty estimates for each turn, it is much more time-consuming than the original one.
 
-```{r simdata_ife_loo, eval=FALSE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r simdata_ife_loo, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.ife.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "ife", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200, loo = TRUE)
+  method = "ife", force = "two-way", se = TRUE, parallel = TRUE, cores = 8, nboots = 200, loo = TRUE)
 out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "mc", force = "two-way", se = TRUE, parallel = TRUE, nboots = 200, loo = TRUE)
+  method = "mc", force = "two-way", se = TRUE, parallel = TRUE, cores = 8, nboots = 200, loo = TRUE)
 ```
 
-After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the `plot` function.
+After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the `plot` function. Since all pre-treatment estimates are now out-of-sample, the plot uses a uniform black color for all points (no gray/black distinction). The equivalence plots below use the LOO estimates directly.
 
-```{r pretrend_loo_ife, eval = FALSE, cache = TRUE, fig.width = 6, fig.height = 4.5}
-plot(out.ife.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
-     cex.legend = 0.6, main = "Testing Pre-Trend LOO (IFEct)", cex.text = 0.8)
+### Joint test for (no) pre-trends
 
-plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
-     cex.legend = 0.6, main = "Testing Pre-Trend LOO (MC)", cex.text = 0.8)
-```
-
-Note that the LOO test usually takes lots of computational power. For our example, we find that the IFE estimator still passes both the F test and the equivalence test based on its LOO pre-trends, while the MC estimator fails both tests.
-
-### Equivalence test
-
-We introduce two statistical tests for the presence of a pre-trend (or the lack thereof). The first test is an $F$ test for zero residual averages in the pretreatment periods. The second test is a two-one-sided $t$ (TOST) test, a type of equivalence tests.
+We now introduce two statistical tests for the presence of a pre-trend (or the lack thereof) that jointly assess pre-trend quality. The first test is an $F$ test for zero residual averages in the pretreatment periods. The second test is a two-one-sided $t$ (TOST) test, a type of equivalence tests.
 
 **F test.** We offer a goodness-of-fit test (a variant of the $F$ test) and to gauge the presence of pretreatment (differential) trends. A larger F-test p-value suggests a better pre-trend fitting. Users can specify a test range in option `pre.periods`. For example, `pre.periods = c(-4,0)` means that we test pretreatment trend of the last 5 periods prior to the treatment (from period -4 to period 0). If `pre.period = NULL` (default), all pretreatment periods in which the number of treated units exceeds the total number of treated units \* `proportion` will be included in the test.
 
@@ -231,15 +221,20 @@ We introduce two statistical tests for the presence of a pre-trend (or the lack 
 
 On the topleft corner of the graph, we show several statistics of the user's choice. User can choose which statistics to show by setting `stats = c("none", "F.stat", "F.p", "F.equiv.p", "equiv.p")` which corresponds to not showing any, the $F$ statistic, the p-value for the $F$ test, the p-value for the equivalence $F$ test, the (maximum) p-value for the the TOST tests, respectively. For the gap plot, the default is `stats = "none"`. For the equivalence plot, the default is `stats = c("equiv.p, F.p")`. Users can also change the labels of statistics using the `stats.labs` options. Users can adjust its position using the `stats.pos` option, for example `stats.pos = c(-30, 4)`. To turn off the statistics, set `stats = "none"`.
 
-Below, we visualize the result of the equivalence test for each of the two estimators using our simulated data.
+Below, we visualize the result of the joint pre-trend test for each of the two estimators using our simulated data. We use the LOO estimates computed above, which provide genuine out-of-sample pre-trend assessments.
+
+::: {.callout-note appearance="simple"}
+### Why LOO for pre-trend testing?
+In-sample pre-trend estimates can be misleadingly close to zero because the model is fitted to these same observations. LOO provides genuine out-of-sample estimates, giving a more honest assessment of whether the parallel trends assumption holds.
+:::
 
 ```{r pretrend_ife, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5}
-plot(out.ife, type = "equiv", ylim = c(-4,4),
+plot(out.ife.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
      cex.legend = 0.6, main = "Testing Pre-Trend (IFEct)", cex.text = 0.8)
 ```
 
 ```{r pretrend_mc, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5}
-plot(out.mc, type = "equiv", ylim = c(-4,4),
+plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
      cex.legend = 0.6, main = "Testing Pre-Trend (MC)", cex.text = 0.8)
 ```
 
@@ -263,7 +258,7 @@ out.mc.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
 ```
 
-Like the placebo test, the plot will display the p-value of the carryover effect test (`stats = "carryover.p"`). Users can also add the p-value of a corresponding TOST test by setting `stats = c("carryover.p","equiv.p")`.
+Like the placebo test, the plot will display the p-value of the carryover effect test (`stats = "carryover.p"`). Users can also add the p-value of a corresponding TOST test by setting `stats = c("carryover.p","equiv.p")`. In exit plots, pre-exit estimates are shown in black (out-of-sample) and post-exit estimates in gray (in-sample).
 
 ```{r carryover_ife_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.ife.c, type = "exit", ylim = c(-2.5,4.5),
@@ -288,5 +283,22 @@ out.ife.rm.test <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time")
 plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(5, 2))
 ```
 
-In the above plot, the three periods in blue are droppred from the first-stage estimation of the factor model while the periods in red are reserved for the (no) carryover effects test.
+In the above plot, the three periods in blue are dropped from the first-stage estimation of the factor model while the periods in red are reserved for the (no) carryover effects test.
+
+### Summary of diagnostic tests
+
+| Test | Purpose | Key arguments | Plot type | Statistics shown |
+|:-----|:--------|:--------------|:----------|:-----------------|
+| Placebo test | Tests whether the model produces zero ATT in withheld pre-treatment periods | `placeboTest = TRUE`, `placebo.period = c(a, b)` | `"gap"` (default) | `placebo.p`, `equiv.p` |
+| LOO pre-trend test | Out-of-sample check for pre-trends by leaving out one pre-treatment period at a time | `loo = TRUE` (in `fect()`), `loo = TRUE` (in `plot()`) | `"gap"` or `"equiv"` | `F.p`, `equiv.p` |
+| Joint pre-trend test (F + TOST) | Joint assessment: F test for zero residual averages; TOST for equivalence within a threshold | `type = "equiv"` in `plot()`, `tost.threshold` | `"equiv"` | `F.p`, `F.equiv.p`, `equiv.p` |
+| Carryover test | Tests whether treatment effects persist after treatment ends | `carryoverTest = TRUE`, `carryover.period = c(a, b)` | `"exit"` | `carryover.p`, `equiv.p` |
+
+::: {.callout-tip appearance="simple"}
+- A **larger** F-test / placebo / carryover p-value suggests the model passes the test.
+- A **smaller** TOST / equivalence p-value suggests the pre-trends or carryover effects are within an acceptable range.
+- We recommend using `loo = TRUE` for pre-trend tests to avoid the false reassurance of in-sample fit.
+- The `proportion` option controls which pre-treatment periods are included in the tests (default: periods where the number of treated units exceeds `proportion` $\times$ total treated units).
+- The `tost.threshold` option sets the equivalence range for the TOST test (default: $0.36\hat{\sigma}_\epsilon$).
+:::
 
