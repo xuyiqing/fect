@@ -1,9 +1,12 @@
 # fect 2.2.0
 
-* Added CFE (Complex Fixed Effects) estimator as `method = "cfe"`
-* Fixed `est.fect$sigma2` crash when bootstrap is enabled with normalization
-* Fixed `detectCores()` returning NA in parallel setup causing worker count failures
-* Updated `index` parameter documentation to describe CFE grouping variables
+* Added CFE (Complex Fixed Effects) estimator (`method = "cfe"`)
+* Added `time.component.from` parameter for latent factor estimation timing
+* Added k-fold cross-validation (`cv.sample`) for nevertreated designs
+* Improved plot styling: pre/post shading colors, harmonized `type = "esplot"`
+* Fixed EM convergence and solver equivalence issues in CFE routines (C++)
+* Fixed bootstrap and parallel setup crashes
+* Restructured Quarto book with new CFE chapter
 
 # fect 2.1.1
 
