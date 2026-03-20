@@ -1,3 +1,5 @@
+utils::globalVariables(c("x", "y", "legend_id"))
+
 esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    Period = NULL,
                    Estimate = "ATT",
@@ -50,7 +52,9 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    xbreaks   = NULL,
                    ybreaks   = NULL,
                    legendOff = FALSE,
-                   cex.legend = NULL
+                   cex.legend = NULL,
+                   pre.label  = "Pre-treatment",
+                   post.label = "Post-treatment"
 )
 {
   if (is.null(est.lwidth) || is.null(est.pointsize)) {
@@ -868,13 +872,13 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       legend_ids    <- c(legend_ids, "pre")
       legend_shapes <- c(legend_shapes, 19)
       legend_colors <- c(legend_colors, pre.color)
-      legend_labels <- c(legend_labels, "Pre-treatment")
+      legend_labels <- c(legend_labels, pre.label)
     }
     if (has_post) {
       legend_ids    <- c(legend_ids, "post")
       legend_shapes <- c(legend_shapes, 19)
       legend_colors <- c(legend_colors, post.color)
-      legend_labels <- c(legend_labels, "Post-treatment")
+      legend_labels <- c(legend_labels, post.label)
     }
 
     # Map each unique highlight shape to its color from highlight.colors
@@ -922,7 +926,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       theme(legend.position = "bottom",
             legend.box = "vertical",
             legend.margin = margin(0, 0, 0, 0),
-            legend.text = element_text(size = if (!is.null(cex.legend)) cex.legend else 10),
+            legend.text = element_text(size = if (!is.null(cex.legend)) cex.legend * 0.6 else 8),
             plot.margin = margin(5, 5, 15, 5))
   }
 

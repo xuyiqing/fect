@@ -71,7 +71,7 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | **Input** | **fe** | **ife** | **mc** | **gsynth** | **cfe** |
 |:----------|:----------|:---------:|:---------:|:---------:|:---------:|
 | `W` (weight) | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `factors.from` (estimation sample) | – | ✓ | ✓ | ✓ | ✓ |
+| `time.component.from` (time component source) | – | ✓ | ✓ | ✓ | ✓ |
 | `em` (EM algorithm) | – | ✓ | – | – | ✓ |
 | `se` (uncertainty) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `nboots` (# bootstrap reps) | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -91,7 +91,7 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | **Input** | **Options** | **Applicable Methods** |
 |:-----------------------|:-----------------------|:-----------------------|
 | `force` | Fixed effects structure: "none", "unit", "time", "two-way" (default) | fe, ife, mc, cfe, gsynth |
-| `factors.from` | Estimation sample: "notyettreated" (default), "nevertreated". When "nevertreated", only never-treated controls estimate factors. `method = "gsynth"` auto-sets to "nevertreated". | ife, mc, cfe, gsynth |
+| `time.component.from` | Time component source: "notyettreated" (default), "nevertreated". Controls which units provide the time-varying model components (time fixed effects, latent factors, temporal dynamics). When "nevertreated", only never-treated controls estimate these components. `method = "gsynth"` auto-sets to "nevertreated". | ife, mc, cfe, gsynth |
 | `em` | EM algorithm: `TRUE` (default), `FALSE`. Required `TRUE` for "notyettreated"; auto-set to `FALSE` by `method = "gsynth"`. | ife, cfe |
 | `vartype` (when `method = "gsynth"`) | Uncertainty estimator: "parametric" (default), "bootstrap", "jackknife" | gsynth |
 | `vartype` (otherwise) | Uncertainty estimator: "bootstrap" (default), "jackknife" | fe, ife, mc, cfe |

@@ -131,7 +131,7 @@ plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(5, 2))
 ##########################
 
 out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-                        method = "ife", factors.from = "nevertreated",
+                        method = "ife", time.component.from = "nevertreated",
                         force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'bootstrap',
                         parallel = FALSE, keep.sims=TRUE)

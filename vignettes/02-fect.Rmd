@@ -1,13 +1,13 @@
 # The Imputation Estimator {#sec-fect}
 
-In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022--\[<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>\].
+In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022 \[<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>\].
 
 ## Simulated data
 
 In this chapter, we use `sim_base`, a simulated panel dataset in which the parallel trends assumption holds. The dataset has 200 units, 35 time periods, and treatment that switches on and off. The data are simulated with treatment switching on and off, capturing the general case of treatment reversal under strict exogeneity. The outcome is generated from a two-way fixed effects model with two covariates:
-$$Y_{it} = \alpha_i + \xi_t + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \tau_{it} D_{it} + \epsilon_{it}$$
+$$Y_{it} = \tau_{it} D_{it} + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \alpha_i + \xi_t  + \epsilon_{it}$$
 
-Since there are no latent factors, the `"fe"` method (two-way fixed effects counterfactual estimator) is correctly specified for this DGP. For settings where latent factors are present and the FE estimator is biased, see [Chapter @sec-ife-mc].
+Since there are no latent factors, the `"fe"` method (two-way fixed effects counterfactual estimator, or FEct) is correctly specified for this DGP. For settings where latent factors are present and the FE estimator is biased, see [Chapter @sec-ife-mc].
 
 ```{r setup-seed, echo = FALSE}
 set.seed(1234)
@@ -31,10 +31,10 @@ panelview(Y ~ D, data = sim_base, index = c("id","time"),
 
 In the figure below, blue and gray represent treatment and control conditions.
 
-```{r panelview-outcome, fig.width = 6, fig.height = 4.5}
+```{r panelview-outcome, fig.width = 6, fig.height = 4.5, warning = FALSE}
 panelview(Y ~ D, data = sim_base, index = c("id","time"),
   axis.lab = "time", xlab = "Time", ylab = "Unit",
-  theme.bw = TRUE, type = "outcome",
+  theme.bw = TRUE, type = "outcome", 
   main = "Simulated Data: Outcome")
 ```
 
@@ -42,7 +42,7 @@ panelview(Y ~ D, data = sim_base, index = c("id","time"),
 
 ## The FEct estimator
 
-The two-way fixed effects counterfactual estimator (FEct) imputes the counterfactual outcome $\hat{Y}(0)$ for treated observations using a two-way fixed effects model estimated on control observations. It is also independently proposed by @BJS2024 and @gardnertwo, who refer to it as the "imputation method" and "two-stage DID," respectively.
+The two-way fixed effects counterfactual (FEct) estimator imputes the counterfactual outcome $\hat{Y}(0)$ for treated observations using a two-way fixed effects model estimated on control observations. It is also independently proposed by @BJS2024 and @gardnertwo, who refer to it as the "imputation method" and "two-stage DID," respectively.
 
 ### Estimation
 
@@ -56,8 +56,8 @@ out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
 ```
 
 ::: {.callout-tip appearance="simple"}
-### Estimation parameters
-The key parameters that control the **model** are: `method` (estimator choice), `force` (fixed effects structure), and `r` (number of factors for IFE/MC methods; see [Chapter @sec-ife-mc]). These determine how $\hat{Y}(0)$ is imputed.
+### Model specification
+The key parameters that control the **model** are: `method` (estimator choice), `force` (fixed effects structure), and `r` (number of factors for IFE/MC methods; see [Chapter @sec-ife-mc]; by default, `r` is set to 0 when `method = "fe"`). These determine how $\hat{Y}(0)$ is imputed.
 :::
 
 We can use the `plot` function to visualize the estimation results. By default, it produces a "gap" plot --- `plot(out.fect, type = "gap")` --- which shows the estimated period-wise ATT (dynamic treatment effects). The true population average effects in `sim_base` go from 1 to 3 from the 1st to the 10th post-treatment period.
@@ -69,24 +69,18 @@ plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
 
 In the gap plot, pre-treatment estimates appear in gray (in-sample) while post-treatment estimates appear in black (out-of-sample). This visual distinction highlights that pre-treatment "effects" should be near zero if the model is well-specified, while post-treatment effects are the quantities of interest. When `loo = TRUE` is used in the plot call, all points appear in black because both pre- and post-treatment estimates are out-of-sample. The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power. See [Chapter @sec-plots] for more visualization options.
 
-### Inferences
+### Inference
 
 The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
 
 ::: {.callout-tip appearance="simple"}
 ### Inference parameters
-The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These do not affect point estimates.
+The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These parameters do not affect point estimates. `"parametric"` is only available in the Synth setting, i.e., when `time.component.from = "nevertreated"`.
 :::
 
 ::: {.callout-note appearance="simple"}
 **Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
 :::
-
-```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
-  method = "fe", force = "two-way", se = TRUE,
-  cores = 8, parallel = TRUE, nboots = 1000)
-```
 
 ::: {.callout-note appearance="simple"}
 **Clustering.**
@@ -95,6 +89,14 @@ out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
 -   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level. In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset. This can be particularly useful when the number of treated units is small.
 -   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option.
 :::
+
+```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
+  method = "fe", force = "two-way", se = TRUE,
+  cores = 8, parallel = TRUE, nboots = 1000)
+```
+
+
 
 The `plot()` function can visualize the estimated period-wise ATTs as well as their uncertainty estimates. `stats = "F.p"` shows the p-value for the F test of no-pretrend.
 
@@ -168,7 +170,7 @@ out.fect.carry <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   carryoverTest = TRUE, carryover.period = c(1, 3))
 ```
 
-```{r fect_carryover_plot, eval=TRUE, cache=TRUE, warning=FALSE, fig.width=6, fig.height=4.5}
+```{r fect_carryover_plot, eval=TRUE, cache=TRUE, warning=FALSE, fig.width=6, fig.height=5}
 plot(out.fect.carry, type = "exit", cex.text = 0.8, main = "Carryover Effects (FEct)")
 ```
 
@@ -181,7 +183,7 @@ For more detail on carryover tests with IFE and MC, see [Chapter @sec-ife-mc].
 ::: {.callout-note appearance="simple"}
 We recommend setting `loo = TRUE` when (i) the event-study plot is intended as a critical piece of evidence to support the parallel trends assumption, which is often the case, or (ii) when implementing an equivalence test for the pre-trend estimates. For more discussion on the LOO pre-trend test, see [Chapter @sec-ife-mc].
 
-Our most preferred test, however, is the sensitivity analysis discussed in [Chapter @sec-panel-sens], which combines out-of-sample placebo estimates with post-treatment ATT estimates.
+Our most preferred tests, however, are the placebo test described above and the sensitivity analysis discussed in [Chapter @sec-panel-sens], which combines out-of-sample placebo estimates with post-treatment ATT estimates, but it requires a lot of power.
 :::
 
 We can implement the leave-one-out pre-trend test by setting `loo = TRUE`.
@@ -206,12 +208,12 @@ plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO",
 Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
 
 ::: {.callout-note appearance="simple"}
-The example below uses `method = "ife"` with `factors.from = "nevertreated"`, which is equivalent to `method = "gsynth"` (see [Chapter @sec-gsynth]). We use the explicit form here for clarity.
+The example below uses `method = "ife"` with `time.component.from = "nevertreated"`, which is equivalent to `method = "gsynth"` (see [Chapter @sec-gsynth]). We use the explicit form here for clarity.
 :::
 
 ```{r cumu_effect, cache = TRUE}
 out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-                        method = "ife", factors.from = "nevertreated",
+                        method = "ife", time.component.from = "nevertreated",
                         force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'bootstrap',
                         parallel = FALSE, keep.sims=TRUE)
@@ -290,16 +292,14 @@ plot(out.bal, main = "Estimated ATT (Balanced Sample)",
 
 **fect** allows us to estimate and visualize the ATTs for sub-groups of treated units. For example, it can draw the gap plot for units that adopt the treatment at the same time under staggered adoption, which is defined as "Cohort" in Sun & Abraham (2021). Our simulated dataset is not ideal to demonstrate this functionality because the treatment switches on and off. To improve feasibility, we define a cohort as a group of treated units that first adopt the treatment at the same time.
 
-```{r simdata_panelview_cohort, fig.width = 6, fig.height = 4.5}
+```{r simdata_panelview_cohort, fig.width = 6, fig.height = 4.5, warning = FALSE}
 panelview(Y ~ D, data = sim_base, index = c("id","time"), by.timing = TRUE,
   axis.lab = "time", xlab = "Time", ylab = "Unit",
   background = "white", main = "Simulated Data: Treatment Status")
 ```
 
-The `get.cohort()` function (originally from the **paneltools** package) can generate a new variable "Cohort" based on the timing when treated units first get treated. The new version of **fect** incorporates the feature: users no longer need to install any complementary packages to replicate the tutorial.
-
+The `get.cohort()` function can generate a new variable "Cohort" based on the timing when treated units first get treated. 
 ```{r get_cohort}
-#  devtools:: install_github("xuyiqing/paneltools" if not already installed
 sim_base.cohort <- get.cohort(data = sim_base,D = 'D',index = c("id","time"))
 print(table(sim_base.cohort[,'Cohort']))
 ```
@@ -352,4 +352,4 @@ plot(out.w, main = "Estimated Weighted ATT")
 
 2.  We can get replicable results by setting the option `seed` to a certain integer, no matter whether the parallel computing is used.
 
-3.  When `na.rm = FALSE` (default), the program allows observations to have missing outcomes $Y$ or covariates $X$ but decided treatment statuses $D$. Otherwise the program will drop all observations that have missing values in outcomes, treatments, or covariates.
+3.  When `na.rm = FALSE` (default), the program allows observations to have missing outcomes $Y$ but not $X$ or  treatment statuses $D$. When `na.rm = TRUE` the program will drop all observations that have missing values in outcomes, treatments, or covariates.

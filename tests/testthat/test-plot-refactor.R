@@ -75,8 +75,8 @@ test_that("B2: esplot(fect_object) matches plot.fect gap output structure", {
     expect_true(inherits(p1, "gg"))
     expect_true(inherits(p2, "gg"))
     ## Both should have the same number of data points
-    d1 <- ggplot2::ggplot_build(p1)$data
-    d2 <- ggplot2::ggplot_build(p2)$data
+    d1 <- suppressWarnings(ggplot2::ggplot_build(p1)$data)
+    d2 <- suppressWarnings(ggplot2::ggplot_build(p2)$data)
     ## At least the point data should have similar row counts
     ## (exact match may differ due to count bars, but should be close)
     expect_true(length(d1) > 0)

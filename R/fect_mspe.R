@@ -109,7 +109,7 @@ fect_mspe <- function(
         D_mat <- d_ref
         II_mat <- I_mat
         II_mat[D_mat == 1] <- 0
-        if (!is.null(ref$factors.from) && ref$factors.from == "nevertreated") {
+        if (!is.null(ref$time.component.from) && ref$time.component.from == "nevertreated") {
             D_cum <- apply(D_mat, 2, function(vec) cummax(vec))
             ever_treated <- which(colSums(D_cum) > 0)
             II_mat[, ever_treated] <- 0

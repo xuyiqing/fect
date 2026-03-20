@@ -20,7 +20,7 @@ data(fect)
 
 The standard FEct estimator (`method = "fe"`) assumes that the untreated potential outcome is driven by unit and time fixed effects plus observed time-varying covariates:
 
-$$Y_{it}^{0} = \alpha_i + \xi_t + X_{it}'\beta + e_{it}$$
+$$Y_{it}^{0} = X_{it}'\beta + \alpha_i + \xi_t + e_{it}$$
 
 This may be insufficient when:
 
@@ -43,6 +43,12 @@ where:
 - $\omega_{k(i)}$ are additional group-level fixed effects,
 - $\lambda_{im} f_{tm}$ are interactive fixed effects (latent factors),
 - $e_{it}$ is the idiosyncratic error.
+
+::: {.callout-tip appearance="simple"}
+Most of the above elements, except additional group-level fixed effects $\omega_{k(i)}$, can be captured by an interactive fixed effects model. Knowing $Z_i$ or $Q_t$, however, can improve efficiency. In practice, we often do not know the exact functional form of $Q$, and $Z$ may suffer from severe measurement error. Therefore, including these terms may not yield the expected gains and may instead inflate variance. 
+
+In general, we recommend a data-driven approach to model selection, such as using `fect_mspe()`, which is based on cross-validation.
+:::
 
 ### Observed vs. unobserved
 
@@ -127,7 +133,7 @@ plot(out.cfe.region, cex.text = 0.8,
 The placebo test now passes (high p-value), confirming that the region×time fixed effects absorb the group-level confounding. By including the interacted `region_time` variable in the `index` argument, the CFE estimator absorbs the full set of region-specific time shocks $\delta_{g(i),t}$ during counterfactual imputation, removing the bias that was driving the spurious pre-trends.
 
 ::: {.callout-note appearance="simple"}
-In the `index` argument, elements beyond the first two (unit, time) are treated as additional fixed-effect grouping variables. You can include multiple additional groupings: `index = c("id", "time", "region", "sector")`.
+In the `index` argument, elements beyond the first two (unit, time) are treated as additional fixed-effect grouping variables. You can include multiple additional groupings: `index = c("id", "time", "region_time", "sector_time")`.
 :::
 
 ------------------------------------------------------------------------

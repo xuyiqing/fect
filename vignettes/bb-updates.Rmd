@@ -2,8 +2,8 @@
 
 ## v2.2.0
 
-* Added `factors.from` parameter: `"notyettreated"` (default) or `"nevertreated"` controls which units provide the factor structure. Replaces `method = "gsynth"` with `method = "ife", factors.from = "nevertreated"`.
-* CFE estimator now supports `factors.from = "nevertreated"`, enabling full CFE model components (additional FEs, $Z/\gamma$, $Q/\kappa$, latent factors) with never-treated estimation.
+* Added `time.component.from` parameter: `"notyettreated"` (default) or `"nevertreated"` controls which units provide the time-varying model components (time fixed effects, latent factors, and temporal dynamics). Replaces `method = "gsynth"` with `method = "ife", time.component.from = "nevertreated"`.
+* CFE estimator now supports `time.component.from = "nevertreated"`, enabling full CFE model components (additional FEs, $Z/\gamma$, $Q/\kappa$, latent factors) with never-treated estimation.
 * Added `fect_mspe()` for out-of-sample model comparison (MSPE, RMSE, MAD) across specifications.
 * Unified cross-validation: replaced `cv.treat` + `mask.method` with single `cv.method` parameter; added `cv.sample` k-fold CV for `fect_nevertreated`.
 * Improved EM convergence conditioning: R-level centering + C++ component-wise convergence (up to 2000x better component accuracy).
@@ -11,6 +11,10 @@
 * Plot system overhaul: pre/post color distinction, highlight shapes (triangles for placebo, diamonds for carryover), new `esplot()` parameters (`xangle`, `yangle`, `xbreaks`, `ybreaks`, `legendOff`).
 * Fixed parallel bootstrap `.export` lists for CFE + nevertreated; fixed `fect_mspe` + `CV=TRUE` interaction; fixed `start0` coloring; fixed `.as_mask()` dimension bug.
 * Renamed datasets for clarity: `simdata1` → `sim_base`, `simdata2` → `sim_trend`, `simgsynth` → `sim_gsynth`. Added `sim_region` and `sim_linear`. `simdata` kept for backward compatibility.
+* Fixed ggplot2 deprecation warnings: `size` → `linewidth` in all `geom_hline`, `geom_line`, and bound line aesthetics.
+* Fixed `GGally::ggpairs` loadings plot warnings by applying color/fill scales inside sub-panel functions.
+* Exit plot legends now read "Under treatment" / "Out of treatment" instead of "Pre-treatment" / "Post-treatment".
+* CRAN compliance: resolved codoc mismatches in `esplot.Rd`, `fect_mspe.Rd`, `plot.fect.Rd`; removed duplicate data source (`fect.RData`); added `globalVariables` declarations.
 * 590 tests (up from 131), including 98 book-derived behavioral tests and 36 CFE bifurcation tests.
 
 ## v2.1.1

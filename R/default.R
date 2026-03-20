@@ -35,7 +35,7 @@ fect <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
-    factors.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # number of factors
     lambda = NULL, # mc method: regularization parameter
@@ -108,7 +108,7 @@ fect.formula <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
-    factors.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # nubmer of factors
     lambda = NULL, # mc method: regularization parameter
@@ -213,7 +213,7 @@ fect.formula <- function(
         fill.missing = fill.missing,
         index = index,
         force = force,
-        factors.from = factors.from,
+        time.component.from = time.component.from,
         em = em,
         r = r,
         lambda = lambda,
@@ -288,7 +288,7 @@ fect.default <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
-    factors.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # nubmer of factors
     lambda = NULL, ## mc method: regularization parameter
@@ -467,27 +467,27 @@ fect.default <- function(
         )
     }
 
-    ## validate factors.from
-    if (!factors.from %in% c("notyettreated", "nevertreated")) {
-        stop("\"factors.from\" must be \"notyettreated\" or \"nevertreated\".")
+    ## validate time.component.from
+    if (!time.component.from %in% c("notyettreated", "nevertreated")) {
+        stop("\"time.component.from\" must be \"notyettreated\" or \"nevertreated\".")
     }
 
     ## mc does not use explicit factor estimation
-    if (method %in% c("mc", "both") && factors.from == "nevertreated") {
-        stop("\"factors.from = 'nevertreated'\" is not supported for the \"mc\" or \"both\" methods. ",
+    if (method %in% c("mc", "both") && time.component.from == "nevertreated") {
+        stop("\"time.component.from = 'nevertreated'\" is not supported for the \"mc\" or \"both\" methods. ",
              "Matrix completion does not use explicit factor estimation.")
     }
 
     ## em=FALSE requires a complete estimation sample
-    if (isFALSE(em) && factors.from == "notyettreated") {
-        stop("\"em = FALSE\" is not compatible with \"factors.from = 'notyettreated'\". ",
+    if (isFALSE(em) && time.component.from == "notyettreated") {
+        stop("\"em = FALSE\" is not compatible with \"time.component.from = 'notyettreated'\". ",
              "The not-yet-treated estimation sample has missing data by construction.")
     }
 
     ## gsynth always uses never-treated units only
     if (method == "gsynth") {
-        if (factors.from == "notyettreated") {
-            factors.from <- "nevertreated"
+        if (time.component.from == "notyettreated") {
+            time.component.from <- "nevertreated"
         }
         em <- FALSE
     }
@@ -512,7 +512,7 @@ fect.default <- function(
             CV <- FALSE
             method <- "ife"
         } else if (method == "cfe") {
-            if (factors.from == "nevertreated") {
+            if (time.component.from == "nevertreated") {
                 if (length(r) == 1) {
                     CV <- FALSE
                 } else if (length(r) > 1) {
@@ -545,7 +545,7 @@ fect.default <- function(
             CV <- FALSE
             method <- "ife"
         } else if (method == "cfe") {
-            if (factors.from != "nevertreated") {
+            if (time.component.from != "nevertreated") {
                 CV <- FALSE
             }
         } else if (method == "both") {
@@ -1486,23 +1486,23 @@ fect.default <- function(
     T0 <- apply(II, 2, sum)
     T0.min <- min(T0)
 
-    if (factors.from == "nevertreated") {
+    if (time.component.from == "nevertreated") {
         ## Validate: enough never-treated units for factor estimation
         D.cum <- apply(D, 2, function(vec) { cummax(vec) })
         D.unit.sum <- colSums(D.cum)
         co.never <- which(D.unit.sum == 0)
 
         if (length(co.never) == 0) {
-            stop("\"factors.from\" is set to \"nevertreated\" but no never-treated units found in the data.")
+            stop("\"time.component.from\" is set to \"nevertreated\" but no never-treated units found in the data.")
         }
         if (length(co.never) < r + 1) {
-            stop(paste0("\"factors.from\" is set to \"nevertreated\" but only ",
+            stop(paste0("\"time.component.from\" is set to \"nevertreated\" but only ",
                          length(co.never), " never-treated units found. Need at least ",
                          r + 1, " for r = ", r, "."))
         }
 
         if (!(method %in% c("gsynth", "ife") ||
-              (method == "cfe" && factors.from == "nevertreated"))) {
+              (method == "cfe" && time.component.from == "nevertreated"))) {
             ## Zero out II for methods that don't do their own co/tr split
             ## (gsynth, ife+nevertreated, cfe+nevertreated route to fect_nevertreated which splits internally)
             ever.treated <- setdiff(1:ncol(II), co.never)
@@ -1901,7 +1901,7 @@ fect.default <- function(
         }
     }
 
-    if (factors.from != "nevertreated" && min(apply(II, 2, sum)) == 0) {
+    if (time.component.from != "nevertreated" && min(apply(II, 2, sum)) == 0) {
         if (placeboTest == 1) {
             stop(
                 "Some units do not have any observations. Please set a smaller range for placebo period."
@@ -2003,7 +2003,7 @@ fect.default <- function(
                     norm.para = norm.para,
                     group.level = g.level,
                     group = G,
-                    factors.from = factors.from,
+                    time.component.from = time.component.from,
                     X.extra.FE = X.extra.FE,
                     X.Z = X.Z,
                     X.Q = X.Q,
@@ -2039,7 +2039,7 @@ fect.default <- function(
             }
         } else {
             ## non-binary case
-            if (method == "ife" && factors.from == "nevertreated") {
+            if (method == "ife" && time.component.from == "nevertreated") {
                 ## nevertreated: route to fect_nevertreated (the nevertreated estimator)
                 out <- fect_nevertreated(
                     Y = Y,
@@ -2100,7 +2100,7 @@ fect.default <- function(
                     group.level = g.level,
                     group = G
                 )
-            } else if (method == "cfe" && factors.from == "nevertreated") {
+            } else if (method == "cfe" && time.component.from == "nevertreated") {
                 ## cfe + nevertreated: route to fect_nevertreated with method="cfe"
                 out <- fect_nevertreated(
                     Y = Y,
@@ -2300,7 +2300,7 @@ fect.default <- function(
             group.level = g.level,
             group = G,
             keep.sims = keep.sims,
-            factors.from = factors.from
+            time.component.from = time.component.from
         )
 
     }
@@ -2819,7 +2819,7 @@ fect.default <- function(
             unit.type = unit.type,
             obs.missing = obs.missing,
             obs.missing.balance = obs.missing.balance,
-            factors.from = factors.from,
+            time.component.from = time.component.from,
             em = em
         ),
         out

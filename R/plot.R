@@ -519,11 +519,13 @@ plot.fect <- function(
           if (x$Ntr >= 5) {
             my_dens <- function(data, mapping, ...) {
               ggplot(data = data, mapping = mapping) +
-                geom_density(..., alpha = 0.5, color = NA)
+                geom_density(..., alpha = 0.5, color = NA) +
+                scale_fill_manual(values = loadings_colors)
             }
             my_scatter <- function(data, mapping, ...) {
               ggplot(data = data, mapping = mapping) +
-                geom_point(..., alpha = 0.4, size = 1.2)
+                geom_point(..., alpha = 0.4, size = 1.2) +
+                scale_color_manual(values = loadings_colors)
             }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group, fill = .data$group),
@@ -533,8 +535,6 @@ plot.fect <- function(
               lower = list(continuous = my_scatter),
               title = main
             ) +
-              scale_color_manual(values = loadings_colors) +
-              scale_fill_manual(values = loadings_colors) +
               theme(plot.title = element_text(hjust = 0.5))
           } else if (x$Ntr > 1) {
             my_dens <- function(data, mapping, ...) {
@@ -543,7 +543,8 @@ plot.fect <- function(
             }
             my_scatter <- function(data, mapping, ...) {
               ggplot(data = data, mapping = mapping) +
-                geom_point(..., alpha = 0.4, size = 1.2)
+                geom_point(..., alpha = 0.4, size = 1.2) +
+                scale_color_manual(values = loadings_colors)
             }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group),
@@ -552,9 +553,7 @@ plot.fect <- function(
               diag = list(continuous = my_dens),
               lower = list(continuous = my_scatter),
               title = main
-            ) +
-              scale_color_manual(values = loadings_colors) +
-              scale_fill_manual(values = loadings_colors)
+            )
           } else {
             my_dens <- function(data, mapping, ...) {
               ggplot(data = data, mapping = mapping) +
@@ -666,7 +665,7 @@ plot.fect <- function(
           p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
         }
         p <- p + xlab(xlab) + ylab(ylab) + ggtitle(main) +
-          geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
+          geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1]) +
           theme(
             legend.position = legend.pos,
             axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
@@ -2821,6 +2820,10 @@ plot.fect <- function(
       bot_pad <- if (show.count) 0.38 else 0.05
       ylim <- c(y_min - y_range * bot_pad, y_max + y_range * top_pad)
     }
+    ## Legend labels: exit plots use treatment-status labels
+    exit.pre.label  <- if (type == "exit") "Under treatment" else "Pre-treatment"
+    exit.post.label <- if (type == "exit") "Out of treatment" else "Post-treatment"
+
     ## point estimates
     if (classic == 1) {
       #
@@ -2857,7 +2860,7 @@ plot.fect <- function(
         show.points = show.points,
         ci.outline = ci.outline,
         connected = connected,
-        color = color, pre.color = pre.color, post.color = post.color,
+        color = color, pre.color = pre.color, post.color = post.color, pre.label = exit.pre.label, post.label = exit.post.label,
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
@@ -2927,7 +2930,7 @@ plot.fect <- function(
         Count = "count",
         show.count = show.count,
         connected = connected,
-        color = color, pre.color = pre.color, post.color = post.color,
+        color = color, pre.color = pre.color, post.color = post.color, pre.label = exit.pre.label, post.label = exit.post.label,
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
@@ -3014,7 +3017,7 @@ plot.fect <- function(
         show.points = show.points,
         ci.outline = ci.outline,
         connected = connected,
-        color = color, pre.color = pre.color, post.color = post.color,
+        color = color, pre.color = pre.color, post.color = post.color, pre.label = exit.pre.label, post.label = exit.post.label,
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
@@ -3056,17 +3059,17 @@ plot.fect <- function(
 
     # plot bound
     if (bound.old != "none") { ## with bounds
-      p <- p + geom_line(data = data2, aes(time, bound, colour = type, linetype = type, size = type, group = id))
+      p <- p + geom_line(data = data2, aes(time, bound, colour = type, linetype = type, linewidth = type, group = id))
       ## legends for bounds
       if (is.null(legend.nrow) == TRUE) {
         legend.nrow <- ifelse(length(set.limits) <= 3, 1, 2)
       }
       p <- p + scale_colour_manual(limits = set.limits, labels = set.labels, values = set.colors) +
-        scale_size_manual(limits = set.limits, labels = set.labels, values = set.size) +
+        scale_linewidth_manual(limits = set.limits, labels = set.labels, values = set.size) +
         scale_linetype_manual(limits = set.limits, labels = set.labels, values = set.linetypes) +
         guides(
           linetype = guide_legend(title = NULL, nrow = legend.nrow), colour = guide_legend(title = NULL, nrow = legend.nrow),
-          size = guide_legend(title = NULL, nrow = legend.nrow)
+          linewidth = guide_legend(title = NULL, nrow = legend.nrow)
         )
 
       if (isTRUE(legendOff)) {
@@ -3190,19 +3193,19 @@ plot.fect <- function(
     }
 
     # horizontal 0 line
-    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
 
     TTT <- as.numeric(rownames(data.1))
     TTT.2 <- as.numeric(rownames(data.2))
 
     if (CI == FALSE) {
-      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
+      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
       p <- p + geom_point(aes(x = TTT, y = d1[, 1]), color = "gray50", fill = "gray50", alpha = 1, size = 1.2)
     } else {
       p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, size = 0)
-      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
+      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
       p <- p + geom_pointrange(aes(x = TTT, y = d1[, 1], ymin = d1[, 3], ymax = d1[, 4]), color = "gray50", fill = "gray50", alpha = 1, size = 0.6)
     }
 
@@ -3381,8 +3384,8 @@ plot.fect <- function(
       )
 
       ## core geoms (even spacing because x is factor)
-      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
-      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
+      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
       # nicer CI + mean: thick error bars + solid point
       p <- p + geom_linerange(
         aes(x = x, ymin = .data$lower, ymax = .data$upper),
@@ -3462,10 +3465,10 @@ plot.fect <- function(
         p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
       }
 
-      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
       p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, size = 0)
-      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, size = 1.1)
+      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, linewidth = 1.1)
 
       ## title
       if (is.null(main) == TRUE) {
@@ -3608,7 +3611,7 @@ plot.fect <- function(
     }
 
     # horizontal 0 line
-    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
 
     complete.index.eff <- which(!is.na(x$eff))
     complete.index.time <- which(!is.na(x$T.on))
@@ -4068,7 +4071,7 @@ plot.fect <- function(
       p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
     }
 
-    p <- p + geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
+    p <- p + geom_hline(yintercept = 0, color = lcolor[1], linewidth = lwidth[1], linetype = ltype[1]) +
       geom_errorbar(
         aes(ymin = .data$lb, ymax = .data$ub, color = .data$color_group),
         width = 0.02, # Width of error bar caps

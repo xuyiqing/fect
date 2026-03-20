@@ -7,29 +7,40 @@ Evaluates the prediction accuracy of one or more \code{fect} model fits by hidin
 \usage{
 fect_mspe(
   out.fect,
-  hide_mask = NULL,
-  hide_n = 20,
   seed = NULL,
-  n_rep = 1,
-  pre.trend = TRUE,
-  pre.trend.n = 2
+  cv.method = "all_units",
+  cv.nobs = 3,
+  cv.donut = 1,
+  cv.prop = 0.1,
+  min.T0 = 5,
+  k = 5,
+  criterion = "mspe",
+  W = NULL,
+  norm.para = NULL,
+  proportion = 0
 )
 }
 \arguments{
   \item{out.fect}{A fitted \code{fect} object or a named list of fitted \code{fect} objects to compare.}
-  \item{hide_mask}{Optional matrix (TT x N or N x TT) or vector of length TT*N indicating which observations to hide. If \code{NULL}, positions are randomly selected.}
-  \item{hide_n}{Integer; number of control observations to hide per replication. Default is 20.}
   \item{seed}{Optional integer; random seed for reproducibility.}
-  \item{n_rep}{Integer; number of replications. Default is 1.}
-  \item{pre.trend}{Logical; if \code{TRUE}, candidate hide positions are restricted to pre-treatment periods. Default is \code{TRUE}.}
-  \item{pre.trend.n}{Integer; number of pre-treatment periods (counting backwards from treatment onset) from which to draw hide candidates. Default is 2.}
+  \item{cv.method}{Character; cross-validation masking strategy. Either \code{"all_units"} or \code{"treated_units"}. Default is \code{"all_units"}.}
+  \item{cv.nobs}{Integer; number of observations to mask per unit per fold. Default is 3.}
+  \item{cv.donut}{Integer; number of periods around treatment onset to exclude from masking. Default is 1.}
+  \item{cv.prop}{Numeric; proportion of observations to mask. Default is 0.1.}
+  \item{min.T0}{Integer; minimum number of pre-treatment periods required. Default is 5.}
+  \item{k}{Integer; number of cross-validation folds. Default is 5.}
+  \item{criterion}{Character; scoring criterion. One of \code{"mspe"}, \code{"wmspe"}, \code{"gmspe"}, \code{"wgmspe"}, \code{"mad"}, \code{"moment"}, \code{"gmoment"}. Default is \code{"mspe"}.}
+  \item{W}{Optional TT x N observation weight matrix. Default is \code{NULL}.}
+  \item{norm.para}{Optional normalization vector. Default is \code{NULL}.}
+  \item{proportion}{Numeric; proportion cutoff for count.T.cv (same as fect_cv). Default is 0.}
 }
 \value{
 A list containing:
-\item{summary}{A data frame with mean RMSE and Bias across replications for each model.}
-\item{records}{A data frame with per-replication results including Rep, Model, Hidden_N, RMSE, and Bias.}
-\item{hide_mask}{The hide mask used in the last replication.}
+\item{summary}{A data frame with mean scores across replications for each model, including MSPE, WMSPE, GMSPE, WGMSPE, MAD, Moment, GMoment, RMSE, and Bias.}
+\item{records}{A data frame with per-replication results including Rep, Model, Hidden_N, and all score columns.}
 \item{fits}{The refitted \code{fect} objects from the last replication.}
+\item{criterion}{The scoring criterion used.}
+\item{scores}{The scores from the last replication.}
 }
 \examples{
 \dontrun{

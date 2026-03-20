@@ -115,7 +115,7 @@ fect_boot <- function(
   group = NULL,
   dis = 0,
   keep.sims = FALSE,
-  factors.from = "notyettreated"
+  time.component.from = "notyettreated"
 ) {
   na.pos <- NULL
   TT <- dim(Y)[1]
@@ -251,7 +251,7 @@ fect_boot <- function(
       if ("try-error" %in% class(out)) {
         stop("\nCannot estimate using full data with MC algorithm.\n")
       }
-    } else if (method == "cfe" && factors.from == "nevertreated") {
+    } else if (method == "cfe" && time.component.from == "nevertreated") {
       out <- try(
         fect_nevertreated(
           Y = Y,
@@ -373,7 +373,7 @@ fect_boot <- function(
         cv.prop = cv.prop,
         cv.method = cv.method,
         cv.nobs = cv.nobs,
-        factors.from = factors.from,
+        time.component.from = time.component.from,
         X.extra.FE = X.extra.FE,
         X.Z = X.Z,
         X.Q = X.Q,
@@ -793,7 +793,7 @@ fect_boot <- function(
       }
 
       ## output
-      if (method == "gsynth" || (method == "ife" && factors.from == "nevertreated")) {
+      if (method == "gsynth" || (method == "ife" && time.component.from == "nevertreated")) {
         synth.out <- try(
           fect_nevertreated(
             Y = Y.pseudo,
@@ -814,7 +814,7 @@ fect_boot <- function(
           ),
           silent = TRUE
         )
-      } else if (method == "cfe" && factors.from == "nevertreated") {
+      } else if (method == "cfe" && time.component.from == "nevertreated") {
         synth.out <- try(
           fect_nevertreated(
             Y = Y.pseudo,

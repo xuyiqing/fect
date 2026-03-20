@@ -1,32 +1,30 @@
 # Gsynth Program {#sec-gsynth}
 
-This chapter demonstrate the generalized synthetic control method, or Gsynth, proposed in @Xu2017 (\[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\]).
+This chapter demonstrate the generalized synthetic control method, or Gsynth, proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\].
 
 Gsynth was originally implemented in the **gsynth** package but has now been fully integrated into the **fect** package. Gsynth (`method = "gsynth"`) and FEct/IFEct/MC (`method = "fe"/"ife"/"mc"`) are different in the following ways:
 
 -   Gsynth is designed to handle block and staggered DID settings **without** treatment reversal, whereas other methods allow for treatment reversal under the assumption of limited carryover effects.
--   Gsynth is particularly suited for cases where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
--   Compared with IFEct (`method = "ife"`), Gsynth *does not* rely on pre-treatment data from the treated units to impute $\hat{Y}(0)$. This approach significantly speeds up computation and improves stability.
+-   Gsynth is particularly suited for the Synth setting, where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
+-   Compared with IFEct (`method = "ife"`), Gsynth *does not* rely on pre-treatment data from the treated units to estimate time components (e.g., factors). Hence, `time.component.from = "nevertreated"`. This approach speeds up computation, improves stability, and is more suitable for predictive inference based on row exchangablity.
 
-Therefore, we recommend setting `method = "gsynth"` in **fect** for scenarios where the treatment does not reverse (or is coded accordingly) and the number of treated units is small .
+Therefore, we recommend setting `method = "gsynth"` in **fect** for the synthetic control setting, where the treatment does not reverse (or is coded accordingly) and the number of treated units is small.
 
 ::: {.callout-important appearance="simple"}
 ### Key Equivalence
-`fect(..., method = "gsynth")` is equivalent to `fect(..., method = "ife", factors.from = "nevertreated")`.
+`fect(..., method = "gsynth")` is equivalent to `fect(..., method = "ife", time.component.from = "nevertreated")`.
 
-Gsynth is not a separate estimator — it is the IFE model estimated using only never-treated controls. The **gsynth** package was developed in the synthetic control research setting, where a small number of treated units are compared against never-treated controls to learn latent time effects.
+Gsynth is a procedure based on an IFE model estimated using only never-treated controls. The gsynth package was developed in the synthetic control setting, where a small number of treated units are compared with never-treated controls to learn latent time effects.
 :::
 
-### When to use the never-treated regime
+Use `method = "gsynth"` (or equivalently `time.component.from = "nevertreated"`) when:
 
-Use `factors.from = "nevertreated"` (or equivalently `method = "gsynth"`) when:
+-   The treatment does *not* reverse (block or staggered adoption only).
+-   The number of treated units is *small*, including $N_{tr} = 1$.
+-   You want *parametric bootstrap* (`vartype = "parametric"`) for uncertainty estimation — this is particularly useful with few treated units.
+-   You do *not* want pre-treatment data from treated units to influence time component (i.e., factor) estimation.
 
--   The treatment does **not** reverse (block or staggered adoption only).
--   The number of treated units is **small**, including $N_{tr} = 1$.
--   You want **parametric bootstrap** (`vartype = "parametric"`) for uncertainty estimation — this is particularly useful with few treated units.
--   You do **not** want pre-treatment data from treated units to influence factor estimation — this improves computational speed and stability.
-
-In contrast, the default regime (`factors.from = "notyettreated"`, used in [Chapter @sec-fect]) accommodates treatment reversal and uses EM to estimate factors from all not-yet-treated observations.
+In contrast, the default regime (`time.component.from = "notyettreated"`, used in [Chapter @sec-fect]) accommodates treatment reversal and uses EM to estimate time components (time fixed effects, latent factors, and temporal dynamics) from all not-yet-treated observations.
 
 We will use two datasets, `sim_gsynth` and `turnout`, to perform analyses in block and staggered DID settings. First, we load the two datasets: `sim_gsynth` and `turnout`:
 
@@ -41,11 +39,13 @@ data(fect)
 ls()
 ```
 
-## Simulated Data
+## Baisc Usage 
+
+### Simulated Data
 
 We start with the first example, `sim_gsynth`, a simulated dataset described in @Xu2017.
 
-There are 5 treated units, 45 control units, and 30 time periods. The treatment kicks at Period 21 for all treated units, hence, a multiperiod DID set up.
+There are 5 treated units, 45 control units, and 30 time periods. The treatment kicks at Period 21 for all treated units, hence, a block DID set up.
 
 ```{r head-sim_gsynth}
 head(sim_gsynth)
@@ -53,7 +53,7 @@ head(sim_gsynth)
 
 Before we conduct any statistical analysis, it is helpful to visualize the data structure and spot missing values (if there are any). We can easily do so with the help of the **panelView** package. The figure below shows that: (1) there are 5 treated units and 45 control units; (2) the treated units start to be treated in period 21; and (3) there are no missing values, which is a rare case.
 
-```{r sim-panelview-status, cache = FALSE, fig.height=7, fig.width=7}
+```{r sim-panelview-status, cache = FALSE, fig.height=7, fig.width=7, warning=FALSE}
 library(panelView)
 panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), pre.post = TRUE) 
 ```
@@ -64,7 +64,7 @@ The code chunk below visualizes the trends of outcome variable over the full pan
 panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), type = "outcome") 
 ```
 
-## Estimation
+### Estimation
 
 We estimate the model using only the outcome variable ($Y$), treatment indicator ($D$), covariates ($X_1$) and ($X_2$), and group indicators ($id$) and ($time$).
 
@@ -80,11 +80,9 @@ out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
 
 The first variable on the right-hand side is the binary treatment indicator, with remaining variables as controls. The `index` option designates unit and time indicators for fixed effects analysis.
 
-The `force` option (`"none"`, `"unit"`, `"time"`, and `"two-way"`) specifies the additive component(s) of the fixed effects included in the model. The default option is `"two-way"` (including additive unit fixed effects). A cross-validation procedure is provided (when `CV = TRUE`) to select the number of unobserved factors within the interval of `r=c(0,5)`. When cross-validation is switched off, the first element in r will be set as the number of factors. Alternatively, for example, when `CV = FALSE`, r can take in a numeric value (`r= 0`).
+The `force` option (`"none"`, `"unit"`, `"time"`, and `"two-way"`) specifies the additive component(s) of the fixed effects included in the model. The default option is `"two-way"` (including additive unit fixed effects). A cross-validation procedure is provided (when `CV = TRUE`) to select the number of unobserved factors within the interval of `r=c(0,5)`. When cross-validation is switched off, the first element in r will be set as the number of factors. Alternatively, for example, when `CV = FALSE`, r can take in a numeric value ($r = 0$).
 
-Setting `se = TRUE`, the algorithm can produce uncertainty measurements. When the number of treated units is small, a parametric bootstrap procedure is preferred (`vartype = "parametric"`). The default number of parametric bootstrap runs is set to 200. Alternatively, non-parametric bootstrap procedure is also available. (`vartype = "bootstrap"`); note, it only works well when the treatment group is relatively large, (e.g. $Ntr>40$). The number of bootstrap runs can be set by `nboots`.
-
-Because the core function of Gsynth in **fect** is written in C++, the algorithm runs relatively fast. The entire procedure (including cross-validation and 1,000 bootstrap runs) takes only a few seconds on a 2023 Macbook Pro Max.
+Setting `se = TRUE`, the algorithm can produce uncertainty measurements. When the number of treated units is small, a parametric bootstrap procedure is preferred (`vartype = "parametric"`). The default number of parametric bootstrap runs is set to 200. The number of bootstrap runs can be set by `nboots`.
 
 The algorithm prints out the results automatically. `sigma2` stands for the estimated variance of the error term; `IC` represents the Bayesian Information Criterion; and `MPSE` is the Mean Squared Prediction Error. The cross-validation procedure selects an `r*` that minimizes the MSPE.
 
@@ -103,11 +101,9 @@ out$beta
 
 Treatment effect estimates from each bootstrap run is stored in `att.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
 
-The full list of generated estimates of a **fect** object can be found on [GitHub](https://github.com/xuyiqing/fect/blob/master/man/fect.Rd) (Line 134-239).
-
-Parallel computing will speed up the bootstrap procedure significantly. When `parallel = TRUE` (default) and `cores` options are omitted, the algorithm will detect the number of available cores on your computer automatically.
-
-(Warning: it may consume most of your computer's computational power if all cores are being used.)
+::: {.callout-note appearance="simple"}
+**Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
+:::
 
 ```{r sim2, cache = TRUE, warning = FALSE}
 system.time(
@@ -122,11 +118,23 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
                method = "gsynth", force = "two-way", 
                CV = TRUE, r = c(0, 5), se = TRUE,
                vartype = "jackknife", 
-               parallel = TRUE, cores = 16)
+               parallel = TRUE, cores = 8)
 
 ```
 
-## Visualizing Results
+### Cross-validation
+
+Not all `cv.method` options are available in the Synth/Gsynth settings:
+
+| | `fect_cv` (DID/TWFE) | CV in Gsynth | `fect_mspe` (post-hoc) |
+|:--|:--|:--|:--|
+| `"all_units"` | Default | Available | Default |
+| `"treated_units"` | Available | Default | Available |
+| `"loo"` | --- | Available | --- |
+
+The `"loo"` method is exclusive to Gsynth (`time.component.from = "nevertreated"`) because it requires factor estimation to be independent of the held-out treated observations. In the `"nevertreated"` setting, factors are estimated from control units only, so holding out treated pre-treatment periods does not compromise estimation. In the `"notyettreated"` setting, all units contribute to estimation, making LOO less clean; use `"treated_units"` instead.
+
+### Visualizing Results
 
 By default, the `print` function produces a *gap* plot, equivalent to using `plot(out, type = "gap")`, and visualizes the estimated Average Treatment Effect on the Treated (ATT) by period. For reference, the true effects in `gsynth` range from 1 to 10 (with some added white noise) and take effect during periods 21 to 30.
 
@@ -160,19 +168,38 @@ Aesthetic options for ggplot2 objects are compatible for all **fect** plots.
 For demonstration, we use `main`, `xlim`, and `ylim` to set the plot title and axis labels.
 
 ```{r sim_gap2, fig.height=5, fig.width=7}
-plot(out, type = "gap", ylim = c(-3,12), xlab = "Period", 
-     main = "Estimated ATT (FEct)")
+plot(out, type = "gap", ylim = c(-6,12), xlab = "Period", 
+     main = "Estimated ATT (Gsynth)")
 ```
 
 **fect** objects can generate eight types of plots for diverse demonstration purposes. The `type` option includes the following:
 
 -   `"gap"`: Reports ATT by period (default).
+-   `"counterfactual"`: Generates the observed treated outcome alongside the imputed counterfactual averages. The style can be modified with `raw = "all"` for linear or `raw = "band"` for graphic representation of all estimated counterfactual results.
+-   `"factors"` and `"loadings"`: Plot the estimated factors and loadings, respectively.
 -   `"status"`: Plots treatment status of all observations, similar to `panelview()`. The time labels are displayed only when `axis.lab = "time"` is set.
 -   `"box"`: Displays the estimated individual treatment effects with box plot.
 -   `"calendar"`: Shows how the treatment effect evolves over time.
--   `"factors"` and `"loadings"`: Plot the estimated factors and loadings, respectively.
--   `"counterfactual"`: Generates the observed treated outcome alongside the imputed counterfactual averages. The style can be modified with `raw = "all"` for linear or `raw = "band"` for graphic representation of all estimated counterfactual results.
--   `"equiv"`: Exhibits the average pretreatment residuals with equivalence confidence intervals.
+-   `"equiv"`: Exhibits the average pre-treatment residuals with equivalence confidence intervals.
+
+To visualize the estimated counterfactual outcomes, we use `type = "counterfactual"`. If no argument is assigned to `raw`, the plot will display the average of the *treated* and of the *estimated counterfactual* outcomes. When `method = "gsynth"` and `vartype = "parametric"`, the 95% confidence intervals around the counterfactual outcomes will be the same as for the event-study ATT (though flipped in shape).
+
+```{r sim-counterfactual, cache = FALSE, fig.height=5, fig.width=7}
+plot(out, type = "counterfactual")
+```
+
+**fect** offers two options for displaying all estimated counterfactual estimates: `raw = "all"` for linear and `raw = "band"` for a graphical (shaded band) representation.
+
+```{r sim-counterfactual-all, cache = FALSE,fig.height=5, fig.width=7}
+plot(out, type = "counterfactual", raw = "all")
+```
+
+Note that in the plot below, the shaded areas represent the 5-95% quantiles of the treated and estimated counterfactual trajectories, not their uncertainty estimates.
+
+```{r sim-counterfactual-band, cache = FALSE,fig.height=5, fig.width=7}
+plot(out, type = "counterfactual", raw = "band")
+```
+
 
 The figure below illustrates the treatment status of all observations. Users can specify the exact values shown on the x- and y-axes using the `xticklabels` and `yticklabels` parameters (i.e., `xticklabels=c("1","5","10", "15","20", "25", "30")`). Setting a nonexistent value to the option removes all numeric labels for that axis (i.e., `yticklabels="0"`). The `status` plot has now been incorporated into a standalone package, **panelView**.
 
@@ -180,6 +207,17 @@ The figure below illustrates the treatment status of all observations. Users can
 plot(out, type = "status", yticklabels="0", 
      xticklabels=c("5", "10", "15","20", "25", "30") )
 ```
+
+The next two figures plot the estimated factors and factor loadings, respectively.
+
+```{r sim_L, cache = TRUE, message = FALSE, results='hide', fig.height=7, fig.width=7}
+plot(out, type = "loadings")
+```
+
+```{r sim_F, message = FALSE, results='hide', fig.height=5, fig.width=7}
+plot(out, type = "factors", xlab = "Time")
+```
+
 
 The box plot visualize the estimated individual treatment effects for the treated units. While these effects are not identified at the individual level, their dispersion provides insight into heterogeneous treatment effect across different time periods and informs model performance. By default, the number of total treated units is labeled on the graph. Note, if the number of treated units is small, the box plot will reduce to a scatter plot, as shown below.
 
@@ -205,35 +243,7 @@ In the plot below, the points represent the ATTs by calendar time. The blue curv
 plot(out,type = "calendar")
 ```
 
-The next two figures plot the estimated factors and factor loadings, respectively.
-
-```{r sim_L, cache = TRUE, message = FALSE, results='hide', fig.height=7, fig.width=7}
-plot(out, type = "loadings")
-```
-
-```{r sim_F, message = FALSE, results='hide', fig.height=5, fig.width=7}
-plot(out, type = "factors", xlab = "Time")
-```
-
-To visualize the estimated counterfactual outcomes, we use `type = "counterfactual"`. If no argument is assigned to `raw`, the plot will display the average of the *treated* and of the *estimated counterfactual* outcomes. When `method = "gsynth"` and `vartype = "parametric"`, the 95% confidence intervals around the counterfactual outcomes will be the same as for the event-study ATT (though flipped in shape).
-
-```{r sim-counterfactual, cache = FALSE, fig.height=5, fig.width=7}
-plot(out, type = "counterfactual")
-```
-
-**fect** offers two options for displaying all estimated counterfactual estimates: `raw = "all"` for linear and `raw = "band"` for a graphical (shaded band) representation.
-
-```{r sim-counterfactual-all, cache = FALSE,fig.height=5, fig.width=7}
-plot(out, type = "counterfactual", raw = "all")
-```
-
-Note that in the plot below, the shaded areas represent the 5-95% quantiles of the treated and estimated counterfactual trajectories, not their uncertainty estimates.
-
-```{r sim-counterfactual-band, cache = FALSE,fig.height=5, fig.width=7}
-plot(out, type = "counterfactual", raw = "band")
-```
-
-Lastly, `type = "equiv"` helps visualize the average pretreatment residuals with equivalence confidence intervals.
+Lastly, `type = "equiv"` helps visualize the average pre-treatment residuals with equivalence confidence intervals.
 
 ```{r sim-equiv, cache = FALSE, fig.height=5, fig.width=7}
 plot(out, type = "equiv", ylim = c(-5, 5))
@@ -251,43 +261,6 @@ Alternatively, it can be repositioned by providing coordinates to `stats.pos`.
 plot(out, type = "equiv", stats.pos = c(-19, 4.5), ylim = c(-5, 5))
 ```
 
-## Comparing w/ IFEct & MC
-
-Since we have now merged **gysnth** into **fect**, the original `ife` and `mc` methods in **gysnth** now can be directly implemented in **fect**. Please refer to the previous chapter for implementation details.
-
-Here, we apply these two methods to the simulated dataset `sim_gsynth` and compare the results from those from setting `method = "gysnth"`. Note that not only the algorithms are (slightly) different, the inferential methods are different, too. Both `ife` and `mc` use large-sample inferential method such as nonparametric bootstrap or jackknife while `gsynth` employs a two-step parametric bootstrap procedure, analogous to conformal inference, which accommodates a small number of treated units.
-
-### IFEct
-
-For the `ife` method, we need to specify an interval of candidate number of unobserved factors in option r like `r=c(0,5)`. When cross-validation is switched off, the first element in r will be set as the number of factors. Below we use the MSPE criterion and search the number of factors from 0 to 5.
-
-```{r sim_ife, cache = TRUE, message = FALSE}
-out.ife <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-          force = "two-way", method = "ife", CV = TRUE, r = c(0, 5),
-          se = TRUE, nboots = 200, parallel = TRUE)
-```
-
-The figure below shows the estimated ATT using the IFE method. The cross-validation procedure selects the correct number of factors $(r=2)$.
-
-```{r sim_ife2, fig.height=5, fig.width=7}
-plot(out.ife, main = "Estimated ATT (EM)")
-```
-
-### Matrix completion
-
-To implement the MC method, a sequence of candidate tuning parameters must be specified. For example, users can set `lambda = c(1, 0.8, 0.6, 0.4, 0.2, 0.05)`. If `lambda` is not specified, **fect** uses an algorithm to automatically generate a set of candidate tuning parameters based on the outcome variable. Users can adjust the number of tuning parameters with `nlambda`, which defaults to `nlambda = 10`.
-
-```{r sim_mc, cache = TRUE}
-out.mc <- fect(Y ~ D + X1 + X2, data = sim_gsynth,
-               index = c("id","time"),
-                force = "two-way", method = "mc", CV = TRUE,
-                se = TRUE, nboots = 200, parallel = TRUE)
-
-```
-
-```{r sim_MC, fig.height=5, fig.width=7}
-plot(out.mc, main = "Estimated ATT (MC)")
-```
 
 ------------------------------------------------------------------------
 
@@ -327,7 +300,7 @@ out0 <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
 ```
 
 ```{r turnout_did_gap, fig.height=5, fig.width=7}
-plot(out0, type = "gap", xlim = c(-15, 15))
+plot(out0, type = "gap", xlim = c(-15, 5), ylim=c(-15, 10))
 ```
 
 ### Estimation w/ factors
@@ -356,7 +329,7 @@ sort(out_turnout$wgt.implied[,8])
 Like we have demonstrated with the multiperiod DID analysis, we also use the gap (default) plot to visualize the ATT.
 
 ```{r turnout_gap, fig.height=5, fig.width=7}
-plot(out_turnout, xlim = c(-10, 5), ylim=c(-15,15))
+plot(out_turnout, xlim = c(-10, 5), ylim=c(-15, 10))
 ```
 
 For staggered DID, a status plot can be generated after estimation. Here, we use `xlab`, `ylab`, and `main` to modify the axis labels and the graph title, respectively. Additionally, `xangle` and `yangle` can tilt the numeric labels to improve readability. Note that the values provided for these options specify the degree of tilt.
@@ -394,11 +367,11 @@ plot(out_turnout, type = "calendar", ylim = c(-15,15))
 
 Estimated factors and factor loadings are ploted below.
 
-```{r turnout_F, message = FALSE, results = 'hide', fig.height=5, fig.width=7}
+```{r turnout_F, message = FALSE, results = 'hide', fig.height=5, fig.width=7, warning=FALSE}
 plot(out_turnout, type = "factors", xlab = "Year")
 ```
 
-```{r turnout_L, message = FALSE, results = 'hide', fig.height=7, fig.width=7}
+```{r turnout_L, message = FALSE, results = 'hide', fig.height=7, fig.width=7, warning=FALSE}
 plot(out_turnout, type = "loadings")
 ```
 
@@ -463,57 +436,19 @@ We re-produce the gap plot with the unbalanced panel, here, we set the range of 
 plot(out_ub, type = "gap", ylim = c(-10, 20))
 ```
 
-### Matrix completion
-
-Finally, we re-estimate the model using the matrix completion method.
-
-```{r turnout_ub_est2, cache = TRUE, message = FALSE}
-out.mc_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor, 
-                 min.T0 = 8, data = turnout.ub,  
-                 index = c("abb","year"), method = "mc", 
-                 se = TRUE, nboots = 1000, seed = 02139)
-```
-
-Again, we use a gap plot to visualize estimated ATT.
-
-```{r turnout_ub_mc_gap, fig.height=5, fig.width=7}
-plot(out.mc_ub, main = "Estimated ATT (MC)", ylim = c(-10, 20))
-```
-
-## Additional Notes
-
-1.  **Unbalanced Panels**: Running Gsynth within **fect** on unbalanced panels will take significantly more time compared to balanced panels, often by a factor of 100:1 or more. This is because the EM algorithm, which fills in missing values (implemented in C++), requires many more iterations to converge. To reduce run-time, users can remove units or time periods with extensive missing values. Understanding the data structure before running any regressions is always helpful. Note that this approach differs from setting `method = "ife"`, as no pre-treatment data from the treated units is used to impute $\hat{Y}(0)$.
-
-2.  **Adding Covariates**: Including covariates in the model will significantly slow down the algorithm, as the IFE/MC model requires more time to converge. Users should be aware of this trade-off when incorporating covariates.
-
-3.  **Setting `min.T0`**: Setting `min.T0` to a positive value helps. The algorithm will automatically exclude treated units with too few pre-treatment periods. A larger $T_0$ reduces bias in causal estimates and minimizes the risk of severe extrapolation. When running cross-validation to select the number of factors, `min.T0` must be equal to or greater than (`r.max` + 2). Errors frequently occur when there are too few pre-treatment periods, so ensuring adequate $T_0$ (e.g. setting `min.T0 = 5`) is crucial.
 
 ------------------------------------------------------------------------
 
-## Cross-validation in the nevertreated regime
+## CFE with GSynth
 
-Not all `cv.method` options are available in all settings:
-
-| | `fect_cv` (notyettreated) | nevertreated CV | `fect_mspe` (post-hoc) |
-|:--|:--|:--|:--|
-| `"all_units"` | Default | Available | Default |
-| `"treated_units"` | Available | Default | Available |
-| `"loo"` | --- | Available | --- |
-
-The `"loo"` method is exclusive to the nevertreated regime because it requires factor estimation to be independent of the held-out treated observations. In the nevertreated setting, factors are estimated from control units only, so holding out treated pre-treatment periods does not compromise estimation. In the notyettreated setting, all units contribute to estimation, making LOO less clean; use `"treated_units"` instead.
-
-------------------------------------------------------------------------
-
-## CFE in the nevertreated setting
-
-The nevertreated regime is not limited to the IFE method. The complex fixed effects (CFE) estimator can also be used with `factors.from = "nevertreated"`, combining the nevertreated estimation regime with CFE's richer model structure. This is useful when the data generating process involves not only latent interactive fixed effects but also additional additive fixed effects (e.g., region, industry), unit-specific time trends (via `Q.type`), or time-invariant covariates with time-varying coefficients (`Z`/`gamma`). See [Chapter @sec-cfe] for the full CFE tutorial.
+Gsynth is not limited to the IFE method. The complex fixed effects (CFE) estimator can also be used with `time.component.from = "nevertreated"`. This is useful when the data generating process involves not only latent interactive fixed effects but also additional additive fixed effects (e.g., region, industry), unit-specific time trends (via `Q.type`), or time-invariant covariates with time-varying coefficients (`Z`/`gamma`). See [Chapter @sec-cfe] for the full CFE tutorial.
 
 ### Example: CFE + nevertreated
 
 ```{r cfe_nt_demo, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.cfe.nt <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                    method = "cfe", force = "two-way",
-                   factors.from = "nevertreated",
+                   time.component.from = "nevertreated",
                    Q.type = "linear",
                    se = FALSE, CV = TRUE, r = c(0, 5),
                    parallel = TRUE)
@@ -525,27 +460,47 @@ cat("CFE + nevertreated: r.cv =", out.cfe.nt$r.cv,
 ```
 
 ::: {.callout-note appearance="simple"}
-Under `factors.from = "nevertreated"`, the CFE estimator uses only never-treated controls for factor estimation — the same principle as gsynth. The additional CFE components (extra FE, time trends, Z/gamma) are estimated on the control panel and projected onto treated units alongside the interactive factors. See [Chapter @sec-cfe] for the full CFE tutorial.
+Under `time.component.from = "nevertreated"`, the CFE estimator uses only never-treated controls for factor estimation — the same principle as gsynth. The additional CFE components (extra FE, time trends, Z/gamma) are estimated on the control panel and projected onto treated units alongside the interactive factors. See [Chapter @sec-cfe] for the full CFE tutorial.
 :::
 
 ### Comparing gsynth and CFE + nevertreated
 
-Both approaches share the same estimation regime (never-treated controls only), but CFE adds structural components. Whether the extra flexibility helps depends on the data generating process. If the true model has unit-specific trends or group fixed effects, CFE with nevertreated will outperform plain gsynth. If the true model is pure IFE, the additional CFE parameters add noise without benefit. The `fect_mspe()` function provides a principled comparison:
+Both approaches share the same estimation regime (never-treated controls only), but CFE can add structural components on top. Whether the extra flexibility helps depends on the data generating process. We compare three specifications using `fect_mspe()`:
 
 ```{r cfe_nt_vs_gsynth, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
+# Model 1: gsynth (pure IFE, r = 2)
 out.gsynth.comp <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "gsynth", force = "two-way",
                         r = 2, se = FALSE, CV = FALSE)
 
+# Model 2: CFE + nevertreated with r = 2 only (equivalent to gsynth)
 out.cfe.nt.comp <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "cfe", force = "two-way",
-                        factors.from = "nevertreated",
+                        time.component.from = "nevertreated",
                         r = 2, se = FALSE, CV = FALSE)
+
+# Model 3: CFE + nevertreated with r = 2 and linear trend (overspecified)
+out.cfe.nt.lin <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
+                       method = "cfe", force = "two-way",
+                       time.component.from = "nevertreated",
+                       Q.type = "linear", r = 2, se = FALSE, CV = FALSE)
 ```
 
 ```{r cfe_nt_mspe, eval=TRUE, cache=TRUE}
-mspe.comp <- fect_mspe(list(out.gsynth.comp, out.cfe.nt.comp), seed = 1234)
-print(mspe.comp$summary)
+mspe.comp <- fect_mspe(list(gsynth_r2 = out.gsynth.comp,
+                            CFE_r2 = out.cfe.nt.comp,
+                            CFE_linear_r2 = out.cfe.nt.lin), seed = 1234)
+print(mspe.comp$summary[, c("Model", "MSPE", "RMSE", "MAD")])
 ```
 
-Since `sim_gsynth` follows a pure IFE data generating process, gsynth and CFE with nevertreated should produce similar MSPE, confirming that the additional CFE structure neither helps nor hurts when it is not needed.
+Since `sim_gsynth` follows a pure IFE data generating process with two factors, Models 1 and 2 should produce identical MSPE --- confirming that CFE with `time.component.from = "nevertreated"` and no additional structure is numerically equivalent to gsynth. Model 3, which adds unnecessary linear trends, should produce similar or slightly worse MSPE because the extra parameters add noise without benefit when the true DGP has no unit-specific trends.
+
+------------------------------------------------------------------------
+
+## Additional Notes
+
+1.  **Unbalanced Panels**: Running Gsynth within **fect** on unbalanced panels will take significantly more time compared to balanced panels, often by a factor of 100:1 or more. This is because the EM algorithm, which fills in missing values (implemented in C++), requires many more iterations to converge. To reduce run-time, users can remove units or time periods with extensive missing values. Understanding the data structure before running any regressions is always helpful. Note that this approach differs from setting `method = "ife"`, as no pre-treatment data from the treated units is used to impute $\hat{Y}(0)$.
+
+2.  **Adding Covariates**: Including covariates in the model will significantly slow down the algorithm, as the IFE/MC model requires more time to converge. Users should be aware of this trade-off when incorporating covariates.
+
+3.  **Setting `min.T0`**: Setting `min.T0` to a positive value helps. The algorithm will automatically exclude treated units with too few pre-treatment periods. A larger $T_0$ reduces bias in causal estimates and minimizes the risk of severe extrapolation. When running cross-validation to select the number of factors, `min.T0` must be equal to or greater than (`r.max` + 2). Errors frequently occur when there are too few pre-treatment periods, so ensuring adequate $T_0$ (e.g. setting `min.T0 = 5`) is crucial.

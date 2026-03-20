@@ -32,7 +32,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     norm.para = NULL,
                     group.level = NULL,
                     group = NULL,
-                    factors.from = "notyettreated",
+                    time.component.from = "notyettreated",
                     X.extra.FE = NULL,
                     X.Z = NULL,
                     X.Q = NULL,
@@ -210,7 +210,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         }
 
         ## for ife with nevertreated, use the cross-validation function in fect_nevertreated
-        if (method == "ife" && factors.from == "nevertreated") {
+        if (method == "ife" && time.component.from == "nevertreated") {
             message("IFE model with nevertreated factors...\n")
             out <- fect_nevertreated(
                 Y = Y, D = D, X = X, W = W, I = I, II = II,
@@ -231,7 +231,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         }
 
         ## for cfe with nevertreated, use the cross-validation function in fect_nevertreated
-        if (method == "cfe" && factors.from == "nevertreated") {
+        if (method == "cfe" && time.component.from == "nevertreated") {
             message("CFE model with nevertreated factors...\n")
             out <- fect_nevertreated(
                 Y = Y, D = D, X = X, W = W, I = I, II = II,

@@ -1,6 +1,6 @@
 # Plot Options {#sec-plots}
 
-In this chapter, we explore visualization options available in the **fect** package. Plots are organized by `type`, from the default gap plot through diagnostic plots (equivalence, placebo, carryover), cumulative effects, heterogeneity plots, and special-purpose displays. We begin with shared parameter conventions, then work through each plot type progressively.
+In this chapter, we explore visualization options available in the **fect** package. Plots are organized by `type`, from the default `gap` plot to the `counterfactual` plot, followed by diagnostic plots (`equiv`, `placebo`, `carryover`), cumulative effects (`cumul`), heterogeneity plots (`box`, `calendar`, and `hte`), and special-purpose displays (`status`, `factors`, and `loadings`), as well as the standalone `esplot()`. We begin with shared parameter conventions and then work through each plot type in turn.
 
 `plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter.
 
@@ -21,7 +21,7 @@ ls()
 
 ------------------------------------------------------------------------
 
-## Gap Plot (`type = "gap"`) {#sec-gap}
+## Gap Plot {#sec-gap}
 
 The gap plot---also known as the event study plot---displays dynamic treatment effects over relative time. It is the default plot type.
 
@@ -189,6 +189,64 @@ plot(out,
 
 ------------------------------------------------------------------------
 
+## Counterfactual plot
+
+While the gap plot shows the ATT (difference), the counterfactual plot shows the **levels**: observed outcomes for treated units alongside model-predicted counterfactual paths.
+
+```{r counterfactual}
+plot(out, type = "counterfactual",
+     main = "Grumbach & Sahn (2020): Treated vs. Counterfactuals",
+     ylab = "Proportion of Asian Donation",
+     legend.pos = "bottom")
+```
+
+```{r counterfactual-hh}
+plot(out.hh, type = "counterfactual",
+     main = "Hainmueller & Hangartner (2019): Treated vs. Counterfactuals",
+     ylab = "Naturalization Rate",
+     legend.pos = "top")
+```
+
+Use `color` for the observed-outcome line and `counterfactual.color` for the counterfactual line (which also colors the CI band with more transparency). Add `ci.outline = TRUE` to outline the band.
+
+```{r counterfactual-colors}
+plot(out.hh, type = "counterfactual",
+     main = "Hainmueller & Hangartner (2019): Treated vs. Counterfactuals",
+     ylab = "Naturalization Rate",
+     legend.pos = "bottom",
+     ci.outline = TRUE,
+     color = "red3",
+     counterfactual.color = "green4")
+```
+
+Setting `raw = "all"` overlays individual unit paths.
+
+```{r counterfactual-rawall}
+plot(out, type = "counterfactual", raw = "all")
+```
+
+Setting `raw = "band"` displays the 5th--95th interpercentile range. When adoption is staggered, only the band around treated units is shown.
+
+```{r counterfactual-rawband}
+plot(out, type = "counterfactual", raw = "band")
+```
+
+The individual-path colors are also customizable:
+
+```{r counterfactual-colors2}
+plot(out, type = "counterfactual",
+     count.color = "black",
+     count.alpha = 1,
+     color = "red",
+     counterfactual.color = "purple",
+     counterfactual.raw.treated.color = "orange",
+     counterfactual.linetype = "dotted",
+     raw = "all",
+     main = "Counterfactual Plot with Custom Colors")
+```
+
+------------------------------------------------------------------------
+
 ## Pretrend Tests {#sec-pretrend}
 
 We provide two tests that shed light on the parallel trends assumption: the placebo test and the equivalence test. For methodological details, see @sec-fect or @LWX2022.
@@ -222,7 +280,7 @@ The color of the placebo period markers can be changed with the `placebo.color` 
 plot(out_fe_placebo, placebo.color = "green4")
 ```
 
-### Equivalence test (`type = "equiv"`)
+### Joint pre-trend test
 
 The equivalence plot displays only the **pre-treatment** period. The equivalence bound is defined by the two-one-sided test (TOST) threshold. Note: post-treatment estimates are not shown in this plot type---use the gap plot for those.
 
@@ -259,7 +317,7 @@ plot(out, type = "equiv",
 
 ------------------------------------------------------------------------
 
-## Carryover Test (`type = "exit"`) {#sec-exit}
+## Carryover Test  {#sec-exit}
 
 The exit plot shows how the difference between treatment and control groups evolves **after treatment ends**. The x-axis represents time relative to treatment exit, in contrast to the gap plot's focus on treatment entry. Exit plots are essential for assessing potential carryover effects.
 
@@ -354,11 +412,33 @@ plot(out.hh, type = "calendar", xlim = c(1995, 2009),
      main = "The Effect of Indirect Democracy")
 ```
 
+### HTE by covariate (`type = "hte"`)
+
+The `"hte"` plot (or equivalently `"heterogeneous"`) displays the conditional average treatment effect (CATT) as a function of a pre-treatment covariate. The `covariate` argument specifies which variable to use. The blue curve and band show a loess fit with 95% confidence intervals; the red dashed line marks the overall ATT; and a histogram at the bottom shows the covariate distribution.
+
+```{r plot-hte-covariate}
+plot(out, type = "hte", covariate = "cand_B_all",
+     main = "HTE by Black Candidate Presence",
+     xlab = "Black Candidate Indicator",
+     ylab = "Effect on Asian Donation Share")
+```
+
+When the covariate is **discrete**, the plot automatically switches to a grouped display. Use `covariate.labels` to assign readable labels to the discrete values:
+
+```{r plot-hte-discrete-ch6}
+plot(out, type = "hte", covariate = "cand_H_all",
+     covariate.labels = c("No Hispanic Candidate", "Hispanic Candidate"),
+     main = "HTE by Hispanic Candidate Presence",
+     ylab = "Effect on Asian Donation Share")
+```
+
+Key parameters for HTE plots: `covariate` (required), `covariate.labels` (for discrete covariates), `show.count` (toggle covariate histogram, default TRUE). Axis, text size, and color parameters apply as usual. For more on HTE analysis, see [Chapter @sec-hte].
+
 ------------------------------------------------------------------------
 
 ## Other Plot Types {#sec-other}
 
-### Status plot (`type = "status"`)
+### Status plot
 
 The status plot displays the treatment status by period for all units, similar to `panelView`. Each indicator color is customizable.
 
@@ -374,63 +454,8 @@ plot(out_fe_carryover, type = "status",
 
 Note: most styling parameters (`connected`, `plot.ci`, `pre.color`/`post.color`, `count.*`) do not apply to status plots. Only axis, text size, and status-specific color parameters are relevant.
 
-### Counterfactual plot (`type = "counterfactual"`)
 
-While the gap plot shows the ATT (difference), the counterfactual plot shows the **levels**: observed outcomes for treated units alongside model-predicted counterfactual paths.
-
-```{r counterfactual}
-plot(out, type = "counterfactual",
-     main = "Grumbach & Sahn (2020): Treated vs. Counterfactuals",
-     ylab = "Proportion of Asian Donation",
-     legend.pos = "bottom")
-```
-
-```{r counterfactual-hh}
-plot(out.hh, type = "counterfactual",
-     main = "Hainmueller & Hangartner (2019): Treated vs. Counterfactuals",
-     ylab = "Naturalization Rate",
-     legend.pos = "top")
-```
-
-Use `color` for the observed-outcome line and `counterfactual.color` for the counterfactual line (which also colors the CI band with more transparency). Add `ci.outline = TRUE` to outline the band.
-
-```{r counterfactual-colors}
-plot(out.hh, type = "counterfactual",
-     main = "Hainmueller & Hangartner (2019): Treated vs. Counterfactuals",
-     ylab = "Naturalization Rate",
-     legend.pos = "bottom",
-     ci.outline = TRUE,
-     color = "red3",
-     counterfactual.color = "green4")
-```
-
-Setting `raw = "all"` overlays individual unit paths.
-
-```{r counterfactual-rawall}
-plot(out, type = "counterfactual", raw = "all")
-```
-
-Setting `raw = "band"` displays the 5th--95th interpercentile range. When adoption is staggered, only the band around treated units is shown.
-
-```{r counterfactual-rawband}
-plot(out, type = "counterfactual", raw = "band")
-```
-
-The individual-path colors are also customizable:
-
-```{r counterfactual-colors2}
-plot(out, type = "counterfactual",
-     count.color = "black",
-     count.alpha = 1,
-     color = "red",
-     counterfactual.color = "purple",
-     counterfactual.raw.treated.color = "orange",
-     counterfactual.linetype = "dotted",
-     raw = "all",
-     main = "Counterfactual Plot with Custom Colors")
-```
-
-### Factors and loadings (`type = "factors"`, `type = "loadings"`)
+### Factors and loadings plots
 
 These plot types are available when the model is estimated with interactive fixed effects (`method = "ife"` or `method = "gsynth"`). We first fit an IFE model with two factors:
 

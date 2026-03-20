@@ -8,7 +8,7 @@ assumptions.}
             W = NULL, group = NULL,
             na.rm = FALSE,
             index, force = "two-way",
-            factors.from = "notyettreated", em = TRUE,
+            time.component.from = "notyettreated", em = TRUE,
             r = 0, lambda = NULL, nlambda = 10,
             CV = NULL, k = 10, cv.prop = 0.1, cv.method = "all_units",
             cv.nobs = 3, cv.donut = 0, criterion = "mspe",
@@ -41,8 +41,8 @@ assumptions.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
 \item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Every observation should be uniquely defined by the pair of the unit and time indicator.}
 \item{force}{a string indicating whether unit or time or both fixed effects will be imposed. Must be one of the following, "none", "unit", "time", or "two-way". The default is "two-way".}
-\item{factors.from}{a string specifying which units are used for factor estimation. \code{"notyettreated"} (default) uses all not-yet-treated observations; \code{"nevertreated"} restricts estimation to never-treated control units only and projects counterfactuals onto treated units via pre-treatment residuals.}
-\item{em}{a logical flag indicating whether to use the EM algorithm for missing data in the estimation sample. Default is \code{TRUE}. Setting \code{em = FALSE} requires a complete estimation sample and is only compatible with \code{factors.from = "nevertreated"}.}
+\item{time.component.from}{Controls which units provide the time-varying model components (time fixed effects, factor structure, temporal dynamics). Options are \code{"notyettreated"} (default) --- all units contribute during their pre-treatment periods, or \code{"nevertreated"} --- only never-treated units estimate the time components, which are then projected onto treated units.}
+\item{em}{a logical flag indicating whether to use the EM algorithm for missing data in the estimation sample. Default is \code{TRUE}. Setting \code{em = FALSE} requires a complete estimation sample and is only compatible with \code{time.component.from = "nevertreated"}.}
 \item{r}{an integer specifying the number of factors. If \code{CV = TRUE}, the cross validation procedure will select the optimal number of factors from \code{r} to 5.}
 \item{lambda}{a single or sequence of positive numbers specifying the hyper-parameter sequence for matrix completion method. If \code{lambda} is a sequence and \code{CV = 1}, cross-validation will be performed.}
 \item{nlambda}{an integer specifying the length of hyper-parameter sequence for matrix completion method. Default is \code{nlambda = 10}.}
@@ -229,7 +229,7 @@ assumptions.}
 }
 \examples{
 library(fect)
-data(fect)
+data(simdata)
 out <- fect(Y ~ D + X1 + X2, data = simdata,
             index = c("id","time"), force = "two-way",
             CV = TRUE, r = c(0, 5), se = 0, parallel = FALSE)

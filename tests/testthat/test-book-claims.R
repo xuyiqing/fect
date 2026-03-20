@@ -76,13 +76,13 @@ make_panel <- function(N = 40, TT = 20, T0 = 12, Ntr = 12,
 ## Section A: Method Equivalences (Book: index.qmd, 04-gsynth.Rmd)
 ## =========================================================
 
-test_that("A1: gsynth == ife + factors.from='nevertreated' (exact)", {
+test_that("A1: gsynth == ife + time.component.from='nevertreated' (exact)", {
     skip_on_cran()
     d <- make_panel(N = 50, TT = 20, T0 = 12, Ntr = 10, r = 2, seed = 8010)
     out_g <- fect(Y ~ D + X1, data = d, index = c("id", "time"),
                   method = "gsynth", r = 2, se = FALSE, CV = FALSE)
     out_i <- fect(Y ~ D + X1, data = d, index = c("id", "time"),
-                  method = "ife", factors.from = "nevertreated",
+                  method = "ife", time.component.from = "nevertreated",
                   r = 2, se = FALSE, CV = FALSE)
     expect_equal(out_g$att.avg, out_i$att.avg, tolerance = 1e-8)
     expect_equal(as.vector(out_g$eff), as.vector(out_i$eff), tolerance = 1e-8)
@@ -394,12 +394,12 @@ test_that("F1: method='mc' basic functionality", {
     expect_true(abs(out$att.avg - 3.0) < 2.0)
 })
 
-test_that("F2: mc rejects factors.from='nevertreated'", {
+test_that("F2: mc rejects time.component.from='nevertreated'", {
     skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8071)
     expect_error(
         fect(Y ~ D, data = d, index = c("id", "time"),
-             method = "mc", factors.from = "nevertreated",
+             method = "mc", time.component.from = "nevertreated",
              se = FALSE, CV = FALSE)
     )
 })
@@ -452,13 +452,13 @@ test_that("G3: CFE with extra group FE via index[3]", {
     expect_false(is.na(out$att.avg))
 })
 
-test_that("G4: CFE defaults to factors.from='notyettreated'", {
+test_that("G4: CFE defaults to time.component.from='notyettreated'", {
     skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8083)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "cfe", r = 0, se = FALSE, CV = FALSE)
     ## Book: CFE defaults to notyettreated, unlike gsynth
-    expect_equal(out$factors.from, "notyettreated")
+    expect_equal(out$time.component.from, "notyettreated")
 })
 
 test_that("G5: CFE with r > 0 adds latent factors", {
@@ -467,7 +467,7 @@ test_that("G5: CFE with r > 0 adds latent factors", {
                     r = 2, seed = 8084)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "cfe", r = 2, se = FALSE, CV = FALSE,
-                factors.from = "nevertreated")
+                time.component.from = "nevertreated")
     expect_true(is.numeric(out$att.avg))
     ## ATT should be in reasonable range
     expect_true(abs(out$att.avg - 3.0) < 2.0)
@@ -486,9 +486,9 @@ test_that("H1: vartype='parametric' only for gsynth/nevertreated", {
                 method = "gsynth", r = 1, se = TRUE,
                 vartype = "parametric", nboots = 30, CV = FALSE))
     expect_true(!is.null(out$est.att))
-    ## Also works for ife with factors.from='nevertreated' (Phase 3 unlocked)
+    ## Also works for ife with time.component.from='nevertreated' (Phase 3 unlocked)
     out2 <- suppressWarnings(fect(Y ~ D, data = d, index = c("id", "time"),
-                 method = "ife", factors.from = "nevertreated",
+                 method = "ife", time.component.from = "nevertreated",
                  r = 1, se = TRUE, vartype = "parametric",
                  nboots = 30, CV = FALSE))
     expect_true(!is.null(out2$est.att))

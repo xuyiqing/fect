@@ -1,9 +1,9 @@
 ## ---------------------------------------------------------
-## Phase tests for the factors.from refactoring
+## Phase tests for the time.component.from refactoring
 ##
 ## These tests define acceptance criteria for 5 phases:
-##   Phase 1: factors.from parameter (notyettreated / nevertreated)
-##   Phase 2: gsynth merged into ife via factors.from
+##   Phase 1: time.component.from parameter (notyettreated / nevertreated)
+##   Phase 2: gsynth merged into ife via time.component.from
 ##   Phase 3: parametric bootstrap unlocked for ife/cfe
 ##   Phase 4: polynomial removed (superseded by cfe)
 ##   Phase 5: input validation and safety guards
@@ -95,7 +95,7 @@ test_that("Phase 6a: gsynth and ife+nevertreated produce identical ATT", {
   out_ife <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -103,7 +103,7 @@ test_that("Phase 6a: gsynth and ife+nevertreated produce identical ATT", {
                info = "gsynth and ife+nevertreated must be the same estimator")
 })
 
-test_that("Phase 6b: em=FALSE + factors.from='notyettreated' errors", {
+test_that("Phase 6b: em=FALSE + time.component.from='notyettreated' errors", {
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -111,7 +111,7 @@ test_that("Phase 6b: em=FALSE + factors.from='notyettreated' errors", {
     fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "ife", r = 2, CV = FALSE, se = FALSE,
-      factors.from = "notyettreated", em = FALSE,
+      time.component.from = "notyettreated", em = FALSE,
       parallel = FALSE
     ),
     regexp = "em.*FALSE|notyettreated.*em"
@@ -152,7 +152,7 @@ test_that("Phase 6e: ife+nevertreated and ife+notyettreated both close to true t
   out_nyt <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "notyettreated",
+    force = "two-way", time.component.from = "notyettreated",
     parallel = FALSE
   )))
 
@@ -160,7 +160,7 @@ test_that("Phase 6e: ife+nevertreated and ife+notyettreated both close to true t
   out_nt <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -176,17 +176,17 @@ test_that("Phase 6e: ife+nevertreated and ife+notyettreated both close to true t
 })
 
 ## ========================================================
-## PHASE 1: factors.from parameter
+## PHASE 1: time.component.from parameter
 ## ========================================================
 
-test_that("Phase 1a: fect accepts factors.from='notyettreated' (default behavior)", {
+test_that("Phase 1a: fect accepts time.component.from='notyettreated' (default behavior)", {
   skip_on_cran()
   df <- make_staggered_data()
 
   out <- suppressWarnings(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    factors.from = "notyettreated",
+    time.component.from = "notyettreated",
     parallel = FALSE
   ))
 
@@ -195,14 +195,14 @@ test_that("Phase 1a: fect accepts factors.from='notyettreated' (default behavior
   expect_true(!is.na(out$att.avg))
 })
 
-test_that("Phase 1b: fect accepts factors.from='nevertreated'", {
+test_that("Phase 1b: fect accepts time.component.from='nevertreated'", {
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)  ## 25 never-treated
 
   out <- suppressWarnings(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     parallel = FALSE
   ))
 
@@ -211,21 +211,21 @@ test_that("Phase 1b: fect accepts factors.from='nevertreated'", {
   expect_true(!is.na(out$att.avg))
 })
 
-test_that("Phase 1c: factors.from='nevertreated' produces different estimates than 'notyettreated'", {
+test_that("Phase 1c: time.component.from='nevertreated' produces different estimates than 'notyettreated'", {
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15, seed = 99)
 
   out_nyt <- suppressWarnings(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    factors.from = "notyettreated",
+    time.component.from = "notyettreated",
     parallel = FALSE
   ))
 
   out_nt <- suppressWarnings(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     parallel = FALSE
   ))
 
@@ -238,22 +238,22 @@ test_that("Phase 1c: factors.from='nevertreated' produces different estimates th
   expect_s3_class(out_nt, "fect")
 })
 
-test_that("Phase 1d: factors.from defaults to 'notyettreated' when omitted", {
+test_that("Phase 1d: time.component.from defaults to 'notyettreated' when omitted", {
   skip_on_cran()
   df <- make_staggered_data()
 
-  ## Without factors.from
+  ## Without time.component.from
   out_default <- suppressWarnings(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
     parallel = FALSE
   ))
 
-  ## With factors.from = "notyettreated" explicitly
+  ## With time.component.from = "notyettreated" explicitly
   out_explicit <- suppressWarnings(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    factors.from = "notyettreated",
+    time.component.from = "notyettreated",
     parallel = FALSE
   ))
 
@@ -261,14 +261,14 @@ test_that("Phase 1d: factors.from defaults to 'notyettreated' when omitted", {
   expect_equal(out_default$att.avg, out_explicit$att.avg, tolerance = 1e-10)
 })
 
-test_that("Phase 1e: factors.from='nevertreated' works with method='cfe'", {
+test_that("Phase 1e: time.component.from='nevertreated' works with method='cfe'", {
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
   out <- suppressWarnings(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", r = 0, CV = FALSE, se = FALSE,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     parallel = FALSE
   ))
 
@@ -276,14 +276,14 @@ test_that("Phase 1e: factors.from='nevertreated' works with method='cfe'", {
   expect_true(is.numeric(out$att.avg))
 })
 
-test_that("Phase 1f: factors.from threads through cross-validation", {
+test_that("Phase 1f: time.component.from threads through cross-validation", {
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
   out <- suppressWarnings(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = c(0, 3), CV = TRUE, se = FALSE,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     parallel = FALSE
   ))
 
@@ -291,7 +291,7 @@ test_that("Phase 1f: factors.from threads through cross-validation", {
   expect_true(!is.null(out$r.cv))
 })
 
-test_that("Phase 1g: factors.from threads through bootstrap inference", {
+test_that("Phase 1g: time.component.from threads through bootstrap inference", {
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -299,7 +299,7 @@ test_that("Phase 1g: factors.from threads through bootstrap inference", {
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE,
     se = TRUE, nboots = 30,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     parallel = FALSE
   ))
 
@@ -312,7 +312,7 @@ test_that("Phase 1g: factors.from threads through bootstrap inference", {
 ## PHASE 2: gsynth merged into ife
 ## ========================================================
 
-test_that("Phase 2a: gsynth produces same results via ife+factors.from='nevertreated'", {
+test_that("Phase 2a: gsynth produces same results via ife+time.component.from='nevertreated'", {
   skip_on_cran()
   suppressWarnings(try(data("sim_gsynth", package = "fect"), silent = TRUE))
   skip_if_not(exists("sim_gsynth"), "Dataset 'sim_gsynth' not available")
@@ -330,7 +330,7 @@ test_that("Phase 2a: gsynth produces same results via ife+factors.from='nevertre
     Y ~ D, data = sim_gsynth, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
     force = "two-way",
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     parallel = FALSE
   ))
 
@@ -448,7 +448,7 @@ test_that("Phase 3d: vartype='parametric' still errors for method='mc'", {
 ## PHASE 5: input validation and safety guards
 ## ========================================================
 
-test_that("Phase 5a: factors.from rejects invalid values", {
+test_that("Phase 5a: time.component.from rejects invalid values", {
   skip_on_cran()
   df <- make_staggered_data()
 
@@ -456,14 +456,14 @@ test_that("Phase 5a: factors.from rejects invalid values", {
     fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "ife", r = 2, CV = FALSE, se = FALSE,
-      factors.from = "invalid_value",
+      time.component.from = "invalid_value",
       parallel = FALSE
     ),
-    regexp = "factors.from"
+    regexp = "time.component.from"
   )
 })
 
-test_that("Phase 5b: factors.from='nevertreated' + method='mc' errors", {
+test_that("Phase 5b: time.component.from='nevertreated' + method='mc' errors", {
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -471,14 +471,14 @@ test_that("Phase 5b: factors.from='nevertreated' + method='mc' errors", {
     fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "mc", CV = FALSE, se = FALSE,
-      factors.from = "nevertreated",
+      time.component.from = "nevertreated",
       parallel = FALSE
     ),
-    regexp = "factors.from|nevertreated|mc"
+    regexp = "time.component.from|nevertreated|mc"
   )
 })
 
-test_that("Phase 5c: factors.from='nevertreated' errors when no never-treated units", {
+test_that("Phase 5c: time.component.from='nevertreated' errors when no never-treated units", {
   skip_on_cran()
   ## All units are treated
   df <- make_staggered_data(N = 20, Ntr = 20)
@@ -487,14 +487,14 @@ test_that("Phase 5c: factors.from='nevertreated' errors when no never-treated un
     fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "ife", r = 2, CV = FALSE, se = FALSE,
-      factors.from = "nevertreated",
+      time.component.from = "nevertreated",
       parallel = FALSE
     ),
     regexp = "never.treated|nevertreated|control"
   )
 })
 
-test_that("Phase 5d: factors.from='nevertreated' errors when too few never-treated units", {
+test_that("Phase 5d: time.component.from='nevertreated' errors when too few never-treated units", {
   skip_on_cran()
   ## Only 1 never-treated unit (insufficient for r=2)
   df <- make_staggered_data(N = 20, Ntr = 19)
@@ -503,29 +503,29 @@ test_that("Phase 5d: factors.from='nevertreated' errors when too few never-treat
     suppressWarnings(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "ife", r = 2, CV = FALSE, se = FALSE,
-      factors.from = "nevertreated",
+      time.component.from = "nevertreated",
       parallel = FALSE
     )),
     regexp = "never.treated|nevertreated|insuffic|too few"
   )
 })
 
-test_that("Phase 5e: output records factors.from in return object", {
+test_that("Phase 5e: output records time.component.from in return object", {
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
   out <- suppressWarnings(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     parallel = FALSE
   ))
 
-  expect_true("factors.from" %in% names(out))
-  expect_equal(out$factors.from, "nevertreated")
+  expect_true("time.component.from" %in% names(out))
+  expect_equal(out$time.component.from, "nevertreated")
 })
 
-test_that("Phase 5f: factors.from='nevertreated' + method='both' errors", {
+test_that("Phase 5f: time.component.from='nevertreated' + method='both' errors", {
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -533,7 +533,7 @@ test_that("Phase 5f: factors.from='nevertreated' + method='both' errors", {
     fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "both", CV = FALSE, se = FALSE,
-      factors.from = "nevertreated",
+      time.component.from = "nevertreated",
       parallel = FALSE
     ),
     regexp = "both"
@@ -771,7 +771,7 @@ test_that("Phase 3a-B1: ife+nevertreated equals cfe+nevertreated (no extras)", {
   out_ife <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -779,7 +779,7 @@ test_that("Phase 3a-B1: ife+nevertreated equals cfe+nevertreated (no extras)", {
   out_cfe <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -794,14 +794,14 @@ test_that("Phase 3a-B2: fe+nevertreated equals cfe+nevertreated at r=0", {
   out_ife <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 0, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
   out_cfe <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", r = 0, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -817,7 +817,7 @@ test_that("Phase 3a-B3: cfe+nevertreated is deterministic (same seed, same resul
   out1 <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -825,7 +825,7 @@ test_that("Phase 3a-B3: cfe+nevertreated is deterministic (same seed, same resul
   out2 <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -847,7 +847,7 @@ test_that("Phase 3a-B4: gsynth equals cfe+nevertreated (no extras)", {
   out_cfe <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -864,7 +864,7 @@ test_that("Phase 3a-C1: accuracy with Z (time-invariant covariates)", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -879,7 +879,7 @@ test_that("Phase 3a-C2: accuracy with Q (unit-specific time trends)", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Q = "Q", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -894,7 +894,7 @@ test_that("Phase 3a-C3: accuracy with shared extra FE (Type B)", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time", "industry"),
     method = "cfe", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -910,7 +910,7 @@ test_that("Phase 3a-C4: accuracy with unit-nesting extra FE (Type A)", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time", "industry"),
     method = "cfe", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -925,7 +925,7 @@ test_that("Phase 3a-C5: accuracy with all CFE components", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time", "industry"),
     method = "cfe", Z = "Z", Q = "Q", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -940,14 +940,14 @@ test_that("Phase 3a-C6: notyettreated vs nevertreated both accurate", {
   out_nyt <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "notyettreated",
+    force = "two-way", time.component.from = "notyettreated",
     parallel = FALSE
   )))
 
   out_nt <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -964,7 +964,7 @@ test_that("Phase 3a-C7: accuracy with Z at r=0 (no factors)", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 0, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -984,7 +984,7 @@ test_that("Phase 3a-D1: Type-B FE with missing level in co errors", {
     suppressWarnings(suppressMessages(fect::fect(
       Y ~ D, data = df, index = c("id", "time", "industry"),
       method = "cfe", r = 2, CV = FALSE, se = FALSE,
-      force = "two-way", factors.from = "nevertreated",
+      force = "two-way", time.component.from = "nevertreated",
       parallel = FALSE
     )))
   )
@@ -998,7 +998,7 @@ test_that("Phase 3a-D2: no never-treated units errors", {
     suppressWarnings(suppressMessages(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "cfe", r = 0, CV = FALSE, se = FALSE,
-      force = "two-way", factors.from = "nevertreated",
+      force = "two-way", time.component.from = "nevertreated",
       parallel = FALSE
     ))),
     regexp = "never.treated|nevertreated|control"
@@ -1013,7 +1013,7 @@ test_that("Phase 3a-D3: too few control units for r errors", {
     suppressWarnings(suppressMessages(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "cfe", r = 2, CV = FALSE, se = FALSE,
-      force = "two-way", factors.from = "nevertreated",
+      force = "two-way", time.component.from = "nevertreated",
       parallel = FALSE
     ))),
     regexp = "never.treated|nevertreated|insuffic|too few"
@@ -1027,7 +1027,7 @@ test_that("Phase 3a-D4: valid cfe+nevertreated combination is accepted", {
   out <- expect_no_error(suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   ))))
 
@@ -1042,10 +1042,10 @@ test_that("Phase 3a-D5: mc+nevertreated is rejected", {
     suppressWarnings(suppressMessages(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "mc", r = 2, CV = FALSE, se = FALSE,
-      force = "two-way", factors.from = "nevertreated",
+      force = "two-way", time.component.from = "nevertreated",
       parallel = FALSE
     ))),
-    regexp = "mc|nevertreated|factors.from"
+    regexp = "mc|nevertreated|time.component.from"
   )
 })
 
@@ -1059,7 +1059,7 @@ test_that("Phase 3a-A1: complex_fe_ub vs inter_fe_ub equivalence", {
   out_cfe <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1067,7 +1067,7 @@ test_that("Phase 3a-A1: complex_fe_ub vs inter_fe_ub equivalence", {
   out_ife <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1082,14 +1082,14 @@ test_that("Phase 3a-A2: solver equivalence at r=0 (FE only)", {
   out_cfe <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", r = 0, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
   out_ife <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 0, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1104,14 +1104,14 @@ test_that("Phase 3a-A3: solver equivalence with unbalanced data", {
   out_cfe <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", r = 0, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
   out_ife <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 0, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1129,7 +1129,7 @@ test_that("Phase 3a-F2: parametric bootstrap SE with cfe+nevertreated", {
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE,
     se = TRUE, vartype = "parametric", nboots = 30,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1145,7 +1145,7 @@ test_that("Phase 3a-F1: jackknife SE with cfe+nevertreated", {
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE,
     se = TRUE, vartype = "jackknife", nboots = 30,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1161,7 +1161,7 @@ test_that("Phase 3a-F3: parametric bootstrap with cfe+notyettreated and extras",
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE,
     se = TRUE, vartype = "parametric", nboots = 30,
-    force = "two-way", factors.from = "notyettreated",
+    force = "two-way", time.component.from = "notyettreated",
     parallel = FALSE
   )))
 
@@ -1176,7 +1176,7 @@ test_that("Phase 3a-F4: ife+nevertreated SE unchanged (regression)", {
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE,
     se = TRUE, nboots = 30,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1193,7 +1193,7 @@ test_that("Phase 3a-E1: gamma and kappa fields present", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1201,18 +1201,18 @@ test_that("Phase 3a-E1: gamma and kappa fields present", {
   ## kappa can be NULL if no Q was specified — that's OK
 })
 
-test_that("Phase 3a-E2: factors.from field in output", {
+test_that("Phase 3a-E2: time.component.from field in output", {
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
-  expect_equal(out$factors.from, "nevertreated")
+  expect_equal(out$time.component.from, "nevertreated")
 })
 
 test_that("Phase 3a-E3: core output fields non-NULL with correct dimensions", {
@@ -1222,7 +1222,7 @@ test_that("Phase 3a-E3: core output fields non-NULL with correct dimensions", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1242,7 +1242,7 @@ test_that("Phase 3a-E4: plot() works without error", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1256,7 +1256,7 @@ test_that("Phase 3a-E5: print() works without error", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1272,7 +1272,7 @@ test_that("Phase 3a-G1: CV selects a reasonable r with factors in data", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = c(0, 5), CV = TRUE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1287,7 +1287,7 @@ test_that("Phase 3a-G2: CV selects r=0 on no-factor data", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = c(0, 3), CV = TRUE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1301,7 +1301,7 @@ test_that("Phase 3a-G3: ife+nevertreated CV unchanged (regression)", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = c(0, 5), CV = TRUE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1317,7 +1317,7 @@ test_that("Phase 3a-H1: single treated unit", {
   expect_no_error(suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   ))))
 })
@@ -1331,7 +1331,7 @@ test_that("Phase 3a-H2: single control unit (r=0)", {
     suppressWarnings(suppressMessages(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "cfe", r = 0, CV = FALSE, se = FALSE,
-      force = "two-way", factors.from = "nevertreated",
+      force = "two-way", time.component.from = "nevertreated",
       parallel = FALSE
     ))),
     error = function(e) e
@@ -1354,7 +1354,7 @@ test_that("Phase 3a-H3: cfe+nevertreated with r=0 (no factors)", {
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 0, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   )))
 
@@ -1370,7 +1370,7 @@ test_that("Phase 3a-H4: no covariates at all", {
   expect_no_error(suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   ))))
 })
@@ -1385,7 +1385,7 @@ test_that("Phase 3a-H5: treatment reversals", {
   expect_no_error(suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time", "industry"),
     method = "cfe", Z = "Z", Q = "Q", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", factors.from = "nevertreated",
+    force = "two-way", time.component.from = "nevertreated",
     parallel = FALSE
   ))))
 })
@@ -1403,7 +1403,7 @@ test_that("Phase 3a-I1: ife+nevertreated parametric bootstrap, em=TRUE, parallel
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, force = "two-way",
-    factors.from = "nevertreated", em = TRUE,
+    time.component.from = "nevertreated", em = TRUE,
     se = TRUE, vartype = "bootstrap", nboots = 20,
     parallel = TRUE, cores = 2, seed = 123
   )))
@@ -1423,7 +1423,7 @@ test_that("Phase 3a-I2: ife+nevertreated parametric bootstrap, em=FALSE, paralle
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, force = "two-way",
-    factors.from = "nevertreated", em = FALSE,
+    time.component.from = "nevertreated", em = FALSE,
     se = TRUE, vartype = "bootstrap", nboots = 20,
     parallel = TRUE, cores = 2, seed = 123
   )))
@@ -1443,7 +1443,7 @@ test_that("Phase 3a-I3: cfe+nevertreated parametric bootstrap, em=TRUE, parallel
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
-    factors.from = "nevertreated", em = TRUE,
+    time.component.from = "nevertreated", em = TRUE,
     se = TRUE, vartype = "bootstrap", nboots = 20,
     parallel = TRUE, cores = 2, seed = 123
   )))
@@ -1463,7 +1463,7 @@ test_that("Phase 3a-I4: cfe+nevertreated parametric bootstrap, em=FALSE, paralle
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
-    factors.from = "nevertreated", em = FALSE,
+    time.component.from = "nevertreated", em = FALSE,
     se = TRUE, vartype = "bootstrap", nboots = 20,
     parallel = TRUE, cores = 2, seed = 123
   )))
@@ -1484,7 +1484,7 @@ test_that("Phase 3a-I5: bootstrap reproducibility with same seed (ife+nevertreat
     suppressWarnings(suppressMessages(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "ife", r = 2, CV = FALSE, force = "two-way",
-      factors.from = "nevertreated", em = TRUE,
+      time.component.from = "nevertreated", em = TRUE,
       se = TRUE, vartype = "bootstrap", nboots = 10,
       parallel = TRUE, cores = 2, seed = s
     )))
@@ -1507,7 +1507,7 @@ test_that("Phase 3a-I6: bootstrap reproducibility with same seed (cfe+nevertreat
     suppressWarnings(suppressMessages(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
-      factors.from = "nevertreated", em = TRUE,
+      time.component.from = "nevertreated", em = TRUE,
       se = TRUE, vartype = "bootstrap", nboots = 10,
       parallel = TRUE, cores = 2, seed = s
     )))
@@ -1530,7 +1530,7 @@ test_that("Phase 3a-I7: different seeds give different bootstrap SE (ife+nevertr
     suppressWarnings(suppressMessages(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "ife", r = 2, CV = FALSE, force = "two-way",
-      factors.from = "nevertreated", em = TRUE,
+      time.component.from = "nevertreated", em = TRUE,
       se = TRUE, vartype = "bootstrap", nboots = 10,
       parallel = TRUE, cores = 2, seed = s
     )))
@@ -1554,7 +1554,7 @@ test_that("Phase 3a-I8: ATT accuracy check under bootstrap (cfe+nevertreated, em
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
-    factors.from = "nevertreated", em = TRUE,
+    time.component.from = "nevertreated", em = TRUE,
     se = TRUE, vartype = "bootstrap", nboots = 20,
     parallel = TRUE, cores = 2, seed = 123
   )))
@@ -1576,7 +1576,7 @@ test_that("Phase 3a-I9: quantile.CI=TRUE bias-corrected reflection CI (cfe+never
   out <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     se = TRUE, vartype = "bootstrap", nboots = 20,
     quantile.CI = TRUE,
     parallel = TRUE, cores = 2, seed = 123
@@ -1611,7 +1611,7 @@ test_that("Phase 3a-I10: em=TRUE vs em=FALSE identical for nevertreated (ife)", 
     suppressWarnings(suppressMessages(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "ife", r = 2, CV = FALSE, force = "two-way",
-      factors.from = "nevertreated", em = em_val,
+      time.component.from = "nevertreated", em = em_val,
       se = FALSE
     )))
   }
@@ -1636,7 +1636,7 @@ test_that("Phase 3a-I11: unbalanced data forces _ub/EM path in draw.error() boot
   out_ife <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df_ub, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, force = "two-way",
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     se = TRUE, vartype = "bootstrap", nboots = 15,
     parallel = TRUE, cores = 2, seed = 123
   )))
@@ -1656,7 +1656,7 @@ test_that("Phase 3a-I11: unbalanced data forces _ub/EM path in draw.error() boot
   out_cfe <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df2_ub, index = c("id", "time"),
     method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     se = TRUE, vartype = "bootstrap", nboots = 15,
     parallel = TRUE, cores = 2, seed = 123
   )))
@@ -1667,26 +1667,26 @@ test_that("Phase 3a-I11: unbalanced data forces _ub/EM path in draw.error() boot
               info = "CFE unbalanced: SE estimates should not all be NA")
 })
 
-test_that("Phase 3a-I12: r=0 invariance — factors.from is a no-op when r=0", {
+test_that("Phase 3a-I12: r=0 invariance — time.component.from is a no-op when r=0", {
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 0, seed = 42)
 
   out_nyt <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 0, CV = FALSE, force = "two-way",
-    factors.from = "notyettreated",
+    time.component.from = "notyettreated",
     se = FALSE
   )))
 
   out_nt <- suppressWarnings(suppressMessages(fect::fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "ife", r = 0, CV = FALSE, force = "two-way",
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     se = FALSE
   )))
 
   expect_equal(out_nyt$att.avg, out_nt$att.avg, tolerance = 1e-2,
-               info = "factors.from should be a no-op when r=0: att.avg must match")
+               info = "time.component.from should be a no-op when r=0: att.avg must match")
 })
 
 ## ========================================================
@@ -1700,7 +1700,7 @@ test_that("cfe+nevertreated CV selects r and runs without error", {
   out <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = c(0, 3), CV = TRUE, se = FALSE,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     force = "two-way", parallel = TRUE, cores = 10
   )))
 
@@ -1723,7 +1723,7 @@ test_that("cfe+nevertreated+Z CV correctly selects r=2", {
   out <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = c(0, 5), CV = TRUE, se = FALSE,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     force = "two-way", parallel = TRUE, cores = 10
   )))
 
@@ -1740,7 +1740,7 @@ test_that("cfe+nevertreated+Z CV correctly selects r=0 on zero-factor data", {
   out <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", Z = "Z", r = c(0, 5), CV = TRUE, se = FALSE,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     force = "two-way", parallel = TRUE, cores = 10
   )))
 
@@ -1755,7 +1755,7 @@ test_that("cfe+nevertreated CV selects r=2 on factor-only data (no Z in DGP)", {
   out <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = df, index = c("id", "time"),
     method = "cfe", r = c(0, 5), CV = TRUE, se = FALSE,
-    factors.from = "nevertreated",
+    time.component.from = "nevertreated",
     force = "two-way", parallel = TRUE, cores = 10
   )))
 
