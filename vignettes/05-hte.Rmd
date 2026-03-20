@@ -24,7 +24,7 @@ plot(out.fect, type = "box", xlim = c(-15, 10))
 
 ## By calendar time
 
-Another way to explore HTE is to investigate how the treatment effect evolves over time. In the plot below, the point estimates represents the ATTs by calendar time; the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively; and the red horizontal dashed line represents the ATT (averaged over all time periods).
+Another way to explore HTE is to investigate how the treatment effect evolves over time. In the plot below, the point estimates represent the ATTs by calendar time; the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively; and the red horizontal dashed line represents the ATT (averaged over all time periods).
 
 ```{r hte_time, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.fect, type = "calendar", xlim = c(1, 35))
@@ -32,7 +32,7 @@ plot(out.fect, type = "calendar", xlim = c(1, 35))
 
 ## By a covariate
 
-By setting `type = "hte"` or `type = "heterogeneous`, we can also plot the HTE by arbitrary covariates that are unaffected by the treatment. As before, the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively. The red dashed line represents the ATT. The histogram at the bottom of the figure illustrates the distribution of the covariates, and can be turned off using `show.count = FALSE`. In our simulated case, the effect size is unrelated to the values of covariate `X1`.
+By setting `type = "hte"` or `type = "heterogeneous"`, we can also plot the HTE by arbitrary covariates that are unaffected by the treatment. As before, the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively. The red dashed line represents the ATT. The histogram at the bottom of the figure illustrates the distribution of the covariates, and can be turned off using `show.count = FALSE`. In our simulated case, the effect size is unrelated to the values of covariate `X1`.
 
 ```{r hte_X1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.fect, type = "hte", covariate = "X1")

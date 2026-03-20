@@ -1,11 +1,10 @@
 # The Imputation Estimator {#sec-fect}
 
-In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022 \[<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>\].
+In this chapter, we illustrate how to use the **fect** package to implement counterfactual estimators (or imputation estimators) and conduct diagnostic tests proposed by @LWX2022 [<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>].
 
 ## Simulated data
 
-In this chapter, we use `sim_base`, a simulated panel dataset in which the parallel trends assumption holds. The dataset has 200 units, 35 time periods, and treatment that switches on and off. The data are simulated with treatment switching on and off, capturing the general case of treatment reversal under strict exogeneity. The outcome is generated from a two-way fixed effects model with two covariates:
-$$Y_{it} = \tau_{it} D_{it} + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \alpha_i + \xi_t  + \epsilon_{it}$$
+In this chapter, we use `sim_base`, a simulated panel dataset in which the parallel trends assumption holds. The dataset has 200 units, 35 time periods, and treatment that switches on and off. The data are simulated with treatment switching on and off, capturing the general case of treatment reversal under strict exogeneity. The outcome is generated from a two-way fixed effects model with two covariates: $$Y_{it} = \tau_{it} D_{it} + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \alpha_i + \xi_t  + \epsilon_{it}$$
 
 Since there are no latent factors, the `"fe"` method (two-way fixed effects counterfactual estimator, or FEct) is correctly specified for this DGP. For settings where latent factors are present and the FE estimator is biased, see [Chapter @sec-ife-mc].
 
@@ -57,6 +56,7 @@ out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
 
 ::: {.callout-tip appearance="simple"}
 ### Model specification
+
 The key parameters that control the **model** are: `method` (estimator choice), `force` (fixed effects structure), and `r` (number of factors for IFE/MC methods; see [Chapter @sec-ife-mc]; by default, `r` is set to 0 when `method = "fe"`). These determine how $\hat{Y}(0)$ is imputed.
 :::
 
@@ -75,6 +75,7 @@ The package can produce uncertainty estimates when `se = TRUE`. The default is t
 
 ::: {.callout-tip appearance="simple"}
 ### Inference parameters
+
 The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These parameters do not affect point estimates. `"parametric"` is only available in the Synth setting, i.e., when `time.component.from = "nevertreated"`.
 :::
 
@@ -95,8 +96,6 @@ out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   method = "fe", force = "two-way", se = TRUE,
   cores = 8, parallel = TRUE, nboots = 1000)
 ```
-
-
 
 The `plot()` function can visualize the estimated period-wise ATTs as well as their uncertainty estimates. `stats = "F.p"` shows the p-value for the F test of no-pretrend.
 
@@ -298,7 +297,8 @@ panelview(Y ~ D, data = sim_base, index = c("id","time"), by.timing = TRUE,
   background = "white", main = "Simulated Data: Treatment Status")
 ```
 
-The `get.cohort()` function can generate a new variable "Cohort" based on the timing when treated units first get treated. 
+The `get.cohort()` function can generate a new variable "Cohort" based on the timing when treated units first get treated.
+
 ```{r get_cohort}
 sim_base.cohort <- get.cohort(data = sim_base,D = 'D',index = c("id","time"))
 print(table(sim_base.cohort[,'Cohort']))
@@ -348,8 +348,8 @@ plot(out.w, main = "Estimated Weighted ATT")
 
 ## Additional notes
 
-1.  By default, the program will drop the units that have no larger than 5 observations under control, which is the reason why sometimes there are less available units in the placebo test or carryover test than in the original estimation. We can specify a preferred criteria in the option `min.T0` (default to 5). As a rule of thumb for the IFE estimator, the minimum number of observations under control for a unit should be larger than the specified number of factor `r`.
+1.  By default, the program will drop the units that have no larger than 5 observations under control, which is the reason why sometimes there are less available units in the placebo test or carryover test than in the original estimation. We can specify a preferred criterion in the option `min.T0` (default to 5). As a rule of thumb for the IFE estimator, the minimum number of observations under control for a unit should be larger than the specified number of factor `r`.
 
 2.  We can get replicable results by setting the option `seed` to a certain integer, no matter whether the parallel computing is used.
 
-3.  When `na.rm = FALSE` (default), the program allows observations to have missing outcomes $Y$ but not $X$ or  treatment statuses $D$. When `na.rm = TRUE` the program will drop all observations that have missing values in outcomes, treatments, or covariates.
+3.  When `na.rm = FALSE` (default), the program allows observations to have missing outcomes $Y$ but not $X$ or treatment statuses $D$. When `na.rm = TRUE` the program will drop all observations that have missing values in outcomes, treatments, or covariates.

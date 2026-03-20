@@ -18,34 +18,33 @@ data(fect)
 
 ## When to use CFE
 
-The standard FEct estimator (`method = "fe"`) assumes that the untreated potential outcome is driven by unit and time fixed effects plus observed time-varying covariates:
+The standard IFEct estimator (`method = "ife"`) assumes that the untreated potential outcome is driven by observed time-varying covariates, interactive fixed effects, plus unit and time fixed effects:
 
-$$Y_{it}^{0} = X_{it}'\beta + \alpha_i + \xi_t + e_{it}$$
+$$Y_{it}^{0} = \mu + X_{it}'\beta + \sum_{m=1}^{r} \lambda_{im} f_{tm} + \alpha_i + \xi_t + e_{it}$$
 
 This may be insufficient when:
 
-1. Units belong to groups with group-level time shocks (additional FEs needed),
-2. Time-invariant characteristics have effects that change over time ($Z'\gamma$),
-3. Units follow known time trends with heterogeneous intensity ($\kappa' Q$),
-4. Latent factors drive outcomes ($\lambda' f$).
+1.  Units belong to groups with group-level time shocks (additional FEs needed),
+2.  Time-invariant characteristics have effects that change over time ($Z'\gamma$),
+3.  Units follow known time trends with heterogeneous intensity ($\kappa' Q$),
 
 The CFE estimator models the untreated potential outcome as:
 
-$$Y_{it}^{0} = \mu + X_{it}'\beta + Z_i'\gamma_{g(t)} + \kappa_i' Q_t + \alpha_i + \xi_t + \omega_{k(i)} + \sum_{m=1}^{r} \lambda_{im} f_{tm} + e_{it}$$
+$$Y_{it}^{0} = \mu + X_{it}'\beta + \sum_{m=1}^{r} \lambda_{im} f_{tm} + \alpha_i + \xi_t + \omega_{k(i)}  + Z_i'\gamma_{g(t)} + \kappa_i' Q_t  + e_{it}$$
 
 where:
 
-- $\mu$ is the grand mean,
-- $X_{it}'\beta$ captures time-varying covariates with constant coefficients,
-- $Z_i'\gamma_{g(t)}$ captures time-invariant covariates with coefficients that vary by time group,
-- $\kappa_i' Q_t$ captures unit-specific loadings on known time trends,
-- $\alpha_i$ and $\xi_t$ are unit and time fixed effects,
-- $\omega_{k(i)}$ are additional group-level fixed effects,
-- $\lambda_{im} f_{tm}$ are interactive fixed effects (latent factors),
-- $e_{it}$ is the idiosyncratic error.
+-   $\mu$ is the grand mean,
+-   $X_{it}'\beta$ captures time-varying covariates with constant coefficients,
+-   $\lambda_{im} f_{tm}$ are interactive fixed effects (latent factors),
+-   $\alpha_i$ and $\xi_t$ are unit and time fixed effects,
+-   $\omega_{k(i)}$ are additional group-level fixed effects,
+-   $Z_i'\gamma_{g(t)}$ captures time-invariant covariates with coefficients that vary by time group,
+-   $\kappa_i' Q_t$ captures unit-specific loadings on known time trends,
+-   $e_{it}$ is the idiosyncratic error.
 
 ::: {.callout-tip appearance="simple"}
-Most of the above elements, except additional group-level fixed effects $\omega_{k(i)}$, can be captured by an interactive fixed effects model. Knowing $Z_i$ or $Q_t$, however, can improve efficiency. In practice, we often do not know the exact functional form of $Q$, and $Z$ may suffer from severe measurement error. Therefore, including these terms may not yield the expected gains and may instead inflate variance. 
+Most of the above elements, except additional group-level fixed effects $\omega_{k(i)}$, can be captured by an interactive fixed effects model. Knowing $Z_i$ or $Q_t$, however, can improve efficiency. In practice, we often do not know the exact functional form of $Q$, and $Z$ may suffer from severe measurement error. Therefore, including these terms may not yield the expected gains and may instead inflate variance.
 
 In general, we recommend a data-driven approach to model selection, such as using `fect_mspe()`, which is based on cross-validation.
 :::
@@ -53,7 +52,7 @@ In general, we recommend a data-driven approach to model selection, such as usin
 ### Observed vs. unobserved
 
 | Component | What the researcher provides | What **fect** estimates |
-|:----------|:----------------------------|:-----------------------|
+|:----------------|:-----------------------------|:------------------------|
 | $X_{it}$ (time-varying covariates) | Covariates in the formula (right-hand side) | $\beta$ --- constant coefficients |
 | $Z_i$ (time-invariant covariates) | Column names via `Z` argument | $\gamma_{g(t)}$ --- coefficients that vary by time group |
 | $Q_t$ (known time basis) | Either column names via `Q`, or auto-generated via `Q.type` | $\kappa_i$ --- unit-specific loadings |
@@ -311,10 +310,10 @@ simdata$gamma_t <- simdata$time
 
 We fit four models and compare their out-of-sample prediction accuracy:
 
-1. FE only (baseline),
-2. CFE with $Z = L_1$ only (one observed loading, no factors),
-3. CFE with $Z = L_1$ + 1 latent factor (correct specification),
-4. IFE with 2 latent factors (correct for IFE, but less efficient than CFE).
+1.  FE only (baseline),
+2.  CFE with $Z = L_1$ only (one observed loading, no factors),
+3.  CFE with $Z = L_1$ + 1 latent factor (correct specification),
+4.  IFE with 2 latent factors (correct for IFE, but less efficient than CFE).
 
 ```{r cfe-45-fit-models, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 # Model 1: FE only
@@ -386,8 +385,8 @@ The placebo test passes, confirming that the CFE model with one observed loading
 
 In some applications, the $Z$-$\gamma$ or $\kappa$-$Q$ coefficients should not all share the same grouping structure. For example:
 
-- **`Z.param`**: Suppose you have two time-invariant covariates --- baseline GDP and initial population --- and their effects change at different rates. GDP effects may shift by decade, while population effects shift by political era. `Z.param` allows you to assign different gamma groupings to different $Z$ variables.
-- **`Q.param`**: Similarly, if you specify multiple $Q$ time bases, `Q.param` controls which unit-grouping variable is used for each $Q$ basis.
+-   **`Z.param`**: Suppose you have two time-invariant covariates --- baseline GDP and initial population --- and their effects change at different rates. GDP effects may shift by decade, while population effects shift by political era. `Z.param` allows you to assign different gamma groupings to different $Z$ variables.
+-   **`Q.param`**: Similarly, if you specify multiple $Q$ time bases, `Q.param` controls which unit-grouping variable is used for each $Q$ basis.
 
 ### `Z.param` syntax
 
@@ -406,7 +405,7 @@ This means: `baseline_gdp` uses `decade` for its time grouping, while `baseline_
 
 ### `Q.param` syntax
 
-```
+```         
 Q.param = list(sector = c("Q_linear", "Q_quadratic"), region = "Q_spline")
 ```
 
@@ -414,9 +413,9 @@ This means: the linear and quadratic trend bases are grouped by sector, while th
 
 ### When to use grouped coefficients
 
-- Use `Z.param` when different covariates' effects change at different timescales.
-- Use `Q.param` when different trend components should vary by different unit groupings.
-- Without `Z.param`/`Q.param`, all $Z$ variables share all gamma groupings (fully crossed), and all $Q$ variables share all kappa groupings --- this may overparameterize the model.
+-   Use `Z.param` when different covariates' effects change at different timescales.
+-   Use `Q.param` when different trend components should vary by different unit groupings.
+-   Without `Z.param`/`Q.param`, all $Z$ variables share all gamma groupings (fully crossed), and all $Q$ variables share all kappa groupings --- this may overparameterize the model.
 
 ::: {.callout-note appearance="simple"}
 `Z.param` and `Q.param` are optional. Without them, all $Z$ (or $Q$) variables are assigned to all gamma (or kappa) groupings. Use them to impose structure when you have domain knowledge about which covariates should share which groupings.
@@ -427,7 +426,7 @@ This means: the linear and quadratic trend bases are grouped by sector, while th
 ## Summary of CFE-specific arguments
 
 | Argument | Type | Description |
-|:---------|:-----|:------------|
+|:-----------------------|:----------------|:------------------------------|
 | `method = "cfe"` | character | Activates the CFE estimator |
 | `index` | character vector | `c(unit, time, ...)` --- elements beyond the first two are extra additive FEs |
 | `Z` | character vector | Names of time-invariant covariate columns |

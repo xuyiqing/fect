@@ -1,12 +1,12 @@
 # Gsynth Program {#sec-gsynth}
 
-This chapter demonstrate the generalized synthetic control method, or Gsynth, proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\].
+This chapter demonstrates the generalized synthetic control method, or Gsynth, proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\].
 
 Gsynth was originally implemented in the **gsynth** package but has now been fully integrated into the **fect** package. Gsynth (`method = "gsynth"`) and FEct/IFEct/MC (`method = "fe"/"ife"/"mc"`) are different in the following ways:
 
 -   Gsynth is designed to handle block and staggered DID settings **without** treatment reversal, whereas other methods allow for treatment reversal under the assumption of limited carryover effects.
 -   Gsynth is particularly suited for the Synth setting, where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
--   Compared with IFEct (`method = "ife"`), Gsynth *does not* rely on pre-treatment data from the treated units to estimate time components (e.g., factors). Hence, `time.component.from = "nevertreated"`. This approach speeds up computation, improves stability, and is more suitable for predictive inference based on row exchangablity.
+-   Compared with IFEct (`method = "ife"`), Gsynth *does not* rely on pre-treatment data from the treated units to estimate time components (e.g., factors). Hence, `time.component.from = "nevertreated"`. This approach speeds up computation, improves stability, and is more suitable for predictive inference based on row exchangeability.
 
 Therefore, we recommend setting `method = "gsynth"` in **fect** for the synthetic control setting, where the treatment does not reverse (or is coded accordingly) and the number of treated units is small.
 
@@ -39,13 +39,13 @@ data(fect)
 ls()
 ```
 
-## Baisc Usage 
+## Basic Usage 
 
 ### Simulated Data
 
 We start with the first example, `sim_gsynth`, a simulated dataset described in @Xu2017.
 
-There are 5 treated units, 45 control units, and 30 time periods. The treatment kicks at Period 21 for all treated units, hence, a block DID set up.
+There are 5 treated units, 45 control units, and 30 time periods. The treatment kicks at Period 21 for all treated units, hence a block DID setup.
 
 ```{r head-sim_gsynth}
 head(sim_gsynth)
@@ -99,7 +99,7 @@ out$est.avg
 out$beta
 ```
 
-Treatment effect estimates from each bootstrap run is stored in `att.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
+Treatment effect estimates from each bootstrap run are stored in `att.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
 
 ::: {.callout-note appearance="simple"}
 **Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
@@ -219,7 +219,7 @@ plot(out, type = "factors", xlab = "Time")
 ```
 
 
-The box plot visualize the estimated individual treatment effects for the treated units. While these effects are not identified at the individual level, their dispersion provides insight into heterogeneous treatment effect across different time periods and informs model performance. By default, the number of total treated units is labeled on the graph. Note, if the number of treated units is small, the box plot will reduce to a scatter plot, as shown below.
+The box plot visualizes the estimated individual treatment effects for the treated units. While these effects are not identified at the individual level, their dispersion provides insight into heterogeneous treatment effects across different time periods and informs model performance. By default, the number of total treated units is labeled on the graph. Note, if the number of treated units is small, the box plot will reduce to a scatter plot, as shown below.
 
 We also provide the `xangle` and `yangle` options to allow users to tilt the labels for better display. We will demonstrate the functionality in later examples.
 
@@ -365,7 +365,7 @@ Here, we visualize the estimated average treatment effects by calendar time.
 plot(out_turnout, type = "calendar", ylim = c(-15,15))
 ```
 
-Estimated factors and factor loadings are ploted below.
+Estimated factors and factor loadings are plotted below.
 
 ```{r turnout_F, message = FALSE, results = 'hide', fig.height=5, fig.width=7, warning=FALSE}
 plot(out_turnout, type = "factors", xlab = "Year")

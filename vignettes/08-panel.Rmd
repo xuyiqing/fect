@@ -279,7 +279,7 @@ The stacked DID plot closely resembles that of the TWFE model, suggesting that p
 ### Interaction Weighted
 
 @sun2021-event proposes an interaction-weighted (IW) estimator for estimating the ATT.
-the IW estimator computes a weighted average of ATT estimates for each cohort, obtained from a TWFE regression where cohort dummies are fully interacted with indicators of relative time to treatment onset.
+The IW estimator computes a weighted average of ATT estimates for each cohort, obtained from a TWFE regression where cohort dummies are fully interacted with indicators of relative time to treatment onset.
 See a simple illustration below.
 
 ```{r fig-iw-illustration, echo=FALSE, out.width="50%", fig.align="center"}
@@ -300,7 +300,7 @@ model.sa.1 <- feols(nat_rate_ord~sunab(FirstTreat,year)|bfs+year,
 summary(model.sa.1,agg = "ATT")
 ```
 
-The estimation results are saved `coeftable` for plotting.
+The estimation results are saved in `coeftable` for plotting.
 We can make an event study plot as before.
 The results are quite similar to TWFE and stacked DID.
 
@@ -495,7 +495,7 @@ Note that the terms *lead* and *lag* here are opposite to their traditional usag
 To assign equal weights to all control units in each matched set, we set `refinement.method = "none"` (without matching on controls).
 Notably, by matching on treatment history and defining the lead window, `PanelMatch` uses only the subset of treated units with three pre-treatment periods and four post-treatment periods to compute the average treatment effects.
 
-The PanelMatch estimator is equivalent to the DIDmulitple estimator proposed by @CDH2020 if we only match on the last pre-treatment period and only estimate the treatment effect at the first post-treatment period.
+The PanelMatch estimator is equivalent to the DIDmultiple estimator proposed by @CDH2020 if we only match on the last pre-treatment period and only estimate the treatment effect at the first post-treatment period.
 
 ```{r hh_pm, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 df.pm <- df.use
@@ -532,7 +532,7 @@ PM.results.placebo <- PanelMatch(lag=3,
 We can estimate the ATT and dynamic treatment effects using the function `PanelEstimate`.
 To obtain the ATT, we set the option `pooled = TRUE`.
 The standard error is calculated using a block bootstrapping method.
-This is different from the standard boostrapping method, which is not valid for matching estimators \cite{abadie2008failure}.
+This is different from the standard boostrapping method, which is not valid for matching estimators [@abadie2008failure].
 
 ```{r hh_pm1, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 # ATT
@@ -745,7 +745,7 @@ twfe.est <- feols(general_sharetotal_A_all ~
                   data = data_cohort, cluster = "district_final")
 ```
 
-We then visualize the estimated dynamic treatment.
+We then visualize the estimated dynamic treatment effects.
 
 ```{r gb_twfeplot, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 twfe.output <- as.data.frame(twfe.est$coeftable[c(1:25),])
@@ -843,7 +843,7 @@ model.fect <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all",
 print(model.fect$est.avg)
 ```
 
-We visualize the estimated dynamic treatment for the counterfactual estimator in the same way.
+We visualize the estimated dynamic treatment effects for the counterfactual estimator in the same way.
 
 ```{r gb_fectplot, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 fect.output <- as.data.frame(model.fect$est.att)

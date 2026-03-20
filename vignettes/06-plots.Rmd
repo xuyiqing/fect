@@ -1,8 +1,16 @@
 # Plot Options {#sec-plots}
 
-In this chapter, we explore visualization options available in the **fect** package. Plots are organized by `type`, from the default `gap` plot to the `counterfactual` plot, followed by diagnostic plots (`equiv`, `placebo`, `carryover`), cumulative effects (`cumul`), heterogeneity plots (`box`, `calendar`, and `hte`), and special-purpose displays (`status`, `factors`, and `loadings`), as well as the standalone `esplot()`. We begin with shared parameter conventions and then work through each plot type in turn.
+In this chapter, we explore visualization options available in the **fect** package. Plots are organized by `type`:
 
-`plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter.
+- the event study plot (`gap`)
+- treated counterfactual plot (`counterfactual`)
+- diagnostic plots (`equiv`, `placebo`, `carryover`)
+- cumulative effects (`cumul`)
+- treatment effect heterogeneity plots (`box`, `calendar`, and `hte`)
+- special-purpose displays (`status`, `factors`, and `loadings`)
+- standalone `esplot()`
+
+We begin with shared parameter conventions and then work through each plot type in turn. `plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter.
 
 ------------------------------------------------------------------------
 
@@ -55,7 +63,7 @@ plot(out.hh) # the effect of indirect democracy on naturalization rate
 
 ### Starting period
 
-By default, the first post-treatment period is labeled 0 and the last pre-treatment period is -1. Some researchers prefer to label these as 1 and 0, respectively. Set `start0 = TRUE` to shift accordingly.
+By default, the first post-treatment period is labeled 1 and the last pre-treatment period is 0. Some researchers prefer to label these as 0 and -1, respectively. Set `start0 = TRUE` to shift accordingly.
 
 ```{r begin-post-customization}
 plot(out, start0 = TRUE,
@@ -291,7 +299,7 @@ plot(out, type = "equiv", bound = "equiv", tost.threshold = 0.1,
      ylim = c(-0.15, 0.15))
 ```
 
-The `"min"` bound displays the minimum range based on the maximum absolute pre-treatment residual. For example, if the largest pre-treatment estimate is 0.03, lines appear at $\pm$0.03.
+The `"min"` bound displays the minimum range based on the maximum absolute pre-treatment residual. For example, if the largest pre-treatment estimate is 0.03, lines appear at \$\pm\$0.03.
 
 ```{r plot-equiv-min}
 plot(out, type = "equiv", bound = "min", ylim = c(-0.15, 0.15))
@@ -317,7 +325,7 @@ plot(out, type = "equiv",
 
 ------------------------------------------------------------------------
 
-## Carryover Test  {#sec-exit}
+## Carryover Test {#sec-exit}
 
 The exit plot shows how the difference between treatment and control groups evolves **after treatment ends**. The x-axis represents time relative to treatment exit, in contrast to the gap plot's focus on treatment entry. Exit plots are essential for assessing potential carryover effects.
 
@@ -454,7 +462,6 @@ plot(out_fe_carryover, type = "status",
 
 Note: most styling parameters (`connected`, `plot.ci`, `pre.color`/`post.color`, `count.*`) do not apply to status plots. Only axis, text size, and status-specific color parameters are relevant.
 
-
 ### Factors and loadings plots
 
 These plot types are available when the model is estimated with interactive fixed effects (`method = "ife"` or `method = "gsynth"`). We first fit an IFE model with two factors:
@@ -510,7 +517,8 @@ es_data <- data.frame(
 esplot(es_data, Period = "Time",
        main = "Event Study Plot with esplot()",
        ylab = "Estimated ATT",
-       xlab = "Periods Since Treatment")
+       xlab = "Periods Since Treatment",
+       xlim = c(-15, 5), ylim = c(-0.3, 0.7))
 ```
 
 ### Using fect objects directly
@@ -529,7 +537,8 @@ Setting `connected = TRUE` displays estimates as a connected line with a confide
 esplot(es_data, Period = "Time",
        connected = TRUE,
        main = "Connected Event Study Plot",
-       ylab = "Estimated ATT")
+       ylab = "Estimated ATT",
+       xlim = c(-15, 5), ylim = c(-0.3, 0.7))
 ```
 
 ### Highlighting periods
@@ -541,20 +550,21 @@ esplot(es_data, Period = "Time",
        highlight.periods = c(-2, -1, 0),
        highlight.colors = c("orange", "orange", "red"),
        main = "Highlighting Key Periods",
-       ylab = "Estimated ATT")
+       ylab = "Estimated ATT",
+       xlim = c(-15, 5), ylim = c(-0.3, 0.7))
 ```
 
 ### Count bar behavior
 
 When you pass a **fect object** to `esplot()`, count bars appear by default because the function auto-extracts treated unit counts from the object:
 
-```r
+``` r
 esplot(out)  # count bars shown automatically
 ```
 
 When passing a **data frame**, you must include a count column and specify its name:
 
-```r
+``` r
 esplot(df, Count = "n_treated")
 ```
 
@@ -573,7 +583,7 @@ Legends appear automatically when multiple visual encodings are present (e.g., s
 The table below summarizes which parameters apply to each plot type. Parameters not listed are either universal (e.g., `main`, `theme.bw`) or internal.
 
 | Parameter | gap | equiv | exit | box | calendar | counterfactual | status | factors | loadings | esplot |
-|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|:------|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
 | `bound` / `tost.threshold` | --- | Yes | --- | --- | --- | --- | --- | --- | --- | --- |
 | `carryover.color` | --- | --- | Yes | --- | --- | --- | --- | --- | --- | --- |
 | `cex.main` / `cex.axis` / `cex.lab` | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes |

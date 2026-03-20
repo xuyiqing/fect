@@ -22,7 +22,7 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 |------------------------|------------------------|------------------------|
 | **box** | Box plot of ATT by period. | fe, ife, mc, gsynth, cfe |
 | **calendar** | CATT by calendar time. | fe, ife, mc, gsynth, cfe |
-| **heterogenous** or **hte** | CATT by a covariate. | fe, ife, mc, gsynth, cfe |
+| **heterogeneous** or **hte** | CATT by a covariate. | fe, ife, mc, gsynth, cfe |
 | **counterfactual** or **ct** | Observed vs. imputed outcome for treated units. | fe, ife, mc, gsynth |
 | **equiv** | Pretreatment residuals with equivalence intervals. | fe, ife, mc, gsynth, cfe |
 | **exit** | Period-wise ATT relative to treatment exit. | fe, ife, mc, cfe |
@@ -76,8 +76,8 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | `se` (uncertainty) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `nboots` (# bootstrap reps) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `force` (FE structure) | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `lambda`(Hyper-parameter sequence) | – | – | ✓ | ✓ | – |
-| `nlambda`(Length of hyper-parameter sequence) | – | – | ✓ | ✓ | – |
+| `lambda` (Hyper-parameter sequence) | – | – | ✓ | ✓ | – |
+| `nlambda` (Length of hyper-parameter sequence) | – | – | ✓ | ✓ | – |
 | `r` (# factor) | – | ✓ | – | ✓ | ✓ |
 | `k` ( \# cross-validation rounds) | – | ✓ | ✓ | ✓ | – |
 | `gamma` (time grouping for Z) | – | – | – | – | ✓ |
@@ -103,7 +103,7 @@ A check mark (✓) indicates that the method requires or accepts the input.
 
 -   Method `cfe` allows either "jackknife" or "bootstrap" for uncertainty estimates.
 
--   Factor-based methods (`ife`, `gsynth`) can use `r`and `k` for factor selection and cross validation. We can implement a similar process using `mc` or `gsynth` with `lambda` and`nlambda`.
+-   Factor-based methods (`ife`, `gsynth`) can use `r` and `k` for factor selection and cross-validation. We can implement a similar process using `mc` or `gsynth` with `lambda` and `nlambda`.
 
 -   `carryoverTest` is available in `fe`, `ife`, `mc`, and `cfe` but not in `gsynth`. `loo` is available in `fe`, `ife`, `mc`, and `gsynth`.
 
