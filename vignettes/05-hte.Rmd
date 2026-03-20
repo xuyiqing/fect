@@ -6,7 +6,7 @@ library(fect)
 data(fect)
 ```
 
-We provide several methods for researchers to explore heterogeneous treatment effects (HTE). These work with any method; here we demonstrate with the FE estimator using `sim_base`.
+We provide several methods for researchers to explore heterogeneous treatment effects (HTE). These work with any method; here we demonstrate with the FE estimator using `sim_base`. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/05-hte.R).
 
 ```{r hte_setup, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
