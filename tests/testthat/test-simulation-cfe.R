@@ -4,7 +4,8 @@
 ## ---------------------------------------------------------
 
 test_that("CFE estimator recovers ATT with time-varying covariate", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(4001)
 
@@ -78,7 +79,8 @@ test_that("CFE estimator recovers ATT with time-varying covariate", {
 })
 
 test_that("CFE estimator handles correlated covariate correctly", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(4002)
 

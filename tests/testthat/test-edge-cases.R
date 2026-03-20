@@ -3,7 +3,8 @@
 ## ---------------------------------------------------------
 
 test_that("fect handles single treated unit", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(7001)
 
@@ -58,7 +59,8 @@ test_that("fect handles single treated unit", {
 })
 
 test_that("fect handles missing data (scattered NAs in Y)", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(7002)
 
@@ -123,7 +125,8 @@ test_that("fect handles missing data (scattered NAs in Y)", {
 })
 
 test_that("fect output structure is complete (FE)", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(7003)
 
@@ -178,7 +181,8 @@ test_that("fect output structure is complete (FE)", {
 })
 
 test_that("fect with many treated units still works", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(7004)
 

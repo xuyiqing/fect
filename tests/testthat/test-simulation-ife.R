@@ -4,7 +4,8 @@
 ## ---------------------------------------------------------
 
 test_that("IFE estimator recovers ATT under factor model DGP", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(3001)
 
@@ -81,7 +82,8 @@ test_that("IFE estimator recovers ATT under factor model DGP", {
 })
 
 test_that("IFE with r=0 reduces to FE and produces consistent estimates", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(3002)
 

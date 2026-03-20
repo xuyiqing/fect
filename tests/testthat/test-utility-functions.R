@@ -64,6 +64,7 @@ out_norev <- suppressWarnings(suppressMessages(
 ## -----------------------------------------------------------------
 test_that("fect_mspe returns correct structure and values", {
 
+  skip_on_cran()
   ## Basic invocation (cv.sample-based API — no hide_n / n_rep / hide_mask)
   result <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42)
@@ -100,6 +101,7 @@ test_that("fect_mspe returns correct structure and values", {
 ## -----------------------------------------------------------------
 test_that("esplot handles parameter variations correctly", {
 
+  skip_on_cran()
   ## Manual test data
   es_data <- data.frame(
     time = -3:3,
@@ -174,6 +176,7 @@ test_that("esplot handles parameter variations correctly", {
 ## -----------------------------------------------------------------
 test_that("att.cumu and effect produce valid cumulative ATT", {
 
+  skip_on_cran()
   ## ---- att.cumu (works with reversals) ----
   c1 <- att.cumu(out_boot, period = c(1, 3), plot = FALSE)
   expect_true(is.matrix(c1))

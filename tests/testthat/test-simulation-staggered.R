@@ -4,7 +4,8 @@
 ## ---------------------------------------------------------
 
 test_that("FE estimator recovers ATT under staggered adoption", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(5001)
 
@@ -75,7 +76,8 @@ test_that("FE estimator recovers ATT under staggered adoption", {
 })
 
 test_that("IFE handles staggered adoption with factor structure", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(5002)
 

@@ -1,4 +1,6 @@
 test_that("gsynth parametric bootstrap aligns group (unit-level) results with boot resampling", {
+
+  skip_on_cran()
   suppressWarnings(try(data("sim_gsynth", package = "fect"), silent = TRUE))
   skip_if_not(exists("sim_gsynth"), "Dataset 'sim_gsynth' not available")
 

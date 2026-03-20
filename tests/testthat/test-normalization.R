@@ -5,7 +5,8 @@
 ## ---------------------------------------------------------
 
 test_that("sigma2 is consistent with and without normalization (FE)", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(6001)
 
@@ -83,7 +84,8 @@ test_that("sigma2 is consistent with and without normalization (FE)", {
 })
 
 test_that("sigma2 is consistent with and without normalization (IFE)", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(6002)
 

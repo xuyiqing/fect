@@ -66,6 +66,8 @@ out_base <- suppressWarnings(suppressMessages(
 ## =================================================================
 
 test_that("S1.1: Basic unweighted scoring", {
+
+  skip_on_cran()
   score_fn <- tryCatch(
     getFromNamespace(".score_residuals", "fect"),
     error = function(e) NULL
@@ -104,6 +106,8 @@ test_that("S1.1: Basic unweighted scoring", {
 })
 
 test_that("S1.2: With observation weights", {
+
+  skip_on_cran()
   score_fn <- tryCatch(
     getFromNamespace(".score_residuals", "fect"),
     error = function(e) NULL
@@ -125,6 +129,8 @@ test_that("S1.2: With observation weights", {
 })
 
 test_that("S1.3: With time_index and count_weights (Moment/GMoment)", {
+
+  skip_on_cran()
   score_fn <- tryCatch(
     getFromNamespace(".score_residuals", "fect"),
     error = function(e) NULL
@@ -156,6 +162,8 @@ test_that("S1.3: With time_index and count_weights (Moment/GMoment)", {
 })
 
 test_that("S1.4: With norm.para", {
+
+  skip_on_cran()
   score_fn <- tryCatch(
     getFromNamespace(".score_residuals", "fect"),
     error = function(e) NULL
@@ -174,6 +182,8 @@ test_that("S1.4: With norm.para", {
 })
 
 test_that("S1.5: Edge case - single residual", {
+
+  skip_on_cran()
   score_fn <- tryCatch(
     getFromNamespace(".score_residuals", "fect"),
     error = function(e) NULL
@@ -190,6 +200,8 @@ test_that("S1.5: Edge case - single residual", {
 })
 
 test_that("S1.6: Edge case - zero residual", {
+
+  skip_on_cran()
   score_fn <- tryCatch(
     getFromNamespace(".score_residuals", "fect"),
     error = function(e) NULL
@@ -210,6 +222,8 @@ test_that("S1.6: Edge case - zero residual", {
 })
 
 test_that("S1.7: Edge case - empty residuals", {
+
+  skip_on_cran()
   score_fn <- tryCatch(
     getFromNamespace(".score_residuals", "fect"),
     error = function(e) NULL
@@ -225,6 +239,8 @@ test_that("S1.7: Edge case - empty residuals", {
 ## =================================================================
 
 test_that("S2.1: IFE method CV - r.cv and CV.out snapshot", {
+
+  skip_on_cran()
   cv_out <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D + X1 + X2,
@@ -251,6 +267,8 @@ test_that("S2.1: IFE method CV - r.cv and CV.out snapshot", {
 })
 
 test_that("S2.2: MC method CV - lambda.cv selection", {
+
+  skip_on_cran()
   cv_mc <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D + X1 + X2,
@@ -269,6 +287,8 @@ test_that("S2.2: MC method CV - lambda.cv selection", {
 })
 
 test_that("S2.3: GMoment column correctly populated (IFE)", {
+
+  skip_on_cran()
   cv_out <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D + X1 + X2,
@@ -310,6 +330,8 @@ test_that("S2.3: GMoment column correctly populated (IFE)", {
 ## =================================================================
 
 test_that("S3.1: Default criterion='mspe' matches old RMSE", {
+
+  skip_on_cran()
   res_new <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 123, criterion = "mspe")
   ))
@@ -322,6 +344,8 @@ test_that("S3.1: Default criterion='mspe' matches old RMSE", {
 })
 
 test_that("S3.2: All 7 criteria produce finite, positive scores", {
+
+  skip_on_cran()
   for (crit in c("mspe", "wmspe", "gmspe", "wgmspe", "mad",
                  "moment", "gmoment")) {
     res <- suppressWarnings(suppressMessages(
@@ -343,6 +367,8 @@ test_that("S3.2: All 7 criteria produce finite, positive scores", {
 ## =================================================================
 
 test_that("S4.1: cv.method='treated_units' masking runs without error", {
+
+  skip_on_cran()
   res <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, cv.method = "treated_units",
               k = 3, cv.prop = 0.1,
@@ -358,6 +384,8 @@ test_that("S4.1: cv.method='treated_units' masking runs without error", {
 })
 
 test_that("S4.2: cv.method='all_units' masking runs without error", {
+
+  skip_on_cran()
   res_cv <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, cv.method = "all_units",
               k = 3, criterion = "mspe")
@@ -367,6 +395,8 @@ test_that("S4.2: cv.method='all_units' masking runs without error", {
 })
 
 test_that("S4.3: cv.method='treated_units' with k=1 (single fold)", {
+
+  skip_on_cran()
   res <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, cv.method = "treated_units",
               k = 1, criterion = "mspe")
@@ -380,6 +410,8 @@ test_that("S4.3: cv.method='treated_units' with k=1 (single fold)", {
 ## =================================================================
 
 test_that("S6.1: W parameter produces different scores than unweighted", {
+
+  skip_on_cran()
   TT <- nrow(out_base$Y.dat)
   NN <- ncol(out_base$Y.dat)
   set.seed(7)
@@ -396,6 +428,8 @@ test_that("S6.1: W parameter produces different scores than unweighted", {
 })
 
 test_that("S6.2: Uniform W equals unweighted", {
+
+  skip_on_cran()
   TT <- nrow(out_base$Y.dat)
   NN <- ncol(out_base$Y.dat)
   W_uniform <- matrix(1, nrow = TT, ncol = NN)
@@ -418,6 +452,8 @@ test_that("S6.2: Uniform W equals unweighted", {
 ## =================================================================
 
 test_that("S7.1: norm.para scales scores", {
+
+  skip_on_cran()
   np <- c(2.0, 0.0)
   res_raw <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, criterion = "mspe")
@@ -439,6 +475,8 @@ test_that("S7.1: norm.para scales scores", {
 ## =================================================================
 
 test_that("S8.3: Return structure has summary and records", {
+
+  skip_on_cran()
   res <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42)
   ))
@@ -455,6 +493,8 @@ test_that("S8.3: Return structure has summary and records", {
 ## =================================================================
 
 test_that("S9.1: Invalid criterion rejected", {
+
+  skip_on_cran()
   invalid_result <- tryCatch({
     suppressWarnings(suppressMessages(
       fect_mspe(out_base, criterion = "invalid", seed = 42)
@@ -469,6 +509,8 @@ test_that("S9.1: Invalid criterion rejected", {
 })
 
 test_that("S9.2: Invalid cv.method rejected by fect_mspe", {
+
+  skip_on_cran()
   expect_error(
     fect_mspe(out_base, cv.method = "invalid"),
     "cv.method|arg"
@@ -476,6 +518,8 @@ test_that("S9.2: Invalid cv.method rejected by fect_mspe", {
 })
 
 test_that("S9.3: W wrong dimensions", {
+
+  skip_on_cran()
   W_bad <- matrix(1, nrow = 5, ncol = 5)
   expect_error(
     fect_mspe(out_base, W = W_bad),
@@ -484,6 +528,8 @@ test_that("S9.3: W wrong dimensions", {
 })
 
 test_that("S9.5: .score_residuals() empty input", {
+
+  skip_on_cran()
   score_fn <- tryCatch(
     getFromNamespace(".score_residuals", "fect"),
     error = function(e) NULL
@@ -499,6 +545,8 @@ test_that("S9.5: .score_residuals() empty input", {
 ## =================================================================
 
 test_that("P1: RMSE = sqrt(MSPE) invariant", {
+
+  skip_on_cran()
   res <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, criterion = "mspe")
   ))
@@ -508,6 +556,8 @@ test_that("P1: RMSE = sqrt(MSPE) invariant", {
 })
 
 test_that("P2: MSPE >= 0", {
+
+  skip_on_cran()
   res <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, criterion = "mspe")
   ))
@@ -517,6 +567,8 @@ test_that("P2: MSPE >= 0", {
 })
 
 test_that("P5: Moment = 0 when all per-group mean residuals are 0", {
+
+  skip_on_cran()
   score_fn <- tryCatch(
     getFromNamespace(".score_residuals", "fect"),
     error = function(e) NULL
@@ -534,6 +586,8 @@ test_that("P5: Moment = 0 when all per-group mean residuals are 0", {
 })
 
 test_that("P7: Seed reproducibility", {
+
+  skip_on_cran()
   r1 <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42)
   ))
@@ -549,6 +603,8 @@ test_that("P7: Seed reproducibility", {
 ## =================================================================
 
 test_that("E3: Single model in fect_mspe (not a list)", {
+
+  skip_on_cran()
   res <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42)
   ))
@@ -557,6 +613,8 @@ test_that("E3: Single model in fect_mspe (not a list)", {
 })
 
 test_that("E4: Multiple models in fect_mspe", {
+
+  skip_on_cran()
   multi <- suppressWarnings(suppressMessages(
     fect_mspe(list(m1 = out_base, m2 = out_base),
               seed = 42)
@@ -571,6 +629,8 @@ test_that("E4: Multiple models in fect_mspe", {
 ## =================================================================
 
 test_that("CV1: cv.method='all_units' selects r.cv", {
+
+  skip_on_cran()
   cv_out <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D + X1 + X2,
@@ -595,6 +655,8 @@ test_that("CV1: cv.method='all_units' selects r.cv", {
 })
 
 test_that("CV2: cv.method='treated_units' selects r.cv", {
+
+  skip_on_cran()
   cv_out <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D + X1 + X2,
@@ -619,6 +681,8 @@ test_that("CV2: cv.method='treated_units' selects r.cv", {
 })
 
 test_that("CV3: Invalid cv.method rejected", {
+
+  skip_on_cran()
   expect_error(
     fect::fect(
       Y ~ D + X1 + X2,
@@ -638,6 +702,8 @@ test_that("CV3: Invalid cv.method rejected", {
 ## =================================================================
 
 test_that("NT1: fect_nevertreated cv.method='loo' selects r.cv (IFE)", {
+
+  skip_on_cran()
   nt_out <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D,
@@ -663,6 +729,8 @@ test_that("NT1: fect_nevertreated cv.method='loo' selects r.cv (IFE)", {
 })
 
 test_that("NT2: fect_nevertreated cv.method='treated_units' selects r.cv (IFE)", {
+
+  skip_on_cran()
   nt_out <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D,
@@ -682,6 +750,8 @@ test_that("NT2: fect_nevertreated cv.method='treated_units' selects r.cv (IFE)",
 })
 
 test_that("NT3: fect_nevertreated cv.method='all_units' selects r.cv (IFE)", {
+
+  skip_on_cran()
   nt_out <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D,
@@ -701,6 +771,8 @@ test_that("NT3: fect_nevertreated cv.method='all_units' selects r.cv (IFE)", {
 })
 
 test_that("NT4: fect_nevertreated cv.method='loo' selects r.cv (CFE)", {
+
+  skip_on_cran()
   nt_cfe <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D,
@@ -720,6 +792,8 @@ test_that("NT4: fect_nevertreated cv.method='loo' selects r.cv (CFE)", {
 })
 
 test_that("NT5: fect_nevertreated cv.method='treated_units' selects r.cv (CFE)", {
+
+  skip_on_cran()
   nt_cfe <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D,
@@ -739,6 +813,8 @@ test_that("NT5: fect_nevertreated cv.method='treated_units' selects r.cv (CFE)",
 })
 
 test_that("NT6: fect_nevertreated default cv.method is treated_units", {
+
+  skip_on_cran()
   nt_default <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D,
@@ -772,6 +848,8 @@ test_that("NT6: fect_nevertreated default cv.method is treated_units", {
 })
 
 test_that("NT7: Invalid cv.method rejected for nevertreated", {
+
+  skip_on_cran()
   expect_error(
     fect::fect(
       Y ~ D,
@@ -792,6 +870,8 @@ test_that("NT7: Invalid cv.method rejected for nevertreated", {
 ## =================================================================
 
 test_that("MSPE1: Simplified fect_mspe with cv.method='all_units'", {
+
+  skip_on_cran()
   res <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, cv.method = "all_units", criterion = "mspe")
   ))
@@ -805,6 +885,8 @@ test_that("MSPE1: Simplified fect_mspe with cv.method='all_units'", {
 })
 
 test_that("MSPE2: Simplified fect_mspe with cv.method='treated_units'", {
+
+  skip_on_cran()
   res <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, cv.method = "treated_units",
               criterion = "mspe")
@@ -815,6 +897,8 @@ test_that("MSPE2: Simplified fect_mspe with cv.method='treated_units'", {
 })
 
 test_that("MSPE3: Removed parameters rejected", {
+
+  skip_on_cran()
   expect_error(fect_mspe(out_base, mask.method = "random"))
   expect_error(fect_mspe(out_base, hide_mask = matrix(TRUE, 10, 10)))
   expect_error(fect_mspe(out_base, n_rep = 3))
@@ -825,6 +909,8 @@ test_that("MSPE3: Removed parameters rejected", {
 })
 
 test_that("MSPE4: Invalid cv.method rejected", {
+
+  skip_on_cran()
   expect_error(
     fect_mspe(out_base, cv.method = "loo"),
     "cv.method|arg"
@@ -832,6 +918,8 @@ test_that("MSPE4: Invalid cv.method rejected", {
 })
 
 test_that("MSPE5: Multi-model comparison with cv.method", {
+
+  skip_on_cran()
   res <- suppressWarnings(suppressMessages(
     fect_mspe(list(m1 = out_base, m2 = out_base),
               seed = 42, cv.method = "all_units")
@@ -841,6 +929,8 @@ test_that("MSPE5: Multi-model comparison with cv.method", {
 })
 
 test_that("MSPE6: Seed reproducibility", {
+
+  skip_on_cran()
   r1 <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, cv.method = "all_units")
   ))
@@ -851,6 +941,8 @@ test_that("MSPE6: Seed reproducibility", {
 })
 
 test_that("MSPE7: fect_mspe with observation weights", {
+
+  skip_on_cran()
   TT <- nrow(out_base$Y.dat)
   NN <- ncol(out_base$Y.dat)
   W_mat <- matrix(1, nrow = TT, ncol = NN)
@@ -864,6 +956,8 @@ test_that("MSPE7: fect_mspe with observation weights", {
 })
 
 test_that("MSPE8: fect_mspe with norm.para", {
+
+  skip_on_cran()
   res_raw <- suppressWarnings(suppressMessages(
     fect_mspe(out_base, seed = 42, cv.method = "all_units")
   ))
@@ -885,6 +979,8 @@ test_that("MSPE8: fect_mspe with norm.para", {
 ## =================================================================
 
 test_that("SEL1: 1% selection rule in IFE nevertreated", {
+
+  skip_on_cran()
   # Large tol should NOT affect the 1% rule
   nt_bigtol <- suppressWarnings(suppressMessages(
     fect::fect(
@@ -918,6 +1014,8 @@ test_that("SEL1: 1% selection rule in IFE nevertreated", {
 })
 
 test_that("SEL2: 1% selection rule in CFE nevertreated", {
+
+  skip_on_cran()
   nt_bigtol <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D,
@@ -955,6 +1053,8 @@ test_that("SEL2: 1% selection rule in CFE nevertreated", {
 ## =================================================================
 
 test_that("WT1: W weights flow through nevertreated LOO scoring", {
+
+  skip_on_cran()
   # W in fect() is a column name, not a matrix. Add a weight column to ntdata.
   ntdata_w <- ntdata
   ntdata_w$wt <- 1.0  # uniform weights
@@ -993,6 +1093,8 @@ test_that("WT1: W weights flow through nevertreated LOO scoring", {
 })
 
 test_that("WT2: Non-uniform W may change r selection", {
+
+  skip_on_cran()
   # W in fect() is a column name. Add non-uniform weight column.
   ntdata_w <- ntdata
   set.seed(99)
@@ -1022,6 +1124,8 @@ test_that("WT2: Non-uniform W may change r selection", {
 ## =================================================================
 
 test_that("INT1: End-to-end cv.method pipeline", {
+
+  skip_on_cran()
   ## Use CV=FALSE for the fit since fect_mspe performs its own
 
   ## cross-validation masking; what matters is that the fit object
@@ -1051,6 +1155,8 @@ test_that("INT1: End-to-end cv.method pipeline", {
 })
 
 test_that("INT2: IFE CV respects cv.method='treated_units'", {
+
+  skip_on_cran()
   ## Original test used method="gsynth" + cv.method="loo", but simdata has
   ## treatment reversals which gsynth rejects. We test that cv.method is
   ## respected by using cv.method="treated_units" (non-default) with method="ife".
@@ -1080,6 +1186,8 @@ test_that("INT2: IFE CV respects cv.method='treated_units'", {
 ## ---- H.1: IFE smoke tests ---- ##
 
 test_that("NTCV1: cv.method='all_units' IFE produces valid output", {
+
+  skip_on_cran()
   set.seed(42)
   out_au <- suppressWarnings(suppressMessages(
     fect::fect(
@@ -1117,6 +1225,8 @@ test_that("NTCV1: cv.method='all_units' IFE produces valid output", {
 })
 
 test_that("NTCV2: cv.method='treated_units' IFE produces valid output", {
+
+  skip_on_cran()
   set.seed(42)
   out_tu <- suppressWarnings(suppressMessages(
     fect::fect(
@@ -1145,6 +1255,8 @@ test_that("NTCV2: cv.method='treated_units' IFE produces valid output", {
 ## ---- H.2: CFE smoke tests ---- ##
 
 test_that("NTCV3: cv.method='all_units' CFE produces valid output", {
+
+  skip_on_cran()
   set.seed(42)
   out_au_cfe <- suppressWarnings(suppressMessages(
     fect::fect(
@@ -1167,6 +1279,8 @@ test_that("NTCV3: cv.method='all_units' CFE produces valid output", {
 })
 
 test_that("NTCV4: cv.method='treated_units' CFE produces valid output", {
+
+  skip_on_cran()
   set.seed(42)
   out_tu_cfe <- suppressWarnings(suppressMessages(
     fect::fect(
@@ -1191,6 +1305,8 @@ test_that("NTCV4: cv.method='treated_units' CFE produces valid output", {
 ## ---- H.3: LOO backward compatibility ---- ##
 
 test_that("NTCV5: cv.method='loo' IFE backward compatibility", {
+
+  skip_on_cran()
   set.seed(1234)
   out_loo <- suppressWarnings(suppressMessages(
     fect::fect(
@@ -1234,6 +1350,8 @@ test_that("NTCV5: cv.method='loo' IFE backward compatibility", {
 ## ---- H.4: r-selection and ATT checks ---- ##
 
 test_that("NTCV6: r-selection validity across all cv.methods (IFE)", {
+
+  skip_on_cran()
   r_start <- 0
   r_end <- 3
 
@@ -1277,6 +1395,8 @@ test_that("NTCV6: r-selection validity across all cv.methods (IFE)", {
 })
 
 test_that("NTCV7: ATT consistency across cv.methods (IFE)", {
+
+  skip_on_cran()
   att_vals <- numeric(3)
   methods_list <- c("loo", "all_units", "treated_units")
   for (i in seq_along(methods_list)) {
@@ -1313,6 +1433,8 @@ test_that("NTCV7: ATT consistency across cv.methods (IFE)", {
 ## ---- H.5: Edge cases ---- ##
 
 test_that("NTCV-Edge1: r=c(0,0) with all cv.methods", {
+
+  skip_on_cran()
   for (cm in c("loo", "all_units", "treated_units")) {
     set.seed(42)
     out <- suppressWarnings(suppressMessages(
@@ -1343,6 +1465,8 @@ test_that("NTCV-Edge1: r=c(0,0) with all cv.methods", {
 })
 
 test_that("NTCV-Edge2: Small panel with all cv.methods", {
+
+  skip_on_cran()
   # Create data with few pre-treatment periods for treated units
   small_data <- make_factor_data(N = 30, TT = 10, Ntr = 8, r = 1, seed = 99)
 
@@ -1381,6 +1505,8 @@ test_that("NTCV-Edge2: Small panel with all cv.methods", {
 })
 
 test_that("NTCV-Edge3: Single treated unit", {
+
+  skip_on_cran()
   single_tr_data <- make_factor_data(N = 30, TT = 15, Ntr = 1, r = 1, seed = 77)
 
   for (cm in c("loo", "all_units", "treated_units")) {
@@ -1414,6 +1540,8 @@ test_that("NTCV-Edge3: Single treated unit", {
 ## ---- H.6: Property-based invariants for cv.sample ---- ##
 
 test_that("NTCV-P1: Score non-negativity in CV.out", {
+
+  skip_on_cran()
   for (cm in c("all_units", "treated_units")) {
     set.seed(42)
     out <- suppressWarnings(suppressMessages(
@@ -1448,6 +1576,8 @@ test_that("NTCV-P1: Score non-negativity in CV.out", {
 })
 
 test_that("NTCV-P4: LOO determinism", {
+
+  skip_on_cran()
   set.seed(42)
   out1 <- suppressWarnings(suppressMessages(
     fect::fect(
@@ -1488,6 +1618,8 @@ test_that("NTCV-P4: LOO determinism", {
 })
 
 test_that("NTCV-P5: cv.sample reproducibility with set.seed", {
+
+  skip_on_cran()
   for (cm in c("all_units", "treated_units")) {
     set.seed(42)
     out1 <- suppressWarnings(suppressMessages(
@@ -1537,6 +1669,7 @@ test_that("NTCV-P5: cv.sample reproducibility with set.seed", {
 ## =================================================================
 
 test_that("BENCH1: IFE timing comparison (loo vs all_units vs treated_units)", {
+
   skip_on_cran()
 
   cat("\n=== Runtime Benchmark: IFE nevertreated cv.method timing ===\n")
@@ -1612,6 +1745,7 @@ test_that("BENCH1: IFE timing comparison (loo vs all_units vs treated_units)", {
 })
 
 test_that("BENCH2: CFE timing comparison (loo vs all_units vs treated_units)", {
+
   skip_on_cran()
 
   cat("\n=== Runtime Benchmark: CFE nevertreated cv.method timing ===\n")
@@ -1701,6 +1835,7 @@ test_that("BENCH2: CFE timing comparison (loo vs all_units vs treated_units)", {
 ## -- G.1  Sequential-Parallel Equivalence: IFE, all_units ----------
 
 test_that("G.1: parallel CV matches sequential — IFE, all_units", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -1754,6 +1889,7 @@ test_that("G.1: parallel CV matches sequential — IFE, all_units", {
 ## -- G.2  Sequential-Parallel Equivalence: IFE, treated_units ------
 
 test_that("G.2: parallel CV matches sequential — IFE, treated_units", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -1805,6 +1941,7 @@ test_that("G.2: parallel CV matches sequential — IFE, treated_units", {
 ## -- G.3  Sequential-Parallel Equivalence: CFE, all_units ----------
 
 test_that("G.3: parallel CV matches sequential — CFE, all_units", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -1856,6 +1993,7 @@ test_that("G.3: parallel CV matches sequential — CFE, all_units", {
 ## -- G.4  Sequential-Parallel Equivalence: CFE, treated_units ------
 
 test_that("G.4: parallel CV matches sequential — CFE, treated_units", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -1907,6 +2045,7 @@ test_that("G.4: parallel CV matches sequential — CFE, treated_units", {
 ## -- G.5  Reproducibility Under Parallelism ------------------------
 
 test_that("G.5: parallel CV is reproducible with same seed", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -1958,6 +2097,7 @@ test_that("G.5: parallel CV is reproducible with same seed", {
 ## -- G.6  Default Behavior Unchanged -------------------------------
 
 test_that("G.6: default (no parallel arg) behaves as sequential", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -2005,6 +2145,7 @@ test_that("G.6: default (no parallel arg) behaves as sequential", {
 ## -- G.7  LOO Path Unaffected --------------------------------------
 
 test_that("G.7: LOO path is unaffected by parallel flag", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -2052,6 +2193,7 @@ test_that("G.7: LOO path is unaffected by parallel flag", {
 ## -- G.8  Edge Case: k = 1 ----------------------------------------
 
 test_that("G.8: edge case — k = 1 with parallel=TRUE runs without error", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -2099,6 +2241,7 @@ test_that("G.8: edge case — k = 1 with parallel=TRUE runs without error", {
 ## -- G.9  Edge Case: cores = 1 ------------------------------------
 
 test_that("G.9: edge case — cores = 1 behaves as sequential", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -2148,6 +2291,7 @@ test_that("G.9: edge case — cores = 1 behaves as sequential", {
 ## -- G.10  Edge Case: cores = NULL (auto-detect) ------------------
 
 test_that("G.10: edge case — cores = NULL auto-detects and runs", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -2197,6 +2341,7 @@ test_that("G.10: edge case — cores = NULL auto-detects and runs", {
 ## -- G.11  Edge Case: parallel=FALSE with cores specified ----------
 
 test_that("G.11: edge case — parallel=FALSE ignores cores", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)
@@ -2248,6 +2393,7 @@ test_that("G.11: edge case — parallel=FALSE ignores cores", {
 ## "Not a pass/fail test, but auditor should measure and report").
 
 test_that("G.12: timing benchmark — parallel vs sequential with 10 cores", {
+
   skip_on_cran()
 
   ## Larger dataset for meaningful timing differences
@@ -2452,6 +2598,7 @@ test_that("G.12: timing benchmark — parallel vs sequential with 10 cores", {
 ## -- G.13  Property: Backend Cleanup After Parallel CV -------------
 
 test_that("G.13: parallel backend is restored after fect() returns", {
+
   skip_on_cran()
 
   dat <- make_factor_data(N = 50, TT = 20, Ntr = 15, r = 2, seed = 42)

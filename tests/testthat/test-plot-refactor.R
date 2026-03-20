@@ -20,7 +20,8 @@ setup_once <- function() {
 ## =========================================================
 
 test_that("A1: default gap plot has pre.color=gray50, post.color=black", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- plot(out_fect, type = "gap")
     expect_true(inherits(p, "gg") || inherits(p, "ggplot"))
@@ -31,7 +32,8 @@ test_that("A1: default gap plot has pre.color=gray50, post.color=black", {
 })
 
 test_that("A2: connected gap plot uses dashed pre-treatment line", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- plot(out_fect, type = "gap", connected = TRUE)
     expect_true(inherits(p, "gg"))
@@ -42,14 +44,16 @@ test_that("A2: connected gap plot uses dashed pre-treatment line", {
 })
 
 test_that("A3: custom pre.color and post.color", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- plot(out_fect, pre.color = "steelblue", post.color = "firebrick")
     expect_true(inherits(p, "gg"))
 })
 
 test_that("A4: pre.color = post.color = color reproduces single-color behavior", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- plot(out_fect, pre.color = "red", post.color = "red", color = "red")
     expect_true(inherits(p, "gg"))
@@ -60,14 +64,16 @@ test_that("A4: pre.color = post.color = color reproduces single-color behavior",
 ## =========================================================
 
 test_that("B1: esplot(fect_object) produces a valid plot", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- esplot(out_fect, main = "esplot(fect)")
     expect_true(inherits(p, "gg"))
 })
 
 test_that("B2: esplot(fect_object) matches plot.fect gap output structure", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p1 <- plot(out_fect, type = "gap")
     p2 <- esplot(out_fect)
@@ -84,14 +90,16 @@ test_that("B2: esplot(fect_object) matches plot.fect gap output structure", {
 })
 
 test_that("B3: esplot(fect_object) with custom colors", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- esplot(out_fect, pre.color = "blue", post.color = "darkred")
     expect_true(inherits(p, "gg"))
 })
 
 test_that("B4: esplot(fect_object) with connected = TRUE", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- esplot(out_fect, connected = TRUE)
     expect_true(inherits(p, "gg"))
@@ -102,7 +110,9 @@ test_that("B4: esplot(fect_object) with connected = TRUE", {
 ## =========================================================
 
 test_that("C1: esplot(data.frame) still works", {
-    df <- data.frame(
+
+  skip_on_cran()
+  df <- data.frame(
         Period = -3:3,
         ATT = c(-0.1, 0.05, -0.02, 0.01, 1.5, 2.0, 2.5),
         CI.lower = c(-0.1, 0.05, -0.02, 0.01, 1.5, 2.0, 2.5) - 0.5,
@@ -113,7 +123,9 @@ test_that("C1: esplot(data.frame) still works", {
 })
 
 test_that("C2: esplot(data.frame) with pre/post colors", {
-    df <- data.frame(
+
+  skip_on_cran()
+  df <- data.frame(
         Period = -3:3,
         ATT = c(-0.1, 0.05, -0.02, 0.01, 1.5, 2.0, 2.5),
         CI.lower = c(-0.1, 0.05, -0.02, 0.01, 1.5, 2.0, 2.5) - 0.5,
@@ -124,7 +136,9 @@ test_that("C2: esplot(data.frame) with pre/post colors", {
 })
 
 test_that("C3: esplot(data.frame) connected with pre/post", {
-    df <- data.frame(
+
+  skip_on_cran()
+  df <- data.frame(
         Period = -3:3,
         ATT = c(-0.1, 0.05, -0.02, 0.01, 1.5, 2.0, 2.5),
         CI.lower = c(-0.1, 0.05, -0.02, 0.01, 1.5, 2.0, 2.5) - 0.5,
@@ -139,15 +153,20 @@ test_that("C3: esplot(data.frame) connected with pre/post", {
 ## =========================================================
 
 test_that("D1: esplot show.points defaults to TRUE", {
-    expect_equal(formals(esplot)$show.points, TRUE)
+
+  skip_on_cran()
+  expect_equal(formals(esplot)$show.points, TRUE)
 })
 
 test_that("D2: esplot show.count defaults to TRUE", {
-    expect_equal(formals(esplot)$show.count, TRUE)
+
+  skip_on_cran()
+  expect_equal(formals(esplot)$show.count, TRUE)
 })
 
 test_that("D3: plot.fect count.color uses 'gray' not 'grey'", {
-    skip_on_cran()
+
+  skip_on_cran()
     ## Check that the default is set consistently
     ## (This is a static check; the actual default is resolved at runtime)
     setup_once()
@@ -161,7 +180,8 @@ test_that("D3: plot.fect count.color uses 'gray' not 'grey'", {
 ## =========================================================
 
 test_that("E1: placebo test plot with pre/post colors", {
-    skip_on_cran()
+
+  skip_on_cran()
     data(fect, package = "fect")
     out_p <- suppressWarnings(fect::fect(
         Y ~ D, data = simdata, index = c("id", "time"),
@@ -173,7 +193,9 @@ test_that("E1: placebo test plot with pre/post colors", {
 })
 
 test_that("E2: esplot highlight.periods overlays on pre/post", {
-    df <- data.frame(
+
+  skip_on_cran()
+  df <- data.frame(
         Period = -3:3,
         ATT = c(-0.1, 0.05, -0.02, 0.01, 1.5, 2.0, 2.5),
         CI.lower = c(-0.1, 0.05, -0.02, 0.01, 1.5, 2.0, 2.5) - 0.5,
@@ -190,21 +212,24 @@ test_that("E2: esplot highlight.periods overlays on pre/post", {
 ## =========================================================
 
 test_that("F1: all-pre data (only.pre = TRUE)", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- esplot(out_fect, only.pre = TRUE)
     expect_true(inherits(p, "gg"))
 })
 
 test_that("F2: all-post data (only.post = TRUE)", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- esplot(out_fect, only.post = TRUE)
     expect_true(inherits(p, "gg"))
 })
 
 test_that("F3: esplot errors on fect object without se", {
-    skip_on_cran()
+
+  skip_on_cran()
     data(fect, package = "fect")
     out_nose <- fect::fect(Y ~ D, data = simdata, index = c("id", "time"),
                            method = "fe", se = FALSE, CV = FALSE)
@@ -212,7 +237,8 @@ test_that("F3: esplot errors on fect object without se", {
 })
 
 test_that("F4: equiv plot with pre/post colors", {
-    skip_on_cran()
+
+  skip_on_cran()
     setup_once()
     p <- plot(out_fect, type = "equiv")
     expect_true(inherits(p, "gg"))

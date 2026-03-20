@@ -81,6 +81,7 @@ make_factor_data <- function(N = 100, TT = 30, Ntr = 30, tau = 3.0,
 ## ========================================================
 
 test_that("Phase 6a: gsynth and ife+nevertreated produce identical ATT", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -104,6 +105,7 @@ test_that("Phase 6a: gsynth and ife+nevertreated produce identical ATT", {
 })
 
 test_that("Phase 6b: em=FALSE + time.component.from='notyettreated' errors", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -119,6 +121,7 @@ test_that("Phase 6b: em=FALSE + time.component.from='notyettreated' errors", {
 })
 
 test_that("Phase 6c: method='gsynth' auto-sets em=FALSE in output", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -132,6 +135,7 @@ test_that("Phase 6c: method='gsynth' auto-sets em=FALSE in output", {
 })
 
 test_that("Phase 6d: method='ife' defaults em=TRUE in output", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -145,6 +149,7 @@ test_that("Phase 6d: method='ife' defaults em=TRUE in output", {
 })
 
 test_that("Phase 6e: ife+nevertreated and ife+notyettreated both close to true tau", {
+
   skip_on_cran()
   df <- make_factor_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
@@ -180,6 +185,7 @@ test_that("Phase 6e: ife+nevertreated and ife+notyettreated both close to true t
 ## ========================================================
 
 test_that("Phase 1a: fect accepts time.component.from='notyettreated' (default behavior)", {
+
   skip_on_cran()
   df <- make_staggered_data()
 
@@ -196,6 +202,7 @@ test_that("Phase 1a: fect accepts time.component.from='notyettreated' (default b
 })
 
 test_that("Phase 1b: fect accepts time.component.from='nevertreated'", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)  ## 25 never-treated
 
@@ -212,6 +219,7 @@ test_that("Phase 1b: fect accepts time.component.from='nevertreated'", {
 })
 
 test_that("Phase 1c: time.component.from='nevertreated' produces different estimates than 'notyettreated'", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15, seed = 99)
 
@@ -239,6 +247,7 @@ test_that("Phase 1c: time.component.from='nevertreated' produces different estim
 })
 
 test_that("Phase 1d: time.component.from defaults to 'notyettreated' when omitted", {
+
   skip_on_cran()
   df <- make_staggered_data()
 
@@ -262,6 +271,7 @@ test_that("Phase 1d: time.component.from defaults to 'notyettreated' when omitte
 })
 
 test_that("Phase 1e: time.component.from='nevertreated' works with method='cfe'", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -277,6 +287,7 @@ test_that("Phase 1e: time.component.from='nevertreated' works with method='cfe'"
 })
 
 test_that("Phase 1f: time.component.from threads through cross-validation", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -292,6 +303,7 @@ test_that("Phase 1f: time.component.from threads through cross-validation", {
 })
 
 test_that("Phase 1g: time.component.from threads through bootstrap inference", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -313,6 +325,7 @@ test_that("Phase 1g: time.component.from threads through bootstrap inference", {
 ## ========================================================
 
 test_that("Phase 2a: gsynth produces same results via ife+time.component.from='nevertreated'", {
+
   skip_on_cran()
   suppressWarnings(try(data("sim_gsynth", package = "fect"), silent = TRUE))
   skip_if_not(exists("sim_gsynth"), "Dataset 'sim_gsynth' not available")
@@ -339,6 +352,7 @@ test_that("Phase 2a: gsynth produces same results via ife+time.component.from='n
 })
 
 test_that("Phase 2b: gsynth still works (backward compatibility)", {
+
   skip_on_cran()
   suppressWarnings(try(data("sim_gsynth", package = "fect"), silent = TRUE))
   skip_if_not(exists("sim_gsynth"), "Dataset 'sim_gsynth' not available")
@@ -356,6 +370,7 @@ test_that("Phase 2b: gsynth still works (backward compatibility)", {
 })
 
 test_that("Phase 2c: gsynth with parametric bootstrap still works", {
+
   skip_on_cran()
   suppressWarnings(try(data("sim_gsynth", package = "fect"), silent = TRUE))
   skip_if_not(exists("sim_gsynth"), "Dataset 'sim_gsynth' not available")
@@ -378,6 +393,7 @@ test_that("Phase 2c: gsynth with parametric bootstrap still works", {
 ## ========================================================
 
 test_that("Phase 3a: vartype='parametric' accepted for method='ife'", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -395,6 +411,7 @@ test_that("Phase 3a: vartype='parametric' accepted for method='ife'", {
 })
 
 test_that("Phase 3b: vartype='parametric' accepted for method='fe'", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -410,6 +427,7 @@ test_that("Phase 3b: vartype='parametric' accepted for method='fe'", {
 })
 
 test_that("Phase 3c: vartype='parametric' accepted for method='cfe'", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -425,6 +443,7 @@ test_that("Phase 3c: vartype='parametric' accepted for method='cfe'", {
 })
 
 test_that("Phase 3d: vartype='parametric' still errors for method='mc'", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -449,6 +468,7 @@ test_that("Phase 3d: vartype='parametric' still errors for method='mc'", {
 ## ========================================================
 
 test_that("Phase 5a: time.component.from rejects invalid values", {
+
   skip_on_cran()
   df <- make_staggered_data()
 
@@ -464,6 +484,7 @@ test_that("Phase 5a: time.component.from rejects invalid values", {
 })
 
 test_that("Phase 5b: time.component.from='nevertreated' + method='mc' errors", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -479,6 +500,7 @@ test_that("Phase 5b: time.component.from='nevertreated' + method='mc' errors", {
 })
 
 test_that("Phase 5c: time.component.from='nevertreated' errors when no never-treated units", {
+
   skip_on_cran()
   ## All units are treated
   df <- make_staggered_data(N = 20, Ntr = 20)
@@ -495,6 +517,7 @@ test_that("Phase 5c: time.component.from='nevertreated' errors when no never-tre
 })
 
 test_that("Phase 5d: time.component.from='nevertreated' errors when too few never-treated units", {
+
   skip_on_cran()
   ## Only 1 never-treated unit (insufficient for r=2)
   df <- make_staggered_data(N = 20, Ntr = 19)
@@ -511,6 +534,7 @@ test_that("Phase 5d: time.component.from='nevertreated' errors when too few neve
 })
 
 test_that("Phase 5e: output records time.component.from in return object", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -526,6 +550,7 @@ test_that("Phase 5e: output records time.component.from in return object", {
 })
 
 test_that("Phase 5f: time.component.from='nevertreated' + method='both' errors", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
@@ -764,6 +789,7 @@ make_cfe_full_data <- function(N = 100, TT = 30, Ntr = 30, tau = 3.0,
 ## ---- Category B: Specification Equivalence ----
 
 test_that("Phase 3a-B1: ife+nevertreated equals cfe+nevertreated (no extras)", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -788,6 +814,7 @@ test_that("Phase 3a-B1: ife+nevertreated equals cfe+nevertreated (no extras)", {
 })
 
 test_that("Phase 3a-B2: fe+nevertreated equals cfe+nevertreated at r=0", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 0, seed = 42)
 
@@ -810,6 +837,7 @@ test_that("Phase 3a-B2: fe+nevertreated equals cfe+nevertreated at r=0", {
 })
 
 test_that("Phase 3a-B3: cfe+nevertreated is deterministic (same seed, same result)", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -833,6 +861,7 @@ test_that("Phase 3a-B3: cfe+nevertreated is deterministic (same seed, same resul
 })
 
 test_that("Phase 3a-B4: gsynth equals cfe+nevertreated (no extras)", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -858,6 +887,7 @@ test_that("Phase 3a-B4: gsynth equals cfe+nevertreated (no extras)", {
 ## ---- Category C: Accuracy ----
 
 test_that("Phase 3a-C1: accuracy with Z (time-invariant covariates)", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
@@ -873,6 +903,7 @@ test_that("Phase 3a-C1: accuracy with Z (time-invariant covariates)", {
 })
 
 test_that("Phase 3a-C2: accuracy with Q (unit-specific time trends)", {
+
   skip_on_cran()
   df <- make_cfe_q_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
@@ -888,6 +919,7 @@ test_that("Phase 3a-C2: accuracy with Q (unit-specific time trends)", {
 })
 
 test_that("Phase 3a-C3: accuracy with shared extra FE (Type B)", {
+
   skip_on_cran()
   df <- make_cfe_fe_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
@@ -903,6 +935,7 @@ test_that("Phase 3a-C3: accuracy with shared extra FE (Type B)", {
 })
 
 test_that("Phase 3a-C4: accuracy with unit-nesting extra FE (Type A)", {
+
   skip_on_cran()
   df <- make_cfe_fe_nesting_data(N = 200, TT = 30, Ntr = 60, tau = 3.0,
                                   r = 2, seed = 42)
@@ -919,6 +952,7 @@ test_that("Phase 3a-C4: accuracy with unit-nesting extra FE (Type A)", {
 })
 
 test_that("Phase 3a-C5: accuracy with all CFE components", {
+
   skip_on_cran()
   df <- make_cfe_full_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
@@ -934,6 +968,7 @@ test_that("Phase 3a-C5: accuracy with all CFE components", {
 })
 
 test_that("Phase 3a-C6: notyettreated vs nevertreated both accurate", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
@@ -958,6 +993,7 @@ test_that("Phase 3a-C6: notyettreated vs nevertreated both accurate", {
 })
 
 test_that("Phase 3a-C7: accuracy with Z at r=0 (no factors)", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 0, seed = 42)
 
@@ -975,6 +1011,7 @@ test_that("Phase 3a-C7: accuracy with Z at r=0 (no factors)", {
 ## ---- Category D: Validation Guards ----
 
 test_that("Phase 3a-D1: Type-B FE with missing level in co errors", {
+
   skip_on_cran()
   df <- make_cfe_fe_data(N = 100, TT = 30, Ntr = 30, seed = 42)
   ## Assign a unique industry level to treated unit 1 (not in controls)
@@ -991,6 +1028,7 @@ test_that("Phase 3a-D1: Type-B FE with missing level in co errors", {
 })
 
 test_that("Phase 3a-D2: no never-treated units errors", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, TT = 20, Ntr = 40)
 
@@ -1006,6 +1044,7 @@ test_that("Phase 3a-D2: no never-treated units errors", {
 })
 
 test_that("Phase 3a-D3: too few control units for r errors", {
+
   skip_on_cran()
   df <- make_factor_data(N = 35, TT = 30, Ntr = 33, tau = 3.0, r = 2, seed = 42)
 
@@ -1021,6 +1060,7 @@ test_that("Phase 3a-D3: too few control units for r errors", {
 })
 
 test_that("Phase 3a-D4: valid cfe+nevertreated combination is accepted", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1035,6 +1075,7 @@ test_that("Phase 3a-D4: valid cfe+nevertreated combination is accepted", {
 })
 
 test_that("Phase 3a-D5: mc+nevertreated is rejected", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, seed = 42)
 
@@ -1052,6 +1093,7 @@ test_that("Phase 3a-D5: mc+nevertreated is rejected", {
 ## ---- Category A: Solver Equivalence ----
 
 test_that("Phase 3a-A1: complex_fe_ub vs inter_fe_ub equivalence", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1076,6 +1118,7 @@ test_that("Phase 3a-A1: complex_fe_ub vs inter_fe_ub equivalence", {
 })
 
 test_that("Phase 3a-A2: solver equivalence at r=0 (FE only)", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 0, seed = 42)
 
@@ -1098,6 +1141,7 @@ test_that("Phase 3a-A2: solver equivalence at r=0 (FE only)", {
 })
 
 test_that("Phase 3a-A3: solver equivalence with unbalanced data", {
+
   skip_on_cran()
   df <- make_staggered_data(N = 40, TT = 20, Ntr = 15, tau = 3.0, seed = 42)
 
@@ -1122,6 +1166,7 @@ test_that("Phase 3a-A3: solver equivalence with unbalanced data", {
 ## ---- Category F: Bootstrap / Inference ----
 
 test_that("Phase 3a-F2: parametric bootstrap SE with cfe+nevertreated", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1138,6 +1183,7 @@ test_that("Phase 3a-F2: parametric bootstrap SE with cfe+nevertreated", {
 })
 
 test_that("Phase 3a-F1: jackknife SE with cfe+nevertreated", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1154,6 +1200,7 @@ test_that("Phase 3a-F1: jackknife SE with cfe+nevertreated", {
 })
 
 test_that("Phase 3a-F3: parametric bootstrap with cfe+notyettreated and extras", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1169,6 +1216,7 @@ test_that("Phase 3a-F3: parametric bootstrap with cfe+notyettreated and extras",
 })
 
 test_that("Phase 3a-F4: ife+nevertreated SE unchanged (regression)", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1187,6 +1235,7 @@ test_that("Phase 3a-F4: ife+nevertreated SE unchanged (regression)", {
 ## ---- Category E: Output Completeness ----
 
 test_that("Phase 3a-E1: gamma and kappa fields present", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1202,6 +1251,7 @@ test_that("Phase 3a-E1: gamma and kappa fields present", {
 })
 
 test_that("Phase 3a-E2: time.component.from field in output", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1216,6 +1266,7 @@ test_that("Phase 3a-E2: time.component.from field in output", {
 })
 
 test_that("Phase 3a-E3: core output fields non-NULL with correct dimensions", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1236,6 +1287,7 @@ test_that("Phase 3a-E3: core output fields non-NULL with correct dimensions", {
 })
 
 test_that("Phase 3a-E4: plot() works without error", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1250,6 +1302,7 @@ test_that("Phase 3a-E4: plot() works without error", {
 })
 
 test_that("Phase 3a-E5: print() works without error", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1266,6 +1319,7 @@ test_that("Phase 3a-E5: print() works without error", {
 ## ---- Category G: Cross-Validation ----
 
 test_that("Phase 3a-G1: CV selects a reasonable r with factors in data", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
@@ -1281,6 +1335,7 @@ test_that("Phase 3a-G1: CV selects a reasonable r with factors in data", {
 })
 
 test_that("Phase 3a-G2: CV selects r=0 on no-factor data", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 0, seed = 42)
 
@@ -1295,6 +1350,7 @@ test_that("Phase 3a-G2: CV selects r=0 on no-factor data", {
 })
 
 test_that("Phase 3a-G3: ife+nevertreated CV unchanged (regression)", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1311,6 +1367,7 @@ test_that("Phase 3a-G3: ife+nevertreated CV unchanged (regression)", {
 ## ---- Category H: Edge Cases ----
 
 test_that("Phase 3a-H1: single treated unit", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 1, tau = 3.0, r = 2, seed = 42)
 
@@ -1323,6 +1380,7 @@ test_that("Phase 3a-H1: single treated unit", {
 })
 
 test_that("Phase 3a-H2: single control unit (r=0)", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 31, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1348,6 +1406,7 @@ test_that("Phase 3a-H2: single control unit (r=0)", {
 })
 
 test_that("Phase 3a-H3: cfe+nevertreated with r=0 (no factors)", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 0, seed = 42)
 
@@ -1364,6 +1423,7 @@ test_that("Phase 3a-H3: cfe+nevertreated with r=0 (no factors)", {
 })
 
 test_that("Phase 3a-H4: no covariates at all", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1376,6 +1436,7 @@ test_that("Phase 3a-H4: no covariates at all", {
 })
 
 test_that("Phase 3a-H5: treatment reversals", {
+
   skip_on_cran()
   df <- make_cfe_full_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
   ## Create reversals: unit 1 reverts to control after period 20
@@ -1397,6 +1458,7 @@ test_that("Phase 3a-H5: treatment reversals", {
 ## ========================================================
 
 test_that("Phase 3a-I1: ife+nevertreated parametric bootstrap, em=TRUE, parallel", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1417,6 +1479,7 @@ test_that("Phase 3a-I1: ife+nevertreated parametric bootstrap, em=TRUE, parallel
 })
 
 test_that("Phase 3a-I2: ife+nevertreated parametric bootstrap, em=FALSE, parallel", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1437,6 +1500,7 @@ test_that("Phase 3a-I2: ife+nevertreated parametric bootstrap, em=FALSE, paralle
 })
 
 test_that("Phase 3a-I3: cfe+nevertreated parametric bootstrap, em=TRUE, parallel", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1457,6 +1521,7 @@ test_that("Phase 3a-I3: cfe+nevertreated parametric bootstrap, em=TRUE, parallel
 })
 
 test_that("Phase 3a-I4: cfe+nevertreated parametric bootstrap, em=FALSE, parallel", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1477,6 +1542,7 @@ test_that("Phase 3a-I4: cfe+nevertreated parametric bootstrap, em=FALSE, paralle
 })
 
 test_that("Phase 3a-I5: bootstrap reproducibility with same seed (ife+nevertreated)", {
+
   skip_on_cran()
   df <- make_factor_data(N = 80, TT = 20, Ntr = 25, tau = 3.0, r = 2, seed = 42)
 
@@ -1500,6 +1566,7 @@ test_that("Phase 3a-I5: bootstrap reproducibility with same seed (ife+nevertreat
 })
 
 test_that("Phase 3a-I6: bootstrap reproducibility with same seed (cfe+nevertreated)", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 80, TT = 20, Ntr = 25, tau = 3.0, r = 2, seed = 42)
 
@@ -1523,6 +1590,7 @@ test_that("Phase 3a-I6: bootstrap reproducibility with same seed (cfe+nevertreat
 })
 
 test_that("Phase 3a-I7: different seeds give different bootstrap SE (ife+nevertreated)", {
+
   skip_on_cran()
   df <- make_factor_data(N = 80, TT = 20, Ntr = 25, tau = 3.0, r = 2, seed = 42)
 
@@ -1548,6 +1616,7 @@ test_that("Phase 3a-I7: different seeds give different bootstrap SE (ife+nevertr
 })
 
 test_that("Phase 3a-I8: ATT accuracy check under bootstrap (cfe+nevertreated, em=TRUE)", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 150, TT = 30, Ntr = 50, tau = 3.0, r = 2, seed = 42)
 
@@ -1570,6 +1639,7 @@ test_that("Phase 3a-I8: ATT accuracy check under bootstrap (cfe+nevertreated, em
 })
 
 test_that("Phase 3a-I9: quantile.CI=TRUE bias-corrected reflection CI (cfe+nevertreated)", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1604,6 +1674,7 @@ test_that("Phase 3a-I9: quantile.CI=TRUE bias-corrected reflection CI (cfe+never
 })
 
 test_that("Phase 3a-I10: em=TRUE vs em=FALSE identical for nevertreated (ife)", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
@@ -1624,6 +1695,7 @@ test_that("Phase 3a-I10: em=TRUE vs em=FALSE identical for nevertreated (ife)", 
 })
 
 test_that("Phase 3a-I11: unbalanced data forces _ub/EM path in draw.error() bootstrap", {
+
   skip_on_cran()
 
   ## IFE on unbalanced data
@@ -1668,6 +1740,7 @@ test_that("Phase 3a-I11: unbalanced data forces _ub/EM path in draw.error() boot
 })
 
 test_that("Phase 3a-I12: r=0 invariance — time.component.from is a no-op when r=0", {
+
   skip_on_cran()
   df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 0, seed = 42)
 
@@ -1694,6 +1767,7 @@ test_that("Phase 3a-I12: r=0 invariance — time.component.from is a no-op when 
 ## ========================================================
 
 test_that("cfe+nevertreated CV selects r and runs without error", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
@@ -1717,6 +1791,7 @@ test_that("cfe+nevertreated CV selects r and runs without error", {
 ## ========================================================
 
 test_that("cfe+nevertreated+Z CV correctly selects r=2", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 
@@ -1734,6 +1809,7 @@ test_that("cfe+nevertreated+Z CV correctly selects r=2", {
 })
 
 test_that("cfe+nevertreated+Z CV correctly selects r=0 on zero-factor data", {
+
   skip_on_cran()
   df <- make_cfe_z_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 0, seed = 42)
 
@@ -1749,6 +1825,7 @@ test_that("cfe+nevertreated+Z CV correctly selects r=0 on zero-factor data", {
 })
 
 test_that("cfe+nevertreated CV selects r=2 on factor-only data (no Z in DGP)", {
+
   skip_on_cran()
   df <- make_factor_data(N = 200, TT = 30, Ntr = 60, tau = 3.0, r = 2, seed = 42)
 

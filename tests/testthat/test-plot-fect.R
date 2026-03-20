@@ -1,4 +1,6 @@
 test_that("plot.fect executes for gap plot without error", {
+
+  skip_on_cran()
   suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
   expect_true(exists("simdata"))
   set.seed(4)

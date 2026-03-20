@@ -4,7 +4,8 @@
 ## ---------------------------------------------------------
 
 test_that("FE estimator recovers ATT under simple two-way FE DGP", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(2024)
 
@@ -82,7 +83,8 @@ test_that("FE estimator recovers ATT under simple two-way FE DGP", {
 })
 
 test_that("FE estimator produces near-zero pre-treatment effects", {
-    skip_on_cran()
+
+  skip_on_cran()
 
     set.seed(2025)
 

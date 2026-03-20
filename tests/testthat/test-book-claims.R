@@ -77,7 +77,8 @@ make_panel <- function(N = 40, TT = 20, T0 = 12, Ntr = 12,
 ## =========================================================
 
 test_that("A1: gsynth == ife + time.component.from='nevertreated' (exact)", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 50, TT = 20, T0 = 12, Ntr = 10, r = 2, seed = 8010)
     out_g <- fect(Y ~ D + X1, data = d, index = c("id", "time"),
                   method = "gsynth", r = 2, se = FALSE, CV = FALSE)
@@ -89,7 +90,8 @@ test_that("A1: gsynth == ife + time.component.from='nevertreated' (exact)", {
 })
 
 test_that("A2: IFE(r=0) == FE (exact equivalence)", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 10, r = 0, seed = 8020)
     out_fe <- fect(Y ~ D + X1, data = d, index = c("id", "time"),
                    method = "fe", se = FALSE, CV = FALSE)
@@ -105,7 +107,8 @@ test_that("A2: IFE(r=0) == FE (exact equivalence)", {
 ## =========================================================
 
 test_that("B1: force='unit' runs without error", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 10, seed = 8030)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", force = "unit", se = FALSE, CV = FALSE)
@@ -114,7 +117,8 @@ test_that("B1: force='unit' runs without error", {
 })
 
 test_that("B2: force='time' runs without error", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 10, seed = 8031)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", force = "time", se = FALSE, CV = FALSE)
@@ -123,7 +127,8 @@ test_that("B2: force='time' runs without error", {
 })
 
 test_that("B3: force='none' runs without error", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 10, seed = 8032)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", force = "none", se = FALSE, CV = FALSE)
@@ -132,7 +137,8 @@ test_that("B3: force='none' runs without error", {
 })
 
 test_that("B4: force variations work for IFE with r > 0", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, r = 1, seed = 8033)
     for (f in c("unit", "time", "none", "two-way")) {
         out <- fect(Y ~ D, data = d, index = c("id", "time"),
@@ -148,7 +154,8 @@ test_that("B4: force variations work for IFE with r > 0", {
 ## =========================================================
 
 test_that("C1: placeboTest produces p-value and test output", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8040)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", se = TRUE, nboots = 50,
@@ -160,7 +167,8 @@ test_that("C1: placeboTest produces p-value and test output", {
 })
 
 test_that("C2: carryoverTest produces test output", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12,
                     reversals = TRUE, seed = 8041)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
@@ -172,7 +180,8 @@ test_that("C2: carryoverTest produces test output", {
 })
 
 test_that("C3: loo=TRUE produces pre-trend leave-one-out estimates", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8042)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", se = TRUE, nboots = 50,
@@ -184,7 +193,8 @@ test_that("C3: loo=TRUE produces pre-trend leave-one-out estimates", {
 })
 
 test_that("C4: equivalence test output (pre-trend F-test)", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8043)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", se = TRUE, nboots = 50, loo = TRUE, CV = FALSE)
@@ -202,7 +212,8 @@ test_that("C4: equivalence test output (pre-trend F-test)", {
 ## =========================================================
 
 test_that("D1: est.att structure (periods × 6 columns)", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8050)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", se = TRUE, nboots = 50, CV = FALSE)
@@ -218,7 +229,8 @@ test_that("D1: est.att structure (periods × 6 columns)", {
 })
 
 test_that("D2: est.avg vs est.avg.unit differ with unequal exposure", {
-    skip_on_cran()
+
+  skip_on_cran()
     ## staggered adoption → unequal treated-period counts
     d <- make_panel(N = 40, TT = 20, T0 = 10, Ntr = 12,
                     stagger = TRUE, seed = 8051)
@@ -234,7 +246,8 @@ test_that("D2: est.avg vs est.avg.unit differ with unequal exposure", {
 })
 
 test_that("D3: eff.boot dimensions = periods × treated × nboots", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8052)
     nboots <- 30
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
@@ -250,7 +263,8 @@ test_that("D3: eff.boot dimensions = periods × treated × nboots", {
 })
 
 test_that("D4: est.beta present with covariates", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12,
                     beta_x = 1.5, seed = 8053)
     out <- fect(Y ~ D + X1, data = d, index = c("id", "time"),
@@ -261,7 +275,8 @@ test_that("D4: est.beta present with covariates", {
 })
 
 test_that("D5: sigma2 is estimated error variance", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 50, TT = 20, T0 = 12, Ntr = 15, seed = 8054)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", se = FALSE, CV = FALSE)
@@ -273,7 +288,8 @@ test_that("D5: sigma2 is estimated error variance", {
 })
 
 test_that("D6: wgt.implied dimensions = Nco × Ntr for gsynth", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 50, TT = 20, T0 = 12, Ntr = 10, r = 1, seed = 8055)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "gsynth", r = 1, se = FALSE, CV = FALSE)
@@ -292,7 +308,8 @@ test_that("D6: wgt.implied dimensions = Nco × Ntr for gsynth", {
 ## =========================================================
 
 test_that("E1: single treated unit + parametric bootstrap", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 20, T0 = 12, Ntr = 1, r = 1, seed = 8060)
     ## Book: parametric bootstrap works even with Ntr = 1
     out <- suppressWarnings(fect(
@@ -307,7 +324,8 @@ test_that("E1: single treated unit + parametric bootstrap", {
 })
 
 test_that("E2: missing Y allowed, missing D errors", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8061)
     ## Introduce missing Y
     d$Y[sample(nrow(d), 10)] <- NA
@@ -328,7 +346,8 @@ test_that("E2: missing Y allowed, missing D errors", {
 })
 
 test_that("E3: unbalanced panel (missing time periods) works", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8063)
     ## Drop ~10% of observations to create unbalanced panel
     keep <- sample(nrow(d), round(nrow(d) * 0.9))
@@ -342,7 +361,8 @@ test_that("E3: unbalanced panel (missing time periods) works", {
 })
 
 test_that("E4: balance.period restricts included units", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 10, Ntr = 12,
                     stagger = TRUE, seed = 8064)
     out_full <- fect(Y ~ D, data = d, index = c("id", "time"),
@@ -356,7 +376,8 @@ test_that("E4: balance.period restricts included units", {
 })
 
 test_that("E5: min.T0 drops units with few control observations", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8065)
     out5 <- fect(Y ~ D, data = d, index = c("id", "time"),
                  method = "fe", se = FALSE, CV = FALSE, min.T0 = 5)
@@ -368,7 +389,8 @@ test_that("E5: min.T0 drops units with few control observations", {
 })
 
 test_that("E6: seed produces reproducible results", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8066)
     out1 <- fect(Y ~ D, data = d, index = c("id", "time"),
                  method = "fe", se = TRUE, nboots = 30, seed = 1234, CV = FALSE)
@@ -384,7 +406,8 @@ test_that("E6: seed produces reproducible results", {
 ## =========================================================
 
 test_that("F1: method='mc' basic functionality", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, r = 1, seed = 8070)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "mc", se = FALSE, CV = FALSE)
@@ -395,7 +418,8 @@ test_that("F1: method='mc' basic functionality", {
 })
 
 test_that("F2: mc rejects time.component.from='nevertreated'", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8071)
     expect_error(
         fect(Y ~ D, data = d, index = c("id", "time"),
@@ -405,7 +429,8 @@ test_that("F2: mc rejects time.component.from='nevertreated'", {
 })
 
 test_that("F3: mc with CV selects lambda", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, r = 1, seed = 8072)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "mc", se = FALSE, CV = TRUE)
@@ -419,7 +444,8 @@ test_that("F3: mc with CV selects lambda", {
 ## =========================================================
 
 test_that("G1: CFE with unit-specific linear time trend (Q.type)", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8080)
     out <- fect(Y ~ D + X1, data = d, index = c("id", "time"),
                 method = "cfe", r = 0, se = FALSE, CV = FALSE,
@@ -429,7 +455,8 @@ test_that("G1: CFE with unit-specific linear time trend (Q.type)", {
 })
 
 test_that("G2: CFE with time-invariant covariate Z and gamma", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12,
                     add_Z = TRUE, seed = 8081)
     ## Create time group for gamma: early vs late
@@ -442,7 +469,8 @@ test_that("G2: CFE with time-invariant covariate Z and gamma", {
 })
 
 test_that("G3: CFE with extra group FE via index[3]", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12,
                     add_group = TRUE, seed = 8082)
     ## Book: extra FE specified via index with 3+ elements
@@ -453,7 +481,8 @@ test_that("G3: CFE with extra group FE via index[3]", {
 })
 
 test_that("G4: CFE defaults to time.component.from='notyettreated'", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8083)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "cfe", r = 0, se = FALSE, CV = FALSE)
@@ -462,7 +491,8 @@ test_that("G4: CFE defaults to time.component.from='notyettreated'", {
 })
 
 test_that("G5: CFE with r > 0 adds latent factors", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 50, TT = 20, T0 = 12, Ntr = 10,
                     r = 2, seed = 8084)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
@@ -479,7 +509,8 @@ test_that("G5: CFE with r > 0 adds latent factors", {
 ## =========================================================
 
 test_that("H1: vartype='parametric' only for gsynth/nevertreated", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 50, TT = 20, T0 = 12, Ntr = 10, r = 1, seed = 8090)
     ## Book: parametric specific to gsynth
     out <- suppressWarnings(fect(Y ~ D, data = d, index = c("id", "time"),
@@ -495,7 +526,8 @@ test_that("H1: vartype='parametric' only for gsynth/nevertreated", {
 })
 
 test_that("H2: vartype='jackknife' works for FE and IFE", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8091)
     out_fe <- fect(Y ~ D, data = d, index = c("id", "time"),
                    method = "fe", se = TRUE, vartype = "jackknife", CV = FALSE)
@@ -508,7 +540,8 @@ test_that("H2: vartype='jackknife' works for FE and IFE", {
 })
 
 test_that("H3: nboots default is 200", {
-    skip_on_cran()
+
+  skip_on_cran()
     ## Check default via formals
     defs <- formals(fect)
     expect_equal(defs$nboots, 200)
@@ -520,7 +553,8 @@ test_that("H3: nboots default is 200", {
 ## =========================================================
 
 test_that("I1: gap plot (default) returns ggplot", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8100)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", se = TRUE, nboots = 30, CV = FALSE)
@@ -529,7 +563,8 @@ test_that("I1: gap plot (default) returns ggplot", {
 })
 
 test_that("I2: counterfactual plot returns ggplot", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8101)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", se = TRUE, nboots = 30, CV = FALSE)
@@ -538,7 +573,8 @@ test_that("I2: counterfactual plot returns ggplot", {
 })
 
 test_that("I3: equivalence plot returns ggplot", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8102)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", se = TRUE, nboots = 30, CV = FALSE)
@@ -547,7 +583,8 @@ test_that("I3: equivalence plot returns ggplot", {
 })
 
 test_that("I4: status plot returns ggplot", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 30, TT = 15, T0 = 10, Ntr = 8, seed = 8103)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "fe", se = FALSE, CV = FALSE)
@@ -556,7 +593,8 @@ test_that("I4: status plot returns ggplot", {
 })
 
 test_that("I5: gsynth factor and loading plots", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 50, TT = 20, T0 = 12, Ntr = 10, r = 2, seed = 8104)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "gsynth", r = 2, se = FALSE, CV = FALSE)
@@ -573,7 +611,8 @@ test_that("I5: gsynth factor and loading plots", {
 ## =========================================================
 
 test_that("J1: CV selects r minimizing MSPE", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 50, TT = 20, T0 = 12, Ntr = 10, r = 2, seed = 8110)
     out <- fect(Y ~ D, data = d, index = c("id", "time"),
                 method = "ife", r = c(0, 5), se = FALSE, CV = TRUE)
@@ -583,7 +622,8 @@ test_that("J1: CV selects r minimizing MSPE", {
 })
 
 test_that("J2: criterion='pc' runs and may select different r", {
-    skip_on_cran()
+
+  skip_on_cran()
     d <- make_panel(N = 50, TT = 20, T0 = 12, Ntr = 10, r = 2, seed = 8111)
     out_mspe <- fect(Y ~ D, data = d, index = c("id", "time"),
                      method = "ife", r = c(0, 5), se = FALSE,
@@ -602,13 +642,17 @@ test_that("J2: criterion='pc' runs and may select different r", {
 ## =========================================================
 
 test_that("K1: simdata has 200 units and 30+ time periods", {
-    data(simdata, package = "fect")
+
+  skip_on_cran()
+  data(simdata, package = "fect")
     expect_equal(length(unique(simdata$id)), 200)
     expect_true(length(unique(simdata$time)) >= 30)
 })
 
 test_that("K2: simdata has treatment reversals", {
-    data(simdata, package = "fect")
+
+  skip_on_cran()
+  data(simdata, package = "fect")
     ## Check that some units switch D from 1 back to 0
     has_reversal <- FALSE
     for (uid in unique(simdata$id)) {
@@ -623,7 +667,9 @@ test_that("K2: simdata has treatment reversals", {
 })
 
 test_that("K3: sim_gsynth has 5 treated, 45 control, 30 periods", {
-    data(sim_gsynth, package = "fect")
+
+  skip_on_cran()
+  data(sim_gsynth, package = "fect")
     uid <- unique(sim_gsynth$id)
     expect_equal(length(uid), 50)
     expect_equal(length(unique(sim_gsynth$time)), 30)
@@ -634,7 +680,9 @@ test_that("K3: sim_gsynth has 5 treated, 45 control, 30 periods", {
 })
 
 test_that("K4: sim_gsynth treatment starts at period 21", {
-    data(sim_gsynth, package = "fect")
+
+  skip_on_cran()
+  data(sim_gsynth, package = "fect")
     ## For treated units, first treatment period should be 21
     ever_treated <- tapply(sim_gsynth$D, sim_gsynth$id, max)
     tr_ids <- names(ever_treated[ever_treated == 1])
