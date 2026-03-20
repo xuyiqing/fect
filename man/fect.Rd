@@ -7,10 +7,8 @@ assumptions.}
 \usage{fect(formula = NULL, data, Y, D, X = NULL,
             W = NULL, group = NULL,
             na.rm = FALSE,
-            index, force = "two-way",
-            time.component.from = "notyettreated", em = TRUE,
-            r = 0, lambda = NULL, nlambda = 10,
-            CV = NULL, k = 10, cv.prop = 0.1, cv.method = "all_units",
+            index, force = "two-way", r = 0, lambda = NULL, nlambda = 10,
+            CV = NULL, k = 10, cv.prop = 0.1, cv.treat = FALSE,
             cv.nobs = 3, cv.donut = 0, criterion = "mspe",
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
@@ -23,8 +21,7 @@ assumptions.}
             knots = NULL, degree = 2,
             sfe = NULL, cfe = NULL,
             Z = NULL, gamma = NULL, Q = NULL, kappa = NULL, 
-            Q.type = NULL,
-            Q.bspline.degree = NULL,
+            Q.type = NULL, # c(1,2,3) or c("linear", "quadratic", "cubic")
             Z.param = NULL, Q.param = NULL,
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,
@@ -39,17 +36,15 @@ assumptions.}
 \item{W}{the weight indicator. If specified, the program will fit the data with a weighted outcome model and calculate weighted average and dynamic treatment effect.}
 \item{group}{the group indicator. If specified, the group-wise ATT will be estimated.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
-\item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Every observation should be uniquely defined by the pair of the unit and time indicator.}
+\item{index}{a two-element string vector specifying the unit and time indicators. Must be of length 2. Every observation should be uniquely defined by the pair of the unit and time indicator.}
 \item{force}{a string indicating whether unit or time or both fixed effects will be imposed. Must be one of the following, "none", "unit", "time", or "two-way". The default is "two-way".}
-\item{time.component.from}{Controls which units provide the time-varying model components (time fixed effects, factor structure, temporal dynamics). Options are \code{"notyettreated"} (default) --- all units contribute during their pre-treatment periods, or \code{"nevertreated"} --- only never-treated units estimate the time components, which are then projected onto treated units.}
-\item{em}{a logical flag indicating whether to use the EM algorithm for missing data in the estimation sample. Default is \code{TRUE}. Setting \code{em = FALSE} requires a complete estimation sample and is only compatible with \code{time.component.from = "nevertreated"}.}
 \item{r}{an integer specifying the number of factors. If \code{CV = TRUE}, the cross validation procedure will select the optimal number of factors from \code{r} to 5.}
 \item{lambda}{a single or sequence of positive numbers specifying the hyper-parameter sequence for matrix completion method. If \code{lambda} is a sequence and \code{CV = 1}, cross-validation will be performed.}
 \item{nlambda}{an integer specifying the length of hyper-parameter sequence for matrix completion method. Default is \code{nlambda = 10}.}
 \item{CV}{a logical flag indicating whether cross-validation will be performed to select the optimal number of factors or hyper-parameter in matrix completion algorithm. If \code{r} is not specified, the procedure will search through \code{r = 0} to \code{5}.}
 \item{k}{an integer specifying number of cross-validation rounds. Default is \code{k = 10}.}
 \item{cv.prop}{a numerical value specifying the proportion of testing set compared to sample size during the cross-validation procedure.}
-\item{cv.method}{a string specifying the cross-validation masking strategy. \code{"all_units"} (default) masks observations across all units; \code{"treated_units"} masks only treated unit observations. For \code{fect_nevertreated}, \code{"loo"} (leave-one-out) is also supported.}
+\item{cv.treat}{a logical flag speficying whether to only use observations of treated units as testing set.}
 \item{cv.nobs}{an integer specifying the length of continuous observations within a unit in the testing set. Default is \code{cv.nobs = 3}.}
 \item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}.}
 \item{criterion}{criterion used for model selection. Default is "mspe".
@@ -60,7 +55,7 @@ assumptions.}
 \item{binary}{This version doesn't support this option.}
 \item{QR}{This version doesn't support this option.}
 \item{method}{a string specifying which imputation algorithm will be used.
-  \code{"fe"}, \code{"ife"}, \code{"mc"},
+  \code{"fe"}, \code{"ife"}, \code{"mc"}, \code{"polynomial"}, \code{"bspline"},
   \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
 \item{vartype}{a string specifying the type of variance estimator, e.g. \code{"bootstrap"}.}
@@ -79,16 +74,15 @@ assumptions.}
 \item{pre.periods}{a vector specifying the range of pre-treatment periods used for the goodness-of-fit test.}
 \item{f.threshold}{a numeric threshold for an F-test in equivalence testing. Default \code{0.5}.}
 \item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
-\item{knots}{a numeric vector specifying knots (currently unused; reserved for future use).}
-\item{degree}{an integer specifying the degree (currently unused; reserved for future use).}
-\item{sfe}{vector specifying other fixed effects for \code{method="cfe"}.}
-\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
+\item{knots}{a numeric vector specifying knots for the b-spline.}
+\item{degree}{an integer specifying the polynomial or b-spline degree.}
+\item{sfe}{vector specifying other fixed effects for \code{method="cfe_old"}.}
+\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe_old"}.}
 \item{Z}{a vector specifying the time-invariant covariates for the Z matrix.}
 \item{gamma}{a vector specifying the time-varying covariates for the gamma matrix.}
 \item{Q}{a vector specifying the time-varying covariates for the Q matrix.}
 \item{kappa}{a vector specifying the time-invariant covariates for the kappa matrix.}
 \item{Q.type}{a vector specifying the type of Q matrix.}
-\item{Q.bspline.degree}{an integer specifying the degree used when \code{Q.type} includes \code{"bspline"} in \code{method="cfe"}. If NULL, a default degree is chosen based on the number of distinct time values.}
 \item{Z.param}{a list specifying the parameters for the Z matrix.}
 \item{Q.param}{a list specifying the parameters for the Q matrix.}
 \item{balance.period}{a length-2 vector specifying a time range for a balanced sample.}
@@ -229,7 +223,7 @@ assumptions.}
 }
 \examples{
 library(fect)
-data(simdata)
+data(fect)
 out <- fect(Y ~ D + X1 + X2, data = simdata,
             index = c("id","time"), force = "two-way",
             CV = TRUE, r = c(0, 5), se = 0, parallel = FALSE)

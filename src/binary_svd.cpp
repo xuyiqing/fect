@@ -27,8 +27,8 @@ List inter_fe_d (const arma::mat& Y,
   double dif = 1.0 ;
 
   double allh_old = 0 ;
-  double allh ;
-  double llh ;
+  double allh = 0 ;
+  double llh = 0 ;
   double IC ;
 
   double mu = 0 ;
@@ -169,8 +169,8 @@ List inter_fe_d_ub (const arma::mat& Y,
   double dif = 1.0 ;
   double mu = 0 ;
   double allh_old = 0;
-  double allh;
-  double llh;
+  double allh = 0;
+  double llh = 0;
   double IC;
   arma::mat alpha(N, 1, arma::fill::zeros) ;
   arma::mat lambda(N, r, arma::fill::zeros) ;

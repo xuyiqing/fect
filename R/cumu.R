@@ -75,8 +75,8 @@ att.cumu <- function(x, ## a fect object
         data[1, 1] <- lp.start
 
         p <- ggplot(data)
-        p <- p + geom_hline(yintercept = 0, colour="#FFFFFF", linewidth = 1)
-        p <- p + geom_line(data = data, aes(end, catt), linewidth = 1.2)
+        p <- p + geom_hline(yintercept = 0, colour="#FFFFFF", size = 1)
+        p <- p + geom_line(data = data, aes(end, catt), size = 1.2)
         if (se == 1) {
             p <- p + geom_ribbon(data = data, aes(x = end, ymin = CI.lower, ymax = CI.upper), alpha = 0.2) 
         }

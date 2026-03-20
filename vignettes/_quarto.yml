@@ -10,23 +10,19 @@ book:
     - index.qmd
     - 01-start.Rmd
     - 02-fect.Rmd
-    - 03-ife-mc.Rmd
-    - 04-cfe.Rmd
-    - 05-hte.Rmd
-    - 06-plots.Rmd
-    - 07-gsynth.Rmd
-    - 08-panel.Rmd
-    - 09-sens.Rmd
+    - 03-plots.Rmd
+    - 04-gsynth.Rmd
+    - 05-panel.Rmd
+    - 06-sens.Rmd
     - aa-cheatsheet.Rmd
     - references.qmd
-    - bb-updates.Rmd
+  
+delete_merged_file: true
 
 bibliography: references.bib
 
 nocite: |
   @*
-
-suppress-bibliography: true
 
 format:
   html:
@@ -34,11 +30,11 @@ format:
     code-fold: false
     code-tools: true
     code-link: true
-    toc-depth: 3
 
 knitr:
-  opts_chunk:
+  opts_chunk: 
     collapse: true
-    comment: "#>"
+    comment: "#>" 
 
 editor: visual
+

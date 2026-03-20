@@ -118,6 +118,14 @@ fect_test <- function(
                                 norm.para = norm.para,
                                 placebo.period = NULL, placeboTest = 0), silent = TRUE)
             }
+            else if (method %in% c("polynomial", "bspline")) {
+                boot <- try(fect_polynomial(Y = Y.boot, X = X, D = D, I = I, II = II, 
+                                T.on = T.on, T.off = NULL, method = method, 
+                                degree = degree, knots = knots, 
+                                force = force, hasRevs = 0, tol = tol, boot = 1,
+                                norm.para = norm.para, 
+                                placebo.period = NULL, placeboTest = 0), silent = TRUE)
+            }
             
             if ('try-error' %in% class(boot)) {
                 ## message("NA")
@@ -213,7 +221,7 @@ fect_test <- function(
     if (parallel == TRUE) { 
         boot.out <- foreach(j=1:nboots, 
                             .inorder = FALSE,
-                            .export = c("fect_fe", "fect_mc", "get_term"),
+                            .export = c("fect_fe", "fect_mc", "fect_polynomial", "get_term"),
                             .packages = c("fect")
                             ) %dopar% {
                                 return(one.nonpara())
