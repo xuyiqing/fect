@@ -1,0 +1,155 @@
+# Effect Heterogeneity {#sec-hte}
+
+In this chapter, we explore the new causal moderation framework in **fect**, which allows researchers to formally model how treatment effects vary with a moderator variable. Download the R code used in this chapter [here](rscript/05-hte.R).
+
+```{r echo = FALSE}
+set.seed(1234)
+rm(list = ls())
+```
+
+```{r message = FALSE, warning = FALSE}
+library(fect)
+data(fect)
+```
+
+------------------------------------------------------------------------
+
+In [Chapter @sec-fect] and [Chapter @sec-plots], we introduced several tools for exploring heterogeneous treatment effects (HTE). Box plots (`type = "box"`) show the distribution of individual treatment effects across relative time periods, while calendar plots (`type = "calendar"`) depict how the ATT varies over calendar time. The HTE plot (`type = "hte"`) allows researchers to visualize the relationship between individual treatment effects and a covariate.
+
+These approaches are *descriptive* --- they visualize patterns in the estimated treatment effects but do not formally model how a moderator variable influences the treatment effect. In this chapter, we introduce the **causal moderation** framework, which provides a model-based approach to understanding treatment effect heterogeneity.
+
+## Causal Moderation
+
+Causal moderation addresses the question: does the treatment effect depend on a moderator variable $M_{it}$? While standard HTE plots show the correlation between estimated individual effects and covariates, causal moderation formalizes this relationship by fitting separate imputation models for treated and control potential outcomes.
+
+The key idea is to allow the moderator to have different effects on the treated and control outcomes. By comparing the fitted values from the two models at different levels of the moderator, we obtain a formal estimate of how the treatment effect varies --- the causal moderation effect $\theta(m)$.
+
+Causal moderation is available for `method = "fe"` (two-way fixed effects) and `method = "ife"` (interactive fixed effects) only.
+
+### Using `cm = TRUE`
+
+To estimate a model with causal moderation, set `cm = TRUE` in the `fect()` call:
+
+```{r cm_fe, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.cm <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+               method = "fe", force = "two-way", se = TRUE,
+               cm = TRUE, parallel = TRUE, cores = 4, nboots = 200)
+```
+
+When `cm = TRUE`, **fect** fits two imputation models:
+
+1.  A model for $Y(0)$ using control observations --- this produces fitted values $\hat{g}_0$.
+2.  A model for $Y(1)$ using treated observations --- this produces fitted values $\hat{g}_1$.
+
+These fitted values are stored as `out.cm$est$fit` ($\hat{g}_0$) and `out.cm$est.cm$fit` ($\hat{g}_1$). The causal moderation effect is computed as $\theta(m) = \hat{g}_1(m) - \hat{g}_0(m)$, showing how the moderator changes the treatment effect.
+
+### Visualizing Causal Moderation
+
+We can compare the standard (descriptive) HTE plot with the model-based causal moderation plot:
+
+```{r hte_standard, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+# Standard HTE plot (descriptive)
+plot(out.cm, type = "hte", covariate = "X1")
+```
+
+The standard HTE plot shows the raw association between estimated individual treatment effects and the covariate $X_1$. The loess curve provides a smoothed summary, but this relationship is descriptive.
+
+```{r hte_cm, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+# Causal moderation plot (model-based)
+plot(out.cm, type = "hte", covariate = "X1", cm = TRUE)
+```
+
+With `cm = TRUE` in the plot call, instead of plotting raw individual effects against the covariate, **fect** computes $\theta(m) = E[\hat{g}_1 - \hat{g}_0 \mid M = m]$ for each unique moderator value. This gives a formal estimate of how the treatment effect varies with the moderator.
+
+To show only the scatter without loess smoothing, set `loess.fit = FALSE`:
+
+```{r hte_cm_noloess, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+plot(out.cm, type = "hte", covariate = "X1", cm = TRUE, loess.fit = FALSE)
+```
+
+## Over-Identification Test
+
+The linear causal moderation model assumes that the moderator enters linearly in the outcome model. If the true relationship is nonlinear --- for example, involving quadratic terms or interaction effects --- the linear specification is misspecified, and the estimated causal moderation effect may be biased.
+
+The `fect_iden()` function implements an over-identification test to check this assumption. It regresses the residuals from the causal moderation model on quadratic and interaction terms of the moderator and covariates, including unit and time fixed effects. Under correct specification, these nonlinear terms should have no explanatory power.
+
+The test statistic is $n \times R^2 \sim \chi^2(df)$, where $df$ is the number of nonlinear terms retained in the auxiliary regression.
+
+### Usage
+
+```{r iden_test, eval = TRUE, cache = TRUE, message = FALSE}
+iden.test <- fect_iden(out.cm, moderator = "X1")
+```
+
+### Interpreting Results
+
+The test produces results for both treated cells (`e1`) and control cells (`e0`):
+
+```{r iden_results}
+# For treated cells (e1):
+cat("Treated cells test:\n")
+cat("  n =", iden.test$e1$n, "\n")
+cat("  R^2 =", round(iden.test$e1$r2, 4), "\n")
+cat("  Test stat =", round(iden.test$e1$stat, 3), "\n")
+cat("  df =", iden.test$e1$df, "\n")
+cat("  p-value =", round(iden.test$e1$p, 4), "\n")
+
+# For control cells (e0):
+cat("\nControl cells test:\n")
+cat("  n =", iden.test$e0$n, "\n")
+cat("  R^2 =", round(iden.test$e0$r2, 4), "\n")
+cat("  Test stat =", round(iden.test$e0$stat, 3), "\n")
+cat("  df =", iden.test$e0$df, "\n")
+cat("  p-value =", round(iden.test$e0$p, 4), "\n")
+```
+
+The two components of the test are:
+
+-   **`e1` (treated cells)**: Residuals $Y_{it} - \hat{g}_1(X_{it})$ are regressed on the nonlinear terms for observations where $D_{it} = 1$. This tests whether the treated-outcome model is correctly specified.
+-   **`e0` (control cells)**: Residuals $Y_{it} - \hat{g}_0(X_{it})$ are regressed on the nonlinear terms for observations where $D_{it} = 0$. This tests whether the control-outcome model is correctly specified.
+
+A large p-value (failure to reject $H_0$) indicates no evidence against the linear specification. A small p-value suggests that nonlinear effects are present that the linear causal moderation model misses.
+
+### Parameters
+
+The `fect_iden()` function accepts several options to control the auxiliary regression:
+
+-   `quadratic = TRUE/FALSE`: Include squared terms $M^2$ and $X^2$ in the auxiliary regression. Default is `TRUE`.
+-   `interaction = TRUE/FALSE`: Include interaction terms $M \times X$. Default is `TRUE`.
+-   `covariates`: Override which covariates to include. By default, all covariates in $X$ except the moderator are included.
+
+## Causal Moderation with Interactive Fixed Effects
+
+Causal moderation also works with `method = "ife"`, which accommodates unobserved interactive fixed effects:
+
+```{r cm_ife, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.cm.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+                   method = "ife", force = "two-way", CV = TRUE, r = c(0, 5),
+                   cm = TRUE, se = TRUE, parallel = TRUE, cores = 4, nboots = 200)
+```
+
+We can visualize the causal moderation effect:
+
+```{r hte_cm_ife, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+plot(out.cm.ife, type = "hte", covariate = "X1", cm = TRUE)
+```
+
+And run the over-identification test:
+
+```{r iden_test_ife, eval = TRUE, cache = TRUE, message = FALSE}
+iden.test.ife <- fect_iden(out.cm.ife, moderator = "X1")
+cat("IFE - Treated cells p-value:", round(iden.test.ife$e1$p, 4), "\n")
+cat("IFE - Control cells p-value:", round(iden.test.ife$e0$p, 4), "\n")
+```
+
+When the underlying data-generating process involves interactive effects (latent factors), the IFE method may provide better estimates of the causal moderation effect. The FE method assumes that only additive unit and time effects are present, so it may be biased if interactive effects exist. In practice, researchers should compare both approaches and use the over-identification test to assess model adequacy.
+
+## Summary
+
+This chapter introduced the causal moderation framework in **fect**:
+
+-   **Basic HTE visualization**: Box plots and calendar plots provide descriptive summaries of treatment effect heterogeneity (see [Chapter @sec-fect] and [Chapter @sec-plots]).
+-   **Causal moderation**: Setting `cm = TRUE` in `fect()` fits separate imputation models for treated and control outcomes, enabling a formal estimate of how the treatment effect varies with a moderator.
+-   **Over-identification test**: `fect_iden()` tests whether the linear causal moderation specification is adequate by checking for unexplained nonlinear patterns in the residuals.
+
+In [Chapter @sec-panel], we discuss heterogeneous treatment effects in the context of modern DID methods, which provide alternative approaches to causal panel analysis under parallel trends.
