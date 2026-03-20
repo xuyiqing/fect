@@ -78,53 +78,10 @@ where $\alpha_i$ is a unit fixed effect, $\xi_t$ is a time fixed effect, and $\d
 
 We generate an unbalanced panel with 300 units belonging to 5 regions. Each region has a distinct linear time trend, and treatment probability and timing both depend on region. Units in higher-numbered regions enter the panel later, creating the kind of unbalancedness common in real datasets (e.g., firms entering markets, countries joining surveys).
 
-```{r cfe-42-dgp, eval = TRUE}
-set.seed(42)
-N <- 500; TT <- 20; n.groups <- 5
+The `sim_region` dataset ships with the package. It is an unbalanced panel with 500 units belonging to 5 regions. The DGP generation script is in `data-raw/sim_region.R`.
 
-# Assign regions (equal-sized groups)
-region <- rep(1:n.groups, each = N / n.groups)
-
-# Unit and time effects
-alpha_i <- rnorm(N, 0, 1)
-xi_t <- rnorm(TT, 0, 0.5)
-
-# Region-specific linear time trends (confounding source)
-region_slope <- c(-1, -0.5, 0, 0.5, 1) * 0.08
-delta_gt <- outer(region_slope, (1:TT) - TT / 2)
-
-# Treatment: probability and timing depend on region
-treat_prob <- c(0.05, 0.15, 0.30, 0.60, 0.80)
-is_treated <- rbinom(N, 1, treat_prob[region])
-treat_time <- rep(NA, N)
-for (i in which(is_treated == 1)) {
-  treat_time[i] <- max(5, min(16,
-    round(13 - 2 * (region[i] - 3)) + sample(-1:1, 1)))
-}
-
-# True treatment effect
-tau <- 1
-
-# Build panel
-dat_fe <- expand.grid(time = 1:TT, id = 1:N)
-dat_fe$region <- region[dat_fe$id]
-dat_fe$Y <- alpha_i[dat_fe$id] + xi_t[dat_fe$time] +
-            delta_gt[cbind(region[dat_fe$id], dat_fe$time)] +
-            rnorm(N * TT, 0, 1)
-dat_fe$D <- 0
-for (i in which(is_treated == 1)) {
-  idx <- dat_fe$id == i & dat_fe$time >= treat_time[i]
-  dat_fe$D[idx] <- 1
-}
-dat_fe$Y <- dat_fe$Y + tau * dat_fe$D
-
-# Create region × time interaction for group-period fixed effects
-dat_fe$region_time <- interaction(dat_fe$region, dat_fe$time, drop = TRUE)
-
-# Staggered panel entry: higher-region units enter later
-entry_period <- pmax(1, region[dat_fe$id] - 1 +
-                     sample(0:1, nrow(dat_fe), replace = TRUE))
-dat_fe <- dat_fe[dat_fe$time >= entry_period, ]
+```{r cfe-42-load, eval = TRUE}
+head(sim_region)
 ```
 
 ### Without additional fixed effects
@@ -132,7 +89,7 @@ dat_fe <- dat_fe[dat_fe$time >= entry_period, ]
 We first try the standard FE estimator, which ignores the region-level shocks:
 
 ```{r cfe-42-fe-only, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.fe.only <- fect(Y ~ D, data = dat_fe,
+out.fe.only <- fect(Y ~ D, data = sim_region,
   index = c("id", "time"),
   method = "fe", force = "two-way",
   se = TRUE, parallel = TRUE, nboots = 200,
@@ -153,7 +110,7 @@ The placebo test detects significant pre-trends (low p-value) because the model 
 Now we interact region with time to create group×period fixed effects, which absorb the region-specific time shocks $\delta_{g(i),t}$. A simple region intercept FE cannot capture these shocks because they vary across both regions and time periods. By passing `region_time` as the third index element, the CFE estimator absorbs the full set of region-by-period effects:
 
 ```{r cfe-42-with-region, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.cfe.region <- fect(Y ~ D, data = dat_fe,
+out.cfe.region <- fect(Y ~ D, data = sim_region,
   index = c("id", "time", "region_time"),
   method = "cfe", force = "two-way",
   se = TRUE, parallel = TRUE, nboots = 200,
@@ -238,36 +195,16 @@ When all units follow the same temporal pattern but the amplitude differs across
 
 The simplest case is a linear time trend with unit-specific slopes. We generate a block DID panel with 200 units (80 treated, 120 control), where treated units have systematically steeper linear trends.
 
-```{r cfe-44-linear-dgp, eval = TRUE}
-set.seed(42)
-N_lin <- 200; TT_lin <- 50; T0_lin <- 41
+The `sim_linear` dataset ships with the package. It has 200 units (80 treated, 120 control), 50 time periods, with block treatment at period 41. The DGP generation script is in `data-raw/sim_linear.R`.
 
-alpha_lin_i <- rnorm(N_lin, 0, 1)
-xi_lin_t <- rnorm(TT_lin, 0, 0.5)
-
-is_treated_lin <- c(rep(1, N_lin * 0.4), rep(0, N_lin * 0.6))
-kappa_lin_i <- ifelse(is_treated_lin == 1,
-                      runif(N_lin, 0.5, 1.0),
-                      runif(N_lin, 0.1, 0.3))
-
-# True trend: linear t/TT with unit-specific slope
-Q_lin_t <- (1:TT_lin) / TT_lin
-
-tau_lin <- 1
-
-simdata_lin <- expand.grid(time = 1:TT_lin, id = 1:N_lin)
-simdata_lin$Y <- alpha_lin_i[simdata_lin$id] + xi_lin_t[simdata_lin$time] +
-                 kappa_lin_i[simdata_lin$id] * Q_lin_t[simdata_lin$time] +
-                 rnorm(N_lin * TT_lin, 0, 1)
-simdata_lin$D <- as.integer(is_treated_lin[simdata_lin$id] == 1 &
-                            simdata_lin$time >= T0_lin)
-simdata_lin$Y <- simdata_lin$Y + tau_lin * simdata_lin$D
+```{r cfe-44-linear-load, eval = TRUE}
+head(sim_linear)
 ```
 
 Without accounting for the unit-specific linear trends, the FE estimator fails the placebo test:
 
 ```{r cfe-44-lin-fe-only, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.fe.lin <- fect(Y ~ D, data = simdata_lin,
+out.fe.lin <- fect(Y ~ D, data = sim_linear,
   index = c("id", "time"),
   method = "fe", force = "two-way",
   se = TRUE, parallel = TRUE, nboots = 200,
@@ -284,7 +221,7 @@ plot(out.fe.lin, cex.text = 0.8,
 Now we use `Q.type = "linear"` to allow unit-specific loadings on a linear time basis. Because the true DGP is exactly linear, this specification matches perfectly:
 
 ```{r cfe-44-lin-cfe, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.cfe.lin <- fect(Y ~ D, data = simdata_lin,
+out.cfe.lin <- fect(Y ~ D, data = sim_linear,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
   Q.type = "linear",
@@ -305,35 +242,16 @@ The placebo test passes because the linear basis exactly matches the true trend 
 
 When the true trend is nonlinear, a linear basis is insufficient. We now generate a DGP with a sinusoidal time trend --- a half-cycle over the panel --- and unit-specific amplitudes:
 
-```{r cfe-44-sin-dgp, eval = TRUE}
-set.seed(42)
-N2 <- 200; TT2 <- 50; T0 <- 41
+The `sim_trend` dataset ships with the package. It has the same block DID structure as `sim_linear` but with a sinusoidal (half-cycle) time trend instead of a linear one. The DGP generation script is in `data-raw/sim_trend.R`.
 
-alpha2_i <- rnorm(N2, 0, 1)
-xi2_t <- rnorm(TT2, 0, 0.5)
-
-is_treated2 <- c(rep(1, N2 * 0.4), rep(0, N2 * 0.6))
-kappa2_i <- ifelse(is_treated2 == 1,
-                   runif(N2, 0.5, 1.0),
-                   runif(N2, 0.125, 0.375))
-
-# True time trend: half-cycle sin wave (lower frequency)
-Q2_t <- sin(2 * pi * (1:TT2) / (2 * TT2))
-
-tau2 <- 1
-
-simdata2 <- expand.grid(time = 1:TT2, id = 1:N2)
-simdata2$Y <- alpha2_i[simdata2$id] + xi2_t[simdata2$time] +
-              kappa2_i[simdata2$id] * Q2_t[simdata2$time] +
-              rnorm(N2 * TT2, 0, 1)
-simdata2$D <- as.integer(is_treated2[simdata2$id] == 1 & simdata2$time >= T0)
-simdata2$Y <- simdata2$Y + tau2 * simdata2$D
+```{r cfe-44-sin-load, eval = TRUE}
+head(sim_trend)
 ```
 
 The FE estimator fails the placebo test because it cannot capture the nonlinear trend:
 
 ```{r cfe-44-sin-fe-only, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.fe.trend <- fect(Y ~ D, data = simdata2,
+out.fe.trend <- fect(Y ~ D, data = sim_trend,
   index = c("id", "time"),
   method = "fe", force = "two-way",
   se = TRUE, parallel = TRUE, nboots = 200,
@@ -350,7 +268,7 @@ plot(out.fe.trend, cex.text = 0.8,
 Now we use `Q.type = "bspline"`, which generates a B-spline basis that can approximate smooth nonlinear functions:
 
 ```{r cfe-44-sin-bspline, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.cfe.bs <- fect(Y ~ D, data = simdata2,
+out.cfe.bs <- fect(Y ~ D, data = sim_trend,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
   Q.type = "bspline",

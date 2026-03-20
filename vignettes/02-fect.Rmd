@@ -4,7 +4,7 @@ In this chapter, we illustrate how to use the **fect** package to implement coun
 
 ## Simulated data
 
-In this chapter, we use `simdata1`, a simulated panel dataset in which the parallel trends assumption holds. The dataset has 200 units, 35 time periods, and treatment that switches on and off. The data are simulated with treatment switching on and off, capturing the general case of treatment reversal under strict exogeneity. The outcome is generated from a two-way fixed effects model with two covariates:
+In this chapter, we use `sim_base`, a simulated panel dataset in which the parallel trends assumption holds. The dataset has 200 units, 35 time periods, and treatment that switches on and off. The data are simulated with treatment switching on and off, capturing the general case of treatment reversal under strict exogeneity. The outcome is generated from a two-way fixed effects model with two covariates:
 $$Y_{it} = \alpha_i + \xi_t + \beta_1 X_{1,it} + \beta_2 X_{2,it} + \tau_{it} D_{it} + \epsilon_{it}$$
 
 Since there are no latent factors, the `"fe"` method (two-way fixed effects counterfactual estimator) is correctly specified for this DGP. For settings where latent factors are present and the FE estimator is biased, see [Chapter @sec-ife-mc].
@@ -23,7 +23,7 @@ We use the **panelView** package to visualize the treatment and outcome variable
 
 ```{r panelview-treatment, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 library(panelView)
-panelview(Y ~ D, data = simdata1, index = c("id","time"),
+panelview(Y ~ D, data = sim_base, index = c("id","time"),
   axis.lab = "time", xlab = "Time", ylab = "Unit",
   gridOff = TRUE, by.timing = TRUE,
   background = "white", main = "Simulated Data: Treatment Status")
@@ -32,7 +32,7 @@ panelview(Y ~ D, data = simdata1, index = c("id","time"),
 In the figure below, blue and gray represent treatment and control conditions.
 
 ```{r panelview-outcome, fig.width = 6, fig.height = 4.5}
-panelview(Y ~ D, data = simdata1, index = c("id","time"),
+panelview(Y ~ D, data = sim_base, index = c("id","time"),
   axis.lab = "time", xlab = "Time", ylab = "Unit",
   theme.bw = TRUE, type = "outcome",
   main = "Simulated Data: Outcome")
@@ -51,7 +51,7 @@ We estimate the average treatment effect on the treated (ATT) using the followin
 The first variable on the right hand side of the formula is the treatment indicator $D$; the rest of the right-hand-side variables serve as controls. The `index` option specifies the unit and time indicators. The `force` option ("none", "unit", "time", and "two-way") specifies the additive component(s) of the fixed effects included in the model. The default option is "two-way" (including both unit and time fixed effects).
 
 ```{r simdata_fect_nose, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.fect <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
                  method = "fe", force = "two-way")
 ```
 
@@ -60,7 +60,7 @@ out.fect <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
 The key parameters that control the **model** are: `method` (estimator choice), `force` (fixed effects structure), and `r` (number of factors for IFE/MC methods; see [Chapter @sec-ife-mc]). These determine how $\hat{Y}(0)$ is imputed.
 :::
 
-We can use the `plot` function to visualize the estimation results. By default, it produces a "gap" plot --- `plot(out.fect, type = "gap")` --- which shows the estimated period-wise ATT (dynamic treatment effects). The true population average effects in `simdata1` go from 1 to 3 from the 1st to the 10th post-treatment period.
+We can use the `plot` function to visualize the estimation results. By default, it produces a "gap" plot --- `plot(out.fect, type = "gap")` --- which shows the estimated period-wise ATT (dynamic treatment effects). The true population average effects in `sim_base` go from 1 to 3 from the 1st to the 10th post-treatment period.
 
 ```{r fect_plot_nose, fig.width = 6, fig.height = 4.5}
 plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
@@ -83,7 +83,7 @@ The key parameters that control **uncertainty estimation** are: `se` (enable sta
 :::
 
 ```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
-out.fect <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   method = "fe", force = "two-way", se = TRUE,
   cores = 8, parallel = TRUE, nboots = 1000)
 ```
@@ -146,7 +146,7 @@ Once we have point estimates and uncertainty estimates, we conduct diagnostic ch
 We provide a placebo test for a settled model by setting `placeboTest = TRUE`. We specify a range of pretreatment periods as "placebo periods" in option `placebo.period` to remove observations in the specified range for model fitting, and then test whether the estimated ATT in this range is significantly different from zero. Below, we set `c(-2, 0)` as the placebo periods.
 
 ```{r fect_placebo, eval=TRUE, cache=TRUE, message=FALSE, results='hide', fig.width=6, fig.height=4.5}
-out.fect.placebo <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+out.fect.placebo <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   force = "two-way", method = "fe",
   se = TRUE, cores = 8, nboots = 200, parallel = TRUE,
   placeboTest = TRUE, placebo.period = c(-2, 0))
@@ -159,10 +159,10 @@ For more detail on placebo tests, including IFE and MC examples, see [Chapter @s
 
 The idea of the placebo test can be extended to testing the presence of carryover effects. Instead of hiding a few periods right before the treatment starts, we hide a few periods right after the treatment ends. If carryover effects do not exist, we would expect the average prediction error in those periods to be close to zero.
 
-To perform the carryover test, we set `carryoverTest = TRUE` and specify the range of exit-treatment periods in `carryover.period`. Below, we set `carryover.period = c(1, 3)`. Since `simdata1` is simulated without carryover effects, we expect the test to pass.
+To perform the carryover test, we set `carryoverTest = TRUE` and specify the range of exit-treatment periods in `carryover.period`. Below, we set `carryover.period = c(1, 3)`. Since `sim_base` is simulated without carryover effects, we expect the test to pass.
 
 ```{r fect_carryover, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
-out.fect.carry <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+out.fect.carry <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   force = "two-way", method = "fe",
   se = TRUE, cores = 8, nboots = 200, parallel = TRUE,
   carryoverTest = TRUE, carryover.period = c(1, 3))
@@ -187,7 +187,7 @@ Our most preferred test, however, is the sensitivity analysis discussed in [Chap
 We can implement the leave-one-out pre-trend test by setting `loo = TRUE`.
 
 ```{r fect_loo, eval=TRUE, cache = TRUE, message = FALSE}
-out.fect.loo <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+out.fect.loo <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   method = "fe", force = "two-way", se = TRUE, loo = TRUE,
   cores = 8, parallel = TRUE, nboots = 200)
 ```
@@ -210,7 +210,7 @@ The example below uses `method = "ife"` with `factors.from = "nevertreated"`, wh
 :::
 
 ```{r cumu_effect, cache = TRUE}
-out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "ife", factors.from = "nevertreated",
                         force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'bootstrap',
@@ -240,7 +240,7 @@ effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
 `effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
 
 ```{r effect-mc, cache = TRUE}
-out_mc <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out_mc <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'bootstrap',
                         parallel = FALSE, keep.sims=TRUE)
@@ -250,7 +250,7 @@ plot(effect(out_mc))
 We can also use jackknife instead of bootstrap for inference:
 
 ```{r effect-jackknife, cache = TRUE}
-out_jack <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out_jack <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'jackknife',
                         parallel = FALSE, keep.sims=TRUE)
@@ -268,7 +268,7 @@ After obtaining the individual treatment effects using one of the counterfactual
 **fect** also provides the option `balance.period`, which allows the calculation of the average treatment effects only for *treated* units that exhibit complete data in specified pre- and post-treatment periods. For instance, if the option is set to `balance.period = c(-3,4)`, the algorithm will calculate the average treatment effects for units that have at least four consecutive non-missing observations in the pre-treatment periods `(-3, -2, -1, 0)` and at least four consecutive non-missing observations in the post-treatment periods `(1, 2, 3, 4)`. Note that this option does not affect whether a never-treated unit enters estimation.
 
 ```{r simdata_bal, eval=TRUE, cache = TRUE}
-out.bal <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+out.bal <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   balance.period = c(-3, 4), force = "two-way", method = "ife",
   CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
 ```
@@ -291,7 +291,7 @@ plot(out.bal, main = "Estimated ATT (Balanced Sample)",
 **fect** allows us to estimate and visualize the ATTs for sub-groups of treated units. For example, it can draw the gap plot for units that adopt the treatment at the same time under staggered adoption, which is defined as "Cohort" in Sun & Abraham (2021). Our simulated dataset is not ideal to demonstrate this functionality because the treatment switches on and off. To improve feasibility, we define a cohort as a group of treated units that first adopt the treatment at the same time.
 
 ```{r simdata_panelview_cohort, fig.width = 6, fig.height = 4.5}
-panelview(Y ~ D, data = simdata1, index = c("id","time"), by.timing = TRUE,
+panelview(Y ~ D, data = sim_base, index = c("id","time"), by.timing = TRUE,
   axis.lab = "time", xlab = "Time", ylab = "Unit",
   background = "white", main = "Simulated Data: Treatment Status")
 ```
@@ -300,22 +300,22 @@ The `get.cohort()` function (originally from the **paneltools** package) can gen
 
 ```{r get_cohort}
 #  devtools:: install_github("xuyiqing/paneltools" if not already installed
-simdata1.cohort <- get.cohort(data = simdata1,D = 'D',index = c("id","time"))
-print(table(simdata1.cohort[,'Cohort']))
+sim_base.cohort <- get.cohort(data = sim_base,D = 'D',index = c("id","time"))
+print(table(sim_base.cohort[,'Cohort']))
 ```
 
 We can also pass a list of **intervals** for first get-treated time into the `entry.time` option of `get.cohort()`. For example, we can categorize all treated units into the group that adopts the treatment between time 21 and 27, and the group that adopts the treatment in time 30 and 33.
 
 ```{r get_cohort2}
-simdata1.cohort2 <- get.cohort(data = simdata1,D = 'D',index = c("id","time"),
+sim_base.cohort2 <- get.cohort(data = sim_base,D = 'D',index = c("id","time"),
                                entry.time = list(c(21,27),c(30,33)))
-print(table(simdata1.cohort2[,'Cohort']))
+print(table(sim_base.cohort2[,'Cohort']))
 ```
 
 By setting the option `group = "Cohort"`, **fect** estimates the ATT for each specified sub-group and saves it for further visualization.
 
 ```{r simdata_fe_cohort, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
-out.fe.g <- fect(Y ~ D + X1 + X2, data = simdata1.cohort, index = c("id","time"),
+out.fe.g <- fect(Y ~ D + X1 + X2, data = sim_base.cohort, index = c("id","time"),
           force = "two-way", method = "fe",
           se = TRUE, nboots = 200, parallel = TRUE, group = 'Cohort')
 ```
@@ -332,8 +332,8 @@ plot(out.fe.g, show.group = "Cohort:22",
 The package offers the option `W` to calculate the weighted average treatment effects. The weighting variable does not affect the estimation of fixed effects or factors. Only the weighted average treatment effects or weighted dynamic treatment effects are obtained by aggregating the treatment effects using the weight `W`.
 
 ```{r simdata_w, eval=TRUE, cache = TRUE}
-simdata1$Weight <- abs(rnorm(n = dim(simdata1)[1]))
-out.w <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+sim_base$Weight <- abs(rnorm(n = dim(sim_base)[1]))
+out.w <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   force = "two-way", method = "ife", W = 'Weight',
   CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = TRUE)
 ```

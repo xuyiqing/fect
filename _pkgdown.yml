@@ -47,7 +47,11 @@ reference:
   - title: Datasets
   - contents:
     - simdata
-    - simdata1
+    - sim_base
+    - sim_trend
+    - sim_region
+    - sim_linear
+    - sim_gsynth
     - turnout
     - capacity
   - title: Internal

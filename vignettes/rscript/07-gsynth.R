@@ -34,15 +34,15 @@ library(fect)
 data(fect)
 ls()
 
-head(simgsynth)
+head(sim_gsynth)
 
 library(panelView)
-panelview(Y ~ D, data = simgsynth,  index = c("id","time"), pre.post = TRUE) 
+panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), pre.post = TRUE) 
 
-panelview(Y ~ D, data = simgsynth,  index = c("id","time"), type = "outcome") 
+panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), type = "outcome") 
 
 system.time(
-out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"), 
+out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), 
             method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), 
             se = TRUE, nboots = 1000, vartype = 'parametric', 
             parallel = FALSE))
@@ -53,10 +53,10 @@ out$est.avg
 out$beta
 
 system.time(
-out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 1000,vartype = 'parametric', parallel = TRUE, cores = 16)
+out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 1000,vartype = 'parametric', parallel = TRUE, cores = 16)
 )
 
-out2 <- fect(Y ~ D + X1 + X2, data = simgsynth,  index = c("id","time"), 
+out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"), 
                method = "gsynth", force = "two-way", 
                CV = TRUE, r = c(0, 5), se = TRUE,
                vartype = "jackknife", 
@@ -102,13 +102,13 @@ plot(out, type = "equiv", show.stats =  FALSE)
 
 plot(out, type = "equiv", stats.pos = c(-19, 4.5), ylim = c(-5, 5))
 
-out.ife <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"), 
+out.ife <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), 
           force = "two-way", method = "ife", CV = TRUE, r = c(0, 5), 
           se = TRUE, nboots = 200, parallel = TRUE)
 
 plot(out.ife, main = "Estimated ATT (EM)")
 
-out.mc <- fect(Y ~ D + X1 + X2, data = simgsynth, 
+out.mc <- fect(Y ~ D + X1 + X2, data = sim_gsynth, 
                index = c("id","time"), 
                 force = "two-way", method = "mc", CV = TRUE, 
                 se = TRUE, nboots = 200, parallel = TRUE)

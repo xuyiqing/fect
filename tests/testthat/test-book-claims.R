@@ -622,24 +622,24 @@ test_that("K2: simdata has treatment reversals", {
     expect_true(has_reversal, info = "simdata should contain treatment reversals")
 })
 
-test_that("K3: simgsynth has 5 treated, 45 control, 30 periods", {
-    data(simgsynth, package = "fect")
-    uid <- unique(simgsynth$id)
+test_that("K3: sim_gsynth has 5 treated, 45 control, 30 periods", {
+    data(sim_gsynth, package = "fect")
+    uid <- unique(sim_gsynth$id)
     expect_equal(length(uid), 50)
-    expect_equal(length(unique(simgsynth$time)), 30)
+    expect_equal(length(unique(sim_gsynth$time)), 30)
     ## 5 treated units (check treatment ever on)
-    ever_treated <- tapply(simgsynth$D, simgsynth$id, max)
+    ever_treated <- tapply(sim_gsynth$D, sim_gsynth$id, max)
     expect_equal(sum(ever_treated == 1), 5)
     expect_equal(sum(ever_treated == 0), 45)
 })
 
-test_that("K4: simgsynth treatment starts at period 21", {
-    data(simgsynth, package = "fect")
+test_that("K4: sim_gsynth treatment starts at period 21", {
+    data(sim_gsynth, package = "fect")
     ## For treated units, first treatment period should be 21
-    ever_treated <- tapply(simgsynth$D, simgsynth$id, max)
+    ever_treated <- tapply(sim_gsynth$D, sim_gsynth$id, max)
     tr_ids <- names(ever_treated[ever_treated == 1])
     for (uid in tr_ids) {
-        subset <- simgsynth[simgsynth$id == uid, ]
+        subset <- sim_gsynth[sim_gsynth$id == uid, ]
         first_treat <- min(subset$time[subset$D == 1])
         expect_equal(first_treat, 21,
                      info = paste("Unit", uid, "first treatment at", first_treat))

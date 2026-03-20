@@ -130,7 +130,7 @@ plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(5, 2))
 # Cumulative effects
 ##########################
 
-out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "ife", factors.from = "nevertreated",
                         force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'bootstrap',
@@ -145,14 +145,14 @@ effect(out, cumu=FALSE)
 effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
 
 ## MC cumulative effects
-out_mc <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out_mc <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'bootstrap',
                         parallel = FALSE, keep.sims=TRUE)
 plot(effect(out_mc))
 
 ## Jackknife cumulative effects
-out_jack <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out_jack <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 200, vartype = 'jackknife',
                         parallel = FALSE, keep.sims=TRUE)

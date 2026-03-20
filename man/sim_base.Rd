@@ -1,9 +1,9 @@
 \encoding{UTF-8}
-\name{simdata1}
+\name{sim_base}
 \docType{data}
-\alias{simdata1}
+\alias{sim_base}
 \title{Simulated data (no interactive fixed effects)}
-\description{A simulated dataset with continuous outcomes and no interactive fixed effects (factor loadings set to zero).}
+\description{A simulated dataset with continuous outcomes and no interactive fixed effects (factor loadings set to zero). Same DGP as \code{simdata} but with the factor contribution removed from the outcome.}
 \format{dataframe}
 \keyword{datasets}
 \references{

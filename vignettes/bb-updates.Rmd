@@ -2,24 +2,42 @@
 
 ## v2.2.0
 
-* Added CFE (Complex Fixed Effects) estimator as `method = "cfe"`
-* Fixed `est.fect$sigma2` crash when bootstrap is enabled with normalization
-* Fixed `detectCores()` returning NA in parallel setup causing worker count failures
-* Updated `index` parameter documentation to describe CFE grouping variables
+* Added `factors.from` parameter: `"notyettreated"` (default) or `"nevertreated"` controls which units provide the factor structure. Replaces `method = "gsynth"` with `method = "ife", factors.from = "nevertreated"`.
+* CFE estimator now supports `factors.from = "nevertreated"`, enabling full CFE model components (additional FEs, $Z/\gamma$, $Q/\kappa$, latent factors) with never-treated estimation.
+* Added `fect_mspe()` for out-of-sample model comparison (MSPE, RMSE, MAD) across specifications.
+* Unified cross-validation: replaced `cv.treat` + `mask.method` with single `cv.method` parameter; added `cv.sample` k-fold CV for `fect_nevertreated`.
+* Improved EM convergence conditioning: R-level centering + C++ component-wise convergence (up to 2000x better component accuracy).
+* Removed deprecated methods: `polynomial`, `bspline`, `cfe_old`. Renamed internal `fect_gsynth` to `fect_nevertreated`.
+* Plot system overhaul: pre/post color distinction, highlight shapes (triangles for placebo, diamonds for carryover), new `esplot()` parameters (`xangle`, `yangle`, `xbreaks`, `ybreaks`, `legendOff`).
+* Fixed parallel bootstrap `.export` lists for CFE + nevertreated; fixed `fect_mspe` + `CV=TRUE` interaction; fixed `start0` coloring; fixed `.as_mask()` dimension bug.
+* Renamed datasets for clarity: `simdata1` → `sim_base`, `simdata2` → `sim_trend`, `simgsynth` → `sim_gsynth`. Added `sim_region` and `sim_linear`. `simdata` kept for backward compatibility.
+* 590 tests (up from 131), including 98 book-derived behavioral tests and 36 CFE bifurcation tests.
 
 ## v2.1.1
 
-* Added `codetools` to Imports in DESCRIPTION (required by `trim_closure_env()` in `boot.R`)
-* Added `importFrom("utils", "tail")` to NAMESPACE (used in `fect_mspe.R`)
-* Bumped version to 2.1.1 and updated Date field for CRAN submission
+* Added `fect_mspe()` for evaluating out-of-sample prediction accuracy across model specifications.
+* Optimized CFE estimator performance: memory recycling, sparse data handling, reduced C++ deep copies.
+* Fixed `sigma2` normalization crash and division-by-zero guards in bootstrap.
+* Fixed bootstrap NA and multicollinearity abort issues.
+* Fixed gsynth weight calculation and `r=0` grand mean issue.
+* Fixed `Q.type` routing in CFE and handling of time periods with all units under control.
+* Switched parallel backend from `future` to `parallelly`.
+* Added CFE tutorial chapter to Quarto book.
+* Added `codetools` and `tail` imports required by new functions.
 
 ## v2.1.0
 
 (2025-10-27)
 
-* Fix speed issue
-* Rewrite complex fixed effect handling
-* Fixed various bugs
+* Added CFE (Complex Fixed Effects) estimator as `method = "cfe"`: additional group FEs via `index`, time-invariant covariates with time-varying coefficients (`Z`/`gamma`), unit-specific loadings on known time bases (`Q.type`/`Q`/`kappa`), and latent factors (`r`).
+* Added B-spline option to `Q.type` for flexible nonlinear time trend approximation.
+* Added `return.data = TRUE` option to `plot()` for extracting plot data.
+* Added `doRNG` for reproducible parallel bootstrap results.
+* Switched parallel backend from `future` to `parallelly`.
+* Aligned gsynth bootstrap values and standard errors with the original gsynth package.
+* Reduced memory usage by removing unnecessary C++ deep copies.
+* Added `min.T0` restrictions to prevent estimation with too few control observations.
+* Fixed various R CMD check issues for CRAN compliance.
 
 ## v2.0.5
 

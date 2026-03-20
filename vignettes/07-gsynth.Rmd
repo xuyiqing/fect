@@ -28,7 +28,7 @@ Use `factors.from = "nevertreated"` (or equivalently `method = "gsynth"`) when:
 
 In contrast, the default regime (`factors.from = "notyettreated"`, used in [Chapter @sec-fect]) accommodates treatment reversal and uses EM to estimate factors from all not-yet-treated observations.
 
-We will use two datasets, `simgsynth` and `turnout`, to perform analyses in block and staggered DID settings. First, we load the two datasets: `simgsynth` and `turnout`:
+We will use two datasets, `sim_gsynth` and `turnout`, to perform analyses in block and staggered DID settings. First, we load the two datasets: `sim_gsynth` and `turnout`:
 
 ```{r setup-seed, echo = FALSE}
 set.seed(1234)
@@ -43,25 +43,25 @@ ls()
 
 ## Simulated Data
 
-We start with the first example, `simgsynth`, a simulated dataset described in @Xu2017.
+We start with the first example, `sim_gsynth`, a simulated dataset described in @Xu2017.
 
 There are 5 treated units, 45 control units, and 30 time periods. The treatment kicks at Period 21 for all treated units, hence, a multiperiod DID set up.
 
-```{r head-simgsynth}
-head(simgsynth)
+```{r head-sim_gsynth}
+head(sim_gsynth)
 ```
 
 Before we conduct any statistical analysis, it is helpful to visualize the data structure and spot missing values (if there are any). We can easily do so with the help of the **panelView** package. The figure below shows that: (1) there are 5 treated units and 45 control units; (2) the treated units start to be treated in period 21; and (3) there are no missing values, which is a rare case.
 
 ```{r sim-panelview-status, cache = FALSE, fig.height=7, fig.width=7}
 library(panelView)
-panelview(Y ~ D, data = simgsynth,  index = c("id","time"), pre.post = TRUE) 
+panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), pre.post = TRUE) 
 ```
 
 The code chunk below visualizes the trends of outcome variable over the full panel across groups; different colors correspond to unique treatment statuses.
 
 ```{r sim-panelview-outcome, cache = FALSE,fig.height=5, fig.width=7}
-panelview(Y ~ D, data = simgsynth,  index = c("id","time"), type = "outcome") 
+panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), type = "outcome") 
 ```
 
 ## Estimation
@@ -72,7 +72,7 @@ To implement the Gsynth algorithm proposed in Xu (2017), set `method = "gsynth"`
 
 ```{r sim2_onecore, cache = TRUE}
 system.time(
-out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"), 
+out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), 
             method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), 
             se = TRUE, nboots = 1000, vartype = 'parametric', 
             parallel = FALSE))
@@ -111,14 +111,14 @@ Parallel computing will speed up the bootstrap procedure significantly. When `pa
 
 ```{r sim2, cache = TRUE, warning = FALSE}
 system.time(
-out <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 1000,vartype = 'parametric', parallel = TRUE, cores = 16)
+out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 1000,vartype = 'parametric', parallel = TRUE, cores = 16)
 )
 ```
 
 Gsynth in **fect** also incorporates jackknife method for uncertainty estimates.
 
 ```{r simJack, cache = TRUE, message = FALSE}
-out2 <- fect(Y ~ D + X1 + X2, data = simgsynth,  index = c("id","time"), 
+out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"), 
                method = "gsynth", force = "two-way", 
                CV = TRUE, r = c(0, 5), se = TRUE,
                vartype = "jackknife", 
@@ -255,14 +255,14 @@ plot(out, type = "equiv", stats.pos = c(-19, 4.5), ylim = c(-5, 5))
 
 Since we have now merged **gysnth** into **fect**, the original `ife` and `mc` methods in **gysnth** now can be directly implemented in **fect**. Please refer to the previous chapter for implementation details.
 
-Here, we apply these two methods to the simulated dataset `simgsynth` and compare the results from those from setting `method = "gysnth"`. Note that not only the algorithms are (slightly) different, the inferential methods are different, too. Both `ife` and `mc` use large-sample inferential method such as nonparametric bootstrap or jackknife while `gsynth` employs a two-step parametric bootstrap procedure, analogous to conformal inference, which accommodates a small number of treated units.
+Here, we apply these two methods to the simulated dataset `sim_gsynth` and compare the results from those from setting `method = "gysnth"`. Note that not only the algorithms are (slightly) different, the inferential methods are different, too. Both `ife` and `mc` use large-sample inferential method such as nonparametric bootstrap or jackknife while `gsynth` employs a two-step parametric bootstrap procedure, analogous to conformal inference, which accommodates a small number of treated units.
 
 ### IFEct
 
 For the `ife` method, we need to specify an interval of candidate number of unobserved factors in option r like `r=c(0,5)`. When cross-validation is switched off, the first element in r will be set as the number of factors. Below we use the MSPE criterion and search the number of factors from 0 to 5.
 
 ```{r sim_ife, cache = TRUE, message = FALSE}
-out.ife <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out.ife <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
           force = "two-way", method = "ife", CV = TRUE, r = c(0, 5),
           se = TRUE, nboots = 200, parallel = TRUE)
 ```
@@ -278,7 +278,7 @@ plot(out.ife, main = "Estimated ATT (EM)")
 To implement the MC method, a sequence of candidate tuning parameters must be specified. For example, users can set `lambda = c(1, 0.8, 0.6, 0.4, 0.2, 0.05)`. If `lambda` is not specified, **fect** uses an algorithm to automatically generate a set of candidate tuning parameters based on the outcome variable. Users can adjust the number of tuning parameters with `nlambda`, which defaults to `nlambda = 10`.
 
 ```{r sim_mc, cache = TRUE}
-out.mc <- fect(Y ~ D + X1 + X2, data = simgsynth,
+out.mc <- fect(Y ~ D + X1 + X2, data = sim_gsynth,
                index = c("id","time"),
                 force = "two-way", method = "mc", CV = TRUE,
                 se = TRUE, nboots = 200, parallel = TRUE)
@@ -511,7 +511,7 @@ The nevertreated regime is not limited to the IFE method. The complex fixed effe
 ### Example: CFE + nevertreated
 
 ```{r cfe_nt_demo, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
-out.cfe.nt <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out.cfe.nt <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                    method = "cfe", force = "two-way",
                    factors.from = "nevertreated",
                    Q.type = "linear",
@@ -533,11 +533,11 @@ Under `factors.from = "nevertreated"`, the CFE estimator uses only never-treated
 Both approaches share the same estimation regime (never-treated controls only), but CFE adds structural components. Whether the extra flexibility helps depends on the data generating process. If the true model has unit-specific trends or group fixed effects, CFE with nevertreated will outperform plain gsynth. If the true model is pure IFE, the additional CFE parameters add noise without benefit. The `fect_mspe()` function provides a principled comparison:
 
 ```{r cfe_nt_vs_gsynth, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
-out.gsynth.comp <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out.gsynth.comp <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "gsynth", force = "two-way",
                         r = 2, se = FALSE, CV = FALSE)
 
-out.cfe.nt.comp <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id","time"),
+out.cfe.nt.comp <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "cfe", force = "two-way",
                         factors.from = "nevertreated",
                         r = 2, se = FALSE, CV = FALSE)
@@ -548,4 +548,4 @@ mspe.comp <- fect_mspe(list(out.gsynth.comp, out.cfe.nt.comp), seed = 1234)
 print(mspe.comp$summary)
 ```
 
-Since `simgsynth` follows a pure IFE data generating process, gsynth and CFE with nevertreated should produce similar MSPE, confirming that the additional CFE structure neither helps nor hurts when it is not needed.
+Since `sim_gsynth` follows a pure IFE data generating process, gsynth and CFE with nevertreated should produce similar MSPE, confirming that the additional CFE structure neither helps nor hurts when it is not needed.

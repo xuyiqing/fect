@@ -15,7 +15,7 @@ set.seed(1234)
 # Setup
 ##########################
 
-out.fect <- fect(Y ~ D + X1 + X2, data = simdata1, index = c("id","time"),
+out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   method = "fe", force = "two-way", se = TRUE,
   cores = 8, parallel = TRUE, nboots = 1000)
 
@@ -38,8 +38,8 @@ plot(out.fect, type = "calendar", xlim = c(1, 35))
 plot(out.fect, type = "hte", covariate = "X1")
 
 # Discrete covariate
-simdata1$X3 <- sample(1:3, size = nrow(simdata1), replace = TRUE)
-out.fect.X3 <- fect(Y ~ D + X1 + X2 + X3, data = simdata1, index = c("id","time"),
+sim_base$X3 <- sample(1:3, size = nrow(sim_base), replace = TRUE)
+out.fect.X3 <- fect(Y ~ D + X1 + X2 + X3, data = sim_base, index = c("id","time"),
                    method = "fe", se = TRUE, seed = 123,
                    cores = 8, nboots = 1000, parallel = TRUE)
 
