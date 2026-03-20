@@ -56,6 +56,28 @@ fect_cfe <- function(
     ## unit id and time
     TT <- dim(Y)[1]
     N <- dim(Y)[2]
+
+    ## Input validation
+    if (is.null(dim(Y)) || length(dim(Y)) != 2) {
+        stop("Y must be a T x N matrix.")
+    }
+    if (!all(dim(D) == c(TT, N))) {
+        stop("Dimensions of D (", paste(dim(D), collapse = " x "),
+             ") do not match Y (", TT, " x ", N, ").")
+    }
+    if (!all(dim(I) == c(TT, N))) {
+        stop("Dimensions of I do not match Y.")
+    }
+    if (!all(dim(II) == c(TT, N))) {
+        stop("Dimensions of II do not match Y.")
+    }
+    ## D must be binary (0/1/NA only)
+    D.vals <- unique(c(D[!is.na(D)]))
+    if (!all(D.vals %in% c(0, 1))) {
+        stop("Treatment indicator D must contain only 0 and 1 (and NA).")
+    }
+
+    r.cv <- min(r.cv, TT, N)
     if (is.null(X) == FALSE) {
         p <- dim(X)[3]
     } else {
@@ -76,6 +98,20 @@ fect_cfe <- function(
     Ntr <- length(tr)
     co <- which(D.sum == 0)
     Nco <- length(co)
+
+    if (Ntr < 1) {
+        stop("No treated units found. At least one unit must be treated (D == 1).")
+    }
+    if (Nco < 1) {
+        stop("No control units found. At least one unit must be untreated (D == 0 for all periods).")
+    }
+    ## Check for pre-treatment observations among treated units
+    has.pretreat <- any(sapply(tr, function(j) {
+        any(D[, j] == 0 & II[, j] == 1)
+    }))
+    if (!has.pretreat) {
+        warning("No pre-treatment observations found for treated units. Counterfactual estimation may be unreliable.")
+    }
 
     ## -------------------------------##
     ## ----------- Main Algorithm ----------- ##
@@ -142,6 +178,15 @@ fect_cfe <- function(
         max.iteration
     )
 
+    ## Convergence check for est.best
+    if (!is.null(est.best$niter) && est.best$niter >= max.iteration) {
+        warning(paste0(
+            "CFE optimization did not converge within ", max.iteration,
+            " iterations. Results may be unreliable. ",
+            "Consider increasing max.iteration or checking data quality."
+        ))
+    }
+
     # est.fect <- est.best
     est.fect <- NULL
     if (boot == FALSE) {
@@ -168,6 +213,15 @@ fect_cfe <- function(
                 max.iteration
             )
         }
+    }
+
+    ## Convergence check for est.fect
+    if (!is.null(est.fect) && !is.null(est.fect$niter) &&
+        est.fect$niter >= max.iteration) {
+        warning(paste0(
+            "FE-only (r=0) optimization did not converge within ",
+            max.iteration, " iterations."
+        ))
     }
 
     validX <- est.best$validX
@@ -212,8 +266,8 @@ fect_cfe <- function(
         ## ini.res <- ini.res * norm.para[1]
         if (boot == FALSE) {
             est.fect$fit <- est.fect$fit * norm.para[1]
+            est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
         }
-        est.fect$sigma2 <- est.fect$sigma2 * norm.para[1]
     }
 
     ## 0. relevant parameters
@@ -255,24 +309,35 @@ fect_cfe <- function(
         eff[which(I == 0)] <- NA
     }
     complete.index <- which(!is.na(eff))
-    att.avg <- sum(eff[complete.index] * D[complete.index]) /
-        (sum(D[complete.index]))
+    denom <- sum(D[complete.index])
+    att.avg <- if (denom > 0) {
+        sum(eff[complete.index] * D[complete.index]) / denom
+    } else {
+        NA
+    }
 
     # balance effect
     att.avg.balance <- NA
     if (!is.null(balance.period)) {
         complete.index2 <- which(!is.na(T.on.balance))
-        att.avg.balance <- sum(eff[complete.index2] * D[complete.index2]) /
-            (sum(D[complete.index2]))
+        denom.balance <- sum(D[complete.index2])
+        att.avg.balance <- if (denom.balance > 0) {
+            sum(eff[complete.index2] * D[complete.index2]) / denom.balance
+        } else {
+            NA
+        }
     }
 
     # weighted effect
     att.avg.W <- NA
     if (!is.null(W)) {
-        att.avg.W <- sum(
-            eff[complete.index] * D[complete.index] * W[complete.index]
-        ) /
-            (sum(D[complete.index] * W[complete.index]))
+        denom.W <- sum(D[complete.index] * W[complete.index])
+        att.avg.W <- if (denom.W > 0) {
+            sum(eff[complete.index] * D[complete.index] * W[complete.index]) /
+                denom.W
+        } else {
+            NA
+        }
     }
 
     ## average marginal effect
@@ -289,9 +354,12 @@ fect_cfe <- function(
     ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
     att.unit <- sapply(1:length(tr.pos), function(vec) {
-        return(
-            sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]])
-        )
+        d <- sum(D[, tr.pos[vec]])
+        if (d > 0) {
+            return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / d)
+        } else {
+            return(NA)
+        }
     })
     att.avg.unit <- mean(att.unit, na.rm = TRUE)
 
@@ -302,8 +370,12 @@ fect_cfe <- function(
             eff.equiv[which(I == 0)] <- NA
         }
         complete.index <- which(!is.na(eff.equiv))
-        equiv.att.avg <- sum(eff.equiv[complete.index] * D[complete.index]) /
-            (sum(D[complete.index]))
+        denom.equiv <- sum(D[complete.index])
+        equiv.att.avg <- if (denom.equiv > 0) {
+            sum(eff.equiv[complete.index] * D[complete.index]) / denom.equiv
+        } else {
+            NA
+        }
     }
 
     ## 2. rmse for treated units' observations under control
@@ -541,16 +613,18 @@ fect_cfe <- function(
         rm.pos3 <- which(is.na(t.off))
         eff.v.use2 <- eff.v
         t.off.use <- t.off
+        n.off.use <- rep(1:N, each = TT)
         if (NA %in% eff.v | NA %in% t.off) {
             eff.v.use2 <- eff.v[-c(rm.pos1, rm.pos3)]
             t.off.use <- t.off[-c(rm.pos1, rm.pos3)]
+            n.off.use <- n.off.use[-c(rm.pos1, rm.pos3)]
         }
 
         off.pos <- which(t.off.use > 0)
         eff.off <- cbind(
             eff.v.use2[off.pos],
             t.off.use[off.pos],
-            n.on.use[off.pos]
+            n.off.use[off.pos]
         )
         colnames(eff.off) <- c("eff", "period", "unit")
 
@@ -558,7 +632,7 @@ fect_cfe <- function(
             eff.off.equiv <- cbind(
                 eff.equiv.v[off.pos],
                 t.off.use[off.pos],
-                n.on.use[off.pos]
+                n.off.use[off.pos]
             )
             colnames(eff.off.equiv) <- c("off.equiv", "period", "unit")
             off.sd <- tapply(eff.off.equiv[, 1], eff.off.equiv[, 2], sd)
@@ -919,6 +993,7 @@ fect_cfe <- function(
         Y = Y,
         X = X,
         eff = eff,
+        eff.tr = eff[, tr],
         I = I,
         II = II,
         att.avg = att.avg,

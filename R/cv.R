@@ -16,7 +16,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     criterion = "mspe",
                     k = 5, # CV time
                     cv.prop = 0.1,
-                    cv.treat = TRUE,
+                    cv.method = "all_units",
                     cv.nobs = 3,
                     cv.donut = 1,
                     min.T0 = 5,
@@ -31,10 +31,25 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     max.iteration = 1000,
                     norm.para = NULL,
                     group.level = NULL,
-                    group = NULL) {
+                    group = NULL,
+                    time.component.from = "notyettreated",
+                    X.extra.FE = NULL,
+                    X.Z = NULL,
+                    X.Q = NULL,
+                    X.gamma = NULL,
+                    X.kappa = NULL,
+                    Zgamma.id = NULL,
+                    kappaQ.id = NULL,
+                    parallel = FALSE,
+                    cores = NULL) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
+
+    ## Two-tier tolerance: CV uses looser tol for r/lambda selection speed,
+    ## final estimation uses the user's tol for precision.
+    cv_tol <- max(tol, 1e-3)
+
     placebo.pos <- na.pos <- NULL
     ## unit id and time
     TT <- dim(Y)[1]
@@ -63,7 +78,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         WW[which(II == 0)] <- 0 ## reset to 0
     }
     t.on <- c(T.on)
-    T0.min <- min(apply(II, 2, sum))
+    II.colsums <- apply(II, 2, sum)
+    T0.min <- min(II.colsums[II.colsums > 0])
 
     D.c <- apply(D, 2, function(vec) {
         cumsum(vec)
@@ -172,10 +188,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             message("Criterion: PC\n")
         }
 
-        ## for gsynth, use the cross-validation function in fect_gsynth
+        ## for gsynth, use the cross-validation function in fect_nevertreated
         if (method == "gsynth") {
             message("Interactive fixed effects model...\n")
-            out <- fect_gsynth(
+            out <- fect_nevertreated(
                 Y = Y, D = D, X = X, W = W, I = I, II = II,
                 T.on = T.on, T.off = T.off,
                 T.on.balance = T.on.balance,
@@ -184,10 +200,64 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 force = force, hasRevs = hasRevs,
                 tol = tol, boot = 0,
                 norm.para = norm.para,
-                group.level = group.level, group = group
+                group.level = group.level, group = group,
+                cv.method = cv.method, cv.nobs = cv.nobs,
+                cv.prop = cv.prop, cv.donut = cv.donut,
+                min.T0 = min.T0, k = k, criterion = criterion,
+                parallel = parallel, cores = cores
             )
             return(out)
         }
+
+        ## for ife with nevertreated, use the cross-validation function in fect_nevertreated
+        if (method == "ife" && time.component.from == "nevertreated") {
+            message("IFE model with nevertreated factors...\n")
+            out <- fect_nevertreated(
+                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                T.on = T.on, T.off = T.off,
+                T.on.balance = T.on.balance,
+                balance.period = balance.period,
+                r = r, r.end = r.end, CV = TRUE,
+                force = force, hasRevs = hasRevs,
+                tol = tol, boot = 0,
+                norm.para = norm.para,
+                group.level = group.level, group = group,
+                cv.method = cv.method, cv.nobs = cv.nobs,
+                cv.prop = cv.prop, cv.donut = cv.donut,
+                min.T0 = min.T0, k = k, criterion = criterion,
+                parallel = parallel, cores = cores
+            )
+            return(out)
+        }
+
+        ## for cfe with nevertreated, use the cross-validation function in fect_nevertreated
+        if (method == "cfe" && time.component.from == "nevertreated") {
+            message("CFE model with nevertreated factors...\n")
+            out <- fect_nevertreated(
+                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                T.on = T.on, T.off = T.off,
+                T.on.balance = T.on.balance,
+                balance.period = balance.period,
+                r = r, r.end = r.end, CV = TRUE,
+                force = force, hasRevs = hasRevs,
+                tol = tol, boot = 0,
+                norm.para = norm.para,
+                group.level = group.level, group = group,
+                method = "cfe",
+                X.extra.FE = X.extra.FE, X.Z = X.Z, X.Q = X.Q,
+                X.gamma = X.gamma, X.kappa = X.kappa,
+                Zgamma.id = Zgamma.id, kappaQ.id = kappaQ.id,
+                cv.method = cv.method, cv.nobs = cv.nobs,
+                cv.prop = cv.prop, cv.donut = cv.donut,
+                min.T0 = min.T0, k = k, criterion = criterion,
+                parallel = parallel, cores = cores
+            )
+            return(out)
+        }
+
+        ## ---- cv.method → cv.treat mapping (after nevertreated delegation) ---- ##
+        cv.method <- match.arg(cv.method, c("all_units", "treated_units"))
+        cv.treat <- (cv.method == "treated_units")
 
         ## ----- ##
         ## ------------- initialize ------------ ##
@@ -260,7 +330,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             }
 
             if (length(cv.id) == 0) {
-                stop("Some units have too few pre-treatment observations. Set a larger \"cv.prop\" or set \"cv.treat\" to FALSE.")
+                stop("Some units have too few pre-treatment observations. Set a larger \"cv.prop\" or set cv.method to \"all_units\".")
             }
 
             rmCV[[i]] <- cv.id
@@ -363,15 +433,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 ## inter FE based on control, before & after
                 r <- CV.out.ife[i, "r"]
                 ## k <- 5
-                if (criterion %in% c("mspe", "wmspe", "gmspe", "wgmspe", "mad", "moment")) {
-                    SSE <- 0
-                    WSSE <- 0
-                    GSSE <- 0
-                    WGSSE <- 0
-                    ll.length <- 0
-                    moment.list <- c()
-                    index.moment.list <- c()
-                    MAD.list <- c()
+                if (criterion %in% c("mspe", "wmspe", "gmspe", "wgmspe", "mad", "moment", "gmoment")) {
+                    all_resid <- c()
+                    all_obs_w <- c()
+                    all_time_idx <- c()
                     for (ii in 1:k) {
                         II.cv <- II
                         II.cv[rmCV[[ii]]] <- 0
@@ -386,71 +451,31 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         est.cv.fit <- inter_fe_ub(
                             YY.cv, as.matrix(Y0CV[, , ii]), X, II.cv,
                             W.use2, as.matrix(beta0CV[, , ii]),
-                            r, force, tol, max.iteration
+                            r, force, cv_tol, max.iteration
                         )$fit
-                        index.cv <- as.character(T.on[estCV[[ii]]])
-                        index.cv[which(is.na(index.cv))] <- "Control"
-                        weight.cv <- count.T.cv[index.cv]
-                        names(weight.cv) <- NULL
-                        if (use_weight == 0) {
-                            SSE <- SSE + sum((YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                            WSSE <- WSSE + sum(weight.cv * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                            GSSE <- GSSE + sum(log((YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2))
-                            ll <- weight.cv * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2
-                            ll <- ll[which(ll > 0)]
-                            WGSSE <- WGSSE + sum(log(ll))
-                            ll.length <- ll.length + length(ll)
-                            MAD.list <- c(MAD.list, (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                        } else {
-                            W.estCV[[ii]] <- WW[estCV[[ii]]]
-                            # print(WW[estCV[[ii]]])
-                            SSE <- SSE + sum(WW[estCV[[ii]]] * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                            WSSE <- WSSE + sum(WW[estCV[[ii]]] * weight.cv * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                            GSSE <- GSSE + sum(WW[estCV[[ii]]] * log((YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2))
-                            ll <- WW[estCV[[ii]]] * weight.cv * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2
-                            ll <- ll[which(ll > 0)]
-                            WGSSE <- WGSSE + sum(log(ll))
-                            ll.length <- ll.length + length(ll)
-                            MAD.list <- c(MAD.list, WW[estCV[[ii]]] * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
+                        resid_ii <- YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
+                        all_resid <- c(all_resid, resid_ii)
+                        if (use_weight == 1) {
+                            all_obs_w <- c(all_obs_w, WW[estCV[[ii]]])
                         }
-                        # moment conditions
-                        moment.list <- c(moment.list, (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]))
-                        index.moment.list <- c(index.moment.list, index.cv)
-
-                        # resid.mean <- tapply((YY[estCV[[ii]]]-est.cv.fit[estCV[[ii]]]), index.cv, mean)
-                        # resid.mean <- abs(resid.mean)
-                        # weight.cv <- count.T.cv[names(resid.mean)]
-                        # names(weight.cv) <- NULL
-                        # moment <- c(moment, sum(weight.cv*resid.mean)/sum(weight.cv))
+                        idx_ii <- as.character(T.on[estCV[[ii]]])
+                        idx_ii[which(is.na(idx_ii))] <- "Control"
+                        all_time_idx <- c(all_time_idx, idx_ii)
                     }
-
-                    if (use_weight == 0) {
-                        MSPE <- SSE / (length(unlist(estCV)))
-                        WMSPE <- WSSE / (length(unlist(estCV)))
-                        GMSPE <- exp(GSSE / (length(unlist(estCV))))
-                        WGMSPE <- exp(WGSSE / ll.length)
-                        MAD <- median(abs(MAD.list - median(MAD.list)))
-                    } else {
-                        MSPE <- SSE / (sum(unlist(W.estCV)))
-                        WMSPE <- WSSE / (sum(unlist(W.estCV)))
-                        GMSPE <- exp(GSSE / (sum(unlist(W.estCV))))
-                        WGMSPE <- exp(WGSSE / ll.length)
-                        MAD <- median(abs(MAD.list - median(MAD.list)))
-                    }
-                    # moment
-                    resid.mean <- tapply(moment.list, index.moment.list, mean)
-                    resid.mean <- abs(resid.mean)
-                    # g-moment
-                    gm_mean <- function(x) {
-                        exp(sum(log(x)) / length(x))
-                    }
-                    resid.g.mean <- tapply(abs(moment.list), index.moment.list, gm_mean)
-                    weight.cv.g <- count.T.cv[names(resid.g.mean)]
-                    weight.cv <- count.T.cv[names(resid.mean)]
-                    names(weight.cv) <- NULL
-                    names(weight.cv.g) <- NULL
-                    moment <- sum(weight.cv * resid.mean) / sum(weight.cv)
-                    gmoment <- sum(weight.cv.g * resid.g.mean) / sum(weight.cv)
+                    scores <- .score_residuals(
+                        resid = all_resid,
+                        obs_weights = if (use_weight == 1) all_obs_w else NULL,
+                        time_index = all_time_idx,
+                        count_weights = count.T.cv,
+                        norm.para = NULL
+                    )
+                    MSPE    <- scores["MSPE"]
+                    WMSPE   <- scores["WMSPE"]
+                    GMSPE   <- scores["GMSPE"]
+                    WGMSPE  <- scores["WGMSPE"]
+                    MAD     <- scores["MAD"]
+                    moment  <- scores["Moment"]
+                    gmoment <- scores["GMoment"]
                 }
 
                 est.cv <- inter_fe_ub(
@@ -462,7 +487,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     beta0,
                     r,
                     force,
-                    tol,
+                    cv_tol,
                     max.iteration
                 ) ## overall
                 sigma2 <- est.cv$sigma2
@@ -557,7 +582,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
                 if (criterion != "pc") {
-                    CV.out.ife[i, 2:12] <- c(sigma2, IC, PC, MSPE, WMSPE, GMSPE, WGMSPE, MAD, moment, MSPTATT, MSE)
+                    CV.out.ife[i, 2:13] <- c(sigma2, IC, PC, MSPE, WMSPE, GMSPE, WGMSPE, MAD, moment, gmoment, MSPTATT, MSE)
                 } else {
                     CV.out.ife[i, 2:6] <- c(sigma2, IC, PC, MSPTATT, MSE)
                 }
@@ -668,15 +693,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             break_check <- 0
             for (i in 1:length(lambda)) {
                 ## k <- 5
-                SSE <- 0
-                WSSE <- 0
-                GSSE <- 0
-                WGSSE <- 0
-                ll.length <- 0
-                moment.list <- c()
-                index.moment.list <- c()
-                MAD.list <- c()
-
+                all_resid <- c()
+                all_obs_w <- c()
+                all_time_idx <- c()
                 for (ii in 1:k) {
                     II.cv <- II
                     II.cv[rmCV[[ii]]] <- 0
@@ -691,69 +710,36 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     est.cv.fit <- inter_fe_mc(
                         YY.cv, as.matrix(Y0CV[, , ii]),
                         X, II.cv, W.use2, as.matrix(beta0CV[, , ii]),
-                        1, lambda[i], force, tol, max.iteration
+                        1, lambda[i], force, cv_tol, max.iteration
                     )$fit
-                    index.cv <- as.character(T.on[estCV[[ii]]])
-                    index.cv[which(is.na(index.cv))] <- "Control"
-                    weight.cv <- count.T.cv[index.cv]
-                    names(weight.cv) <- NULL
-                    if (use_weight == 0) {
-                        SSE <- SSE + sum((YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                        WSSE <- WSSE + sum(weight.cv * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                        GSSE <- GSSE + sum(log((YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2))
-                        ll <- weight.cv * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2
-                        ll <- ll[which(ll > 0)]
-                        WGSSE <- WGSSE + sum(log(ll))
-                        ll.length <- ll.length + length(ll)
-                        MAD.list <- c(MAD.list, (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                    } else {
-                        W.estCV[[ii]] <- WW[estCV[[ii]]]
-                        SSE <- SSE + sum(WW[estCV[[ii]]] * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                        WSSE <- WSSE + sum(WW[estCV[[ii]]] * weight.cv * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
-                        GSSE <- GSSE + sum(WW[estCV[[ii]]] * log((YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2))
-                        ll <- WW[estCV[[ii]]] * weight.cv * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2
-                        ll <- ll[which(ll > 0)]
-                        WGSSE <- WGSSE + sum(log(ll))
-                        ll.length <- ll.length + length(ll)
-                        MAD.list <- c(MAD.list, WW[estCV[[ii]]] * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
+                    resid_ii <- YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
+                    all_resid <- c(all_resid, resid_ii)
+                    if (use_weight == 1) {
+                        all_obs_w <- c(all_obs_w, WW[estCV[[ii]]])
                     }
-                    # moment conditions
-                    moment.list <- c(moment.list, (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]))
-                    index.moment.list <- c(index.moment.list, index.cv)
+                    idx_ii <- as.character(T.on[estCV[[ii]]])
+                    idx_ii[which(is.na(idx_ii))] <- "Control"
+                    all_time_idx <- c(all_time_idx, idx_ii)
                 }
-                if (use_weight == 0) {
-                    MSPE <- SSE / (length(unlist(estCV)))
-                    WMSPE <- WSSE / (length(unlist(estCV)))
-                    GMSPE <- exp(GSSE / (length(unlist(estCV))))
-                    WGMSPE <- exp(WGSSE / ll.length)
-                    MAD <- median(abs(MAD.list - median(MAD.list)))
-                } else {
-                    MSPE <- SSE / (sum(unlist(W.estCV)))
-                    WMSPE <- WSSE / (sum(unlist(W.estCV)))
-                    GMSPE <- exp(GSSE / (sum(unlist(W.estCV))))
-                    WGMSPE <- exp(WGSSE / ll.length)
-                    MAD <- median(abs(MAD.list - median(MAD.list)))
-                }
-
-                # moment
-                resid.mean <- tapply(moment.list, index.moment.list, mean)
-                resid.mean <- abs(resid.mean)
-                # g-moment
-                gm_mean <- function(x) {
-                    exp(sum(log(x)) / length(x))
-                }
-                resid.g.mean <- tapply(abs(moment.list), index.moment.list, gm_mean)
-                weight.cv.g <- count.T.cv[names(resid.g.mean)]
-                weight.cv <- count.T.cv[names(resid.mean)]
-                names(weight.cv) <- NULL
-                names(weight.cv.g) <- NULL
-                moment <- sum(weight.cv * resid.mean) / sum(weight.cv)
-                gmoment <- sum(weight.cv.g * resid.g.mean) / sum(weight.cv)
+                scores <- .score_residuals(
+                    resid = all_resid,
+                    obs_weights = if (use_weight == 1) all_obs_w else NULL,
+                    time_index = all_time_idx,
+                    count_weights = count.T.cv,
+                    norm.para = NULL
+                )
+                MSPE    <- scores["MSPE"]
+                WMSPE   <- scores["WMSPE"]
+                GMSPE   <- scores["GMSPE"]
+                WGMSPE  <- scores["WGMSPE"]
+                MAD     <- scores["MAD"]
+                moment  <- scores["Moment"]
+                gmoment <- scores["GMoment"]
 
                 est.cv <- inter_fe_mc(
                     YY, Y0, X, II, W.use, beta0,
                     1, lambda[i],
-                    force, tol, max.iteration
+                    force, cv_tol, max.iteration
                 ) ## overall
 
                 eff.v.cv <- c(Y - est.cv$fit)[cv.pos]
@@ -1532,6 +1518,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             group.output = group.output
         ))
     }
+
+    # Keep the selected concrete method for downstream bootstrap/inference.
+    out <- c(out, list(method = method))
 
     return(out)
 } ## cross-validation function ends

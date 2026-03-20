@@ -240,12 +240,20 @@ List beta_part(arma::mat E, arma::cube XX, arma::mat xxinv, arma::mat W,
 List ife_part(arma::mat E, int r) {
   int T = E.n_rows;
   int N = E.n_cols;
+  int d = T <= N ? T : N;
+  int r_use = r;
+  if (r_use < 0) {
+    r_use = 0;
+  }
+  if (r_use > d) {
+    r_use = d;
+  }
 
   List pf;
-  arma::mat F(T, r, arma::fill::zeros);
-  arma::mat L(N, r, arma::fill::zeros);
-  arma::mat VNT(r, r);
-  pf = panel_factor(E, r);
+  arma::mat F(T, r_use, arma::fill::zeros);
+  arma::mat L(N, r_use, arma::fill::zeros);
+  arma::mat VNT(r_use, r_use);
+  pf = panel_factor(E, r_use);
   F = as<arma::mat>(pf["factor"]);
   L = as<arma::mat>(pf["lambda"]);
   VNT = as<arma::mat>(pf["VNT"]);
@@ -294,6 +302,12 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
   } else {
     d = N;
   }
+  if (r < 0) {
+    r = 0;
+  }
+  if (r > d) {
+    r = d;
+  }
 
   if (Y.n_rows == W.n_rows && Y.n_cols == W.n_cols) {
     use_weight = 1;
@@ -338,7 +352,11 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
   fit = Y0;
   fit_old = fit;
   for (int i = 0; i < p; i++) {
-    fit1 = fit1 + XX.slice(i) * beta0(i);
+    double beta_init = 0.0;
+    if (i < static_cast<int>(beta0.n_elem)) {
+      beta_init = beta0(i);
+    }
+    fit1 = fit1 + XX.slice(i) * beta_init;
   }
 
   FE = fit - fit1 - fit2sum - fit3sum; // fit4 + fit5
@@ -415,6 +433,10 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
   }
 
   int p_extra_FE = X_extra_FE.n_slices;
+  // When no CFE components exist, use joint ife() for FE+factors
+  // to match inter_fe_ub behavior exactly
+  int simple_ife = (p_gamma == 0 && p_kappa == 0 && p_extra_FE == 0) ? 1 : 0;
+
   std::vector<std::vector<arma::uvec>> extra_FE_index_cache;
   extra_FE_index_cache.resize(p_extra_FE);
 
@@ -435,8 +457,9 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
   }
 
   int stop_burnin = 0;
-  while (((dif > tolerate) || (dif1 > tolerate) || dif2_tol || dif3_tol ||
-          (dif4 > tolerate) || (dif5 > tolerate)) &&
+  while (((dif > tolerate) ||
+          (simple_ife ? false : ((dif1 > tolerate) || dif2_tol || dif3_tol ||
+                                 (dif4 > tolerate) || (dif5 > tolerate)))) &&
          (niter <= max_iter)) {
     YYY = E_adj(Y, fit, I);
     result1 = beta_part(YYY - fit2sum - fit3sum - FE, XX, xxinv, W, use_weight);
@@ -448,8 +471,9 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
                   use_weight, W);
       result2[k] =
           gamma_part(YY, Z.cols(Zgamma_id_raw[k]), zzinv[k], gamma_t_group[k]);
-      fit2.slice(k) = as<arma::mat>(result2[k]["fit"]);
-      fit2sum = arma::sum(fit2, 2);
+      arma::mat fit2_new = as<arma::mat>(result2[k]["fit"]);
+      fit2sum += fit2_new - fit2.slice(k);
+      fit2.slice(k) = fit2_new;
     }
 
     for (int k = 0; k < p_kappa; ++k) {
@@ -458,55 +482,129 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
                   use_weight, W);
       result3[k] =
           kappa_part(YY, Q.rows(kappaQ_id_raw[k]), qqinv[k], kappa_i_group[k]);
-      fit3.slice(k) = as<arma::mat>(result3[k]["fit"]);
-      fit3sum = arma::sum(fit3, 2);
+      arma::mat fit3_new = as<arma::mat>(result3[k]["fit"]);
+      fit3sum += fit3_new - fit3.slice(k);
+      fit3.slice(k) = fit3_new;
     }
 
-    YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit5, FE - fit5, I, use_weight,
-                W);
-    result4 = fixed_effects_part(YY, force, X_extra_FE, extra_FE_index_cache);
-    fit4 = as<arma::mat>(result4["fit"]);
-
-    YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit4, FE - fit4, I, use_weight,
-                W);
-    if (use_weight == 1 && stop_burnin == 0) {
-      r_burnin = d - niter;
-      if (r_burnin <= r) {
-        r_burnin = r;
+    if (simple_ife) {
+      // No CFE components: use joint ife() for FE+factors in one shot,
+      // matching fe_ad_inter_iter behavior exactly
+      YY = YY_adj(YYY - fit1, FE, I, use_weight, W);
+      List ife_result;
+      if (use_weight == 1 && stop_burnin == 0) {
+        r_burnin = d - niter;
+        if (r_burnin <= r) {
+          r_burnin = r;
+        }
+        if (r_burnin > d) {
+          r_burnin = d;
+        }
+        ife_result = ife(YY, force, 0, r_burnin, 0, 0);
+      } else {
+        ife_result = ife(YY, force, 0, r, 0, 0);
       }
-      result5 = ife_part(YY, r_burnin);
+      FE = as<arma::mat>(ife_result["FE"]);
+      // Decompose FE into additive (fit4) and interactive (fit5) for tracking
+      if (r > 0 && ife_result.containsElementNamed("FE_inter_use")) {
+        fit5 = as<arma::mat>(ife_result["FE_inter_use"]);
+        fit4 = FE - fit5;
+      } else {
+        fit4 = FE;
+        fit5.zeros();
+      }
+      // Store results for output assembly
+      result4 = List::create(Named("mu") = ife_result["mu"]);
+      if (ife_result.containsElementNamed("alpha")) {
+        result4["alpha"] = ife_result["alpha"];
+      }
+      if (ife_result.containsElementNamed("xi")) {
+        result4["xi"] = ife_result["xi"];
+      }
+      if (ife_result.containsElementNamed("factor")) {
+        result5 = List::create(
+          Named("factor") = ife_result["factor"],
+          Named("lambda") = ife_result["lambda"],
+          Named("VNT") = ife_result["VNT"],
+          Named("fit") = fit5
+        );
+      } else {
+        result5 = List::create(
+          Named("factor") = arma::mat(T, 0),
+          Named("lambda") = arma::mat(N, 0),
+          Named("VNT") = arma::mat(0, 0),
+          Named("fit") = fit5
+        );
+      }
+      fit = fit1 + FE;
     } else {
-      result5 = ife_part(YY, r);
-    }
-    fit5 = as<arma::mat>(result5["fit"]);
+      // Full CFE BCD: separate FE demean + factor extraction
+      YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit5, FE - fit5, I, use_weight,
+                  W);
+      result4 = fixed_effects_part(YY, force, X_extra_FE, extra_FE_index_cache);
+      fit4 = as<arma::mat>(result4["fit"]);
 
-    FE = fit4 + fit5;
-    fit = fit1 + fit2sum + fit3sum + fit4 + fit5;
+      YY = YY_adj(YYY - fit1 - fit2sum - fit3sum - fit4, FE - fit4, I, use_weight,
+                  W);
+      if (use_weight == 1 && stop_burnin == 0) {
+        r_burnin = d - niter;
+        if (r_burnin <= r) {
+          r_burnin = r;
+        }
+        if (r_burnin > d) {
+          r_burnin = d;
+        }
+        result5 = ife_part(YY, r_burnin);
+      } else {
+        result5 = ife_part(YY, r);
+      }
+      fit5 = as<arma::mat>(result5["fit"]);
+
+      FE = fit4 + fit5;
+      fit = fit1 + fit2sum + fit3sum + fit4 + fit5;
+    }
 
     if (use_weight == 1) {
       dif = arma::norm(W % (fit - fit_old), "fro") /
-            arma::norm(W % (fit_old), "fro");
+            (arma::norm(W % (fit_old), "fro") + 1e-10);
     } else {
-      dif = arma::norm(fit - fit_old, "fro") / arma::norm(fit_old, "fro");
+      dif = arma::norm(fit - fit_old, "fro") /
+            (arma::norm(fit_old, "fro") + 1e-10);
     }
 
-    dif1 = arma::norm(fit1 - fit1_old, "fro") / arma::norm(fit1_old, "fro");
+    // Component-wise convergence: track interactive FE independently
+    // (matches fe_ad_inter_iter pattern in ife_sub.cpp).
+    // When grand mean dominates fit, overall dif can drop below tol
+    // while factors are still poorly converged.
+    if (r > 0) {
+      double norm_inter = arma::norm(fit5_old, "fro");
+      if (norm_inter > 1e-10) {
+        double dif_inter = arma::norm(fit5 - fit5_old, "fro") / norm_inter;
+        if (dif_inter > dif) dif = dif_inter;
+      }
+    }
+
+    dif1 = arma::norm(fit1 - fit1_old, "fro") /
+           (arma::norm(fit1_old, "fro") + 1e-10);
 
     dif2_tol = 0.0;
     for (int k = 0; k < p_gamma; ++k) {
       dif2 = arma::norm(fit2.slice(k) - fit2_old.slice(k), "fro") /
-             arma::norm(fit2_old.slice(k), "fro");
+             (arma::norm(fit2_old.slice(k), "fro") + 1e-10);
       dif2_tol = dif2_tol || (dif2 > tolerate);
     }
 
+    dif3_tol = 0.0;
     for (int k = 0; k < p_kappa; ++k) {
       dif3 = arma::norm(fit3.slice(k) - fit3_old.slice(k), "fro") /
-             arma::norm(fit3_old.slice(k), "fro");
+             (arma::norm(fit3_old.slice(k), "fro") + 1e-10);
       dif3_tol = dif3_tol || (dif3 > tolerate);
     }
 
-    dif4 = arma::norm(fit4 - fit4_old, "fro") / arma::norm(fit4_old, "fro");
-    dif5 = arma::norm(fit5 - fit5_old, "fro") / arma::norm(fit5_old, "fro");
+    dif4 = arma::norm(fit4 - fit4_old, "fro") /
+           (arma::norm(fit4_old, "fro") + 1e-10);
+    dif5 = arma::norm(fit5 - fit5_old, "fro") /
+           (arma::norm(fit5_old, "fro") + 1e-10);
 
     fit_old = fit;
     fit1_old = fit1;
@@ -514,6 +612,13 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
     fit3_old = fit3;
     fit4_old = fit4;
     fit5_old = fit5;
+
+    // Stop-burnin: lock in actual r once convergence first reached
+    // during burnin period (matches fe_ad_inter_iter pattern)
+    if (dif <= tolerate && niter <= d && use_weight == 1 &&
+        stop_burnin == 0) {
+      stop_burnin = 1;
+    }
 
     niter = niter + 1;
   }
@@ -524,8 +629,12 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
 
   List result;
   result["mu"] = result4["mu"];
-  result["alpha"] = result4["alpha"];
-  result["xi"] = result4["xi"];
+  if (force == 1 || force == 3) {
+    result["alpha"] = result4["alpha"];
+  }
+  if (force == 2 || force == 3) {
+    result["xi"] = result4["xi"];
+  }
   result["niter"] = niter;
   result["e"] = e;
   result["beta"] = result1["beta"];

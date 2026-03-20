@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactual Estimators
-Version: 2.1.0
-Date: 2026-01-15
+Version: 2.1.1
+Date: 2026-03-14
 Authors@R: 
     c(person("Licheng", "Liu", , "lichengl@stanford.edu", role = c("aut")), 
       person("Ziyi", "Liu", , "zyliu2023@berkeley.edu", role = c("aut")),
@@ -27,6 +27,7 @@ Imports:
     doFuture, 
     foreach (>= 1.4.3), 
     abind (>= 1.4-0),
+    codetools,
     MASS, 
     gridExtra, 
     grid, 
@@ -53,3 +54,4 @@ RoxygenNote: 7.3.2
 Packaged: 2024-01-26 03:25:56 UTC; ziyil
 Encoding: UTF-8
 Config/testthat/edition: 3
+LazyData: true

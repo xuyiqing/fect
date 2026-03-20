@@ -1,11 +1,13 @@
 test_that("gsynth parametric bootstrap aligns group (unit-level) results with boot resampling", {
-  suppressWarnings(try(data("simgsynth", package = "fect"), silent = TRUE))
-  skip_if_not(exists("simgsynth"), "Dataset 'simgsynth' not available")
+
+  skip_on_cran()
+  suppressWarnings(try(data("sim_gsynth", package = "fect"), silent = TRUE))
+  skip_if_not(exists("sim_gsynth"), "Dataset 'sim_gsynth' not available")
 
   set.seed(123)
   out <- fect::fect(
     Y ~ D,
-    data = simgsynth,
+    data = sim_gsynth,
     index = c("id", "time"),
     method = "gsynth",
     force = "two-way",

@@ -35,13 +35,15 @@ fect <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
+    time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # number of factors
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
     k = 10, # times of CV
     cv.prop = 0.1, ## proportion of CV counts
-    cv.treat = FALSE, ## cv targeting treated units
+    cv.method = "all_units", ## CV masking strategy
     cv.nobs = 3, ## cv taking consecutive units
     cv.donut = 0, ## cv mspe
     criterion = "mspe", # for ife model: mspe, pc or both
@@ -106,13 +108,15 @@ fect.formula <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
+    time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # nubmer of factors
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
     k = 10, # times of CV
     cv.prop = 0.1, ## proportion of CV counts
-    cv.treat = FALSE,
+    cv.method = "all_units",
     cv.nobs = 3,
     cv.donut = 0, ## cv mspe
     criterion = "mspe", # for ife model: mspe, pc or both
@@ -209,13 +213,15 @@ fect.formula <- function(
         fill.missing = fill.missing,
         index = index,
         force = force,
+        time.component.from = time.component.from,
+        em = em,
         r = r,
         lambda = lambda,
         nlambda = nlambda,
         CV = CV,
         k = k,
         cv.prop = cv.prop,
-        cv.treat = cv.treat,
+        cv.method = cv.method,
         cv.nobs = cv.nobs,
         cv.donut = cv.donut,
         criterion = criterion,
@@ -282,13 +288,15 @@ fect.default <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
+    time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # nubmer of factors
     lambda = NULL, ## mc method: regularization parameter
     nlambda = 0,
     CV = NULL, # cross-validation
     k = 10, # times of CV
     cv.prop = 0.1,
-    cv.treat = TRUE,
+    cv.method = "all_units",
     cv.nobs = 3,
     cv.donut = 1, ## cv mspe
     criterion = "mspe",
@@ -377,13 +385,9 @@ fect.default <- function(
         if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
             stop("\"vartype\" option misspecified.")
         }
-        if (
-            vartype == "parametric" &&
-                method %in%
-                    c("fe", "ife", "mc", "both", "polynomial", "cfe_old", "cfe")
-        ) {
+        if (vartype == "parametric" && method %in% c("mc", "both")) {
             stop(
-                "The \"parametric\" option is only available for the \"gsynth\" method."
+                "The \"parametric\" option is not available for the \"mc\" or \"both\" methods."
             )
         }
     }
@@ -454,15 +458,38 @@ fect.default <- function(
                 "ife",
                 "mc",
                 "both",
-                "polynomial",
-                "cfe_old",
                 "gsynth",
                 "cfe"
             )
     ) {
         stop(
-            "\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"polynomial\",\"cfe\")."
+            "\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"cfe\")."
         )
+    }
+
+    ## validate time.component.from
+    if (!time.component.from %in% c("notyettreated", "nevertreated")) {
+        stop("\"time.component.from\" must be \"notyettreated\" or \"nevertreated\".")
+    }
+
+    ## mc does not use explicit factor estimation
+    if (method %in% c("mc", "both") && time.component.from == "nevertreated") {
+        stop("\"time.component.from = 'nevertreated'\" is not supported for the \"mc\" or \"both\" methods. ",
+             "Matrix completion does not use explicit factor estimation.")
+    }
+
+    ## em=FALSE requires a complete estimation sample
+    if (isFALSE(em) && time.component.from == "notyettreated") {
+        stop("\"em = FALSE\" is not compatible with \"time.component.from = 'notyettreated'\". ",
+             "The not-yet-treated estimation sample has missing data by construction.")
+    }
+
+    ## gsynth always uses never-treated units only
+    if (method == "gsynth") {
+        if (time.component.from == "notyettreated") {
+            time.component.from <- "nevertreated"
+        }
+        em <- FALSE
     }
 
     if (is.null(min.T0)) {
@@ -471,9 +498,6 @@ fect.default <- function(
         }
         if (method %in% c("ife", "mc", "both", "gsynth", "cfe")) {
             min.T0 <- 5
-        }
-        if (method %in% c("polynomial", "cfe_old")) {
-            min.T0 <- 2
         }
     } else {
         if (min.T0 <= 0) {
@@ -488,9 +512,15 @@ fect.default <- function(
             CV <- FALSE
             method <- "ife"
         } else if (method == "cfe") {
-            CV <- FALSE
-        } else if (method %in% c("polynomial", "cfe_old")) {
-            CV <- FALSE
+            if (time.component.from == "nevertreated") {
+                if (length(r) == 1) {
+                    CV <- FALSE
+                } else if (length(r) > 1) {
+                    CV <- TRUE
+                }
+            } else {
+                CV <- FALSE
+            }
         } else if (method == "both") {
             CV <- TRUE
             if (length(r) == 1 & r == 0) {
@@ -514,10 +544,10 @@ fect.default <- function(
             r <- 0
             CV <- FALSE
             method <- "ife"
-        } else if (method %in% c("polynomial", "cfe_old")) {
-            CV <- FALSE
         } else if (method == "cfe") {
-            CV <- FALSE
+            if (time.component.from != "nevertreated") {
+                CV <- FALSE
+            }
         } else if (method == "both") {
             CV <- TRUE
         }
@@ -618,20 +648,14 @@ fect.default <- function(
     } else {
         if (
             !method %in%
-                c("gsynth", "ife", "mc", "polynomial", "cfe_old", "cfe")
+                c("gsynth", "ife", "mc", "cfe")
         ) {
             stop(
-                "\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"polynomial\", \"cfe\")."
+                "\"method\" option misspecified; please choose from c(\"gsynth\",\"ife\", \"mc\", \"cfe\")."
             )
         }
     }
 
-    if (method %in% c("polynomial", "cfe_old")) {
-        if (permute == 1) {
-            message("Cannot do permutation test.\n")
-            permute <- 0
-        }
-    }
 
     if (permute == 1) {
         if (placeboTest == TRUE) {
@@ -791,46 +815,6 @@ fect.default <- function(
         }
     }
 
-    if (method == "cfe_old") {
-        if (is.null(sfe) & is.null(cfe)) {
-            message(
-                "No additional sfe and cfe, use the \"fe\" estimator by default.\n"
-            )
-            r <- 0
-            CV <- FALSE
-            method <- "ife"
-        }
-    }
-
-    if (method == "cfe_old") {
-        if (!is.null(sfe)) {
-            for (sub.sfe in sfe) {
-                if (!sub.sfe %in% names(data)) {
-                    stop("\"sfe\" misspecified.\n")
-                }
-                if (sub.sfe %in% index) {
-                    stop("\"sfe\" only contains additional fixed effects.\n")
-                }
-            }
-        }
-
-        if (!is.null(cfe)) {
-            if (!is.list(cfe)) {
-                stop("\"cfe\" should be a list.\n")
-            }
-
-            for (sub.cfe in cfe) {
-                for (sub.sub.cfe in sub.cfe) {
-                    if (!sub.sub.cfe %in% names(data)) {
-                        stop("\"cfe\" misspecified.\n")
-                    }
-                }
-                if (sub.cfe[1] == index[1] & sub.cfe[2] %in% X) {
-                    stop(paste0("Should remove ", sub.cfe[2], " from X.\n"))
-                }
-            }
-        }
-    }
 
     if (method == "cfe") {
         if (length(index) > 2) {
@@ -849,24 +833,28 @@ fect.default <- function(
                 stop("\"Q\" and \"Q.type\" cannot be used simultaneously.")
             }
             Q <- c()
+            time.raw <- data[, time]
+            if (is.factor(time.raw)) {
+                time.num <- suppressWarnings(as.numeric(as.character(time.raw)))
+            } else {
+                time.num <- suppressWarnings(as.numeric(time.raw))
+            }
+            if (all(is.na(time.num))) {
+                ## fallback: use ordered time index if not numeric
+                time.num <- as.numeric(factor(time.raw, levels = sort(unique(time.raw))))
+            }
             for (i in seq_along(Q.type)) {
                 Q.i <- tolower(as.character(Q.type[i]))
                 if (Q.i == "linear" || Q.i == "1") {
-                    data[, paste(time, "1", sep = ".")] <- data[, time]**1
+                    data[, paste(time, "1", sep = ".")] <- time.num**1
                     Q <- c(Q, paste(time, "1", sep = "."))
                 } else if (Q.i == "quadratic" || Q.i == "2") {
-                    data[, paste(time, "2", sep = ".")] <- data[, time]**2
+                    data[, paste(time, "2", sep = ".")] <- time.num**2
                     Q <- c(Q, paste(time, "2", sep = "."))
                 } else if (Q.i == "cubic" || Q.i == "3") {
-                    data[, paste(time, "3", sep = ".")] <- data[, time]**3
+                    data[, paste(time, "3", sep = ".")] <- time.num**3
                     Q <- c(Q, paste(time, "3", sep = "."))
                 } else if (Q.i == "bspline" || Q.i == "b" || Q.i == "bs") {
-                    time.raw <- data[, time]
-                    time.num <- suppressWarnings(as.numeric(as.character(time.raw)))
-                    if (all(is.na(time.num))) {
-                        ## fallback: use ordered time index if not numeric
-                        time.num <- as.numeric(factor(time.raw, levels = sort(unique(time.raw))))
-                    }
                     n.t <- length(unique(time.num))
                     if (n.t < 2) {
                         stop("\"Q.type='bspline'\" requires at least 2 distinct time values.")
@@ -915,15 +903,12 @@ fect.default <- function(
         }
     }
 
-    if (method != "cfe_old" & method != "cfe") {
+    if (method != "cfe") {
         if (!is.null(group)) {
             data <- data[, unique(c(index, Y, D, X, W, group, cl))]
         } else {
             data <- data[, unique(c(index, Y, D, X, W, cl))] ## some variables may not be used
         }
-    } else if (method == "cfe_old") {
-        all.var <- unique(c(index, sfe, unlist(cfe), Y, D, X, W, group, cl))
-        data <- data[, all.var]
     } else if (method == "cfe") {
         all.var <- unique(c(
             index,
@@ -961,17 +946,6 @@ fect.default <- function(
             stop(
                 "\"D\" or \"index\" should not have missing values when setting \"na.rm\" to FALSE."
             )
-        }
-        if (method == "cfe_old") {
-            if (!is.null(sfe)) {
-                for (sub.sfe in sfe) {
-                    if (sum(is.na(data[, sub.sfe])) >= 1) {
-                        stop(
-                            "Variables in \"sfe\" should not have missing values when setting \"na.rm\" to FALSE."
-                        )
-                    }
-                }
-            }
         }
     }
 
@@ -1119,20 +1093,6 @@ fect.default <- function(
         max.missing <- TT
     }
 
-    if (method == "cfe_old") {
-        if (!is.null(sfe)) {
-            for (sub.sfe in sfe) {
-                data[, sub.sfe] <- as.numeric(as.factor(data[, sub.sfe]))
-            }
-        }
-
-        if (!is.null(cfe)) {
-            for (sub.cfe in cfe) {
-                data[, sub.cfe[1]] <- as.numeric(as.factor(data[, sub.cfe[1]]))
-            }
-        }
-    }
-
     if (method == "cfe") {
         if (length(index) > 2) {
             for (extra.FE in index[3:length(index)]) {
@@ -1228,10 +1188,6 @@ fect.default <- function(
 
         if (!is.null(W)) {
             variable <- c(variable, Wname)
-        }
-
-        if (method == "cfe_old") {
-            variable <- unique(c(sfe, unlist(cfe), variable))
         }
 
         if (method == "cfe") {
@@ -1391,28 +1347,6 @@ fect.default <- function(
     }
 
     index.matrix <- list()
-    if (method == "cfe_old") {
-        if (!is.null(sfe)) {
-            for (sub.sfe in sfe) {
-                data[, sub.sfe] <- as.numeric(as.factor(data[, sub.sfe]))
-                sub.sfe.matrix <- matrix(data[, sub.sfe], TT, N)
-                index.matrix[[sub.sfe]] <- sub.sfe.matrix
-            }
-        }
-
-        if (!is.null(cfe)) {
-            for (sub.cfe in cfe) {
-                sub.cfe.matrix <- matrix(
-                    as.numeric(as.factor(data[, sub.cfe[1]])),
-                    TT,
-                    N
-                )
-                index.matrix[[sub.cfe[1]]] <- sub.cfe.matrix
-                sub.cfe.matrix <- matrix(data[, sub.cfe[2]], TT, N)
-                index.matrix[[sub.cfe[2]]] <- sub.cfe.matrix
-            }
-        }
-    }
 
     data.colnames <- colnames(data)
 
@@ -1502,11 +1436,25 @@ fect.default <- function(
         }
 
         if (length(kappa) > 1) {
-            for (i in 1:length(kappa)) {
-                X.kappa[,, i] <- matrix(data[, kappa[i]], TT, N)
+            for (i in seq_along(kappa)) {
+                kappa.val <- data[, kappa[i]]
+                if (!is.numeric(kappa.val)) {
+                    kappa.val <- suppressWarnings(as.numeric(as.character(kappa.val)))
+                    if (all(is.na(kappa.val))) {
+                        kappa.val <- as.numeric(factor(data[, kappa[i]]))
+                    }
+                }
+                X.kappa[,, i] <- matrix(kappa.val, TT, N)
             }
         } else if (length(kappa) == 1) {
-            X.kappa[,, 1] <- matrix(data[, kappa], TT, N)
+            kappa.val <- data[, kappa]
+            if (!is.numeric(kappa.val)) {
+                kappa.val <- suppressWarnings(as.numeric(as.character(kappa.val)))
+                if (all(is.na(kappa.val))) {
+                    kappa.val <- as.numeric(factor(data[, kappa]))
+                }
+            }
+            X.kappa[,, 1] <- matrix(kappa.val, TT, N)
         }
 
         Zgamma.id <- list()
@@ -1535,10 +1483,35 @@ fect.default <- function(
     II <- I
     II[which(D == 1)] <- 0 ## regard treated values as missing
 
-    # Unbalance Check
-    ## 1. remove units that have too control status
     T0 <- apply(II, 2, sum)
     T0.min <- min(T0)
+
+    if (time.component.from == "nevertreated") {
+        ## Validate: enough never-treated units for factor estimation
+        D.cum <- apply(D, 2, function(vec) { cummax(vec) })
+        D.unit.sum <- colSums(D.cum)
+        co.never <- which(D.unit.sum == 0)
+
+        if (length(co.never) == 0) {
+            stop("\"time.component.from\" is set to \"nevertreated\" but no never-treated units found in the data.")
+        }
+        if (length(co.never) < r + 1) {
+            stop(paste0("\"time.component.from\" is set to \"nevertreated\" but only ",
+                         length(co.never), " never-treated units found. Need at least ",
+                         r + 1, " for r = ", r, "."))
+        }
+
+        if (!(method %in% c("gsynth", "ife") ||
+              (method == "cfe" && time.component.from == "nevertreated"))) {
+            ## Zero out II for methods that don't do their own co/tr split
+            ## (gsynth, ife+nevertreated, cfe+nevertreated route to fect_nevertreated which splits internally)
+            ever.treated <- setdiff(1:ncol(II), co.never)
+            II[, ever.treated] <- 0
+        }
+    }
+
+    # Unbalance Check
+    ## 1. remove units that have too control status
 
     if (sum(T0[which(apply(D, 2, sum) > 0)] >= min.T0) == 0) {
         stop(
@@ -1607,13 +1580,6 @@ fect.default <- function(
         if (!is.null(W)) {
             W <- as.matrix(W[, -rm.id])
         }
-        if (method == "cfe_old") {
-            for (ind.name in names(index.matrix)) {
-                index.matrix[[ind.name]] <- as.matrix(index.matrix[[ind.name]][,
-                    -rm.id
-                ])
-            }
-        }
         if (method == "cfe") {
             rm.id.diff <- setdiff(1:dim(X.extra.FE)[2], rm.id)
             X.extra.FE <- X.extra.FE[, rm.id.diff, , drop = FALSE]
@@ -1638,11 +1604,6 @@ fect.default <- function(
                 )
             }
         }
-        if (method %in% c("polynomial")) {
-            message(
-                "\nThere are not any observations at some periods. Estimation results may not be reliable. Please use time fixed effects.\n"
-            )
-        }
         TT <- TT - sum(I.use == 0)
         time.uni <- time.uni[-which(I.use == 0)]
 
@@ -1664,12 +1625,12 @@ fect.default <- function(
             cl <- cl[-which(I.use == 0), ]
         }
 
-        if (method == "cfe_old") {
-            for (ind.name in names(index.matrix)) {
-                index.matrix[[ind.name]] <- as.matrix(index.matrix[[ind.name]][
-                    -which(I.use == 0),
-                ])
-            }
+        if (method == "cfe") {
+            X.extra.FE <- X.extra.FE[-which(I.use == 0), , , drop = FALSE]
+            X.Z <- X.Z[-which(I.use == 0), , , drop = FALSE]
+            X.Q <- X.Q[-which(I.use == 0), , , drop = FALSE]
+            X.gamma <- X.gamma[-which(I.use == 0), , , drop = FALSE]
+            X.kappa <- X.kappa[-which(I.use == 0), , , drop = FALSE]
         }
 
         X.old <- X
@@ -1710,7 +1671,7 @@ fect.default <- function(
         T.on.carry[which(T.on.carry <= 0)] <- NA ## only keep carryover effect
     }
     rm(D1, D2)
-    calendar.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
+    # calendar.time <- as.matrix(replicate((N - length(rm.id)), c(time.uni)))
 
     ## 3.1 balance samples
     ## for balance group, add group indicator
@@ -1827,13 +1788,6 @@ fect.default <- function(
                 cl <- as.matrix(cl[, -rm.id.2.pos])
             }
 
-            if (method == "cfe_old") {
-                for (ind.name in names(index.matrix)) {
-                    index.matrix[[ind.name]] <- as.matrix(index.matrix[[
-                        ind.name
-                    ]][, -rm.id.2.pos])
-                }
-            }
             if (method == "cfe") {
                 rm.id.2.diff <- setdiff(1:dim(X.extra.FE)[2], rm.id.2.pos)
                 X.extra.FE <- X.extra.FE[, rm.id.2.diff, , drop = FALSE]
@@ -1911,13 +1865,6 @@ fect.default <- function(
             if (!is.null(cl)) {
                 cl <- as.matrix(cl[, -rm.id.3.pos])
             }
-            if (method == "cfe_old") {
-                for (ind.name in names(index.matrix)) {
-                    index.matrix[[ind.name]] <- as.matrix(index.matrix[[
-                        ind.name
-                    ]][, -rm.id.3.pos])
-                }
-            }
             if (method == "cfe") {
                 rm.id.3.diff <- setdiff(1:dim(X.extra.FE)[2], rm.id.3.pos)
                 X.extra.FE <- X.extra.FE[, rm.id.3.diff, , drop = FALSE]
@@ -1954,7 +1901,7 @@ fect.default <- function(
         }
     }
 
-    if (min(apply(II, 2, sum)) == 0) {
+    if (time.component.from != "nevertreated" && min(apply(II, 2, sum)) == 0) {
         if (placeboTest == 1) {
             stop(
                 "Some units do not have any observations. Please set a smaller range for placebo period."
@@ -1996,15 +1943,26 @@ fect.default <- function(
             set.seed(seed)
         }
         if (is.null(cores) == TRUE) {
-            cores <- min(detectCores() - 2, 8) # default to 8 cores if not specified
+            cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
         }
         old.future.plan <- future::plan()
-        future::plan(future::multisession, workers = cores)
-        doFuture::registerDoFuture()
+        suppressWarnings(suppressPackageStartupMessages({
+            future::plan(future::multisession, workers = cores)
+            doFuture::registerDoFuture()
+        }))
         if (is.null(seed) == FALSE) {
             registerDoRNG(seed)
         }
-        message("Parallel computing ...\n")
+        avail <- parallelly::availableCores()
+        msg_line <- sprintf("Parallel computing: using %d of %d available cores.", cores, avail)
+        pad <- strrep(" ", max(0, 56 - nchar(msg_line)))
+        message("\n",
+            " +----------------------------------------------------------+\n",
+            " | ", msg_line, pad, " |\n",
+            " |                                                          |\n",
+            " | To change: set cores = <n> in fect().                    |\n",
+            " | Default: min(available - 2, 8).                          |\n",
+            " +----------------------------------------------------------+\n")
     }
 
     ## -------------------------------##
@@ -2029,7 +1987,7 @@ fect.default <- function(
                     criterion = criterion,
                     k = k,
                     cv.prop = cv.prop,
-                    cv.treat = cv.treat,
+                    cv.method = cv.method,
                     cv.nobs = cv.nobs,
                     cv.donut = cv.donut,
                     min.T0 = min.T0,
@@ -2044,7 +2002,17 @@ fect.default <- function(
                     max.iteration = max.iteration,
                     norm.para = norm.para,
                     group.level = g.level,
-                    group = G
+                    group = G,
+                    time.component.from = time.component.from,
+                    X.extra.FE = X.extra.FE,
+                    X.Z = X.Z,
+                    X.Q = X.Q,
+                    X.gamma = X.gamma,
+                    X.kappa = X.kappa,
+                    Zgamma.id = Zgamma.id,
+                    kappaQ.id = kappaQ.id,
+                    parallel = parallel,
+                    cores = cores
                 )
             } else {
                 out <- fect_binary_cv(
@@ -2057,7 +2025,7 @@ fect.default <- function(
                     T.off = T.off,
                     k = k,
                     cv.prop = cv.prop,
-                    cv.treat = cv.treat,
+                    cv.method = cv.method,
                     cv.nobs = cv.nobs,
                     r = r,
                     r.end = r.end,
@@ -2071,7 +2039,39 @@ fect.default <- function(
             }
         } else {
             ## non-binary case
-            if (method == "ife") {
+            if (method == "ife" && time.component.from == "nevertreated") {
+                ## nevertreated: route to fect_nevertreated (the nevertreated estimator)
+                out <- fect_nevertreated(
+                    Y = Y,
+                    D = D,
+                    X = X,
+                    W = W,
+                    I = I,
+                    II = II,
+                    T.on = T.on,
+                    T.off = T.off,
+                    r = r,
+                    CV = 0,
+                    T.on.balance = T.on.balance,
+                    balance.period = balance.period,
+                    binary = binary,
+                    QR = QR,
+                    force = force,
+                    hasRevs = hasRevs,
+                    tol = tol,
+                    max.iteration = max.iteration,
+                    boot = 0,
+                    norm.para = norm.para,
+                    placeboTest = placeboTest,
+                    placebo.period = placebo.period,
+                    carryoverTest = carryoverTest,
+                    carryover.period = carryover.period,
+                    group.level = g.level,
+                    group = G,
+                    parallel = parallel,
+                    cores = cores
+                )
+            } else if (method == "ife") {
                 out <- fect_fe(
                     Y = Y,
                     D = D,
@@ -2099,6 +2099,47 @@ fect.default <- function(
                     carryover.period = carryover.period,
                     group.level = g.level,
                     group = G
+                )
+            } else if (method == "cfe" && time.component.from == "nevertreated") {
+                ## cfe + nevertreated: route to fect_nevertreated with method="cfe"
+                out <- fect_nevertreated(
+                    Y = Y,
+                    D = D,
+                    X = X,
+                    W = W,
+                    I = I,
+                    II = II,
+                    T.on = T.on,
+                    T.off = T.off,
+                    r = r,
+                    CV = 0,
+                    T.on.balance = T.on.balance,
+                    balance.period = balance.period,
+                    binary = binary,
+                    QR = QR,
+                    force = force,
+                    hasRevs = hasRevs,
+                    tol = tol,
+                    max.iteration = max.iteration,
+                    boot = 0,
+                    norm.para = norm.para,
+                    placeboTest = placeboTest,
+                    placebo.period = placebo.period,
+                    carryoverTest = carryoverTest,
+                    carryover.period = carryover.period,
+                    group.level = g.level,
+                    group = G,
+                    ## CFE-specific parameters
+                    method = "cfe",
+                    X.extra.FE = X.extra.FE,
+                    X.Z = X.Z,
+                    X.Q = X.Q,
+                    X.gamma = X.gamma,
+                    X.kappa = X.kappa,
+                    Zgamma.id = Zgamma.id,
+                    kappaQ.id = kappaQ.id,
+                    parallel = parallel,
+                    cores = cores
                 )
             } else if (method == "cfe") {
                 out <- fect_cfe(
@@ -2137,7 +2178,7 @@ fect.default <- function(
                     group = G
                 )
             } else if (method == "gsynth") {
-                out <- fect_gsynth(
+                out <- fect_nevertreated(
                     Y = Y,
                     D = D,
                     X = X,
@@ -2163,7 +2204,9 @@ fect.default <- function(
                     carryoverTest = carryoverTest,
                     carryover.period = carryover.period,
                     group.level = g.level,
-                    group = G
+                    group = G,
+                    parallel = parallel,
+                    cores = cores
                 )
             } else if (method == "mc") {
                 out <- fect_mc(
@@ -2192,47 +2235,10 @@ fect.default <- function(
                     group.level = g.level,
                     group = G
                 )
-            } else if (method %in% c("polynomial", "cfe_old")) {
-                out <- fect_polynomial(
-                    Y = Y,
-                    D = D,
-                    X = X,
-                    W = W,
-                    I = I,
-                    II = II,
-                    T.on = T.on,
-                    T.on.carry = T.on.carry,
-                    T.on.balance = T.on.balance,
-                    balance.period = balance.period,
-                    T.off = T.off,
-                    method = method,
-                    degree = degree,
-                    sfe = sfe,
-                    cfe = cfe,
-                    ind.matrix = index.matrix,
-                    knots = knots,
-                    force = force,
-                    hasRevs = hasRevs,
-                    tol = tol,
-                    max.iteration = max.iteration,
-                    boot = 0,
-                    placeboTest = placeboTest,
-                    placebo.period = placebo.period,
-                    carryoverTest = carryoverTest,
-                    carryover.period = carryover.period,
-                    norm.para = norm.para,
-                    group.level = g.level,
-                    group = G
-                )
             }
 
             if ("try-error" %in% class(out)) {
                 stop("\nCannot estimate.\n")
-            }
-            # only for polynomial methods
-            if (method %in% c("polynomial", "cfe_old")) {
-                I <- out$I
-                II <- out$II
             }
         }
     } else {
@@ -2268,7 +2274,7 @@ fect.default <- function(
             CV = CV,
             k = k,
             cv.prop = cv.prop,
-            cv.treat = cv.treat,
+            cv.method = cv.method,
             cv.nobs = cv.nobs,
             r = r,
             r.end = r.end,
@@ -2293,13 +2299,10 @@ fect.default <- function(
             cores = cores,
             group.level = g.level,
             group = G,
-            keep.sims = keep.sims
+            keep.sims = keep.sims,
+            time.component.from = time.component.from
         )
 
-        if (method %in% c("polynomial", "cfe_old")) {
-            I <- out$I
-            II <- out$II
-        }
     }
 
     if ((out$validX == 0) & (p != 0)) {
@@ -2522,7 +2525,7 @@ fect.default <- function(
                     CV = 0,
                     k = k,
                     cv.prop = cv.prop,
-                    cv.treat = cv.treat,
+                    cv.method = cv.method,
                     cv.nobs = cv.nobs,
                     r = r.cv,
                     r.end = r.end,
@@ -2815,7 +2818,9 @@ fect.default <- function(
             carryover.period = carryover.period,
             unit.type = unit.type,
             obs.missing = obs.missing,
-            obs.missing.balance = obs.missing.balance
+            obs.missing.balance = obs.missing.balance,
+            time.component.from = time.component.from,
+            em = em
         ),
         out
     )

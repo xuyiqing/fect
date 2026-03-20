@@ -71,6 +71,8 @@ plot.fect <- function(
     connected = NULL,
     ci.outline = FALSE,
     color = NULL,
+    pre.color = NULL,
+    post.color = NULL,
     est.lwidth = NULL,
     est.pointsize = NULL,
     count.color = NULL,
@@ -171,9 +173,9 @@ plot.fect <- function(
     if (is.null(ltype)) ltype <- c("solid", "solid")
     if (is.null(gridOff)) gridOff <- FALSE
     if (is.null(color)) color <- "black"
-    if (is.null(count.color)) count.color <- "grey70"
+    if (is.null(count.color)) count.color <- "gray70"
     if (is.null(count.alpha)) count.alpha <- 0.4
-    if (is.null(count.outline.color)) count.outline.color <- "grey69"
+    if (is.null(count.outline.color)) count.outline.color <- "gray69"
     if (is.null(placebo.color)) placebo.color <- "blue"
     if (is.null(carryover.color)) carryover.color <- "red"
     if (is.null(carryover.rm.color)) carryover.rm.color <- "blue"
@@ -349,6 +351,7 @@ plot.fect <- function(
   } else {
     loo <- 0
   }
+
   ## y=0 line type
   if (is.null(lcolor) == TRUE) {
     lcolor <- "white"
@@ -415,6 +418,17 @@ plot.fect <- function(
   }
   if (!is.null(x$effect.est.att)) {
     type <- "cumul"
+  }
+
+  ## Override pre/post colors based on plot type and LOO status
+  ## Gap plot + LOO: all points are out-of-sample, no pre/post distinction needed
+  if (loo == 1 && type %in% c("gap", "equiv") && is.null(pre.color)) {
+    pre.color <- color
+  }
+  ## Exit plot: pre = out-of-sample (black), post = in-sample (gray)
+  if (type == "exit") {
+    if (is.null(pre.color))  pre.color  <- color
+    if (is.null(post.color)) post.color <- "gray50"
   }
 
   type.old <- type
@@ -491,37 +505,53 @@ plot.fect <- function(
           ))
         )
 
+        loadings_colors <- c("Control" = "#2C3E50", "Treated" = "#C0392B")
+
         if (nfactors == 1) {
           p <- ggplot(data, aes(x = .data$group, y = .data$L1, fill = .data$group)) +
-            geom_boxplot(alpha = 0.7) +
+            geom_boxplot(alpha = 0.5) +
+            scale_fill_manual(values = loadings_colors) +
             coord_flip() +
-            guides(fill = FALSE) +
+            guides(fill = "none") +
             xlab("") +
             ylab("Factor Loading")
         } else {
           if (x$Ntr >= 5) {
             my_dens <- function(data, mapping, ...) {
               ggplot(data = data, mapping = mapping) +
-                geom_density(..., alpha = 0.7, color = NA)
+                geom_density(..., alpha = 0.5, color = NA) +
+                scale_fill_manual(values = loadings_colors)
+            }
+            my_scatter <- function(data, mapping, ...) {
+              ggplot(data = data, mapping = mapping) +
+                geom_point(..., alpha = 0.4, size = 1.2) +
+                scale_color_manual(values = loadings_colors)
             }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group, fill = .data$group),
               columns = 1:nfactors,
               columnLabels = Llabel[1:nfactors],
               diag = list(continuous = my_dens),
+              lower = list(continuous = my_scatter),
               title = main
             ) +
               theme(plot.title = element_text(hjust = 0.5))
           } else if (x$Ntr > 1) {
             my_dens <- function(data, mapping, ...) {
               ggplot(data = data, mapping = mapping) +
-                geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
+                geom_density(..., fill = "gray", alpha = 0.5, color = "gray50")
+            }
+            my_scatter <- function(data, mapping, ...) {
+              ggplot(data = data, mapping = mapping) +
+                geom_point(..., alpha = 0.4, size = 1.2) +
+                scale_color_manual(values = loadings_colors)
             }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group),
               columns = 1:nfactors,
               columnLabels = Llabel[1:nfactors],
               diag = list(continuous = my_dens),
+              lower = list(continuous = my_scatter),
               title = main
             )
           } else {
@@ -635,7 +665,7 @@ plot.fect <- function(
           p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
         }
         p <- p + xlab(xlab) + ylab(ylab) + ggtitle(main) +
-          geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
+          geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1]) +
           theme(
             legend.position = legend.pos,
             axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
@@ -650,11 +680,18 @@ plot.fect <- function(
         p <- p + geom_line(aes(time, factor,
           colour = .data$group,
           group = .data$group
-        ), size = 1.2)
+        ), linewidth = 0.6)
 
+        # Add subtle points at integer time periods for clarity
+        data_int <- data[abs(data$time - round(data$time)) < 1e-8, ]
+        if (nrow(data_int) > 0) {
+          p <- p + geom_point(aes(time, factor, colour = .data$group, group = .data$group),
+                               data = data_int, size = 1.5, show.legend = FALSE)
+        }
 
-        brew.colors <- c("black", "steelblue", "#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072", "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9")
-        set.colors <- brew.colors[1:r]
+        # Okabe-Ito colorblind-safe palette
+        okabe_ito <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#CC79A7", "#F0E442", "#000000", "#BEBADA", "#FB8072")
+        set.colors <- okabe_ito[1:r]
         p <- p + scale_colour_manual(values = set.colors)
 
         ## legend
@@ -1545,7 +1582,7 @@ plot.fect <- function(
 
           p <- ggplot()
           if (!is.null(raw_co_data_abs)) {
-            p <- p + geom_line(data = raw_co_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type))
+            p <- p + geom_line(data = raw_co_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type), na.rm = TRUE)
           }
           p <- p + geom_line(data = main_tr_line_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
           p <- p + geom_line(data = main_ct_line_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
@@ -1681,10 +1718,10 @@ plot.fect <- function(
           y_data_for_range_calc <- c(y_data_for_range_calc, if (!is.null(raw_tr_data_abs)) raw_tr_data_abs$outcome else NULL, if (!is.null(raw_co_data_abs)) raw_co_data_abs$outcome else NULL)
           p <- ggplot()
           if (!is.null(raw_tr_data_abs)) {
-            p <- p + geom_line(data = raw_tr_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type))
+            p <- p + geom_line(data = raw_tr_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type), na.rm = TRUE)
           }
           if (!is.null(raw_co_data_abs)) {
-            p <- p + geom_line(data = raw_co_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type))
+            p <- p + geom_line(data = raw_co_data_abs, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type), na.rm = TRUE)
           }
           p <- p + geom_line(data = avg_tr_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
           p <- p + geom_line(data = avg_co_data_abs, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
@@ -2000,7 +2037,7 @@ plot.fect <- function(
         y_data_for_range_calc <- c(y_data_for_range_calc, if (!is.null(raw_tr_data_plot)) raw_tr_data_plot$outcome else NULL)
         p <- ggplot()
         if (!is.null(raw_tr_data_plot)) {
-          p <- p + geom_line(data = raw_tr_data_plot, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type))
+          p <- p + geom_line(data = raw_tr_data_plot, aes(x = time, y = outcome, group = id, colour = type, linetype = type, linewidth = type), na.rm = TRUE)
         }
         p <- p + geom_line(data = avg_tr_data_plot, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
         p <- p + geom_line(data = avg_co_data_plot, aes(x = time, y = outcome, colour = type, linetype = type, linewidth = type))
@@ -2259,6 +2296,14 @@ plot.fect <- function(
     # which periods to be shown
     show <- intersect(show.c, show.time)
 
+    ## Ensure carryover test periods are always included in show
+    if (type == "exit" && carryoverTest == TRUE && !is.null(carryover.period) && length(carryover.period) == 2) {
+      carry_time_vals <- seq(carryover.period[1], carryover.period[2])
+      carry_indices <- which(time %in% carry_time_vals)
+      carry_indices <- intersect(carry_indices, show.time)
+      show <- sort(unique(c(show, carry_indices)))
+    }
+
     # maximum number of cases to be shown
     max.count <- max(count.num[show])
 
@@ -2421,12 +2466,13 @@ plot.fect <- function(
       ## add legend for 95\% CI
       set.limits <- "ci"
       if (is.null(legend.labs) == TRUE) {
+        est_label <- if (loo == 1 && type %in% c("gap", "equiv")) "LOO Estimates" else "ATT"
         if (plot.ci == "90") {
-          set.labels <- "Residual Average (w/ 90% CI)"
+          set.labels <- paste0(est_label, " (w/ 90% CI)")
         } else if (plot.ci == "95") {
-          set.labels <- "ATT (w/ 95% CI)"
+          set.labels <- paste0(est_label, " (w/ 95% CI)")
         } else {
-          set.labels <- "ATT"
+          set.labels <- est_label
         }
       } else {
         set.labels <- legend.labs
@@ -2758,6 +2804,26 @@ plot.fect <- function(
     if (type == "equiv" && is.null(ylim)) {
       ylim <- c(-max(abs(data2$bound)) * 1.4, max(abs(data2$bound)) * 1.4)
     }
+
+    ## Expand ylim for exit plots: 10% top padding by default, 30% when stats shown
+    if (type == "exit" && is.null(ylim)) {
+      if (CI == TRUE) {
+        y_max <- max(data[, "CI.upper"], na.rm = TRUE)
+        y_min <- min(data[, "CI.lower"], na.rm = TRUE)
+      } else {
+        y_max <- max(data[, "ATT"], na.rm = TRUE)
+        y_min <- min(data[, "ATT"], na.rm = TRUE)
+      }
+      y_range <- y_max - y_min
+      has_stats <- !is.null(stats) && show.stats && !identical(stats, "none")
+      top_pad <- if (has_stats) 0.35 else 0.10
+      bot_pad <- if (show.count) 0.38 else 0.05
+      ylim <- c(y_min - y_range * bot_pad, y_max + y_range * top_pad)
+    }
+    ## Legend labels: exit plots use treatment-status labels
+    exit.pre.label  <- if (type == "exit") "Under treatment" else "Pre-treatment"
+    exit.post.label <- if (type == "exit") "Out of treatment" else "Post-treatment"
+
     ## point estimates
     if (classic == 1) {
       #
@@ -2794,7 +2860,7 @@ plot.fect <- function(
         show.points = show.points,
         ci.outline = ci.outline,
         connected = connected,
-        color = color,
+        color = color, pre.color = pre.color, post.color = post.color, pre.label = exit.pre.label, post.label = exit.post.label,
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
@@ -2805,10 +2871,10 @@ plot.fect <- function(
         ylim = ylim,
         gridOff = gridOff,
         start0 = start0,
-        cex.main = cex.main / 16,
-        cex.axis = cex.axis / 15,
-        cex.lab = cex.lab / 15,
-        cex.text = cex.text / 5,
+        cex.main = cex.main,
+        cex.axis = cex.axis,
+        cex.lab = cex.lab,
+        cex.text = cex.text,
         proportion = proportion,
         est.lwidth = est.lwidth,
         est.pointsize = est.pointsize,
@@ -2821,7 +2887,13 @@ plot.fect <- function(
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         stats.pos = stats.pos,
         theme.bw = theme.bw,
-        only.pre = type == "equiv"
+        only.pre = type == "equiv",
+        xangle = xangle,
+        yangle = yangle,
+        xbreaks = xbreaks,
+        ybreaks = ybreaks,
+        legendOff = legendOff,
+        cex.legend = cex.legend
       )
     } else if (classic == 0 && switch.on == TRUE) {
       #
@@ -2858,7 +2930,7 @@ plot.fect <- function(
         Count = "count",
         show.count = show.count,
         connected = connected,
-        color = color,
+        color = color, pre.color = pre.color, post.color = post.color, pre.label = exit.pre.label, post.label = exit.post.label,
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
@@ -2866,6 +2938,7 @@ plot.fect <- function(
         ci.outline = ci.outline,
         highlight.periods = placebo_seq,
         highlight.colors = rep(placebo.color, n_placebo),
+        highlight.shapes = rep(17L, n_placebo),
         xlab = xlab,
         ylab = ylab,
         main = main,
@@ -2878,30 +2951,37 @@ plot.fect <- function(
         lcolor = lcolor,
         lwidth = lwidth,
         ltype = ltype,
-        cex.main = cex.main / 16,
-        cex.axis = cex.axis / 15,
-        cex.lab = cex.lab / 15,
-        cex.text = cex.text / 5,
+        cex.main = cex.main,
+        cex.axis = cex.axis,
+        cex.lab = cex.lab,
+        cex.text = cex.text,
         axis.adjust = axis.adjust,
         est.lwidth = est.lwidth,
         est.pointsize = est.pointsize,
         stats = if (exists("stats_values")) stats_values else NULL,
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         theme.bw = theme.bw,
-        stats.pos = stats.pos
+        stats.pos = stats.pos,
+        only.pre = type == "equiv",
+        xangle = xangle,
+        yangle = yangle,
+        xbreaks = xbreaks,
+        ybreaks = ybreaks,
+        legendOff = legendOff,
+        cex.legend = cex.legend
       )
     } else if (classic == 0 && switch.on == FALSE) {
       #
       # --- CARRYOVER TEST OR EXITING TREATMENT ---
       #
-      if (is.null(x$est.carry.att)) {
+      if (is.null(x$est.carryover)) {
         placebo_seq <- c()
         n_placebo <- 0
         shift <- 0
       } else {
-        placebo_seq <- seq(carryover.period[1], carryover.period[1] - 1 + dim(x$est.carry.att)[1])
+        placebo_seq <- seq(carryover.period[1], carryover.period[1] - 1 + dim(x$est.carryover)[1])
         n_placebo <- length(placebo_seq)
-        shift <- dim(x$est.carry.att)[1]
+        shift <- dim(x$est.carryover)[1]
       }
 
       data_es <- data.frame(
@@ -2937,12 +3017,13 @@ plot.fect <- function(
         show.points = show.points,
         ci.outline = ci.outline,
         connected = connected,
-        color = color,
+        color = color, pre.color = pre.color, post.color = post.color, pre.label = exit.pre.label, post.label = exit.post.label,
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
         highlight.periods = c(placebo_seq, carry_seq),
         highlight.colors = c(rep(carryover.rm.color, n_placebo), rep(carryover.color, n_carry)),
+        highlight.shapes = c(rep(17L, n_placebo), rep(18L, n_carry)),
         xlab = xlab,
         ylab = ylab,
         main = main,
@@ -2953,10 +3034,10 @@ plot.fect <- function(
         lcolor = lcolor,
         lwidth = lwidth,
         ltype = ltype,
-        cex.main = cex.main / 16,
-        cex.axis = cex.axis / 15,
-        cex.lab = cex.lab / 15,
-        cex.text = cex.text / 5,
+        cex.main = cex.main,
+        cex.axis = cex.axis,
+        cex.lab = cex.lab,
+        cex.text = cex.text,
         axis.adjust = axis.adjust,
         start0 = start0,
         proportion = proportion,
@@ -2966,26 +3047,38 @@ plot.fect <- function(
         stats = if (exists("stats_values")) stats_values else NULL,
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         theme.bw = theme.bw,
-        stats.pos = stats.pos
+        stats.pos = stats.pos,
+        xangle = xangle,
+        yangle = yangle,
+        xbreaks = xbreaks,
+        ybreaks = ybreaks,
+        legendOff = legendOff,
+        cex.legend = cex.legend
       )
     }
 
     # plot bound
     if (bound.old != "none") { ## with bounds
-      p <- p + geom_line(data = data2, aes(time, bound, colour = type, linetype = type, size = type, group = id))
+      p <- p + geom_line(data = data2, aes(time, bound, colour = type, linetype = type, linewidth = type, group = id))
       ## legends for bounds
       if (is.null(legend.nrow) == TRUE) {
         legend.nrow <- ifelse(length(set.limits) <= 3, 1, 2)
       }
       p <- p + scale_colour_manual(limits = set.limits, labels = set.labels, values = set.colors) +
-        scale_size_manual(limits = set.limits, labels = set.labels, values = set.size) +
+        scale_linewidth_manual(limits = set.limits, labels = set.labels, values = set.size) +
         scale_linetype_manual(limits = set.limits, labels = set.labels, values = set.linetypes) +
         guides(
           linetype = guide_legend(title = NULL, nrow = legend.nrow), colour = guide_legend(title = NULL, nrow = legend.nrow),
-          size = guide_legend(title = NULL, nrow = legend.nrow)
+          linewidth = guide_legend(title = NULL, nrow = legend.nrow)
         )
 
-      p <- p + theme(legend.position = "bottom")
+      if (isTRUE(legendOff)) {
+        p <- p + theme(legend.position = "none")
+      } else {
+        p <- p + theme(legend.position = "bottom",
+                       legend.box = "vertical",
+                       legend.margin = margin(0, 0, 0, 0))
+      }
     }
 
     if (isTRUE(return.data)) {
@@ -3100,19 +3193,19 @@ plot.fect <- function(
     }
 
     # horizontal 0 line
-    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
 
     TTT <- as.numeric(rownames(data.1))
     TTT.2 <- as.numeric(rownames(data.2))
 
     if (CI == FALSE) {
-      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
+      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
       p <- p + geom_point(aes(x = TTT, y = d1[, 1]), color = "gray50", fill = "gray50", alpha = 1, size = 1.2)
     } else {
       p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, size = 0)
-      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, size = 1.1)
+      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
       p <- p + geom_pointrange(aes(x = TTT, y = d1[, 1], ymin = d1[, 3], ymax = d1[, 4]), color = "gray50", fill = "gray50", alpha = 1, size = 0.6)
     }
 
@@ -3291,8 +3384,8 @@ plot.fect <- function(
       )
 
       ## core geoms (even spacing because x is factor)
-      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
-      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
+      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
       # nicer CI + mean: thick error bars + solid point
       p <- p + geom_linerange(
         aes(x = x, ymin = .data$lower, ymax = .data$upper),
@@ -3372,10 +3465,10 @@ plot.fect <- function(
         p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
       }
 
-      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+      p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
       p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, size = 0)
-      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, size = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, size = 1.1)
+      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, linewidth = 1.1)
 
       ## title
       if (is.null(main) == TRUE) {
@@ -3518,7 +3611,7 @@ plot.fect <- function(
     }
 
     # horizontal 0 line
-    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], size = lwidth[1], linetype = ltype[1])
+    p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
 
     complete.index.eff <- which(!is.na(x$eff))
     complete.index.time <- which(!is.na(x$T.on))
@@ -3533,6 +3626,19 @@ plot.fect <- function(
     if (start0 == TRUE) {
       data.toplot$time <- data.toplot$time - 1
       data.count$time <- data.count$time - 1
+    }
+
+    # Apply proportion-based x-range filtering (consistent with gap/equiv plots)
+    if (is.null(xlim) && proportion > 0) {
+      max_count_box <- max(data.count$count, na.rm = TRUE)
+      if (is.finite(max_count_box) && max_count_box > 0) {
+        keep_times <- data.count$time[data.count$count >= proportion * max_count_box]
+        if (length(keep_times) > 0) {
+          box_xlim <- range(keep_times)
+          data.count <- data.count[data.count$time >= box_xlim[1] & data.count$time <= box_xlim[2], ]
+          data.toplot <- data.toplot[data.toplot$time >= box_xlim[1] & data.toplot$time <= box_xlim[2], ]
+        }
+      }
     }
 
     if (!is.null(xlim)) {
@@ -3552,20 +3658,41 @@ plot.fect <- function(
       rect.min <- min(data.use[, "eff"], na.rm = TRUE) - rect.length
     }
 
+    box_count_threshold <- max(10, proportion * max(data.use$count, na.rm = TRUE))
+
     if (start0 == FALSE) {
-      data.pre.1 <- data.use[which(data.use$time <= 0 & data.use$count >= 10), ]
-      data.pre.2 <- data.use[which(data.use$time <= 0 & data.use$count < 10), ]
-      data.post.1 <- data.use[which(data.use$time > 0 & data.use$count >= 10), ]
-      data.post.2 <- data.use[which(data.use$time > 0 & data.use$count < 10), ]
+      data.pre.1 <- data.use[which(data.use$time <= 0 & data.use$count >= box_count_threshold), ]
+      data.pre.2 <- data.use[which(data.use$time <= 0 & data.use$count < box_count_threshold), ]
+      data.post.1 <- data.use[which(data.use$time > 0 & data.use$count >= box_count_threshold), ]
+      data.post.2 <- data.use[which(data.use$time > 0 & data.use$count < box_count_threshold), ]
     } else {
-      data.pre.1 <- data.use[which(data.use$time < 0 & data.use$count >= 10), ]
-      data.pre.2 <- data.use[which(data.use$time < 0 & data.use$count < 10), ]
-      data.post.1 <- data.use[which(data.use$time >= 0 & data.use$count >= 10), ]
-      data.post.2 <- data.use[which(data.use$time >= 0 & data.use$count < 10), ]
+      data.pre.1 <- data.use[which(data.use$time < 0 & data.use$count >= box_count_threshold), ]
+      data.pre.2 <- data.use[which(data.use$time < 0 & data.use$count < box_count_threshold), ]
+      data.post.1 <- data.use[which(data.use$time >= 0 & data.use$count >= box_count_threshold), ]
+      data.post.2 <- data.use[which(data.use$time >= 0 & data.use$count < box_count_threshold), ]
     }
 
 
     levels <- as.factor(as.character(data.count[, 1]))
+
+    # Label thinning for x-axis when many levels
+    n_levels <- length(levels)
+    thin_labels <- NULL
+    if (n_levels > 20 && is.null(xticklabels)) {
+      thin_every <- ceiling(n_levels / 20)
+      thin_labels <- as.character(levels)
+      for (i in seq_along(thin_labels)) {
+        if ((i - 1) %% thin_every != 0) {
+          thin_labels[i] <- ""
+        }
+      }
+    }
+
+    # Auto-enable axis.adjust for box plots with many time periods
+    if (n_levels > 15) {
+      angle <- 45; x.v <- 1; x.h <- 1
+    }
+
     data.pre.1$time <- as.character(data.pre.1$time)
     data.pre.2$time <- as.character(data.pre.2$time)
     data.post.1$time <- as.character(data.post.1$time)
@@ -3652,6 +3779,8 @@ plot.fect <- function(
         }
       }
       p <- p + scale_x_discrete(limits = levels, breaks = xticklabels.all, labels = labels)
+    } else if (!is.null(thin_labels) && n_levels > 20) {
+      p <- p + scale_x_discrete(limits = levels, labels = thin_labels)
     } else {
       p <- p + scale_x_discrete(limits = levels)
     }
@@ -3663,7 +3792,7 @@ plot.fect <- function(
       } else {
         period_group <- ifelse(plot_data$time <= 0, "pre", "post")
       }
-      count_group <- ifelse(plot_data$count >= 10, "high_count", "low_count")
+      count_group <- ifelse(plot_data$count >= box_count_threshold, "high_count", "low_count")
       plot_data$period_group <- period_group
       plot_data$count_group <- count_group
       plot_data$group <- paste(period_group, count_group, sep = "_")
@@ -3781,6 +3910,10 @@ plot.fect <- function(
 
     if (x.gap != 0) {
       T.b <- seq(from = 1, to = length(show), by = (x.gap + 1))
+    } else if (length(show) > 20) {
+      ## Auto-thin x-axis labels when many time periods to avoid overlap
+      thin_step <- ceiling(length(show) / 20)
+      T.b <- seq(from = 1, to = length(show), by = thin_step)
     }
     if (y.gap != 0) {
       N.b <- seq(from = N, to = 1, by = -(y.gap + 1))
@@ -3790,12 +3923,12 @@ plot.fect <- function(
     p <- ggplot(data, aes(
       x = period, y = units,
       fill = res
-    ), position = "identity")
+    ))
 
     if (gridOff == FALSE) {
-      p <- p + geom_tile(colour = status.background.color, linewidth = 0.05, stat = "identity")
+      p <- p + geom_tile(colour = status.background.color, linewidth = 0.05)
     } else {
-      p <- p + geom_tile(stat = "identity")
+      p <- p + geom_tile()
     }
 
     p <- p +
@@ -3828,7 +3961,7 @@ plot.fect <- function(
         plot.background = element_rect(fill = status.background.color),
         legend.background = element_rect(fill = status.background.color),
         legend.position = legend.pos,
-        legend.margin = margin(c(0, 5, 5, 0)),
+        legend.margin = margin(0, 5, 5, 0),
         legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
         legend.title = element_blank(),
         plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(8, 0, 8, 0))
@@ -3938,7 +4071,7 @@ plot.fect <- function(
       p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
     }
 
-    p <- p + geom_hline(yintercept = 0, color = lcolor[1], size = lwidth[1], linetype = ltype[1]) +
+    p <- p + geom_hline(yintercept = 0, color = lcolor[1], linewidth = lwidth[1], linetype = ltype[1]) +
       geom_errorbar(
         aes(ymin = .data$lb, ymax = .data$ub, color = .data$color_group),
         width = 0.02, # Width of error bar caps
@@ -4026,7 +4159,7 @@ plot.fect <- function(
         show.points = show.points,
         ci.outline = ci.outline,
         connected = connected,
-        color = color,
+        color = color, pre.color = pre.color, post.color = post.color,
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
@@ -4039,10 +4172,10 @@ plot.fect <- function(
         lcolor = lcolor,
         lwidth = lwidth,
         ltype = ltype,
-        cex.main = cex.main / 16,
-        cex.axis = cex.axis / 15,
-        cex.lab = cex.lab / 15,
-        cex.text = cex.text / 5,
+        cex.main = cex.main,
+        cex.axis = cex.axis,
+        cex.lab = cex.lab,
+        cex.text = cex.text,
         axis.adjust = axis.adjust,
         xlim = xlim,
         ylim = ylim,
@@ -4050,7 +4183,16 @@ plot.fect <- function(
         start0 = start0,
         est.lwidth = est.lwidth,
         theme.bw = theme.bw,
-        est.pointsize = est.pointsize
+        est.pointsize = est.pointsize,
+        stats = if (exists("stats_values")) stats_values else NULL,
+        stats.labs = if (exists("stats_labels")) stats_labels else NULL,
+        stats.pos = stats.pos,
+        xangle = xangle,
+        yangle = yangle,
+        xbreaks = xbreaks,
+        ybreaks = ybreaks,
+        legendOff = legendOff,
+        cex.legend = cex.legend
       )
 
       mbar_levels <- sort(unique(dte_output$Mbar))
@@ -4121,7 +4263,7 @@ plot.fect <- function(
         show.points = show.points,
         ci.outline = ci.outline,
         connected = connected,
-        color = color,
+        color = color, pre.color = pre.color, post.color = post.color,
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
@@ -4137,15 +4279,24 @@ plot.fect <- function(
         lcolor = lcolor,
         lwidth = lwidth,
         ltype = ltype,
-        cex.main = cex.main / 16,
-        cex.axis = cex.axis / 15,
-        cex.lab = cex.lab / 15,
-        cex.text = cex.text / 5,
+        cex.main = cex.main,
+        cex.axis = cex.axis,
+        cex.lab = cex.lab,
+        cex.text = cex.text,
         axis.adjust = axis.adjust,
         start0 = start0,
         theme.bw = theme.bw,
         est.lwidth = est.lwidth,
-        est.pointsize = est.pointsize
+        est.pointsize = est.pointsize,
+        stats = if (exists("stats_values")) stats_values else NULL,
+        stats.labs = if (exists("stats_labels")) stats_labels else NULL,
+        stats.pos = stats.pos,
+        xangle = xangle,
+        yangle = yangle,
+        xbreaks = xbreaks,
+        ybreaks = ybreaks,
+        legendOff = legendOff,
+        cex.legend = cex.legend
       )
 
       m_levels <- sort(unique(dte_output$M))
@@ -4196,25 +4347,33 @@ plot.fect <- function(
       lcolor = lcolor,
       lwidth = lwidth,
       ltype = ltype,
-      cex.main = cex.main / 16,
-      cex.axis = cex.axis / 15,
-      cex.lab = cex.lab / 15,
-      cex.text = cex.text / 5,
+      cex.main = cex.main,
+      cex.axis = cex.axis,
+      cex.lab = cex.lab,
+      cex.text = cex.text,
       show.points = show.points,
       ci.outline = ci.outline,
       axis.adjust = axis.adjust,
       Count = "count",
-      show.count = FALSE,
+      show.count = show.count,
       proportion = proportion,
       est.pointsize = est.pointsize,
       est.lwidth = est.lwidth,
-      color = color,
+      color = color, pre.color = pre.color, post.color = post.color,
       count.color = count.color,
       count.alpha = count.alpha,
       count.outline.color = count.outline.color,
       theme.bw = theme.bw,
       connected = connected,
       only.post = TRUE,
+      gridOff = gridOff,
+      start0 = start0,
+      xangle = xangle,
+      yangle = yangle,
+      xbreaks = xbreaks,
+      ybreaks = ybreaks,
+      legendOff = legendOff,
+      cex.legend = cex.legend
     )
     if (isTRUE(return.data)) {
       return(finalize_plot_return(p, data = plot_data_cumul, test.out = test.out))

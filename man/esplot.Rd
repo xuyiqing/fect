@@ -12,17 +12,23 @@
 esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
        CI.lower = "CI.lower", CI.upper = "CI.upper", Count = NULL,
        proportion = 0.3, est.lwidth = NULL, est.pointsize = NULL,
-       show.points = FALSE, fill.gap = TRUE, start0 = FALSE,
-       only.pre = FALSE, only.post = FALSE, show.count = NULL,
+       show.points = TRUE, fill.gap = TRUE, start0 = FALSE,
+       only.pre = FALSE, only.post = FALSE, show.count = TRUE,
        stats = NULL, stats.labs = NULL, highlight.periods = NULL,
-       highlight.colors = NULL, lcolor = NULL, lwidth = NULL,
+       highlight.colors = NULL, highlight.shapes = NULL,
+       lcolor = NULL, lwidth = NULL,
        ltype = c("solid", "solid"), connected = FALSE, ci.outline = FALSE,
        main = NULL, xlim = NULL, ylim = NULL, xlab = NULL, ylab = NULL,
        gridOff = FALSE, stats.pos = NULL, theme.bw = TRUE,
        cex.main = NULL, cex.axis = NULL, cex.lab = NULL,
        cex.text = NULL, axis.adjust = FALSE, color = "#000000",
+       pre.color = NULL, post.color = NULL,
        count.color = "gray70", count.alpha = 0.4,
-       count.outline.color = "grey69")
+       count.outline.color = "grey69",
+       xangle = NULL, yangle = NULL,
+       xbreaks = NULL, ybreaks = NULL,
+       legendOff = FALSE, cex.legend = NULL,
+       pre.label = "Pre-treatment", post.label = "Post-treatment")
 }
 \arguments{
   \item{data}{The input data for the event study plot. Can be a \code{data.frame} or an object of class \code{did_wrapper} (in which case, the \code{est.att} component will be used).}
@@ -35,16 +41,17 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
   \item{proportion}{Numeric, between 0 and 1. If \code{Count} is specified and \code{xlim} is not, this proportion is used to determine the default x-axis limits. Periods where the count is below \code{proportion * max(Count)} might be excluded from the default view. Default is \code{0.3}.}
   \item{est.lwidth}{Numeric. The line width for the estimate line (if \code{connected = TRUE}) or the main vertical line of the point-range (if \code{connected = FALSE}). Default is \code{NULL}, which resolves to \code{0.6} if \code{connected = FALSE} (the default for \code{connected}), \code{1.2} if \code{connected = TRUE} and \code{show.points = FALSE} (the default for \code{show.points}), and \code{0.7} if \code{connected = TRUE} and \code{show.points = TRUE}.}
   \item{est.pointsize}{Numeric. The size of the points. If \code{connected = TRUE} and \code{show.points = TRUE}, this is the size of points at integer time periods. If \code{connected = FALSE}, this controls the size of the central point in the point-range (via \code{fatten} aesthetic). Default is \code{NULL}, which resolves to \code{2} if \code{connected = FALSE} (the default for \code{connected}), \code{3} if \code{connected = TRUE} and \code{show.points = FALSE} (the default for \code{show.points}), and \code{1.2} if \code{connected = TRUE} and \code{show.points = TRUE}.}
-  \item{show.points}{Logical. If \code{connected = TRUE}, whether to display points at integer time periods on top of the line and ribbon. Default is \code{FALSE}.}
+  \item{show.points}{Logical. If \code{connected = TRUE}, whether to display points at integer time periods on top of the line and ribbon. Default is \code{TRUE}.}
   \item{fill.gap}{Logical. If \code{connected = FALSE}, whether to fill gaps in the sequence of time periods with an estimate and confidence interval of 0. This is useful when some integer time periods are missing from the input data. Default is \code{TRUE}.}
   \item{start0}{Logical. If \code{TRUE}, the vertical line separating pre- and post-treatment periods is drawn at \code{x = -0.5}, implying period 0 is the first post-treatment period. If \code{FALSE} (default), the line is at \code{x = 0.5}, implying period 0 is the last pre-treatment period.}
   \item{only.pre}{Logical. If \code{TRUE}, the plot will only display pre-treatment periods. The vertical separator line will be omitted. Default is \code{FALSE}.}
   \item{only.post}{Logical. If \code{TRUE}, the plot will only display post-treatment periods. The vertical separator line will be omitted. Default is \code{FALSE}.}
-  \item{show.count}{Logical or \code{NULL}. Whether to display a bar plot of the values from the \code{Count} column at the bottom of the main plot. If \code{NULL} (default), it's treated as \code{FALSE}.}
+  \item{show.count}{Logical. Whether to display a bar plot of the values from the \code{Count} column at the bottom of the main plot. Default is \code{TRUE}.}
   \item{stats}{Optional. A numeric vector of statistics (e.g., p-values) to be printed on the plot.}
   \item{stats.labs}{Optional. A character vector of labels corresponding to the \code{stats} values. Must be the same length as \code{stats}.}
   \item{highlight.periods}{Optional. A numeric vector of time periods to highlight with different colors. For \code{connected = TRUE}, these define intervals from \code{period - 0.5} to \code{period + 0.5}. For \code{connected = FALSE}, individual points at these periods are highlighted.}
   \item{highlight.colors}{Optional. A character vector of colors corresponding to \code{highlight.periods}. If \code{NULL} and \code{highlight.periods} is provided, default rainbow colors are used. Must be the same length as \code{highlight.periods}.}
+  \item{highlight.shapes}{Optional. An integer vector of point shapes corresponding to \code{highlight.periods} (e.g., 17 = triangle, 18 = diamond). Must be the same length as \code{highlight.periods}. Default is \code{NULL}.}
   \item{lcolor}{Optional. Color(s) for the reference lines. Can be a single color (applied to both horizontal y=0 line and vertical pre/post separator line) or a vector of two colors (first for horizontal, second for vertical). If \code{NULL}, defaults to \code{"#aaaaaa"} if \code{theme.bw = TRUE}, otherwise \code{"white"}. Default is \code{NULL}.}
   \item{lwidth}{Optional. Line width(s) for the reference lines. Can be a single width or a vector of two widths (similar to \code{lcolor}). If \code{NULL}, defaults to \code{1.5} if \code{theme.bw = TRUE}, otherwise \code{2}. Default is \code{NULL}.}
   \item{ltype}{Optional. Linetype(s) for the reference lines. Can be a single linetype (applied to both horizontal y=0 line and vertical pre/post separator line) or a vector of two linetypes (first for horizontal, second for vertical). Default is \code{c("solid", "solid")}.}
@@ -64,9 +71,19 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
   \item{cex.text}{Optional. Numeric scaling factor for annotated text elements (e.g., \code{stats} text, count label). The base size used by ggplot for annotation is 5. Default is \code{NULL} (uses base size 5).}
   \item{axis.adjust}{Logical. If \code{TRUE}, x-axis tick labels are rotated 45 degrees for better readability with many labels. Default is \code{FALSE}.}
   \item{color}{Character. The primary color for plotting estimates, points, lines, and confidence interval fills/lines (unless overridden by \code{highlight.colors} for specific periods). Default is \code{"#000000"} (black).}
+  \item{pre.color}{Optional. Character. Color for pre-treatment period estimates. If \code{NULL} (default), uses the value of \code{color}.}
+  \item{post.color}{Optional. Character. Color for post-treatment period estimates. If \code{NULL} (default), uses the value of \code{color}.}
   \item{count.color}{Character. The fill color for the bars if \code{show.count = TRUE}. Default is \code{"gray70"}.}
   \item{count.alpha}{Numeric. Alpha transparency for the count bars if \code{show.count = TRUE}. Default is \code{0.4}.}
   \item{count.outline.color}{Character. The color for the outline of count bars if \code{show.count = TRUE}. Default is \code{"grey69"}.}
+  \item{xangle}{Optional. Numeric. Rotation angle (in degrees) for x-axis tick labels. Default is \code{NULL} (no rotation).}
+  \item{yangle}{Optional. Numeric. Rotation angle (in degrees) for y-axis tick labels. Default is \code{NULL} (no rotation).}
+  \item{xbreaks}{Optional. A numeric vector of break points for the x-axis. If \code{NULL} (default), breaks are determined automatically.}
+  \item{ybreaks}{Optional. A numeric vector of break points for the y-axis. If \code{NULL} (default), breaks are determined automatically.}
+  \item{legendOff}{Logical. If \code{TRUE}, the legend is suppressed. Default is \code{FALSE}.}
+  \item{cex.legend}{Optional. Numeric scaling factor for the legend text size. Default is \code{NULL} (uses ggplot2 defaults).}
+  \item{pre.label}{Character. Label for the pre-treatment period in the legend. Default is \code{"Pre-treatment"}.}
+  \item{post.label}{Character. Label for the post-treatment period in the legend. Default is \code{"Post-treatment"}.}
 }
 \value{
   \item{p}{A \code{ggplot} object representing the event study plot.}

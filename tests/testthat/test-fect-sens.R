@@ -1,4 +1,6 @@
 test_that("fect_sens attaches sensitivity results when inputs present", {
+
+  skip_on_cran()
   skip_if_not_installed("HonestDiDFEct")
   suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
   expect_true(exists("simdata"))
@@ -26,6 +28,6 @@ test_that("fect_sens attaches sensitivity results when inputs present", {
   }
   # restrict periods so numPre+numPost matches available row count
   out$placebo.period <- c(-3, -1)
-  out2 <- fect_sens(out, post.periods = 1:10, parallel = FALSE)
+  out2 <- suppressWarnings(fect_sens(out, post.periods = 1:10, parallel = FALSE))
   expect_true(!is.null(out2$sensitivity.rm) || !is.null(out2$sensitivity.smooth))
 })

@@ -45,6 +45,7 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
     ## unit id and time
     TT <- dim(Y)[1]
     N <- dim(Y)[2]
+    r.cv <- min(r.cv, TT, N)
     if (is.null(X) == FALSE) {
         p <- dim(X)[3]
     } else {
@@ -174,8 +175,8 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         ## ini.res <- ini.res * norm.para[1]
         if (boot == FALSE) {
             est.fect$fit <- est.fect$fit * norm.para[1]
+            est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
         }
-        est.fect$sigma2 <- est.fect$sigma2 * norm.para[1]
     }
 
     ## 0. relevant parameters
@@ -217,19 +218,34 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         eff[which(I == 0)] <- NA
     }
     complete.index <- which(!is.na(eff))
-    att.avg <- sum(eff[complete.index] * D[complete.index]) / (sum(D[complete.index]))
+    denom <- sum(D[complete.index])
+    att.avg <- if (denom > 0) {
+        sum(eff[complete.index] * D[complete.index]) / denom
+    } else {
+        NA
+    }
 
     # balance effect
     att.avg.balance <- NA
     if (!is.null(balance.period)) {
         complete.index2 <- which(!is.na(T.on.balance))
-        att.avg.balance <- sum(eff[complete.index2] * D[complete.index2]) / (sum(D[complete.index2]))
+        denom.balance <- sum(D[complete.index2])
+        att.avg.balance <- if (denom.balance > 0) {
+            sum(eff[complete.index2] * D[complete.index2]) / denom.balance
+        } else {
+            NA
+        }
     }
 
     # weighted effect
     att.avg.W <- NA
     if (!is.null(W)) {
-        att.avg.W <- sum(eff[complete.index] * D[complete.index] * W[complete.index]) / (sum(D[complete.index] * W[complete.index]))
+        denom.W <- sum(D[complete.index] * W[complete.index])
+        att.avg.W <- if (denom.W > 0) {
+            sum(eff[complete.index] * D[complete.index] * W[complete.index]) / denom.W
+        } else {
+            NA
+        }
     }
 
 
@@ -247,7 +263,12 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
     ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
     att.unit <- sapply(1:length(tr.pos), function(vec) {
-        return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))
+        d <- sum(D[, tr.pos[vec]])
+        if (d > 0) {
+            return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / d)
+        } else {
+            return(NA)
+        }
     })
     att.avg.unit <- mean(att.unit, na.rm = TRUE)
 
@@ -258,7 +279,12 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
             eff.equiv[which(I == 0)] <- NA
         }
         complete.index <- which(!is.na(eff.equiv))
-        equiv.att.avg <- sum(eff.equiv[complete.index] * D[complete.index]) / (sum(D[complete.index]))
+        denom.equiv <- sum(D[complete.index])
+        equiv.att.avg <- if (denom.equiv > 0) {
+            sum(eff.equiv[complete.index] * D[complete.index]) / denom.equiv
+        } else {
+            NA
+        }
     }
 
     ## 2. rmse for treated units' observations under control
@@ -462,17 +488,19 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         rm.pos3 <- which(is.na(t.off))
         eff.v.use2 <- eff.v
         t.off.use <- t.off
+        n.off.use <- rep(1:N, each = TT)
         if (NA %in% eff.v | NA %in% t.off) {
             eff.v.use2 <- eff.v[-c(rm.pos1, rm.pos3)]
             t.off.use <- t.off[-c(rm.pos1, rm.pos3)]
+            n.off.use <- n.off.use[-c(rm.pos1, rm.pos3)]
         }
 
         off.pos <- which(t.off.use > 0)
-        eff.off <- cbind(eff.v.use2[off.pos], t.off.use[off.pos], n.on.use[off.pos])
+        eff.off <- cbind(eff.v.use2[off.pos], t.off.use[off.pos], n.off.use[off.pos])
         colnames(eff.off) <- c("eff", "period", "unit")
 
         if (binary == FALSE && boot == FALSE) {
-            eff.off.equiv <- cbind(eff.equiv.v[off.pos], t.off.use[off.pos], n.on.use[off.pos])
+            eff.off.equiv <- cbind(eff.equiv.v[off.pos], t.off.use[off.pos], n.off.use[off.pos])
             colnames(eff.off.equiv) <- c("off.equiv", "period", "unit")
             off.sd <- tapply(eff.off.equiv[, 1], eff.off.equiv[, 2], sd)
             off.sd <- cbind(off.sd, sort(unique(eff.off.equiv[, 2])), table(eff.off.equiv[, 2]))
@@ -756,6 +784,7 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         Y = Y,
         X = X,
         eff = eff,
+        eff.tr = eff[, tr],
         I = I,
         II = II,
         att.avg = att.avg,

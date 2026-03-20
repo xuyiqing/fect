@@ -2,7 +2,7 @@
 
 This chapter provides installation instructions and introduces the datasets used in the tutorial.
 
-```{r echo = FALSE}
+```{r clear-environment, echo = FALSE}
 rm(list = ls())
 ```
 
@@ -10,37 +10,37 @@ rm(list = ls())
 
 To install **fect** from CRAN, run the code chunk below:
 
-```{r eval = FALSE, message = FALSE, warning = FALSE}
+```{r install-cran, eval = FALSE, message = FALSE, warning = FALSE}
 install.packages("fect")
 ```
 
 We recommend users to install the most up-to-date, stable version of **fect** from Github using:
 
-```{r eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
+```{r install-github-main, eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
 devtools::install_github("xuyiqing/fect")
 ```
 
 We fix bugs in the `dev` branch before merging into the main branch; therefore, it is often more up to date.
 
-```{r eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
+```{r install-github-dev, eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
 devtools::install_github("xuyiqing/fect@dev")
 ```
 
 After installation, check **fect** version to make sure the package is up-to-date.
 
-```{r}
+```{r check-version}
 installed.packages()["fect", "Version"]
 ```
 
 **panelView** for panel data visualization is highly recommended and will be used in the tutorial:
 
-```{r eval=FALSE}
+```{r install-panelview, eval=FALSE}
 devtools::install_github('xuyiqing/panelView')
 ```
 
 **fect** depends on the following packages, which should be installed automatically when **fect** is being installed. You can also install them manually.
 
-```{r eval=FALSE}
+```{r install-dependencies, eval=FALSE}
 install_all <- function(packages) {
   installed_pkgs <- installed.packages()[, "Package"]
   for (pkg in packages) {
@@ -57,17 +57,38 @@ install_all(packages)
 
 ## Datasets
 
-The **fect** package ships five datasets.
+The **fect** package ships several datasets. All simulated and empirical datasets are loaded together with `data(fect)`.
 
-```{r message = FALSE, warning = FALSE}
+```{r load-data, message = FALSE, warning = FALSE}
 library(fect)
 data(fect)
 ls()
 ```
 
-Below is a brief explanation of the datasets used in this book:
+### Simulated datasets
 
--   `simdata`: Based on @LWX2022. Used in [Chapter @sec-fect] to demonstrate various counterfactual estimators.\
--   `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-plots] and [Chapter @sec-panel].\
--   `simgsynth` & `turnout`: Based on @Xu2017. Used in [Chapter @sec-gsynth] to demonstrate Gsynth.
--   `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-plots], [Chapter @sec-panel] and [Chapter @sec-panel-sens].
+The package includes five simulated panel datasets. The first two (`simdata` and `sim_base`) are generated from the data-generating process (DGP) in @LWX2022. Both have $N = 200$ units and $T = 35$ time periods. Treatment switches on and off over time (99 of 150 treated units experience at least one reversal), reflecting a general treatment pattern rather than simple staggered adoption. The remaining three (`sim_trend`, `sim_region`, `sim_linear`) are block DID designs used to demonstrate CFE model components.
+
+The full DGP for `simdata` is: $$Y_{it} = \tau_{it} D_{it} + X_{1,it} + 3 X_{2,it} + \mu + 3\alpha_i + \xi_t  + \lambda_i' f_t +  \varepsilon_{it}$$ where $\alpha_i \sim N(0,1)$ are unit fixed effects, $\xi_t$ follows an AR(1) process with drift (time fixed effects), $X_{1,it}$ and $X_{2,it} \sim N(0,1)$ are observed covariates with coefficients 1 and 3, $\lambda_i \in \mathbb{R}^2$ are unit-specific factor loadings drawn from $N(0.5, 1)$, $f_t \in \mathbb{R}^2$ are latent time factors (one trending, one white noise), and $\varepsilon_{it} \sim N(0,2)$. The treatment effect is heterogeneous, i.e., $\tau_{it} \sim N(0.4 \cdot \text{tr\_cum}_{it}/T,\; 0.2)$, where $\text{tr\_cum}_{it}$ counts cumulative treatment periods. The grand mean is $\mu = 5$.
+
+Treatment assignment is correlated with unobservables: the latent index $D^*_{it}$ depends on the factor component $5 \lambda_i' f_t$, the unit fixed effect $2\alpha_i$, the time fixed effect $2\xi_t$, and an AR(1)-like persistence term $5 D_{i,t-1}$, passed through a logistic link. Units with larger factor loadings and fixed effects are more likely to be treated, creating confounding that correlates treatment with unobserved heterogeneity. This is why the FE estimator is biased when factors are present---the parallel trends assumption fails because treated units systematically differ in their factor loadings.
+
+-   `simdata`: The main simulated dataset. The outcome includes two latent factors ($r = 2$), so the parallel trends assumption is violated and the FE estimator is biased. Because treatment assignment loads on the same factors and fixed effects that enter the outcome---units with larger $\lambda_i$ and $\alpha_i$ are more likely to be treated---the confounding is structural and cannot be removed by two-way fixed effects alone. Used in [Chapter @sec-ife-mc] and [Chapter @sec-cfe] to demonstrate factor-augmented approaches.
+
+-   `sim_base`: A simplified version of `simdata` in which the latent factor contributions ($\lambda_i' f_t$) are removed from the outcome. The parallel trends assumption holds, and the FE estimator is consistent. Treatment assignment, covariates, fixed effects, and errors are identical to `simdata`---treatment still correlates with the factor loadings and fixed effects, but this no longer causes bias because the factors do not enter the outcome. Used in [Chapter @sec-fect] to demonstrate the imputation estimator.
+
+-   `sim_trend`: A block DID dataset with unit-specific sinusoidal time trends. $N = 200$ units ($80$ treated, $120$ control), $T = 50$ periods, treatment starts at period 41 for all treated units. The DGP is: $$Y_{it} = \alpha_i + \xi_t + \kappa_i \sin(2\pi t / 2T) + \tau D_{it} + \varepsilon_{it}$$ where $\kappa_i \sim U(0.5, 1.0)$ for treated units and $\kappa_i \sim U(0.125, 0.375)$ for controls. Treatment is deterministic (block assignment), but confounding arises because treated units load more heavily on the sinusoidal time trend---the correlation between $\kappa_i$ and $D_i$ violates parallel trends. Used in [Chapter @sec-cfe] to demonstrate nonlinear unit-specific time trends with B-splines.
+
+-   `sim_linear`: A block DID dataset with unit-specific linear time trends. Same structure as `sim_trend` ($N = 200$, $T = 50$, $T_0 = 41$) but the trend is $\kappa_i \cdot t/T$ rather than sinusoidal. Treated units have slopes $\kappa_i \sim U(2, 4)$, controls have $\kappa_i \sim U(0, 0.5)$. Used in [Chapter @sec-cfe] to demonstrate `Q.type = "linear"`.
+
+-   `sim_region`: An unbalanced panel with region-specific time effects. $N = 500$ units in 5 regions, $T = 20$ periods. The DGP is: $$Y_{it}^{0} = \alpha_i + \xi_t + \delta_{g(i),t} + \varepsilon_{it}$$ where $\delta_{g(i),t}$ are region-specific linear time trends. Treatment probability and timing depend on region, and units in higher-numbered regions enter the panel later. Used in [Chapter @sec-cfe] to demonstrate additional fixed effects in the CFE estimator.
+
+-   `sim_gsynth`: A simulated dataset with no treatment reversal, based on @Xu2017. Used in [Chapter @sec-gsynth] to demonstrate the never-treated estimation regime (generalized synthetic control).
+
+The scripts that generate simulated datasets are in `data-raw/`.
+
+### Empirical datasets
+
+-   `turnout`: Based on @Xu2017. Used in [Chapter @sec-gsynth] alongside `sim_gsynth`.
+-   `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-plots] and [Chapter @sec-panel].
+-   `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-plots], [Chapter @sec-panel], and [Chapter @sec-panel-sens].

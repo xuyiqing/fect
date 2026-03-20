@@ -13,3 +13,6 @@
 ^docs$
 ^vignettes$
 ^pkgdown$
+^architecture\.md$
+^log$
+^data-raw$

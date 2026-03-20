@@ -8,7 +8,7 @@ importFrom("foreach","foreach","%dopar%")
 importFrom("parallel", "detectCores", "stopCluster", "makeCluster")
 importFrom("doRNG","registerDoRNG")
 importFrom("MASS", "ginv")
-importFrom("utils", "setTxtProgressBar", "txtProgressBar")
+importFrom("utils", "setTxtProgressBar", "txtProgressBar", "tail")
 importFrom("ggplot2", "ggplot_build", "geom_boxplot", "geom_density", "geom_tile",
            "geom_point", "labs", "theme_bw", "scale_fill_manual",
            "geom_hline", "geom_line", "geom_ribbon", "geom_vline", "geom_text",
@@ -39,6 +39,7 @@ export(esplot)
 export(get.cohort)
 export(interFE)
 export(fect)
+export(fect_mspe)
 export(effect)
 export(plot.fect)
 export(did_wrapper)

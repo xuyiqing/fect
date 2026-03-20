@@ -73,6 +73,8 @@
     connected = NULL,
     ci.outline = FALSE,
     color =  NULL,
+    pre.color = NULL,
+    post.color = NULL,
     est.lwidth = NULL,
     est.pointsize = NULL,
     count.color =  NULL,
@@ -183,6 +185,8 @@
   \item{connected}{Logical or \code{NULL} (default). For event study type plots (e.g., \code{type="gap"}), if \code{TRUE}, connects points with lines; if \code{FALSE}, shows point-ranges. If \code{NULL}, defaults to \code{FALSE} for the base style, and \code{TRUE} if \code{preset = "vibrant"}.}
   \item{ci.outline}{Logical; if \code{FALSE} (default). For event study plots where CIs are shown as ribbons, if \code{TRUE}, adds an outline to the CI ribbon.}
   \item{color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for main plot lines/points (e.g., \code{"black"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{pre.color}{Character string or \code{NULL} (default). Color for pre-treatment period estimates. If \code{NULL}, uses the value of \code{color}.}
+  \item{post.color}{Character string or \code{NULL} (default). Color for post-treatment period estimates. If \code{NULL}, uses the value of \code{color}.}
   \item{est.lwidth}{Numeric or \code{NULL}; line width for the main estimate line in event study plots. If \code{NULL} (default), the width is determined based on \code{connected} and \code{show.points} (e.g., `0.6` for point-ranges with the base style, `0.7` for connected points with markers with the base style). The \code{preset} argument may influence this default. Specifying a numeric value directly overrides any other setting.}
   \item{est.pointsize}{Numeric or \code{NULL}; size of points for the main estimate in event study plots. If \code{NULL} (default), the size is determined based on \code{connected} and \code{show.points} (e.g., `2` for point-ranges with the base style, `1.2` for connected points with markers with the base style). The \code{preset} argument may influence this default. Specifying a numeric value directly overrides any other setting.}
   \item{count.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for count bars (e.g., \code{"grey70"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}

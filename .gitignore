@@ -2,6 +2,8 @@
 .Rhistory
 .Rapp.history
 .Ruserdata
+.RData
+.Rproj.user/
 
 # Session Data files
 .Data
@@ -25,6 +27,7 @@ vignettes/*_cache/
 vignettes/*_files/
 vignettes/_back/**
 vignettes/_book/**
+vignettes/_book_bak/**
 !vignettes/_book/rscript/
 !vignettes/_book/rscript/*.R
 
@@ -35,17 +38,25 @@ vignettes/_book/**
 # knitr and R markdown default cache directories
 /*_cache/
 /cache/
+vignettes/cache/
+vignettes/figure/
 
 # Temporary files created by R markdown
 *.utf8.md
 *.knit.md
+vignettes/*.md
+!vignettes/README.md
+
+# Compiled code
+src/*.o
+src/*.so
+src/*.dll
+
+# OS files
 .DS_Store
 
 docs
 
-man/.DS_Store
-.DS_Store
-.DS_Store
 .RData
 
 check/
