@@ -8,7 +8,7 @@ Gsynth was originally implemented in the **gsynth** package but has now been ful
 -   Gsynth is particularly suited for the Synth setting, where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
 -   Compared with IFEct (`method = "ife"`), Gsynth *does not* rely on pre-treatment data from the treated units to estimate time components (e.g., factors). Hence, `time.component.from = "nevertreated"`. This approach speeds up computation, improves stability, and is more suitable for predictive inference based on row exchangeability.
 
-Therefore, we recommend setting `method = "gsynth"` in **fect** for the synthetic control setting, where the treatment does not reverse (or is coded accordingly) and the number of treated units is small.
+Therefore, we recommend setting `method = "gsynth"` in **fect** for the synthetic control setting, where the treatment does not reverse (or is coded accordingly) and the number of treated units is small. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/07-gsynth.R).
 
 ::: {.callout-important appearance="simple"}
 ### Key Equivalence

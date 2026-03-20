@@ -6,7 +6,7 @@ library(fect)
 data(fect)
 ```
 
-When the parallel trends assumption is violated due to latent common factors with heterogeneous loadings, the FE estimator from [Chapter @sec-fect] is biased. This chapter introduces two methods that account for such latent factors: the **interactive fixed effects** (IFE) method, which explicitly models unit-specific factor loadings, and the **matrix completion** (MC) method, which uses nuclear-norm regularization to recover the low-rank structure of the untreated potential outcomes.
+When the parallel trends assumption is violated due to latent common factors with heterogeneous loadings, the FE estimator from [Chapter @sec-fect] is biased. This chapter introduces two methods that account for such latent factors: the **interactive fixed effects** (IFE) method, which explicitly models unit-specific factor loadings, and the **matrix completion** (MC) method, which uses nuclear-norm regularization to recover the low-rank structure of the untreated potential outcomes. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/03-ife-mc.R).
 
 We use `simdata`, which includes two latent factors ($r = 2$). The FE estimator is biased on this dataset, while IFE and MC recover the correct ATT.
 

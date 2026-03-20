@@ -10,7 +10,7 @@ In this chapter, we explore visualization options available in the **fect** pack
 - special-purpose displays (`status`, `factors`, and `loadings`)
 - standalone `esplot()`
 
-We begin with shared parameter conventions and then work through each plot type in turn. `plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter.
+We begin with shared parameter conventions and then work through each plot type in turn. `plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/06-plots.R).
 
 ------------------------------------------------------------------------
 

@@ -7,7 +7,7 @@
 
 The key intuition is that if an event study demonstrates strong post-treatment effects yet only minor parallel trends deviations before treatment, any post-treatment departure large enough to reverse these findings must be substantially larger than those observed in the pre-treatment period. Consequently, this approach quantifies how sensitive the estimated dynamic treatment effects are to possible parallel trends violations, using pretrend estimates as the benchmark.
 
-Below, we illustrate how to apply this sensitivity analysis with **fect**. We focus on two restrictions from @rambachan2023more: the relative magnitude (RM) restriction and the smoothness restriction, both of which connect pre-treatment parallel trends violations to potential post-treatment counterfactual deviations.
+Below, we illustrate how to apply this sensitivity analysis with **fect**. We focus on two restrictions from @rambachan2023more: the relative magnitude (RM) restriction and the smoothness restriction, both of which connect pre-treatment parallel trends violations to potential post-treatment counterfactual deviations. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/09-sens.R).
 
 ## Install Packages
 
