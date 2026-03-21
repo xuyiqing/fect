@@ -66,6 +66,8 @@ fect_boot <- function(
   cl = NULL,
   I,
   II,
+  cm=FALSE,
+  II.cm=NULL,
   T.on,
   T.off = NULL,
   T.on.carry = NULL,
@@ -88,6 +90,7 @@ fect_boot <- function(
   CV = 0,
   k = 10,
   cv.prop = 0.1,
+  cv.treat = TRUE,
   cv.method = "all_units",
   cv.nobs = 3,
   r = 0,
@@ -197,6 +200,8 @@ fect_boot <- function(
         W = W,
         I = I,
         II = II,
+        cm = cm,
+        II.cm = II.cm,
         T.on = T.on,
         T.off = T.off,
         T.on.carry = T.on.carry,
@@ -311,6 +316,8 @@ fect_boot <- function(
           kappaQ.id = kappaQ.id,
           I = I,
           II = II,
+          cm = cm,
+          II.cm = II.cm,
           T.on = T.on,
           T.off = T.off,
           T.on.carry = T.on.carry,
@@ -371,6 +378,7 @@ fect_boot <- function(
         group.level = group.level,
         group = group,
         cv.prop = cv.prop,
+        cv.treat = cv.treat,
         cv.method = cv.method,
         cv.nobs = cv.nobs,
         time.component.from = time.component.from,
@@ -643,6 +651,8 @@ fect_boot <- function(
           W = W,
           I = I,
           II = II,
+          cm = cm,
+          II.cm = II.cm,
           T.on = T.on,
           T.off = T.off,
           T.on.carry = T.on.carry,
@@ -1024,6 +1034,7 @@ fect_boot <- function(
       D.boot <- out$D[, id.boot, drop = FALSE]
       I.boot <- out$I[, id.boot, drop = FALSE]
       II.boot <- out$II[, id.boot, drop = FALSE]
+      II.cm.boot <- out$II.cm[, id.boot, drop = FALSE]
       W.boot <- NULL
       if (!is.null(W)) {
         W.boot <- NULL
@@ -1161,6 +1172,8 @@ fect_boot <- function(
             W = W,
             I = I,
             II = II,
+            cm = cm,
+            II.cm = II.cm,
             T.on = T.on,
             T.off = T.off,
             T.on.carry = T.on.carry,
@@ -1470,6 +1483,8 @@ fect_boot <- function(
               W = W.boot,
               I = I.boot,
               II = II[, boot.id],
+              cm = cm,
+              II.cm = II.cm[, boot.id],
               T.on = T.on[, boot.id],
               T.off = T.off.boot,
               T.on.carry = T.on.carry[, boot.id],
