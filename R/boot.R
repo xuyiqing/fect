@@ -333,16 +333,7 @@ fect_boot <- function(
         group = group,
         cv.prop = cv.prop,
         cv.treat = cv.treat,
-        cv.method = cv.method,
-        cv.nobs = cv.nobs,
-        time.component.from = time.component.from,
-        X.extra.FE = X.extra.FE,
-        X.Z = X.Z,
-        X.Q = X.Q,
-        X.gamma = X.gamma,
-        X.kappa = X.kappa,
-        Zgamma.id = Zgamma.id,
-        kappaQ.id = kappaQ.id
+        cv.nobs = cv.nobs
       )
 
       if (!is.null(out$method)) {
@@ -852,7 +843,7 @@ fect_boot <- function(
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
         .multicombine = TRUE,
-        .export = c("fect_gsynth", "fect_fe", "fect_cfe", "initialFit",
+        .export = c("fect_gsynth", "fect_fe", "fect_cfe", "fect_polynomial", "initialFit",
                      ".reconstruct_gamma_fit_tr", ".reconstruct_kappa_fit",
                      ".extract_and_apply_typeB_fe"),
         .packages = c("fect", "mvtnorm", "fixest"),
@@ -1482,6 +1473,50 @@ fect_boot <- function(
             ),
             silent = TRUE
           )
+        } else if (method %in% c("polynomial", "cfe_old", "bspline")) {
+          boot <- try(
+            fect_polynomial(
+              Y = Y[, boot.id],
+              X = X.boot,
+              D = D[, boot.id],
+              W = W.boot,
+              I = I[, boot.id],
+              II = II[, boot.id],
+              T.on = T.on[, boot.id],
+              T.off = T.off.boot,
+              T.on.carry = T.on.carry[, boot.id],
+              T.on.balance = T.on.balance[, boot.id],
+              balance.period = balance.period,
+              method = method,
+              degree = degree,
+              sfe = sfe,
+              cfe = cfe,
+              ind.matrix = ind.matrix,
+              knots = knots,
+              force = force,
+              hasRevs = hasRevs,
+              tol = tol,
+              max.iteration = max.iteration,
+              boot = 1,
+              norm.para = norm.para,
+              calendar.enp.seq = target.enp,
+              time.on.seq = time.on,
+              time.off.seq = time.off,
+              time.on.seq.W = time.on.W,
+              time.off.seq.W = time.off.W,
+              time.on.carry.seq = carry.time,
+              time.on.balance.seq = balance.time,
+              placebo.period = placebo.period.boot,
+              placeboTest = placeboTest,
+              carryoverTest = carryoverTest,
+              carryover.period = carryover.period.boot,
+              group.level = group.level,
+              group = boot.group,
+              time.on.seq.group = group.time.on,
+              time.off.seq.group = group.time.off
+            ),
+            silent = TRUE
+          )
         } else if (method == "cfe") {
           X.extra.FE.boot <- X.extra.FE[, boot.id, , drop = FALSE]
           X.Z.boot <- X.Z[, boot.id, , drop = FALSE]
@@ -1671,6 +1706,7 @@ fect_boot <- function(
             "fect_fe",
             "fect_mc",
             "fect_cfe",
+            "fect_polynomial",
             "get_term",
             "fect_gsynth",
             "initialFit",
