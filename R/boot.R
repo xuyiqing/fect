@@ -301,6 +301,45 @@ fect_boot <- function(
         print(out)
         stop("\nCannot estimate.\n")
       }
+    } else if (method %in% c("polynomial", "cfe_old", "bspline")) {
+      out <- try(
+        fect_polynomial(
+          Y = Y,
+          X = X,
+          D = D,
+          W = W,
+          I = I,
+          II = II,
+          T.on = T.on,
+          T.off = T.off,
+          T.on.carry = T.on.carry,
+          T.on.balance = T.on.balance,
+          balance.period = balance.period,
+          method = method,
+          degree = degree,
+          sfe = sfe,
+          cfe = cfe,
+          ind.matrix = ind.matrix,
+          knots = knots,
+          force = force,
+          hasRevs = hasRevs,
+          tol = tol,
+          max.iteration = max.iteration,
+          boot = 0,
+          norm.para = norm.para,
+          placebo.period = placebo.period,
+          placeboTest = placeboTest,
+          carryover.period = carryover.period,
+          carryoverTest = carryoverTest,
+          group.level = group.level,
+          group = group
+        ),
+        silent = TRUE
+      )
+      if ("try-error" %in% class(out)) {
+        print(out)
+        stop("\nCannot estimate.\n")
+      }
     }
   } else {
     ## cross-valiadtion
