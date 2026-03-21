@@ -403,7 +403,6 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                             MAD.list <- c(MAD.list, (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
                         } else {
                             W.estCV[[ii]] <- WW[estCV[[ii]]]
-                            # print(WW[estCV[[ii]]])
                             SSE <- SSE + sum(WW[estCV[[ii]]] * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
                             WSSE <- WSSE + sum(WW[estCV[[ii]]] * weight.cv * (YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2)
                             GSSE <- GSSE + sum(WW[estCV[[ii]]] * log((YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]])^2))

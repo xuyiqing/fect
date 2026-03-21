@@ -38,7 +38,9 @@ reference:
     - fect
     - interFE
     - get.cohort
-    - att.cumu
+    - effect
+    - esplot
+    - fect_iden
   - title: S3 methods
   - contents:
     - print.fect
@@ -47,11 +49,7 @@ reference:
   - title: Datasets
   - contents:
     - simdata
-    - sim_base
-    - sim_trend
-    - sim_region
-    - sim_linear
-    - sim_gsynth
+    - simgsynth
     - turnout
     - capacity
   - title: Internal

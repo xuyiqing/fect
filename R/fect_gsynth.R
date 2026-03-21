@@ -565,7 +565,6 @@ fect_gsynth <- function(Y, # Outcome variable, (T*N) matrix
     ## counterfactuals for treated units
     Y.ct.tr <- as.matrix(Y.tr - eff)
     Y.ct.co <- Y.co - est.co.best$residuals
-    # print(Y.ct.co)
     Y.ct <- Y
     Y.ct[, tr] <- Y.ct.tr
     Y.ct[, co] <- Y.ct.co

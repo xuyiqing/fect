@@ -776,8 +776,6 @@ fect_polynomial <- function(Y, # Outcome variable, (T*N) matrix
         sigma2.pre = sigma2.pre
     )
 
-    # print(att.on)
-
     if (hasRevs == 1) {
         out <- c(out, list(
             time.off = time.off,

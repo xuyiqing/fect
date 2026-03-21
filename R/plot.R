@@ -500,7 +500,6 @@ plot.fect <- function(
             )
           }
         }
-        # suppressWarnings(print(p))
         return(p)
       }
     }
@@ -627,7 +626,6 @@ plot.fect <- function(
         if (is.null(ylim) == FALSE) {
           p <- p + coord_cartesian(ylim = ylim)
         }
-        # suppressWarnings(print(p))
         return(p)
       }
     }
@@ -3694,8 +3692,6 @@ plot.fect <- function(
       att.avg.use <- x$att.avg
     }
 
-    # print(eff.vec)  # debug
-    
     if (length(unique(X.vec)) <= 4) {
       p <- ggplot()
       ## xlab and ylab
@@ -3984,7 +3980,6 @@ plot.fect <- function(
 
 
     data.use <- merge(data.toplot, data.count, by = "time")
-    # print(data.use)
 
     if (length(ylim) != 0) {
       rect.length <- (ylim[2] - ylim[1]) / 5
@@ -4622,7 +4617,6 @@ plot.fect <- function(
     return(p)
   }
 
-  # suppressWarnings(print(p))
   if (return.test == TRUE) {
     return(list(p = p, test.out = test.out))
   } else {
