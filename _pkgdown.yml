@@ -51,7 +51,6 @@ reference:
     - simdata
     - simgsynth
     - turnout
-    - capacity
   - title: Internal
   - contents:
     - fect-package
