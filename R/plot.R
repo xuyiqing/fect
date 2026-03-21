@@ -466,10 +466,15 @@ plot.fect <- function(
               ggplot(data = data, mapping = mapping) +
                 geom_density(..., alpha = 0.7, color = NA)
             }
+            my_cor <- function(data, mapping, ...) {
+              GGally::ggally_cor(data = data, mapping = mapping, ...) +
+                scale_color_manual(values = loadings_colors)
+            }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group, fill = .data$group),
               columns = 1:nfactors,
               columnLabels = Llabel[1:nfactors],
+              upper = list(continuous = my_cor),
               diag = list(continuous = my_dens),
               title = main
             ) +
@@ -479,10 +484,15 @@ plot.fect <- function(
               ggplot(data = data, mapping = mapping) +
                 geom_density(..., fill = "gray", alpha = 0.7, color = "gray50")
             }
+            my_cor <- function(data, mapping, ...) {
+              GGally::ggally_cor(data = data, mapping = mapping, ...) +
+                scale_color_manual(values = loadings_colors)
+            }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group),
               columns = 1:nfactors,
               columnLabels = Llabel[1:nfactors],
+              upper = list(continuous = my_cor),
               diag = list(continuous = my_dens),
               title = main
             )

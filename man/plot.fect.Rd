@@ -113,6 +113,7 @@
     relative.time = FALSE,
     pretreatment = FALSE,
     num.pretreatment = 3,
+    cm = FALSE,
     ...
 )
 }
@@ -228,6 +229,7 @@
   \item{relative.time}{Logical; if \code{TRUE} and \code{type = "calendar"}, aggregates effects by event time defined in \code{x$T.on} (time since treatment onset) rather than by calendar time. Default is \code{FALSE}.}
   \item{pretreatment}{Logical; if \code{TRUE}, restricts heterogeneous effect plots (\code{type = "heterogeneous"}) to the last \code{num.pretreatment} event-time periods up to 0 (i.e., \code{-(K-1), ..., -1, 0}). Default is \code{FALSE}.}
   \item{num.pretreatment}{Integer; used only when \code{pretreatment = TRUE} in heterogeneous plots. Controls how many event-time periods up to 0 are used (e.g., 3 uses \code{-2,-1,0}; 5 uses \code{-4,-3,-2,-1,0}). Default is \code{3}.}
+  \item{cm}{a logical flag indicating whether to plot causal moderation effects. Default \code{cm = FALSE}.}
   \item{...}{Additional graphical parameters passed to internal plotting routines, primarily those accepted by \code{esplot} for event study style plots (gap, equiv, exit, sens_es, cumul).}
 }
 \details{

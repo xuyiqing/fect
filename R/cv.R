@@ -31,7 +31,16 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     max.iteration = 1000,
                     norm.para = NULL,
                     group.level = NULL,
-                    group = NULL) {
+                    group = NULL,
+                    cv.method = NULL,
+                    time.component.from = NULL,
+                    X.extra.FE = NULL,
+                    X.Z = NULL,
+                    X.Q = NULL,
+                    X.gamma = NULL,
+                    X.kappa = NULL,
+                    Zgamma.id = NULL,
+                    kappaQ.id = NULL) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
