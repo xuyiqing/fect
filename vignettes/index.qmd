@@ -138,4 +138,7 @@ Please report any bugs by submitting an issue on [GitHub](https://github.com/xuy
 
 **gsynth** (retiring): [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://www.r-pkg.org/badges/version/gsynth" alt="CRAN status"/>](https://CRAN.R-project.org/package=gsynth) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/gsynth" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/gsynth/index.html)
 
+**panelView**: [![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://www.r-pkg.org/badges/version/panelView" alt="CRAN status"/>](https://CRAN.R-project.org/package=panelView) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/panelView" alt="downloads: CRAN"/>](https://cran.r-project.org/package=panelView) 
+
+
 <!-- badges: end -->

@@ -527,10 +527,15 @@ plot.fect <- function(
                 geom_point(..., alpha = 0.4, size = 1.2) +
                 scale_color_manual(values = loadings_colors)
             }
+            my_cor <- function(data, mapping, ...) {
+              GGally::ggally_cor(data = data, mapping = mapping, ...) +
+                scale_color_manual(values = loadings_colors)
+            }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group, fill = .data$group),
               columns = 1:nfactors,
               columnLabels = Llabel[1:nfactors],
+              upper = list(continuous = my_cor),
               diag = list(continuous = my_dens),
               lower = list(continuous = my_scatter),
               title = main
@@ -546,10 +551,15 @@ plot.fect <- function(
                 geom_point(..., alpha = 0.4, size = 1.2) +
                 scale_color_manual(values = loadings_colors)
             }
+            my_cor <- function(data, mapping, ...) {
+              GGally::ggally_cor(data = data, mapping = mapping, ...) +
+                scale_color_manual(values = loadings_colors)
+            }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group),
               columns = 1:nfactors,
               columnLabels = Llabel[1:nfactors],
+              upper = list(continuous = my_cor),
               diag = list(continuous = my_dens),
               lower = list(continuous = my_scatter),
               title = main
