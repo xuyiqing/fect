@@ -11,25 +11,68 @@ arma::mat crossprod (const arma::mat& x, const arma::mat& y) {
 /* Expectation :E if Iij==0, Eij=FEij */
 arma::mat E_adj (const arma::mat& E, const arma::mat& FE,
                  const arma::mat& I) {
-  return(I % E + (1 - I) % FE) ;
+  int T = E.n_rows ;
+  int N = E.n_cols ;
+  arma::mat EE = E ;
+  for (int i = 0; i < T; i++) {
+    for (int j = 0; j < N; j++) {
+      if (I(i, j) == 0) {
+        EE(i, j) = FE(i, j) ;
+      }
+    }
+  }
+  return(EE) ;
 }
 
 /* Expectation Step :E if Iij==0, Eij=FEij with Weights */
 // [[Rcpp::export]]
 arma::mat wE_adj (const arma::mat& E, const arma::mat& FE, const arma::mat& W,
                   const arma::mat& I) {
-  return((1 - I) % FE + I % ((1 - W) % FE + W % E)) ;
+  int T = E.n_rows ;
+  int N = E.n_cols ;
+  arma::mat EE = E ;
+  for (int i = 0; i < T; i++) {
+    for (int j = 0; j < N; j++) {
+      if (I(i, j) == 0) {
+        EE(i, j) = FE(i, j) ;
+      }
+      else{
+        EE(i, j) = (1-W(i,j))*FE(i, j) + W(i,j)*E(i, j) ;
+      }
+    }
+  }
+  return(EE) ;
 }
 
 
 /* reset FEij=0 if Iij==0 */
 arma::mat FE_adj (const arma::mat& FE, const arma::mat& I) {
-  return(FE % I) ;
+  int T = FE.n_rows ;
+  int N = FE.n_cols ;
+  arma::mat FEE = FE ;
+  for (int i = 0; i < T; i++) {
+    for (int j = 0; j < N; j++) {
+      if (I(i, j) == 0) {
+        FEE(i, j) = 0 ;
+      }
+    }
+  }
+  return(FEE) ;
 }
 
 /* drop values if Iij == 1 */
 arma::mat FE_missing (const arma::mat& FE, const arma::mat& I) {
-  return(FE % (1 - I)) ;
+  int T = FE.n_rows ;
+  int N = FE.n_cols ;
+  arma::mat FEE = FE ;
+  for (int i = 0; i < T; i++) {
+    for (int j = 0; j < N; j++) {
+      if (I(i, j) == 1) {
+        FEE(i, j) = 0 ;
+      }
+    }
+  }
+  return(FEE) ;
 }
         /* ------------------------------------------ */
 /* ------------------- 2. Only for Probit ----------------------- */
@@ -92,7 +135,13 @@ arma::mat M_gen_ub (const arma::mat& Y_fit, const arma::mat& Y, const arma::mat&
 double alpha_hat (const arma::mat& res, const arma::mat& v) {
   int T = res.n_rows;
   int N = res.n_cols;
-  double alhat2 = arma::accu(arma::square(res) + v) / (N * T);
+  arma::mat vhat(T, N, arma::fill::zeros);
+  for (int i = 0; i < T; i++) {
+    for (int j = 0; j < N; j++) {
+      vhat(i,j) = pow(res(i,j),2) + v(i,j);
+    }
+  }
+  double alhat2 = arma::accu(vhat)/(N*T);
   double alhat = sqrt(alhat2);
   return(alhat);
 }
@@ -113,13 +162,31 @@ double S (double a, double b, double w) {
 double gamma_hat (const arma::mat& res, const arma::mat& V) {
   int T = res.n_rows;
   int N = res.n_cols;
-  double out = (N * T) / arma::accu(arma::square(res) + V);
+  arma::mat gam(T,N, arma::fill::zeros);
+  double out;
+  for(int i=0; i<T; i++){
+    for(int j=0; j<N; j++){
+      gam(i,j)=pow(res(i,j),2)+V(i,j);
+    }
+  }
+  out = (N*T)/arma::accu(gam);
   return(out);
 }
 
 /* calculate gamma_hat in mopx; unbalanced */
 double gamma_hat_ub (const arma::mat& res, const arma::mat& V, const arma::mat& I) {
-  double out = arma::accu(I) / arma::accu(I % (arma::square(res) + V));
+  int T = res.n_rows;
+  int N = res.n_cols;
+  arma::mat gam(T, N, arma::fill::zeros);
+  double out;
+  for(int i=0; i<T; i++){
+    for(int j=0; j<N; j++){
+      if(I(i,j)==1){
+        gam(i,j)=pow(res(i,j),2)+V(i,j);
+      }
+    }
+  }
+  out = arma::accu(I)/arma::accu(gam);
   return(out);
 }
 

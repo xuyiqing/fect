@@ -1,5 +1,4 @@
 test_that("get.cohort adds cohort columns and handles options", {
-  skip_on_cran()
   suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
   expect_true(exists("simdata"))
   df <- simdata

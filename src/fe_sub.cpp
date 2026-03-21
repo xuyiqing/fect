@@ -1,5 +1,4 @@
 #include "fect.h"
-#include <algorithm>
 
 // functions for fixed effects
 
@@ -136,42 +135,35 @@ List fe_add(const arma::mat& alpha_Y, const arma::mat& xi_Y, double mu_Y, int T,
 List panel_factor(const arma::mat& E, int r) {
   int T = E.n_rows;
   int N = E.n_cols;
-  int r_use = std::min(r, std::min(T, N));
-  if (r_use < 0) {
-    r_use = 0;
-  }
-  arma::mat factor(T, r_use, arma::fill::zeros);
-  arma::mat lambda(N, r_use, arma::fill::zeros);
+  arma::mat factor(T, r, arma::fill::zeros);
+  arma::mat lambda(N, r, arma::fill::zeros);
   arma::mat FE(T, N, arma::fill::zeros);
-  arma::mat VNT(r_use, r_use, arma::fill::zeros);
-  if (r_use == 0) {
-    List result;
-    result["lambda"] = lambda;
-    result["factor"] = factor;
-    result["VNT"] = VNT;
-    result["FE"] = FE;
-    return (result);
-  }
+  arma::mat VNT(r, r, arma::fill::zeros);
+  arma::mat U;
   arma::vec s;
-  arma::mat eigvec;
+  arma::mat V;
   if (T < N) {
+    /*arma::mat EE = E * E.t() /(N * T) ;
+    arma::eig_sym(s, U, EE) ;
+    factor = U.tail_cols(r) * sqrt(double(T)) ;
+    lambda = E.t() * factor/T ;
+    VNT = diagmat(s.tail_rows(r)) ;*/
     arma::mat EE = E * E.t() / (N * T);
-    arma::eig_sym(s, eigvec, EE);
-    // eig_sym returns eigenvalues in ascending order; take the last r_use
-    factor = eigvec.tail_cols(r_use) * sqrt(double(T));
+    arma::svd(U, s, V, EE);
+    factor = U.head_cols(r) * sqrt(double(T));
     lambda = E.t() * factor / T;
-    VNT = diagmat(arma::reverse(s.tail_rows(r_use)));
-    // Reverse columns so largest eigenvalue comes first
-    factor = arma::fliplr(factor);
-    lambda = arma::fliplr(lambda);
+    VNT = diagmat(s.head_rows(r));
   } else {
+    /*arma::mat EE = E.t() * E / (N * T) ;
+    arma::eig_sym(s, U, EE) ;
+    lambda = U.tail_cols(r) * sqrt(double(N)) ;
+    factor = E * lambda / N ;
+    VNT = diagmat(s.tail_rows(r)) ;*/
     arma::mat EE = E.t() * E / (N * T);
-    arma::eig_sym(s, eigvec, EE);
-    lambda = eigvec.tail_cols(r_use) * sqrt(double(N));
+    svd(U, s, V, EE);
+    lambda = U.head_cols(r) * sqrt(double(N));
     factor = E * lambda / N;
-    VNT = diagmat(arma::reverse(s.tail_rows(r_use)));
-    factor = arma::fliplr(factor);
-    lambda = arma::fliplr(lambda);
+    VNT = diagmat(s.head_rows(r));
   }
   FE = factor * lambda.t();
   List result;

@@ -1,59 +1,478 @@
 # Effect Heterogeneity {#sec-hte}
 
-```{r setup-hte, echo = FALSE, message = FALSE, warning = FALSE}
+In this chapter, we introduce the **causal moderation** framework in **fect**, which allows researchers to formally model how treatment effects vary with a moderator variable. We distinguish between two conceptually distinct quantities of interest --- *effect modification* and *causal moderation* --- and show how **fect** estimates each. This chapter draws on the theoretical framework in @ZQX2025. Download the R code used in this chapter [here](rscript/05-hte.R).
+
+```{r echo = FALSE}
 set.seed(1234)
+rm(list = ls())
+```
+
+```{r message = FALSE, warning = FALSE}
 library(fect)
 data(fect)
 ```
 
-We provide several methods for researchers to explore heterogeneous treatment effects (HTE). These work with any method; here we demonstrate with the FE estimator using `sim_base`. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/05-hte.R).
+------------------------------------------------------------------------
 
-```{r hte_setup, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
-out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
-  method = "fe", force = "two-way", se = TRUE,
-  cores = 8, parallel = TRUE, nboots = 1000)
+## Conceptual Framework
+
+A prevalent approach for examining treatment effect heterogeneity in political science is the two-way fixed effects (TWFE) model with a multiplicative interaction term --- the *linear interaction model*:
+$$
+Y_{it} = \beta_0 + \tau\, D_{it}\, M_{it} + \beta_D\, D_{it} + \beta_M\, M_{it} + \beta_X\, X_{it} + \alpha_i + \lambda_t + \epsilon_{it}
+$$
+where $Y_{it}$ is the outcome, $D_{it}$ is the treatment indicator, $M_{it}$ is the moderator of interest, $X_{it}$ is a vector of covariates, and $\alpha_i, \lambda_t$ are unit and time fixed effects. The coefficient $\tau$ is typically interpreted as the extent to which the treatment effect varies with $M$.
+
+Despite its widespread use, this model conflates two conceptually distinct questions:
+
+1. **Effect modification**: How does the *average treatment effect* vary across subpopulations defined by the moderator?
+2. **Causal moderation**: Does exogenously changing the moderator *causally alter* the treatment effect?
+
+### Effect Modification
+
+Effect modification describes a *correlational* relationship: the moderator serves as a signal for different underlying conditions. For example, if we study how railway access ($D$) affects separatist conflict ($Y$), per capita GDP ($M$) might serve as an effect modifier. Regions with low GDP may respond differently to railway access, but this is because GDP proxies for deeper economic structures --- *experimentally increasing* GDP alone may not change the treatment effect.
+
+Formally, the **Conditional Marginal Effect** (CME) for effect modification is:
+$$
+\tau_{\text{em},t}^{\text{CME}}(m) = \mathbb{E}\!\big[Y_t(1, M_t) - Y_t(0, M_t) \mid D_t = 1,\, M_t = m\big]
+$$
+where $Y_t(d, M_t)$ is the potential outcome when treatment is set to $d$ while the moderator takes its naturally occurring value. The key feature is that $M_t$ remains at its *observed* level; we simply condition on it.
+
+### Causal Moderation
+
+Causal moderation describes a *mechanistic* relationship: the moderator has a direct causal influence on the treatment effect. For instance, the quality of democratic institutions ($M$) may directly protect minority rights, thereby *causing* a different reaction to a policy ($D$). Exogenously changing $M$ from "low" to "high" would genuinely alter the treatment effect.
+
+Formally, the CME for causal moderation is:
+$$
+\tau_{\text{cm},t}^{\text{CME}}(m) = \mathbb{E}\!\big[Y_t(1, m) - Y_t(0, m) \mid D_t = 1\big]
+$$
+where both the treatment $d$ and the moderator $m$ are *intervened upon*. Unlike effect modification, the moderator is set to a hypothetical value $m$, and we average over the treated population unconditionally.
+
+### When Do They Coincide?
+
+Under the **ignorability of $M$** assumption --- i.e., there are no causal links between unobserved confounders $U$ and the moderator $M$, nor between $D$ and $M$, nor between $X$ and $M$ --- the two estimands are numerically identical at the aggregate level. In practice, the divergence between the two estimates provides a diagnostic: if $\hat{\tau}_{\text{em}}^{\text{CME}}(m) \approx \hat{\tau}_{\text{cm}}^{\text{CME}}(m)$ for all $m$, the moderator primarily acts as a causal moderator; a large divergence suggests it functions more as an effect modifier (a proxy for other causal drivers).
+
+### Aggregation
+
+The period-specific CMEs are aggregated across time:
+$$
+\tau_{\text{em}}^{\text{CME}}(m) = \sum_t \omega_t^{\text{em}}(m)\, \tau_{\text{em},t}^{\text{CME}}(m), \quad
+\tau_{\text{cm}}^{\text{CME}}(m) = \sum_t \omega_t^{\text{cm}}(m)\, \tau_{\text{cm},t}^{\text{CME}}(m)
+$$
+where $\omega_t^{\text{em}}(m)$ and $\omega_t^{\text{cm}}(m)$ are appropriate weights summing to one. The effect modification and causal moderation estimands are then:
+$$
+\tau_{\text{em}}(m, m') = \tau_{\text{em}}^{\text{CME}}(m) - \tau_{\text{em}}^{\text{CME}}(m'), \quad
+\tau_{\text{cm}}(m, m') = \tau_{\text{cm}}^{\text{CME}}(m) - \tau_{\text{cm}}^{\text{CME}}(m')
+$$
+
+------------------------------------------------------------------------
+
+## Identification Assumptions
+
+The identification strategy for both estimands relies on a Directed Acyclic Graph (DAG) representation of the data-generating process. Following @Pearl2009 and @imai2019, we use a DAG to separate identification from functional form.
+
+### The NPSEM
+
+Under the DGP assumption, the Non-Parametric Structural Equation Model (NPSEM) for any time period $t$ is:
+
+$$
+\begin{aligned}
+Y_{it} &= f_Y^t(D_{it}, M_{it}, X_{it}, U_{it}, \epsilon_{it}) \\
+D_{it} &= f_D^t(D_{i1}, \ldots, D_{it-1}, M_{i1}, \ldots, M_{it}, X_{i1}, \ldots, X_{it}, U_{it}, \epsilon_{it}^D) \\
+M_{it} &= f_M^t(M_{i1}, \ldots, M_{it-1}, X_{i1}, \ldots, X_{it}, U_{it}, \epsilon_{it}^M) \\
+X_{it} &= f_X^t(X_{i1}, \ldots, X_{it-1}, U_{it}, \epsilon_{it}^X) \\
+U_{it} &= \alpha_i + \lambda_t
+\end{aligned}
+$$
+
+where $\epsilon_{it}, \epsilon_{it}^D, \epsilon_{it}^M, \epsilon_{it}^X$ are mutually independent disturbances. The composite $U_{it} = \alpha_i + \lambda_t$ captures unobserved confounding through additive unit and time effects.
+
+Two key restrictions enable identification via differencing:
+
+1. **No Feedback**: Past outcomes do not directly influence current treatments, moderators, or covariates (strict exogeneity).
+2. **Additive Separability**: Unobserved confounders enter additively as $\alpha_i + \lambda_t$.
+
+### Conditional Parallel Trends
+
+For **effect modification**, we require:
+$$
+\mathbb{E}\!\big[Y_t(0, M_t) - Y_s(0, M_s) \mid \vec{M}, \vec{X}, \vec{D}\big] = \mathbb{E}\!\big[Y_t(0, M_t) - Y_s(0, M_s) \mid \vec{M}, \vec{X}, \vec{D} = \vec{0}\big]
+$$
+That is, conditional on the full history of moderators and covariates, the trend in untreated potential outcomes is independent of the treatment history.
+
+For **causal moderation**, a stricter version is needed that extends parallel trends to both treated and untreated potential outcomes across moderator values.
+
+### The No-Mediator Restriction
+
+A critical restriction is that $D$ must not causally affect $M$. If $D \to M$ existed, the moderator would become a mediator, requiring formal mediation analysis. Our estimands are not defined for such scenarios.
+
+------------------------------------------------------------------------
+
+## Estimation Strategy
+
+### Effect Modification
+
+The estimation proceeds in four steps:
+
+1. **Fit the control model**: On untreated observations $\mathcal{C} = \{(i,t) : D_{it} = 0\}$, estimate $Y_{it} = f_C(M_{it}, X_{it}) + \hat{\alpha}_i^C + \hat{\lambda}_t^C$.
+2. **Predict counterfactuals**: For each $(i,t) \in \mathcal{T}$, compute $\hat{Y}_{it}(0) = \hat{f}_C(M_{it}, X_{it}) + \hat{\alpha}_i^C + \hat{\lambda}_t^C$.
+3. **Estimate individual effects**: $\hat{\delta}_{it} = Y_{it} - \hat{Y}_{it}(0)$.
+4. **Project onto the moderator**: Estimate $\hat{\tau}_{\text{em}}^{\text{CME}}(m)$ via kernel regression of $\hat{\delta}_{it}$ on $M_{it}$.
+
+This is what **fect** does by default with `type = "hte"`.
+
+### Causal Moderation
+
+Causal moderation requires fitting *two* imputation models:
+
+1. **Control model** ($\hat{g}_0$): Fit on $\mathcal{C}$ to obtain $\hat{f}_C, \hat{\alpha}_i^C, \hat{\lambda}_t^C$.
+2. **Treated model** ($\hat{g}_1$): Fit on $\mathcal{T}$ to obtain $\hat{f}_T, \hat{\alpha}_i^T, \hat{\lambda}_t^T$.
+
+Then for any hypothetical moderator value $m$:
+$$
+\hat{\tau}_{\text{cm}}^{\text{CME}}(m) = \frac{1}{|\mathcal{T}|} \sum_{(i,t) \in \mathcal{T}} \hat{\omega}_{it}^{\text{adj}} \big[\hat{g}_1(m, X_{it}) - \hat{g}_0(m, X_{it})\big]
+$$
+
+This is what **fect** computes when `cm = TRUE`.
+
+------------------------------------------------------------------------
+
+## Basic HTE Visualization
+
+We start with descriptive tools using `simdata`, which features treatment switching on and off over 35 periods for 200 units.
+
+```{r setup_base, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.fe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+               method = "fe", force = "two-way", se = TRUE,
+               parallel = TRUE, cores = 4, nboots = 200)
 ```
 
-## Box plot
+### Box Plots
 
-One way to understand HTE is to use a series of box plots to visualize the estimated individualistic treatment effects of observations under the treatment condition (by setting `type = "box"`). Although these effects are not identified at the individual observation level, their level of dispersion is informative of treatment effects heterogeneity at different (relative) time periods, as well as model performance.
+Box plots visualize the distribution of individual treatment effects $\hat{\delta}_{it}$ across relative time periods. While individual effects are not identified, their dispersion is informative about treatment effect heterogeneity.
 
-```{r hte, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = "box", xlim = c(-15, 10))
+```{r hte_box, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.fe, type = "box", xlim = c(-15, 10))
 ```
 
-## By calendar time
+### Calendar Plots
 
-Another way to explore HTE is to investigate how the treatment effect evolves over time. In the plot below, the point estimates represent the ATTs by calendar time; the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively; and the red horizontal dashed line represents the ATT (averaged over all time periods).
+Calendar plots show the ATT by calendar time. The blue curve is a loess fit with 95% confidence intervals; the red dashed line is the overall ATT.
 
-```{r hte_time, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = "calendar", xlim = c(1, 35))
+```{r hte_calendar, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.fe, type = "calendar", xlim = c(1, 35))
 ```
 
-## By a covariate
+### Effect Modification Plot
 
-By setting `type = "hte"` or `type = "heterogeneous"`, we can also plot the HTE by arbitrary covariates that are unaffected by the treatment. As before, the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively. The red dashed line represents the ATT. The histogram at the bottom of the figure illustrates the distribution of the covariates, and can be turned off using `show.count = FALSE`. In our simulated case, the effect size is unrelated to the values of covariate `X1`.
+Setting `type = "hte"` plots $\hat{\delta}_{it}$ against a covariate with a loess fit, visualizing $\hat{\tau}_{\text{em}}^{\text{CME}}(m)$.
 
-```{r hte_X1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.fect, type = "hte", covariate = "X1")
+```{r hte_em, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.fe, type = "hte", covariate = "X1",
+     xlab = "Moderator (X1)", ylab = "Effect on Y")
 ```
 
-We can also plot the CATT when a covariate is discrete. To demonstrate this, we artificially create a moderating variable `X3`, which must be included in the outcome model and then specified in the heterogeneous treatment effect plot.
+In the simulated data, the treatment effect is unrelated to $X_1$, so we expect a flat curve around the ATT.
 
-```{r hte_discrete, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-sim_base$X3 <- sample(1:3, size = nrow(sim_base), replace = TRUE)
-out.fect.X3 <- fect(Y ~ D + X1 + X2 + X3, data = sim_base, index = c("id","time"),
-                   method = "fe", se = TRUE, seed = 123,
-                   cores = 8, nboots = 1000, parallel = TRUE)
+------------------------------------------------------------------------
+
+## Causal Moderation with `cm = TRUE`
+
+### Estimation
+
+To estimate the causal moderation effect, set `cm = TRUE` in `fect()`:
+
+```{r cm_fe, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.cm <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+               method = "fe", force = "two-way", se = TRUE,
+               cm = TRUE, parallel = TRUE, cores = 4, nboots = 200)
 ```
 
-As expected, there is not much effect heterogeneity along `X3`. In the resulting figure, we can also assign labels to the discrete values in the moderator.
+When `cm = TRUE`, **fect** fits two separate imputation models:
 
-```{r plot-hte-discrete, fig.width = 6, fig.height = 4.5}
-plot(out.fect.X3, type="hte", covariate = "X3",
-     xlab = "", ylab = "Effet of D on Y",
-     covariate.labels = c("USA", "China", "UK"),
-     ylim = c(-2, 6))
+- A model for $Y(0)$ using control observations $\to$ `out.cm$est$fit` ($\hat{g}_0$)
+- A model for $Y(1)$ using treated observations $\to$ `out.cm$est.cm$fit` ($\hat{g}_1$)
+
+### Comparing Effect Modification vs. Causal Moderation
+
+The default HTE plot shows the effect modification estimate:
+
+```{r hte_standard, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.cm, type = "hte", covariate = "X1",
+     main = "Effect Modification",
+     xlab = "X1", ylab = "Effect on Y")
 ```
 
-Our next update will accommodate time-invariant covariates and allow users to explore effect heterogeneity around them.
+By adding `cm = TRUE` to the plot call, we get the causal moderation estimate $\hat{\theta}(m) = \hat{g}_1(m) - \hat{g}_0(m)$:
+
+```{r hte_cm, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.cm, type = "hte", covariate = "X1", cm = TRUE,
+     main = "Causal Moderation",
+     xlab = "X1", ylab = "Effect on Y")
+```
+
+When the ignorability assumption for $M$ holds (as in the simulated data), the two curves should be similar. A divergence between the two would indicate that the moderator functions primarily as a proxy (effect modifier) rather than a direct causal driver.
+
+### Scatter Without Smoothing
+
+To inspect the raw relationship, set `loess.fit = FALSE`:
+
+```{r hte_cm_scatter, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.cm, type = "hte", covariate = "X1", cm = TRUE, loess.fit = FALSE,
+     main = "Causal Moderation (No Smoothing)")
+```
+
+------------------------------------------------------------------------
+
+## Diagnostic Tools
+
+Valid inference relies on the **conditional parallel trends assumption** (CPTA). We provide several diagnostic tools.
+
+### Placebo Test (Pre-Treatment HTE)
+
+The placebo test applies the HTE estimation to *pre-treatment* periods only. Under CPTA, there should be no relationship between the moderator and the "treatment effect" before treatment onset:
+
+```{r hte_placebo, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.cm, type = "hte", covariate = "X1",
+     pretreatment = TRUE, num.pretreatment = 3,
+     main = "Placebo Test (Pre-Treatment Periods)",
+     xlab = "X1", ylab = "Placebo Effect")
+```
+
+The `pretreatment = TRUE` option restricts the analysis to the last `num.pretreatment` event-time periods before treatment onset. If the curve is flat around zero, it supports CPTA. A significant non-zero pattern signals that the moderator co-varies with pre-existing trends.
+
+The placebo test can also be applied to the causal moderation estimate:
+
+```{r hte_placebo_cm, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.cm, type = "hte", covariate = "X1", cm = TRUE,
+     pretreatment = TRUE, num.pretreatment = 3,
+     main = "Placebo Test: Causal Moderation",
+     xlab = "X1", ylab = "Placebo Effect")
+```
+
+### Subsample Dynamic Treatment Effects
+
+According to CPTA, parallel trends should hold for any conditional value of the moderator. We can partition the sample by the moderator and estimate separate `fect` models for each subsample:
+
+```{r sub_dyn_setup, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+x1_med <- median(simdata$X1[simdata$D == 1], na.rm = TRUE)
+
+# Subsample: X1 below median
+sim_low <- simdata[simdata$X1 < x1_med, ]
+out.low <- fect(Y ~ D + X1 + X2, data = sim_low, index = c("id", "time"),
+                method = "fe", force = "two-way", se = FALSE)
+
+# Subsample: X1 above median
+sim_high <- simdata[simdata$X1 >= x1_med, ]
+out.high <- fect(Y ~ D + X1 + X2, data = sim_high, index = c("id", "time"),
+                 method = "fe", force = "two-way", se = FALSE)
+```
+
+```{r sub_dyn_low, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.low, main = paste0("Dynamic Effects: X1 < ", round(x1_med, 2)),
+     ylab = "Effect on Y", xlim = c(-10, 10))
+```
+
+```{r sub_dyn_high, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.high, main = paste0("Dynamic Effects: X1 >= ", round(x1_med, 2)),
+     ylab = "Effect on Y", xlim = c(-10, 10))
+```
+
+Under CPTA, both subsamples should exhibit flat pre-trends. Opposite-direction violations across subsamples strongly indicate moderator-dependent confounding.
+
+### Subsample Calendar Plots
+
+We can also compare calendar-time treatment effects across subgroups using `type = "calendar"` with the `covariate.value` filter:
+
+```{r cal_sub_low, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.cm, type = "calendar",
+     covariate = "X1", covariate.value = c(-Inf, x1_med),
+     covariate.value.range = TRUE,
+     main = paste0("Calendar Effects: X1 < ", round(x1_med, 2)))
+```
+
+```{r cal_sub_high, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.cm, type = "calendar",
+     covariate = "X1", covariate.value = c(x1_med, Inf),
+     covariate.value.range = TRUE,
+     main = paste0("Calendar Effects: X1 >= ", round(x1_med, 2)))
+```
+
+------------------------------------------------------------------------
+
+## Over-Identification Test
+
+The linear CM model assumes $M$ enters linearly. If the true relationship involves $M^2$ or $M \times X$, the linear model is misspecified. `fect_iden()` tests this by regressing residuals on nonlinear terms:
+$$
+H_0:\text{Nonlinear terms have no explanatory power} \quad \Rightarrow \quad n \times R^2 \sim \chi^2(\text{df})
+$$
+
+### Usage
+
+```{r iden_test, eval = TRUE, cache = TRUE, message = FALSE}
+iden.test <- fect_iden(out.cm, moderator = "X1")
+```
+
+### Results
+
+```{r iden_results, eval = TRUE}
+cat("=== Treated cells (e1) ===\n")
+cat("  n =", iden.test$e1$n, "\n")
+cat("  R-squared =", round(iden.test$e1$r2, 4), "\n")
+cat("  Test stat =", round(iden.test$e1$stat, 3), "\n")
+cat("  df =", iden.test$e1$df, "\n")
+cat("  p-value =", round(iden.test$e1$p, 4), "\n\n")
+
+cat("=== Control cells (e0) ===\n")
+cat("  n =", iden.test$e0$n, "\n")
+cat("  R-squared =", round(iden.test$e0$r2, 4), "\n")
+cat("  Test stat =", round(iden.test$e0$stat, 3), "\n")
+cat("  df =", iden.test$e0$df, "\n")
+cat("  p-value =", round(iden.test$e0$p, 4), "\n")
+```
+
+- **Large p-values** ($> 0.05$): No evidence against the linear specification.
+- **Small p-values** ($< 0.05$): Nonlinear effects present. Consider more flexible specifications.
+
+### Controlling Test Components
+
+```{r iden_quad, eval = TRUE, cache = TRUE, message = FALSE}
+# Quadratic terms only (no interactions)
+iden.quad <- fect_iden(out.cm, moderator = "X1", interaction = FALSE)
+cat("Quadratic-only: p =",
+    round(iden.quad$e1$p, 4), "(treated),",
+    round(iden.quad$e0$p, 4), "(control)\n")
+
+# Interactions only (no quadratics)
+iden.inter <- fect_iden(out.cm, moderator = "X1", quadratic = FALSE)
+cat("Interaction-only: p =",
+    round(iden.inter$e1$p, 4), "(treated),",
+    round(iden.inter$e0$p, 4), "(control)\n")
+```
+
+------------------------------------------------------------------------
+
+## Interactive Fixed Effects
+
+When the DGP involves latent factors, the FE method may be biased. The IFE method (`method = "ife"`) accommodates unobserved interactive effects:
+
+```{r cm_ife, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.cm.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+                   method = "ife", force = "two-way", r = 2,
+                   cm = TRUE, se = FALSE, parallel = TRUE, cores = 4)
+```
+
+### Comparing FE and IFE
+
+```{r cm_ife_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.cm.ife, type = "hte", covariate = "X1", cm = TRUE,
+     main = "Causal Moderation (IFE)")
+```
+
+Since `simdata` is generated with interactive fixed effects, the IFE method may provide better estimates:
+
+```{r cm_fe_compare, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.cm, type = "hte", covariate = "X1", cm = TRUE,
+     main = "Causal Moderation (FE)")
+```
+
+The over-identification test helps assess model adequacy:
+
+```{r iden_ife, eval = TRUE, cache = TRUE, message = FALSE}
+iden.ife <- fect_iden(out.cm.ife, moderator = "X1")
+cat("IFE over-identification test:\n")
+cat("  Treated p-value:", round(iden.ife$e1$p, 4), "\n")
+cat("  Control p-value:", round(iden.ife$e0$p, 4), "\n")
+```
+
+------------------------------------------------------------------------
+
+## Discrete Moderators
+
+For discrete moderators, the HTE plot automatically produces group-wise estimates:
+
+```{r discrete_setup, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+simdata$Region <- sample(c("North", "South"), nrow(simdata), replace = TRUE)
+simdata$Region_num <- ifelse(simdata$Region == "North", 0, 1)
+out.discrete <- fect(Y ~ D + X1 + X2 + Region_num, data = simdata,
+                     index = c("id", "time"),
+                     method = "fe", force = "two-way", se = TRUE,
+                     cm = TRUE, parallel = TRUE, cores = 4, nboots = 200)
+```
+
+### Effect Modification with Discrete Moderator
+
+```{r discrete_em, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.discrete, type = "hte", covariate = "Region_num",
+     covariate.labels = c("North", "South"),
+     xlab = "", ylab = "Effect on Y",
+     main = "Effect Modification by Region")
+```
+
+### Causal Moderation with Discrete Moderator
+
+```{r discrete_cm, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.discrete, type = "hte", covariate = "Region_num", cm = TRUE,
+     covariate.labels = c("North", "South"),
+     xlab = "", ylab = "Effect on Y",
+     main = "Causal Moderation by Region")
+```
+
+Since `Region` is randomly assigned and unrelated to the DGP, both estimates should show no significant heterogeneity.
+
+------------------------------------------------------------------------
+
+## Empirical Application: Direct Democracy in Switzerland
+
+We replicate the analysis from @HH2019, who examine how the transition from direct democratic voting to representative committees affects naturalization rates in Swiss municipalities. The `hh2019` dataset contains 1,209 municipalities observed from 1991 to 2009.
+
+```{r hh_data, eval = TRUE, message = FALSE}
+data(hh2019)
+head(hh2019, 3)
+```
+
+### Baseline Estimation
+
+```{r hh_est, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.hh <- fect(nat_rate_ord ~ indirect, data = hh2019,
+               index = c("bfs", "year"),
+               method = "fe", force = "two-way", se = TRUE,
+               parallel = TRUE, cores = 4, nboots = 200)
+```
+
+```{r hh_gap, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
+plot(out.hh, main = "Effect of Indirect Democracy on Naturalization",
+     ylab = "Effect on Naturalization Rate", xlim = c(-6, 6))
+```
+
+The results are consistent with the original findings: switching to representative committees increases naturalization rates.
+
+------------------------------------------------------------------------
+
+## Summary of Parameters
+
+| Parameter | Description |
+|:---|:---|
+| `cm = TRUE` in `fect()` | Estimate causal moderation model (dual imputation) |
+| `cm = TRUE` in `plot()` | Plot causal moderation effect $\hat{\theta}(m)$ |
+| `type = "hte"` | HTE plot: individual effects vs. covariate |
+| `covariate` | Specify the moderator variable |
+| `pretreatment = TRUE` | Restrict to pre-treatment periods (placebo test) |
+| `num.pretreatment` | Number of pre-treatment periods to include |
+| `covariate.value` | Filter observations by moderator values |
+| `covariate.value.range = TRUE` | Treat `covariate.value` as range $[\text{lo}, \text{hi}]$ |
+| `loess.fit = FALSE` | Scatter only, without loess smoothing |
+| `covariate.labels` | Labels for discrete moderator categories |
+| `fect_iden()` | Over-identification test for linearity |
+
+------------------------------------------------------------------------
+
+## Summary
+
+This chapter introduced the causal moderation framework for heterogeneous treatment effects:
+
+- **Effect modification** describes how the treatment effect varies across observed levels of $M$; it is obtained by projecting individual treatment effects $\hat{\delta}_{it}$ onto the moderator.
+- **Causal moderation** answers whether exogenously changing $M$ would alter the treatment effect; it requires separate models for treated and control outcomes (`cm = TRUE`).
+- **Diagnostics**: The placebo test (`pretreatment = TRUE`) and subsample event-study plots (`covariate.value`) probe CPTA. The over-identification test (`fect_iden()`) checks linearity.
+- **Comparison**: When the EM and CM estimates diverge, $M$ is primarily a proxy; when they converge, $M$ is likely a genuine causal moderator.
+
+For DID-based heterogeneous treatment effect analysis, see @sec-panel.

@@ -66,6 +66,8 @@ fect_boot <- function(
   cl = NULL,
   I,
   II,
+  cm=FALSE,
+  II.cm=NULL,
   T.on,
   T.off = NULL,
   T.on.carry = NULL,
@@ -88,6 +90,7 @@ fect_boot <- function(
   CV = 0,
   k = 10,
   cv.prop = 0.1,
+  cv.treat = TRUE,
   cv.method = "all_units",
   cv.nobs = 3,
   r = 0,
@@ -161,7 +164,7 @@ fect_boot <- function(
   ## estimation
   if (CV == 0) {
     if (method == "gsynth") {
-      out <- fect_nevertreated(
+      out <- fect_gsynth(
         Y = Y,
         X = X,
         D = D,
@@ -197,6 +200,8 @@ fect_boot <- function(
         W = W,
         I = I,
         II = II,
+        cm = cm,
+        II.cm = II.cm,
         T.on = T.on,
         T.off = T.off,
         T.on.carry = T.on.carry,
@@ -251,50 +256,6 @@ fect_boot <- function(
       if ("try-error" %in% class(out)) {
         stop("\nCannot estimate using full data with MC algorithm.\n")
       }
-    } else if (method == "cfe" && time.component.from == "nevertreated") {
-      out <- try(
-        fect_nevertreated(
-          Y = Y,
-          X = X,
-          D = D,
-          W = W,
-          I = I,
-          II = II,
-          T.on = T.on,
-          T.off = T.off,
-          CV = 0,
-          T.on.balance = T.on.balance,
-          balance.period = balance.period,
-          r = r,
-          binary = binary,
-          QR = QR,
-          force = force,
-          hasRevs = hasRevs,
-          tol = tol,
-          max.iteration = max.iteration,
-          boot = 0,
-          norm.para = norm.para,
-          placebo.period = placebo.period,
-          placeboTest = placeboTest,
-          carryover.period = carryover.period,
-          carryoverTest = carryoverTest,
-          group.level = group.level,
-          group = group,
-          method = "cfe",
-          X.extra.FE = X.extra.FE,
-          X.Z = X.Z,
-          X.Q = X.Q,
-          X.gamma = X.gamma,
-          X.kappa = X.kappa,
-          Zgamma.id = Zgamma.id,
-          kappaQ.id = kappaQ.id
-        ),
-        silent = TRUE
-      )
-      if ("try-error" %in% class(out)) {
-        print(out)
-        stop("\nCannot estimate.\n")
-      }
     } else if (method %in% c("cfe")) {
       out <- try(
         fect_cfe(
@@ -311,6 +272,8 @@ fect_boot <- function(
           kappaQ.id = kappaQ.id,
           I = I,
           II = II,
+          cm = cm,
+          II.cm = II.cm,
           T.on = T.on,
           T.off = T.off,
           T.on.carry = T.on.carry,
@@ -334,8 +297,6 @@ fect_boot <- function(
         ),
         silent = TRUE
       )
-      # I.report <- out$I
-      # II.report <- out$II
       if ("try-error" %in% class(out)) {
         print(out)
         stop("\nCannot estimate.\n")
@@ -371,6 +332,7 @@ fect_boot <- function(
         group.level = group.level,
         group = group,
         cv.prop = cv.prop,
+        cv.treat = cv.treat,
         cv.method = cv.method,
         cv.nobs = cv.nobs,
         time.component.from = time.component.from,
@@ -643,6 +605,8 @@ fect_boot <- function(
           W = W,
           I = I,
           II = II,
+          cm = cm,
+          II.cm = II.cm,
           T.on = T.on,
           T.off = T.off,
           T.on.carry = T.on.carry,
@@ -795,7 +759,7 @@ fect_boot <- function(
       ## output
       if (method == "gsynth" || (method == "ife" && time.component.from == "nevertreated")) {
         synth.out <- try(
-          fect_nevertreated(
+          fect_gsynth(
             Y = Y.pseudo,
             X = X.pseudo,
             D = D.pseudo,
@@ -811,35 +775,6 @@ fect_boot <- function(
             max.iteration = max.iteration,
             norm.para = norm.para,
             boot = 1
-          ),
-          silent = TRUE
-        )
-      } else if (method == "cfe" && time.component.from == "nevertreated") {
-        synth.out <- try(
-          fect_nevertreated(
-            Y = Y.pseudo,
-            X = X.pseudo,
-            D = D.pseudo,
-            W = NULL,
-            I = I.id.pseudo,
-            II = II.id.pseudo,
-            T.on = T.on.pseudo,
-            hasRevs = hasRevs,
-            force = force,
-            r = out$r.cv,
-            CV = 0,
-            tol = tol,
-            max.iteration = max.iteration,
-            norm.para = norm.para,
-            boot = 1,
-            method = "cfe",
-            X.extra.FE = X.extra.FE.pseudo,
-            X.Z = X.Z.pseudo,
-            X.Q = X.Q.pseudo,
-            X.gamma = X.gamma.pseudo,
-            X.kappa = X.kappa.pseudo,
-            Zgamma.id = Zgamma.id,
-            kappaQ.id = kappaQ.id
           ),
           silent = TRUE
         )
@@ -917,7 +852,7 @@ fect_boot <- function(
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
         .multicombine = TRUE,
-        .export = c("fect_nevertreated", "fect_fe", "fect_cfe", "initialFit",
+        .export = c("fect_gsynth", "fect_fe", "fect_cfe", "initialFit",
                      ".reconstruct_gamma_fit_tr", ".reconstruct_kappa_fit",
                      ".extract_and_apply_typeB_fe"),
         .packages = c("fect", "mvtnorm", "fixest"),
@@ -1024,6 +959,7 @@ fect_boot <- function(
       D.boot <- out$D[, id.boot, drop = FALSE]
       I.boot <- out$I[, id.boot, drop = FALSE]
       II.boot <- out$II[, id.boot, drop = FALSE]
+      II.cm.boot <- out$II.cm[, id.boot, drop = FALSE]
       W.boot <- NULL
       if (!is.null(W)) {
         W.boot <- NULL
@@ -1038,7 +974,7 @@ fect_boot <- function(
         }
       }
       synth.out <- try(
-        fect_nevertreated(
+        fect_gsynth(
           Y = Y.boot,
           X = X.boot,
           D = D.boot,
@@ -1161,6 +1097,8 @@ fect_boot <- function(
             W = W,
             I = I,
             II = II,
+            cm = cm,
+            II.cm = II.cm,
             T.on = T.on,
             T.off = T.off,
             T.on.carry = T.on.carry,
@@ -1423,7 +1361,7 @@ fect_boot <- function(
         boot <- NULL
         if (method == "gsynth") {
           boot <- try(
-            fect_nevertreated(
+            fect_gsynth(
               Y = Y[, boot.id],
               X = X.boot,
               D = D.boot,
@@ -1470,6 +1408,8 @@ fect_boot <- function(
               W = W.boot,
               I = I.boot,
               II = II[, boot.id],
+              cm = cm,
+              II.cm = II.cm[, boot.id],
               T.on = T.on[, boot.id],
               T.off = T.off.boot,
               T.on.carry = T.on.carry[, boot.id],
@@ -1708,7 +1648,7 @@ fect_boot <- function(
           "fect_mc",
           "fect_cfe",
           "get_term",
-          "fect_nevertreated",
+          "fect_gsynth",
           "initialFit",
           ".reconstruct_gamma_fit_tr",
           ".reconstruct_kappa_fit",
@@ -1732,7 +1672,7 @@ fect_boot <- function(
             "fect_mc",
             "fect_cfe",
             "get_term",
-            "fect_nevertreated",
+            "fect_gsynth",
             "initialFit",
             ".reconstruct_gamma_fit_tr",
             ".reconstruct_kappa_fit",

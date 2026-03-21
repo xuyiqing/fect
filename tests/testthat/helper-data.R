@@ -14,6 +14,6 @@ if (!exists("simdata", inherits = TRUE)) {
     try(load(f, envir = environment()), silent = TRUE)
   }
 }
-if (!exists("sim_gsynth", inherits = TRUE)) {
-  suppressWarnings(try(utils::data("sim_gsynth", package = "fect"), silent = TRUE))
+if (!exists("simgsynth", inherits = TRUE)) {
+  suppressWarnings(try(utils::data("simgsynth", package = "fect"), silent = TRUE))
 }

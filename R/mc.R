@@ -134,8 +134,8 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
         est.best$fit <- est.best$fit * norm.para[1]
         if (boot == FALSE) {
             est.fect$fit <- est.fect$fit * norm.para[1]
-            est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
         }
+        est.fect$sigma2 <- est.fect$sigma2 * norm.para[1]
     }
 
     ## 0. revelant parameters
@@ -161,44 +161,24 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
         eff[which(I == 0)] <- NA
     }
     complete.index <- which(!is.na(eff))
-    denom <- sum(D[complete.index])
-    att.avg <- if (denom > 0) {
-        sum(eff[complete.index] * D[complete.index]) / denom
-    } else {
-        NA
-    }
+    att.avg <- sum(eff[complete.index] * D[complete.index]) / (sum(D[complete.index]))
 
     att.avg.balance <- NA
     if (!is.null(balance.period)) {
         complete.index2 <- which(!is.na(T.on.balance))
-        denom.balance <- sum(D[complete.index2])
-        att.avg.balance <- if (denom.balance > 0) {
-            sum(eff[complete.index2] * D[complete.index2]) / denom.balance
-        } else {
-            NA
-        }
+        att.avg.balance <- sum(eff[complete.index2] * D[complete.index2]) / (sum(D[complete.index2]))
     }
 
     # weighted effect
     att.avg.W <- NA
     if (!is.null(W)) {
-        denom.W <- sum(D[complete.index] * W[complete.index])
-        att.avg.W <- if (denom.W > 0) {
-            sum(eff[complete.index] * D[complete.index] * W[complete.index]) / denom.W
-        } else {
-            NA
-        }
+        att.avg.W <- sum(eff[complete.index] * D[complete.index] * W[complete.index]) / (sum(D[complete.index] * W[complete.index]))
     }
 
     ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
     att.unit <- sapply(1:length(tr.pos), function(vec) {
-        d <- sum(D[, tr.pos[vec]])
-        if (d > 0) {
-            return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / d)
-        } else {
-            return(NA)
-        }
+        return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))
     })
     att.avg.unit <- mean(att.unit, na.rm = TRUE)
 
@@ -210,12 +190,7 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
             eff.equiv[which(I == 0)] <- NA
         }
         complete.index <- which(!is.na(eff.equiv))
-        denom.equiv <- sum(D[complete.index])
-        equiv.att.avg <- if (denom.equiv > 0) {
-            sum(eff.equiv[complete.index] * D[complete.index]) / denom.equiv
-        } else {
-            NA
-        }
+        equiv.att.avg <- sum(eff.equiv[complete.index] * D[complete.index]) / (sum(D[complete.index]))
     }
 
     ## 2. rmse for treated units' observations under control
@@ -419,20 +394,18 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
         rm.pos3 <- which(is.na(t.off))
         eff.v.use2 <- eff.v
         t.off.use <- t.off
-        n.off.use <- rep(1:N, each = TT)
 
         if (NA %in% eff.v | NA %in% t.off) {
             eff.v.use2 <- eff.v[-c(rm.pos1, rm.pos3)]
             t.off.use <- t.off[-c(rm.pos1, rm.pos3)]
-            n.off.use <- n.off.use[-c(rm.pos1, rm.pos3)]
         }
 
         off.pos <- which(t.off.use > 0)
-        eff.off <- cbind(eff.v.use2[off.pos], t.off.use[off.pos], n.off.use[off.pos])
+        eff.off <- cbind(eff.v.use2[off.pos], t.off.use[off.pos], n.on.use[off.pos])
         colnames(eff.off) <- c("eff", "period", "unit")
 
         if (boot == FALSE) {
-            eff.off.equiv <- cbind(eff.equiv.v[off.pos], t.off.use[off.pos], n.off.use[off.pos])
+            eff.off.equiv <- cbind(eff.equiv.v[off.pos], t.off.use[off.pos], n.on.use[off.pos])
             colnames(eff.off.equiv) <- c("off.equiv", "period", "unit")
 
             off.sd <- tapply(eff.off.equiv[, 1], eff.off.equiv[, 2], sd)
