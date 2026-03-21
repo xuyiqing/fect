@@ -251,40 +251,47 @@ plot(out.cm, type = "hte", covariate = "X1", cm = TRUE,
 
 ### Subsample Dynamic Treatment Effects
 
-According to CPTA, parallel trends should hold for any conditional value of the moderator. The `covariate.value` and `covariate.value.range` options enable subsample event-study plots to probe this:
+According to CPTA, parallel trends should hold for any conditional value of the moderator. We can partition the sample by the moderator and estimate separate `fect` models for each subsample:
+
+```{r sub_dyn_setup, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+x1_med <- median(simdata$X1[simdata$D == 1], na.rm = TRUE)
+
+# Subsample: X1 below median
+sim_low <- simdata[simdata$X1 < x1_med, ]
+out.low <- fect(Y ~ D + X1 + X2, data = sim_low, index = c("id", "time"),
+                method = "fe", force = "two-way", se = FALSE)
+
+# Subsample: X1 above median
+sim_high <- simdata[simdata$X1 >= x1_med, ]
+out.high <- fect(Y ~ D + X1 + X2, data = sim_high, index = c("id", "time"),
+                 method = "fe", force = "two-way", se = FALSE)
+```
 
 ```{r sub_dyn_low, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
-x1_med <- median(simdata$X1[simdata$D == 1], na.rm = TRUE)
-plot(out.cm, type = "gap",
-     covariate = "X1", covariate.value = c(-Inf, x1_med),
-     covariate.value.range = TRUE,
-     main = paste0("Dynamic Effects: X1 < ", round(x1_med, 2)),
-     xlim = c(-10, 10))
+plot(out.low, main = paste0("Dynamic Effects: X1 < ", round(x1_med, 2)),
+     ylab = "Effect on Y", xlim = c(-10, 10))
 ```
 
 ```{r sub_dyn_high, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
-plot(out.cm, type = "gap",
-     covariate = "X1", covariate.value = c(x1_med, Inf),
-     covariate.value.range = TRUE,
-     main = paste0("Dynamic Effects: X1 >= ", round(x1_med, 2)),
-     xlim = c(-10, 10))
+plot(out.high, main = paste0("Dynamic Effects: X1 >= ", round(x1_med, 2)),
+     ylab = "Effect on Y", xlim = c(-10, 10))
 ```
 
 Under CPTA, both subsamples should exhibit flat pre-trends. Opposite-direction violations across subsamples strongly indicate moderator-dependent confounding.
 
 ### Subsample Calendar Plots
 
-Calendar-time effects for subgroups, using `relative.time = TRUE` for event-study style:
+We can also compare calendar-time treatment effects across subgroups using `type = "calendar"` with the `covariate.value` filter:
 
 ```{r cal_sub_low, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
-plot(out.cm, type = "calendar", relative.time = TRUE,
+plot(out.cm, type = "calendar",
      covariate = "X1", covariate.value = c(-Inf, x1_med),
      covariate.value.range = TRUE,
      main = paste0("Calendar Effects: X1 < ", round(x1_med, 2)))
 ```
 
 ```{r cal_sub_high, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 7, fig.height = 5}
-plot(out.cm, type = "calendar", relative.time = TRUE,
+plot(out.cm, type = "calendar",
      covariate = "X1", covariate.value = c(x1_med, Inf),
      covariate.value.range = TRUE,
      main = paste0("Calendar Effects: X1 >= ", round(x1_med, 2)))
@@ -350,8 +357,8 @@ When the DGP involves latent factors, the FE method may be biased. The IFE metho
 
 ```{r cm_ife, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.cm.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
-                   method = "ife", force = "two-way", r = c(0, 5), CV = TRUE,
-                   cm = TRUE, se = TRUE, parallel = TRUE, cores = 4, nboots = 200)
+                   method = "ife", force = "two-way", r = 2,
+                   cm = TRUE, se = FALSE, parallel = TRUE, cores = 4)
 ```
 
 ### Comparing FE and IFE
