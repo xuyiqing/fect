@@ -76,7 +76,7 @@ We begin with an empirical example from @HH2019, who investigate the effects of 
 The study finds that switching from direct to indirect democracy increased naturalization rates by an average of 1.22 percentage points (Model 1, Table 1).
 
 ```{r load-hh2019, message = FALSE, warning = FALSE}
-data(fect)
+if (dir.exists("../data")) load("../data/fect.RData") else data(fect)
 data <- hh2019
 head(data)
 ```
@@ -674,7 +674,7 @@ House general elections between 1980 and 2012, arguing that the presence of Asia
 Here, we focus specifically on the effects of Asian candidates, as shown in the top left panel of Figure 5 in the paper.
 
 ```{r load-gs2020, message = FALSE, warning = FALSE}
-data(fect)
+if (dir.exists("../data")) load("../data/fect.RData") else data(fect)
 data <- gs2020
 data$cycle <- as.integer(as.numeric(data$cycle/2))
 head(data)

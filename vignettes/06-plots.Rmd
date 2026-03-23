@@ -23,7 +23,7 @@ We use two datasets throughout. @GS2020 examines the mobilizing effect of minori
 library(ggplot2)
 library(panelView)
 library(fect)
-data(fect)
+if (dir.exists("../data")) load("../data/fect.RData") else data(fect)
 ls()
 ```
 
