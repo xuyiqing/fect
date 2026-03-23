@@ -1,5 +1,9 @@
 # Plot Options {#sec-plots}
 
+```{r .common, include = FALSE}
+source("_common.R")
+```
+
 In this chapter, we explore visualization options available in the **fect** package. Plots are organized by `type`:
 
 - the event study plot (`gap`)
@@ -23,7 +27,7 @@ We use two datasets throughout. @GS2020 examines the mobilizing effect of minori
 library(ggplot2)
 library(panelView)
 library(fect)
-if (dir.exists("../data")) load("../data/fect.RData") else data(fect)
+data(fect)
 ls()
 ```
 

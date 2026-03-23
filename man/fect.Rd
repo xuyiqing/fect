@@ -29,7 +29,9 @@ assumptions.}
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,
             carryoverTest = FALSE, carryover.period = NULL, carryover.rm = NULL,
-            loo = FALSE, permute = FALSE, m = 2, normalize = FALSE, keep.sims = FALSE, cm = FALSE)}
+            loo = FALSE, permute = FALSE, m = 2,
+            normalize = FALSE, keep.sims = FALSE,
+            cm = FALSE)}
 \arguments{
 \item{formula}{an object of class "formula": a symbolic description of the model to be fitted, e.g, Y~D+X1+X2}
 \item{data}{a data frame, can be a balanced or unbalanced panel data.}

@@ -1,0 +1,11 @@
+# Shared setup for all vignette chapters
+# When rendering locally from the source tree, devtools::load_all()
+# ensures the LATEST R functions (including new features like cm) and
+# all datasets are available, even if the installed package is outdated.
+# During R CMD check the package is freshly installed, so library() suffices.
+if (file.exists("../DESCRIPTION") &&
+    requireNamespace("devtools", quietly = TRUE)) {
+  suppressMessages(devtools::load_all("..", quiet = TRUE))
+} else {
+  suppressMessages(library(fect))
+}

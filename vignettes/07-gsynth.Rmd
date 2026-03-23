@@ -1,5 +1,9 @@
 # Gsynth Program {#sec-gsynth}
 
+```{r .common, include = FALSE}
+source("_common.R")
+```
+
 This chapter demonstrates the generalized synthetic control method, or Gsynth, proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\].
 
 Gsynth was originally implemented in the **gsynth** package but has now been fully integrated into the **fect** package. Gsynth (`method = "gsynth"`) and FEct/IFEct/MC (`method = "fe"/"ife"/"mc"`) are different in the following ways:
@@ -30,17 +34,12 @@ We will use two datasets, `sim_gsynth` and `turnout`, to perform analyses in blo
 
 ```{r setup-seed, echo = FALSE}
 set.seed(1234)
-rm(list = ls())
 ```
 
 ```{r load-packages, warning=FALSE, message=FALSE}
 library(fect)
-if (dir.exists("../data")) {
-  load("../data/fect.RData")
-  load("../data/sim_gsynth.rda")
-} else {
-  data(fect); data(sim_gsynth)
-}
+data(fect)
+data(sim_gsynth)
 ls()
 ```
 

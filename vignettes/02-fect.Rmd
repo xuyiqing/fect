@@ -8,20 +8,19 @@ In this chapter, we use `sim_base`, a simulated panel dataset in which the paral
 
 Since there are no latent factors, the `"fe"` method (two-way fixed effects counterfactual estimator, or FEct) is correctly specified for this DGP. For settings where latent factors are present and the FE estimator is biased, see [Chapter @sec-ife-mc].
 
+```{r .common, include = FALSE}
+source("_common.R")
+```
+
 ```{r setup-seed, echo = FALSE}
 set.seed(1234)
-rm(list = ls())
 ```
 
 ```{r load-packages, message = FALSE, warning = FALSE}
 library(fect)
-if (dir.exists("../data")) {
-  load("../data/fect.RData")
-  load("../data/sim_base.rda")
-  load("../data/sim_gsynth.rda")
-} else {
-  data(fect); data(sim_base); data(sim_gsynth)
-}
+data(fect)
+data(sim_base)
+data(sim_gsynth)
 ```
 
 We use the **panelView** package to visualize the treatment and outcome variables:
