@@ -453,6 +453,8 @@ plot.fect <- function(
           ))
         )
 
+        loadings_colors <- c("Treated" = status.treat.color, "Control" = status.control.color)
+
         if (nfactors == 1) {
           p <- ggplot(data, aes(x = .data$group, y = .data$L1, fill = .data$group)) +
             geom_boxplot(alpha = 0.7) +
