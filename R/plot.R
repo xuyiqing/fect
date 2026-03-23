@@ -1,3 +1,7 @@
+## Suppress R CMD check NOTEs for ggplot2 NSE variables
+utils::globalVariables(c("fit", "group", "y_hat", "y_hat_lower", "y_hat_upper",
+                         "ci.lower", "ci.upper", "time", "X.vec"))
+
 ## new plot
 # x: a fect object
 # type of the plot; axes limits; axes labels;
