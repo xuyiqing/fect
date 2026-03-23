@@ -16,6 +16,8 @@ rm(list = ls())
 ```{r load-packages, message = FALSE, warning = FALSE}
 library(fect)
 data(fect)
+data(sim_base)
+data(sim_gsynth)
 ```
 
 We use the **panelView** package to visualize the treatment and outcome variables:

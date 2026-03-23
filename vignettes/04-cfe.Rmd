@@ -12,6 +12,9 @@ rm(list = ls())
 ```{r load-packages-cfe, message = FALSE, warning = FALSE}
 library(fect)
 data(fect)
+data(sim_region)
+data(sim_linear)
+data(sim_trend)
 ```
 
 ------------------------------------------------------------------------

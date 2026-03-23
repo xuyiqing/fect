@@ -62,6 +62,11 @@ The **fect** package ships several datasets. All simulated and empirical dataset
 ```{r load-data, message = FALSE, warning = FALSE}
 library(fect)
 data(fect)
+data(sim_base)
+data(sim_gsynth)
+data(sim_linear)
+data(sim_trend)
+data(sim_region)
 ls()
 ```
 
