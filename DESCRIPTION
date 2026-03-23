@@ -37,7 +37,8 @@ Imports:
     future.apply,
     reshape2,
     rlang,
-    scales
+    scales,
+    splines
 Suggests:
     panelView,
     testthat (>= 3.0.0),

@@ -17,8 +17,6 @@ fect_cfe <- function(
     kappaQ.id = NULL,
     I,
     II,
-    cm=FALSE,
-    II.cm=NULL,
     T.on,
     T.off = NULL,
     T.on.carry = NULL,

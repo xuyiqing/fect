@@ -31,7 +31,7 @@ interFE.formula <- function(formula = NULL, data, # a data frame
                             index, # id and time indicators
                             r = 0, # number of factors
                             force = "two-way", # additived fixed effects
-                            se = FALSE, # standard error
+                            se = 0, # standard error
                             nboots = 500, # number of bootstrap runs
                             seed = NULL,
                             tol = 1e-3,
@@ -99,10 +99,10 @@ interFE.default <- function(formula = NULL, data, # a data frame
                             index, # id and time indicators
                             r = 0, # number of factors
                             force = "two-way", # additived fixed effects
-                            se = FALSE, # standard error
+                            se = 0, # standard error
                             nboots = 500, # number of bootstrap runs
                             seed = NULL,
-                            tol = 1e-3,
+                            tol = 1e-5,
                             max_iteration = 500,
                             binary = FALSE,
                             QR = FALSE,
