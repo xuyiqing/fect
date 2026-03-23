@@ -42,6 +42,6 @@ library(fect)
 data(fect)
 out <- fect(Y ~ D + X1 + X2, data = simdata, 
             index = c("id","time"), force = "two-way",
-            CV = TRUE, r = c(0, 5), se = 0, parallel = FALSE) 
+            CV = TRUE, r = c(0, 5), se = FALSE, parallel = FALSE)
 print(out)
 }
