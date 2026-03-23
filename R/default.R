@@ -284,13 +284,13 @@ fect.default <- function(
     force = "two-way", # fixed effects demeaning
     r = 0, # nubmer of factors
     lambda = NULL, ## mc method: regularization parameter
-    nlambda = 0,
+    nlambda = 10,
     CV = NULL, # cross-validation
     k = 10, # times of CV
     cv.prop = 0.1,
-    cv.treat = TRUE,
+    cv.treat = FALSE,
     cv.nobs = 3,
-    cv.donut = 1, ## cv mspe
+    cv.donut = 0, ## cv mspe
     criterion = "mspe",
     binary = FALSE, # probit model
     QR = FALSE, # QR or SVD for binary probit

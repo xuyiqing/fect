@@ -7,7 +7,7 @@ fect_polynomial <- function(Y, # Outcome variable, (T*N) matrix
                             W,
                             I,
                             II,
-                            II.cm,
+                            II.cm = NULL,
                             T.on,
                             T.off = NULL,
                             T.on.carry = NULL,
