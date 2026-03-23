@@ -539,7 +539,7 @@ did_wrapper <- function(
     }
 
     if (parallel) {
-      if (is.null(core)) core <- max(1, future::availableCores() - 1)
+      if (is.null(core)) core <- parallelly::availableCores(omit = 1)
       future::plan(future::multisession, workers = core) # Use future::multisession
       # Ensure seed is handled correctly for parallel processing
       rep_list <- future.apply::future_lapply(seq_len(nboots), boot_fun,

@@ -1,3 +1,5 @@
+utils::globalVariables(c("x", "y", "legend_id"))
+
 esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    Period = NULL,
                    Estimate = "ATT",
@@ -9,17 +11,18 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    proportion = 0.3,
                    est.lwidth = NULL,  # line thickness
                    est.pointsize = NULL,    # point size if show.points=TRUE
-                   show.points = FALSE,  # for connected=TRUE, show points only at integer times
+                   show.points = TRUE,   # show points at integer times
                    fill.gap = TRUE,      # fill missing times with 0
                    start0 = FALSE,       # if TRUE => vertical dashed line at x=-0.5
                    only.pre = FALSE,
                    only.post = FALSE,
-                   show.count = NULL,    # whether to show count bars
+                   show.count = TRUE,    # whether to show count bars
                    stats = NULL,         # numeric p-values
                    stats.labs = NULL,    # labels for each p-value
 
                    highlight.periods = NULL,  # numeric vector of times to highlight
                    highlight.colors  = NULL,    # color for each highlight time
+                   highlight.shapes  = NULL,    # integer shape for each highlight time (17=triangle, 18=diamond, etc.)
                    lcolor = NULL,
                    lwidth = NULL,
                    ltype = c("solid", "solid"),
@@ -39,9 +42,19 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    cex.text  = NULL,
                    axis.adjust = FALSE,
                    color       = "#000000",
+                   pre.color   = NULL,
+                   post.color  = NULL,
                    count.color = "gray70",
                    count.alpha = 0.4,
-                   count.outline.color = "grey69"
+                   count.outline.color = "grey69",
+                   xangle    = NULL,
+                   yangle    = NULL,
+                   xbreaks   = NULL,
+                   ybreaks   = NULL,
+                   legendOff = FALSE,
+                   cex.legend = NULL,
+                   pre.label  = "Pre-treatment",
+                   post.label = "Post-treatment"
 )
 {
   if (is.null(est.lwidth) || is.null(est.pointsize)) {
@@ -68,11 +81,27 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     x_chr <- if (is.factor(x)) as.character(x) else x
     all(grepl("^[-+]?[0-9]+$", x_chr))
   }
-  # If input is a did_wrapper object, extract the event-study data
-  if (inherits(data, "did_wrapper")) {
+  # If input is a fect object, extract the event-study data
+  if (inherits(data, "fect")) {
+    if (is.null(data$est.att)) {
+      stop("The fect object does not contain 'est.att'. Run fect() with se = TRUE.")
+    }
+    fect_att <- as.data.frame(data$est.att)
+    fect_att$Period <- as.numeric(rownames(fect_att))
+    if (is.null(Period)) Period <- "Period"
+    if (is.null(Count) && "count" %in% names(fect_att)) Count <- "count"
+    if (is.null(Count) && "count.on" %in% names(fect_att)) {
+      Count <- "count.on"
+    }
+    data <- fect_att
+  } else if (inherits(data, "did_wrapper")) {
     data <- data$est.att
   }
   data <- as.data.frame(data)
+
+  ## Resolve pre/post colors
+  if (is.null(post.color)) post.color <- color
+  if (is.null(pre.color))  pre.color  <- "gray50"
 
   # Identify time/period column
   if (is.null(Period)) {
@@ -226,9 +255,12 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   data[[CI.upper]] <- as.numeric(data[[CI.upper]])
 
 
-  # Check "show.count"
-  if (is.null(show.count)) {
+  # Check "show.count": default TRUE only if count data is available
+  if (isTRUE(show.count) && (is.null(Count) || !(Count %in% names(data)))) {
     show.count <- FALSE
+  }
+  if (is.null(show.count)) {
+    show.count <- (!is.null(Count) && Count %in% names(data))
   }
   if (!is.logical(show.count) && !is.numeric(show.count)) {
     stop("\"show.count\" must be TRUE/FALSE or NULL.")
@@ -251,14 +283,13 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     stop("\"axis.adjust\" must be TRUE/FALSE.")
   }
 
-  # Title & label sizing
+  # Title & label sizing (values are in pt; defaults match plot.fect)
   if (!is.null(main)) {
     if (!is.character(main)) stop("\"main\" is not a string.")
     main <- main[1]
   }
   if (!is.null(cex.main)) {
     if (!is.numeric(cex.main)) stop("\"cex.main\" must be numeric.")
-    cex.main <- 16 * cex.main # ggplot title size is different from base R
   } else {
     cex.main <- 16
   }
@@ -268,21 +299,18 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
 
   if (!is.null(cex.lab)) {
     if (!is.numeric(cex.lab)) stop("\"cex.lab\" must be numeric.")
-    cex.lab <- 15 * cex.lab
   } else {
     cex.lab <- 15
   }
 
   if (!is.null(cex.axis)) {
     if (!is.numeric(cex.axis)) stop("\"cex.axis\" must be numeric.")
-    cex.axis <- 15 * cex.axis
   } else {
     cex.axis <- 15
   }
 
-  if (!is.null(cex.text)) { # For annotate text
+  if (!is.null(cex.text)) {
     if (!is.numeric(cex.text)) stop("\"cex.text\" must be numeric.")
-    cex.text <- 5 * cex.text # ggplot text size for annotate
   } else {
     cex.text <- 5
   }
@@ -588,7 +616,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     if (show.count && !is.null(Count) && Count %in% names(plot_data)) {
       idx_valid_count_plot_data <- !is.na(plot_data[[Count]]) & plot_data[[Count]] > 0
       if (any(idx_valid_count_plot_data)) {
-        bot_expand_factor <- bot_expand_factor + 0.15
+        bot_expand_factor <- bot_expand_factor + 0.35
       }
     }
 
@@ -654,10 +682,14 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       warning("highlight.colors not provided or mismatched length; using default rainbow colors.")
       highlight.colors <- grDevices::rainbow(length(highlight.periods))
     }
+    if (is.null(highlight.shapes) || length(highlight.shapes) != length(highlight.periods)) {
+      highlight.shapes <- rep(19, length(highlight.periods))
+    }
     intervals <- data.frame(
       start = highlight.periods - 0.5,
       end   = highlight.periods + 0.5,
-      color = highlight.colors
+      color = highlight.colors,
+      shape = highlight.shapes
     )
   }
 
@@ -677,66 +709,225 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     return(out_df)
   }
 
+  ## Helper: add connected layers (ribbon + line + optional points) for a data subset
+  .add_connected_layers <- function(p, df, col, lt, Period, Estimate, CI.lower, CI.upper,
+                                    est.lwidth, est.pointsize, show.points, ci.outline,
+                                    point.shape = 19) {
+    if (nrow(df) == 0) return(p)
+    outline_col <- ifelse(ci.outline, grDevices::adjustcolor(col, offset = c(0.3,0.3,0.3,0)), NA)
+    p <- p +
+      geom_ribbon(data = df, aes(x = .data[[Period]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
+                  fill = col, alpha = 0.2, inherit.aes = FALSE, na.rm = TRUE, color = outline_col) +
+      geom_line(data = df, aes(x = .data[[Period]], y = .data[[Estimate]]),
+                linewidth = est.lwidth, color = col, linetype = lt, inherit.aes = FALSE, na.rm = TRUE)
+    if (show.points) {
+      idx_int <- abs(as.numeric(df[[Period]]) - round(as.numeric(df[[Period]]))) < 1e-8 & !is.na(df[[Estimate]])
+      df_int <- df[idx_int, ]
+      if (nrow(df_int) > 0) {
+        ## Non-circle shapes (triangles, diamonds) appear smaller at the same
+        ## nominal size; scale up by 1.5× so they match circle visual weight
+        pt_size <- if (point.shape != 19) est.pointsize * 1.5 else est.pointsize
+        p <- p + geom_point(data = df_int, aes(x = .data[[Period]], y = .data[[Estimate]]),
+                            size = pt_size, color = col, shape = point.shape,
+                            inherit.aes = FALSE, na.rm = TRUE)
+      }
+    }
+    p
+  }
+
+  ## Split plot_data into pre-treatment and post-treatment
+  ## When start0 = TRUE, period 0 is the first post-treatment period
+  if (start0) {
+    is_pre  <- plot_data[[Period]] < 0
+    is_post <- plot_data[[Period]] >= 0
+  } else {
+    is_pre  <- plot_data[[Period]] <= 0
+    is_post <- plot_data[[Period]] > 0
+  }
+  data_pre  <- plot_data[is_pre, ]
+  data_post <- plot_data[is_post, ]
+
   if (connected) {
     data_base <- plot_data
     if (!is.null(intervals) && nrow(intervals) > 0) {
       data_base <- remove_strictly_inside(data_base, intervals, Estimate, CI.lower, CI.upper, Period)
     }
-    p <- p +
-      geom_ribbon(
-        data = data_base, aes(x = .data[[Period]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
-        fill = color, alpha = 0.2, inherit.aes = FALSE, na.rm = TRUE,
-        color =  ifelse(ci.outline, grDevices::adjustcolor(color, offset = c(0.3, 0.3, 0.3, 0)), NA)) +
-      geom_line(
-        data = data_base, aes(x = .data[[Period]], y = .data[[Estimate]]),
-        linewidth = est.lwidth, color = color, inherit.aes = FALSE, na.rm = TRUE)
-    if (show.points) {
-      idx_int_points <- abs(as.numeric(data_base[[Period]]) - round(as.numeric(data_base[[Period]]))) < 1e-8 & !is.na(data_base[[Estimate]])
-      data_base_int <- data_base[idx_int_points, ]
-
-      if(nrow(data_base_int) > 0) {
-        p <- p + geom_point(
-          data = data_base_int, aes(x = .data[[Period]], y = .data[[Estimate]]),
-          size = est.pointsize, color = color, inherit.aes = FALSE, na.rm = TRUE)
-      }
+    if (start0) {
+      data_base_pre  <- data_base[data_base[[Period]] < 0, ]
+      data_base_post <- data_base[data_base[[Period]] >= 0, ]
+    } else {
+      data_base_pre  <- data_base[data_base[[Period]] <= 0, ]
+      data_base_post <- data_base[data_base[[Period]] > 0, ]
     }
+
+    ## Pre-treatment: long-dashed line
+    p <- .add_connected_layers(p, data_base_pre, pre.color, "longdash",
+                               Period, Estimate, CI.lower, CI.upper,
+                               est.lwidth, est.pointsize, show.points, ci.outline)
+    ## Post-treatment: solid line
+    p <- .add_connected_layers(p, data_base_post, post.color, "solid",
+                               Period, Estimate, CI.lower, CI.upper,
+                               est.lwidth, est.pointsize, show.points, ci.outline)
+
+    ## Bridge segment: connect the last pre point to the first post point
+    ## When start0=FALSE: pre ends at 0, post starts at 0.5 → bridge 0→0.5
+    ## When start0=TRUE:  pre ends at -0.5, post starts at 0 → bridge -0.5→0
+    if (start0) {
+      bridge_from <- -0.5; bridge_to <- 0
+    } else {
+      bridge_from <- 0; bridge_to <- 0.5
+    }
+    idx_from <- which(abs(data_base[[Period]] - bridge_from) < 1e-8)
+    idx_to   <- which(abs(data_base[[Period]] - bridge_to)   < 1e-8)
+    if (length(idx_from) > 0 && length(idx_to) > 0) {
+      bridge_df <- data_base[c(idx_from[1], idx_to[1]), ]
+      p <- .add_connected_layers(p, bridge_df, pre.color, "longdash",
+                                 Period, Estimate, CI.lower, CI.upper,
+                                 est.lwidth, est.pointsize, FALSE, ci.outline)
+    }
+
+    ## Highlight interval overlays (e.g., placebo, carryover)
     if (!is.null(intervals) && nrow(intervals) > 0) {
       for (i in seq_len(nrow(intervals))) {
-        sub_color <- intervals$color[i]; range_start <- intervals$start[i]; range_end <- intervals$end[i]
-        idx_sub_data <- plot_data[[Period]] >= range_start & plot_data[[Period]] <= range_end
-        sub.data <- plot_data[idx_sub_data, ]
+        sub_color <- intervals$color[i]
+        sub_shape <- if (!is.null(intervals$shape)) intervals$shape[i] else 19
+        idx_sub <- plot_data[[Period]] >= intervals$start[i] & plot_data[[Period]] <= intervals$end[i]
+        sub.data <- plot_data[idx_sub, ]
+        p <- .add_connected_layers(p, sub.data, sub_color, "solid",
+                                   Period, Estimate, CI.lower, CI.upper,
+                                   est.lwidth, est.pointsize, show.points, ci.outline,
+                                   point.shape = sub_shape)
+      }
+    }
+  } else { # Not connected
+    ## Pre-treatment points
+    if (nrow(data_pre) > 0) {
+      p <- p + geom_pointrange(
+        data = data_pre,
+        aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
+        lwd = est.lwidth, color = pre.color, fill = pre.color, fatten = est.pointsize,
+        inherit.aes = FALSE, na.rm = TRUE)
+    }
+    ## Post-treatment points
+    if (nrow(data_post) > 0) {
+      p <- p + geom_pointrange(
+        data = data_post,
+        aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
+        lwd = est.lwidth, color = post.color, fill = post.color, fatten = est.pointsize,
+        inherit.aes = FALSE, na.rm = TRUE)
+    }
 
-        if(nrow(sub.data) > 0){
-          p <- p + geom_ribbon(data = sub.data, aes(x = .data[[Period]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]), inherit.aes = FALSE, na.rm = TRUE, fill = sub_color, alpha = 0.2, color =  ifelse(ci.outline, grDevices::adjustcolor(sub_color, offset = c(0.3,0.3,0.3,0)), NA)) +
-            geom_line(data = sub.data, aes(x = .data[[Period]], y = .data[[Estimate]]), inherit.aes = FALSE, na.rm = TRUE, color = sub_color, linewidth = est.lwidth)
-          if(show.points){
-            idx_sub_data_int <- abs(as.numeric(sub.data[[Period]]) - round(as.numeric(sub.data[[Period]]))) < 1e-8 & !is.na(sub.data[[Estimate]])
-            sub.data.int <- sub.data[idx_sub_data_int, ]
-
-            if(nrow(sub.data.int) > 0) p <- p + geom_point(data = sub.data.int, aes(x = .data[[Period]], y = .data[[Estimate]]), size = est.pointsize, color = sub_color, inherit.aes = FALSE, na.rm = TRUE)
+    ## Highlight overlays
+    if (!is.null(highlight.periods) && length(highlight.periods) > 0) {
+      for (i in seq_along(highlight.periods)) {
+        hp_period <- highlight.periods[i]
+        hp_color <- highlight.colors[i]
+        hp_shape <- if (!is.null(highlight.shapes)) highlight.shapes[i] else 19
+        idx_sub <- as.numeric(plot_data[[Period]]) == hp_period
+        sub_data_point <- plot_data[idx_sub, ]
+        if (nrow(sub_data_point) > 0) {
+          if (hp_shape != 19) {
+            # Use linerange + point to support custom shapes
+            p <- p + geom_linerange(
+              data = sub_data_point,
+              aes(x = .data[[Period]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
+              lwd = est.lwidth, color = hp_color, inherit.aes = FALSE, na.rm = TRUE)
+            p <- p + geom_point(
+              data = sub_data_point,
+              aes(x = .data[[Period]], y = .data[[Estimate]]),
+              size = est.pointsize * 1.5, color = hp_color, shape = hp_shape,
+              inherit.aes = FALSE, na.rm = TRUE)
+          } else {
+            p <- p + geom_pointrange(
+              data = sub_data_point,
+              aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
+              lwd = est.lwidth, color = hp_color, fill = hp_color, fatten = est.pointsize,
+              inherit.aes = FALSE, na.rm = TRUE)
           }
         }
       }
     }
-  } else { # Not connected
-    p <- p + geom_pointrange(
-      aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
-      lwd = est.lwidth, color = color, fill = color, fatten = est.pointsize, na.rm = TRUE)
+  }
 
-    if (!is.null(highlight.periods) && length(highlight.periods) > 0) {
-      highlight_points_df <- data.frame(period_val = highlight.periods, color_val = highlight.colors)
-      for (i in seq_len(nrow(highlight_points_df))) {
-        hp_period <- highlight_points_df$period_val[i]; hp_color  <- highlight_points_df$color_val[i]
-        idx_sub_data_point <- as.numeric(plot_data[[Period]]) == hp_period
-        sub_data_point <- plot_data[idx_sub_data_point, ]
+  # Build shape legend when highlight shapes differ from base circle
+  if (!is.null(highlight.shapes) && any(highlight.shapes != 19) && !legendOff) {
+    unique_shapes <- unique(highlight.shapes[highlight.shapes != 19])
 
-        if(nrow(sub_data_point) > 0) {
-          p <- p + geom_pointrange(
-            data = sub_data_point, aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
-            lwd = est.lwidth, color = hp_color, fill = hp_color, fatten = est.pointsize, inherit.aes = FALSE, na.rm = TRUE)
-        }
-      }
+    # Standard shape label map
+    shape_label_map <- c("17" = "Placebo Test", "18" = "Carryover Test",
+                          "15" = "Square", "8" = "Asterisk")
+
+    # Build legend entries conditionally:
+    # - Include "Pre-treatment" only if pre-treatment data is shown
+    # - Include "Post-treatment" only if post-treatment data is shown (not only.pre)
+    legend_ids    <- c()
+    legend_shapes <- c()
+    legend_colors <- c()
+    legend_labels <- c()
+
+    has_pre  <- nrow(data_pre) > 0
+    has_post <- nrow(data_post) > 0 && !only.pre
+
+    if (has_pre) {
+      legend_ids    <- c(legend_ids, "pre")
+      legend_shapes <- c(legend_shapes, 19)
+      legend_colors <- c(legend_colors, pre.color)
+      legend_labels <- c(legend_labels, pre.label)
     }
+    if (has_post) {
+      legend_ids    <- c(legend_ids, "post")
+      legend_shapes <- c(legend_shapes, 19)
+      legend_colors <- c(legend_colors, post.color)
+      legend_labels <- c(legend_labels, post.label)
+    }
+
+    # Map each unique highlight shape to its color from highlight.colors
+    for (s in unique_shapes) {
+      s_chr <- as.character(s)
+      lbl <- if (s_chr %in% names(shape_label_map)) shape_label_map[s_chr] else paste("Shape", s)
+      idx <- which(highlight.shapes == s)[1]
+      hcol <- if (!is.null(highlight.colors) && !is.na(idx)) highlight.colors[idx] else color
+      legend_ids    <- c(legend_ids, s_chr)
+      legend_shapes <- c(legend_shapes, s)
+      legend_colors <- c(legend_colors, hcol)
+      legend_labels <- c(legend_labels, lbl)
+    }
+    names(legend_shapes) <- legend_ids
+    names(legend_colors) <- legend_ids
+    names(legend_labels) <- legend_ids
+
+    legend_df <- data.frame(
+      x = rep(NA_real_, length(legend_ids)),
+      y = rep(NA_real_, length(legend_ids)),
+      legend_id = legend_ids,
+      stringsAsFactors = FALSE
+    )
+
+    # Use 2 rows when 4+ legend entries to avoid overflow
+    legend_nrow <- if (length(legend_ids) >= 4) 2 else 1
+
+    p <- p + geom_point(
+      data = legend_df,
+      aes(x = x, y = y, shape = legend_id, color = legend_id),
+      na.rm = TRUE, inherit.aes = FALSE
+    ) +
+      ggplot2::scale_shape_manual(
+        values = legend_shapes,
+        labels = legend_labels,
+        name = NULL
+      ) +
+      ggplot2::scale_color_manual(
+        values = legend_colors,
+        labels = legend_labels,
+        name = NULL
+      ) +
+      guides(shape = guide_legend(nrow = legend_nrow, title = NULL),
+             color = guide_legend(nrow = legend_nrow, title = NULL)) +
+      theme(legend.position = "bottom",
+            legend.box = "vertical",
+            legend.margin = margin(0, 0, 0, 0),
+            legend.text = element_text(size = if (!is.null(cex.legend)) cex.legend * 0.6 else 8),
+            plot.margin = margin(5, 5, 15, 5))
   }
 
   p <- p +
@@ -763,8 +954,14 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       plot_range_y <- final_ylim[2] - final_ylim[1]
       if(!is.finite(plot_range_y) || plot_range_y <=0) plot_range_y <- 1
 
-      rect_max_height_prop <- 0.1
-      rect_bar_max_h <- plot_range_y * rect_max_height_prop
+      ## Divide the bot_expand space into bars (bottom 50%) and gap (top 50%)
+      ## This guarantees a visible gap without feedback loops
+      bot_space <- if (exists("y_min_data") && is.finite(y_min_data)) {
+        y_min_data - final_ylim[1]
+      } else {
+        plot_range_y * 0.35
+      }
+      rect_bar_max_h <- bot_space * 0.50
       rect.min_yval  <- final_ylim[1]
 
       max_rect_count <- max(rect_data[[Count]], na.rm = TRUE)
@@ -897,6 +1094,25 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     }
   )
 
+
+  if (!is.null(xbreaks)) {
+    p <- p + scale_x_continuous(breaks = xbreaks)
+  }
+  if (!is.null(ybreaks)) {
+    p <- p + scale_y_continuous(breaks = ybreaks)
+  }
+  if (!is.null(xangle)) {
+    p <- p + theme(axis.text.x = element_text(angle = xangle, hjust = 1))
+  }
+  if (!is.null(yangle)) {
+    p <- p + theme(axis.text.y = element_text(angle = yangle))
+  }
+  if (isTRUE(legendOff)) {
+    p <- p + theme(legend.position = "none")
+  }
+  if (!is.null(cex.legend)) {
+    p <- p + theme(legend.text = element_text(size = cex.legend))
+  }
 
   return(p)
 }

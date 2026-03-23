@@ -10,7 +10,7 @@ fect_binary_cv <- function(Y, # Outcome variable, (T*N) matrix
                            T.off = NULL, 
                            k = 5, # CV time
                            cv.prop = 0.1,
-                           cv.treat = TRUE, 
+                           cv.method = "all_units",
                            cv.nobs = 3,
                            r = 0, # initial number of factors considered if CV==1
                            r.end,
@@ -24,7 +24,11 @@ fect_binary_cv <- function(Y, # Outcome variable, (T*N) matrix
     
     ##-------------------------------##
     ## Parsing data
-    ##-------------------------------##  
+    ##-------------------------------##
+
+    ## ---- cv.method → cv.treat mapping ---- ##
+    cv.method <- match.arg(cv.method, c("all_units", "treated_units"))
+    cv.treat <- (cv.method == "treated_units")
 
     ## unit id and time
     TT <- dim(Y)[1]

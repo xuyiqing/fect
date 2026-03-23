@@ -21,7 +21,7 @@ fect_sens <- function(
     parallel = FALSE,
     cores = NULL) {
   if (parallel && is.null(cores)) {
-    cores <- min(parallel::detectCores() - 2, 8) # default to 8 cores if not specified
+    cores <- parallelly::availableCores(omit = 2, max = 8) # use at most 8 cores
     cl <- parallel::makeCluster(cores)
     doParallel::registerDoParallel(cl)
   }

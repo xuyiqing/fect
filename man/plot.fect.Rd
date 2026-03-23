@@ -14,7 +14,6 @@
     highlight = NULL,
     plot.ci = NULL,
     show.points = TRUE,
-    loess.fit = TRUE,
     show.group = NULL,
     bound = NULL,
     show.count = TRUE,
@@ -61,6 +60,7 @@
     shade.post = FALSE,
     start0 = FALSE,
     return.test = FALSE,
+    return.data = FALSE,
     balance = NULL,
     weight = NULL,
     lcolor = NULL,
@@ -73,6 +73,8 @@
     connected = NULL,
     ci.outline = FALSE,
     color =  NULL,
+    pre.color = NULL,
+    post.color = NULL,
     est.lwidth = NULL,
     est.pointsize = NULL,
     count.color =  NULL,
@@ -108,12 +110,6 @@
     status.background.color = NULL,
     covariate = NULL,
     covariate.labels = NULL,
-    covariate.value = NULL,
-    covariate.value.range = FALSE,
-    relative.time = FALSE,
-    pretreatment = FALSE,
-    num.pretreatment = 3,
-    cm = FALSE,
     ...
 )
 }
@@ -129,7 +125,6 @@
   \item{plot.ci}{Specifies the confidence interval to be plotted. Options include:
     \code{"0.9"}, \code{"0.95"}, or \code{"none"}. Default is \code{NULL}, which is context-dependent (e.g., "0.95" for gap plots, "0.9" for equivalence plots, "none" if no CIs are available in the \code{fect} object).}
   \item{show.points}{Logical; if \code{TRUE} (default), shows point estimates on event study style plots (e.g., gap, equiv, exit plots).}
-  \item{loess.fit}{Logical; if \code{TRUE} (default), uses loess smoothing for calendar and heterogeneous plots. When \code{FALSE}, no loess fit (or ribbon) is added.}
   \item{show.group}{Optional character string or \code{NULL} (default); if specified, plots results for a particular subgroup defined in the \code{fect} call.}
   \item{bound}{Which bounds to display in bounding/equivalence tests:
     \code{"none"} (default for most plots), \code{"min"} (minimal effect bound), \code{"equiv"} (equivalence range), or \code{"both"} (default for \code{type="equiv"}).}
@@ -177,6 +172,7 @@
   \item{shade.post}{Logical; if \code{FALSE} (default). If \code{TRUE}, shades post-treatment periods in certain plots. For counterfactual plots, if \code{NULL} (the default for the argument is \code{FALSE}), it effectively becomes \code{TRUE} internally unless explicitly set to \code{FALSE}.}
   \item{start0}{Logical; if \code{TRUE} (default is \code{FALSE}), re-indexes the first post-treatment period as 0 in event-time plots (gap, equiv, exit). The period before treatment becomes -1.}
   \item{return.test}{Logical; if \code{TRUE} (default is \code{FALSE}), returns a list containing the plot object and relevant test statistics instead of just the plot.}
+  \item{return.data}{Logical; if \code{TRUE} (default is \code{FALSE}), returns a data frame with the data used to construct the plot instead of returning a plot object. If \code{return.test=TRUE} as well, returns a list with \code{data} and \code{test.out}.}
   \item{balance}{Logical or \code{NULL} (default); if \code{TRUE}, uses a "balance sample" (if available from the \code{fect} object, e.g., from setting \code{balanced.sample = TRUE} in \code{fect}) for plotting.}
   \item{weight}{Logical or \code{NULL} (default); if \code{TRUE}, applies weighting (if available from the \code{fect} object, e.g., from providing weights in \code{fect}) to the estimates being plotted.}
   \item{lcolor}{Character vector of length 1 or 2, or \code{NULL} (default). If \code{NULL}, uses a default color (e.g., \code{"#AAAAAA70"} if \code{theme.bw=TRUE}, else \code{"white"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
@@ -189,6 +185,8 @@
   \item{connected}{Logical or \code{NULL} (default). For event study type plots (e.g., \code{type="gap"}), if \code{TRUE}, connects points with lines; if \code{FALSE}, shows point-ranges. If \code{NULL}, defaults to \code{FALSE} for the base style, and \code{TRUE} if \code{preset = "vibrant"}.}
   \item{ci.outline}{Logical; if \code{FALSE} (default). For event study plots where CIs are shown as ribbons, if \code{TRUE}, adds an outline to the CI ribbon.}
   \item{color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for main plot lines/points (e.g., \code{"black"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{pre.color}{Character string or \code{NULL} (default). Color for pre-treatment period estimates. If \code{NULL}, uses the value of \code{color}.}
+  \item{post.color}{Character string or \code{NULL} (default). Color for post-treatment period estimates. If \code{NULL}, uses the value of \code{color}.}
   \item{est.lwidth}{Numeric or \code{NULL}; line width for the main estimate line in event study plots. If \code{NULL} (default), the width is determined based on \code{connected} and \code{show.points} (e.g., `0.6` for point-ranges with the base style, `0.7` for connected points with markers with the base style). The \code{preset} argument may influence this default. Specifying a numeric value directly overrides any other setting.}
   \item{est.pointsize}{Numeric or \code{NULL}; size of points for the main estimate in event study plots. If \code{NULL} (default), the size is determined based on \code{connected} and \code{show.points} (e.g., `2` for point-ranges with the base style, `1.2` for connected points with markers with the base style). The \code{preset} argument may influence this default. Specifying a numeric value directly overrides any other setting.}
   \item{count.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for count bars (e.g., \code{"grey70"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
@@ -224,12 +222,6 @@
   \item{status.background.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default background color for status plots (e.g., \code{"gray90"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{covariate}{Character string or \code{NULL} (default). If \code{NULL}, uses a default covariate for heterogeneous plots (e.g., \code{"X"} for the base style). The \code{preset} argument may define a different covariate. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{covariate.labels}{Character vector or \code{NULL} (default). If \code{NULL}, uses a default covariate labels for heterogeneous plots (e.g., \code{"X1"} for the base style). The \code{preset} argument may define a different covariate labels. Specifying this argument directly overrides any \code{preset} or base style setting.}
-  \item{covariate.value}{Optional value filter for calendar plots. When \code{type = "calendar"}, supply a value or a vector of values to restrict to treated observations whose covariate (specified via \code{covariate}) falls within the given set. A length-2 numeric vector is treated as a set unless \code{covariate.value.range = TRUE}.}
-  \item{covariate.value.range}{Logical; if \code{TRUE}, interpret \code{covariate.value} (must be numeric length 2) as a range \code{[min, max]} for calendar plots. Default is \code{FALSE}.}
-  \item{relative.time}{Logical; if \code{TRUE} and \code{type = "calendar"}, aggregates effects by event time defined in \code{x$T.on} (time since treatment onset) rather than by calendar time. Default is \code{FALSE}.}
-  \item{pretreatment}{Logical; if \code{TRUE}, restricts heterogeneous effect plots (\code{type = "heterogeneous"}) to the last \code{num.pretreatment} event-time periods up to 0 (i.e., \code{-(K-1), ..., -1, 0}). Default is \code{FALSE}.}
-  \item{num.pretreatment}{Integer; used only when \code{pretreatment = TRUE} in heterogeneous plots. Controls how many event-time periods up to 0 are used (e.g., 3 uses \code{-2,-1,0}; 5 uses \code{-4,-3,-2,-1,0}). Default is \code{3}.}
-  \item{cm}{a logical flag indicating whether to plot causal moderation effects. Default \code{cm = FALSE}.}
   \item{...}{Additional graphical parameters passed to internal plotting routines, primarily those accepted by \code{esplot} for event study style plots (gap, equiv, exit, sens_es, cumul).}
 }
 \details{
@@ -244,9 +236,15 @@
   The function heavily relies on \code{ggplot2} for plotting and \code{esplot} for event-study style visualizations.
 }
 \value{
-  A \code{ggplot2} object representing the plot. If \code{return.test=TRUE}, a list containing:
+  By default, a \code{ggplot2} object representing the plot.
+
+  If \code{return.data=TRUE}, returns a list containing:
   \item{p}{The \code{ggplot2} object.}
+  \item{data}{A named list of data frames containing the data used to construct each layer of the plot (no extra all-NA columns are added).}
+  If \code{return.test=TRUE} as well, the list also contains:
   \item{test.out}{A list or data frame containing relevant test statistics (such as F-tests, equivalence p-values, placebo test p-values, etc.), if applicable to the plot type and options chosen.}
+
+  If \code{return.test=TRUE} and \code{return.data=FALSE}, returns a list containing \code{p} and \code{test.out}.
 }
 \author{
   Licheng Liu, Ye Wang, Yiqing Xu, Ziyi Liu, Rivka Lipkovitz
