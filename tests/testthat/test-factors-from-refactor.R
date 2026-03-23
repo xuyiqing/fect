@@ -327,12 +327,12 @@ test_that("Phase 1g: time.component.from threads through bootstrap inference", {
 test_that("Phase 2a: gsynth produces same results via ife+time.component.from='nevertreated'", {
 
   skip_on_cran()
-  suppressWarnings(try(data("sim_gsynth", package = "fect"), silent = TRUE))
-  skip_if_not(exists("sim_gsynth"), "Dataset 'sim_gsynth' not available")
+  suppressWarnings(try(data("simgsynth", package = "fect"), silent = TRUE))
+  skip_if_not(exists("simgsynth"), "Dataset 'simgsynth' not available")
 
   set.seed(200)
   out_gs <- suppressWarnings(fect::fect(
-    Y ~ D, data = sim_gsynth, index = c("id", "time"),
+    Y ~ D, data = simgsynth, index = c("id", "time"),
     method = "gsynth", r = 2, CV = FALSE, se = FALSE,
     force = "two-way",
     parallel = FALSE
@@ -340,7 +340,7 @@ test_that("Phase 2a: gsynth produces same results via ife+time.component.from='n
 
   set.seed(200)
   out_ife <- suppressWarnings(fect::fect(
-    Y ~ D, data = sim_gsynth, index = c("id", "time"),
+    Y ~ D, data = simgsynth, index = c("id", "time"),
     method = "ife", r = 2, CV = FALSE, se = FALSE,
     force = "two-way",
     time.component.from = "nevertreated",
@@ -354,12 +354,12 @@ test_that("Phase 2a: gsynth produces same results via ife+time.component.from='n
 test_that("Phase 2b: gsynth still works (backward compatibility)", {
 
   skip_on_cran()
-  suppressWarnings(try(data("sim_gsynth", package = "fect"), silent = TRUE))
-  skip_if_not(exists("sim_gsynth"), "Dataset 'sim_gsynth' not available")
+  suppressWarnings(try(data("simgsynth", package = "fect"), silent = TRUE))
+  skip_if_not(exists("simgsynth"), "Dataset 'simgsynth' not available")
 
   set.seed(201)
   out <- suppressWarnings(fect::fect(
-    Y ~ D, data = sim_gsynth, index = c("id", "time"),
+    Y ~ D, data = simgsynth, index = c("id", "time"),
     method = "gsynth", r = 2, CV = FALSE, se = FALSE,
     force = "two-way",
     parallel = FALSE
@@ -372,12 +372,12 @@ test_that("Phase 2b: gsynth still works (backward compatibility)", {
 test_that("Phase 2c: gsynth with parametric bootstrap still works", {
 
   skip_on_cran()
-  suppressWarnings(try(data("sim_gsynth", package = "fect"), silent = TRUE))
-  skip_if_not(exists("sim_gsynth"), "Dataset 'sim_gsynth' not available")
+  suppressWarnings(try(data("simgsynth", package = "fect"), silent = TRUE))
+  skip_if_not(exists("simgsynth"), "Dataset 'simgsynth' not available")
 
   set.seed(202)
   out <- suppressWarnings(fect::fect(
-    Y ~ D, data = sim_gsynth, index = c("id", "time"),
+    Y ~ D, data = simgsynth, index = c("id", "time"),
     method = "gsynth", r = 2, CV = FALSE,
     se = TRUE, vartype = "parametric", nboots = 30,
     force = "two-way", min.T0 = 2,

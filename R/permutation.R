@@ -210,43 +210,47 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
         stop("No valid observations under treatment.\n")
     }
 
-    ## initial fit using fastplm
-    data.ini <- matrix(NA, (TT * N), (2 + 1 + p))
-    data.ini[, 2] <- rep(1:N, each = TT) ## unit fe
-    data.ini[, 3] <- rep(1:TT, N) ## time fe
-    data.ini[, 1] <- c(Y) ## outcome
-    if (p > 0) { ## covar
-        for (i in 1:p) {
-            data.ini[, (3 + i)] <- c(X[, , i])
+    if (method %in% c("polynomial", "bspline")) {
+        stop("Doesn't support in this version.")
+    } else {
+        ## initial fit using fastplm
+        data.ini <- matrix(NA, (TT * N), (2 + 1 + p))
+        data.ini[, 2] <- rep(1:N, each = TT) ## unit fe
+        data.ini[, 3] <- rep(1:TT, N) ## time fe
+        data.ini[, 1] <- c(Y) ## outcome
+        if (p > 0) { ## covar
+            for (i in 1:p) {
+                data.ini[, (3 + i)] <- c(X[, , i])
+            }
         }
-    }
-    ## observed Y0 indicator:
-    initialOut <- Y0 <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
+        ## observed Y0 indicator:
+        initialOut <- Y0 <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
 
-    initialOut <- initialFit(data = data.ini, force = force, oci = oci)
-    Y0 <- initialOut$Y0
-    beta0 <- initialOut$beta0
-    if (p > 0 && sum(is.na(beta0)) > 0) {
-        beta0[which(is.na(beta0))] <- 0
-    }
+        initialOut <- initialFit(data = data.ini, force = force, oci = oci)
+        Y0 <- initialOut$Y0
+        beta0 <- initialOut$beta0
+        if (p > 0 && sum(is.na(beta0)) > 0) {
+            beta0[which(is.na(beta0))] <- 0
+        }
 
-    ## -------------------------------##
-    ## ----------- Main Algorithm ----------- ##
-    ## -------------------------------##
+        ## -------------------------------##
+        ## ----------- Main Algorithm ----------- ##
+        ## -------------------------------##
 
-    est <- NULL
-    if (method == "fe") {
-        est <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
-    } else if (method == "ife") {
-        est <- inter_fe_ub(YY, Y0, X, II, beta0, r.cv, force = force, tol)
-    } else if (method == "mc") {
-        est <- inter_fe_mc(YY, Y0, X, II, beta0, 1, lambda.cv, force, tol)
-    }
+        est <- NULL
+        if (method == "fe") {
+            est <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+        } else if (method == "ife") {
+            est <- inter_fe_ub(YY, Y0, X, II, beta0, r.cv, force = force, tol)
+        } else if (method == "mc") {
+            est <- inter_fe_mc(YY, Y0, X, II, beta0, 1, lambda.cv, force, tol)
+        }
 
-    if (!is.null(norm.para)) {
-        est$fit <- est$fit * norm.para[1]
+        if (!is.null(norm.para)) {
+            est$fit <- est$fit * norm.para[1]
+        }
+        Y.ct <- est$fit
     }
-    Y.ct <- est$fit
 
     if (!is.null(norm.para)) {
         Y <- Y * norm.para[1]
