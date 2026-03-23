@@ -1,0 +1,305 @@
+# Factor-Based Methods {#sec-ife-mc}
+
+```{r setup-ife-mc, echo = FALSE, message = FALSE, warning = FALSE}
+set.seed(1234)
+library(fect)
+data(fect)
+```
+
+When the parallel trends assumption is violated due to latent common factors with heterogeneous loadings, the FE estimator from [Chapter @sec-fect] is biased. This chapter introduces two methods that account for such latent factors: the **interactive fixed effects** (IFE) method, which explicitly models unit-specific factor loadings, and the **matrix completion** (MC) method, which uses nuclear-norm regularization to recover the low-rank structure of the untreated potential outcomes. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/03-ife-mc.R).
+
+We use `simdata`, which includes two latent factors ($r = 2$). The FE estimator is biased on this dataset, while IFE and MC recover the correct ATT.
+
+## Interactive fixed effects
+
+In addition to FEct, **fect** supports the interactive fixed effects counterfactual (IFEct) method proposed by @Gobillon2016 and @Xu2017 and the matrix completion (MC) method proposed by @Athey2021---`method = "ife"` and `method = "mc"`, respectively. The EM algorithm is used to impute the counterfactuals of treated observations.
+
+For the IFE approach, we need to specify the number of factors using option `r`. By default, the algorithm will select an optimal hyper-parameter via a built-in cross-validation procedure (see the Cross-validation section below).
+
+We specify an interval of candidate number of unobserved factors in option `r` like `r=c(0,5)`. When cross-validation is switched off, the first element in `r` will be set as the number of factors. Below we use the MSPE criterion and search the number of factors from 0 to 5.
+
+```{r simdata_ife, eval=TRUE, cache = TRUE}
+out.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+          force = "two-way", method = "ife", CV = TRUE, r = c(0, 5),
+          se = TRUE, cores = 8, nboots = 1000, parallel = TRUE)
+print(out.ife)
+```
+
+The figure below shows the estimated ATT using the IFE method. The cross-validation procedure selects the correct number of factors ($r=2$).
+
+```{r plot-att-ife,  fig.width = 6, fig.height = 4.5}
+plot(out.ife, main = "Estimated ATT (IFEct)")
+```
+
+------------------------------------------------------------------------
+
+## Matrix completion
+
+For the MC method, we need to specify the tuning parameter in the penalty term using option `lambda`. If users don't have any prior knowledge to set candidate tuning parameters, a number of candidate tuning parameters can be generated automatically based on the information from the outcome variable. We specify the number in option `nlambda`, e.g. `nlambda = 10`.
+
+```{r simdata_mc, eval=TRUE, cache = TRUE}
+out.mc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+          force = "two-way", method = "mc", CV = TRUE,
+          se = TRUE, cores = 8, nboots = 1000, parallel = TRUE)
+
+print(out.mc)
+```
+
+```{r plot-att-mc, fig.width = 6, fig.height = 4.5}
+plot(out.mc, main = "Estimated ATT (MC)")
+```
+
+::: {.callout-note appearance="simple"}
+### The `em` parameter
+
+By default, `em = TRUE` and the EM algorithm is used to estimate the factor model when the estimation sample has missing entries. This is always the case in the default DID setting (`time.component.from = "notyettreated"`), where treated post-treatment cells are unobserved under control. For the synthetic control setting, see [Chapter @sec-gsynth].
+:::
+
+------------------------------------------------------------------------
+
+## Cross-validation
+
+When using `method = "ife"` or `method = "mc"`, we need to choose a tuning parameter --- the number of factors `r` (IFE) or the regularization strength `lambda` (MC). Setting `CV = TRUE` activates the built-in cross-validation procedure. In each round, a subset of observations is masked (held out), the model is re-estimated on the remaining data, and the prediction error on the held-out set is scored. The tuning parameter that minimizes the chosen criterion is selected.
+
+```{r cv_ife_demo, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
+out.cv <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+               method = "ife", CV = TRUE, r = c(0, 5),
+               se = FALSE, parallel = TRUE)
+```
+
+```{r print-cv-selected-r}
+cat("Selected r:", out.cv$r.cv, "\n")
+```
+
+### CV method
+
+The `cv.method` parameter controls *which observations are masked* during cross-validation. Different masking strategies test different aspects of the model.
+
+| `cv.method` | What is masked | What it tests |
+|:---------------------|:-------------------------|:-----------------------|
+| `"all_units"` | Random subsets of control observations across all units | Factor estimation quality on the full panel |
+| `"treated_units"` | Random subsets from eventually-treated units' pre-treatment observations only | Counterfactual prediction quality for the target units |
+| `"loo"` | One treated pre-treatment period at a time | Projection quality (legacy gsynth method) |
+
+::: {.callout-note appearance="simple"}
+### Which `cv.method` should I use?
+
+`"all_units"` (default for `fect_cv` and `fect_mspe`) is the general-purpose choice --- it tests whether the model can predict held-out control observations well, and is suitable when the panel is large and the factor structure is the main concern. `"treated_units"` (default for nevertreated/gsynth) directly tests counterfactual quality for the treated group, and is preferred when prediction accuracy for treated units is the priority. `"loo"` (nevertreated only) is the original gsynth leave-one-out method; it can be unstable with few pre-treatment periods, in which case `"treated_units"` is a more robust alternative.
+:::
+
+We provide an example below.
+```{r cv_method_compare, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
+out.all <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+                method = "ife", CV = TRUE, r = c(0, 5),
+                cv.method = "all_units", se = FALSE, parallel = TRUE)
+
+out.tr <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+               method = "ife", CV = TRUE, r = c(0, 5),
+               cv.method = "treated_units", se = FALSE, parallel = TRUE)
+```
+
+```{r print-cv-method-compare}
+cat("cv.method = 'all_units':     r.cv =", out.all$r.cv, "\n")
+cat("cv.method = 'treated_units': r.cv =", out.tr$r.cv, "\n")
+```
+
+Both strategies often agree, but they can select different `r` when the factor structure matters more for one group than the other.
+
+### Sub-options
+
+The k-fold masking procedure is controlled by several sub-options that apply to both `"all_units"` and `"treated_units"`:
+
+| Option | Default | Description |
+|:-------------------|:----------------------|:-----------------------------|
+| `k` | 10 | Number of cross-validation rounds |
+| `cv.prop` | 0.1 | Proportion of eligible observations held out per round |
+| `cv.nobs` | 3 | Block size for structured removal (consecutive observations) |
+| `cv.donut` | 0 | Periods excluded around treatment onset in the evaluation set to minimize contamination |
+| `min.T0` | 5 | Minimum pre-treatment observations required per unit |
+
+The block removal (`cv.nobs`) addresses serial correlation: instead of masking individual observations, we mask blocks of consecutive observations. The `cv.donut` option further excludes observations near the treatment boundary from the test set to avoid contamination due to temporal correlation in data.
+
+### Scoring criteria
+
+The `criterion` parameter determines which scoring metric is used to select the best tuning parameter:
+
+| `criterion` | Description | When to use |
+|:------------------------|:-----------------------|:-----------------------|
+| `"mspe"` (default) | Mean squared prediction error | General-purpose; best for prediction accuracy |
+| `"gmspe"` | Geometric mean SPE | Robust to outlier prediction errors |
+| `"pc"` | Information criterion (Bai & Ng) | Model selection based on penalized fit; does not require CV rounds |
+| `"moment"` | Weighted period-wise residual averages | Selects for best pre-trend fitting rather than prediction |
+
+```{r criterion_compare, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
+out.mspe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+                 method = "ife", CV = TRUE, r = c(0, 5),
+                 criterion = "mspe", se = FALSE, parallel = TRUE)
+
+out.pc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+               method = "ife", CV = TRUE, r = c(0, 5),
+               criterion = "gmspe", se = FALSE, parallel = TRUE)
+```
+
+```{r print-criterion-compare}
+cat("criterion = 'mspe': r.cv =", out.mspe$r.cv, "\n")
+cat("criterion = 'gmspe': r.cv =", out.pc$r.cv, "\n")
+```
+
+::: {.callout-tip appearance="simple"}
+### Selection rule
+
+A candidate `r` is selected over a smaller value only if its criterion score improves by more than 1%. This prevents overfitting to marginal improvements.
+:::
+
+### Parallel computing
+
+Cross-validation can be computationally expensive, especially with `cv.method = "all_units"` in the nevertreated setting (which re-estimates the full factor model `k` times per candidate `r`). Parallel computing is enabled by default when `parallel = TRUE` in `fect()`.
+
+For the nevertreated path, parallel CV auto-activates when the panel is large enough ($N_{co} \times T > 20{,}000$) and `cv.method = "all_units"`. The `"treated_units"` and `"loo"` methods are always sequential because the per-fold cost is too low to benefit from parallelization overhead.
+
+------------------------------------------------------------------------
+
+## Diagnostics
+
+We provide three types of diagnostic tests: (1) a placebo test, (2) a joint test for (no) pretrend, and (3) a test for (no) carry-over effects. For each test, we support both the difference-in-means approach and the equivalence approach. The details are provided in the paper. We demonstrate each test using both the IFE and MC estimators.
+
+### Placebo tests
+
+We provide a placebo test for a settled model---hence, cross-validation is not allowed---by setting `placeboTest = TRUE`. We specify a range of pre-treatment periods as "placebo periods" in option `placebo.period` to remove observations in the specified range for model fitting, and then test whether the estimated ATT in this range is significantly different from zero. Below, we set `c(-2, 0)` as the placebo periods.
+
+```{r placebo_ife, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
+out.ife.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+  force = "two-way", method = "ife",  r = 2, CV = 0,
+  parallel = TRUE, se = TRUE,
+  nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))
+
+out.mc.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+  force = "two-way", method = "mc",  lambda = out.mc$lambda.cv,
+  CV = 0, parallel = TRUE, se = TRUE,
+  nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))
+```
+
+The placebo test conducts two types of tests:
+
+**t test.** If t-test p-value is smaller than a pre-specified threshold (e.g. 5%), we reject the null of no-differences. Hence, the placebo test is deemed failed.
+
+**TOST.** The TOST checks whether the 90% confidence intervals for estimated ATTs in the placebo period exceed a pre-specified range (defined by a threshold), or the equivalence range. A TOST p-value smaller than a pre-specified threshold suggests that the null of difference bigger than the threshold is rejected; hence, the placebo test is passed.
+
+By default, the plot will display the p-value of the $t$-test (`stats = "placebo.p"`). Users can also add the p-value of a corresponding TOST test by setting `stats = c("placebo.p","equiv.p")`. A larger placebo p-value from a t-test and a smaller placebo TOST p-value are preferred.
+
+```{r placebo_ife_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+plot(out.ife.p, ylab = "Effect of D on Y", main = "Estimated ATT (IFE)",
+     cex.text = 0.8, stats = c("placebo.p","equiv.p"))
+```
+
+```{r placebo_mc_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+plot(out.mc.p, cex.text = 0.8, stats = c("placebo.p","equiv.p"),
+     main = "Estimated ATT (MC)")
+```
+
+The results in the placebo test confirm that IFEct is a better model than MC for this particular DGP.
+
+### LOO pre-trend test {#loo-pre-trend-test}
+
+Instead of using estimated ATTs for periods prior to the treatment to test for pre-trends, we recommend users employ a leave-one-out (LOO) approach (`loo = TRUE`) to consecutively hide one pre-treatment period (relative to the timing of the treatment) and repeatedly estimate the pseudo treatment effects for that pre-treatment period. The LOO approach can be understood as an extension of the placebo test. It has the benefit of providing users with a more holistic view of whether the identifying assumptions likely hold. However, as the program needs to conduct uncertainty estimates for each turn, it is much more time-consuming than the original one.
+
+```{r simdata_ife_loo, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.ife.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+  method = "ife", force = "two-way", se = TRUE, parallel = TRUE, cores = 8, nboots = 200, loo = TRUE)
+out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+  method = "mc", force = "two-way", se = TRUE, parallel = TRUE, cores = 8, nboots = 200, loo = TRUE)
+```
+
+After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the `plot` function. Since all pre-treatment estimates are now out-of-sample, the plot uses a uniform black color for all points (no gray/black distinction). The equivalence plots below use the LOO estimates directly.
+
+### Joint tests
+
+We now introduce two statistical tests for the presence of a pre-trend (or the lack thereof) that *jointly* assess pre-trend quality. The first test is an $F$ test for zero residual averages in the pre-treatment periods. The second test is a two-one-sided $t$ (TOST) test, a type of equivalence tests.
+
+**F test.** We offer a goodness-of-fit test (a variant of the $F$ test) and to gauge the presence of pre-treatment (differential) trends. A larger F-test p-value suggests a better pre-trend fitting. Users can specify a test range in option `pre.periods`. For example, `pre.periods = c(-4,0)` means that we test pre-treatment trend of the last 5 periods prior to the treatment (from period -4 to period 0). If `pre.period = NULL` (default), all pre-treatment periods in which the number of treated units exceeds the total number of treated units \* `proportion` will be included in the test.
+
+**TOST.** The TOST checks whether the 90% confidence intervals for estimated ATTs in the pre-treatment periods (again, subject to the `proportion` option) exceed a pre-specified range, or the equivalence range. A smaller TOST p-value suggests a better pre-trend fitting. While users can check the values of confidence intervals, we give a visualization of the equivalence test. We can plot the pre-treatment residual average with the equivalence confidence intervals by setting `type = "equiv"`. Option `tost.threshold` sets the equivalence range (the default is $0.36\sigma_{\epsilon}$ in which $\sigma_{\epsilon}$ is the standard deviation of the outcome variable after two-way fixed effects are partialed out). By setting `range = "both"`, both the minimum range (in gray) and the equivalence range (in red) are drawn.
+
+On the topleft corner of the graph, we show several statistics of the user's choice. User can choose which statistics to show by setting `stats = c("none", "F.stat", "F.p", "F.equiv.p", "equiv.p")` which corresponds to not showing any, the $F$ statistic, the p-value for the $F$ test, the p-value for the equivalence $F$ test, the (maximum) p-value for the TOST tests, respectively. For the gap plot, the default is `stats = "none"`. For the equivalence plot, the default is `stats = c("equiv.p, F.p")`. Users can also change the labels of statistics using the `stats.labs` options. Users can adjust its position using the `stats.pos` option, for example `stats.pos = c(-30, 4)`. To turn off the statistics, set `stats = "none"`.
+
+Below, we visualize the result of the joint pre-trend test for each of the two estimators using our simulated data. We use the LOO estimates computed above, which provide a more honest out-of-sample pre-trend assessments.
+
+::: {.callout-note appearance="simple"}
+### Why LOO for pre-trend testing?
+
+In-sample pre-trend estimates can be misleadingly close to zero because the model is fitted to these same observations. LOO provides genuine out-of-sample estimates, giving a more honest assessment of whether the parallel trends assumption holds.
+:::
+
+```{r pretrend_ife, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5, warning = FALSE}
+plot(out.ife.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
+     cex.legend = 0.6, main = "Testing Pre-Trend (IFEct)", cex.text = 0.8)
+```
+
+```{r pretrend_mc, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5, warning = FALSE}
+plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
+     cex.legend = 0.6, main = "Testing Pre-Trend (MC)", cex.text = 0.8)
+```
+
+From the above plots, we see that IFEct passes both tests using a conventional test size (5%); and MC fails the F tests, but passes the TOST (equivalence) test. Hence, we may conclude that IFEct is a more suitable model.
+
+### Carryover effects
+
+The idea of the placebo test can be extended to testing the presence of carryover effects. Instead of hiding a few periods right before the treatment starts, we hide a few periods right after the treatment ends. If carryover effects do not exist, we would expect the average prediction error in those periods to be close to zero. To perform the carryover test, we set the option `carryoverTest = TRUE`. We can treat a range of exit-treatment periods in option `carryover.period` to remove observations in the specified range for model fitting, and then test whether the estimated ATT in this range is significantly different from zero.
+
+Below, we set `carryover.period = c(1, 3)`. As we deduct the treatment effect from the outcome in `simdata`, we expect the average prediction error for these removed periods to be close to zero.
+
+```{r carryover_ife, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
+out.ife.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+  force = "two-way", method = "ife", r = 2, CV = 0,
+  parallel = TRUE, se = TRUE,
+  nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
+
+out.mc.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+  force = "two-way", method = "mc",  lambda = out.mc$lambda.cv,
+  CV = 0, parallel = TRUE, se = TRUE,
+  nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
+```
+
+Like the placebo test, the plot will display the p-value of the carryover effect test (`stats = "carryover.p"`). Users can also add the p-value of a corresponding TOST test by setting `stats = c("carryover.p","equiv.p")`. In exit plots, pre-exit estimates are shown in black (out-of-sample) and post-exit estimates in gray (in-sample).
+
+```{r carryover_ife_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 5}
+plot(out.ife.c, type = "exit", ylim = c(-2.5,4.5),
+          cex.text = 0.8, main = "Carryover Effects (IFE)")
+```
+
+```{r carryover_mc_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 5}
+plot(out.mc.c, type = "exit", ylim = c(-2.5,4.5),
+          cex.text = 0.8, main = "Carryover Effects (MC)")
+```
+
+Once again, the IFE estimator outperforms the other two.
+
+Using real-world data, researchers will likely find that carryover effects exist. If such effects are limited, researchers can consider removing a few periods after the treatment ended for the treated units from the first-stage estimation (using the `carryover.period` option) and re-estimated the model (and re-conduct the test). We provide such an example in the paper. Here, we illustrate the option using `simdata`.
+
+```{r carryover_rm, eval = TRUE, cache = TRUE, message = FALSE, results='hide', fig.width = 6, fig.height = 4.5}
+out.ife.rm.test <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+  force = "two-way", method = "ife", r = 2, CV = 0,
+  parallel = TRUE, se = TRUE,  carryover.rm = 3,
+  nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))# remove three periods
+
+plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(5, 2.5))
+```
+
+In the above plot, the three periods in blue are dropped from the first-stage estimation of the factor model while the periods in red are reserved for the (no) carryover effects test.
+
+### Summary 
+
+| Test | Purpose | Key arguments | Plot type | Statistics shown |
+|:-------------|:-------------|:-------------|:-------------|:-----------------|
+| Placebo test | Tests whether the model produces zero ATT in withheld pre-treatment periods | `placeboTest = TRUE`, `placebo.period = c(a, b)` | `"gap"` (default) | `placebo.p`, `equiv.p` |
+| LOO pre-trend test | Out-of-sample check for pre-trends by leaving out one pre-treatment period at a time | `loo = TRUE` (in `fect()`), `loo = TRUE` (in `plot()`) | `"gap"` or `"equiv"` | `F.p`, `equiv.p` |
+| Joint pre-trend test (F + TOST) | Joint assessment: F test for zero residual averages; TOST for equivalence within a threshold | `type = "equiv"` in `plot()`, `tost.threshold` | `"equiv"` | `F.p`, `F.equiv.p`, `equiv.p` |
+| Carryover test | Tests whether treatment effects persist after treatment ends | `carryoverTest = TRUE`, `carryover.period = c(a, b)` | `"exit"` | `carryover.p`, `equiv.p` |
+
+::: {.callout-tip appearance="simple"}
+-   A **larger** F-test / placebo / carryover p-value suggests the model passes the test.
+-   A **smaller** TOST / equivalence p-value suggests the pre-trends or carryover effects are within an acceptable range.
+-   We recommend using `loo = TRUE` for pre-trend tests to avoid the false reassurance of in-sample fit.
+-   The `proportion` option controls which pre-treatment periods are included in the tests (default: periods where the number of treated units exceeds `proportion` $\times$ total treated units).
+-   The `tost.threshold` option sets the equivalence range for the TOST test (default: $0.36\hat{\sigma}_\epsilon$). Finding the "right" threshold is often a challenge in empirical research.
+:::

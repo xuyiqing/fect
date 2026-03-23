@@ -4,11 +4,10 @@ editor:
     wrap: sentence
 ---
 
-# New DID Methods {#sec-panel}
+# Modern DID Methods {#sec-panel}
 
 This chapter, authored by Ziyi Liu and Yiqing Xu, complements @CLLX2025 ([paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf), [slides](https://yiqingxu.org/papers/english/2023_panel/CLLX_slides.pdf)).
-Rivka Lipkovitz also contributes to this tutorial.
-Download the R code used in this chapter [here](rscript/06-panel.R).
+Rivka Lipkovitz also contributes to this tutorial. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/08-panel.R).
 
 ------------------------------------------------------------------------
 
@@ -22,13 +21,19 @@ In the process, we will present a recommended pipeline for analyzing panel data,
 
 We illustrate these methods with two empirical examples: @HH2019 (without treatment reversals) and @GS2020 (with treatment reversals).
 
+::: {.callout-note appearance="simple"}
+## macOS Users
+
+Some packages in this chapter (e.g., `DIDmultiplegtDYN`) depend on `rgl`, which requires an X11 system. If you encounter graphics-related errors, install [XQuartz](https://www.xquartz.org/), the X11 implementation for macOS, then restart R.
+:::
+
 ## Install Packages
 
 To begin, you will need to install the necessary packages from CRAN and GitHub.
 
-```{r message = FALSE, warning = FALSE}
+```{r install-packages, message = FALSE, warning = FALSE}
 # install packages from CRAN
-packages <- c("dplyr", "fixest", "did", "didimputation", 
+packages <- c("dplyr", "fixest", "did", "didimputation",
               "panelView", "ggplot2", "bacondecomp", "HonestDiD",
               "DIDmultiplegtDYN", "PanelMatch", "readstata13")
 install.packages(setdiff(packages, rownames(installed.packages())))  
@@ -46,7 +51,7 @@ if ("HonestDiDFEct" %in% rownames(installed.packages()) == FALSE) {
 
 Load libraries:
 
-```{r message = FALSE, warning = FALSE}
+```{r load-libraries, message = FALSE, warning = FALSE}
 library(dplyr)
 library(readstata13)
 library(fixest)
@@ -61,7 +66,8 @@ library(didimputation)
 library(doParallel)
 library(HonestDiD)
 library(HonestDiDFEct)
-library(DIDmultiplegtDYN) # may require XQuartz 
+library(polars)
+library(DIDmultiplegtDYN) # requires polars; may require XQuartz for rgl
 ```
 
 ## No Treatment Reversals
@@ -69,7 +75,7 @@ library(DIDmultiplegtDYN) # may require XQuartz
 We begin with an empirical example from @HH2019, who investigate the effects of indirect democracy versus direct democracy on naturalization rates in Switzerland using municipality-year panel data from 1991 to 2009.
 The study finds that switching from direct to indirect democracy increased naturalization rates by an average of 1.22 percentage points (Model 1, Table 1).
 
-```{r message = FALSE, warning = FALSE}
+```{r load-hh2019, message = FALSE, warning = FALSE}
 data(fect)
 data <- hh2019
 head(data)
@@ -273,10 +279,10 @@ The stacked DID plot closely resembles that of the TWFE model, suggesting that p
 ### Interaction Weighted
 
 @sun2021-event proposes an interaction-weighted (IW) estimator for estimating the ATT.
-the IW estimator computes a weighted average of ATT estimates for each cohort, obtained from a TWFE regression where cohort dummies are fully interacted with indicators of relative time to treatment onset.
+The IW estimator computes a weighted average of ATT estimates for each cohort, obtained from a TWFE regression where cohort dummies are fully interacted with indicators of relative time to treatment onset.
 See a simple illustration below.
 
-```{r, echo=FALSE, out.width="50%", fig.align="center"}
+```{r fig-iw-illustration, echo=FALSE, out.width="50%", fig.align="center"}
 knitr::include_graphics("fig/fig_iw.png")
 ```
 
@@ -294,7 +300,7 @@ model.sa.1 <- feols(nat_rate_ord~sunab(FirstTreat,year)|bfs+year,
 summary(model.sa.1,agg = "ATT")
 ```
 
-The estimation results are saved `coeftable` for plotting.
+The estimation results are saved in `coeftable` for plotting.
 We can make an event study plot as before.
 The results are quite similar to TWFE and stacked DID.
 
@@ -381,7 +387,7 @@ p.cs.1.u
 One advantage of CSDID is the ability to use **not-yet-treated** units as the comparison group by setting `control_group = "notyettreated"`.
 See a simple illustration below.
 
-```{r, echo=FALSE, out.width="50%", fig.align="center"}
+```{r fig-cs-illustration, echo=FALSE, out.width="50%", fig.align="center"}
 knitr::include_graphics("fig/fig_cs.png")
 ```
 
@@ -439,13 +445,13 @@ For each placebo period $k$, the command compares the outcome evolution of switc
 
 See a simple illustration below with $l = 2$ (number of lags, capturing post-treatment effects) and $k = 2$ (number of leads, capturing pre-treatment placebo effects).
 
-```{r, echo=FALSE, out.width="50%", fig.align="center"}
+```{r fig-pm-illustration, echo=FALSE, out.width="50%", fig.align="center"}
 knitr::include_graphics("fig/fig_pm.png")
 ```
 
 In the following example, we set $l = 12$ and $k = 9$.
 
-```{r hh_didm, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE, eval=requireNamespace("polars", quietly=TRUE)}
+```{r hh_didm, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 didm.results <- did_multiplegt_dyn(
       df = df.use,
       outcome = "nat_rate_ord",
@@ -463,7 +469,7 @@ print(didm.results)
 
 Again, we make an event study plot using `esplot`.
 
-```{r hh_didm.dynamic, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE, eval=requireNamespace("polars", quietly=TRUE)}
+```{r hh_didm.dynamic, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 T.post <- dim(didm.results$results$Effects)[1]
 T.pre <- dim(didm.results$results$Placebos)[1]
 didm.vis <- rbind(didm.results$results$Placebos,didm.results$results$Effects)
@@ -489,7 +495,7 @@ Note that the terms *lead* and *lag* here are opposite to their traditional usag
 To assign equal weights to all control units in each matched set, we set `refinement.method = "none"` (without matching on controls).
 Notably, by matching on treatment history and defining the lead window, `PanelMatch` uses only the subset of treated units with three pre-treatment periods and four post-treatment periods to compute the average treatment effects.
 
-The PanelMatch estimator is equivalent to the DIDmulitple estimator proposed by @CDH2020 if we only match on the last pre-treatment period and only estimate the treatment effect at the first post-treatment period.
+The PanelMatch estimator is equivalent to the DIDmultiple estimator proposed by @CDH2020 if we only match on the last pre-treatment period and only estimate the treatment effect at the first post-treatment period.
 
 ```{r hh_pm, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 df.pm <- df.use
@@ -526,7 +532,7 @@ PM.results.placebo <- PanelMatch(lag=3,
 We can estimate the ATT and dynamic treatment effects using the function `PanelEstimate`.
 To obtain the ATT, we set the option `pooled = TRUE`.
 The standard error is calculated using a block bootstrapping method.
-This is different from the standard boostrapping method, which is not valid for matching estimators \cite{abadie2008failure}.
+This is different from the standard boostrapping method, which is not valid for matching estimators [@abadie2008failure].
 
 ```{r hh_pm1, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 # ATT
@@ -563,7 +569,7 @@ Now, we return to the imputation method, which **fect** is originally designed t
 See a simple illustration below.
 For details, see @sec-fect.
 
-```{r, echo=FALSE, out.width="50%", fig.align="center"}
+```{r fig-fect-illustration, echo=FALSE, out.width="50%", fig.align="center"}
 knitr::include_graphics("fig/fig_fect.png")
 ```
 
@@ -667,7 +673,7 @@ In the original paper, the authors use district by election-cycle panel data fro
 House general elections between 1980 and 2012, arguing that the presence of Asian (Black/Latino) candidates in general elections increases the proportion of campaign contributions from Asian (Black/Latino) donors.
 Here, we focus specifically on the effects of Asian candidates, as shown in the top left panel of Figure 5 in the paper.
 
-```{r message = FALSE, warning = FALSE}
+```{r load-gs2020, message = FALSE, warning = FALSE}
 data(fect)
 data <- gs2020
 data$cycle <- as.integer(as.numeric(data$cycle/2))
@@ -739,7 +745,7 @@ twfe.est <- feols(general_sharetotal_A_all ~
                   data = data_cohort, cluster = "district_final")
 ```
 
-We then visualize the estimated dynamic treatment.
+We then visualize the estimated dynamic treatment effects.
 
 ```{r gb_twfeplot, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 twfe.output <- as.data.frame(twfe.est$coeftable[c(1:25),])
@@ -837,7 +843,7 @@ model.fect <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all",
 print(model.fect$est.avg)
 ```
 
-We visualize the estimated dynamic treatment for the counterfactual estimator in the same way.
+We visualize the estimated dynamic treatment effects for the counterfactual estimator in the same way.
 
 ```{r gb_fectplot, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 fect.output <- as.data.frame(model.fect$est.att)

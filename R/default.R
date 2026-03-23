@@ -90,7 +90,8 @@ fect <- function(
     permute = FALSE, ## permutation test
     m = 2, ## block length
     normalize = FALSE, # accelerate option
-    keep.sims = FALSE # keep individual bootstrap/jackknife simulations
+    keep.sims = FALSE, # keep individual bootstrap/jackknife simulations
+    cm = FALSE # causal moderation
 ) {
     UseMethod("fect")
 }
@@ -163,7 +164,8 @@ fect.formula <- function(
     permute = FALSE, ## permutation test
     m = 2, ## block length
     normalize = FALSE,
-    keep.sims = FALSE
+    keep.sims = FALSE,
+    cm = FALSE
 ) {
     ## parsing
     varnames <- all.vars(formula)
@@ -266,7 +268,8 @@ fect.formula <- function(
         permute = permute,
         m = m,
         normalize = normalize,
-        keep.sims = keep.sims
+        keep.sims = keep.sims,
+        cm = cm
     )
 
     out$call <- match.call()
@@ -343,7 +346,8 @@ fect.default <- function(
     permute = FALSE, ## permutation test
     m = 2, ## block length
     normalize = FALSE,
-    keep.sims = FALSE
+    keep.sims = FALSE,
+    cm=FALSE
 ) {
     ## -------------------------------##
     ## Checking Parameters
@@ -380,6 +384,11 @@ fect.default <- function(
 
     id <- index[1]
     time <- index[2]
+
+
+    if (cm == TRUE & ! method %in% c("fe", "ife")) {
+        stop("\"cm\" option is only available for the \"fe\" and \"ife\" methods.")
+    }
 
     if (se == 1) {
         if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
@@ -1483,6 +1492,12 @@ fect.default <- function(
     II <- I
     II[which(D == 1)] <- 0 ## regard treated values as missing
 
+    II.cm <- matrix(0, TT, N)
+    II.cm[which(D == 1)] <- 1
+    II.cm[is.nan(Y.ind)] <- 0
+
+    # Unbalance Check
+    ## 1. remove units that have too control status
     T0 <- apply(II, 2, sum)
     T0.min <- min(T0)
 
@@ -1571,6 +1586,7 @@ fect.default <- function(
         I <- as.matrix(I[, -rm.id]) ## after removing
         I.D <- as.matrix(I.D[, -rm.id])
         II <- as.matrix(II[, -rm.id])
+        II.cm <- as.matrix(II.cm[, -rm.id])
         if (!is.null(group)) {
             G <- as.matrix(G[, -rm.id])
         }
@@ -1610,6 +1626,7 @@ fect.default <- function(
         I <- I[-which(I.use == 0), ] ## remove that period
         I.D <- I.D[-which(I.use == 0), ]
         II <- II[-which(I.use == 0), ] ## remove that period
+        II.cm <- II.cm[-which(I.use == 0), ] ## remove that period
         D <- D[-which(I.use == 0), ] ## remove that period
         Y <- Y[-which(I.use == 0), ] ## remove that period
 
@@ -2048,6 +2065,8 @@ fect.default <- function(
                     W = W,
                     I = I,
                     II = II,
+                    cm=cm,
+                    II.cm = II.cm,
                     T.on = T.on,
                     T.off = T.off,
                     r = r,
@@ -2251,6 +2270,8 @@ fect.default <- function(
             W = W,
             I = I,
             II = II,
+            cm = cm,
+            II.cm = II.cm,
             T.on = T.on,
             T.off = T.off,
             T.on.carry = T.on.carry,

@@ -1,0 +1,88 @@
+# Changelog {#sec-changelog .unnumbered}
+
+## v2.2.0
+
+* Added `time.component.from` parameter: `"notyettreated"` (default) or `"nevertreated"` controls which units provide the time-varying model components (time fixed effects, latent factors, and temporal dynamics). Replaces `method = "gsynth"` with `method = "ife", time.component.from = "nevertreated"`.
+* CFE estimator now supports `time.component.from = "nevertreated"`, enabling full CFE model components (additional FEs, $Z/\gamma$, $Q/\kappa$, latent factors) with never-treated estimation.
+* Added `fect_mspe()` for out-of-sample model comparison (MSPE, RMSE, MAD) across specifications.
+* Unified cross-validation: replaced `cv.treat` + `mask.method` with single `cv.method` parameter; added `cv.sample` k-fold CV for `fect_nevertreated`.
+* Improved EM convergence conditioning: R-level centering + C++ component-wise convergence (up to 2000x better component accuracy).
+* Removed deprecated methods: `polynomial`, `bspline`, `cfe_old`. Renamed internal `fect_gsynth` to `fect_nevertreated`.
+* Plot system overhaul: pre/post color distinction, highlight shapes (triangles for placebo, diamonds for carryover), new `esplot()` parameters (`xangle`, `yangle`, `xbreaks`, `ybreaks`, `legendOff`).
+* Fixed parallel bootstrap `.export` lists for CFE + nevertreated; fixed `fect_mspe` + `CV=TRUE` interaction; fixed `start0` coloring; fixed `.as_mask()` dimension bug.
+* Renamed datasets for clarity: `simdata1` → `sim_base`, `simdata2` → `sim_trend`, `simgsynth` → `sim_gsynth`. Added `sim_region` and `sim_linear`. `simdata` kept for backward compatibility.
+* Fixed ggplot2 deprecation warnings: `size` → `linewidth` in all `geom_hline`, `geom_line`, and bound line aesthetics.
+* Fixed `GGally::ggpairs` loadings plot warnings by applying color/fill scales inside sub-panel functions.
+* Exit plot legends now read "Under treatment" / "Out of treatment" instead of "Pre-treatment" / "Post-treatment".
+* CRAN compliance: resolved codoc mismatches in `esplot.Rd`, `fect_mspe.Rd`, `plot.fect.Rd`; removed duplicate data source (`fect.RData`); added `globalVariables` declarations.
+* 590 tests (up from 131), including 98 book-derived behavioral tests and 36 CFE bifurcation tests.
+
+## v2.1.1
+
+* Added `fect_mspe()` for evaluating out-of-sample prediction accuracy across model specifications.
+* Optimized CFE estimator performance: memory recycling, sparse data handling, reduced C++ deep copies.
+* Fixed `sigma2` normalization crash and division-by-zero guards in bootstrap.
+* Fixed bootstrap NA and multicollinearity abort issues.
+* Fixed gsynth weight calculation and `r=0` grand mean issue.
+* Fixed `Q.type` routing in CFE and handling of time periods with all units under control.
+* Switched parallel backend from `future` to `parallelly`.
+* Added CFE tutorial chapter to Quarto book.
+* Added `codetools` and `tail` imports required by new functions.
+
+## v2.1.0
+
+(2025-10-27)
+
+* Added CFE (Complex Fixed Effects) estimator as `method = "cfe"`: additional group FEs via `index`, time-invariant covariates with time-varying coefficients (`Z`/`gamma`), unit-specific loadings on known time bases (`Q.type`/`Q`/`kappa`), and latent factors (`r`).
+* Added B-spline option to `Q.type` for flexible nonlinear time trend approximation.
+* Added `return.data = TRUE` option to `plot()` for extracting plot data.
+* Added `doRNG` for reproducible parallel bootstrap results.
+* Switched parallel backend from `future` to `parallelly`.
+* Aligned gsynth bootstrap values and standard errors with the original gsynth package.
+* Reduced memory usage by removing unnecessary C++ deep copies.
+* Added `min.T0` restrictions to prevent estimation with too few control observations.
+* Fixed various R CMD check issues for CRAN compliance.
+
+## v2.0.5
+
+(2025-08-25) CRAN release.
+
+* Fixed various bugs due to changes in dependencies
+* Added limit to `cores` by default in parallel computing
+* Add new plot `type = "hte"`
+* Added R-CMD-check for merging
+
+## v2.0.2
+
+(2025-05-07)
+
+* Fixed various bugs
+* Updated counterfactual plot
+* Added sensitivity analysis
+* Added `did_wrapper()` and `esplot()`
+* Added various plotting options
+* Improved documentation
+
+## v2.0.0
+
+(2025-01-17) CRAN release.
+
+* Changed to new syntax
+* Fixed various bugs
+* Added `get_cohort()`
+* Merged in **gsynth**
+
+## v1.0.0
+
+* First CRAN version
+* Fixed bugs
+
+## v0.6.5
+
+* Replace fastplm with fixest for fixed effects estimation
+* Added plots for heterogeneous treatment effects
+* Fixed bugs
+
+## v0.4.1
+
+* Added a `NEWS.md` file to track changes to the package.
