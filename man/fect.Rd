@@ -21,7 +21,7 @@ assumptions.}
             knots = NULL, degree = 2,
             sfe = NULL, cfe = NULL,
             Z = NULL, gamma = NULL, Q = NULL, kappa = NULL, 
-            Q.type = NULL, # c(1,2,3) or c("linear", "quadratic", "cubic")
+            Q.type = NULL,
             Z.param = NULL, Q.param = NULL,
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,

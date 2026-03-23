@@ -882,9 +882,7 @@ fect_boot <- function(
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
         .multicombine = TRUE,
-        .export = c("fect_gsynth", "fect_fe", "fect_cfe", "fect_polynomial", "initialFit",
-                     ".reconstruct_gamma_fit_tr", ".reconstruct_kappa_fit",
-                     ".extract_and_apply_typeB_fe"),
+        .export = c("fect_gsynth", "fect_fe", "fect_cfe", "fect_polynomial", "initialFit"),
         .packages = c("fect", "mvtnorm", "fixest"),
         .options.future = list(seed = TRUE),
         .inorder = FALSE
@@ -1723,10 +1721,7 @@ fect_boot <- function(
           "fect_cfe",
           "get_term",
           "fect_gsynth",
-          "initialFit",
-          ".reconstruct_gamma_fit_tr",
-          ".reconstruct_kappa_fit",
-          ".extract_and_apply_typeB_fe"
+          "initialFit"
         ),
         .packages = c("fect", "mvtnorm", "fixest")
       ) %dopar%
@@ -1748,10 +1743,7 @@ fect_boot <- function(
             "fect_polynomial",
             "get_term",
             "fect_gsynth",
-            "initialFit",
-            ".reconstruct_gamma_fit_tr",
-            ".reconstruct_kappa_fit",
-            ".extract_and_apply_typeB_fe"
+            "initialFit"
           ),
           .packages = c("fect", "mvtnorm", "fixest"),
           .options.future = list(seed = TRUE)
