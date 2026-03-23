@@ -1,5 +1,8 @@
 # Sensitivity Analysis {#sec-panel-sens}
 
+```{r .common, include = FALSE}
+source("_common.R")
+```
 
 ------------------------------------------------------------------------
 
@@ -44,7 +47,7 @@ library(HonestDiDFEct) # Required for fect_sens to work
 We begin with an empirical example from @HH2019, who investigate the effects of indirect democracy versus direct democracy on naturalization rates in Switzerland using municipality-year panel data from 1991 to 2009. The study finds that switching from direct to indirect democracy increased naturalization rates by an average of 1.22 percentage points (Model 1, Table 1).
 
 ```{r load-hh2019, message = FALSE, warning = FALSE}
-if (dir.exists("../data")) load("../data/fect.RData") else data(fect)
+data(fect)
 data <- hh2019
 head(data)
 ```

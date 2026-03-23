@@ -4,21 +4,20 @@ The **Complex Fixed Effects (CFE)** estimator extends the standard two-way fixed
 
 In [Chapter @sec-ife-mc], we introduced factor-based methods (IFE and MC) that model latent common factors. CFE generalizes this framework by allowing researchers to incorporate additional observed structure alongside latent factors.
 
+```{r .common, include = FALSE}
+source("_common.R")
+```
+
 ```{r setup-cfe, echo = FALSE}
 set.seed(1234)
-rm(list = ls())
 ```
 
 ```{r load-packages-cfe, message = FALSE, warning = FALSE}
 library(fect)
-if (dir.exists("../data")) {
-  load("../data/fect.RData")
-  load("../data/sim_region.rda")
-  load("../data/sim_linear.rda")
-  load("../data/sim_trend.rda")
-} else {
-  data(fect); data(sim_region); data(sim_linear); data(sim_trend)
-}
+data(fect)
+data(sim_region)
+data(sim_linear)
+data(sim_trend)
 ```
 
 ------------------------------------------------------------------------
