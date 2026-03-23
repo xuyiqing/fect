@@ -36,6 +36,7 @@ rm(list = ls())
 ```{r load-packages, warning=FALSE, message=FALSE}
 library(fect)
 data(fect)
+data(sim_gsynth)
 ls()
 ```
 
