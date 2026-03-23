@@ -35,8 +35,12 @@ rm(list = ls())
 
 ```{r load-packages, warning=FALSE, message=FALSE}
 library(fect)
-data(fect)
-data(sim_gsynth)
+if (dir.exists("../data")) {
+  load("../data/fect.RData")
+  load("../data/sim_gsynth.rda")
+} else {
+  data(fect); data(sim_gsynth)
+}
 ls()
 ```
 

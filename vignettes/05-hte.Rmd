@@ -3,8 +3,12 @@
 ```{r setup-hte, echo = FALSE, message = FALSE, warning = FALSE}
 set.seed(1234)
 library(fect)
-data(fect)
-data(sim_base)
+if (dir.exists("../data")) {
+  load("../data/fect.RData")
+  load("../data/sim_base.rda")
+} else {
+  data(fect); data(sim_base)
+}
 ```
 
 We provide several methods for researchers to explore heterogeneous treatment effects (HTE). These methods help distinguish between *effect modification* --- how the treatment effect varies across subpopulations --- and *causal moderation* --- whether changing the moderator causally alters the treatment effect. This chapter demonstrates both descriptive HTE tools and the formal causal moderation framework. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/05-hte.R).
