@@ -14,6 +14,7 @@
     highlight = NULL,
     plot.ci = NULL,
     show.points = TRUE,
+    loess.fit = TRUE,
     show.group = NULL,
     bound = NULL,
     show.count = TRUE,
@@ -110,6 +111,12 @@
     status.background.color = NULL,
     covariate = NULL,
     covariate.labels = NULL,
+    covariate.value = NULL,
+    covariate.value.range = FALSE,
+    relative.time = FALSE,
+    pretreatment = FALSE,
+    num.pretreatment = 3,
+    cm = FALSE,
     ...
 )
 }
@@ -222,6 +229,13 @@
   \item{status.background.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default background color for status plots (e.g., \code{"gray90"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{covariate}{Character string or \code{NULL} (default). If \code{NULL}, uses a default covariate for heterogeneous plots (e.g., \code{"X"} for the base style). The \code{preset} argument may define a different covariate. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{covariate.labels}{Character vector or \code{NULL} (default). If \code{NULL}, uses a default covariate labels for heterogeneous plots (e.g., \code{"X1"} for the base style). The \code{preset} argument may define a different covariate labels. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{covariate.value}{Numeric or \code{NULL} (default); a specific covariate value at which to evaluate the HTE plot. If \code{NULL}, the full range is used.}
+  \item{covariate.value.range}{Logical; if \code{TRUE}, plots HTE over the range of covariate values. Default is \code{FALSE}.}
+  \item{relative.time}{Logical; if \code{TRUE}, uses relative time (time since treatment) on the x-axis for HTE plots. Default is \code{FALSE}.}
+  \item{pretreatment}{Logical; if \code{TRUE}, restricts HTE analysis to pre-treatment periods only. Default is \code{FALSE}.}
+  \item{num.pretreatment}{Integer; number of pre-treatment periods to include when \code{pretreatment = TRUE}. Default is \code{3}.}
+  \item{cm}{Logical; if \code{TRUE}, plots causal moderation estimates instead of effect modification estimates for HTE plots. Requires the \code{fect} object to have been estimated with \code{cm = TRUE}. Default is \code{FALSE}.}
+  \item{loess.fit}{Logical; if \code{TRUE} (default), overlays a LOESS smoothing curve on HTE scatter plots.}
   \item{...}{Additional graphical parameters passed to internal plotting routines, primarily those accepted by \code{esplot} for event study style plots (gap, equiv, exit, sens_es, cumul).}
 }
 \details{

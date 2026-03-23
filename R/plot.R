@@ -1,3 +1,5 @@
+utils::globalVariables(c("fit", "group", "y_hat", "y_hat_lower", "y_hat_upper"))
+
 ## new plot
 # x: a fect object
 # type of the plot; axes limits; axes labels;
