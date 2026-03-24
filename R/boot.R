@@ -712,7 +712,11 @@ fect_boot <- function(
           att.carryover.W = NA,
           balance.avg.att = NA,
           balance.time = NA,
-          group.output = list()
+          group.output = list(),
+          eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          boot.id = NULL
         )
         return(boot0)
       } else {
@@ -1112,7 +1116,11 @@ fect_boot <- function(
           count.off.W = NA,
           time.off.W = NA,
           att.carryover.W = NA,
-          group.output = list()
+          group.output = list(),
+          eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          boot.id = NULL
         )
         return(boot0)
       } else {
@@ -1275,7 +1283,11 @@ fect_boot <- function(
           count.off.W = NA,
           time.off.W = NA,
           att.carryover.W = NA,
-          group.output = list()
+          group.output = list(),
+          eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          boot.id = NULL
         )
         return(boot0)
       } else {
@@ -1642,7 +1654,11 @@ fect_boot <- function(
             att.off.W = NA,
             count.off.W = NA,
             time.off.W = NA,
-            att.carryover.W = NA
+            att.carryover.W = NA,
+            eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+            D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+            I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+            boot.id = NULL
           )
           return(boot0)
         } else {
