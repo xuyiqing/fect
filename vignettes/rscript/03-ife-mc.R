@@ -6,7 +6,7 @@ rm(list = ls())
 set.seed(1234)
 
 library(fect)
-data(fect)
+data(simdata)
 
 ## --- simdata_ife ---
 out.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),

@@ -14,7 +14,7 @@ set.seed(1234)
 
 ```{r load-packages-cfe, message = FALSE, warning = FALSE}
 library(fect)
-data(fect)
+data(simdata)
 data(sim_region)
 data(sim_linear)
 data(sim_trend)

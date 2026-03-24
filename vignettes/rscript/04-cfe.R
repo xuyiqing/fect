@@ -6,7 +6,10 @@ rm(list = ls())
 set.seed(1234)
 
 library(fect)
-data(fect)
+data(simdata)
+data(sim_region)
+data(sim_linear)
+data(sim_trend)
 
 ## --- cfe-42-load ---
 head(sim_region)

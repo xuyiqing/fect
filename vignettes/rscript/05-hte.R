@@ -6,7 +6,7 @@ rm(list = ls())
 set.seed(1234)
 
 library(fect)
-data(fect)
+data(sim_base)
 
 ## --- hte_setup ---
 out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),

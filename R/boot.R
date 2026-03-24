@@ -1414,7 +1414,11 @@ fect_boot <- function(
           count.off.W = NA,
           time.off.W = NA,
           att.carryover.W = NA,
-          group.out = list()
+          group.out = list(),
+          eff = if (keep.sims) matrix(NA_real_, TT, length(boot.id)) else NULL,
+          D = if (keep.sims) matrix(NA_real_, TT, length(boot.id)) else NULL,
+          I = if (keep.sims) matrix(NA_real_, TT, length(boot.id)) else NULL,
+          boot.id = boot.id
         )
         return(boot0)
       } else {

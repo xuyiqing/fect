@@ -7,7 +7,8 @@ set.seed(1234)
 
 ## --- load-packages ---
 library(fect)
-data(fect)
+data(sim_gsynth)
+data(turnout)
 ls()
 
 ## --- head-sim_gsynth ---

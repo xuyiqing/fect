@@ -6,7 +6,8 @@ rm(list = ls())
 set.seed(1234)
 
 library(fect)
-data(fect)
+data(sim_base)
+data(sim_gsynth)
 
 ## --- panelview-treatment ---
 library(panelView)

@@ -9,7 +9,8 @@ rm(list = ls())
 library(ggplot2)
 library(panelView)
 library(fect)
-data(fect)
+data(gs2020)
+data(hh2019)
 ls()
 
 ## --- est ---
