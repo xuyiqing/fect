@@ -83,7 +83,7 @@ effect <- function(x, ## a fect object
     cat("No uncertainty estimates.")
   } else {
     # Perform bootstrap analysis
-    nboots <- length(x$att.avg.boot)
+    nboots <- dim(x$eff.boot)[3]
     catt.boot <- matrix(NA, period[2] - period[1] + 1, nboots)
 
     # Calculate treatment effect for each bootstrap sample

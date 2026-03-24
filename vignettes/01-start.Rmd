@@ -61,10 +61,9 @@ install_all(packages)
 
 ## Datasets
 
-The **fect** package ships several datasets. With `LazyData: true`, all datasets become available after `library(fect)`.
+The **fect** package ships several datasets. With `LazyData: true`, all datasets become available once the package is loaded.
 
 ```{r load-data, message = FALSE, warning = FALSE}
-library(fect)
 data(simdata)
 data(sim_base)
 data(sim_gsynth)

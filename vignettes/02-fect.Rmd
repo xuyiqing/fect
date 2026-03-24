@@ -17,7 +17,6 @@ set.seed(1234)
 ```
 
 ```{r load-packages, message = FALSE, warning = FALSE}
-library(fect)
 data(sim_base)
 data(sim_gsynth)
 ```

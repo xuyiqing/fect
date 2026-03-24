@@ -26,7 +26,6 @@ We use two datasets throughout. @GS2020 examines the mobilizing effect of minori
 # load libraries and data
 library(ggplot2)
 library(panelView)
-library(fect)
 data(gs2020)
 data(hh2019)
 ls()
