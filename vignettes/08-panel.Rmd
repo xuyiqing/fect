@@ -840,7 +840,7 @@ Both are very close to the TWFE estimates.
 model.fect <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", 
                    X= c("cand_H_all", "cand_B_all"), data = data, 
                    method = "fe", index = index, se = TRUE, 
-                   parallel = TRUE, seed = 1234, force = "two-way")
+                   parallel = FALSE, seed = 1234, force = "two-way")
 
 print(model.fect$est.avg)
 ```

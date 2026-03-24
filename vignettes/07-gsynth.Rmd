@@ -110,18 +110,18 @@ Treatment effect estimates from each bootstrap run are stored in `att.boot`, an 
 
 ```{r sim2, cache = TRUE, warning = FALSE}
 system.time(
-out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 1000,vartype = 'parametric', parallel = TRUE, cores = 16)
+out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 200, vartype = 'parametric', parallel = FALSE)
 )
 ```
 
 Gsynth in **fect** also incorporates jackknife method for uncertainty estimates.
 
 ```{r simJack, cache = TRUE, message = FALSE}
-out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"), 
-               method = "gsynth", force = "two-way", 
+out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
+               method = "gsynth", force = "two-way",
                CV = TRUE, r = c(0, 5), se = TRUE,
-               vartype = "jackknife", 
-               parallel = TRUE, cores = 8)
+               vartype = "jackknife",
+               parallel = FALSE)
 
 ```
 
@@ -405,7 +405,7 @@ out_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
               data = turnout.ub,  index = c("abb","year"), 
               se = TRUE, method = "gsynth", 
               r = c(0, 5), CV = TRUE, force = "two-way", 
-              parallel = TRUE, min.T0 = 8, 
+              parallel = FALSE, min.T0 = 8,
               nboots = 1000, seed = 02139)
 ```
 
@@ -454,7 +454,7 @@ out.cfe.nt <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                    time.component.from = "nevertreated",
                    Q.type = "linear",
                    se = FALSE, CV = TRUE, r = c(0, 5),
-                   parallel = TRUE)
+                   parallel = FALSE)
 ```
 
 ```{r cfe-nt-summary}
