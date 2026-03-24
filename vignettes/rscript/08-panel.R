@@ -40,7 +40,7 @@ library(polars)
 library(DIDmultiplegtDYN) # requires polars; may require XQuartz for rgl
 
 ## --- load-hh2019 ---
-data(fect)
+data(hh2019)
 data <- hh2019
 head(data)
 
@@ -396,7 +396,7 @@ p.fect.balance <- esplot(fect.balance.output,Period = 'Time',
 p.fect.balance
 
 ## --- load-gs2020 ---
-data(fect)
+data(gs2020)
 data <- gs2020
 data$cycle <- as.integer(as.numeric(data$cycle/2))
 head(data)

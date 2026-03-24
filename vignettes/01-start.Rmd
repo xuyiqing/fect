@@ -61,16 +61,19 @@ install_all(packages)
 
 ## Datasets
 
-The **fect** package ships several datasets. All simulated and empirical datasets are loaded together with `data(fect)`.
+The **fect** package ships several datasets. With `LazyData: true`, all datasets become available after `library(fect)`.
 
 ```{r load-data, message = FALSE, warning = FALSE}
 library(fect)
-data(fect)
+data(simdata)
 data(sim_base)
 data(sim_gsynth)
 data(sim_linear)
 data(sim_trend)
 data(sim_region)
+data(hh2019)
+data(gs2020)
+data(turnout)
 ls()
 ```
 

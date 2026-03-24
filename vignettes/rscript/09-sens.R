@@ -27,7 +27,7 @@ library(ggplot2)
 library(HonestDiDFEct) # Required for fect_sens to work
 
 ## --- load-hh2019 ---
-data(fect)
+data(hh2019)
 data <- hh2019
 head(data)
 

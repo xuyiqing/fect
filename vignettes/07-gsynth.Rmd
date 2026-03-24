@@ -38,8 +38,8 @@ set.seed(1234)
 
 ```{r load-packages, warning=FALSE, message=FALSE}
 library(fect)
-data(fect)
 data(sim_gsynth)
+data(turnout)
 ls()
 ```
 
