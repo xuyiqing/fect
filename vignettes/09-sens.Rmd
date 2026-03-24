@@ -60,10 +60,12 @@ Below, we designate placebo periods using **fect**. These placebo periods are ex
 By setting `placeboTest = TRUE` and `placebo.period = c(-2, 0)`, we define three pre-treatment periods as placebo periods. Their dynamic treatment effects serve as the benchmark for parallel trends violations in the post-treatment phase. In the code chunk below, we fit **fect** with these placebo settings, then use the `fect_sens` function to perform the sensitivity analysis. This function wraps the procedures from **HonestDiDFEct**, preparing the output for plotting. Note that not all of `Mbarvec`, `periodMbarvec`, `Mvec`, or `periodMvec` need to be specified; only the ones you want to use for the sensitivity analysis.
 
 ```{r, hh_honest_placebo, warning=FALSE, message=FALSE, cache=TRUE}
-out.fect.placebo <- fect(nat_rate_ord~indirect, data = hh2019, 
+out.fect.placebo <- fect(nat_rate_ord~indirect, data = hh2019,
                          index = c("bfs","year"),
-                         method = 'fe', se = TRUE, 
-                         placeboTest = TRUE, placebo.period = c(-2,0))
+                         method = 'fe', se = TRUE,
+                         vartype = 'jackknife',
+                         placeboTest = TRUE, placebo.period = c(-2,0),
+                         parallel = FALSE)
 
 # Define post-treatment periods and sensitivity parameters for fect_sens
 T.post <- 10 # Number of post-treatment periods based on original analysis

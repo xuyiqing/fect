@@ -49,6 +49,12 @@ fect_sens <- function(
 
   # Extract DTE estimates (beta.hat) and var-cov (vcov.hat)
   beta.hat <- fect.out$est.att[idx, 1]
+
+  if (is.null(fect.out$att.vcov) || !is.matrix(fect.out$att.vcov)) {
+    stop("fect_sens requires a valid variance-covariance matrix (att.vcov) from fect(). ",
+         "Please re-run fect() with se = TRUE and ensure sufficient bootstrap iterations (nboots).",
+         call. = FALSE)
+  }
   vcov.hat <- fect.out$att.vcov[idx, idx]
 
   # Counts of pre and post periods
