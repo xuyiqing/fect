@@ -54,7 +54,7 @@ out.hh <- fect(nat_rate_ord ~ indirect,
                data = hh2019,
                index = c("bfs","year"),
                method = 'fe', se = TRUE,
-               parallel = TRUE, nboots = 1000,
+               parallel = FALSE, nboots = 200,
                keep.sims = TRUE)
 ```
 

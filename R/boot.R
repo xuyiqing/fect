@@ -1427,9 +1427,9 @@ fect_boot <- function(
           time.off.W = NA,
           att.carryover.W = NA,
           group.out = list(),
-          eff = if (keep.sims) matrix(NA_real_, TT, length(boot.id)) else NULL,
-          D = if (keep.sims) matrix(NA_real_, TT, length(boot.id)) else NULL,
-          I = if (keep.sims) matrix(NA_real_, TT, length(boot.id)) else NULL,
+          eff = matrix(NA_real_, TT, length(boot.id)),
+          D = matrix(NA_real_, TT, length(boot.id)),
+          I = matrix(NA_real_, TT, length(boot.id)),
           boot.id = boot.id
         )
         return(boot0)
@@ -1655,10 +1655,10 @@ fect_boot <- function(
             count.off.W = NA,
             time.off.W = NA,
             att.carryover.W = NA,
-            eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
-            D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
-            I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
-            boot.id = NULL
+            eff = matrix(NA_real_, TT, length(boot.id)),
+            D = matrix(NA_real_, TT, length(boot.id)),
+            I = matrix(NA_real_, TT, length(boot.id)),
+            boot.id = boot.id
           )
           return(boot0)
         } else {
