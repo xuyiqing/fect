@@ -36,7 +36,6 @@ Load libraries:
 
 ```{r load-libraries, message = FALSE, warning = FALSE}
 library(dplyr)
-library(fect)
 library(panelView)
 library(ggplot2)
 library(HonestDiDFEct) # Required for fect_sens to work

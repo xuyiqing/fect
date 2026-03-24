@@ -6,7 +6,6 @@ source("_common.R")
 
 ```{r setup-ife-mc, echo = FALSE, message = FALSE, warning = FALSE}
 set.seed(1234)
-library(fect)
 data(simdata)
 ```
 
