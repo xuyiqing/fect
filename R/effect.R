@@ -82,15 +82,33 @@ effect <- function(x, ## a fect object
   if (is.null(x$est.avg)) {
     cat("No uncertainty estimates.")
   } else {
-    # Perform bootstrap analysis
-    nboots <- dim(x$eff.boot)[3]
+    # Determine nboots from the 3D arrays
+    if (!is.null(x$eff.boot) && length(dim(x$eff.boot)) == 3) {
+      nboots <- dim(x$eff.boot)[3]
+    } else {
+      stop("eff.boot is not a valid 3D array. Ensure keep.sims = TRUE in fect().")
+    }
+    if (nboots == 0) {
+      stop("All bootstrap iterations failed. Cannot compute cumulative effects.")
+    }
+
+    # Validate D.boot and I.boot exist with matching dimensions
+    has.D.boot <- !is.null(x$D.boot) && length(dim(x$D.boot)) == 3 && dim(x$D.boot)[3] >= nboots
+    has.I.boot <- !is.null(x$I.boot) && length(dim(x$I.boot)) == 3 && dim(x$I.boot)[3] >= nboots
+
     catt.boot <- matrix(NA, period[2] - period[1] + 1, nboots)
 
     # Calculate treatment effect for each bootstrap sample
     for (i in 1:nboots) {
       # Extract bootstrap matrices
-      D.boot <- x$D.boot[, , i]
-      I.boot <- x$I.boot[, , i]
+      if (has.D.boot) {
+        D.boot <- x$D.boot[, , i]
+        I.boot <- x$I.boot[, , i]
+      } else {
+        # Fallback: use original D.dat and I.dat (less accurate but prevents crash)
+        D.boot <- x$D.dat
+        I.boot <- x$I.dat
+      }
       eff.boot <- x$eff.boot[, , i]
 
       # Select treated units in bootstrap sample

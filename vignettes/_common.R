@@ -5,7 +5,14 @@
 # During R CMD check the package is freshly installed, so library() suffices.
 if (file.exists("../DESCRIPTION") &&
     requireNamespace("devtools", quietly = TRUE)) {
-  suppressMessages(devtools::load_all("..", quiet = TRUE))
+  tryCatch(
+    suppressMessages(devtools::load_all("..", quiet = TRUE)),
+    error = function(e) {
+      message("devtools::load_all() failed: ", conditionMessage(e))
+      message("Falling back to library(fect)")
+      suppressMessages(library(fect))
+    }
+  )
 } else {
   suppressMessages(library(fect))
 }
