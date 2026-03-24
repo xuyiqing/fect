@@ -2178,6 +2178,12 @@ fect_boot <- function(
         }
       }
     }
+    if (keep.sims) {
+      eff.boot <- eff.boot[, , -boot.rm, drop = FALSE]
+      D.boot <- D.boot[, , -boot.rm, drop = FALSE]
+      I.boot <- I.boot[, , -boot.rm, drop = FALSE]
+      colnames.boot <- colnames.boot[-boot.rm]
+    }
   }
   if (dis) {
     message(dim(att.boot)[2], " runs\n", sep = "")
