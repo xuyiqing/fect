@@ -959,7 +959,9 @@ res_st <- did_wrapper(
   D      = "indirect",
   index  = c("bfs", "year"),
   method = "st",
-  se     = "boot"
+  se     = "boot",
+  nboots = 50,
+  parallel = FALSE
 )
 print(res_st)
 ```
