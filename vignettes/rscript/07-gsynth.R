@@ -1,213 +1,262 @@
-##############################
-# 07-gsynth.R
-# Generated from 07-gsynth.Rmd
-##############################
-rm(list = ls())
+## ----.common, include = FALSE-------------------------------------------------
+source("_common.R")
+
+
+## ----setup-seed, echo = FALSE-------------------------------------------------
 set.seed(1234)
 
-## --- load-packages ---
-library(fect)
+
+## ----load-packages, warning=FALSE, message=FALSE------------------------------
 data(sim_gsynth)
 data(turnout)
 ls()
 
-## --- head-sim_gsynth ---
+
+## ----head-sim_gsynth----------------------------------------------------------
 head(sim_gsynth)
 
-## --- sim-panelview-status ---
+
+## ----sim-panelview-status, cache = FALSE, fig.height=7, fig.width=7, warning=FALSE----
 library(panelView)
-panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), pre.post = TRUE)
+panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), pre.post = TRUE) 
 
-## --- sim-panelview-outcome ---
-panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), type = "outcome")
 
-## --- sim2_onecore ---
+## ----sim-panelview-outcome, cache = FALSE,fig.height=5, fig.width=7-----------
+panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), type = "outcome") 
+
+
+## ----sim2_onecore, cache = TRUE-----------------------------------------------
 system.time(
-out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-            method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
-            se = TRUE, nboots = 1000, vartype = 'parametric',
-            parallel = FALSE))
+out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), 
+            method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), 
+            se = TRUE, nboots = 1000, vartype = 'parametric', 
+            parallel = TRUE, cores = 16))
 
-## --- print-results ---
-## print(out)
-## out$est.att
-## out$est.avg
-## out$beta
 
-## --- sim2 ---
+## ----print-results, eval = FALSE----------------------------------------------
+# print(out)
+# out$est.att
+# out$est.avg
+# out$beta
+
+
+## ----sim2, cache = TRUE, warning = FALSE--------------------------------------
 system.time(
-out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 1000,vartype = 'parametric', parallel = TRUE, cores = 16)
+out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 1000, vartype = 'parametric', parallel = TRUE, cores = 16)
 )
 
-## --- simJack ---
+
+## ----simJack, cache = TRUE, message = FALSE-----------------------------------
 out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
                method = "gsynth", force = "two-way",
                CV = TRUE, r = c(0, 5), se = TRUE,
                vartype = "jackknife",
-               parallel = TRUE, cores = 8)
+               parallel = TRUE, cores = 16)
 
-## --- sim_gap1 ---
+
+
+## ----sim_gap1, fig.height=5, fig.width=7--------------------------------------
 a <- plot(out) # by default, type = "gap"
 print(a)
 
-## --- sim_gap1a ---
-plot(out, theme.bw = FALSE)
 
-## --- sim-gap-connected ---
+## ----sim_gap1a, fig.height=5, fig.width=7-------------------------------------
+plot(out, theme.bw = FALSE) 
+
+
+## ----sim-gap-connected, fig.height=5, fig.width=7-----------------------------
 plot(out, connected = TRUE)
 
-## --- sim-gap-line ---
+
+## ----sim-gap-line, fig.height=5, fig.width=7----------------------------------
 plot(out, connected = TRUE, show.points = FALSE)
 
-## --- sim_gap2 ---
-plot(out, type = "gap", ylim = c(-6,12), xlab = "Period",
+
+## ----sim_gap2, fig.height=5, fig.width=7--------------------------------------
+plot(out, type = "gap", ylim = c(-6,12), xlab = "Period", 
      main = "Estimated ATT (Gsynth)")
 
-## --- sim-counterfactual ---
+
+## ----sim-counterfactual, cache = FALSE, fig.height=5, fig.width=7-------------
 plot(out, type = "counterfactual")
 
-## --- sim-counterfactual-all ---
+
+## ----sim-counterfactual-all, cache = FALSE,fig.height=5, fig.width=7----------
 plot(out, type = "counterfactual", raw = "all")
 
-## --- sim-counterfactual-band ---
+
+## ----sim-counterfactual-band, cache = FALSE,fig.height=5, fig.width=7---------
 plot(out, type = "counterfactual", raw = "band")
 
-## --- sim_status ---
-plot(out, type = "status", yticklabels="0",
+
+## ----sim_status, cache = FALSE,fig.height=7, fig.width=7----------------------
+plot(out, type = "status", yticklabels="0", 
      xticklabels=c("5", "10", "15","20", "25", "30") )
 
-## --- sim_L ---
+
+## ----sim_L, cache = TRUE, message = FALSE, results='hide', fig.height=7, fig.width=7----
 plot(out, type = "loadings")
 
-## --- sim_F ---
+
+## ----sim_F, message = FALSE, results='hide', fig.height=5, fig.width=7--------
 plot(out, type = "factors", xlab = "Time")
 
-## --- sim_box ---
+
+## ----sim_box, cache = FALSE,fig.height=5, fig.width=8-------------------------
 plot(out, type = "box", xlab = "time",
      xticklabels=c("-19", "-15", "-10", "-5","0","5","10") )
 
-## --- sim_box2 ---
-## plot(out, type = "box", xlim = c(-15, 10),
-##      xticklabels=c( "-15", "-10", "-5","0","5","10"))
 
-## --- calendar ---
+## ----sim_box2, eval = FALSE, fig.height=7, fig.width=7------------------------
+# plot(out, type = "box", xlim = c(-15, 10),
+#      xticklabels=c( "-15", "-10", "-5","0","5","10"))
+
+
+## ----calendar, cache = FALSE,fig.height=5, fig.width=7------------------------
 plot(out,type = "calendar")
 
-## --- sim-equiv ---
+
+## ----sim-equiv, cache = FALSE, fig.height=5, fig.width=7----------------------
 plot(out, type = "equiv", ylim = c(-5, 5))
 
-## --- sim-equiv-no-stats ---
+
+## ----sim-equiv-no-stats, cache = FALSE, fig.height=5, fig.width=7-------------
 plot(out, type = "equiv", show.stats =  FALSE)
 
-## --- sim-equiv-reposition ---
+
+## ----sim-equiv-reposition, cache = FALSE, fig.height=5, fig.width=7-----------
 plot(out, type = "equiv", stats.pos = c(-19, 4.5), ylim = c(-5, 5))
 
-## --- turnout-panelview-status ---
-panelview(turnout ~ policy_edr, data = turnout,
-          index = c("abb","year"), pre.post = TRUE,
-          by.timing = TRUE)
 
-## --- turnout-panelview-outcome ---
+## ----turnout-panelview-status, cache = FALSE, warning=FALSE, fig.height=10, fig.width=7----
+panelview(turnout ~ policy_edr, data = turnout, 
+          index = c("abb","year"), pre.post = TRUE, 
+          by.timing = TRUE) 
+
+
+## ----turnout-panelview-outcome, cache = FALSE, warning =FALSE, fig.height=5, fig.width=7----
 panelview(turnout ~ policy_edr, data = turnout,
-          index = c("abb","year"), type = "outcome",
-          main = "EDR Reform and Turnout",
+          index = c("abb","year"), type = "outcome", 
+          main = "EDR Reform and Turnout", 
           by.group = TRUE)
 
-## --- turnout_did ---
-out0 <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
-               data = turnout, index = c("abb","year"),
+
+## ----turnout_did, cache = TRUE------------------------------------------------
+out0 <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor, 
+               data = turnout, index = c("abb","year"), 
                se = TRUE, method = "gsynth",
-               r = 0, CV = FALSE, force = "two-way",
+               r = 0, CV = FALSE, force = "two-way", 
                nboots = 1000, seed = 02139)
 
-## --- turnout_did_gap ---
+
+## ----turnout_did_gap, fig.height=5, fig.width=7-------------------------------
 plot(out0, type = "gap", xlim = c(-15, 5), ylim=c(-15, 10))
 
-## --- turnout_est ---
-out_turnout <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
-              data = turnout,  index = c("abb","year"),
+
+## ----turnout_est, cache = TRUE------------------------------------------------
+out_turnout <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor, 
+              data = turnout,  index = c("abb","year"), 
               se = TRUE, method = "gsynth", vartype = "parametric",
-              r = c(0, 5), CV = TRUE, force = "two-way",
+              r = c(0, 5), CV = TRUE, force = "two-way", 
               nboots = 1000, seed = 02139, keep.sims = TRUE)
 
-## --- turnout-implied-weights ---
+
+## ----turnout-implied-weights--------------------------------------------------
 dim(out_turnout$wgt.implied)
 sort(out_turnout$wgt.implied[,8])
 
-## --- turnout_gap ---
+
+## ----turnout_gap, fig.height=5, fig.width=7-----------------------------------
 plot(out_turnout, xlim = c(-10, 5), ylim=c(-15, 10))
 
-## --- turnout-status-plot ---
-plot(out_turnout, type = "status",xlab = "Year", ylab = "State", main = "Treatment Status",
-     xticklabels=c(1920, 1928, 1936, 1944, 1952, 1960,
+
+## ----turnout-status-plot, fig.height=12, fig.width=7--------------------------
+plot(out_turnout, type = "status",xlab = "Year", ylab = "State", main = "Treatment Status", 
+     xticklabels=c(1920, 1928, 1936, 1944, 1952, 1960, 
                    1968, 1976, 1984, 1992, 2000, 2008), xangle=10)
 
-## --- turnout_counterfactual ---
+
+## ----turnout_counterfactual, fig.height=5, fig.width=7------------------------
 plot(out_turnout, type = "counterfactual")
 
-## --- turnout_gap2 ---
+
+## ----turnout_gap2, fig.height=5, fig.width=7----------------------------------
 plot(out_turnout, type = "counterfactual", id = "WI", main = "Wisconsin")
 
-## --- turnout_box ---
-plot(out_turnout, type = "box",
+
+## ----turnout_box, fig.height=4, fig.width=8-----------------------------------
+plot(out_turnout, type = "box", 
      xticklabels=c("-20", "-15", "-10", "-5","0","5","10"))
 
-## --- turnout_calendar ---
+
+## ----turnout_calendar, fig.height=5, fig.width=7------------------------------
 plot(out_turnout, type = "calendar", ylim = c(-15,15))
 
-## --- turnout_F ---
+
+## ----turnout_F, message = FALSE, results = 'hide', fig.height=5, fig.width=7, warning=FALSE----
 plot(out_turnout, type = "factors", xlab = "Year")
 
-## --- turnout_L ---
+
+## ----turnout_L, message = FALSE, results = 'hide', fig.height=7, fig.width=7, warning=FALSE----
 plot(out_turnout, type = "loadings")
 
-## --- create-unbalanced-data ---
+
+## ----create-unbalanced-data---------------------------------------------------
 set.seed(123456)
-turnout.ub <- turnout[-c(which(turnout$abb=="WY")[1:15],
+turnout.ub <- turnout[-c(which(turnout$abb=="WY")[1:15], 
                          sample(1:nrow(turnout),50,replace=FALSE)),]
 
-## --- turnout_ub_panelview_miss ---
-panelview(turnout ~ policy_edr + policy_mail_in + policy_motor,
-          data = turnout.ub,  index = c("abb","year"),
-          pre.post = TRUE)
 
-## --- turnout_ub_est ---
-out_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
-              data = turnout.ub,  index = c("abb","year"),
-              se = TRUE, method = "gsynth",
-              r = c(0, 5), CV = TRUE, force = "two-way",
-              parallel = TRUE, min.T0 = 8,
+## ----turnout_ub_panelview_miss, cache = FALSE,fig.height=7, fig.width=7-------
+panelview(turnout ~ policy_edr + policy_mail_in + policy_motor, 
+          data = turnout.ub,  index = c("abb","year"), 
+          pre.post = TRUE) 
+
+
+## ----turnout_ub_est, cache = TRUE, message = FALSE----------------------------
+out_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor, 
+              data = turnout.ub,  index = c("abb","year"), 
+              se = TRUE, method = "gsynth", 
+              r = c(0, 5), CV = TRUE, force = "two-way", 
+              parallel = TRUE, cores = 16, min.T0 = 8,
               nboots = 1000, seed = 02139)
 
-## --- turnout_ub_panelview_miss2 ---
+
+## ----turnout_ub_panelview_miss2, fig.height=12, fig.width=7-------------------
 plot(out_ub, type = "status",
-     xticklabels=c(1920, 1928, 1936, 1944, 1952, 1960,
+     xticklabels=c(1920, 1928, 1936, 1944, 1952, 1960, 
                    1968, 1976, 1984, 1992, 2000, 2008),
      xangle=10)
 
-## --- turnout_ub_obs_2 ---
+
+## ----turnout_ub_obs_2, fig.height=7, fig.width=7------------------------------
 plot(out_ub, type = "status", xlab = "Year", ylab = "State",
      main = "Treatment Status", id = out_ub$id[out_ub$tr],
-     xlim = c(1920,2012),
+     xlim = c(1920,2012), 
      xticklabels=c(1920, 1928, 1936, 1944, 1952, 1960,
                    1968, 1976, 1984, 1992, 2000, 2008))
 
-## --- turnout_ub_gap ---
+
+
+## ----turnout_ub_gap, fig.height=5, fig.width=7--------------------------------
 plot(out_ub, type = "gap", ylim = c(-10, 20))
 
-## --- cfe_nt_demo ---
+
+## ----cfe_nt_demo, eval=TRUE, cache=TRUE, message=FALSE, results='hide'--------
 out.cfe.nt <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                    method = "cfe", force = "two-way",
                    time.component.from = "nevertreated",
                    Q.type = "linear",
                    se = FALSE, CV = TRUE, r = c(0, 5),
-                   parallel = TRUE)
+                   parallel = TRUE, cores = 16)
 
-## --- cfe-nt-summary ---
+
+## ----cfe-nt-summary-----------------------------------------------------------
 cat("CFE + nevertreated: r.cv =", out.cfe.nt$r.cv,
     ", ATT =", round(out.cfe.nt$att.avg, 3), "\n")
 
-## --- cfe_nt_vs_gsynth ---
+
+## ----cfe_nt_vs_gsynth, eval=TRUE, cache=TRUE, message=FALSE, results='hide'----
 # Model 1: gsynth (pure IFE, r = 2)
 out.gsynth.comp <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "gsynth", force = "two-way",
@@ -225,8 +274,10 @@ out.cfe.nt.lin <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"
                        time.component.from = "nevertreated",
                        Q.type = "linear", r = 2, se = FALSE, CV = FALSE)
 
-## --- cfe_nt_mspe ---
+
+## ----cfe_nt_mspe, eval=TRUE, cache=TRUE---------------------------------------
 mspe.comp <- fect_mspe(list(gsynth_r2 = out.gsynth.comp,
                             CFE_r2 = out.cfe.nt.comp,
                             CFE_linear_r2 = out.cfe.nt.lin), seed = 1234)
 print(mspe.comp$summary[, c("Model", "MSPE", "RMSE", "MAD")])
+

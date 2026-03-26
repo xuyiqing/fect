@@ -1,4 +1,5 @@
 test_that("did_wrapper twfe runs and returns structure", {
+  skip_on_cran()
   skip_if_not_installed("fixest")
   suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
   expect_true(exists("simdata"))

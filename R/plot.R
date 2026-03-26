@@ -3686,7 +3686,6 @@ plot.fect <- function(
         data = data.toplot,
         inherit.aes = FALSE,
         fill = count.color,
-        size = 0.3,
         alpha = count.alpha,
         color = count.outline.color,
         linewidth = 0.3

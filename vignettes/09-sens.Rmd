@@ -64,7 +64,7 @@ out.fect.placebo <- fect(nat_rate_ord~indirect, data = hh2019,
                          index = c("bfs","year"),
                          method = 'fe', se = TRUE,
                          placeboTest = TRUE, placebo.period = c(-2,0),
-                         parallel = FALSE)
+                         parallel = TRUE, cores = 16)
 
 # Ensure att.vcov is a valid matrix (compute from bootstrap samples if needed)
 if (!is.matrix(out.fect.placebo$att.vcov) && is.matrix(out.fect.placebo$att.boot)) {

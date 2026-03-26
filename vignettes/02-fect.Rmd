@@ -97,7 +97,7 @@ The key parameters that control **uncertainty estimation** are: `se` (enable sta
 ```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   method = "fe", force = "two-way", se = TRUE,
-  parallel = FALSE, nboots = 1000)
+  parallel = TRUE, cores = 16, nboots = 1000)
 ```
 
 The `plot()` function can visualize the estimated period-wise ATTs as well as their uncertainty estimates. `stats = "F.p"` shows the p-value for the F test of no-pretrend.
@@ -152,7 +152,7 @@ We provide a placebo test for a settled model by setting `placeboTest = TRUE`. W
 ```{r fect_placebo, eval=TRUE, cache=TRUE, message=FALSE, results='hide', fig.width=6, fig.height=4.5}
 out.fect.placebo <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   force = "two-way", method = "fe",
-  se = TRUE, nboots = 200, parallel = FALSE,
+  se = TRUE, nboots = 1000, parallel = TRUE, cores = 16,
   placeboTest = TRUE, placebo.period = c(-2, 0))
 plot(out.fect.placebo, cex.text = 0.8)
 ```
@@ -168,7 +168,7 @@ To perform the carryover test, we set `carryoverTest = TRUE` and specify the ran
 ```{r fect_carryover, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.fect.carry <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   force = "two-way", method = "fe",
-  se = TRUE, nboots = 200, parallel = FALSE,
+  se = TRUE, nboots = 1000, parallel = TRUE, cores = 16,
   carryoverTest = TRUE, carryover.period = c(1, 3))
 ```
 
@@ -193,7 +193,7 @@ We can implement the leave-one-out pre-trend test by setting `loo = TRUE`.
 ```{r fect_loo, eval=TRUE, cache = TRUE, message = FALSE}
 out.fect.loo <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   method = "fe", force = "two-way", se = TRUE, loo = TRUE,
-  parallel = FALSE, nboots = 200)
+  parallel = TRUE, cores = 16, nboots = 1000)
 ```
 
 The event study plot utilizing leave-one-out for pretreatment estimates is shown below. This graph is fairly similar to the graphics we presented earlier without using leave-one-out. However, this is not always true.
@@ -217,8 +217,8 @@ The example below uses `method = "ife"` with `time.component.from = "nevertreate
 out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "ife", time.component.from = "nevertreated",
                         force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 200, vartype = 'bootstrap',
-                        parallel = FALSE, keep.sims=TRUE)
+                        se = TRUE, nboots = 1000, vartype = 'bootstrap',
+                        parallel = TRUE, cores = 16, keep.sims=TRUE)
 cumu.out <- effect(out)
 ```
 
@@ -246,8 +246,8 @@ effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
 ```{r effect-mc, cache = TRUE}
 out_mc <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 200, vartype = 'bootstrap',
-                        parallel = FALSE, keep.sims=TRUE)
+                        se = TRUE, nboots = 1000, vartype = 'bootstrap',
+                        parallel = TRUE, cores = 16, keep.sims=TRUE)
 plot(effect(out_mc))
 ```
 
@@ -256,8 +256,8 @@ We can also use jackknife instead of bootstrap for inference:
 ```{r effect-jackknife, cache = TRUE}
 out_jack <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 200, vartype = 'jackknife',
-                        parallel = FALSE, keep.sims=TRUE)
+                        se = TRUE, nboots = 1000, vartype = 'jackknife',
+                        parallel = TRUE, cores = 16, keep.sims=TRUE)
 plot(effect(out_jack))
 ```
 
@@ -274,7 +274,7 @@ After obtaining the individual treatment effects using one of the counterfactual
 ```{r simdata_bal, eval=TRUE, cache = TRUE}
 out.bal <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   balance.period = c(-3, 4), force = "two-way", method = "ife",
-  CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = FALSE)
+  CV = FALSE, r = 2, se = TRUE, nboots = 1000, parallel = TRUE, cores = 16)
 ```
 
 We can then visualize the dynamic treatment effects using the inbuilt function `plot`. By default, it displays the dynamic treatment effects of the "balanced" sample.
@@ -320,7 +320,7 @@ By setting the option `group = "Cohort"`, **fect** estimates the ATT for each sp
 ```{r simdata_fe_cohort, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
 out.fe.g <- fect(Y ~ D + X1 + X2, data = sim_base.cohort, index = c("id","time"),
           force = "two-way", method = "fe",
-          se = TRUE, nboots = 200, parallel = FALSE, group = 'Cohort')
+          se = TRUE, nboots = 1000, parallel = TRUE, cores = 16, group = 'Cohort')
 ```
 
 Then one can draw the gap plot for each sub-group. Here we present the gap plot for Cohort 22.
@@ -338,7 +338,7 @@ The package offers the option `W` to calculate the weighted average treatment ef
 sim_base$Weight <- abs(rnorm(n = dim(sim_base)[1]))
 out.w <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   force = "two-way", method = "ife", W = 'Weight',
-  CV = FALSE, r = 2, se = TRUE, nboots = 200, parallel = FALSE)
+  CV = FALSE, r = 2, se = TRUE, nboots = 1000, parallel = TRUE, cores = 16)
 ```
 
 We can then visualize the weighted dynamic treatment effects using the inbuilt function `plot`, it by default shows the weighted dynamic treatment effects.

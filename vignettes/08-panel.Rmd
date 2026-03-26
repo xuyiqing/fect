@@ -843,7 +843,7 @@ Both are very close to the TWFE estimates.
 model.fect <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", 
                    X= c("cand_H_all", "cand_B_all"), data = data, 
                    method = "fe", index = index, se = TRUE, 
-                   parallel = FALSE, seed = 1234, force = "two-way")
+                   parallel = TRUE, cores = 16, seed = 1234, force = "two-way")
 
 print(model.fect$est.avg)
 ```
@@ -960,8 +960,8 @@ res_st <- did_wrapper(
   index  = c("bfs", "year"),
   method = "st",
   se     = "boot",
-  nboots = 50,
-  parallel = FALSE
+  nboots = 200,
+  parallel = TRUE
 )
 print(res_st)
 ```

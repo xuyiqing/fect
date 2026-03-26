@@ -8,7 +8,7 @@ out_fect <- NULL
 setup_once <- function() {
     if (is.null(out_fect)) {
         set.seed(9001)
-        data(fect, package = "fect")
+        data(simdata, package = "fect")
         out_fect <<- fect::fect(Y ~ D + X1 + X2, data = simdata,
                                 index = c("id", "time"), method = "fe",
                                 se = TRUE, nboots = 30, parallel = FALSE)
@@ -182,7 +182,7 @@ test_that("D3: plot.fect count.color uses 'gray' not 'grey'", {
 test_that("E1: placebo test plot with pre/post colors", {
 
   skip_on_cran()
-    data(fect, package = "fect")
+    data(simdata, package = "fect")
     out_p <- suppressWarnings(fect::fect(
         Y ~ D, data = simdata, index = c("id", "time"),
         method = "fe", se = TRUE, nboots = 30, parallel = FALSE,
@@ -230,7 +230,7 @@ test_that("F2: all-post data (only.post = TRUE)", {
 test_that("F3: esplot errors on fect object without se", {
 
   skip_on_cran()
-    data(fect, package = "fect")
+    data(simdata, package = "fect")
     out_nose <- fect::fect(Y ~ D, data = simdata, index = c("id", "time"),
                            method = "fe", se = FALSE, CV = FALSE)
     expect_error(esplot(out_nose))

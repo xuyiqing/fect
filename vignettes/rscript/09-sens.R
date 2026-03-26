@@ -1,13 +1,11 @@
-##############################
-# 09-sens.R
-# Generated from 09-sens.Rmd
-##############################
-rm(list = ls())
+## ----.common, include = FALSE-------------------------------------------------
+source("_common.R")
 
-## --- install-packages ---
+
+## ----install-packages, message = FALSE, warning = FALSE-----------------------
 # install packages from CRAN
 packages <- c("dplyr", "panelView", "ggplot2") # Removed HonestDiD, doParallel
-install.packages(setdiff(packages, rownames(installed.packages())))
+install.packages(setdiff(packages, rownames(installed.packages())))  
 
 # install most up-to-date "fect" from Github
 if ("fect" %in% rownames(installed.packages()) == FALSE) {
@@ -19,23 +17,32 @@ if ("HonestDiDFEct" %in% rownames(installed.packages()) == FALSE) {
   devtools:: install_github("lzy318/HonestDiDFEct") # This is used by fect_sens
 }
 
-## --- load-libraries ---
+
+## ----load-libraries, message = FALSE, warning = FALSE-------------------------
 library(dplyr)
-library(fect)
 library(panelView)
 library(ggplot2)
 library(HonestDiDFEct) # Required for fect_sens to work
 
-## --- load-hh2019 ---
+
+## ----load-hh2019, message = FALSE, warning = FALSE----------------------------
 data(hh2019)
 data <- hh2019
 head(data)
 
-## --- hh_honest_placebo ---
+
+## ----hh_honest_placebo, warning=FALSE, message=FALSE, cache=FALSE-------------
 out.fect.placebo <- fect(nat_rate_ord~indirect, data = hh2019,
                          index = c("bfs","year"),
                          method = 'fe', se = TRUE,
-                         placeboTest = TRUE, placebo.period = c(-2,0))
+                         placeboTest = TRUE, placebo.period = c(-2,0),
+                         parallel = TRUE, cores = 16)
+
+# Ensure att.vcov is a valid matrix (compute from bootstrap samples if needed)
+if (!is.matrix(out.fect.placebo$att.vcov) && is.matrix(out.fect.placebo$att.boot)) {
+  out.fect.placebo$att.vcov <- cov(t(out.fect.placebo$att.boot),
+                                    use = "pairwise.complete.obs")
+}
 
 # Define post-treatment periods and sensitivity parameters for fect_sens
 T.post <- 10 # Number of post-treatment periods based on original analysis
@@ -58,43 +65,48 @@ out.fect.placebo <- fect_sens(
   periodMbarvec = Mbar_vec_period_rm,
   Mvec          = M_vec_avg_smooth,
   periodMvec    = M_vec_period_smooth,
-  parallel      = TRUE # Set to TRUE for parallel processing if desired
+  parallel      = FALSE # Set to TRUE for parallel processing if desired
 )
 
-## --- hh_honest.placebo.honest ---
+
+## ----hh_honest.placebo.honest, fig.width = 6, fig.height = 4.5, cache=TRUE----
 plot(out.fect.placebo,
      type = "sens",
      restrict = "rm",
      main = "Relative Magnitude Restriction")
 
-## --- hh_honest.placebo.honest.gap.plot ---
+
+## ----hh_honest.placebo.honest.gap.plot, fig.width=7, fig.height=5, cache=TRUE----
 plot(out.fect.placebo,
     type = "sens_es",
     restrict = "rm",
     main = "ATTs with Robust Confidence Sets (RM)",
     ylab = "Coefficients and 95% CI",
-    xlim = c(-12,10),
-    ylim = c(-6,8),
+    xlim = c(-12,10), 
+    ylim = c(-6,8), 
     show.count = TRUE)
 
-## --- hh_honest.placebo.honest.gap.plot.colors ---
+
+## ----hh_honest.placebo.honest.gap.plot.colors, fig.width=7, fig.height=5, cache=TRUE----
 plot(out.fect.placebo,
     type = "sens_es",
     restrict = "rm",
     main = "ATTs with Robust Confidence Sets (RM)",
     ylab = "Coefficients and 95% CI",
-    xlim = c(-12,10),
-    ylim = c(-6,8),
+    xlim = c(-12,10), 
+    ylim = c(-6,8), 
     show.count = TRUE,
     sens.colors = c("blue", "red"))
 
-## --- hh_honest.placebo.honest.sd ---
+
+## ----hh_honest.placebo.honest.sd,   fig.width = 7, fig.height = 5,  cache=TRUE----
 plot(out.fect.placebo,
     type = "sens",
     restrict = "sm",
     main = "Smoothness Restriction")
 
-## --- hh_honest.placebo.honest.gap.sd.plot ---
+
+## ----hh_honest.placebo.honest.gap.sd.plot, fig.height=5, fig.width=7, cache=TRUE, warning=FALSE----
 plot(out.fect.placebo,
     type = "sens_es",
     restrict = "sm",
@@ -103,3 +115,4 @@ plot(out.fect.placebo,
     xlim = c(-12,10), # Adjusted to match original detailed plot
     ylim = c(-12,15),
     show.count = TRUE)
+

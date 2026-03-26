@@ -24,7 +24,7 @@ We specify an interval of candidate number of unobserved factors in option `r` l
 ```{r simdata_ife, eval=TRUE, cache = TRUE}
 out.ife <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
           force = "two-way", method = "ife", CV = TRUE, r = c(0, 5),
-          se = TRUE, nboots = 1000, parallel = FALSE)
+          se = TRUE, nboots = 200, parallel = TRUE, cores = 16)
 print(out.ife)
 ```
 
@@ -43,7 +43,7 @@ For the MC method, we need to specify the tuning parameter in the penalty term u
 ```{r simdata_mc, eval=TRUE, cache = TRUE}
 out.mc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
           force = "two-way", method = "mc", CV = TRUE,
-          se = TRUE, nboots = 1000, parallel = FALSE)
+          se = TRUE, nboots = 200, parallel = TRUE, cores = 16)
 
 print(out.mc)
 ```
@@ -67,7 +67,7 @@ When using `method = "ife"` or `method = "mc"`, we need to choose a tuning param
 ```{r cv_ife_demo, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.cv <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                method = "ife", CV = TRUE, r = c(0, 5),
-               se = FALSE, parallel = FALSE)
+               se = FALSE, parallel = TRUE, cores = 16)
 ```
 
 ```{r print-cv-selected-r}
@@ -94,11 +94,11 @@ We provide an example below.
 ```{r cv_method_compare, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.all <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                 method = "ife", CV = TRUE, r = c(0, 5),
-                cv.method = "all_units", se = FALSE, parallel = FALSE)
+                cv.method = "all_units", se = FALSE, parallel = TRUE, cores = 16)
 
 out.tr <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                method = "ife", CV = TRUE, r = c(0, 5),
-               cv.method = "treated_units", se = FALSE, parallel = FALSE)
+               cv.method = "treated_units", se = FALSE, parallel = TRUE, cores = 16)
 ```
 
 ```{r print-cv-method-compare}
@@ -136,11 +136,11 @@ The `criterion` parameter determines which scoring metric is used to select the 
 ```{r criterion_compare, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.mspe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                  method = "ife", CV = TRUE, r = c(0, 5),
-                 criterion = "mspe", se = FALSE, parallel = FALSE)
+                 criterion = "mspe", se = FALSE, parallel = TRUE, cores = 16)
 
 out.pc <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                method = "ife", CV = TRUE, r = c(0, 5),
-               criterion = "gmspe", se = FALSE, parallel = FALSE)
+               criterion = "gmspe", se = FALSE, parallel = TRUE, cores = 16)
 ```
 
 ```{r print-criterion-compare}
@@ -156,7 +156,7 @@ A candidate `r` is selected over a smaller value only if its criterion score imp
 
 ### Parallel computing
 
-Cross-validation can be computationally expensive, especially with `cv.method = "all_units"` in the nevertreated setting (which re-estimates the full factor model `k` times per candidate `r`). Parallel computing can be enabled by setting `parallel = TRUE` in `fect()`.
+Cross-validation can be computationally expensive, especially with `cv.method = "all_units"` in the nevertreated setting (which re-estimates the full factor model `k` times per candidate `r`). Parallel computing can be enabled by setting `parallel = TRUE, cores = 16` in `fect()`.
 
 For the nevertreated path, parallel CV auto-activates when the panel is large enough ($N_{co} \times T > 20{,}000$) and `cv.method = "all_units"`. The `"treated_units"` and `"loo"` methods are always sequential because the per-fold cost is too low to benefit from parallelization overhead.
 
@@ -173,12 +173,12 @@ We provide a placebo test for a settled model---hence, cross-validation is not a
 ```{r placebo_ife, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
 out.ife.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife",  r = 2, CV = 0,
-  parallel = FALSE, se = TRUE,
+  parallel = TRUE, cores = 16, se = TRUE,
   nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))
 
 out.mc.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "mc",  lambda = out.mc$lambda.cv,
-  CV = 0, parallel = FALSE, se = TRUE,
+  CV = 0, parallel = TRUE, cores = 16, se = TRUE,
   nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))
 ```
 
@@ -208,9 +208,9 @@ Instead of using estimated ATTs for periods prior to the treatment to test for p
 
 ```{r simdata_ife_loo, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.ife.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "ife", force = "two-way", se = TRUE, parallel = FALSE, nboots = 200, loo = TRUE)
+  method = "ife", force = "two-way", se = TRUE, parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
 out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "mc", force = "two-way", se = TRUE, parallel = FALSE, nboots = 200, loo = TRUE)
+  method = "mc", force = "two-way", se = TRUE, parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
 ```
 
 After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the `plot` function. Since all pre-treatment estimates are now out-of-sample, the plot uses a uniform black color for all points (no gray/black distinction). The equivalence plots below use the LOO estimates directly.
@@ -254,12 +254,12 @@ Below, we set `carryover.period = c(1, 3)`. As we deduct the treatment effect fr
 ```{r carryover_ife, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
 out.ife.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife", r = 2, CV = 0,
-  parallel = FALSE, se = TRUE,
+  parallel = TRUE, cores = 16, se = TRUE,
   nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
 
 out.mc.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "mc",  lambda = out.mc$lambda.cv,
-  CV = 0, parallel = FALSE, se = TRUE,
+  CV = 0, parallel = TRUE, cores = 16, se = TRUE,
   nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
 ```
 
@@ -282,7 +282,7 @@ Using real-world data, researchers will likely find that carryover effects exist
 ```{r carryover_rm, eval = TRUE, cache = TRUE, message = FALSE, results='hide', fig.width = 6, fig.height = 4.5}
 out.ife.rm.test <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife", r = 2, CV = 0,
-  parallel = FALSE, se = TRUE,  carryover.rm = 3,
+  parallel = TRUE, cores = 16, se = TRUE,  carryover.rm = 3,
   nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))# remove three periods
 
 plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(5, 2.5))

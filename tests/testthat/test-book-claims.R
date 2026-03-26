@@ -446,7 +446,7 @@ test_that("F3: mc with CV selects lambda", {
 test_that("G1: CFE with unit-specific linear time trend (Q.type)", {
 
   skip_on_cran()
-    d <- make_panel(N = 40, TT = 20, T0 = 12, Ntr = 12, seed = 8080)
+    d <- make_panel(N = 200, TT = 20, T0 = 12, Ntr = 60, seed = 8080)
     out <- fect(Y ~ D + X1, data = d, index = c("id", "time"),
                 method = "cfe", r = 0, se = FALSE, CV = FALSE,
                 Q.type = "linear")

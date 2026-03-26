@@ -48,13 +48,13 @@ out <- fect(Y = "general_sharetotal_A_all",
             index = c("district_final", "cycle"),
             data = gs2020, method = "fe",
             force = "two-way", se = TRUE,
-            parallel = FALSE, nboots = 1000)
+            parallel = TRUE, cores = 16, nboots = 1000)
 
 out.hh <- fect(nat_rate_ord ~ indirect,
                data = hh2019,
                index = c("bfs","year"),
                method = 'fe', se = TRUE,
-               parallel = FALSE, nboots = 200,
+               parallel = TRUE, cores = 16, nboots = 1000,
                keep.sims = TRUE)
 ```
 
@@ -270,7 +270,7 @@ A placebo test artificially assigns treatment during pre-treatment periods and e
 ```{r placebo, cache = TRUE}
 out_fe_placebo <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020,
                        index = c("district_final", "cycle"), force = "two-way",
-                       method = "fe", CV = FALSE, parallel = FALSE,
+                       method = "fe", CV = FALSE, parallel = TRUE, cores = 16,
                        se = TRUE, nboots = 1000, placeboTest = TRUE,
                        placebo.period = c(-2, 0))
 
@@ -346,7 +346,7 @@ The carryover test examines whether the treatment effect persists after treatmen
 ```{r carryover, cache = TRUE}
 out_fe_carryover <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020,
                        index = c("district_final", "cycle"), force = "two-way",
-                         parallel = FALSE, se = TRUE, CV = FALSE,
+                         parallel = TRUE, cores = 16, se = TRUE, CV = FALSE,
                          nboots = 1000, carryoverTest = TRUE,
                          carryover.period = c(1, 3))
 plot(out_fe_carryover)
@@ -391,8 +391,8 @@ out_no_reversals <- fect(Y = "general_sharetotal_A_all",
                          data = gs2020_no_reversals,
                          method = "fe",
                          force =  "two-way",
-                         se = TRUE, parallel = FALSE,
-                         nboots = 200,
+                         se = TRUE, parallel = TRUE, cores = 16,
+                         nboots = 1000,
                          keep.sims = TRUE)
 ```
 
@@ -475,7 +475,7 @@ out_ife <- fect(nat_rate_ord ~ indirect,
                 data = hh2019,
                 index = c("bfs", "year"),
                 method = "ife", r = 2,
-                se = TRUE, parallel = FALSE, nboots = 200)
+                se = TRUE, parallel = TRUE, cores = 16, nboots = 1000)
 ```
 
 The **factors** plot displays the estimated latent time factors. It uses the Okabe-Ito colorblind-safe palette with thinner lines for a clean, publication-ready appearance. Factor 0 (fixed effects, shown when `include.FE = TRUE`) appears in gray; subsequent factors appear in orange, blue, green, and so on. Use `nfactors` to limit the number of displayed factors.
