@@ -498,7 +498,6 @@ print(mspe.comp$summary[, c("Model", "MSPE", "RMSE", "MAD")])
 
 Since `sim_gsynth` follows a pure IFE data generating process with two factors, Models 1 and 2 should produce identical MSPE --- confirming that CFE with `time.component.from = "nevertreated"` and no additional structure is numerically equivalent to gsynth. Model 3, which adds unnecessary linear trends, should produce similar or slightly worse MSPE because the extra parameters add noise without benefit when the true DGP has no unit-specific trends.
 
-------------------------------------------------------------------------
 
 ## Additional Notes
 
@@ -507,3 +506,20 @@ Since `sim_gsynth` follows a pure IFE data generating process with two factors, 
 2.  **Adding Covariates**: Including covariates in the model will significantly slow down the algorithm, as the IFE/MC model requires more time to converge. Users should be aware of this trade-off when incorporating covariates.
 
 3.  **Setting `min.T0`**: Setting `min.T0` to a positive value helps. The algorithm will automatically exclude treated units with too few pre-treatment periods. A larger $T_0$ reduces bias in causal estimates and minimizes the risk of severe extrapolation. When running cross-validation to select the number of factors, `min.T0` must be equal to or greater than (`r.max` + 2). Errors frequently occur when there are too few pre-treatment periods, so ensuring adequate $T_0$ (e.g. setting `min.T0 = 5`) is crucial.
+
+
+## How to Cite
+
+If you find this method helpful, you can cite @Xu2017.
+
+```bibtex
+@article{Xu2017,
+  title = {Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models},
+  author = {Xu, Yiqing},
+  journal = {Political Analysis},
+  volume = {25},
+  number = {1},
+  pages = {57--76},
+  year = {2017}
+}
+```

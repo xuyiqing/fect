@@ -614,3 +614,21 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 | `status.*.color` | --- | --- | --- | --- | --- | --- | Yes | --- | --- | --- |
 | `xbreaks` / `ybreaks` | Yes | Yes | Yes | Yes | Yes | Yes | --- | --- | --- | Yes |
 | `xlim` / `ylim` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
+
+
+
+## How to Cite
+
+If you find these methods and visualization tools helpful, you can cite @LWX2024.
+
+```bibtex
+@article{LWX2024,
+  title = {A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data},
+  author = {Liu, Licheng and Wang, Ye and Xu, Yiqing},
+  journal = {American Journal of Political Science},
+  volume = {68},
+  number = {1},
+  pages = {160--176},
+  year = {2024}
+}
+```

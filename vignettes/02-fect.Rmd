@@ -347,7 +347,6 @@ We can then visualize the weighted dynamic treatment effects using the inbuilt f
 plot(out.w, main = "Estimated Weighted ATT")
 ```
 
-------------------------------------------------------------------------
 
 ## Additional notes
 
@@ -356,3 +355,20 @@ plot(out.w, main = "Estimated Weighted ATT")
 2.  We can get replicable results by setting the option `seed` to a certain integer, no matter whether the parallel computing is used.
 
 3.  When `na.rm = FALSE` (default), the program allows observations to have missing outcomes $Y$ but not $X$ or treatment statuses $D$. When `na.rm = TRUE` the program will drop all observations that have missing values in outcomes, treatments, or covariates.
+
+
+## How to Cite
+
+If you find these methods helpful, you can cite @LWX2024.
+
+```bibtex
+@article{LWX2024,
+  title = {A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data},
+  author = {Liu, Licheng and Wang, Ye and Xu, Yiqing},
+  journal = {American Journal of Political Science},
+  volume = {68},
+  number = {1},
+  pages = {160--176},
+  year = {2024}
+}
+```

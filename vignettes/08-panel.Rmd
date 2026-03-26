@@ -977,3 +977,15 @@ esplot(data = res_st, main = "Stacked DID", xlim = c(-12,10))
 
 Please cite the authors of the original papers for their innovations.
 If you find this tutorial helpful, you can cite @CLLX2026.
+
+```bibtex
+@article{CLLX2026,
+  title={Causal Panel Analysis under Parallel Trends: Lessons from A Large Reanalysis Study},
+  author={Chiu, Albert and Lan, Xingchen and Liu, Ziyi and Xu, Yiqing},
+  journal={American Political Science Review},
+  volume={120},
+  number={1},
+  pages={245--266},
+  year={2026}
+}
+```
