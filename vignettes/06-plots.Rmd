@@ -402,7 +402,7 @@ plot(effect(out_no_reversals), xlim = c(1, 2))
 
 ------------------------------------------------------------------------
 
-## Effect Heterogeneity {#sec-hte}
+## Effect Heterogeneity {#sec-plots-hte}
 
 ### Box plot (`type = "box"`)
 
