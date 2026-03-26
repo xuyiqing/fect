@@ -1,3 +1,5 @@
+utils::globalVariables(c("fit", "group", "y_hat", "y_hat_lower", "y_hat_upper"))
+
 ## new plot
 # x: a fect object
 # type of the plot; axes limits; axes labels;
@@ -12,6 +14,7 @@ plot.fect <- function(
     highlight = NULL, ## for carryover test and placebo test
     plot.ci = NULL, ## "0.9", "0.95", "none"
     show.points = TRUE,
+    loess.fit = TRUE,
     show.group = NULL,
     bound = NULL, # "none", "min", "equiv", "both"
     show.count = TRUE,
@@ -108,6 +111,12 @@ plot.fect <- function(
     status.background.color = NULL,
     covariate = NULL,
     covariate.labels = NULL,
+    covariate.value = NULL,
+    covariate.value.range = FALSE,
+    relative.time = FALSE,
+    pretreatment = FALSE,
+    num.pretreatment = 3,
+    cm = FALSE,
     ...) {
 
   rbind_fill_fect_plot <- function(...) {
@@ -168,6 +177,7 @@ plot.fect <- function(
     warning("'count' is deprecated. Use 'show.count'.", call. = FALSE)
     if (is.logical(count) && missing(show.count)) show.count <- count
   }
+  use_loess <- isTRUE(loess.fit)
   if (is.null(preset)) {
     if (is.null(connected)) connected <- FALSE
     if (is.null(ltype)) ltype <- c("solid", "solid")
@@ -885,6 +895,13 @@ plot.fect <- function(
   }
 
   if (type == "calendar") {
+    if (!use_loess) {
+      x$eff.calendar.fit <- NULL
+      x$est.eff.calendar.fit <- NULL
+      x$eff.calendar.fit.group <- NULL
+      x$est.eff.calendar.fit.group <- NULL
+    }
+    calendar_att_avg <- x$att.avg
     stats <- "none"
   }
 
@@ -958,10 +975,11 @@ plot.fect <- function(
       maintext <- "Carryover Effects"
     }
   } else if (type == "calendar") {
-    maintext <- "CATT by Calendar Time"
+    maintext <- if (isTRUE(relative.time)) "CATT by Relative Time" else "CATT by Calendar Time"
     ytitle <- paste("Effect on", x$Y)
   } else if (type == "heterogeneous") {
-    maintext <- paste("CATT by", covariate)
+    covariate_label <- if (is.character(covariate) && length(covariate) == 1 && covariate != "") covariate else "M"
+    maintext <- paste("CATT by", covariate_label)
     ytitle <- paste("Effect on", x$Y)
   } else if (type == "box") {
     maintext <- "Individual Treatment Effects"
@@ -2377,6 +2395,10 @@ plot.fect <- function(
       ylab <- NULL
     }
 
+ 
+
+ 
+
 
 
 
@@ -2597,6 +2619,8 @@ plot.fect <- function(
 
 
     # height of the histogram
+    att.avg.use <- x$att.avg
+
     if (CI == FALSE) {
       message("Uncertainty estimates not available.\n")
       if (length(ylim) != 0) {
@@ -3107,6 +3131,354 @@ plot.fect <- function(
   }
 
   if (type == "calendar") {
+    # If relative.time = TRUE, aggregate effects by event time (x$T.on) rather than calendar time.
+    # This overrides the default calendar-time aggregation.
+    if (isTRUE(relative.time)) {
+      mod_keep <- NULL
+      if (!is.null(covariate.value)) {
+        if (!is.character(covariate) || length(covariate) != 1 || covariate == "") {
+          stop("Please provide a single covariate name via `covariate` for calendar plots.\n")
+        }
+        if (!covariate %in% x$X) {
+          stop("`covariate` must be one of `x$X` for calendar plots.\n")
+        }
+        X.arr <- NULL
+        X.cands <- x[names(x) == "X"]
+        if (length(X.cands) >= 2) {
+          X.arr <- X.cands[2]$X
+        } else if (is.array(x$X)) {
+          X.arr <- x$X
+        }
+        if (is.null(X.arr) || length(dim(X.arr)) != 3) {
+          stop("Cannot locate covariate array in `x` for calendar plots.\n")
+        }
+
+        mod.idx <- which(x$X == covariate)[1]
+        M <- X.arr[, , mod.idx]
+
+        if (isTRUE(covariate.value.range)) {
+          if (!is.numeric(covariate.value) || length(covariate.value) != 2) {
+            stop("`covariate.value` must be numeric length 2 when `covariate.value.range = TRUE`.\n")
+          }
+          mod_keep <- M >= min(covariate.value) & M <= max(covariate.value)
+        } else {
+          mod_keep <- M %in% covariate.value
+        }
+      }
+
+      if (is.null(x$T.on) || !is.matrix(x$T.on)) {
+        stop("`relative.time = TRUE` requires `x$T.on` (event-time matrix) in the fect object.\n")
+      }
+      if (is.null(mod_keep)) {
+        mod_keep <- matrix(TRUE, nrow = nrow(x$T.on), ncol = ncol(x$T.on))
+      }
+      if (!all(dim(mod_keep) == dim(x$T.on))) {
+        stop("Dimension mismatch: cannot apply `covariate.value` filter to `x$T.on`.\n")
+      }
+      if (is.null(x$D.dat) || !all(dim(x$D.dat) == dim(x$T.on))) {
+        stop("`relative.time = TRUE` requires `x$D.dat` aligned with `x$T.on` for calendar plots.\n")
+      }
+
+      keep_mask <- mod_keep & !is.na(x$T.on) & !is.na(x$eff)
+      rel_vec <- as.numeric(x$T.on[keep_mask])
+      eff_vec <- as.numeric(x$eff[keep_mask])
+      d_vec <- as.numeric(x$D.dat[keep_mask])
+
+      ok <- is.finite(rel_vec) & is.finite(eff_vec) & !is.na(d_vec)
+      rel_vec <- rel_vec[ok]
+      eff_vec <- eff_vec[ok]
+      d_vec <- d_vec[ok]
+
+      if (length(eff_vec) == 0) {
+        stop("No observations are available for `relative.time = TRUE` under the requested filter.\n")
+      }
+
+      rel_vals <- sort(unique(rel_vec))
+      eff.calendar <- vapply(rel_vals, function(k) mean(eff_vec[rel_vec == k], na.rm = TRUE), numeric(1))
+      N.calendar <- vapply(rel_vals, function(k) sum(!is.na(eff_vec[rel_vec == k])), numeric(1))
+      se.calendar <- vapply(rel_vals, function(k) {
+        v <- eff_vec[rel_vec == k]
+        v <- v[!is.na(v)]
+        n <- length(v)
+        if (n <= 1) return(NA_real_)
+        stats::sd(v) / sqrt(n)
+      }, numeric(1))
+
+      if (sum(N.calendar, na.rm = TRUE) == 0 || all(is.na(eff.calendar))) {
+        stop("No observations match the requested filter under `relative.time = TRUE`.\n")
+      }
+
+      treated_mask <- d_vec > 0
+      control_mask <- d_vec == 0
+
+      rel_vals_tr <- sort(unique(rel_vec[treated_mask]))
+      rel_vals_ct <- sort(unique(rel_vec[control_mask]))
+
+      eff_tr <- vapply(rel_vals_tr, function(k) mean(eff_vec[treated_mask & rel_vec == k], na.rm = TRUE), numeric(1))
+      eff_ct <- vapply(rel_vals_ct, function(k) mean(eff_vec[control_mask & rel_vec == k], na.rm = TRUE), numeric(1))
+
+      N_tr <- vapply(rel_vals_tr, function(k) sum(!is.na(eff_vec[treated_mask & rel_vec == k])), numeric(1))
+      N_ct <- vapply(rel_vals_ct, function(k) sum(!is.na(eff_vec[control_mask & rel_vec == k])), numeric(1))
+
+      x$eff.calendar.fit.group <- NULL
+      x$est.eff.calendar.fit.group <- NULL
+      eff.calendar.fit <- NULL
+      se.fit <- NULL
+      N.fit <- NULL
+      fit_group_df <- NULL
+
+      if (use_loess) {
+        fit_group <- function(rel_vals_g, eff_g, N_g) {
+          if (length(eff_g) <= 1) {
+            return(list(fit = eff_g, se = rep(NA_real_, length(eff_g))))
+          }
+          loess_model <- suppressWarnings(try(loess(eff_g ~ rel_vals_g, weights = N_g), silent = TRUE))
+          if ("try-error" %in% class(loess_model)) {
+            return(list(fit = eff_g, se = rep(NA_real_, length(eff_g))))
+          }
+          pred.fit <- stats::predict(loess_model, newdata = rel_vals_g, se = TRUE)
+          list(fit = as.numeric(pred.fit$fit), se = as.numeric(pred.fit$se.fit))
+        }
+
+        eff.calendar.fit <- rep(NA_real_, length(rel_vals))
+        se.fit <- rep(NA_real_, length(rel_vals))
+        N.fit <- rep(NA_real_, length(rel_vals))
+
+        if (length(rel_vals_tr) > 0) {
+          fit_tr <- fit_group(rel_vals_tr, eff_tr, N_tr)
+          idx_tr <- match(rel_vals_tr, rel_vals)
+          eff.calendar.fit[idx_tr] <- fit_tr$fit
+          se.fit[idx_tr] <- fit_tr$se
+          N.fit[idx_tr] <- N_tr
+        }
+
+        if (length(rel_vals_ct) > 0) {
+          fit_ct <- fit_group(rel_vals_ct, eff_ct, N_ct)
+          idx_ct <- match(rel_vals_ct, rel_vals)
+          eff.calendar.fit[idx_ct] <- fit_ct$fit
+          se.fit[idx_ct] <- fit_ct$se
+          N.fit[idx_ct] <- N_ct
+        }
+      }
+
+      calendar_time <- rel_vals
+
+      df.calendar <- pmax(N.calendar - 1, 1)
+      ci.level <- if (!is.null(plot.ci) && plot.ci %in% c("0.9", "90")) 0.9 else 0.95
+      crit.calendar <- stats::qt(1 - (1 - ci.level) / 2, df.calendar)
+      ci.lower <- eff.calendar - crit.calendar * se.calendar
+      ci.upper <- eff.calendar + crit.calendar * se.calendar
+      if (use_loess) {
+        df.fit <- pmax(N.fit - 1, 1)
+        crit.fit <- stats::qt(1 - (1 - ci.level) / 2, df.fit)
+        ci.fit.lower <- eff.calendar.fit - crit.fit * se.fit
+        ci.fit.upper <- eff.calendar.fit + crit.fit * se.fit
+
+        make_fit_group_df <- function(rel_vals_g, fit_g, se_g, N_g, group_label) {
+          if (length(rel_vals_g) == 0) {
+            return(NULL)
+          }
+          df_g <- pmax(N_g - 1, 1)
+          crit_g <- stats::qt(1 - (1 - ci.level) / 2, df_g)
+          data.frame(
+            time = rel_vals_g,
+            fit = fit_g,
+            se = se_g,
+            ci.lower = fit_g - crit_g * se_g,
+            ci.upper = fit_g + crit_g * se_g,
+            count = N_g,
+            group = group_label
+          )
+        }
+
+        fit_group_df <- rbind(
+          make_fit_group_df(
+            rel_vals_tr,
+            if (length(rel_vals_tr) > 0) fit_tr$fit else numeric(0),
+            if (length(rel_vals_tr) > 0) fit_tr$se else numeric(0),
+            N_tr,
+            "treated"
+          ),
+          make_fit_group_df(
+            rel_vals_ct,
+            if (length(rel_vals_ct) > 0) fit_ct$fit else numeric(0),
+            if (length(rel_vals_ct) > 0) fit_ct$se else numeric(0),
+            N_ct,
+            "control"
+          )
+        )
+        if (!is.null(fit_group_df) && nrow(fit_group_df) > 0) {
+          x$eff.calendar.fit.group <- fit_group_df[, c("time", "fit", "count", "group")]
+          x$est.eff.calendar.fit.group <- fit_group_df
+        }
+      } else {
+        x$eff.calendar.fit.group <- NULL
+        x$est.eff.calendar.fit.group <- NULL
+      }
+
+      x$eff.calendar <- cbind(eff.calendar, count = N.calendar)
+      if (use_loess) {
+        x$eff.calendar.fit <- cbind(eff.calendar.fit, count = N.calendar)
+      } else {
+        x$eff.calendar.fit <- NULL
+      }
+      rownames(x$eff.calendar) <- as.character(calendar_time)
+      if (use_loess) {
+        rownames(x$eff.calendar.fit) <- as.character(calendar_time)
+      }
+      x$N.calendar <- N.calendar
+
+      x$est.eff.calendar <- cbind(
+        "ATT-calendar" = eff.calendar,
+        "S.E." = se.calendar,
+        "CI.lower" = ci.lower,
+        "CI.upper" = ci.upper,
+        "count" = N.calendar
+      )
+      if (use_loess) {
+        x$est.eff.calendar.fit <- cbind(
+          "ATT-calendar Fitted" = eff.calendar.fit,
+          "S.E." = se.fit,
+          "CI.lower" = ci.fit.lower,
+          "CI.upper" = ci.fit.upper,
+          "count" = N.calendar
+        )
+      } else {
+        x$est.eff.calendar.fit <- NULL
+      }
+      rownames(x$est.eff.calendar) <- as.character(calendar_time)
+      if (use_loess) {
+        rownames(x$est.eff.calendar.fit) <- as.character(calendar_time)
+      }
+
+      if (sum(N.calendar, na.rm = TRUE) > 0) {
+        calendar_att_avg <- sum(eff.calendar * N.calendar, na.rm = TRUE) / sum(N.calendar[!is.na(eff.calendar)], na.rm = TRUE)
+      }
+    }
+
+    if (!isTRUE(relative.time) && !is.null(covariate.value)) {
+      if (!is.character(covariate) || length(covariate) != 1 || covariate == "") {
+        stop("Please provide a single covariate name via `covariate` for calendar plots.\n")
+      }
+      if (!covariate %in% x$X) {
+        stop("`covariate` must be one of `x$X` for calendar plots.\n")
+      }
+      X.arr <- NULL
+      X.cands <- x[names(x) == "X"]
+      if (length(X.cands) >= 2) {
+        X.arr <- X.cands[2]$X
+      } else if (is.array(x$X)) {
+        X.arr <- x$X
+      }
+      if (is.null(X.arr) || length(dim(X.arr)) != 3) {
+        stop("Cannot locate covariate array in `x` for calendar plots.\n")
+      }
+
+      mod.idx <- which(x$X == covariate)[1]
+      M <- X.arr[, , mod.idx]
+
+      if (isTRUE(covariate.value.range)) {
+        if (!is.numeric(covariate.value) || length(covariate.value) != 2) {
+          stop("`covariate.value` must be numeric length 2 when `covariate.value.range = TRUE`.\n")
+        }
+        mod.keep <- M >= min(covariate.value) & M <= max(covariate.value)
+      } else {
+        mod.keep <- M %in% covariate.value
+      }
+
+      D.sub <- x$D.dat
+      D.sub[which(D.sub == 0)] <- NA
+      D.sub[!mod.keep] <- NA
+
+      eff.calendar <- apply(x$eff * D.sub, 1, mean, na.rm = TRUE)
+      N.calendar <- apply(!is.na(x$eff * D.sub), 1, sum)
+      if (sum(N.calendar, na.rm = TRUE) == 0 || all(is.na(eff.calendar))) {
+        stop("No treated observations match the requested `covariate.value` filter.\n")
+      }
+      T.calendar <- seq_len(dim(D.sub)[1])
+
+      eff.calendar.fit <- NULL
+      se.fit <- NULL
+      if (use_loess) {
+        if (sum(!is.na(eff.calendar)) > 1) {
+          loess_model <- suppressWarnings(try(loess(eff.calendar ~ T.calendar, weights = N.calendar), silent = TRUE))
+          if ("try-error" %in% class(loess_model)) {
+            eff.calendar.fit <- eff.calendar
+            se.fit <- rep(NA_real_, length(eff.calendar))
+          } else {
+            pred.fit <- stats::predict(loess_model, newdata = T.calendar, se = TRUE)
+            eff.calendar.fit <- as.numeric(pred.fit$fit)
+            se.fit <- as.numeric(pred.fit$se.fit)
+          }
+        } else {
+          eff.calendar.fit <- eff.calendar
+          se.fit <- rep(NA_real_, length(eff.calendar))
+        }
+      }
+
+      calendar_time <- NULL
+      if (!is.null(x$rawtime)) {
+        calendar_time <- x$rawtime
+      } else {
+        calendar_time <- T.calendar
+      }
+
+      x$eff.calendar <- cbind(eff.calendar, count = N.calendar)
+      if (use_loess) {
+        x$eff.calendar.fit <- cbind(eff.calendar.fit, count = N.calendar)
+      } else {
+        x$eff.calendar.fit <- NULL
+      }
+      rownames(x$eff.calendar) <- as.character(calendar_time)
+      if (use_loess) {
+        rownames(x$eff.calendar.fit) <- as.character(calendar_time)
+      }
+      x$N.calendar <- N.calendar
+
+      se.calendar <- apply(x$eff * D.sub, 1, function(v) {
+        v <- v[!is.na(v)]
+        n <- length(v)
+        if (n <= 1) return(NA_real_)
+        stats::sd(v) / sqrt(n)
+      })
+      df.calendar <- pmax(N.calendar - 1, 1)
+      ci.level <- if (!is.null(plot.ci) && plot.ci %in% c("0.9", "90")) 0.9 else 0.95
+      crit.calendar <- stats::qt(1 - (1 - ci.level) / 2, df.calendar)
+      ci.lower <- eff.calendar - crit.calendar * se.calendar
+      ci.upper <- eff.calendar + crit.calendar * se.calendar
+      if (use_loess) {
+        ci.fit.lower <- eff.calendar.fit - crit.calendar * se.fit
+        ci.fit.upper <- eff.calendar.fit + crit.calendar * se.fit
+      }
+
+      x$est.eff.calendar <- cbind(
+        "ATT-calendar" = eff.calendar,
+        "S.E." = se.calendar,
+        "CI.lower" = ci.lower,
+        "CI.upper" = ci.upper,
+        "count" = N.calendar
+      )
+      if (use_loess) {
+        x$est.eff.calendar.fit <- cbind(
+          "ATT-calendar Fitted" = eff.calendar.fit,
+          "S.E." = se.fit,
+          "CI.lower" = ci.fit.lower,
+          "CI.upper" = ci.fit.upper,
+          "count" = N.calendar
+        )
+      } else {
+        x$est.eff.calendar.fit <- NULL
+      }
+      rownames(x$est.eff.calendar) <- as.character(calendar_time)
+      if (use_loess) {
+        rownames(x$est.eff.calendar.fit) <- as.character(calendar_time)
+      }
+
+      if (sum(N.calendar, na.rm = TRUE) > 0) {
+        calendar_att_avg <- sum(eff.calendar * N.calendar, na.rm = TRUE) / sum(N.calendar[!is.na(eff.calendar)], na.rm = TRUE)
+      }
+    }
+
     CI <- NULL
     if (is.null(x$est.eff.calendar) == TRUE) {
       CI <- FALSE
@@ -3114,15 +3486,24 @@ plot.fect <- function(
       CI <- TRUE
     }
     if (!is.null(provided_xlim)) {
-      x$est.eff.calendar <- x$est.eff.calendar[which(rownames(x$est.eff.calendar) >= min(provided_xlim) & rownames(x$est.eff.calendar) <= max(provided_xlim)), ]
-      x$est.eff.calendar.fit <- x$est.eff.calendar.fit[which(rownames(x$est.eff.calendar.fit) >= min(provided_xlim) & rownames(x$est.eff.calendar.fit) <= max(provided_xlim)), ]
+      # IMPORTANT: rownames are character; comparing them to numeric xlim will do
+      # lexicographic comparisons and can drop valid points (e.g., "-2" > "-10").
+      # Convert to numeric event/calenadar time before filtering.
+      tt_cal <- suppressWarnings(as.numeric(rownames(x$est.eff.calendar)))
+      keep_cal <- which(is.finite(tt_cal) & tt_cal >= min(provided_xlim) & tt_cal <= max(provided_xlim))
+      x$est.eff.calendar <- x$est.eff.calendar[keep_cal, , drop = FALSE]
+      if (use_loess && !is.null(x$est.eff.calendar.fit)) {
+        tt_fit <- suppressWarnings(as.numeric(rownames(x$est.eff.calendar.fit)))
+        keep_fit <- which(is.finite(tt_fit) & tt_fit >= min(provided_xlim) & tt_fit <= max(provided_xlim))
+        x$est.eff.calendar.fit <- x$est.eff.calendar.fit[keep_fit, , drop = FALSE]
+      }
     }
     if (plot.ci == "none") {
       CI <- FALSE
     }
     ## axes labels
     if (is.null(xlab) == TRUE) {
-      xlab <- "Calendar Time"
+      xlab <- if (isTRUE(relative.time)) "Time Since the Treatment's Onset" else "Calendar Time"
     } else if (xlab == "") {
       xlab <- NULL
     }
@@ -3133,39 +3514,51 @@ plot.fect <- function(
       ylab <- NULL
     }
 
+    att.avg.use <- calendar_att_avg
 
     if (CI == FALSE) {
       message("Uncertainty estimates not available.\n")
       data.1 <- x$eff.calendar
-      data.2 <- x$eff.calendar.fit
+      has_fit <- use_loess && !is.null(x$eff.calendar.fit)
+      data.2 <- if (has_fit) x$eff.calendar.fit else NULL
       if (length(ylim) != 0) {
         rect.length <- (ylim[2] - ylim[1]) / 5
         rect.min <- ylim[1]
       } else {
-        rect.length <- (max(c(data.1, data.2), na.rm = TRUE) - min(c(data.1, data.2), na.rm = TRUE)) / 2
-        rect.min <- min(c(data.1, data.2), na.rm = TRUE) - rect.length
+        if (has_fit) {
+          rect.length <- (max(c(data.1, data.2), na.rm = TRUE) - min(c(data.1, data.2), na.rm = TRUE)) / 2
+          rect.min <- min(c(data.1, data.2), na.rm = TRUE) - rect.length
+        } else {
+          rect.length <- (max(data.1, na.rm = TRUE) - min(data.1, na.rm = TRUE)) / 2
+          rect.min <- min(data.1, na.rm = TRUE) - rect.length
+        }
       }
       d1 <- data.1 <- as.matrix(x$eff.calendar[which(!is.na(x$eff.calendar[, 1])), ])
-      d2 <- data.2 <- as.matrix(x$eff.calendar.fit[which(!is.na(x$eff.calendar.fit[, 1])), ])
+      if (has_fit) {
+        d2 <- data.2 <- as.matrix(x$eff.calendar.fit[which(!is.na(x$eff.calendar.fit[, 1])), ])
+      }
       if (dim(d1)[2] == 1) {
         d1 <- data.1 <- t(d1)
-        rownames(d1) <- rownames(data.1) <- rownames(x$eff.calendar)[which(!is.na(x$est.eff.calendar[, 1]))]
+        rownames(d1) <- rownames(data.1) <- rownames(x$eff.calendar)[which(!is.na(x$eff.calendar[, 1]))]
       }
-      if (dim(d2)[2] == 1) {
+      if (has_fit && dim(d2)[2] == 1) {
         d2 <- data.2 <- t(d2)
-        rownames(d2) <- rownames(data.2) <- rownames(x$eff.calendar.fit)[which(!is.na(x$est.eff.calendar.fit[, 1]))]
+        rownames(d2) <- rownames(data.2) <- rownames(x$eff.calendar.fit)[which(!is.na(x$eff.calendar.fit[, 1]))]
       }
     } else {
       if (is.null(x$est.eff.calendar)) {
         stop("Uncertainty estimates not available.\n")
       }
       d1 <- data.1 <- as.matrix(x$est.eff.calendar[which(!is.na(x$est.eff.calendar[, 1])), ])
-      d2 <- data.2 <- as.matrix(x$est.eff.calendar.fit[which(!is.na(x$est.eff.calendar.fit[, 1])), ])
+      has_fit <- use_loess && !is.null(x$est.eff.calendar.fit)
+      if (has_fit) {
+        d2 <- data.2 <- as.matrix(x$est.eff.calendar.fit[which(!is.na(x$est.eff.calendar.fit[, 1])), ])
+      }
       if (dim(d1)[2] == 1) {
         d1 <- data.1 <- t(d1)
         rownames(d1) <- rownames(data.1) <- rownames(x$est.eff.calendar)[which(!is.na(x$est.eff.calendar[, 1]))]
       }
-      if (dim(d2)[2] == 1) {
+      if (has_fit && dim(d2)[2] == 1) {
         d2 <- data.2 <- t(d2)
         rownames(d2) <- rownames(data.2) <- rownames(x$est.eff.calendar.fit)[which(!is.na(x$est.eff.calendar.fit[, 1]))]
       }
@@ -3174,8 +3567,13 @@ plot.fect <- function(
         rect.length <- (ylim[2] - ylim[1]) / 5
         rect.min <- ylim[1]
       } else {
-        rect.length <- (max(c(data.1[, 4], data.2[, 4]), na.rm = TRUE) - min(c(data.1[, 3], data.2[, 3]), na.rm = TRUE)) / 2
-        rect.min <- min(c(data.1[, 3], data.2[, 3]), na.rm = TRUE) - rect.length
+        if (has_fit) {
+          rect.length <- (max(c(data.1[, 4], data.2[, 4]), na.rm = TRUE) - min(c(data.1[, 3], data.2[, 3]), na.rm = TRUE)) / 2
+          rect.min <- min(c(data.1[, 3], data.2[, 3]), na.rm = TRUE) - rect.length
+        } else {
+          rect.length <- (max(data.1[, 4], na.rm = TRUE) - min(data.1[, 3], na.rm = TRUE)) / 2
+          rect.min <- min(data.1[, 3], na.rm = TRUE) - rect.length
+        }
       }
     }
     p <- ggplot()
@@ -3196,44 +3594,118 @@ plot.fect <- function(
     p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
 
     TTT <- as.numeric(rownames(data.1))
-    TTT.2 <- as.numeric(rownames(data.2))
+    if (has_fit) {
+      TTT.2 <- as.numeric(rownames(data.2))
+    }
 
     if (CI == FALSE) {
-      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
+      p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+      if (has_fit) {
+        if (isTRUE(relative.time) && !is.null(x$eff.calendar.fit.group)) {
+          fit_data <- x$eff.calendar.fit.group
+          p <- p + geom_line(
+            data = fit_data,
+            aes(x = time, y = fit, group = group),
+            color = calendar.color,
+            linewidth = 1.1
+          )
+        } else {
+          p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
+        }
+      }
       p <- p + geom_point(aes(x = TTT, y = d1[, 1]), color = "gray50", fill = "gray50", alpha = 1, size = 1.2)
     } else {
-      p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, size = 0)
-      p <- p + geom_hline(yintercept = x$att.avg, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
+      if (has_fit) {
+        if (isTRUE(relative.time) && !is.null(x$est.eff.calendar.fit.group)) {
+          fit_data <- x$est.eff.calendar.fit.group
+          p <- p + geom_ribbon(
+            data = fit_data,
+            aes(x = time, ymin = ci.lower, ymax = ci.upper, group = group),
+            color = calendar.cicolor,
+            fill = calendar.cicolor,
+            alpha = 0.5,
+            linewidth = 0
+          )
+          p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+          p <- p + geom_line(
+            data = fit_data,
+            aes(x = time, y = fit, group = group),
+            color = calendar.color,
+            linewidth = 1.1
+          )
+        } else {
+          p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, linewidth = 0)
+          p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+          p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
+        }
+      } else {
+        p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+      }
       p <- p + geom_pointrange(aes(x = TTT, y = d1[, 1], ymin = d1[, 3], ymax = d1[, 4]), color = "gray50", fill = "gray50", alpha = 1, size = 0.6)
     }
 
-    if (show.count == TRUE & !(type == "gap" | type == "equiv")) {
+    if (isTRUE(show.count) && !type %in% c("gap", "equiv")) {
+      # Keep the count bars as a small "indicator band" at the very bottom of the plot,
+      # instead of letting them consume the main y-range.
+      current_plot_yrange <- NULL
+      if (!is.null(ylim) && length(ylim) == 2) {
+        current_plot_yrange <- ylim
+      } else {
+        gb <- ggplot_build(p)
+        current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
+      }
+
+      count_bar_space_prop <- 0.15
+      count_bar_space_height <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
+      actual_rect_length <- count_bar_space_height * 0.8
+      rect_min_val <- if (!is.null(ylim) && length(ylim) == 2) ylim[1] else current_plot_yrange[1] - count_bar_space_height
+
       T.start <- c()
       T.end <- c()
       ymin <- c()
       ymax <- c()
       T.gap <- (max(TTT) - min(TTT)) / length(TTT)
-      for (i in c(1:dim(d1)[1])) {
+      for (i in seq_len(nrow(d1))) {
         T.start <- c(T.start, TTT[i] - 0.25 * T.gap)
         T.end <- c(T.end, TTT[i] + 0.25 * T.gap)
-        ymin <- c(ymin, rect.min)
-        ymax <- c(ymax, rect.min + rect.length * d1[i, "count"] / max(d1[, "count"]))
+        ymin <- c(ymin, rect_min_val)
+        ymax <- c(ymax, rect_min_val + actual_rect_length * d1[i, "count"] / max(d1[, "count"], na.rm = TRUE))
       }
       data.toplot <- cbind.data.frame(
         xmin = T.start,
         xmax = T.end,
         ymin = ymin,
-        ymax = ymax
+        ymax = ymax,
+        count = d1[, "count"]
       )
-      max.count.pos <- mean(TTT[which.max(d1[, "count"])])
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2)
+      max_idx <- which.max(data.toplot$count)
+      max_count_pos <- (data.toplot$xmin[max_idx] + data.toplot$xmax[max_idx]) / 2
+
+      p <- p + geom_rect(
+        aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+        data = data.toplot,
+        inherit.aes = FALSE,
+        fill = count.color,
+        alpha = count.alpha,
+        color = count.outline.color,
+        linewidth = 0.3
+      )
       p <- p + annotate("text",
-        x = max.count.pos - 0.02 * T.gap,
-        y = max(data.toplot$ymax) + 0.2 * rect.length,
-        label = max(x$N.calendar), size = cex.text * 0.8, hjust = 0.5
+        x = max_count_pos,
+        y = data.toplot$ymax[max_idx] + 0.12 * count_bar_space_height,
+        label = max(data.toplot$count, na.rm = TRUE),
+        size = cex.text * 0.8,
+        hjust = 0.5,
+        vjust = 0
       )
+
+      # If ylim was not user-specified, extend the plot downward to make room for the indicator band.
+      # IMPORTANT: don't add coord_cartesian() here; we'll apply xlim/ylim once below.
+      if (is.null(ylim) || length(ylim) == 0) {
+        final_yrange_min <- min(current_plot_yrange[1], rect_min_val)
+        final_yrange_max <- current_plot_yrange[2]
+        ylim <- c(final_yrange_min, final_yrange_max)
+      }
     }
 
     ## title
@@ -3243,9 +3715,12 @@ plot.fect <- function(
       p <- p + ggtitle(main)
     }
 
-    ## ylim
-    if (is.null(ylim) == FALSE) {
-      p <- p + coord_cartesian(ylim = ylim)
+    ## axis limits
+    # NOTE: In ggplot2, adding coord_cartesian() multiple times will replace the
+    # previous coordinate system. So we must set xlim/ylim together to avoid
+    # xlim overriding ylim (or vice versa).
+    if (is.null(ylim) == FALSE || is.null(xlim) == FALSE) {
+      p <- p + coord_cartesian(xlim = xlim, ylim = ylim)
     }
 
     if (length(TTT) <= 10) {
@@ -3266,10 +3741,7 @@ plot.fect <- function(
     #         }
     #     }
     # }
-    ## xlim
-    if (is.null(xlim) == FALSE) {
-      p <- p + coord_cartesian(xlim = xlim)
-    }
+    # xlim handled together with ylim above
 
 
     p <- p + theme(
@@ -3282,7 +3754,8 @@ plot.fect <- function(
       axis.text = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
       axis.text.y = element_text(size = cex.axis),
-      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)),
+      plot.margin = margin(15, 5.5, 5.5, 5.5, "pt")
     )
 
     if (isTRUE(return.data)) {
@@ -3307,16 +3780,26 @@ plot.fect <- function(
   if (type == "heterogeneous") {
     Xs <- x[names(x) == "X"][[2]]
 
-    if ((is.null(covariate) == TRUE) && ((dim(Xs) > 2) && (dim(Xs)[3] > 1))) {
+    covariate_is_custom <- is.matrix(covariate) || is.data.frame(covariate) ||
+      (is.numeric(covariate) && length(covariate) == TT * N)
+    covariate_name <- if (is.character(covariate) && length(covariate) == 1 && covariate != "") covariate else NULL
+
+    if (!covariate_is_custom && is.null(covariate_name) && ((dim(Xs) > 2) && (dim(Xs)[3] > 1))) {
       stop("Please provide a covariate to plot heterogeneous effects.\n")
     }
 
-    if ((is.null(covariate) == FALSE) && (!covariate %in% x$X)) {
+    if (!covariate_is_custom && !is.null(covariate_name) && (!covariate_name %in% x$X)) {
       stop("Please provide a valid covariate to plot heterogeneous effects.\n")
+    }
+    if (!covariate_is_custom && is.null(covariate_name)) {
+      covariate_name <- x$X[1]
+    }
+    if (!covariate_is_custom && !is.null(covariate_name)) {
+      maintext <- paste("CATT by", covariate_name)
     }
 
     if (is.null(xlab) == TRUE) {
-      xlab <- covariate
+      xlab <- if (!is.null(covariate_name)) covariate_name else "M"
     } else if (xlab == "") {
       xlab <- NULL
     }
@@ -3330,16 +3813,124 @@ plot.fect <- function(
     D.missing <- x$D.dat
     D.missing[which(D == 0)] <- NA
     D.missing.vec <- as.vector(D.missing)
+    t.on.vec <- as.vector(x$T.on)
 
-    eff.vec <- as.vector(x$eff)
-    X.vec <- as.vector(x[names(x) == "X"][2]$X[, , which(x$X == covariate)])
+    if (isTRUE(pretreatment)) {
+      if (!is.numeric(num.pretreatment) || length(num.pretreatment) != 1 || is.na(num.pretreatment)) {
+        stop("`num.pretreatment` must be a single positive integer when `pretreatment = TRUE`.\n")
+      }
+      num.pretreatment.int <- as.integer(num.pretreatment)
+      if (num.pretreatment.int < 1) {
+        stop("`num.pretreatment` must be a single positive integer when `pretreatment = TRUE`.\n")
+      }
+      # Use the last `num.pretreatment` event-time periods up to 0: {-(K-1), ..., -1, 0}
+      lower_bound <- -(num.pretreatment.int - 1)
+      keep.pos <- which(!is.na(t.on.vec) & t.on.vec >= lower_bound & t.on.vec <= 0)
+      if (length(keep.pos) == 0) {
+        stop("No pretreatment units are available for heterogeneous effects.\n")
+      }
+    } else {
+      keep.pos <- which(!is.na(D.missing.vec))
+    }
 
-    eff.vec <- eff.vec[which(!is.na(D.missing.vec))]
-    X.vec <- X.vec[which(!is.na(D.missing.vec))]
-
+    if (covariate_is_custom) {
+      if (is.data.frame(covariate)) {
+        covariate <- as.matrix(covariate)
+      }
+      if (is.matrix(covariate)) {
+        if (!all(dim(covariate) == c(TT, N))) {
+          stop("Custom covariate must have dimension T x N to match the fect object.\n")
+        }
+        X.vec <- as.vector(covariate)
+      } else {
+        if (length(covariate) != TT * N) {
+          stop("Custom covariate must have length T*N to match the fect object.\n")
+        }
+        X.vec <- as.vector(covariate)
+      }
+    } else {
+      X.vec <- as.vector(x[names(x) == "X"][2]$X[, , which(x$X == covariate_name)])
+    }
+    X.vec <- X.vec[keep.pos]
     j <- order(X.vec)
-    eff.vec <- eff.vec[j]
     X.vec <- X.vec[j]
+
+    if (cm == FALSE) {
+      eff.vec <- as.vector(x$eff)
+      eff.vec <- eff.vec[keep.pos]
+      eff.vec <- eff.vec[j]
+    } else {
+      if (is.null(x$est.cm)) {
+        stop("Cannot compute heterogeneous effects with cm=TRUE: `est.cm` not found in the fect object.\n",
+             "Please run `fect(..., cm=TRUE)`.\n")
+      }
+      if (covariate_is_custom) {
+        stop("Custom covariate is not supported with `cm = TRUE`.\n")
+      }
+
+      # Treated cell indices in vectorized (column-major) order
+      tr.pos <- keep.pos
+
+      # Full covariate array (T x N x p) stored as the 2nd `X` entry
+      X.full <- x[names(x) == "X"][2]$X
+      cov.idx <- which(x$X == covariate_name)[1]
+      if (length(cov.idx) == 0) {
+        stop("Cannot find the requested covariate in x$X.\n")
+      }
+
+      calc_g <- function(est.obj, X.arr) {
+        TT <- dim(X.arr)[1]
+        N <- dim(X.arr)[2]
+        p <- dim(X.arr)[3]
+
+        mu <- if (!is.null(est.obj$mu)) as.numeric(est.obj$mu) else 0
+        g <- matrix(mu, TT, N)
+
+        if (!is.null(est.obj$alpha)) {
+          alpha <- as.numeric(est.obj$alpha)
+          g <- g + matrix(rep(alpha, each = TT), TT, N)
+        }
+        if (!is.null(est.obj$xi)) {
+          xi <- as.numeric(est.obj$xi)
+          g <- g + matrix(rep(xi, times = N), TT, N)
+        }
+
+        if (p > 0 && !is.null(est.obj$beta)) {
+          beta <- as.numeric(est.obj$beta)
+          for (kk in seq_len(p)) {
+            if (!is.na(beta[kk])) {
+              g <- g + X.arr[, , kk] * beta[kk]
+            }
+          }
+        }
+        return(g)
+      }
+
+      # Compute \hat{theta}(m) for each unique m (= xv) by plugging m into the
+      # selected covariate slice, then averaging g1-g0 over treated cells.
+      X.unique <- unique(X.vec)
+      theta.unique <- sapply(X.unique, function(xv) {
+        X.mod <- X.full
+        X.mod[, , cov.idx] <- xv
+
+        g1 <- calc_g(x$est.cm, X.mod)
+        g0 <- calc_g(x$est, X.mod)
+        diff.vec <- as.vector(g1 - g0)[tr.pos]
+
+        mean(diff.vec, na.rm = TRUE)
+      })
+
+      # Map back to observation-level vector aligned with sorted X.vec
+      eff.vec <- as.numeric(theta.unique[match(X.vec, X.unique)])
+    }
+
+    if (isTRUE(pretreatment)) {
+      att.avg.use <- mean(eff.vec, na.rm = TRUE)
+    } else {
+      att.avg.use <- x$att.avg
+    }
+
+    # print(eff.vec)  # debug
     
     if (length(unique(X.vec)) <= 4) {
       p <- ggplot()
@@ -3385,7 +3976,7 @@ plot.fect <- function(
 
       ## core geoms (even spacing because x is factor)
       p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
-      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
+      p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
       # nicer CI + mean: thick error bars + solid point
       p <- p + geom_linerange(
         aes(x = x, ymin = .data$lower, ymax = .data$upper),
@@ -3425,10 +4016,13 @@ plot.fect <- function(
           count = counts
         )
         p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-          data = data_counts, fill = count.color, color = count.outline.color, alpha = count.alpha, linewidth = 0.2
+          data = data_counts, inherit.aes = FALSE,
+          fill = count.color, color = count.outline.color, alpha = count.alpha, linewidth = 0.2
         )
         p <- p + geom_text(aes(x = .data$xcenter, y = .data$ymax + 0.12 * count_bar_space_height, label = .data$count),
-                           data = data_counts, size = cex.text * 0.85, hjust = 0.5, vjust = 0.5, color = "#444444")
+          data = data_counts, inherit.aes = FALSE,
+          size = cex.text * 0.85, hjust = 0.5, vjust = 0.5, color = "#444444"
+        )
         if (!is.null(covariate.labels)) {
           p <- p + scale_x_discrete(labels = covariate.labels)
         } else {
@@ -3436,22 +4030,36 @@ plot.fect <- function(
         }
       }
 
-      if (is.null(ylim) == FALSE) {
-        p <- p + coord_cartesian(ylim = ylim)
-      }
-
-      if (is.null(xlim) == FALSE) {
-        p <- p + coord_cartesian(xlim = xlim)
+      # NOTE: In ggplot2, adding coord_cartesian() multiple times will replace the
+      # previous coordinate system. So we must set xlim/ylim together to avoid
+      # xlim overriding ylim (or vice versa).
+      if (is.null(ylim) == FALSE || is.null(xlim) == FALSE) {
+        p <- p + coord_cartesian(xlim = xlim, ylim = ylim)
       }
 
     } else {
-      plx <- predict(loess(eff.vec ~ X.vec), se = T)
-      se <- stats::qt(0.975, plx$df) * plx$se
-      y_hat <- plx$fit
-      y_hat_lower <- y_hat - se
-      y_hat_upper <- y_hat + se
+      # Continuous covariate: smooth with loess and show 95% CI ribbon.
+      # NOTE: predict(loess, se=TRUE) returns `se.fit` (not `se`).
+      # Also guard against NA/Inf values in the covariate/effects.
+      df_hte <- cbind.data.frame(X.vec = X.vec, eff.vec = eff.vec)
+      df_hte <- df_hte[is.finite(df_hte$X.vec) & is.finite(df_hte$eff.vec), , drop = FALSE]
+      if (nrow(df_hte) < 2) {
+        stop("Not enough non-missing observations to plot heterogeneous effects for the requested covariate.\n")
+      }
 
-      p <- ggplot()
+      if (use_loess) {
+        lo_fit <- stats::loess(eff.vec ~ X.vec, data = df_hte)
+        plx <- stats::predict(lo_fit, newdata = df_hte$X.vec, se = TRUE)
+        se <- stats::qt(0.975, plx$df) * plx$se.fit
+        df_hte$y_hat <- as.numeric(plx$fit)
+        df_hte$y_hat_lower <- df_hte$y_hat - se
+        df_hte$y_hat_upper <- df_hte$y_hat + se
+      }
+
+      # Keep X.vec aligned for the histogram/count overlay below
+      X.vec <- df_hte$X.vec
+
+      p <- ggplot(df_hte, aes(x = .data$X.vec))
       ## xlab and ylab
       p <- p + xlab(xlab) + ylab(ylab)
 
@@ -3466,9 +4074,13 @@ plot.fect <- function(
       }
 
       p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
-      p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, size = 0)
-      p <- p + geom_hline(yintercept = x$att.avg, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
-      p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, linewidth = 1.1)
+      p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
+      if (use_loess) {
+        p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, linewidth = 0)
+        p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, linewidth = 1.1)
+      } else if (isTRUE(show.points)) {
+        p <- p + geom_point(aes(y = .data$eff.vec), color = heterogeneous.color, alpha = 0.7, size = 1.2)
+      }
 
       ## title
       if (is.null(main) == TRUE) {
@@ -3477,13 +4089,9 @@ plot.fect <- function(
         p <- p + ggtitle(main)
       }
 
-      ## ylim
-      if (is.null(ylim) == FALSE) {
-        p <- p + coord_cartesian(ylim = ylim)
-      }
-
-      if (is.null(xlim) == FALSE) {
-        p <- p + coord_cartesian(xlim = xlim)
+      ## axis limits (set together; see note above)
+      if (is.null(ylim) == FALSE || is.null(xlim) == FALSE) {
+        p <- p + coord_cartesian(xlim = xlim, ylim = ylim)
       }
 
       if (show.count == TRUE) {
@@ -3519,7 +4127,8 @@ plot.fect <- function(
           max_idx <- which.max(counts)
           max_count_pos <- (bin_xmin[max_idx] + bin_xmax[max_idx]) / 2
           p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-            data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+            data = data.toplot, inherit.aes = FALSE,
+            fill = count.color, linewidth = 0.3, alpha = count.alpha, color = count.outline.color
           )
           p <- p + annotate("text",
             x = max_count_pos,
@@ -3529,7 +4138,8 @@ plot.fect <- function(
           if (is.null(ylim)) {
             final_yrange_min <- min(current_plot_yrange[1], rect_min_val)
             final_yrange_max <- current_plot_yrange[2]
-            p <- p + coord_cartesian(ylim = c(final_yrange_min, final_yrange_max))
+            # Preserve xlim if it was supplied; otherwise the new coord would drop it.
+            p <- p + coord_cartesian(xlim = xlim, ylim = c(final_yrange_min, final_yrange_max))
           }
         }
       }
@@ -3545,7 +4155,8 @@ plot.fect <- function(
       axis.text = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
       axis.text.y = element_text(size = cex.axis),
-      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)),
+      plot.margin = margin(15, 5.5, 5.5, 5.5, "pt")
     )
 
     if (isTRUE(return.data)) {
@@ -3742,7 +4353,10 @@ plot.fect <- function(
         ymax = ymax
       )
       max.count.pos <- data.count[which.max(data.count[, 2]), 1][1] - min(data.count[, 1]) + 1
-      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), data = data.toplot, fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2)
+      p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+        data = data.toplot, inherit.aes = FALSE,
+        fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+      )
       p <- p + annotate("text",
         x = max.count.pos - 0.02 * T.gap,
         y = max(data.toplot$ymax) + 0.1 * rect.length,
@@ -3765,7 +4379,8 @@ plot.fect <- function(
       axis.text = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
       axis.text.y = element_text(size = cex.axis),
-      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)),
+      plot.margin = margin(15, 5.5, 5.5, 5.5, "pt")
     )
 
     if (is.null(xticklabels) == FALSE) {

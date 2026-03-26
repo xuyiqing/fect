@@ -1,0 +1,616 @@
+# Plot Options {#sec-plots}
+
+```{r .common, include = FALSE}
+source("_common.R")
+```
+
+In this chapter, we explore visualization options available in the **fect** package. Plots are organized by `type`:
+
+- the event study plot (`gap`)
+- treated counterfactual plot (`counterfactual`)
+- diagnostic plots (`equiv`, `placebo`, `carryover`)
+- cumulative effects (`cumul`)
+- treatment effect heterogeneity plots (`box`, `calendar`, and `hte`)
+- special-purpose displays (`status`, `factors`, and `loadings`)
+- standalone `esplot()`
+
+We begin with shared parameter conventions and then work through each plot type in turn. `plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/06-plots.R).
+
+------------------------------------------------------------------------
+
+## Load Data
+
+We use two datasets throughout. @GS2020 examines the mobilizing effect of minority candidates on coethnic support in U.S. congressional elections. The treatment indicates the presence of an Asian candidate; the outcome is the proportion of general election contributions from Asian donors. @HH2019 study the effects of indirect democracy (treatment) on naturalization rates (outcome) in Swiss municipalities from 1991 to 2009.
+
+```{r load, message=FALSE}
+# load libraries and data
+library(ggplot2)
+library(panelView)
+data(gs2020)
+data(hh2019)
+ls()
+```
+
+------------------------------------------------------------------------
+
+## Gap Plot {#sec-gap}
+
+The gap plot---also known as the event study plot---displays dynamic treatment effects over relative time. It is the default plot type.
+
+### Default gap plot
+
+We first estimate the model. For details on estimation, see @sec-fect.
+
+```{r est, cache = TRUE}
+out <- fect(Y = "general_sharetotal_A_all",
+            D = "cand_A_all",
+            X = c("cand_H_all", "cand_B_all"),
+            index = c("district_final", "cycle"),
+            data = gs2020, method = "fe",
+            force = "two-way", se = TRUE,
+            parallel = TRUE, cores = 16, nboots = 1000)
+
+out.hh <- fect(nat_rate_ord ~ indirect,
+               data = hh2019,
+               index = c("bfs","year"),
+               method = 'fe', se = TRUE,
+               parallel = TRUE, cores = 16, nboots = 1000,
+               keep.sims = TRUE)
+```
+
+After running the model, we plot the dynamic treatment effects, including confidence intervals when `se = TRUE` is specified in estimation. Since `type = "gap"` is the default, we omit it.
+
+```{r plot-gap-default}
+plot(out) # the effect of co-ethnic mobilization
+plot(out.hh) # the effect of indirect democracy on naturalization rate
+```
+
+### Starting period
+
+By default, the first post-treatment period is labeled 1 and the last pre-treatment period is 0. Some researchers prefer to label these as 0 and -1, respectively. Set `start0 = TRUE` to shift accordingly.
+
+```{r begin-post-customization}
+plot(out, start0 = TRUE,
+     main = "Custom Starting Period")
+```
+
+### Connected estimates
+
+By default, estimates are plotted as discrete points. Set `connected = TRUE` to connect them with lines. The line width and point size are controlled by `est.lwidth` and `est.pointsize`.
+
+```{r connected-estimates}
+plot(out,
+     post.color = "green4",
+     connected = TRUE,
+     est.lwidth = 1.2,
+     est.pointsize = 3)
+```
+
+To outline the confidence interval band, add `ci.outline = TRUE`. This improves visibility when colors are similar to the background.
+
+```{r ci-outline}
+plot(out,
+     connected = TRUE,
+     ci.outline = TRUE,
+     main = "The Effect of Coethnic Mobilization")
+plot(out.hh,
+     preset = "vibrant",
+     ci.outline = TRUE,
+     main = "The Effect of Indirect Democracy")
+```
+
+### Presets
+
+The `preset` argument applies coordinated color schemes. Options are `"default"` (mostly black and white with accent color), `"vibrant"` (saturated colors), and `"grayscale"` (monochromatic, suitable for journals that charge for color).
+
+```{r preset-vibrant}
+plot(out,
+     preset = "vibrant",
+     main = "Vibrant Preset Colors: Grumbach and Sahn (2020)")
+plot(out.hh,
+     preset = "vibrant",
+     main = "Vibrant Preset Colors: Hainmueller and Hangartner (2019)")
+```
+
+```{r preset-grayscale}
+plot(out,
+     preset = "grayscale",
+     main = "Grayscale Preset Colors")
+```
+
+### Colors
+
+The `color` parameter sets the master color for estimate lines, points, and CI bands. In gap plots, `color` controls the **post-treatment** color; pre-treatment defaults to gray. To control each phase independently, use `pre.color` and `post.color`.
+
+Default color conventions for gap plots: pre-treatment = gray (in-sample), post-treatment = black (out-of-sample). When `loo = TRUE`, all points are black (all out-of-sample).
+
+```{r preset-vibrant2}
+plot(out.hh,
+     preset = "vibrant",
+     post.color = "green4",
+     main = "Change Estimates' Color: Hainmueller and Hangartner (2019)")
+```
+
+### Confidence intervals
+
+The `plot.ci` argument controls CI display. Options are `"0.95"` (default), `"0.9"`, and `"none"`.
+
+```{r ci-raw-customization}
+plot(out, plot.ci = "0.9",
+     main = "90% confidence intervals")
+```
+
+### Count bars
+
+The bar chart at the bottom of the plot shows the number of treated units at each relative time period. Customize it with `count.color`, `count.outline.color`, and `count.alpha`. Set `show.count = FALSE` to hide the bars entirely.
+
+```{r count-histogram-customization}
+plot(out,
+     count.color = "lightblue",
+     count.outline.color = "darkblue",
+     count.alpha = 0.2,
+     main = "Count Histogram Customization")
+```
+
+The `proportion` parameter controls which periods are displayed based on the count of treated units. Periods where the treated unit count falls below `proportion` $\times$ max(count) are trimmed. The default `proportion = 0.3` retains periods with at least 30% of the maximum treated unit count. When `xlim` is specified explicitly, `proportion` is overridden.
+
+### Axis customization
+
+Use `xlim`/`ylim` for axis ranges, `xbreaks`/`ybreaks` for tick marks, `xlab`/`ylab` for labels, and `xangle` for rotating x-axis text. Set `gridOff = TRUE` to remove grid lines.
+
+```{r axis-legend-customization}
+plot(out,
+     xlim = c(-10, 1),
+     ylim = c(-0.15, 0.30),
+     xlab = "Custom Time Axis",
+     ylab = "Estimated ATT",
+     xangle = 90,
+     xbreaks = seq(-10, 1, by = 2),
+     gridOff = TRUE,
+     main = "Axis and Legend Customization")
+```
+
+### Text sizes
+
+The `cex.*` family of parameters controls text sizes: `cex.main` (title), `cex.axis` (tick labels), `cex.lab` (axis labels), `cex.text` (annotations), and `cex.legend` (legend text). The `theme.bw` option toggles the black-and-white ggplot2 theme.
+
+```{r text-customization}
+plot(out,
+     ylim = c(-0.15, 0.3),
+     theme.bw = FALSE,
+     cex.main = 1.25,
+     cex.axis = 1.2,
+     cex.lab = 1.2,
+     cex.legend = 1,
+     cex.text = 1.2,
+     main = "Text and Theme Customization")
+```
+
+### Reference lines
+
+The `lcolor`, `lwidth`, and `ltype` parameters control the horizontal (zero) and vertical (treatment onset) reference lines. Each accepts a vector of length two; if a single value is given, it applies to both lines.
+
+```{r line-bound-customization}
+plot(out,
+     est.lwidth = 1.5,
+     est.pointsize = 3,
+     lcolor = c("red","skyblue"),
+     lwidth = 2,
+     main = "Line Customization")
+```
+
+------------------------------------------------------------------------
+
+## Counterfactual plot
+
+While the gap plot shows the ATT (difference), the counterfactual plot shows the **levels**: observed outcomes for treated units alongside model-predicted counterfactual paths.
+
+```{r counterfactual}
+plot(out, type = "counterfactual",
+     main = "Grumbach & Sahn (2020): Treated vs. Counterfactuals",
+     ylab = "Proportion of Asian Donation",
+     legend.pos = "bottom")
+```
+
+```{r counterfactual-hh}
+plot(out.hh, type = "counterfactual",
+     main = "Hainmueller & Hangartner (2019): Treated vs. Counterfactuals",
+     ylab = "Naturalization Rate",
+     legend.pos = "top")
+```
+
+Use `color` for the observed-outcome line and `counterfactual.color` for the counterfactual line (which also colors the CI band with more transparency). Add `ci.outline = TRUE` to outline the band.
+
+```{r counterfactual-colors}
+plot(out.hh, type = "counterfactual",
+     main = "Hainmueller & Hangartner (2019): Treated vs. Counterfactuals",
+     ylab = "Naturalization Rate",
+     legend.pos = "bottom",
+     ci.outline = TRUE,
+     color = "red3",
+     counterfactual.color = "green4")
+```
+
+Setting `raw = "all"` overlays individual unit paths.
+
+```{r counterfactual-rawall}
+plot(out, type = "counterfactual", raw = "all")
+```
+
+Setting `raw = "band"` displays the 5th--95th interpercentile range. When adoption is staggered, only the band around treated units is shown.
+
+```{r counterfactual-rawband}
+plot(out, type = "counterfactual", raw = "band")
+```
+
+The individual-path colors are also customizable:
+
+```{r counterfactual-colors2}
+plot(out, type = "counterfactual",
+     count.color = "black",
+     count.alpha = 1,
+     color = "red",
+     counterfactual.color = "purple",
+     counterfactual.raw.treated.color = "orange",
+     counterfactual.linetype = "dotted",
+     raw = "all",
+     main = "Counterfactual Plot with Custom Colors")
+```
+
+------------------------------------------------------------------------
+
+## Pretrend Tests {#sec-pretrend}
+
+We provide two tests that shed light on the parallel trends assumption: the placebo test and the equivalence test. For methodological details, see @sec-fect or @LWX2022.
+
+### Placebo test---shape markers
+
+A placebo test artificially assigns treatment during pre-treatment periods and estimates the "placebo effect" in those periods. The model must be re-estimated with `placeboTest = TRUE`.
+
+```{r placebo, cache = TRUE}
+out_fe_placebo <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020,
+                       index = c("district_final", "cycle"), force = "two-way",
+                       method = "fe", CV = FALSE, parallel = TRUE, cores = 16,
+                       se = TRUE, nboots = 1000, placeboTest = TRUE,
+                       placebo.period = c(-2, 0))
+
+plot(out_fe_placebo)
+```
+
+When `placeboTest = TRUE` and a placebo period is active, the placebo test periods are automatically marked with **triangles** (▲, shape 17) in the plot, while regular estimates use **circles** (●). This distinction is especially important in grayscale, where color alone cannot differentiate test periods from ordinary estimates. A legend at the bottom of the plot identifies each symbol. To suppress the legend, set `legendOff = TRUE`.
+
+In connected mode, the triangle markers are scaled up so they remain visible alongside the line:
+
+```{r plot-placebo-connected}
+plot(out_fe_placebo, connected = TRUE, preset = "grayscale",
+     main = "Placebo Test with Connected Estimates")
+```
+
+The color of the placebo period markers can be changed with the `placebo.color` argument.
+
+```{r plot-placebo-color}
+plot(out_fe_placebo, placebo.color = "green4")
+```
+
+### Joint pre-trend test
+
+The equivalence plot displays only the **pre-treatment** period. The equivalence bound is defined by the two-one-sided test (TOST) threshold. Note: post-treatment estimates are not shown in this plot type---use the gap plot for those.
+
+The `bound` option controls which reference lines appear: `"none"`, `"min"` (maximum absolute pre-treatment residual), `"equiv"` (TOST threshold), or `"both"` (default).
+
+```{r plot-equiv-bound}
+plot(out, type = "equiv", bound = "equiv", tost.threshold = 0.1,
+     ylim = c(-0.15, 0.15))
+```
+
+The `"min"` bound displays the minimum range based on the maximum absolute pre-treatment residual. For example, if the largest pre-treatment estimate is 0.03, lines appear at \$\pm\$0.03.
+
+```{r plot-equiv-min}
+plot(out, type = "equiv", bound = "min", ylim = c(-0.15, 0.15))
+```
+
+With `bound = "both"` (the default), both the minimum range and the equivalence bound are shown.
+
+```{r plot-equiv-both}
+plot(out, type = "equiv", tost.threshold = 0.1, ylim = c(-0.15, 0.15))
+```
+
+Use `stats` to select test results to display, `stats.labs` to label them, and `stats.pos` to position the annotation. Set `show.stats = FALSE` to hide test results entirely.
+
+```{r stats-customization}
+plot(out, type = "equiv",
+     ylim = c(-0.25, 0.25),
+     stats = c("F.p", "equiv.p"),
+     stats.labs = c("F Test P-value", "Equivalence P-value"),
+     stats.pos = c(-8, 0.2),
+     show.stats = TRUE,
+     main = "Statistical Test Annotations")
+```
+
+------------------------------------------------------------------------
+
+## Carryover Test {#sec-exit}
+
+The exit plot shows how the difference between treatment and control groups evolves **after treatment ends**. The x-axis represents time relative to treatment exit, in contrast to the gap plot's focus on treatment entry. Exit plots are essential for assessing potential carryover effects.
+
+In exit plots, the color convention is reversed from gap plots: pre-exit estimates are black (out-of-sample) and post-exit estimates are gray (in-sample).
+
+```{r plot-exit-default}
+plot(out_fe_placebo, type = "exit")
+```
+
+### Carryover test with shape markers
+
+The carryover test examines whether the treatment effect persists after treatment ends. By setting `carryoverTest = TRUE` and specifying `carryover.period`, we designate post-exit periods as a "placebo" window.
+
+```{r carryover, cache = TRUE}
+out_fe_carryover <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020,
+                       index = c("district_final", "cycle"), force = "two-way",
+                         parallel = TRUE, cores = 16, se = TRUE, CV = FALSE,
+                         nboots = 1000, carryoverTest = TRUE,
+                         carryover.period = c(1, 3))
+plot(out_fe_carryover)
+```
+
+Carryover test periods are marked with **diamonds** (shape 18), while placebo test periods use triangles (shape 17). Both shapes are distinguishable in grayscale printing. When both tests are active in the same model, the legend differentiates all three symbol types (circles for regular estimates, triangles for placebo periods, diamonds for carryover periods).
+
+------------------------------------------------------------------------
+
+## Cumulative Effects {#sec-cumul}
+
+The cumulative effect plot displays the running sum of per-period treatment effects. This is only well-defined when there are no treatment reversals---that is, all treated units remain treated for the duration of the study. The model must be estimated with `keep.sims = TRUE`.
+
+We first apply it to `hh2019`, which has no treatment reversals.
+
+```{r plot-cumulative-hh}
+plot(effect(out.hh), main = "Cumulative Effect of Indirect Democracy",
+     ylab = "Cumulative Effect on Naturalization Rate")
+```
+
+Since the `gs2020` dataset has treatment reversals, we subset to units that remained treated throughout.
+
+```{r subset-no-reversals}
+# flag units that ever have a 1 to 0 change in d
+rev_flag <- tapply(gs2020[["cand_A_all"]],
+                   gs2020[["district_final"]],
+                   function(x) any(diff(x) < 0))
+
+# units with no reversals
+good_units <- names(rev_flag)[!rev_flag]
+
+# subset the desired rows
+gs2020_no_reversals <- gs2020[gs2020[["district_final"]] %in% good_units, ]
+
+```
+
+```{r no-reversals-est, cache = TRUE}
+out_no_reversals <- fect(Y = "general_sharetotal_A_all",
+                         D = "cand_A_all" ,
+                         X = c("cand_H_all", "cand_B_all") ,
+                         index = c("district_final", "cycle"),
+                         data = gs2020_no_reversals,
+                         method = "fe",
+                         force =  "two-way",
+                         se = TRUE, parallel = TRUE, cores = 16,
+                         nboots = 1000,
+                         keep.sims = TRUE)
+```
+
+```{r cumulative-effects}
+plot(effect(out_no_reversals), xlim = c(1, 2))
+```
+
+------------------------------------------------------------------------
+
+## Effect Heterogeneity {#sec-plots-hte}
+
+### Box plot (`type = "box"`)
+
+The box plot displays the distribution of individual treatment effects in each period. The box spans the interquartile range (middle 50%), whiskers extend to the 2.5th--97.5th percentiles, and the horizontal line marks the median.
+
+```{r plot-box-hte}
+plot(out, type = "box", xlim = c(-12, 3))
+```
+
+The `proportion` parameter controls the x-axis range for box plots. Periods where the number of treated units falls below `proportion` $\times$ max(count) are trimmed from the display. The default `proportion = 0.3` keeps periods with at least 30% of the maximum treated unit count. When there are many time periods, x-axis labels are automatically thinned and rotated for readability.
+
+### Calendar plot (`type = "calendar"`)
+
+The calendar plot depicts the ATT conditional on **calendar time** (rather than relative time). The ribbon represents a loess fit with 95% confidence intervals.
+
+```{r plot-calendar-hte}
+plot(out, type = "calendar", main = "The Effect of Coethnic Mobilization")
+plot(out.hh, type = "calendar", xlim = c(1995, 2009),
+     main = "The Effect of Indirect Democracy")
+```
+
+### HTE by covariate (`type = "hte"`)
+
+The `"hte"` plot (or equivalently `"heterogeneous"`) displays the conditional average treatment effect (CATT) as a function of a pre-treatment covariate. The `covariate` argument specifies which variable to use. The blue curve and band show a loess fit with 95% confidence intervals; the red dashed line marks the overall ATT; and a histogram at the bottom shows the covariate distribution.
+
+```{r plot-hte-covariate}
+plot(out, type = "hte", covariate = "cand_B_all",
+     main = "HTE by Black Candidate Presence",
+     xlab = "Black Candidate Indicator",
+     ylab = "Effect on Asian Donation Share")
+```
+
+When the covariate is **discrete**, the plot automatically switches to a grouped display. Use `covariate.labels` to assign readable labels to the discrete values:
+
+```{r plot-hte-discrete-ch6}
+plot(out, type = "hte", covariate = "cand_H_all",
+     covariate.labels = c("No Hispanic Candidate", "Hispanic Candidate"),
+     main = "HTE by Hispanic Candidate Presence",
+     ylab = "Effect on Asian Donation Share")
+```
+
+Key parameters for HTE plots: `covariate` (required), `covariate.labels` (for discrete covariates), `show.count` (toggle covariate histogram, default TRUE). Axis, text size, and color parameters apply as usual. For more on HTE analysis, see [Chapter @sec-hte].
+
+------------------------------------------------------------------------
+
+## Other Plot Types {#sec-other}
+
+### Status plot
+
+The status plot displays the treatment status by period for all units, similar to `panelView`. Each indicator color is customizable.
+
+```{r status}
+plot(out_fe_carryover, type = "status",
+     status.treat.color      = "#D55E00",
+     status.control.color    = "#0072B2",
+     status.carryover.color  = "#CC79A7",
+     status.missing.color    = "#009E73",
+     status.background.color = "#F3EAD2",
+     main = "Status Plot")
+```
+
+Note: most styling parameters (`connected`, `plot.ci`, `pre.color`/`post.color`, `count.*`) do not apply to status plots. Only axis, text size, and status-specific color parameters are relevant.
+
+### Factors and loadings plots
+
+These plot types are available when the model is estimated with interactive fixed effects (`method = "ife"` or `method = "gsynth"`). We first fit an IFE model with two factors:
+
+```{r est-ife, cache = TRUE}
+out_ife <- fect(nat_rate_ord ~ indirect,
+                data = hh2019,
+                index = c("bfs", "year"),
+                method = "ife", r = 2,
+                se = TRUE, parallel = TRUE, cores = 16, nboots = 1000)
+```
+
+The **factors** plot displays the estimated latent time factors. It uses the Okabe-Ito colorblind-safe palette with thinner lines for a clean, publication-ready appearance. Factor 0 (fixed effects, shown when `include.FE = TRUE`) appears in gray; subsequent factors appear in orange, blue, green, and so on. Use `nfactors` to limit the number of displayed factors.
+
+```{r plot-factors}
+plot(out_ife, type = "factors", main = "Estimated Latent Factors")
+```
+
+To exclude fixed effects from the plot, set `include.FE = FALSE`:
+
+```{r plot-factors-nofe}
+plot(out_ife, type = "factors", include.FE = FALSE,
+     main = "Factors without Fixed Effects")
+```
+
+The **loadings** plot displays the estimated factor loadings, comparing the distribution across treated and control units. It uses a navy/crimson color scheme with smaller, semi-transparent scatter points for cleaner visualization. When multiple factors are estimated, the plot is rendered as a pairs matrix via `GGally::ggpairs`.
+
+```{r plot-loadings}
+plot(out_ife, type = "loadings", main = "Factor Loadings")
+```
+
+Note: `connected`, `plot.ci`, `show.count`, and most gap-plot styling parameters do not apply to factors or loadings plots.
+
+------------------------------------------------------------------------
+
+## Standalone `esplot()` {#sec-esplot}
+
+The `esplot()` function creates event study plots directly from a data frame or a fitted `fect` object, without requiring the full `plot.fect` dispatch. This is useful when you have pre-computed ATT estimates (e.g., from another package) and want publication-quality event study figures with the same styling as **fect** plots.
+
+### Basic usage with data frames
+
+`esplot()` expects a data frame with columns for the time period, the point estimate, and optionally CI bounds and observation counts. By default, it looks for columns named `"ATT"`, `"CI.lower"`, and `"CI.upper"`.
+
+```{r esplot-basic, fig.width = 6, fig.height = 4.5}
+# Create example data from a fect result
+es_data <- data.frame(
+  Time = as.numeric(rownames(out$est.att)),
+  ATT = out$est.att[, "ATT"],
+  CI.lower = out$est.att[, "CI.lower"],
+  CI.upper = out$est.att[, "CI.upper"]
+)
+
+esplot(es_data, Period = "Time",
+       main = "Event Study Plot with esplot()",
+       ylab = "Estimated ATT",
+       xlab = "Periods Since Treatment",
+       xlim = c(-15, 5), ylim = c(-0.3, 0.7))
+```
+
+### Using fect objects directly
+
+When you pass a **fect object** directly to `esplot()`, it automatically extracts the ATT estimates and treated unit counts. This is the simplest usage:
+
+```{r esplot-fect-object, fig.width = 6, fig.height = 4.5}
+esplot(out, main = "Direct from fect object")
+```
+
+### Connected line style
+
+Setting `connected = TRUE` displays estimates as a connected line with a confidence band:
+
+```{r esplot-connected, fig.width = 6, fig.height = 4.5}
+esplot(es_data, Period = "Time",
+       connected = TRUE,
+       main = "Connected Event Study Plot",
+       ylab = "Estimated ATT",
+       xlim = c(-15, 5), ylim = c(-0.3, 0.7))
+```
+
+### Highlighting periods
+
+The `highlight.periods` argument highlights specific time periods, which is useful for drawing attention to placebo or treatment windows:
+
+```{r esplot-highlight, fig.width = 6, fig.height = 4.5}
+esplot(es_data, Period = "Time",
+       highlight.periods = c(-2, -1, 0),
+       highlight.colors = c("orange", "orange", "red"),
+       main = "Highlighting Key Periods",
+       ylab = "Estimated ATT",
+       xlim = c(-15, 5), ylim = c(-0.3, 0.7))
+```
+
+### Count bar behavior
+
+When you pass a **fect object** to `esplot()`, count bars appear by default because the function auto-extracts treated unit counts from the object:
+
+``` r
+esplot(out)  # count bars shown automatically
+```
+
+When passing a **data frame**, you must include a count column and specify its name:
+
+``` r
+esplot(df, Count = "n_treated")
+```
+
+If no count data is available, `show.count` silently degrades to `FALSE`---no error is thrown, but count bars are not displayed. Set `show.count = FALSE` to suppress count bars explicitly regardless of data availability.
+
+------------------------------------------------------------------------
+
+## Shared Parameters Reference {#sec-param-ref}
+
+### Legend behavior
+
+Legends appear automatically when multiple visual encodings are present (e.g., shape markers from placebo or carryover tests). The dashed/solid pre-treatment vs. post-treatment line distinction does not generate a legend entry, as this convention is standard in causal inference plots. Use `legendOff = TRUE` to suppress all legends. Use `legend.pos` to control placement (default is `"bottom"` for shape legends).
+
+### Parameter applicability table
+
+The table below summarizes which parameters apply to each plot type. Parameters not listed are either universal (e.g., `main`, `theme.bw`) or internal.
+
+| Parameter | gap | equiv | exit | box | calendar | counterfactual | status | factors | loadings | esplot |
+|:------|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
+| `bound` / `tost.threshold` | --- | Yes | --- | --- | --- | --- | --- | --- | --- | --- |
+| `carryover.color` | --- | --- | Yes | --- | --- | --- | --- | --- | --- | --- |
+| `cex.main` / `cex.axis` / `cex.lab` | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes |
+| `ci.outline` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | Yes |
+| `color` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | Yes |
+| `connected` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | Yes |
+| `count.color` / `count.alpha` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | Yes |
+| `counterfactual.color` | --- | --- | --- | --- | --- | Yes | --- | --- | --- | --- |
+| `est.lwidth` / `est.pointsize` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | Yes |
+| `gridOff` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
+| `highlight.periods` / `highlight.shapes` | --- | --- | --- | --- | --- | --- | --- | --- | --- | Yes |
+| `lcolor` / `lwidth` / `ltype` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
+| `legendOff` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | Yes |
+| `nfactors` / `include.FE` | --- | --- | --- | --- | --- | --- | --- | Yes | Yes | --- |
+| `placebo.color` | Yes | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `plot.ci` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | --- |
+| `pre.color` / `post.color` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | Yes |
+| `preset` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | --- |
+| `proportion` | Yes | Yes | Yes | Yes | --- | --- | --- | --- | --- | Yes |
+| `raw` | --- | --- | --- | --- | --- | Yes | --- | --- | --- | --- |
+| `show.count` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | Yes |
+| `start0` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | Yes |
+| `stats` / `stats.pos` / `show.stats` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | Yes |
+| `status.*.color` | --- | --- | --- | --- | --- | --- | Yes | --- | --- | --- |
+| `xbreaks` / `ybreaks` | Yes | Yes | Yes | Yes | Yes | Yes | --- | --- | --- | Yes |
+| `xlim` / `ylim` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |

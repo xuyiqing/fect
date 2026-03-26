@@ -1,4 +1,5 @@
 test_that("fect_sens attaches sensitivity results when inputs present", {
+  skip_on_cran()
   skip_if_not_installed("HonestDiDFEct")
   suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
   expect_true(exists("simdata"))

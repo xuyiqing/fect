@@ -49,7 +49,24 @@ fect_sens <- function(
 
   # Extract DTE estimates (beta.hat) and var-cov (vcov.hat)
   beta.hat <- fect.out$est.att[idx, 1]
-  vcov.hat <- fect.out$att.vcov[idx, idx]
+
+  if (is.matrix(fect.out$att.vcov)) {
+    vcov.hat <- fect.out$att.vcov[idx, idx]
+  } else if (is.matrix(fect.out$att.boot)) {
+    # Fallback: compute vcov from bootstrap samples if att.vcov is unavailable
+    vcov.hat <- cov(t(fect.out$att.boot[idx, , drop = FALSE]),
+                    use = "pairwise.complete.obs")
+    if (!is.matrix(vcov.hat)) {
+      stop("fect_sens requires a valid variance-covariance matrix. ",
+           "Could not compute one from bootstrap samples. ",
+           "Please re-run fect() with se = TRUE and sufficient nboots.",
+           call. = FALSE)
+    }
+  } else {
+    stop("fect_sens requires a valid variance-covariance matrix (att.vcov) from fect(). ",
+         "Please re-run fect() with se = TRUE and ensure sufficient bootstrap iterations (nboots).",
+         call. = FALSE)
+  }
 
   # Counts of pre and post periods
   numPrePeriods <- length(pre.periods)
@@ -85,7 +102,7 @@ fect_sens <- function(
   # -------------------------------------------------------------------
   if (!is.null(Mbarvec) && length(Mbarvec) > 0) {
     # 3a) Weighted-average, across the entire post-treatment window
-    rm_sens_results <- .honest("createSensitivityResults_relativeMagnitudes")(
+    rm_sens_results <- suppressWarnings(.honest("createSensitivityResults_relativeMagnitudes")(
       betahat = beta.hat,
       sigma = vcov.hat,
       numPrePeriods = numPrePeriods,
@@ -93,16 +110,16 @@ fect_sens <- function(
       l_vec = w.att,
       Mbarvec = Mbarvec,
       parallel = parallel
-    )
+    ))
 
 
-    rm_original_cs <- .honest("constructOriginalCS")(
+    rm_original_cs <- suppressWarnings(.honest("constructOriginalCS")(
       betahat        = beta.hat,
       sigma          = vcov.hat,
       numPrePeriods  = numPrePeriods,
       numPostPeriods = numPostPeriods,
       l_vec          = w.att
-    )
+    ))
   }
   if (!is.null(periodMbarvec) && length(periodMbarvec) > 0) {
     # 3b) Period-by-period robust confidence sets
@@ -118,7 +135,7 @@ fect_sens <- function(
 
       # For each t_i, we run createSensitivityResults_relativeMagnitudes
       # across all Mbar in Mbarvec
-      honest.dte <- .honest("createSensitivityResults_relativeMagnitudes")(
+      honest.dte <- suppressWarnings(.honest("createSensitivityResults_relativeMagnitudes")(
         betahat        = beta.hat,
         sigma          = vcov.hat,
         numPrePeriods  = numPrePeriods,
@@ -126,7 +143,7 @@ fect_sens <- function(
         l_vec          = dte_l,
         Mbarvec        = periodMbarvec,
         parallel       = parallel
-      )
+      ))
 
       # Convert to data.frame
       # The returned object typically has columns lb, ub, Mbar, etc.
@@ -153,7 +170,7 @@ fect_sens <- function(
   if (!is.null(Mvec) && length(Mvec) > 0) {
     # 4a) Weighted-average analysis
 
-    smooth_sens_results <- .honest("createSensitivityResults")(
+    smooth_sens_results <- suppressWarnings(.honest("createSensitivityResults")(
       betahat = beta.hat,
       sigma = vcov.hat,
       numPrePeriods = numPrePeriods,
@@ -162,15 +179,15 @@ fect_sens <- function(
       l_vec = w.att,
       Mvec = Mvec,
       parallel = parallel
-    )
+    ))
 
-    sm_original_cs <- .honest("constructOriginalCS")(
+    sm_original_cs <- suppressWarnings(.honest("constructOriginalCS")(
       betahat        = beta.hat,
       sigma          = vcov.hat,
       numPrePeriods  = numPrePeriods,
       numPostPeriods = numPostPeriods,
       l_vec          = w.att
-    )
+    ))
   }
   if (!is.null(periodMvec) && length(periodMvec) > 0) {
     # 4b) Period-by-period robust confidence sets
@@ -181,7 +198,7 @@ fect_sens <- function(
       dte_l <- rep(0, numPostPeriods)
       dte_l[t_i] <- 1
 
-      honest.dte <- .honest("createSensitivityResults")(
+      honest.dte <- suppressWarnings(.honest("createSensitivityResults")(
         betahat = beta.hat,
         sigma = vcov.hat,
         numPrePeriods = numPrePeriods,
@@ -190,7 +207,7 @@ fect_sens <- function(
         l_vec = dte_l,
         Mvec = periodMvec,
         parallel = parallel
-      )
+      ))
 
       honest.dte <- as.data.frame(honest.dte)
       honest.dte$postPeriod <- post.periods[t_i]

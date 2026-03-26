@@ -66,6 +66,8 @@ fect_boot <- function(
   cl = NULL,
   I,
   II,
+  cm=FALSE,
+  II.cm=NULL,
   T.on,
   T.off = NULL,
   T.on.carry = NULL,
@@ -197,6 +199,8 @@ fect_boot <- function(
         W = W,
         I = I,
         II = II,
+        cm = cm,
+        II.cm = II.cm,
         T.on = T.on,
         T.off = T.off,
         T.on.carry = T.on.carry,
@@ -311,6 +315,8 @@ fect_boot <- function(
           kappaQ.id = kappaQ.id,
           I = I,
           II = II,
+          cm = cm,
+          II.cm = II.cm,
           T.on = T.on,
           T.off = T.off,
           T.on.carry = T.on.carry,
@@ -643,6 +649,8 @@ fect_boot <- function(
           W = W,
           I = I,
           II = II,
+          cm = cm,
+          II.cm = II.cm,
           T.on = T.on,
           T.off = T.off,
           T.on.carry = T.on.carry,
@@ -704,7 +712,11 @@ fect_boot <- function(
           att.carryover.W = NA,
           balance.avg.att = NA,
           balance.time = NA,
-          group.output = list()
+          group.output = list(),
+          eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          boot.id = NULL
         )
         return(boot0)
       } else {
@@ -1024,6 +1036,7 @@ fect_boot <- function(
       D.boot <- out$D[, id.boot, drop = FALSE]
       I.boot <- out$I[, id.boot, drop = FALSE]
       II.boot <- out$II[, id.boot, drop = FALSE]
+      II.cm.boot <- out$II.cm[, id.boot, drop = FALSE]
       W.boot <- NULL
       if (!is.null(W)) {
         W.boot <- NULL
@@ -1103,7 +1116,11 @@ fect_boot <- function(
           count.off.W = NA,
           time.off.W = NA,
           att.carryover.W = NA,
-          group.output = list()
+          group.output = list(),
+          eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          boot.id = NULL
         )
         return(boot0)
       } else {
@@ -1161,6 +1178,8 @@ fect_boot <- function(
             W = W,
             I = I,
             II = II,
+            cm = cm,
+            II.cm = II.cm,
             T.on = T.on,
             T.off = T.off,
             T.on.carry = T.on.carry,
@@ -1264,7 +1283,11 @@ fect_boot <- function(
           count.off.W = NA,
           time.off.W = NA,
           att.carryover.W = NA,
-          group.output = list()
+          group.output = list(),
+          eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          boot.id = NULL
         )
         return(boot0)
       } else {
@@ -1403,7 +1426,11 @@ fect_boot <- function(
           count.off.W = NA,
           time.off.W = NA,
           att.carryover.W = NA,
-          group.out = list()
+          group.out = list(),
+          eff = matrix(NA_real_, TT, length(boot.id)),
+          D = matrix(NA_real_, TT, length(boot.id)),
+          I = matrix(NA_real_, TT, length(boot.id)),
+          boot.id = boot.id
         )
         return(boot0)
       } else {
@@ -1470,6 +1497,8 @@ fect_boot <- function(
               W = W.boot,
               I = I.boot,
               II = II[, boot.id],
+              cm = cm,
+              II.cm = II.cm[, boot.id],
               T.on = T.on[, boot.id],
               T.off = T.off.boot,
               T.on.carry = T.on.carry[, boot.id],
@@ -1625,7 +1654,11 @@ fect_boot <- function(
             att.off.W = NA,
             count.off.W = NA,
             time.off.W = NA,
-            att.carryover.W = NA
+            att.carryover.W = NA,
+            eff = matrix(NA_real_, TT, length(boot.id)),
+            D = matrix(NA_real_, TT, length(boot.id)),
+            I = matrix(NA_real_, TT, length(boot.id)),
+            boot.id = boot.id
           )
           return(boot0)
         } else {
@@ -2144,6 +2177,12 @@ fect_boot <- function(
           ]] <- t(as.matrix(group.att.carryover.boot[[sub.name]][, -boot.rm]))
         }
       }
+    }
+    if (keep.sims) {
+      eff.boot <- eff.boot[, , -boot.rm, drop = FALSE]
+      D.boot <- D.boot[, , -boot.rm, drop = FALSE]
+      I.boot <- I.boot[, , -boot.rm, drop = FALSE]
+      colnames.boot <- colnames.boot[-boot.rm]
     }
   }
   if (dis) {

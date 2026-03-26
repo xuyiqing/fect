@@ -285,6 +285,7 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
   double dif4 = 1.0;
   double dif5 = 1.0;
   int niter = 0;
+  int overall_converged_count = 0;
   int validF = 1;
   int use_weight;
   int r_burnin;
@@ -499,6 +500,7 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
       dif2_tol = dif2_tol || (dif2 > tolerate);
     }
 
+    dif3_tol = 0.0;
     for (int k = 0; k < p_kappa; ++k) {
       dif3 = arma::norm(fit3.slice(k) - fit3_old.slice(k), "fro") /
              arma::norm(fit3_old.slice(k), "fro");
@@ -507,6 +509,16 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
 
     dif4 = arma::norm(fit4 - fit4_old, "fro") / arma::norm(fit4_old, "fro");
     dif5 = arma::norm(fit5 - fit5_old, "fro") / arma::norm(fit5_old, "fro");
+
+    if (dif < tolerate && dif1 < tolerate) {
+        overall_converged_count++;
+    } else {
+        overall_converged_count = 0;
+    }
+
+    if (overall_converged_count >= 3) {
+        break;
+    }
 
     fit_old = fit;
     fit1_old = fit1;

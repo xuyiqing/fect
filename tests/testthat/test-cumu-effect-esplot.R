@@ -1,4 +1,5 @@
 test_that("cumu/att.cumu/esplot run without error on fect output", {
+  skip_on_cran()
   suppressWarnings(try(data("simdata", package = "fect"), silent = TRUE))
   expect_true(exists("simdata"))
   out <- fect::fect(
