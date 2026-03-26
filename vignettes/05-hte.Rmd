@@ -99,7 +99,7 @@ By adding `cm = TRUE` to the plot call, we get the causal moderation estimate:
 
 ```{r hte_cm, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.cm, type = "hte", covariate = "X1", cm = TRUE,
-     xlab = "Moderator (X1)", ylab = "Effect on Y")
+     xlab = "Moderator (X1)", ylab = "Effect on Y", ylim = c(-0.5, 5))
 ```
 
 When the ignorability assumption holds (as in the simulated data), the two curves should be similar.
@@ -110,7 +110,7 @@ To inspect the raw relationship without loess smoothing, set `loess.fit = FALSE`
 
 ```{r hte_scatter, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.cm, type = "hte", covariate = "X1", cm = TRUE, loess.fit = FALSE,
-     xlab = "Moderator (X1)", ylab = "Effect on Y")
+     xlab = "Moderator (X1)", ylab = "Effect on Y", ylim = c(-0.5, 5))
 ```
 
 ---
@@ -132,7 +132,7 @@ If the curve is flat around zero, it supports CPTA. A significant non-zero patte
 ```{r hte_placebo_cm, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.cm, type = "hte", covariate = "X1", cm = TRUE,
      pretreatment = TRUE, num.pretreatment = 3,
-     xlab = "X1", ylab = "Placebo Effect")
+     xlab = "X1", ylab = "Placebo Effect", ylim = c(-0.5, 1.5))
 ```
 
 ---
@@ -198,13 +198,13 @@ out.discrete <- fect(Y ~ D + X1 + X2 + X3, data = sim_base,
 ```{r discrete_em_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.discrete, type = "hte", covariate = "X3",
      covariate.labels = c("USA", "China", "UK"),
-     xlab = "", ylab = "Effect on Y")
+     xlab = "", ylab = "Effect on Y", ylim = c(-0.5, 5))
 ```
 
 ```{r discrete_cm_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.discrete, type = "hte", covariate = "X3", cm = TRUE,
      covariate.labels = c("USA", "China", "UK"),
-     xlab = "", ylab = "Effect on Y")
+     xlab = "", ylab = "Effect on Y", ylim = c(-0.5, 5))
 ```
 
 Since `X3` is randomly assigned and unrelated to the DGP, both estimates should show no significant heterogeneity.
