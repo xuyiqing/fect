@@ -3755,7 +3755,8 @@ plot.fect <- function(
       axis.text = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
       axis.text.y = element_text(size = cex.axis),
-      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)),
+      plot.margin = margin(15, 5.5, 5.5, 5.5, "pt")
     )
 
     if (isTRUE(return.data)) {
@@ -4155,7 +4156,8 @@ plot.fect <- function(
       axis.text = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
       axis.text.y = element_text(size = cex.axis),
-      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)),
+      plot.margin = margin(15, 5.5, 5.5, 5.5, "pt")
     )
 
     if (isTRUE(return.data)) {
@@ -4378,7 +4380,8 @@ plot.fect <- function(
       axis.text = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
       axis.text.y = element_text(size = cex.axis),
-      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)),
+      plot.margin = margin(15, 5.5, 5.5, 5.5, "pt")
     )
 
     if (is.null(xticklabels) == FALSE) {

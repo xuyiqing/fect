@@ -98,7 +98,7 @@ head(sim_region)
 
 We first try the standard FE estimator, which ignores the region-level shocks:
 
-```{r cfe-42-fe-only, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-42-fe-only, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 out.fe.only <- fect(Y ~ D, data = sim_region,
   index = c("id", "time"),
   method = "fe", force = "two-way",
@@ -119,7 +119,7 @@ The placebo test detects significant pre-trends (low p-value) because the model 
 
 Now we interact region with time to create group×period fixed effects, which absorb the region-specific time shocks $\delta_{g(i),t}$. A simple region intercept FE cannot capture these shocks because they vary across both regions and time periods. By passing `region_time` as the third index element, the CFE estimator absorbs the full set of region-by-period effects:
 
-```{r cfe-42-with-region, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-42-with-region, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 out.cfe.region <- fect(Y ~ D, data = sim_region,
   index = c("id", "time", "region_time"),
   method = "cfe", force = "two-way",
@@ -152,7 +152,7 @@ We use the existing `simdata` dataset. In the true DGP, $Y_{it}^{0}$ includes th
 
 First, we estimate the FE model, which ignores the interactive structure entirely:
 
-```{r cfe-43-fe-baseline, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-43-fe-baseline, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 out.fe.base <- fect(Y ~ D + X1 + X2, data = simdata,
   index = c("id", "time"),
   method = "fe", force = "two-way",
@@ -173,7 +173,7 @@ The FE estimator fails the placebo test because it cannot account for the intera
 simdata$gamma_t <- simdata$time
 ```
 
-```{r cfe-43-with-z, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-43-with-z, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 out.cfe.z <- fect(Y ~ D + X1 + X2, data = simdata,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
@@ -213,7 +213,7 @@ head(sim_linear)
 
 Without accounting for the unit-specific linear trends, the FE estimator fails the placebo test:
 
-```{r cfe-44-lin-fe-only, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-44-lin-fe-only, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 out.fe.lin <- fect(Y ~ D, data = sim_linear,
   index = c("id", "time"),
   method = "fe", force = "two-way",
@@ -230,7 +230,7 @@ plot(out.fe.lin, cex.text = 0.8,
 
 Now we use `Q.type = "linear"` to allow unit-specific loadings on a linear time basis. Because the true DGP is exactly linear, this specification matches perfectly:
 
-```{r cfe-44-lin-cfe, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-44-lin-cfe, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 out.cfe.lin <- fect(Y ~ D, data = sim_linear,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
@@ -260,7 +260,7 @@ head(sim_trend)
 
 The FE estimator fails the placebo test because it cannot capture the nonlinear trend:
 
-```{r cfe-44-sin-fe-only, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-44-sin-fe-only, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 out.fe.trend <- fect(Y ~ D, data = sim_trend,
   index = c("id", "time"),
   method = "fe", force = "two-way",
@@ -277,7 +277,7 @@ plot(out.fe.trend, cex.text = 0.8,
 
 Now we use `Q.type = "bspline"`, which generates a B-spline basis that can approximate smooth nonlinear functions:
 
-```{r cfe-44-sin-bspline, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-44-sin-bspline, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 out.cfe.bs <- fect(Y ~ D, data = sim_trend,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
@@ -320,7 +320,7 @@ We fit four models and compare their out-of-sample prediction accuracy:
 3.  CFE with $Z = L_1$ + 1 latent factor (correct specification),
 4.  IFE with 2 latent factors (correct for IFE, but less efficient than CFE).
 
-```{r cfe-45-fit-models, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-45-fit-models, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 # Model 1: FE only
 out.fe <- fect(Y ~ D + X1 + X2, data = simdata,
   index = c("id", "time"),
@@ -361,7 +361,7 @@ All three metrics consistently rank the CFE model with observed $Z$ and one late
 
 ### Best model: placebo test
 
-```{r cfe-45-best-placebo, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+```{r cfe-45-best-placebo, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
 out.cfe.best <- fect(Y ~ D + X1 + X2, data = simdata,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
