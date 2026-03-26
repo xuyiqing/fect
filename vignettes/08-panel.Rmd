@@ -10,13 +10,13 @@ editor:
 source("_common.R")
 ```
 
-This chapter, authored by Ziyi Liu and Yiqing Xu, complements @CLLX2025 ([paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf), [slides](https://yiqingxu.org/papers/english/2023_panel/CLLX_slides.pdf)).
+This chapter, authored by Ziyi Liu and Yiqing Xu, complements @CLLX2026 ([paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf), [slides](https://yiqingxu.org/papers/english/2023_panel/CLLX_slides.pdf)).
 Rivka Lipkovitz also contributes to this tutorial. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/08-panel.R).
 
 ------------------------------------------------------------------------
 
 In recent years, researchers have proposed various heterogeneous treatment effect (HTE) robust estimators for causal panel analysis under parallel trends (PT) as alternatives to traditional two-way fixed effects (TWFE) models.
-Examples include those proposed by @CDLZ, @sun2021-event, @callaway2021-did, @CDH2020, @IKW2023, @BJS2024, and @LWX2022.
+Examples include those proposed by @CDLZ, @sun2021-event, @callaway2021-did, @CDH2020, @IKW2023, @BJS2024, and @LWX2024.
 These methods are closely connected to the classic difference-in-differences (DID) estimator.
 
 This chapter will guide you through implementing these HTE-robust estimators, as well as TWFE, in R.
@@ -596,7 +596,7 @@ fect.output <- as.matrix(out.fect$est.att)
 head(fect.output)
 ```
 
-@BJS2024 also provide the **didimputation** package to estimate the ATT using the same approach as @LWX2022.
+@BJS2024 also provide the **didimputation** package to estimate the ATT using the same approach as @LWX2024.
 
 ```{r hh_impute, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 df.impute <- df.use
@@ -835,7 +835,7 @@ p.pm
 
 ### Imputation Method
 
-Now we return to the imputation method proposed by @BJS2024 and @LWX2022.
+Now we return to the imputation method proposed by @BJS2024 and @LWX2024.
 The estimated ATT is 0.127, with a standard error of 0.025.
 Both are very close to the TWFE estimates.
 
@@ -976,4 +976,4 @@ esplot(data = res_st, main = "Stacked DID", xlim = c(-12,10))
 ## How to Cite
 
 Please cite the authors of the original papers for their innovations.
-If you find this tutorial helpful, you can cite @CLLX2025.
+If you find this tutorial helpful, you can cite @CLLX2026.

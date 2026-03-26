@@ -261,7 +261,7 @@ plot(out, type = "counterfactual",
 
 ## Pretrend Tests {#sec-pretrend}
 
-We provide two tests that shed light on the parallel trends assumption: the placebo test and the equivalence test. For methodological details, see @sec-fect or @LWX2022.
+We provide two tests that shed light on the parallel trends assumption: the placebo test and the equivalence test. For methodological details, see @sec-fect or @LWX2024.
 
 ### Placebo test---shape markers
 

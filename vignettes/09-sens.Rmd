@@ -199,4 +199,4 @@ In this figure, different lines/bands will represent the robust CIs for $M=0$ (s
 
 ## How to Cite
 
-Please cite @rambachan2023more for their original contribution to the sensitivity analysis framework for causal panel analysis. If you find this tutorial helpful, you can cite @CLLX2025.
+Please cite @rambachan2023more for their original contribution to the sensitivity analysis framework for causal panel analysis. If you find this tutorial helpful, you can cite @CLLX2026.
