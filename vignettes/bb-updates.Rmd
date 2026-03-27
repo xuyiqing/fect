@@ -2,6 +2,8 @@
 
 ## v2.2.0
 
+(2026-03-27) CRAN release.
+
 * Added `time.component.from` parameter: `"notyettreated"` (default) or `"nevertreated"` controls which units provide the time-varying model components (time fixed effects, latent factors, and temporal dynamics). Replaces `method = "gsynth"` with `method = "ife", time.component.from = "nevertreated"`.
 * CFE estimator now supports `time.component.from = "nevertreated"`, enabling full CFE model components (additional FEs, $Z/\gamma$, $Q/\kappa$, latent factors) with never-treated estimation.
 * Added `fect_mspe()` for out-of-sample model comparison (MSPE, RMSE, MAD) across specifications.
