@@ -199,12 +199,7 @@ In this figure, different lines/bands will represent the robust CIs for $M=0$ (s
 
 ## How to Cite
 
-Please cite @rambachan2023more for their original contribution to the sensitivity analysis framework for causal panel analysis. If you find this tutorial helpful, you can cite @CLLX2026.
-
-## How to Cite
-
-Please cite the authors of the original papers for their innovations.
-If you find this tutorial helpful, you can cite @CLLX2026.
+Please cite @rambachan2023more for the original contribution on sensitivity analysis in causal panel analysis, and @CLLX2026 for adapting it to the counterfactual estimator framework.
 
 ```bibtex
 @article{rambachan2023more,
