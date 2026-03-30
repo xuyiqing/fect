@@ -199,4 +199,26 @@ In this figure, different lines/bands will represent the robust CIs for $M=0$ (s
 
 ## How to Cite
 
-Please cite @rambachan2023more for their original contribution to the sensitivity analysis framework for causal panel analysis. If you find this tutorial helpful, you can cite @CLLX2025.
+Please cite @rambachan2023more for the original contribution on sensitivity analysis in causal panel analysis, and @CLLX2026 for adapting it to the counterfactual estimator framework.
+
+```bibtex
+@article{rambachan2023more,
+  title={A more credible approach to parallel trends},
+  author={Rambachan, Ashesh and Roth, Jonathan},
+  journal={Review of Economic Studies},
+  volume={90},
+  number={5},
+  pages={2555--2591},
+  year={2023}
+}
+
+@article{CLLX2026,
+  title={Causal Panel Analysis under Parallel Trends: Lessons from A Large Reanalysis Study},
+  author={Chiu, Albert and Lan, Xingchen and Liu, Ziyi and Xu, Yiqing},
+  journal={American Political Science Review},
+  volume={120},
+  number={1},
+  pages={245--266},
+  year={2026}
+}
+```

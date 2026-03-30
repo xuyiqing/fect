@@ -306,3 +306,19 @@ In the above plot, the three periods in blue are dropped from the first-stage es
 -   The `proportion` option controls which pre-treatment periods are included in the tests (default: periods where the number of treated units exceeds `proportion` $\times$ total treated units).
 -   The `tost.threshold` option sets the equivalence range for the TOST test (default: $0.36\hat{\sigma}_\epsilon$). Finding the "right" threshold is often a challenge in empirical research.
 :::
+
+## How to Cite
+
+If you find these methods helpful, you can cite @LWX2024.
+
+```bibtex
+@article{LWX2024,
+  title = {A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data},
+  author = {Liu, Licheng and Wang, Ye and Xu, Yiqing},
+  journal = {American Journal of Political Science},
+  volume = {68},
+  number = {1},
+  pages = {160--176},
+  year = {2024}
+}
+```

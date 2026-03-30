@@ -6,9 +6,9 @@ This Quarto book serves as a user manual for the **fect** package in R, which im
 
 -   @Xu2017 for Gsynth \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\]
 
--   @LWX2022 for counterfactual estimators \[<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>\]
+-   @LWX2024 for counterfactual estimators \[<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ajps.12723" target="_blank">Paper</a>\]
 
--   @CLLX2025 for a survey of the new DID estimators \[<a href="https://www.cambridge.org/core/journals/american-political-science-review/article/causal-panel-analysis-under-parallel-trends-lessons-from-a-large-reanalysis-study/219275E0CE901F099F2CFFBA07079243" target="_blank">Paper</a>\]
+-   @CLLX2026 for a survey of the new DID estimators \[<a href="https://www.cambridge.org/core/journals/american-political-science-review/article/causal-panel-analysis-under-parallel-trends-lessons-from-a-large-reanalysis-study/219275E0CE901F099F2CFFBA07079243" target="_blank">Paper</a>\]
 
 ::: {.callout-note appearance="simple"}
 ### Source Code
@@ -31,7 +31,7 @@ However, these counterfactual estimators come with important limitations:
 -   They generally do not accommodate dynamic treatment assignment given past outcomes or covariates---i.e., "feedback"---based on sequential ignorability.\
 -   Methods for continuous treatments are still underdeveloped and are not currently covered by **fect**.
 
-@CLLX2025 reanalyze 49 published studies in political science and offer justifications for adopting these estimators.
+@CLLX2026 reanalyze 49 published studies in political science and offer justifications for adopting these estimators.
 
 ## Why the Merge?
 
@@ -122,9 +122,27 @@ The following individuals (and AI) have contributed to **gsynth** and **fect**, 
 -   [Rivka Lipkovitz](https://rivka.me/) (Undergraduate at MIT)
 -   [StatsClaw](https://github.com/xuyiqing/StatsClaw) (Agentic System for Statistical Software Development)
 
+
+
+## How to Cite
+
+To cite the **fect** package or this user manual, please use:
+
+> Xu, Yiqing, Licheng Liu, Ye Wang, Ziyi Liu, Shijian Liu, Tianzhu Qin, Jinwen Wu, and Rivka Lipkovitz. 2026. *fect: Fixed Effects Counterfactual Estimators --- User Manual (v2.2.0).* <https://yiqingxu.org/packages/fect/>
+
+```bibtex
+@manual{fect2026,
+  title = {fect: Fixed Effects Counterfactual Estimators --- User Manual},
+  author = {Xu, Yiqing and Liu, Licheng and Wang, Ye and Liu, Ziyi and Liu, Shijian and Qin, Tianzhu and Wu, Jinwen and Lipkovitz, Rivka},
+  year = {2026},
+  note = {R package version 2.2.0},
+  url = {https://yiqingxu.org/packages/fect/}
+}
+```
+
 ## Report Bugs
 
-Please report any bugs by submitting an issue on [GitHub](https://github.com/xuyiqing/fect/issues) or emailing me (yiqingxu \[at\] stanford.edu). We'd really appreciate it if you can include your minimally replicable code & data file and a **panelView** treatment status plot. Your feedback is highly valued!
+Please report any bugs by submitting an issue on [GitHub](https://github.com/xuyiqing/fect/issues) or emailing me (yiqingxu \[at\] stanford.edu). We'd really appreciate it if you can include your minimally replicable code & data file and a [**panelView**](https://yiqingxu.org/packages/panelview/) treatment status plot. Your feedback is highly valued!
 
 <!-- badges: start -->
 
@@ -136,6 +154,9 @@ Please report any bugs by submitting an issue on [GitHub](https://github.com/xuy
 -->
 ```
 
-**gsynth** (retiring): [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://www.r-pkg.org/badges/version/gsynth" alt="CRAN status"/>](https://CRAN.R-project.org/package=gsynth) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/gsynth" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/gsynth/index.html)
+**gsynth** (wrapper): [![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://www.r-pkg.org/badges/version/gsynth" alt="CRAN status"/>](https://CRAN.R-project.org/package=gsynth) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/gsynth" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/gsynth/index.html)
+
+**panelView**: 
+[![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://www.r-pkg.org/badges/version/panelView" alt="CRAN status"/>](https://CRAN.R-project.org/package=panelView) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/panelView" alt="downloads: CRAN"/>](https://cran.r-project.org/package=panelView) 
 
 <!-- badges: end -->
