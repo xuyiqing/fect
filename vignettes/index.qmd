@@ -2,7 +2,7 @@
 
 This Quarto book serves as a user manual for the **fect** package in R, which implements counterfactual (imputation) estimators for causal inference with panel data---without feedback---and performs diagnostic tests.
 
-**fect** covers a series of counterfactual estimators, including the five estimators from the last version and integrating the latest version of the **gsynth** package for the generalized synthetic control method (Gsynth). This Quarto book also facilitates the application of various new difference-in-differences (DID) estimators. For details of these methods, see
+**fect** covers a series of counterfactual estimators, including the five estimators from the last version and integrating the latest version of the **gsynth** package ([User Manual](https://yiqingxu.org/packages/gsynth/)) for the generalized synthetic control method (Gsynth). This Quarto book also facilitates the application of various new difference-in-differences (DID) estimators. For details of these methods, see
 
 -   @Xu2017 for Gsynth \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\]
 
@@ -54,7 +54,7 @@ Inference differs across the two settings. The Synth setting conditions on fixed
 Starting from `v2.2.0`, `time.component.from` determines which setting governs estimation. It specifies how time components, such as time fixed effects, latent factors, and temporal dynamics, are learned from the data. The table summarizes compatibility.
 
 | Method | Description | `time.component.from` |
-|:------------------|:-----------------------|:-----------------------------|
+|:------------------|:-----------------------|:----------------------------|
 | `"fe"` | Two-way fixed effects ($r = 0$) | Both |
 | `"ife"` | Interactive fixed effects ($r \geq 0$) | Both |
 | `"cfe"` | Complex fixed effects | Both |
@@ -68,7 +68,7 @@ The two values correspond to the two settings. `"notyettreated"` (default) uses 
 Choose based on estimand and inference. If the target is unit-specific and conditions on $X$, use the Synth setting. If the target is a population parameter, use the DID framework. The table below gives recommendations based on feasibility in common scenarios.
 
 | Scenario | Recommended Settings |
-|:----------------------|:-----------------------------------------------|
+|:-----------------------|:-----------------------------------------------|
 | Treatment switches on and off | `time.component.from = "notyettreated"` (default) |
 | No reversal, many treated units | Either setting |
 | No reversal, few treated units | `time.component.from = "nevertreated"`, `vartype = "parametric"` |
@@ -122,15 +122,13 @@ The following individuals (and AI) have contributed to **gsynth** and **fect**, 
 -   [Rivka Lipkovitz](https://rivka.me/) (Undergraduate at MIT)
 -   [StatsClaw](https://github.com/xuyiqing/StatsClaw) (Agentic System for Statistical Software Development)
 
-
-
 ## How to Cite
 
 To cite the **fect** package or this user manual, please use:
 
 > Xu, Yiqing, Licheng Liu, Ye Wang, Ziyi Liu, Shijian Liu, Tianzhu Qin, Jinwen Wu, and Rivka Lipkovitz. 2026. *fect: Fixed Effects Counterfactual Estimators --- User Manual (v2.2.0).* <https://yiqingxu.org/packages/fect/>
 
-```bibtex
+``` bibtex
 @manual{fect2026,
   title = {fect: Fixed Effects Counterfactual Estimators --- User Manual},
   author = {Xu, Yiqing and Liu, Licheng and Wang, Ye and Liu, Ziyi and Liu, Shijian and Qin, Tianzhu and Wu, Jinwen and Lipkovitz, Rivka},
@@ -142,7 +140,7 @@ To cite the **fect** package or this user manual, please use:
 
 ## Report Bugs
 
-Please report any bugs by submitting an issue on [GitHub](https://github.com/xuyiqing/fect/issues) or emailing me (yiqingxu \[at\] stanford.edu). We'd really appreciate it if you can include your minimally replicable code & data file and a [**panelView**](https://yiqingxu.org/packages/panelview/) treatment status plot. Your feedback is highly valued!
+Please report any bugs by submitting an issue on [GitHub](https://github.com/xuyiqing/fect/issues) or emailing me (yiqingxu \[at\] stanford.edu). We'd really appreciate it if you can include your minimally replicable code & data file and a **panelView** treatment status plot. Your feedback is highly valued!
 
 <!-- badges: start -->
 
@@ -154,9 +152,8 @@ Please report any bugs by submitting an issue on [GitHub](https://github.com/xuy
 -->
 ```
 
-**gsynth** (wrapper): [![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://www.r-pkg.org/badges/version/gsynth" alt="CRAN status"/>](https://CRAN.R-project.org/package=gsynth) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/gsynth" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/gsynth/index.html)
+[**gsynth**](https://yiqingxu.org/packages/gsynth/) (wrapper): [![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://www.r-pkg.org/badges/version/gsynth" alt="CRAN status"/>](https://CRAN.R-project.org/package=gsynth) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/gsynth" alt="downloads: CRAN"/>](https://cran.r-project.org/web/packages/gsynth/index.html)
 
-**panelView**: 
-[![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://www.r-pkg.org/badges/version/panelView" alt="CRAN status"/>](https://CRAN.R-project.org/package=panelView) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/panelView" alt="downloads: CRAN"/>](https://cran.r-project.org/package=panelView) 
+[**panelView**](https://yiqingxu.org/packages/panelview/): [![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [<img src="https://www.r-pkg.org/badges/version/panelView" alt="CRAN status"/>](https://CRAN.R-project.org/package=panelView) [<img src="https://cranlogs.r-pkg.org/badges/grand-total/panelView" alt="downloads: CRAN"/>](https://cran.r-project.org/package=panelView)
 
 <!-- badges: end -->

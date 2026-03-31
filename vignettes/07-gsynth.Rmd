@@ -6,6 +6,10 @@ source("_common.R")
 
 This chapter demonstrates the generalized synthetic control method, or Gsynth, proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\].
 
+::: {.callout-tip appearance="simple"}
+The **gsynth** package as a standalone package still exists, but algorithmically is a wrapper of the **fect** package. Click [here](https://yiqingxu.org/packages/gsynth/) if you want to use the old syntax. 
+:::
+
 Gsynth was originally implemented in the **gsynth** package but has now been fully integrated into the **fect** package. Gsynth (`method = "gsynth"`) and FEct/IFEct/MC (`method = "fe"/"ife"/"mc"`) are different in the following ways:
 
 -   Gsynth is designed to handle block and staggered DID settings **without** treatment reversal, whereas other methods allow for treatment reversal under the assumption of limited carryover effects.
