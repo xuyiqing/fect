@@ -738,15 +738,7 @@ fect_boot <- function(
 
     error.co <- out$res.full[, id.co]
     I.co <- out$I[, id.co]
-    T0.ub <- apply(as.matrix(out$D[, id.tr] == 0), 2, sum)
-    T0.ub.min <- min(T0.ub)
-    co.pre <- apply(as.matrix(I.co[1:T0.ub.min, ]), 2, sum)
-    co.post <- apply(as.matrix(I.co[(max(T0.ub) + 1):TT, ]), 2, sum)
-    if (force %in% c(1, 3)) {
-      valid.co <- id.co[(co.pre >= (out$r.cv + 1)) & (co.post >= 1)]
-    } else {
-      valid.co <- id.co[(co.pre >= out$r.cv) & (co.post >= 1)]
-    }
+    valid.co <- valid_controls(out, method, time.component.from, force)
 
     draw.error <- function() {
       repeat {
@@ -805,106 +797,34 @@ fect_boot <- function(
       }
 
       ## output
-      if (method == "gsynth" || (method == "ife" && time.component.from == "nevertreated")) {
-        synth.out <- try(
-          fect_nevertreated(
-            Y = Y.pseudo,
-            X = X.pseudo,
-            D = D.pseudo,
-            W = NULL,
-            I = I.id.pseudo,
-            II = II.id.pseudo,
-            T.on = T.on.pseudo,
-            hasRevs = hasRevs,
-            force = force,
-            r = out$r.cv,
-            CV = 0,
-            tol = tol,
-            max.iteration = max.iteration,
-            norm.para = norm.para,
-            boot = 1
-          ),
-          silent = TRUE
-        )
-      } else if (method == "cfe" && time.component.from == "nevertreated") {
-        synth.out <- try(
-          fect_nevertreated(
-            Y = Y.pseudo,
-            X = X.pseudo,
-            D = D.pseudo,
-            W = NULL,
-            I = I.id.pseudo,
-            II = II.id.pseudo,
-            T.on = T.on.pseudo,
-            hasRevs = hasRevs,
-            force = force,
-            r = out$r.cv,
-            CV = 0,
-            tol = tol,
-            max.iteration = max.iteration,
-            norm.para = norm.para,
-            boot = 1,
-            method = "cfe",
-            X.extra.FE = X.extra.FE.pseudo,
-            X.Z = X.Z.pseudo,
-            X.Q = X.Q.pseudo,
-            X.gamma = X.gamma.pseudo,
-            X.kappa = X.kappa.pseudo,
-            Zgamma.id = Zgamma.id,
-            kappaQ.id = kappaQ.id
-          ),
-          silent = TRUE
-        )
-      } else if (method %in% c("ife", "cfe")) {
-        if (method == "cfe") {
-          synth.out <- try(
-            fect_cfe(
-              Y = Y.pseudo,
-              X = X.pseudo,
-              D = D.pseudo,
-              W = NULL,
-              X.extra.FE = X.extra.FE.pseudo,
-              X.Z = X.Z.pseudo,
-              X.Q = X.Q.pseudo,
-              X.gamma = X.gamma.pseudo,
-              X.kappa = X.kappa.pseudo,
-              Zgamma.id = Zgamma.id,
-              kappaQ.id = kappaQ.id,
-              I = I.id.pseudo,
-              II = II.id.pseudo,
-              T.on = T.on.pseudo,
-              hasRevs = hasRevs,
-              force = force,
-              r.cv = out$r.cv,
-              tol = tol,
-              max.iteration = max.iteration,
-              norm.para = norm.para,
-              boot = 1
-            ),
-            silent = TRUE
-          )
-        } else {
-          synth.out <- try(
-            fect_fe(
-              Y = Y.pseudo,
-              X = X.pseudo,
-              D = D.pseudo,
-              W = NULL,
-              I = I.id.pseudo,
-              II = II.id.pseudo,
-              T.on = T.on.pseudo,
-              hasRevs = hasRevs,
-              force = force,
-              r.cv = out$r.cv,
-              tol = tol,
-              max.iteration = max.iteration,
-              norm.para = norm.para,
-              boot = 1
-            ),
-            silent = TRUE
-          )
-        }
-      }
+      synth.out <- try(
+        impute_Y0(
+          method     = method,
+          predictive = time.component.from,
+          Y          = Y.pseudo,
+          X          = X.pseudo,
+          D          = D.pseudo,
+          W          = NULL,
+          I          = I.id.pseudo,
+          II         = II.id.pseudo,
+          T.on       = T.on.pseudo,
+          X.extra.FE = X.extra.FE.pseudo,
+          X.Z        = X.Z.pseudo,
+          X.Q        = X.Q.pseudo,
+          X.gamma    = X.gamma.pseudo,
+          X.kappa    = X.kappa.pseudo,
+          Zgamma.id  = Zgamma.id,
+          kappaQ.id  = kappaQ.id,
+          tuning     = out$r.cv,
+          boot       = 1,
+          force      = force,
+          hasRevs    = hasRevs,
+          tol        = tol,
+          max.iteration = max.iteration,
+          norm.para  = norm.para
+        ),
+        silent = TRUE
+      )
 
       if ("try-error" %in% class(synth.out)) {
         return(matrix(NA, TT, Ntr))
@@ -929,7 +849,8 @@ fect_boot <- function(
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
         .multicombine = TRUE,
-        .export = c("fect_nevertreated", "fect_fe", "fect_cfe", "initialFit",
+        .export = c("impute_Y0", "valid_controls",
+                     "fect_nevertreated", "fect_fe", "fect_cfe", "initialFit",
                      ".reconstruct_gamma_fit_tr", ".reconstruct_kappa_fit",
                      ".extract_and_apply_typeB_fe"),
         .packages = c("fect", "mvtnorm", "fixest"),
@@ -1050,39 +971,75 @@ fect_boot <- function(
           boot.group <- group[id.boot]
         }
       }
+
+      ## Extra-FE slicing for cfe branches (new for Phase 3b)
+      X.extra.FE.boot <- if (!is.null(X.extra.FE) && length(dim(X.extra.FE)) == 3 && dim(X.extra.FE)[2] > 0) {
+          X.extra.FE[, id.boot, , drop = FALSE]
+      } else {
+          X.extra.FE
+      }
+      X.Z.boot <- if (!is.null(X.Z) && length(dim(X.Z)) == 3 && dim(X.Z)[2] > 0) {
+          X.Z[, id.boot, , drop = FALSE]
+      } else {
+          X.Z
+      }
+      X.Q.boot <- if (!is.null(X.Q) && length(dim(X.Q)) == 3 && dim(X.Q)[2] > 0) {
+          X.Q[, id.boot, , drop = FALSE]
+      } else {
+          X.Q
+      }
+      X.gamma.boot <- if (!is.null(X.gamma) && length(dim(X.gamma)) == 3 && dim(X.gamma)[2] > 0) {
+          X.gamma[, id.boot, , drop = FALSE]
+      } else {
+          X.gamma
+      }
+      X.kappa.boot <- if (!is.null(X.kappa) && length(dim(X.kappa)) == 3 && dim(X.kappa)[2] > 0) {
+          X.kappa[, id.boot, , drop = FALSE]
+      } else {
+          X.kappa
+      }
+
       synth.out <- try(
-        fect_nevertreated(
-          Y = Y.boot,
-          X = X.boot,
-          D = D.boot,
-          W = W.boot,
-          I = I.boot,
-          II = II.boot,
-          T.on = T.on[, id.boot],
+        impute_Y0(
+          method     = method,
+          predictive = time.component.from,
+          Y          = Y.boot,
+          X          = X.boot,
+          D          = D.boot,
+          W          = W.boot,
+          I          = I.boot,
+          II         = II.boot,
+          T.on       = T.on[, id.boot],
           T.on.balance = T.on.balance[, id.boot],
           balance.period = balance.period,
-          hasRevs = hasRevs,
-          force = force,
-          r = out$r.cv,
-          CV = 0,
-          boot = 1,
+          X.extra.FE = X.extra.FE.boot,
+          X.Z        = X.Z.boot,
+          X.Q        = X.Q.boot,
+          X.gamma    = X.gamma.boot,
+          X.kappa    = X.kappa.boot,
+          Zgamma.id  = Zgamma.id,
+          kappaQ.id  = kappaQ.id,
+          tuning     = out$r.cv,
+          boot       = 1,
           placeboTest = placeboTest,
           placebo.period = placebo.period,
           carryover.period = carryover.period,
           carryoverTest = carryoverTest,
           calendar.enp.seq = target.enp,
-          time.on.seq = time.on,
-          time.off.seq = time.off,
-          time.on.seq.W = time.on.W,
-          time.off.seq.W = time.off.W,
-          time.on.seq.group = group.time.on,
-          time.off.seq.group = group.time.off,
-          time.on.balance.seq = balance.time,
-          norm.para = norm.para,
-          tol = tol,
+          time.on.seq      = time.on,
+          time.off.seq     = time.off,
+          time.on.seq.W    = time.on.W,
+          time.off.seq.W   = time.off.W,
+          time.on.seq.group    = group.time.on,
+          time.off.seq.group   = group.time.off,
+          time.on.balance.seq  = balance.time,
+          norm.para    = norm.para,
+          tol          = tol,
           max.iteration = max.iteration,
-          group.level = group.level,
-          group = boot.group
+          group.level  = group.level,
+          group        = boot.group,
+          force        = force,
+          hasRevs      = hasRevs
         ),
         silent = TRUE
       )
@@ -1126,172 +1083,6 @@ fect_boot <- function(
       } else {
         synth.out$boot.id <- id.boot
         return(synth.out)
-      }
-    }
-  } else if (
-    binary == FALSE &
-      method %in% c("ife", "mc") &
-      vartype == "parametric"
-  ) {
-    message("Parametric Bootstrap \n")
-    sum.D <- colSums(out$D)
-    tr <- which(sum.D > 0)
-    co <- which(sum.D == 0)
-    Nco <- length(co)
-    Ntr <- length(tr)
-    fit.out[which(out$I == 0)] <- 0
-    error.co <- out$res[, co]
-    # error.tr <- out$eff[,tr]
-
-    if (0 %in% out$I) {
-      vcov_co <- res.vcov(res = error.co, cov.ar = 0)
-      vcov_co[is.na(vcov_co) | is.nan(vcov_co)] <- 0
-      # vcov_tr <- res.vcov(res = error.tr, cov.ar = 0)
-      # vcov_tr[is.na(vcov_tr)|is.nan(vcov_tr)] <- 0
-    }
-
-    one.nonpara <- function(num = NULL) {
-      error.id <- sample(1:Nco, N, replace = TRUE)
-
-      ## produce the new outcome data
-      if (0 %in% I) {
-        error.boot <- t(rmvnorm(n = N, rep(0, TT), vcov_co, method = "svd"))
-        # error.boot.co <- t(rmvnorm(n=Nco,rep(0,TT),vcov_co,method="svd"))
-        # error.boot.tr <- t(rmvnorm(n=Ntr,rep(0,TT),vcov_tr,method="svd"))
-        Y.boot <- fit.out + out$eff + error.boot
-        # Y.boot <- fit.out
-        # Y.boot[,tr] <- Y.boot[,tr] +  error.boot.tr
-        # Y.boot[,co] <- Y.boot[,co] +  error.boot.co
-      } else {
-        Y.boot <- fit.out + out$eff + error.co[, error.id]
-        # Y.boot <- fit.out
-        # Y.boot[,tr] <- Y.boot[,tr] + error.tr[,error.id.tr]
-        # Y.boot[,co] <- Y.boot[,co] + error.co[,error.id.co]
-      }
-
-      if (method == "ife") {
-        boot <- try(
-          fect_fe(
-            Y = Y.boot,
-            X = X,
-            D = D,
-            W = W,
-            I = I,
-            II = II,
-            cm = cm,
-            II.cm = II.cm,
-            T.on = T.on,
-            T.off = T.off,
-            T.on.carry = T.on.carry,
-            T.on.balance = T.on.balance,
-            balance.period = balance.period,
-            r.cv = out$r.cv,
-            binary = binary,
-            QR = QR,
-            force = force,
-            hasRevs = hasRevs,
-            tol = tol,
-            max.iteration = max.iteration,
-            boot = 1,
-            norm.para = norm.para,
-            placebo.period = placebo.period,
-            placeboTest = placeboTest,
-            carryover.period = carryover.period,
-            carryoverTest = carryoverTest,
-            group.level = group.level,
-            group = group,
-            calendar.enp.seq = target.enp,
-            time.on.seq = time.on,
-            time.off.seq = time.off,
-            time.on.seq.W = time.on.W,
-            time.off.seq.W = time.off.W,
-            time.on.carry.seq = carry.time,
-            time.on.balance.seq = balance.time,
-            time.on.seq.group = group.time.on,
-            time.off.seq.group = group.time.off
-          ),
-          silent = TRUE
-        )
-      } else if (method == "mc") {
-        boot <- try(
-          fect_mc(
-            Y = Y.boot,
-            X = X,
-            D = D,
-            W = W,
-            I = I,
-            II = II,
-            T.on = T.on,
-            T.off = T.off,
-            T.on.carry = T.on.carry,
-            T.on.balance = T.on.balance,
-            balance.period = balance.period,
-            lambda.cv = out$lambda.cv,
-            force = force,
-            hasRevs = hasRevs,
-            tol = tol,
-            max.iteration = max.iteration,
-            boot = 1,
-            norm.para = norm.para,
-            placebo.period = placebo.period,
-            placeboTest = placeboTest,
-            carryover.period = carryover.period,
-            carryoverTest = carryoverTest,
-            group.level = group.level,
-            group = group,
-            calendar.enp.seq = target.enp,
-            time.on.seq = time.on,
-            time.off.seq = time.off,
-            time.on.seq.W = time.on.W,
-            time.off.seq.W = time.off.W,
-            time.on.carry.seq = carry.time,
-            time.on.balance.seq = balance.time,
-            time.on.seq.group = group.time.on,
-            time.off.seq.group = group.time.off
-          ),
-          silent = TRUE
-        )
-      }
-
-      if ("try-error" %in% class(boot)) {
-        boot0 <- list(
-          att.avg = NA,
-          att = NA,
-          count = NA,
-          beta = NA,
-          att.off = NA,
-          count.off = NA,
-          eff.calendar = NA,
-          eff.calendar.fit = NA,
-          att.placebo = NA,
-          att.avg.unit = NA,
-          att.carryover = NA,
-          group.att = NA,
-          marginal = NA,
-          carry.att = NA,
-          balance.att = NA,
-          balance.att.placebo = NA,
-          balance.count = NA,
-          balance.avg.att = NA,
-          balance.time = NA,
-          att.avg.W = NA,
-          att.on.W = NA,
-          count.on.W = NA,
-          time.on.W = NA,
-          att.placebo.W = NA,
-          att.off.W = NA,
-          count.off.W = NA,
-          time.off.W = NA,
-          att.carryover.W = NA,
-          group.output = list(),
-          eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
-          D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
-          I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
-          boot.id = NULL
-        )
-        return(boot0)
-      } else {
-        return(boot)
       }
     }
   } else {
