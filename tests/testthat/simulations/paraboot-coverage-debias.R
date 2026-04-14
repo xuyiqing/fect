@@ -101,8 +101,6 @@ smoke_test <- function(fect_path = ".", cores = 1L) {
         vartype = "parametric",
         nboots  = 10L,          # tiny B for smoke test
         parallel = FALSE,
-        n.cores  = 1L,
-        hasRevs  = FALSE,
         split_residuals = TRUE
       ))),
       error = function(e)
@@ -499,8 +497,6 @@ run_one_rep_debias <- function(s, cell_params) {
         vartype         = "parametric",
         nboots          = 200L,
         parallel        = FALSE,
-        n.cores         = 1L,
-        hasRevs         = FALSE,
         split_residuals = split_res
       )))
     } else {
@@ -518,8 +514,6 @@ run_one_rep_debias <- function(s, cell_params) {
         vartype         = "parametric",
         nboots          = 200L,
         parallel        = FALSE,
-        n.cores         = 1L,
-        hasRevs         = FALSE,
         split_residuals = split_res
       )))
     }
@@ -599,8 +593,6 @@ for (gi in seq_len(nrow(scenario_grid))) {
           vartype         = "parametric",
           nboots          = 5L,
           parallel        = FALSE,
-          n.cores         = 1L,
-          hasRevs         = FALSE,
           split_residuals = FALSE
         ))),
         error = function(e)
