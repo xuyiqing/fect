@@ -124,8 +124,8 @@ test_that("hasRevs+parametric gate fires in fect()", {
   skip_on_cran()
 
   # Load a dataset with treatment reversals
-  data(fect.simdata)  # standard simdata in the package
-  df <- fect.simdata
+  data(simdata)  # standard simdata in the package
+  df <- simdata
 
   # Manually introduce a reversal: flip treatment off for one unit in the middle
   # Find a treated unit and flip one period from 1 -> 0 in the middle
