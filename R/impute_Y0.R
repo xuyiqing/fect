@@ -229,3 +229,50 @@ impute_Y0 <- function(
     ))
   }
 }
+
+## partition_controls() — internal helper for K=2 cross-fitting debiasing
+##
+## Partitions a control-unit index vector into K=2 disjoint halves.
+## Half-A (smaller or equal): used as the factor-estimation pool in Loop 1.
+## Half-B (larger or equal): used as the OOS-residual pool in Loop 2.
+##
+## Uses the *current* RNG state — no internal set.seed() call.
+## When split_residuals=FALSE this function is never called, so the FALSE path
+## advances the RNG by exactly zero extra calls (parity contract preserved).
+##
+## Args:
+##   id.co  — integer vector of control column indices, length Nco (>= 4 required)
+##   K      — integer scalar, must equal 2L for this release
+##
+## Returns: list with elements $A (half-A indices) and $B (half-B indices),
+##          each sorted to preserve column order.
+
+partition_controls <- function(id.co, K = 2L) {
+  Nco <- length(id.co)
+
+  ## --- Input validation ---
+  if (Nco < 4L) {
+    stop(
+      "split_residuals requires at least 4 control units (Nco = ", Nco,
+      "). Reduce K or disable split_residuals."
+    )
+  }
+  if (!identical(K, 2L)) {
+    stop("partition_controls: only K=2 is supported in this release.")
+  }
+
+  ## --- Partition sizes ---
+  Nco_A <- floor(Nco / 2L)
+  ## Nco_B = Nco - Nco_A  (= ceiling(Nco/2), the larger half)
+
+  ## --- Random assignment (uses current RNG state) ---
+  idx   <- sample(Nco)                          # random permutation of 1:Nco
+  A_idx <- idx[seq_len(Nco_A)]
+  B_idx <- idx[seq.int(Nco_A + 1L, Nco)]
+
+  ## --- Sort within each half to preserve column order ---
+  id.co_A <- id.co[sort(A_idx)]
+  id.co_B <- id.co[sort(B_idx)]
+
+  list(A = id.co_A, B = id.co_B)
+}

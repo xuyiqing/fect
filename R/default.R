@@ -91,6 +91,7 @@ fect <- function(
     m = 2, ## block length
     normalize = FALSE, # accelerate option
     keep.sims = FALSE, # keep individual bootstrap/jackknife simulations
+    split_residuals = FALSE, # K=2 cross-fitting debiasing (experimental, POC)
     cm = FALSE # causal moderation
 ) {
     UseMethod("fect")
@@ -165,6 +166,7 @@ fect.formula <- function(
     m = 2, ## block length
     normalize = FALSE,
     keep.sims = FALSE,
+    split_residuals = FALSE,
     cm = FALSE
 ) {
     ## parsing
@@ -269,6 +271,7 @@ fect.formula <- function(
         m = m,
         normalize = normalize,
         keep.sims = keep.sims,
+        split_residuals = split_residuals,
         cm = cm
     )
 
@@ -347,6 +350,7 @@ fect.default <- function(
     m = 2, ## block length
     normalize = FALSE,
     keep.sims = FALSE,
+    split_residuals = FALSE,
     cm=FALSE
 ) {
     ## -------------------------------##
@@ -1737,11 +1741,28 @@ fect.default <- function(
             "Use vartype='bootstrap' or 'jackknife'."
         )
     }
-    if (se == 1 && vartype == "parametric" && time.component.from == "notyettreated") {
+    ## Validate split_residuals
+    if (!is.logical(split_residuals) || length(split_residuals) != 1L || is.na(split_residuals)) {
+        stop("\"split_residuals\" must be TRUE or FALSE.")
+    }
+    if (isTRUE(split_residuals) && vartype != "parametric") {
+        warning("\"split_residuals = TRUE\" has no effect when vartype != \"parametric\". Ignoring.")
+    }
+    ## Gate C: block parametric + notyettreated unless split_residuals is enabled
+    if (se == 1 && vartype == "parametric" && time.component.from == "notyettreated" &&
+        !isTRUE(split_residuals)) {
         stop(
             "Parametric bootstrap is not valid when \"time.component.from\" is ",
             "\"notyettreated\". Use time.component.from = \"nevertreated\" (if never-treated ",
-            "controls are available) or vartype = \"bootstrap\" or \"jackknife\"."
+            "controls are available), vartype = \"bootstrap\" or \"jackknife\", ",
+            "or set split_residuals = TRUE to use the experimental debiased parametric bootstrap."
+        )
+    }
+    if (se == 1 && vartype == "parametric" && time.component.from == "notyettreated" &&
+        isTRUE(split_residuals)) {
+        message(
+            "split_residuals = TRUE: using experimental debiased parametric bootstrap ",
+            "(K=2 cross-fitting). Coverage properties under active research."
         )
     }
 
@@ -2334,7 +2355,8 @@ fect.default <- function(
             group.level = g.level,
             group = G,
             keep.sims = keep.sims,
-            time.component.from = time.component.from
+            time.component.from = time.component.from,
+            split_residuals = split_residuals
         )
 
     }

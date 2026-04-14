@@ -117,7 +117,8 @@ fect_boot <- function(
   group = NULL,
   dis = 0,
   keep.sims = FALSE,
-  time.component.from = "notyettreated"
+  time.component.from = "notyettreated",
+  split_residuals = FALSE
 ) {
   na.pos <- NULL
   TT <- dim(Y)[1]
@@ -740,6 +741,20 @@ fect_boot <- function(
     I.co <- out$I[, id.co]
     valid.co <- valid_controls(out, method, time.component.from, force)
 
+    ## --- Split-residual partition (POC: K=2) ---
+    if (isTRUE(split_residuals)) {
+      .split <- partition_controls(id.co, K = 2L)
+      id.co_A <- .split$A
+      id.co_B <- .split$B
+      error.co_split <- out$res.full[, id.co_B, drop = FALSE]
+      Nco_B <- length(id.co_B)
+      ## Pre-compute vcov_co_split for the Gaussian draw path (unbalanced panels)
+      if (0 %in% I) {
+        vcov_co_split <- res.vcov(res = error.co_split, cov.ar = 0)
+        vcov_co_split[is.na(vcov_co_split) | is.nan(vcov_co_split)] <- 0
+      }
+    }
+
     draw.error <- function() {
       repeat {
         fake.tr <- sample(id.co, 1, replace = FALSE)
@@ -748,11 +763,23 @@ fect_boot <- function(
         }
       }
 
-      id.co.rest <- id.co[which(!id.co %in% fake.tr)]
-      repeat {
-        id.co.pseudo <- sample(id.co.rest, Nco, replace = TRUE)
-        if (sum(apply(as.matrix(out$I[, id.co.pseudo]), 1, sum) >= 1) == TT) {
-          break
+      if (isTRUE(split_residuals)) {
+        ## Use half-A as the control pool; exclude fake.tr if it's in half-A
+        id.co_A_rest <- id.co_A[which(!id.co_A %in% fake.tr)]
+        ## Sample Nco entries (with replacement) from half-A to match pseudo-sample shape
+        repeat {
+          id.co.pseudo <- sample(id.co_A_rest, Nco, replace = TRUE)
+          if (sum(apply(as.matrix(out$I[, id.co.pseudo]), 1, sum) >= 1) == TT) {
+            break
+          }
+        }
+      } else {
+        id.co.rest <- id.co[which(!id.co %in% fake.tr)]
+        repeat {
+          id.co.pseudo <- sample(id.co.rest, Nco, replace = TRUE)
+          if (sum(apply(as.matrix(out$I[, id.co.pseudo]), 1, sum) >= 1) == TT) {
+            break
+          }
         }
       }
 
@@ -901,11 +928,22 @@ fect_boot <- function(
     }
 
     one.nonpara <- function(num = NULL) {
-      ## boostrap ID
-      repeat {
-        fake.co <- sample(id.co, Nco, replace = TRUE)
-        if (sum(apply(as.matrix(II[, fake.co]), 1, sum) >= 1) == TT) {
-          break
+      ## --- Resample controls ---
+      if (isTRUE(split_residuals)) {
+        ## Draw fake.co from half-B only (Nco_B units)
+        repeat {
+          fake.co <- sample(id.co_B, Nco_B, replace = TRUE)
+          if (sum(apply(as.matrix(II[, fake.co]), 1, sum) >= 1) == TT) {
+            break
+          }
+        }
+      } else {
+        ## Original non-split logic (unchanged)
+        repeat {
+          fake.co <- sample(id.co, Nco, replace = TRUE)
+          if (sum(apply(as.matrix(II[, fake.co]), 1, sum) >= 1) == TT) {
+            break
+          }
         }
       }
       id.boot <- c(id.tr, fake.co)
@@ -927,13 +965,24 @@ fect_boot <- function(
           ))
         }
         error.tr.boot[which(I.tr == 0)] <- 0
-        error.co.boot <- t(rmvnorm(
-          n = Nco,
-          rep(0, TT),
-          vcov_co,
-          method = "svd"
-        ))
-        error.co.boot[which(as.matrix(I[, fake.co]) == 0)] <- 0
+        if (isTRUE(split_residuals)) {
+          ## Draw control errors from half-B vcov (OOS residuals)
+          error.co.boot <- t(rmvnorm(
+            n = Nco_B,
+            rep(0, TT),
+            vcov_co_split,
+            method = "svd"
+          ))
+          error.co.boot[which(as.matrix(I[, fake.co]) == 0)] <- 0
+        } else {
+          error.co.boot <- t(rmvnorm(
+            n = Nco,
+            rep(0, TT),
+            vcov_co,
+            method = "svd"
+          ))
+          error.co.boot[which(as.matrix(I[, fake.co]) == 0)] <- 0
+        }
       } else {
         for (w in 1:Ntr) {
           error.tr.boot[, w] <- error.tr[,
@@ -941,7 +990,12 @@ fect_boot <- function(
             sample(1:nboots, 1, replace = TRUE)
           ]
         }
-        error.co.boot <- error.co[, sample(1:Nco, Nco, replace = TRUE)]
+        if (isTRUE(split_residuals)) {
+          ## Resample columns from error.co_split (TT x Nco_B)
+          error.co.boot <- error.co_split[, sample(1:Nco_B, Nco_B, replace = TRUE), drop = FALSE]
+        } else {
+          error.co.boot <- error.co[, sample(1:Nco, Nco, replace = TRUE)]
+        }
       }
 
       Y.boot <- fit.out[, id.boot]
