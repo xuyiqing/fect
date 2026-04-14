@@ -106,14 +106,15 @@ test_that("split_residuals=FALSE vs omitted argument: byte-identical", {
   r_no_arg <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data=simdf, index=c("id","time"),
     method="ife", vartype="bootstrap", nboots=50,
-    CV=FALSE, r=2L, se=TRUE, force="two-way"
+    CV=FALSE, r=2L, se=TRUE, force="two-way",
+    parallel = FALSE
   )))
   set.seed(42L)
   r_false  <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data=simdf, index=c("id","time"),
     method="ife", vartype="bootstrap", nboots=50,
     CV=FALSE, r=2L, se=TRUE, force="two-way",
-    split_residuals = FALSE
+    parallel = FALSE, split_residuals = FALSE
   )))
   expect_identical(r_no_arg$att.avg, r_false$att.avg)
   expect_identical(r_no_arg$est.att, r_false$est.att)
@@ -150,7 +151,7 @@ test_that("split_residuals=TRUE runs without error for all 5 combinations", {
   # Common args
   common <- list(CV=FALSE, r=1L, se=TRUE, vartype="parametric",
                  nboots=20L, force="two-way",
-                 hasRevs=FALSE, split_residuals=TRUE)
+                 parallel=FALSE, split_residuals=TRUE)
 
   # C1: gsynth (nevertreated via gsynth)
   df <- make_df()
