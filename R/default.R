@@ -1740,7 +1740,7 @@ fect.default <- function(
     if (se == 1 && vartype == "parametric" && time.component.from == "notyettreated") {
         stop(
             "Parametric bootstrap is not valid when \"time.component.from\" is ",
-            "\"notyettreated\". Use factors.from = \"nevertreated\" (if never-treated ",
+            "\"notyettreated\". Use time.component.from = \"nevertreated\" (if never-treated ",
             "controls are available) or vartype = \"bootstrap\" or \"jackknife\"."
         )
     }
