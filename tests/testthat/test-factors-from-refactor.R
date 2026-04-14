@@ -392,54 +392,55 @@ test_that("Phase 2c: gsynth with parametric bootstrap still works", {
 ## PHASE 3: parametric bootstrap unlocked for ife/cfe
 ## ========================================================
 
-test_that("Phase 3a: vartype='parametric' accepted for method='ife'", {
+test_that("Phase 3a: vartype='parametric' + ife + default factors.from errors (notyettreated gate)", {
 
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
-  ## Currently this errors: "parametric option is only available for gsynth"
-  ## After Phase 3, it should succeed
-  out <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", r = 2, CV = FALSE,
-    se = TRUE, vartype = "parametric", nboots = 30,
-    parallel = FALSE
-  ))
-
-  expect_s3_class(out, "fect")
-  expect_true(!is.null(out$est.att))
+  expect_error(
+    fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r = 2, CV = FALSE,
+      se = TRUE, vartype = "parametric", nboots = 30,
+      parallel = FALSE
+    ),
+    regexp = "parametric",
+    ignore.case = TRUE
+  )
 })
 
-test_that("Phase 3b: vartype='parametric' accepted for method='fe'", {
+test_that("Phase 3b: vartype='parametric' + fe (->ife) + default factors.from errors (notyettreated gate)", {
 
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
-  out <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "fe", CV = FALSE,
-    se = TRUE, vartype = "parametric", nboots = 30,
-    parallel = FALSE
-  ))
-
-  expect_s3_class(out, "fect")
-  expect_true(!is.null(out$est.att))
+  expect_error(
+    fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "fe", CV = FALSE,
+      se = TRUE, vartype = "parametric", nboots = 30,
+      parallel = FALSE
+    ),
+    regexp = "parametric",
+    ignore.case = TRUE
+  )
 })
 
-test_that("Phase 3c: vartype='parametric' accepted for method='cfe'", {
+test_that("Phase 3c: vartype='parametric' + cfe + default factors.from errors (notyettreated gate)", {
 
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
-  out <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "cfe", r = 0, CV = FALSE,
-    se = TRUE, vartype = "parametric", nboots = 30,
-    parallel = FALSE
-  ))
-
-  expect_s3_class(out, "fect")
-  expect_true(!is.null(out$est.att))
+  expect_error(
+    fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "cfe", r = 0, CV = FALSE,
+      se = TRUE, vartype = "parametric", nboots = 30,
+      parallel = FALSE
+    ),
+    regexp = "parametric",
+    ignore.case = TRUE
+  )
 })
 
 test_that("Phase 3d: vartype='parametric' still errors for method='mc'", {
@@ -1199,20 +1200,22 @@ test_that("Phase 3a-F1: jackknife SE with cfe+nevertreated", {
   expect_false(all(is.na(out$est.att[, "S.E."])))
 })
 
-test_that("Phase 3a-F3: parametric bootstrap with cfe+notyettreated and extras", {
+test_that("Phase 3a-F3: parametric bootstrap with cfe+notyettreated errors (notyettreated gate)", {
 
   skip_on_cran()
   df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
 
-  out <- suppressWarnings(suppressMessages(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "cfe", Z = "Z", r = 2, CV = FALSE,
-    se = TRUE, vartype = "parametric", nboots = 30,
-    force = "two-way", time.component.from = "notyettreated",
-    parallel = FALSE
-  )))
-
-  expect_false(all(is.na(out$est.att[, "S.E."])))
+  expect_error(
+    fect::fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "cfe", Z = "Z", r = 2, CV = FALSE,
+      se = TRUE, vartype = "parametric", nboots = 30,
+      force = "two-way", time.component.from = "notyettreated",
+      parallel = FALSE
+    ),
+    regexp = "parametric",
+    ignore.case = TRUE
+  )
 })
 
 test_that("Phase 3a-F4: ife+nevertreated SE unchanged (regression)", {

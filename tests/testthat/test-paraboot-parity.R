@@ -178,28 +178,18 @@ test_that("PAR-7: jackknife parity — gsynth", {
 
 ## ---- BUG-1a: ife+notyettreated+parametric est.att changed from pre-fix ------
 
-test_that("BUG-1a: ife+notyettreated+parametric: est.att changed from pre-fix baseline", {
+test_that("BUG-1a: ife+notyettreated+parametric now errors via notyettreated gate", {
   skip_on_cran()
-  baseline <- load_baseline()
   d <- make_fixture_data()
-
-  set.seed(2026)
-  out_post <- suppressWarnings(suppressMessages(fect(
-    Y ~ D, data = d, index = c("id", "time"),
-    method = "ife", r = 1, se = TRUE,
-    vartype = "parametric", nboots = 50,
-    CV = FALSE, parallel = FALSE
-  )))
-
-  ## att.avg (original-fit point estimate) must be unchanged by the Loop 2 fix
-  expect_true(
-    isTRUE(all.equal(out_post$att.avg, baseline$ife_nt_para$att.avg, tolerance = 1e-10)),
-    info = "att.avg (original-fit point estimate) must be unchanged by the Loop 2 fix"
-  )
-  ## est.att (SE/CI table) must differ — Loop 2 now calls fect_fe instead of fect_nevertreated(ife)
-  expect_false(
-    identical(out_post$est.att, baseline$ife_nt_para$est.att),
-    info = "est.att must differ from pre-fix baseline: Loop 2 was calling wrong estimator before"
+  expect_error(
+    suppressWarnings(suppressMessages(fect(
+      Y ~ D, data = d, index = c("id", "time"),
+      method = "ife", r = 1, se = TRUE,
+      vartype = "parametric", nboots = 50,
+      CV = FALSE, parallel = FALSE
+    ))),
+    regexp = "parametric",
+    ignore.case = TRUE
   )
 })
 
@@ -230,26 +220,18 @@ test_that("BUG-2a: cfe+nevertreated+parametric: est.att changed from pre-fix bas
 
 ## ---- BUG-3a: cfe+notyettreated+parametric est.att changed from pre-fix ------
 
-test_that("BUG-3a: cfe+notyettreated+parametric: est.att changed from pre-fix baseline", {
+test_that("BUG-3a: cfe+notyettreated+parametric now errors via notyettreated gate", {
   skip_on_cran()
-  baseline <- load_baseline()
   d <- make_fixture_data()
-
-  set.seed(2026)
-  out_post <- suppressWarnings(suppressMessages(fect(
-    Y ~ D, data = d, index = c("id", "time"),
-    method = "cfe", r = 0, se = TRUE,
-    vartype = "parametric", nboots = 50,
-    CV = FALSE, parallel = FALSE
-  )))
-
-  expect_true(
-    isTRUE(all.equal(out_post$att.avg, baseline$cfe_nt_para$att.avg, tolerance = 1e-10)),
-    info = "att.avg must be unchanged by Loop 2 fix"
-  )
-  expect_false(
-    identical(out_post$est.att, baseline$cfe_nt_para$est.att),
-    info = "est.att must differ from pre-fix baseline: Loop 2 was calling fect_nevertreated(ife) instead of fect_cfe"
+  expect_error(
+    suppressWarnings(suppressMessages(fect(
+      Y ~ D, data = d, index = c("id", "time"),
+      method = "cfe", r = 0, se = TRUE,
+      vartype = "parametric", nboots = 50,
+      CV = FALSE, parallel = FALSE
+    ))),
+    regexp = "parametric",
+    ignore.case = TRUE
   )
 })
 
@@ -286,26 +268,25 @@ test_that("BUG-2b: cfe+nevertreated+parametric no longer byte-identical to gsynt
 
 ## ---- BUG-1c: ife+notyettreated att.avg stability ----------------------------
 
-test_that("BUG-1c: ife+notyettreated att.avg unchanged between se=FALSE and se=TRUE (parametric)", {
+test_that("BUG-1c: ife+notyettreated+parametric (se=TRUE) now errors via notyettreated gate", {
   skip_on_cran()
   d <- make_fixture_data()
-
+  ## se=FALSE still works
   out_no_se <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = d, index = c("id", "time"),
     method = "ife", r = 1, se = FALSE, CV = FALSE, parallel = FALSE
   )))
-
-  set.seed(2026)
-  out_with_se <- suppressWarnings(suppressMessages(fect(
-    Y ~ D, data = d, index = c("id", "time"),
-    method = "ife", r = 1, se = TRUE,
-    vartype = "parametric", nboots = 50,
-    CV = FALSE, parallel = FALSE
-  )))
-
-  expect_true(
-    isTRUE(all.equal(out_with_se$att.avg, out_no_se$att.avg, tolerance = 1e-10)),
-    info = "att.avg must be identical whether se=FALSE or se=TRUE: it is the original-fit estimate"
+  expect_s3_class(out_no_se, "fect")
+  ## se=TRUE, vartype="parametric" + default factors.from now errors
+  expect_error(
+    suppressWarnings(suppressMessages(fect(
+      Y ~ D, data = d, index = c("id", "time"),
+      method = "ife", r = 1, se = TRUE,
+      vartype = "parametric", nboots = 50,
+      CV = FALSE, parallel = FALSE
+    ))),
+    regexp = "parametric",
+    ignore.case = TRUE
   )
 })
 
@@ -337,50 +318,43 @@ test_that("BUG-2c: cfe+nevertreated att.avg unchanged between se=FALSE and se=TR
 
 ## ---- BUG-3c: cfe+notyettreated att.avg stability ----------------------------
 
-test_that("BUG-3c: cfe+notyettreated att.avg unchanged between se=FALSE and se=TRUE (parametric)", {
+test_that("BUG-3c: cfe+notyettreated+parametric (se=TRUE) now errors via notyettreated gate", {
   skip_on_cran()
   d <- make_fixture_data()
-
+  ## se=FALSE still works
   out_no_se <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = d, index = c("id", "time"),
     method = "cfe", r = 0, se = FALSE, CV = FALSE, parallel = FALSE
   )))
-
-  set.seed(2026)
-  out_with_se <- suppressWarnings(suppressMessages(fect(
-    Y ~ D, data = d, index = c("id", "time"),
-    method = "cfe", r = 0, se = TRUE,
-    vartype = "parametric", nboots = 50,
-    CV = FALSE, parallel = FALSE
-  )))
-
-  expect_true(
-    isTRUE(all.equal(out_with_se$att.avg, out_no_se$att.avg, tolerance = 1e-10)),
-    info = "att.avg must be identical whether se=FALSE or se=TRUE"
+  expect_s3_class(out_no_se, "fect")
+  ## se=TRUE, vartype="parametric" + default factors.from now errors
+  expect_error(
+    suppressWarnings(suppressMessages(fect(
+      Y ~ D, data = d, index = c("id", "time"),
+      method = "cfe", r = 0, se = TRUE,
+      vartype = "parametric", nboots = 50,
+      CV = FALSE, parallel = FALSE
+    ))),
+    regexp = "parametric",
+    ignore.case = TRUE
   )
 })
 
 ## ---- BUG-4: ife+notyettreated+parametric SE smoke test -----------------------
 
-test_that("BUG-4: ife+notyettreated+parametric produces non-degenerate SE post-fix", {
+test_that("BUG-4: ife+notyettreated+parametric now errors via notyettreated gate", {
   skip_on_cran()
   d <- make_fixture_data()
-  set.seed(2026)
-  out <- suppressWarnings(suppressMessages(fect(
-    Y ~ D, data = d, index = c("id", "time"),
-    method = "ife", r = 1, se = TRUE,
-    vartype = "parametric", nboots = 50,
-    CV = FALSE, parallel = FALSE
-  )))
-  expect_s3_class(out, "fect")
-  expect_true(!is.null(out$est.att))
-  se_col <- which(grepl("^S[.]E[.]", colnames(out$est.att)))
-  if (length(se_col) > 0) {
-    se_vals <- out$est.att[, se_col]
-    se_vals <- se_vals[!is.na(se_vals)]
-    expect_true(all(is.finite(se_vals)) && all(se_vals > 0),
-      info = "Bootstrap SEs should be positive and finite for ife+notyettreated+parametric")
-  }
+  expect_error(
+    suppressWarnings(suppressMessages(fect(
+      Y ~ D, data = d, index = c("id", "time"),
+      method = "ife", r = 1, se = TRUE,
+      vartype = "parametric", nboots = 50,
+      CV = FALSE, parallel = FALSE
+    ))),
+    regexp = "parametric",
+    ignore.case = TRUE
+  )
 })
 
 ## ---- BUG-5: cfe+nevertreated+parametric SE smoke test -----------------------
@@ -401,18 +375,19 @@ test_that("BUG-5: cfe+nevertreated+parametric produces non-degenerate SE post-fi
 
 ## ---- BUG-6: cfe+notyettreated+parametric SE smoke test ----------------------
 
-test_that("BUG-6: cfe+notyettreated+parametric produces non-degenerate SE post-fix", {
+test_that("BUG-6: cfe+notyettreated+parametric now errors via notyettreated gate", {
   skip_on_cran()
   d <- make_fixture_data()
-  set.seed(2026)
-  out <- suppressWarnings(suppressMessages(fect(
-    Y ~ D, data = d, index = c("id", "time"),
-    method = "cfe", r = 0, se = TRUE,
-    vartype = "parametric", nboots = 50,
-    CV = FALSE, parallel = FALSE
-  )))
-  expect_s3_class(out, "fect")
-  expect_true(!is.null(out$est.att))
+  expect_error(
+    suppressWarnings(suppressMessages(fect(
+      Y ~ D, data = d, index = c("id", "time"),
+      method = "cfe", r = 0, se = TRUE,
+      vartype = "parametric", nboots = 50,
+      CV = FALSE, parallel = FALSE
+    ))),
+    regexp = "parametric",
+    ignore.case = TRUE
+  )
 })
 
 ## ---- GATE-1: hasRevs+parametric errors --------------------------------------
