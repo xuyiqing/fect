@@ -172,15 +172,17 @@ test_that("split_residuals=TRUE runs without error for all 5 combinations", {
   )))
 
   # C4: cfe+nevertreated
+  # Z is unit-constant (group indicator); kept in index for CFE grouping,
+  # but NOT in formula (fect rejects unit-invariant formula covariates).
   df_z <- make_df(with_Z=TRUE)
   expect_no_error(suppressWarnings(suppressMessages(
-    do.call(fect, c(list(Y~D+Z, data=df_z, index=c("id","time","Z"), method="cfe",
+    do.call(fect, c(list(Y~D, data=df_z, index=c("id","time","Z"), method="cfe",
                          time.component.from="nevertreated"), common))
   )))
 
   # C5: cfe+notyettreated (would fail Gate C without split; should pass with split=TRUE)
   expect_no_error(suppressWarnings(suppressMessages(
-    do.call(fect, c(list(Y~D+Z, data=df_z, index=c("id","time","Z"), method="cfe",
+    do.call(fect, c(list(Y~D, data=df_z, index=c("id","time","Z"), method="cfe",
                          time.component.from="notyettreated"), common))
   )))
 })
