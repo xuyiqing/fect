@@ -2844,10 +2844,15 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
+    ## Preserve method regardless of r.cv: the bootstrap dispatcher in fect_boot
+    ## has branches for gsynth/ife/mc/cfe but not for "fe", so relabelling to
+    ## "fe" when r.cv == 0 caused stop("Unsupported bootstrap method: fe") whenever
+    ## CV selected the two-way FE model. The gsynth/cfe branches already handle
+    ## r = 0 correctly on the estimation side (inside fect_nevertreated itself).
     if (method == "cfe") {
-        method <- ifelse(r.cv > 0, "cfe", "fe")
+        method <- "cfe"
     } else {
-        method <- ifelse(r.cv > 0, "gsynth", "fe")
+        method <- "gsynth"
     }
 
     ## -------------------------------##
