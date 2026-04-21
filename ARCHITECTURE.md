@@ -401,14 +401,14 @@ graph TD
 
 The post-refactor dispatch table applies identically to both Loop 1 (`draw.error`) and Loop 2 (`one.nonpara`). Before the refactor, Loop 2 unconditionally called `fect_nevertreated(method="ife")` for all combinations, which was incorrect for three of the five combinations.
 
-**Note (run `2026-04-14-notyet-parametric-gate`)**: Gate C now blocks entry to this table for the two `notyettreated` rows when `se = TRUE` and `vartype = "parametric"`. Users hitting those rows must switch to `factors.from = "nevertreated"` (rows 1–2 or row 4) or use `vartype = "bootstrap"` / `"jackknife"`. The valid regime (rows 1–4, i.e., gsynth and all nevertreated paths) is unchanged.
+**Note (run `2026-04-14-notyet-parametric-gate`)**: Gate C now blocks entry to this table for the two `notyettreated` rows when `se = TRUE` and `vartype = "parametric"`. Users hitting those rows must switch to `time.component.from = "nevertreated"` (rows 1–2 or row 4) or use `vartype = "bootstrap"` / `"jackknife"`. The valid regime (rows 1–4, i.e., gsynth and all nevertreated paths) is unchanged.
 
 | `method` | `predictive` | Callee | Tuning arg name | Reachable with `vartype="parametric"`? |
 | --- | --- | --- | --- | --- |
 | `gsynth` | (nevertreated, implicit) | `fect_nevertreated(method="ife", r=tuning, ...)` | `r=` | YES — gsynth auto-coerces `time.component.from` to `"nevertreated"` at L498 |
-| `ife` | `nevertreated` | `fect_nevertreated(method="ife", r=tuning, ...)` | `r=` | YES — explicit `factors.from = "nevertreated"` required |
+| `ife` | `nevertreated` | `fect_nevertreated(method="ife", r=tuning, ...)` | `r=` | YES — explicit `time.component.from = "nevertreated"` required |
 | `ife` | `notyettreated` | `fect_fe(r.cv=tuning, ...)` | `r.cv=` | **NO — Gate C fires (run 2026-04-14)** |
-| `cfe` | `nevertreated` | `fect_nevertreated(method="cfe", r=tuning, ...)` | `r=` | YES — explicit `factors.from = "nevertreated"` required |
+| `cfe` | `nevertreated` | `fect_nevertreated(method="cfe", r=tuning, ...)` | `r=` | YES — explicit `time.component.from = "nevertreated"` required |
 | `cfe` | `notyettreated` | `fect_cfe(r.cv=tuning, ...)` | `r.cv=` | **NO — Gate C fires (run 2026-04-14)** |
 | `mc` | any | `stop(...)` — Phase 4 deferred | — | NO — Gate A fires (L397) |
 
@@ -439,7 +439,7 @@ Extra-FE arguments (`X.extra.FE`, `X.Z`, `X.Q`, `X.gamma`, `X.kappa`, `Zgamma.id
 - **Defense-in-Depth Parametric Bootstrap Gates in default.R**: `fect.default()` enforces three hard gates before dispatching to `fect_boot()`, together restricting parametric bootstrap to the theoretically-justified regime (gsynth / ife+nevertreated / cfe+nevertreated):
   - **Gate A** (`L397`): `method %in% c("mc","both") && vartype=="parametric"` — fires first; MC parametric bootstrap deferred (Phase 4).
   - **Gate B** (`L1734`): `hasRevs==TRUE && vartype=="parametric"` — fires after `hasRevs` computation; reversal data invalidates parametric inference.
-  - **Gate C** (`L1740`, **added run 2026-04-14**): `time.component.from=="notyettreated" && vartype=="parametric"` — fires after Gate B; EM-imputation machinery produces under-dispersed residuals (empirical SE ratio 0.67 at N=50, ife+notyettreated) and circularity in Loop 2. Error message supplies two migration paths: `factors.from="nevertreated"` or `vartype="bootstrap"`/`"jackknife"`. The `gsynth` auto-coercion at L498 means `method="gsynth"` never reaches Gate C.
+  - **Gate C** (`L1740`, **added run 2026-04-14**): `time.component.from=="notyettreated" && vartype=="parametric"` — fires after Gate B; EM-imputation machinery produces under-dispersed residuals (empirical SE ratio 0.67 at N=50, ife+notyettreated) and circularity in Loop 2. Error message supplies two migration paths: `time.component.from="nevertreated"` or `vartype="bootstrap"`/`"jackknife"`. The `gsynth` auto-coercion at L498 means `method="gsynth"` never reaches Gate C.
 
 - **Comprehensive Diagnostic Suite**: Built-in tests (F-test, TOST equivalence, placebo, carryover) allow users to validate the parallel trends assumption without external tools. Sensitivity analysis via optional HonestDiDFEct integration.
 
