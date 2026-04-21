@@ -94,6 +94,47 @@ The key parameters that control **uncertainty estimation** are: `se` (enable sta
 -   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option.
 :::
 
+### Parametric bootstrap: valid regimes {#sec-parametric-regimes}
+
+The parametric bootstrap (`vartype = "parametric"`) uses a two-stage pseudo-treated resampling procedure to produce uncertainty estimates. It is well-suited for the synthetic control setting, where the number of treated units is small and nonparametric bootstrap is unreliable. However, the procedure rests on two key assumptions: (a) the time components (factors and loadings) are estimated from a **never-treated** control pool that is independent of the treated units' data, and (b) the model residuals on control units accurately reflect the true error distribution. When either assumption is violated, the parametric bootstrap underestimates standard errors and produces confidence intervals that are too narrow.
+
+To prevent users from invoking the parametric bootstrap in settings where these assumptions fail, the package enforces three hard restrictions:
+
+::: {.callout-important appearance="simple"}
+### Three-gate system
+
+| Gate | Condition | What it blocks |
+|---|---|---|
+| A | `method %in% c("mc", "both")` + `vartype = "parametric"` | MC + parametric |
+| B | treatment reversal present + `vartype = "parametric"` | reversal + parametric |
+| C | `time.component.from = "notyettreated"` + `vartype = "parametric"` | notyettreated + parametric |
+
+In all three cases the package raises an informative error pointing to the valid alternatives.
+:::
+
+The motivation for Gate C comes from both theory and evidence. The `notyettreated` path uses EM imputation to estimate factors jointly across all not-yet-treated observations, including the treated units' pre-period data. EM enlarges the effective factor space by imputing masked treated-post cells, which deflates the observed-cell residuals that the parametric bootstrap feeds into its covariance estimator. In a Monte Carlo study (N = 50, T = 20, r = 2 factors, 500 replications), the blocked `ife + notyettreated + parametric` combination produced **80.6% coverage at nominal 95%** (SE ratio ≈ 0.67). In contrast, all tested nevertreated paths produced near-nominal coverage (0.93–0.96, SE ratio ≈ 1.0). The architectural details of all three gates are documented in `ARCHITECTURE.md`.
+
+If your current code uses `vartype = "parametric"` with the default `time.component.from = "notyettreated"`, migrate as follows:
+
+```r
+# Before (now raises an error under Gate C):
+fect(data, Y = "Y", D = "D", index = c("id", "time"),
+     method = "ife", se = TRUE, vartype = "parametric")
+
+# After — option 1: switch to nevertreated imputation
+# (requires that never-treated control units exist in the data)
+fect(data, Y = "Y", D = "D", index = c("id", "time"),
+     method = "ife", time.component.from = "nevertreated",
+     se = TRUE, vartype = "parametric")
+
+# After — option 2: use nonparametric bootstrap (safe default)
+fect(data, Y = "Y", D = "D", index = c("id", "time"),
+     method = "ife",
+     se = TRUE, vartype = "bootstrap")
+```
+
+Option 1 switches to the gsynth-style estimation regime and keeps parametric bootstrap. This is appropriate when never-treated control units exist and the treatment does not reverse. Option 2 leaves the estimator unchanged and uses cluster-bootstrap, which is appropriate when the number of treated units is moderate to large. See [Chapter @sec-gsynth] for guidance.
+
 ```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   method = "fe", force = "two-way", se = TRUE,

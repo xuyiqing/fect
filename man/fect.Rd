@@ -65,7 +65,18 @@ assumptions.}
   \code{"fe"}, \code{"ife"}, \code{"mc"},
   \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
-\item{vartype}{a string specifying the type of variance estimator, e.g. \code{"bootstrap"}.}
+\item{vartype}{a string specifying the type of variance estimator, e.g.
+  \code{"bootstrap"}. Three values are supported:
+  \code{"bootstrap"} (nonparametric cluster-bootstrap; the safe default),
+  \code{"jackknife"} (leave-one-unit-out), and
+  \code{"parametric"} (two-stage pseudo-treated parametric bootstrap).
+  The \code{"parametric"} option is restricted to the
+  gsynth-style regime: it requires
+  \code{time.component.from = "nevertreated"}, no treatment reversal,
+  and \code{method} not in \code{c("mc", "both")}.
+  These three conditions correspond to Gates A, B, and C in the
+  three-gate defense system (see \code{ARCHITECTURE.md}).
+  For all other settings, \code{vartype = "bootstrap"} is recommended.}
 \item{cl}{a string specifying the cluster for cluster bootstrapping.}
 \item{quantile.CI}{a logical flag indicating whether to use quantile confidence intervals when bootstrapping.}
 \item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}.}

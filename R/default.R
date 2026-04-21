@@ -1731,6 +1731,19 @@ fect.default <- function(
     if (hasRevs == TRUE & method == "gsynth") {
         stop("Gsynth can't be used when treatments have reversals.")
     }
+    if (se == 1 && vartype == "parametric" && hasRevs == TRUE) {
+        stop(
+            "Parametric bootstrap is not valid when treatment reversal is present. ",
+            "Use vartype='bootstrap' or 'jackknife'."
+        )
+    }
+    if (se == 1 && vartype == "parametric" && time.component.from == "notyettreated") {
+        stop(
+            "Parametric bootstrap is not valid when \"time.component.from\" is ",
+            "\"notyettreated\". Use time.component.from = \"nevertreated\" (if never-treated ",
+            "controls are available) or vartype = \"bootstrap\" or \"jackknife\"."
+        )
+    }
 
     ## 5. switch-off periods
     T.off <- NULL
