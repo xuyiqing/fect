@@ -444,7 +444,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             use_explicit_cv <- "cv" %in% as.character(parallel) && !isTRUE(parallel)
             cv_ife_parallel <- do_parallel_cv && (ife_threshold_met || use_explicit_cv)
 
-            if (cv_ife_parallel && k > 1 && criterion != "PC") {
+            if (cv_ife_parallel && k > 1 && criterion != "pc") {
                 if (is.null(cores)) {
                     cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
                 }
@@ -611,6 +611,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         sprintf("%.5f", MSPE)
                     )
                 } ## end parallel aggregate loop
+                ## Ensure r.cv carries the name "r" to match the serial path's
+                ## CV.out.ife[i, "r"] extraction which preserves the column name.
+                names(r.cv) <- "r"
 
             } else {
             ## ---- Serial path (original code) ---- ##

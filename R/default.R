@@ -2344,6 +2344,7 @@ fect.default <- function(
             nboots = nboots,
             parallel = parallel,
             cores = cores,
+            do_parallel_cv = do_parallel_cv,
             group.level = g.level,
             group = G,
             keep.sims = keep.sims,

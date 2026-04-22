@@ -113,6 +113,7 @@ fect_boot <- function(
   nboots = 200,
   parallel = TRUE,
   cores = NULL,
+  do_parallel_cv = FALSE,
   group.level = NULL,
   group = NULL,
   dis = 0,
@@ -386,7 +387,10 @@ fect_boot <- function(
         X.gamma = X.gamma,
         X.kappa = X.kappa,
         Zgamma.id = Zgamma.id,
-        kappaQ.id = kappaQ.id
+        kappaQ.id = kappaQ.id,
+        parallel = parallel,
+        cores = cores,
+        do_parallel_cv = do_parallel_cv
       )
 
       if (!is.null(out$method)) {
