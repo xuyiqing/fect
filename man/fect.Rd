@@ -81,7 +81,20 @@ assumptions.}
 \item{quantile.CI}{a logical flag indicating whether to use quantile confidence intervals when bootstrapping.}
 \item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}.}
 \item{alpha}{the significance level for hypothesis tests and confidence intervals. Default \code{0.05}.}
-\item{parallel}{a logical flag indicating whether parallel computing will be used in bootstrapping or cross-validation.}
+\item{parallel}{controls which operations run in parallel. Accepted values:
+\describe{
+  \item{\code{TRUE}}{Enable parallel computing for both CV and bootstrap (default in \code{fect()}).}
+  \item{\code{FALSE}}{Disable all parallel computing.}
+  \item{\code{"cv"}}{Enable parallel CV only; bootstrap runs serially.}
+  \item{\code{"boot"}}{Enable parallel bootstrap only; CV runs serially.}
+  \item{\code{c("cv","boot")}}{Explicit form of \code{TRUE}: parallel for both.}
+}
+When \code{parallel = TRUE}, auto-enable thresholds apply: CV parallelism
+engages only when \code{Nco * TT} exceeds the per-method threshold
+(\code{ife = 20000}, \code{cfe = 60000}). Explicit \code{"cv"} overrides
+the threshold. Nested parallelism (calling \code{fect()} from within a
+\code{future_lapply} or \code{foreach \%dopar\%} block) should use
+\code{parallel = FALSE} to avoid deadlock.}
 \item{cores}{an integer indicating the number of cores for parallel computing.}
 \item{tol}{a positive number indicating the tolerance level for EM updates.}
 \item{max.iteration}{the maximal number of iterations for the EM algorithm.}

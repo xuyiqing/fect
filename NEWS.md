@@ -1,3 +1,27 @@
+# fect 2.2.2
+
+### Parallel CV (Phase 1)
+
+* The `parallel` argument now accepts five forms: `TRUE`, `FALSE`, `"cv"`,
+  `"boot"`, and `c("cv", "boot")`. This allows parallelizing CV and bootstrap
+  independently. Existing `TRUE`/`FALSE` usage is fully backward-compatible.
+* Cross-validation for the IFE model on the `notyettreated` path (`R/cv.R`)
+  now supports parallel execution via `future_lapply`. All `(r, fold)` tasks
+  are dispatched as a flat task list; the 1% rank-selection rule is applied
+  sequentially in the master process, preserving numerical identity with the
+  serial path.
+* A size threshold (`Nco * TT > 20000`) governs auto-enable when
+  `parallel = TRUE`. Use `parallel = "cv"` to override and engage CV
+  parallelism on any panel size.
+* The future plan is saved and restored on exit (including error paths), so
+  scripts that set their own `future::plan()` are unaffected.
+* Internal helper functions (`.fect_cv_score_one_*`) extracted into
+  `R/cv-helpers.R` as the canonical single implementation of each CV scoring
+  step. `fect_nevertreated.R` fold-parallel branches migrated to use these
+  helpers, preserving exact numerical output.
+* Deferred to later phases: MC parallel CV (Phase 2), CFE parallel CV
+  (Phase 3), `boot.R` modernization (Phase 4).
+
 # fect 2.2.1
 
 * Fixed `Unsupported bootstrap method: fe` crash when `fect(method = "gsynth", CV = TRUE, se = TRUE, ...)` (or `method = "cfe"`) selected `r.cv = 0` via cross-validation. `fect_nevertreated()` used to relabel its outgoing `$method` to `"fe"` in that case, and `fect_boot()`'s per-iteration dispatcher had no `"fe"` branch. The fix keeps `$method` as `"gsynth"` (or `"cfe"`); the existing dispatcher branches already handle `r = 0` correctly. Reported against the `gsynth` wrapper, which delegates SE to fect.
