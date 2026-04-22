@@ -1171,3 +1171,454 @@ test_that("M.6: two MC parallel runs with same seed produce identical results", 
   expect_identical(fit_par1$lambda.cv, fit_par2$lambda.cv)
   expect_identical(fit_par1$CV.out.mc, fit_par2$CV.out.mc)
 })
+
+## =================================================================
+## Section C: CFE Nevertreated Parallel CV (Phase 3)
+## =================================================================
+## Tests for the CFE nevertreated flat r×k parallel dispatch added in
+## Phase 3. Mirror the M-section structure.
+##
+## RNG discipline: set.seed() immediately before EVERY fect() call.
+## Synthetic data (ntdata_cfe) is used because simdata triggers an
+## early-exit (insufficient pre-treatment records). ntdata_cfe is
+## generated with a fixed seed inside each test so the test is
+## self-contained and reproducible.
+##
+## See: statsclaw-workspace/fect/runs/REQ-parallel-cv-phase3/spec.md
+## =================================================================
+
+## Helper: generate reproducible synthetic panel for CFE tests
+## N = 38 (Nco=30, Ntr=8), TT=30, treatment from period 20.
+## Nco * TT = 900 < 60000 threshold: use parallel = "cv" to force.
+.make_cfe_panel <- function(seed = 1234) {
+  set.seed(seed)
+  TT <- 30; Nco <- 30; Ntr <- 8; N <- Nco + Ntr
+  panel <- expand.grid(id = 1:N, time = 1:TT)
+  panel <- panel[order(panel$id, panel$time), ]
+  fac1 <- sin(seq(0, pi, length.out = TT))
+  fac2 <- cos(seq(0, pi, length.out = TT))
+  for (i in 1:N) {
+    lambda1_i <- rnorm(1, 0, 0.5); lambda2_i <- rnorm(1, 0, 0.5)
+    panel$Y[panel$id == i] <- 2*lambda1_i*fac1 + lambda2_i*fac2 + rnorm(TT, 0, 0.3)
+  }
+  panel$D <- ifelse(panel$id > Nco & panel$time >= 20, 1, 0)
+  panel
+}
+
+## -- C.1  CFE nevertreated all_units serial == parallel -------------
+
+test_that("C.1: CFE nevertreated all_units serial == parallel (within 1e-10)", {
+
+  skip_on_cran()
+
+  ntdata_cfe <- .make_cfe_panel()
+
+  set.seed(42)
+  fit_seq <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata_cfe,
+      index     = c("id", "time"),
+      method    = "cfe",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "all_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = FALSE
+    )
+  ))
+
+  set.seed(42)
+  fit_par <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata_cfe,
+      index     = c("id", "time"),
+      method    = "cfe",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "all_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  ## r.cv must match
+  expect_identical(fit_seq$r.cv, fit_par$r.cv)
+
+  ## CV.out scores within 1e-10
+  if (!is.null(fit_seq$CV.out) && !is.null(fit_par$CV.out)) {
+    cv_diff <- max(abs(fit_seq$CV.out - fit_par$CV.out), na.rm = TRUE)
+    expect_true(cv_diff < 1e-10,
+      info = sprintf("CV.out max diff = %.2e (tolerance 1e-10)", cv_diff))
+  }
+
+  ## att.avg: same r.cv => same final model
+  expect_equal(fit_seq$att.avg, fit_par$att.avg, tolerance = 1e-10)
+})
+
+## -- C.2  CFE parallel banner contains "Parallel CV (CFE)" ----------
+
+test_that("C.2: parallel='cv' with method='cfe' emits CFE-specific banner", {
+
+  skip_on_cran()
+
+  ntdata_cfe <- .make_cfe_panel()
+
+  msgs <- capture.output({
+    set.seed(42)
+    suppressWarnings(
+      fect::fect(
+        Y ~ D,
+        data      = ntdata_cfe,
+        index     = c("id", "time"),
+        method    = "cfe",
+        r         = 0:2,
+        CV        = TRUE,
+        k         = 3,
+        cv.method = "all_units",
+        time.component.from = "nevertreated",
+        se        = FALSE,
+        parallel  = "cv",
+        cores     = 2
+      )
+    )
+  }, type = "message")
+
+  ## Banner contains "Parallel CV (CFE):" to distinguish from IFE banner
+  expect_true(any(grepl("Parallel CV \\(CFE\\)", msgs)),
+    info = "Expected 'Parallel CV (CFE)' banner when parallel='cv', method='cfe'")
+})
+
+## -- C.3  CFE threshold gate: parallel=TRUE on small panel -> serial --
+
+test_that("C.3: parallel=TRUE on small CFE panel runs serially (CFE threshold gate)", {
+
+  skip_on_cran()
+
+  ntdata_cfe <- .make_cfe_panel()
+  ## ntdata_cfe: Nco * TT = 30 * 30 = 900 < 60000 => parallel=TRUE gates to serial
+
+  msgs <- capture.output({
+    set.seed(42)
+    suppressWarnings(
+      fect::fect(
+        Y ~ D,
+        data      = ntdata_cfe,
+        index     = c("id", "time"),
+        method    = "cfe",
+        r         = 0:2,
+        CV        = TRUE,
+        k         = 3,
+        cv.method = "all_units",
+        time.component.from = "nevertreated",
+        se        = FALSE,
+        parallel  = TRUE
+      )
+    )
+  }, type = "message")
+
+  expect_false(any(grepl("Parallel CV \\(CFE\\)", msgs)),
+    info = "CFE threshold (60k) should suppress CFE parallel banner for small panel")
+})
+
+## -- C.4  CFE parallel: plan restored after normal return -----------
+
+test_that("C.4: future plan restored after CFE parallel CV call", {
+
+  skip_on_cran()
+
+  ntdata_cfe <- .make_cfe_panel()
+
+  future::plan(future::sequential)
+  plan_before_class <- class(future::plan())
+
+  set.seed(42)
+  suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata_cfe,
+      index     = c("id", "time"),
+      method    = "cfe",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "all_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  plan_after_class <- class(future::plan())
+  expect_identical(plan_before_class, plan_after_class)
+
+  future::plan(future::sequential)  ## cleanup
+})
+
+## -- C.5  CFE reproducibility: two parallel runs bit-identical ------
+
+test_that("C.5: two CFE parallel runs with same seed produce identical results", {
+
+  skip_on_cran()
+
+  ntdata_cfe <- .make_cfe_panel()
+
+  set.seed(42)
+  fit_par1 <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata_cfe,
+      index     = c("id", "time"),
+      method    = "cfe",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "all_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  set.seed(42)
+  fit_par2 <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata_cfe,
+      index     = c("id", "time"),
+      method    = "cfe",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "all_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  expect_identical(fit_par1$r.cv, fit_par2$r.cv)
+  if (!is.null(fit_par1$CV.out) && !is.null(fit_par2$CV.out)) {
+    expect_identical(fit_par1$CV.out, fit_par2$CV.out)
+  }
+})
+
+## -- C.6  CFE notyettreated + CV = TRUE => CV forced to FALSE -------
+## Architectural confirmation: planner's finding that method="cfe" with
+## time.component.from="notyettreated" sets CV=FALSE in default.R.
+
+test_that("C.6: CFE notyettreated+CV=TRUE is silently forced to CV=FALSE (no CV output)", {
+
+  skip_on_cran()
+
+  set.seed(42)
+  fit <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = simdata,
+      index     = c("id", "time"),
+      method    = "cfe",
+      CV        = TRUE,
+      time.component.from = "notyettreated",
+      se        = FALSE,
+      parallel  = FALSE
+    )
+  ))
+
+  ## CV forced to FALSE => no CV output, r.cv = 0 (single r candidate)
+  expect_null(fit$CV.out.ife,
+    info = "CV.out.ife should be NULL when CV is forced FALSE for cfe+notyettreated")
+  expect_null(fit$CV.out,
+    info = "CV.out should be NULL when CV is forced FALSE for cfe+notyettreated")
+})
+
+## =================================================================
+## Section N: Nevertreated Flat-Dispatch Migration Regression (Phase 3)
+## =================================================================
+## Pin the post-migration serial == parallel identity for both
+## IFE and CFE nevertreated paths using the Phase 3 fixture data.
+##
+## Fixtures generated from HEAD 5531166 (pre-refactor serial path)
+## and stored in tests/testthat/fixtures/phase3-baseline-*.rds.
+## Serial path remains identical; parallel path (future_lapply) must
+## match within 1e-10.
+##
+## RNG discipline: set.seed(42) immediately before each fect() call.
+## =================================================================
+
+## -- N.1  IFE nevertreated all_units: parallel == serial (fixture) --
+
+test_that("N.1: IFE nevertreated all_units parallel matches phase3 fixture (within 1e-10)", {
+
+  skip_on_cran()
+
+  fixture <- readRDS(test_path("fixtures", "phase3-baseline-ife-all-serial.rds"))
+  ntdata <- fixture$panel  ## NOTE: if fixture was saved without $panel, use inline
+  ## The fixture was saved with the panel as part of the environment — regenerate inline
+  set.seed(if (!is.null(fixture$panel_seed)) fixture$panel_seed else 1234)
+  TT <- 30; Nco <- 30; Ntr <- 8; N <- Nco + Ntr
+  ntdata <- expand.grid(id = 1:N, time = 1:TT)
+  ntdata <- ntdata[order(ntdata$id, ntdata$time), ]
+  fac1 <- sin(seq(0, pi, length.out = TT)); fac2 <- cos(seq(0, pi, length.out = TT))
+  for (i in 1:N) {
+    lambda1_i <- rnorm(1, 0, 0.5); lambda2_i <- rnorm(1, 0, 0.5)
+    ntdata$Y[ntdata$id == i] <- 2*lambda1_i*fac1 + lambda2_i*fac2 + rnorm(TT, 0, 0.3)
+  }
+  ntdata$D <- ifelse(ntdata$id > Nco & ntdata$time >= 20, 1, 0)
+
+  set.seed(42)
+  fit_par <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata,
+      index     = c("id", "time"),
+      method    = "ife",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "all_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  expect_identical(fit_par$r.cv, fixture$fit$r.cv)
+  att_diff <- max(abs(fit_par$att.avg - fixture$fit$att.avg), na.rm = TRUE)
+  expect_true(att_diff < 1e-10,
+    info = sprintf("IFE nevertreated all_units parallel vs fixture: att.avg diff = %.2e", att_diff))
+})
+
+## -- N.2  IFE nevertreated treated_units: serial still matches fixture --
+
+test_that("N.2: IFE nevertreated treated_units serial matches phase3 fixture (within 1e-10)", {
+
+  skip_on_cran()
+
+  fixture <- readRDS(test_path("fixtures", "phase3-baseline-ife-tr-serial.rds"))
+  set.seed(if (!is.null(fixture$panel_seed)) fixture$panel_seed else 1234)
+  TT <- 30; Nco <- 30; Ntr <- 8; N <- Nco + Ntr
+  ntdata <- expand.grid(id = 1:N, time = 1:TT)
+  ntdata <- ntdata[order(ntdata$id, ntdata$time), ]
+  fac1 <- sin(seq(0, pi, length.out = TT)); fac2 <- cos(seq(0, pi, length.out = TT))
+  for (i in 1:N) {
+    lambda1_i <- rnorm(1, 0, 0.5); lambda2_i <- rnorm(1, 0, 0.5)
+    ntdata$Y[ntdata$id == i] <- 2*lambda1_i*fac1 + lambda2_i*fac2 + rnorm(TT, 0, 0.3)
+  }
+  ntdata$D <- ifelse(ntdata$id > Nco & ntdata$time >= 20, 1, 0)
+
+  set.seed(42)
+  fit_ser <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata,
+      index     = c("id", "time"),
+      method    = "ife",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "treated_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = FALSE
+    )
+  ))
+
+  expect_identical(fit_ser$r.cv, fixture$fit$r.cv)
+  att_diff <- max(abs(fit_ser$att.avg - fixture$fit$att.avg), na.rm = TRUE)
+  expect_true(att_diff < 1e-10,
+    info = sprintf("IFE nevertreated treated_units serial vs fixture: att.avg diff = %.2e", att_diff))
+})
+
+## -- N.3  CFE nevertreated all_units: parallel == serial (fixture) --
+
+test_that("N.3: CFE nevertreated all_units parallel matches phase3 fixture (within 1e-10)", {
+
+  skip_on_cran()
+
+  fixture <- readRDS(test_path("fixtures", "phase3-baseline-cfe-all-serial.rds"))
+  set.seed(if (!is.null(fixture$panel_seed)) fixture$panel_seed else 1234)
+  TT <- 30; Nco <- 30; Ntr <- 8; N <- Nco + Ntr
+  ntdata <- expand.grid(id = 1:N, time = 1:TT)
+  ntdata <- ntdata[order(ntdata$id, ntdata$time), ]
+  fac1 <- sin(seq(0, pi, length.out = TT)); fac2 <- cos(seq(0, pi, length.out = TT))
+  for (i in 1:N) {
+    lambda1_i <- rnorm(1, 0, 0.5); lambda2_i <- rnorm(1, 0, 0.5)
+    ntdata$Y[ntdata$id == i] <- 2*lambda1_i*fac1 + lambda2_i*fac2 + rnorm(TT, 0, 0.3)
+  }
+  ntdata$D <- ifelse(ntdata$id > Nco & ntdata$time >= 20, 1, 0)
+
+  set.seed(42)
+  fit_par <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata,
+      index     = c("id", "time"),
+      method    = "cfe",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "all_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  expect_identical(fit_par$r.cv, fixture$fit$r.cv)
+  att_diff <- max(abs(fit_par$att.avg - fixture$fit$att.avg), na.rm = TRUE)
+  expect_true(att_diff < 1e-10,
+    info = sprintf("CFE nevertreated all_units parallel vs fixture: att.avg diff = %.2e", att_diff))
+})
+
+## -- N.4  CFE nevertreated treated_units: serial still matches fixture --
+
+test_that("N.4: CFE nevertreated treated_units serial matches phase3 fixture (within 1e-10)", {
+
+  skip_on_cran()
+
+  fixture <- readRDS(test_path("fixtures", "phase3-baseline-cfe-tr-serial.rds"))
+  set.seed(if (!is.null(fixture$panel_seed)) fixture$panel_seed else 1234)
+  TT <- 30; Nco <- 30; Ntr <- 8; N <- Nco + Ntr
+  ntdata <- expand.grid(id = 1:N, time = 1:TT)
+  ntdata <- ntdata[order(ntdata$id, ntdata$time), ]
+  fac1 <- sin(seq(0, pi, length.out = TT)); fac2 <- cos(seq(0, pi, length.out = TT))
+  for (i in 1:N) {
+    lambda1_i <- rnorm(1, 0, 0.5); lambda2_i <- rnorm(1, 0, 0.5)
+    ntdata$Y[ntdata$id == i] <- 2*lambda1_i*fac1 + lambda2_i*fac2 + rnorm(TT, 0, 0.3)
+  }
+  ntdata$D <- ifelse(ntdata$id > Nco & ntdata$time >= 20, 1, 0)
+
+  set.seed(42)
+  fit_ser <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata,
+      index     = c("id", "time"),
+      method    = "cfe",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "treated_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = FALSE
+    )
+  ))
+
+  expect_identical(fit_ser$r.cv, fixture$fit$r.cv)
+  att_diff <- max(abs(fit_ser$att.avg - fixture$fit$att.avg), na.rm = TRUE)
+  expect_true(att_diff < 1e-10,
+    info = sprintf("CFE nevertreated treated_units serial vs fixture: att.avg diff = %.2e", att_diff))
+})

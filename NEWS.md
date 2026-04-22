@@ -32,6 +32,24 @@
   `break_check` stopping). In serial mode, the existing `break_check`
   short-circuit is preserved unchanged.
 
+### Parallel CV (Phase 3)
+
+* Cross-validation for the CFE model (complex fixed effects) in the
+  `nevertreated` path now uses the same flat `(r, fold)` parallel dispatch
+  as IFE and MC, via `future_lapply`. The auto-enable threshold is
+  `Nco * TT > 60000`; use `parallel = "cv"` to override.
+* The IFE and CFE parallel CV branches in `R/fect_nevertreated.R` have been
+  migrated from `foreach %dopar%` (k-fold only) to flat r×k `future_lapply`
+  dispatch, improving load balancing when multiple rank candidates are
+  evaluated.
+* Centralized threshold constants (`.CV_PARALLEL_THRESH`) are now used
+  consistently across both `R/cv.R` and `R/fect_nevertreated.R`.
+* Future plan lifecycle uses `on.exit(..., after = FALSE)` in both blocks,
+  ensuring correct LIFO restoration when IFE and CFE CV run sequentially.
+* The `doFuture::registerDoFuture()` call has been removed from both
+  `fect_nevertreated.R` parallel setup blocks; `future_lapply` dispatch does
+  not require a foreach backend.
+
 # fect 2.2.1
 
 * Fixed `Unsupported bootstrap method: fe` crash when `fect(method = "gsynth", CV = TRUE, se = TRUE, ...)` (or `method = "cfe"`) selected `r.cv = 0` via cross-validation. `fect_nevertreated()` used to relabel its outgoing `$method` to `"fe"` in that case, and `fect_boot()`'s per-iteration dispatcher had no `"fe"` branch. The fix keeps `$method` as `"gsynth"` (or `"cfe"`); the existing dispatcher branches already handle `r = 0` correctly. Reported against the `gsynth` wrapper, which delegates SE to fect.

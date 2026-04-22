@@ -481,10 +481,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
             }
 
-            ## ---- Parallel backend setup (IFE CV) ---- ##
+            ## ---- Parallel backend setup (IFE CV) — Phase 3 flat dispatch ---- ##
             ## do_parallel_cv: pre-computed flag from default.R/cv.R (NULL means derive from parallel).
             ## parallel=TRUE (default from fect): auto-enable for all_units
-            ##   when control panel is large enough (Nco*TT > 20000)
+            ##   when control panel is large enough (Nco*TT > .CV_PARALLEL_THRESH$ife)
             ## parallel=FALSE: force sequential (user override)
             ## parallel="cv": force parallel regardless of threshold
             if (is.null(do_parallel_cv)) {
@@ -492,20 +492,24 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 do_parallel_cv <- isTRUE(parallel) || "cv" %in% as.character(parallel)
             }
             if (!do_parallel_cv) {
-                use_parallel <- FALSE
+                cv_ife_parallel <- FALSE
             } else {
-                ## auto mode (parallel=TRUE): threshold gates; explicit "cv": always parallel
-                use_explicit_cv <- "cv" %in% as.character(parallel) && !isTRUE(parallel)
-                use_parallel <- (cv.method == "all_units" && (Nco * TT > 20000 || use_explicit_cv) && k > 1)
+                ## Explicit "cv" override: bypass threshold; auto mode: threshold gates
+                use_explicit_cv_ife <- "cv" %in% as.character(parallel) && !isTRUE(parallel)
+                ## Centralized threshold gate — replaces bespoke Nco * TT > 20000 check
+                ife_threshold_met <- (Nco * TT) > .CV_PARALLEL_THRESH$ife
+                cv_ife_parallel <- (cv.method == "all_units") &&
+                                   (ife_threshold_met || use_explicit_cv_ife) &&
+                                   (k > 1)
             }
-            if (cv.method != "loo" && use_parallel == TRUE && k > 1) {
+            if (cv_ife_parallel) {
                 if (is.null(cores)) {
                     cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
                 }
-                old.future.plan <- future::plan()
-                on.exit(future::plan(old.future.plan), add = TRUE)
+                old.future.plan.ife <- future::plan()
+                on.exit(future::plan(old.future.plan.ife), add = TRUE, after = FALSE)
                 future::plan(future::multisession, workers = cores)
-                doFuture::registerDoFuture()
+                ## doFuture::registerDoFuture() removed — not needed for future_lapply dispatch
                 avail <- parallelly::availableCores()
                 msg_line <- sprintf("Parallel CV: using %d of %d available cores.", cores, avail)
                 pad <- strrep(" ", max(0, 56 - nchar(msg_line)))
@@ -516,13 +520,112 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     " | To change: set cores = <n> in fect().                    |\n",
                     " | Default: min(available - 2, 8).                          |\n",
                     " +----------------------------------------------------------+\n")
-                cv_parallel <- TRUE
-                ## capture internal functions for parallel workers
-                .inter_fe_ub <- inter_fe_ub
-                .complex_fe_ub <- NULL  ## only needed for CFE
-            } else {
-                cv_parallel <- FALSE
             }
+
+            ## ---- Task list construction (IFE flat r×k dispatch) ---- ##
+            if (cv_ife_parallel) {
+                r_seq_ife <- CV.out[, "r"]
+                tasks_ife <- vector("list", length(r_seq_ife) * k)
+                idx <- 1L
+                for (ri in seq_along(r_seq_ife)) {
+                    for (ii in 1:k) {
+                        tasks_ife[[idx]] <- list(r = r_seq_ife[ri], ii = ii, ri = ri)
+                        idx <- idx + 1L
+                    }
+                }
+                ## Capture helper in closure for worker serialization
+                .score_fn_ife_all <- .fect_cv_score_one_ife_nt_all
+            }
+
+            if (cv_ife_parallel) {
+            ## ---- PARALLEL BRANCH: flat r×k future_lapply dispatch (IFE all_units) ---- ##
+
+                ## Step 1: dispatch all (r, fold) scoring tasks
+                fold_scores_ife <- future.apply::future_lapply(
+                    tasks_ife,
+                    FUN = function(task) {
+                        .score_fn_ife_all(
+                            ii            = task$ii,
+                            YY.co         = YY.co,
+                            Y0CV.co       = Y0CV.co,
+                            X.co          = X.co,
+                            II.co         = II.co,
+                            W.use         = W.use,
+                            W             = W,
+                            beta0CV.co    = beta0CV.co,
+                            rmCV          = rmCV,
+                            estCV         = estCV,
+                            r             = task$r,
+                            force         = force,
+                            cv_tol        = cv_tol,
+                            max.iteration = max.iteration
+                        )
+                    },
+                    future.seed     = TRUE,
+                    future.packages = "fect"
+                )
+
+                ## Step 2: sequential master walk — apply 1% rule in rank order
+                n_r_ife <- length(r_seq_ife)
+                for (i in seq_len(n_r_ife)) {
+                    r <- unname(r_seq_ife[i])
+                    ## Full-data fit (sequential in master) — needed for sigma2/IC/PC
+                    est.co <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, r, force, cv_tol, max.iteration)
+
+                    if (p > 0) {
+                        na.pos <- is.nan(est.co$beta)
+                        beta <- est.co$beta
+                        beta[is.nan(est.co$beta)] <- 0
+                    }
+                    if (is.null(norm.para)) {
+                        sigma2 <- est.co$sigma2; IC <- est.co$IC; PC <- est.co$PC
+                    } else {
+                        sigma2 <- est.co$sigma2 * (norm.para[1]^2)
+                        IC <- est.co$IC - log(est.co$sigma2) + log(sigma2)
+                        PC <- est.co$PC * (norm.para[1]^2)
+                    }
+
+                    ## Aggregate fold scores for this rank
+                    task_idx <- which(vapply(tasks_ife, function(t) t$ri == i, logical(1)))
+                    all_resid    <- unlist(lapply(fold_scores_ife[task_idx], `[[`, "resid"))
+                    all_time_idx <- unlist(lapply(fold_scores_ife[task_idx], `[[`, "time_idx"))
+                    all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_scores_ife[task_idx], `[[`, "obs_w")) else c()
+
+                    if (length(all_resid) == 0) {
+                        scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
+                                    MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                    } else {
+                        scores <- .score_residuals(
+                            all_resid,
+                            obs_weights   = if (!is.null(W)) all_obs_w else NULL,
+                            time_index    = all_time_idx,
+                            count_weights = count.T.cv,
+                            norm.para     = NULL
+                        )
+                    }
+
+                    ## 1% rule — identical logic to serial path
+                    if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                        est.co.best <- est.co
+                        r.cv <- r
+                    } else {
+                        if (r == r.cv + 1) message("*")
+                    }
+                    if (PC < min(CV.out[, "PC"])) {
+                        r.pc <- r
+                        est.co.pc.best <- est.co
+                    }
+                    CV.out[i, 2:4] <- c(sigma2, IC, PC)
+                    CV.out[i, score_names] <- scores[score_names]
+                    message("r = ", r, "; sigma2 = ",
+                        sprintf("%.5f", sigma2), "; IC = ",
+                        sprintf("%.5f", IC), "; PC = ",
+                        sprintf("%.5f", PC), "; MSPE = ",
+                        sprintf("%.5f", scores["MSPE"]), sep = "")
+                } ## end per-r master walk (IFE parallel)
+
+            } else {
+            ## ---- SERIAL BRANCH (existing r-loop, all cv.method values) ---- ##
 
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
@@ -705,56 +808,28 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
               } else if (cv.method == "all_units") {
-                ## ---- cv.sample "all_units" IFE CV ---- ##
-                if (cv_parallel) {
-                    fold_results <- foreach::foreach(
-                        ii = 1:k,
-                        .options.future = list(seed = TRUE),
-                        .inorder = FALSE
-                    ) %dopar% {
-                        .fect_cv_score_one_ife_nt_all(
-                            ii       = ii,
-                            YY.co    = YY.co,
-                            Y0CV.co  = Y0CV.co,
-                            X.co     = X.co,
-                            II.co    = II.co,
-                            W.use    = W.use,
-                            W        = W,
-                            beta0CV.co = beta0CV.co,
-                            rmCV     = rmCV,
-                            estCV    = estCV,
-                            r        = r,
-                            force    = force,
-                            cv_tol   = cv_tol,
-                            max.iteration = max.iteration
-                        )
-                    }
-                    all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                } else {
-                    fold_results <- lapply(1:k, function(ii) {
-                        .fect_cv_score_one_ife_nt_all(
-                            ii       = ii,
-                            YY.co    = YY.co,
-                            Y0CV.co  = Y0CV.co,
-                            X.co     = X.co,
-                            II.co    = II.co,
-                            W.use    = W.use,
-                            W        = W,
-                            beta0CV.co = beta0CV.co,
-                            rmCV     = rmCV,
-                            estCV    = estCV,
-                            r        = r,
-                            force    = force,
-                            cv_tol   = cv_tol,
-                            max.iteration = max.iteration
-                        )
-                    })
-                    all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                }
+                ## ---- cv.sample "all_units" IFE CV (serial path — lapply only) ---- ##
+                fold_results <- lapply(1:k, function(ii) {
+                    .fect_cv_score_one_ife_nt_all(
+                        ii       = ii,
+                        YY.co    = YY.co,
+                        Y0CV.co  = Y0CV.co,
+                        X.co     = X.co,
+                        II.co    = II.co,
+                        W.use    = W.use,
+                        W        = W,
+                        beta0CV.co = beta0CV.co,
+                        rmCV     = rmCV,
+                        estCV    = estCV,
+                        r        = r,
+                        force    = force,
+                        cv_tol   = cv_tol,
+                        max.iteration = max.iteration
+                    )
+                })
+                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
+                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
+                all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
                 if (length(all_resid) == 0) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
@@ -769,7 +844,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
               } else {
-                ## ---- cv.sample "treated_units" IFE CV ---- ##
+                ## ---- cv.sample "treated_units" IFE CV (serial path — lapply only) ---- ##
                 if (r != 0) {
                     F.hat <- as.matrix(est.co$factor)
                     if (force %in% c(1, 3)) {
@@ -792,53 +867,26 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     U.tr[which(I.tr == 0)] <- 0
                 }
 
-                if (cv_parallel) {
-                    fold_results <- foreach::foreach(
-                        ii = 1:k,
-                        .options.future = list(seed = TRUE),
-                        .inorder = FALSE
-                    ) %dopar% {
-                        .fect_cv_score_one_ife_nt_tr(
-                            ii       = ii,
-                            U.tr     = U.tr,
-                            F.hat    = F.hat,
-                            pre      = pre,
-                            r        = r,
-                            force    = force,
-                            rmCV.tr  = rmCV.tr,
-                            estCV.tr = estCV.tr,
-                            W.tr     = W.tr,
-                            T.on     = T.on,
-                            tr       = tr,
-                            TT       = TT,
-                            Ntr      = Ntr
-                        )
-                    }
-                    all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                } else {
-                    fold_results <- lapply(1:k, function(ii) {
-                        .fect_cv_score_one_ife_nt_tr(
-                            ii       = ii,
-                            U.tr     = U.tr,
-                            F.hat    = F.hat,
-                            pre      = pre,
-                            r        = r,
-                            force    = force,
-                            rmCV.tr  = rmCV.tr,
-                            estCV.tr = estCV.tr,
-                            W.tr     = W.tr,
-                            T.on     = T.on,
-                            tr       = tr,
-                            TT       = TT,
-                            Ntr      = Ntr
-                        )
-                    })
-                    all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                }
+                fold_results <- lapply(1:k, function(ii) {
+                    .fect_cv_score_one_ife_nt_tr(
+                        ii       = ii,
+                        U.tr     = U.tr,
+                        F.hat    = F.hat,
+                        pre      = pre,
+                        r        = r,
+                        force    = force,
+                        rmCV.tr  = rmCV.tr,
+                        estCV.tr = estCV.tr,
+                        W.tr     = W.tr,
+                        T.on     = T.on,
+                        tr       = tr,
+                        TT       = TT,
+                        Ntr      = Ntr
+                    )
+                })
+                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
+                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
+                all_obs_w    <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
                 if (length(all_resid) == 0) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
@@ -876,6 +924,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     sep = ""
                 )
             } ## end of while: search for r_star over
+
+            } ## end SERIAL BRANCH (IFE)
 
             MSPE.best <- min(CV.out[, "MSPE"])
             if (r > (T0.min - 1)) {
@@ -1296,27 +1346,32 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
             }
 
-            ## ---- Parallel backend setup (CFE CV) ---- ##
+            ## ---- Parallel backend setup (CFE CV) — Phase 3 flat dispatch ---- ##
             ## Reuse do_parallel_cv derived at IFE setup; if not yet set (CFE-only call), derive now.
             if (is.null(do_parallel_cv)) {
                 do_parallel_cv <- isTRUE(parallel) || "cv" %in% as.character(parallel)
             }
             if (!do_parallel_cv) {
-                use_parallel <- FALSE
+                cv_cfe_parallel <- FALSE
             } else {
-                use_explicit_cv <- "cv" %in% as.character(parallel) && !isTRUE(parallel)
-                use_parallel <- (cv.method == "all_units" && (Nco * TT > 20000 || use_explicit_cv) && k > 1)
+                ## Re-derive explicitly for CFE block (do NOT reuse use_explicit_cv_ife)
+                use_explicit_cv_cfe <- "cv" %in% as.character(parallel) && !isTRUE(parallel)
+                ## Centralized threshold gate: CFE threshold is 60000L (higher overhead per fit)
+                cfe_threshold_met <- (Nco * TT) > .CV_PARALLEL_THRESH$cfe
+                cv_cfe_parallel <- (cv.method == "all_units") &&
+                                   (cfe_threshold_met || use_explicit_cv_cfe) &&
+                                   (k > 1)
             }
-            if (cv.method != "loo" && use_parallel == TRUE && k > 1) {
+            if (cv_cfe_parallel) {
                 if (is.null(cores)) {
                     cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
                 }
-                old.future.plan <- future::plan()
-                on.exit(future::plan(old.future.plan), add = TRUE)
+                old.future.plan.cfe <- future::plan()
+                on.exit(future::plan(old.future.plan.cfe), add = TRUE, after = FALSE)
                 future::plan(future::multisession, workers = cores)
-                doFuture::registerDoFuture()
+                ## doFuture::registerDoFuture() removed — not needed for future_lapply dispatch
                 avail <- parallelly::availableCores()
-                msg_line <- sprintf("Parallel CV: using %d of %d available cores.", cores, avail)
+                msg_line <- sprintf("Parallel CV (CFE): using %d of %d available cores.", cores, avail)
                 pad <- strrep(" ", max(0, 56 - nchar(msg_line)))
                 message("\n",
                     " +----------------------------------------------------------+\n",
@@ -1325,12 +1380,122 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     " | To change: set cores = <n> in fect().                    |\n",
                     " | Default: min(available - 2, 8).                          |\n",
                     " +----------------------------------------------------------+\n")
-                cv_parallel <- TRUE
-                ## capture internal functions for parallel workers
-                .complex_fe_ub <- complex_fe_ub
-            } else {
-                cv_parallel <- FALSE
             }
+
+            ## ---- Task list construction (CFE flat r×k dispatch) ---- ##
+            if (cv_cfe_parallel) {
+                r_seq_cfe <- CV.out[, "r"]
+                tasks_cfe <- vector("list", length(r_seq_cfe) * k)
+                idx <- 1L
+                for (ri in seq_along(r_seq_cfe)) {
+                    for (ii in 1:k) {
+                        tasks_cfe[[idx]] <- list(r = r_seq_cfe[ri], ii = ii, ri = ri)
+                        idx <- idx + 1L
+                    }
+                }
+                ## Capture helper in closure for worker serialization
+                .score_fn_cfe_all <- .fect_cv_score_one_cfe_nt_all
+            }
+
+            if (cv_cfe_parallel) {
+            ## ---- PARALLEL BRANCH: flat r×k future_lapply dispatch (CFE all_units) ---- ##
+
+                ## Step 1: dispatch all (r, fold) scoring tasks
+                fold_scores_cfe <- future.apply::future_lapply(
+                    tasks_cfe,
+                    FUN = function(task) {
+                        .score_fn_cfe_all(
+                            ii              = task$ii,
+                            YY.co           = YY.co,
+                            Y0CV.co         = Y0CV.co,
+                            X.co            = X.co,
+                            II.co           = II.co,
+                            W.use           = W.use,
+                            W               = W,
+                            beta0CV.co      = beta0CV.co,
+                            X.extra.FE.co.B = X.extra.FE.co.B,
+                            X.Z.co          = X.Z.co,
+                            X.Q.co          = X.Q.co,
+                            X.gamma.co      = X.gamma.co,
+                            X.kappa.co      = X.kappa.co,
+                            Zgamma.id       = Zgamma.id,
+                            kappaQ.id       = kappaQ.id,
+                            rmCV            = rmCV,
+                            estCV           = estCV,
+                            r               = task$r,
+                            force           = force,
+                            cv_tol          = cv_tol,
+                            max.iteration   = max.iteration
+                        )
+                    },
+                    future.seed     = TRUE,
+                    future.packages = "fect"
+                )
+
+                ## Step 2: sequential master walk — apply 1% rule in rank order
+                n_r_cfe <- length(r_seq_cfe)
+                for (i in seq_len(n_r_cfe)) {
+                    r <- unname(r_seq_cfe[i])
+                    ## Full-data fit (sequential in master) — needed for sigma2/IC/PC
+                    est.co <- complex_fe_ub(YY.co, Y0.co, X.co,
+                        X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
+                        Zgamma.id, kappaQ.id,
+                        II.co, W.use, beta0, r, force = force, cv_tol, max.iteration)
+
+                    if (p > 0) {
+                        na.pos <- is.nan(est.co$beta)
+                        beta <- est.co$beta
+                        beta[is.nan(est.co$beta)] <- 0
+                    }
+                    if (is.null(norm.para)) {
+                        sigma2 <- est.co$sigma2; IC <- est.co$IC; PC <- est.co$PC
+                    } else {
+                        sigma2 <- est.co$sigma2 * (norm.para[1]^2)
+                        IC <- est.co$IC - log(est.co$sigma2) + log(sigma2)
+                        PC <- est.co$PC * (norm.para[1]^2)
+                    }
+
+                    ## Aggregate fold scores for this rank
+                    task_idx <- which(vapply(tasks_cfe, function(t) t$ri == i, logical(1)))
+                    all_resid    <- unlist(lapply(fold_scores_cfe[task_idx], `[[`, "resid"))
+                    all_time_idx <- unlist(lapply(fold_scores_cfe[task_idx], `[[`, "time_idx"))
+                    all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_scores_cfe[task_idx], `[[`, "obs_w")) else c()
+
+                    if (length(all_resid) == 0) {
+                        scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
+                                    MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                    } else {
+                        scores <- .score_residuals(
+                            all_resid,
+                            obs_weights   = if (!is.null(W)) all_obs_w else NULL,
+                            time_index    = all_time_idx,
+                            count_weights = count.T.cv,
+                            norm.para     = NULL
+                        )
+                    }
+
+                    ## 1% rule — identical logic to serial path
+                    if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                        est.co.best <- est.co
+                        r.cv <- r
+                    } else {
+                        if (r == r.cv + 1) message("*")
+                    }
+                    if (PC < min(CV.out[, "PC"])) {
+                        r.pc <- r
+                        est.co.pc.best <- est.co
+                    }
+                    CV.out[i, 2:4] <- c(sigma2, IC, PC)
+                    CV.out[i, score_names] <- scores[score_names]
+                    message("r = ", r, "; sigma2 = ",
+                        sprintf("%.5f", sigma2), "; IC = ",
+                        sprintf("%.5f", IC), "; PC = ",
+                        sprintf("%.5f", PC), "; MSPE = ",
+                        sprintf("%.5f", scores["MSPE"]), sep = "")
+                } ## end per-r master walk (CFE parallel)
+
+            } else {
+            ## ---- SERIAL BRANCH (existing r-loop, all cv.method values) ---- ##
 
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
@@ -1538,70 +1703,35 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
               } else if (cv.method == "all_units") {
-                ## ---- cv.sample "all_units" CFE CV ---- ##
-                if (cv_parallel) {
-                    fold_results <- foreach::foreach(
-                        ii = 1:k,
-                        .options.future = list(seed = TRUE),
-                        .inorder = FALSE
-                    ) %dopar% {
-                        .fect_cv_score_one_cfe_nt_all(
-                            ii              = ii,
-                            YY.co           = YY.co,
-                            Y0CV.co         = Y0CV.co,
-                            X.co            = X.co,
-                            II.co           = II.co,
-                            W.use           = W.use,
-                            W               = W,
-                            beta0CV.co      = beta0CV.co,
-                            X.extra.FE.co.B = X.extra.FE.co.B,
-                            X.Z.co          = X.Z.co,
-                            X.Q.co          = X.Q.co,
-                            X.gamma.co      = X.gamma.co,
-                            X.kappa.co      = X.kappa.co,
-                            Zgamma.id       = Zgamma.id,
-                            kappaQ.id       = kappaQ.id,
-                            rmCV            = rmCV,
-                            estCV           = estCV,
-                            r               = r,
-                            force           = force,
-                            cv_tol          = cv_tol,
-                            max.iteration   = max.iteration
-                        )
-                    }
-                    all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                } else {
-                    fold_results <- lapply(1:k, function(ii) {
-                        .fect_cv_score_one_cfe_nt_all(
-                            ii              = ii,
-                            YY.co           = YY.co,
-                            Y0CV.co         = Y0CV.co,
-                            X.co            = X.co,
-                            II.co           = II.co,
-                            W.use           = W.use,
-                            W               = W,
-                            beta0CV.co      = beta0CV.co,
-                            X.extra.FE.co.B = X.extra.FE.co.B,
-                            X.Z.co          = X.Z.co,
-                            X.Q.co          = X.Q.co,
-                            X.gamma.co      = X.gamma.co,
-                            X.kappa.co      = X.kappa.co,
-                            Zgamma.id       = Zgamma.id,
-                            kappaQ.id       = kappaQ.id,
-                            rmCV            = rmCV,
-                            estCV           = estCV,
-                            r               = r,
-                            force           = force,
-                            cv_tol          = cv_tol,
-                            max.iteration   = max.iteration
-                        )
-                    })
-                    all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                }
+                ## ---- cv.sample "all_units" CFE CV (serial path — lapply only) ---- ##
+                fold_results <- lapply(1:k, function(ii) {
+                    .fect_cv_score_one_cfe_nt_all(
+                        ii              = ii,
+                        YY.co           = YY.co,
+                        Y0CV.co         = Y0CV.co,
+                        X.co            = X.co,
+                        II.co           = II.co,
+                        W.use           = W.use,
+                        W               = W,
+                        beta0CV.co      = beta0CV.co,
+                        X.extra.FE.co.B = X.extra.FE.co.B,
+                        X.Z.co          = X.Z.co,
+                        X.Q.co          = X.Q.co,
+                        X.gamma.co      = X.gamma.co,
+                        X.kappa.co      = X.kappa.co,
+                        Zgamma.id       = Zgamma.id,
+                        kappaQ.id       = kappaQ.id,
+                        rmCV            = rmCV,
+                        estCV           = estCV,
+                        r               = r,
+                        force           = force,
+                        cv_tol          = cv_tol,
+                        max.iteration   = max.iteration
+                    )
+                })
+                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
+                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
+                all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
                 if (length(all_resid) == 0) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
@@ -1616,7 +1746,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
               } else {
-                ## ---- cv.sample "treated_units" CFE CV ---- ##
+                ## ---- cv.sample "treated_units" CFE CV (serial path — lapply only) ---- ##
                 ## Build U.tr: subtract Layer 1 from Y.tr
                 if (r != 0) {
                     F.hat <- as.matrix(est.co$factor)
@@ -1661,53 +1791,26 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     U.tr[which(I.tr == 0)] <- 0
                 }
 
-                if (cv_parallel) {
-                    fold_results <- foreach::foreach(
-                        ii = 1:k,
-                        .options.future = list(seed = TRUE),
-                        .inorder = FALSE
-                    ) %dopar% {
-                        .fect_cv_score_one_cfe_nt_tr(
-                            ii       = ii,
-                            U.tr     = U.tr,
-                            F.hat    = F.hat,
-                            pre      = pre,
-                            r        = r,
-                            force    = force,
-                            rmCV.tr  = rmCV.tr,
-                            estCV.tr = estCV.tr,
-                            W.tr     = W.tr,
-                            T.on     = T.on,
-                            tr       = tr,
-                            TT       = TT,
-                            Ntr      = Ntr
-                        )
-                    }
-                    all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                } else {
-                    fold_results <- lapply(1:k, function(ii) {
-                        .fect_cv_score_one_cfe_nt_tr(
-                            ii       = ii,
-                            U.tr     = U.tr,
-                            F.hat    = F.hat,
-                            pre      = pre,
-                            r        = r,
-                            force    = force,
-                            rmCV.tr  = rmCV.tr,
-                            estCV.tr = estCV.tr,
-                            W.tr     = W.tr,
-                            T.on     = T.on,
-                            tr       = tr,
-                            TT       = TT,
-                            Ntr      = Ntr
-                        )
-                    })
-                    all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                }
+                fold_results <- lapply(1:k, function(ii) {
+                    .fect_cv_score_one_cfe_nt_tr(
+                        ii       = ii,
+                        U.tr     = U.tr,
+                        F.hat    = F.hat,
+                        pre      = pre,
+                        r        = r,
+                        force    = force,
+                        rmCV.tr  = rmCV.tr,
+                        estCV.tr = estCV.tr,
+                        W.tr     = W.tr,
+                        T.on     = T.on,
+                        tr       = tr,
+                        TT       = TT,
+                        Ntr      = Ntr
+                    )
+                })
+                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
+                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
+                all_obs_w    <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
                 if (length(all_resid) == 0) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
@@ -1744,6 +1847,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     sep = ""
                 )
             } ## end of CV loop
+
+            } ## end SERIAL BRANCH (CFE)
 
             MSPE.best <- min(CV.out[, "MSPE"])
             if (r > (T0.min - 1)) {
