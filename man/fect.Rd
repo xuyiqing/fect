@@ -91,7 +91,7 @@ assumptions.}
 }
 When \code{parallel = TRUE}, auto-enable thresholds apply: CV parallelism
 engages only when \code{Nco * TT} exceeds the per-method threshold
-(\code{ife = 20000}, \code{cfe = 60000}). Explicit \code{"cv"} overrides
+(\code{ife = 20000}, \code{mc = 20000}, \code{cfe = 60000}). Explicit \code{"cv"} overrides
 the threshold. Nested parallelism (calling \code{fect()} from within a
 \code{future_lapply} or \code{foreach \%dopar\%} block) should use
 \code{parallel = FALSE} to avoid deadlock.

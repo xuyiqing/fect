@@ -1622,3 +1622,76 @@ test_that("N.4: CFE nevertreated treated_units serial matches phase3 fixture (wi
   expect_true(att_diff < 1e-10,
     info = sprintf("CFE nevertreated treated_units serial vs fixture: att.avg diff = %.2e", att_diff))
 })
+
+## -- N.6  method = "both" (sequential IFE + CFE) plan restoration ----
+## Formalized from Phase 3 audit spot-check. Runs IFE nevertreated parallel
+## CV followed immediately by CFE nevertreated parallel CV. Each call
+## registers an on.exit() that restores the caller's sequential plan.
+## After both calls complete, the outer plan must be unchanged.
+
+test_that("N.6: plan restored after sequential IFE and CFE nevertreated parallel CV", {
+
+  skip_on_cran()
+
+  ## Nevertreated panel: Nco=30, Ntr=8, TT=30.  Nco*TT=900 < both thresholds;
+  ## use parallel="cv" to force parallel dispatch regardless of size.
+  set.seed(1234)
+  TT <- 30; Nco <- 30; Ntr <- 8; N <- Nco + Ntr
+  ntdata <- expand.grid(id = 1:N, time = 1:TT)
+  ntdata <- ntdata[order(ntdata$id, ntdata$time), ]
+  fac1 <- sin(seq(0, pi, length.out = TT))
+  fac2 <- cos(seq(0, pi, length.out = TT))
+  for (i in 1:N) {
+    lambda1_i <- rnorm(1, 0, 0.5); lambda2_i <- rnorm(1, 0, 0.5)
+    ntdata$Y[ntdata$id == i] <- 2*lambda1_i*fac1 + lambda2_i*fac2 + rnorm(TT, 0, 0.3)
+  }
+  ntdata$D <- ifelse(ntdata$id > Nco & ntdata$time >= 20, 1, 0)
+
+  plan_before <- class(future::plan())
+
+  ## First call: IFE nevertreated parallel CV
+  set.seed(42)
+  suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata,
+      index     = c("id", "time"),
+      method    = "ife",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "all_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  plan_mid <- class(future::plan())
+  expect_equal(plan_before, plan_mid,
+    info = "plan should be restored to sequential after IFE nevertreated parallel CV")
+
+  ## Second call: CFE nevertreated parallel CV
+  set.seed(42)
+  suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = ntdata,
+      index     = c("id", "time"),
+      method    = "cfe",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      cv.method = "all_units",
+      time.component.from = "nevertreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  plan_after <- class(future::plan())
+  expect_equal(plan_before, plan_after,
+    info = "plan should be restored to sequential after CFE nevertreated parallel CV")
+})

@@ -49,6 +49,10 @@
 * The `doFuture::registerDoFuture()` call has been removed from both
   `fect_nevertreated.R` parallel setup blocks; `future_lapply` dispatch does
   not require a foreach backend.
+* Fix: the prior `foreach %dopar%` parallel CV path in `fect_nevertreated.R`
+  (`cv.method = "all_units"`) was non-functional — worker processes could not
+  resolve dot-prefix internal helpers by name. The migration to
+  `future_lapply(future.packages = "fect")` resolves worker visibility.
 
 # fect 2.2.1
 
