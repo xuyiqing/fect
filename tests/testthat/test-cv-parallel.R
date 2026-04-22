@@ -940,3 +940,234 @@ test_that("E.6: bootstrap + CV interaction (se=TRUE, nboots=5, parallel=TRUE) ru
 ## that exercises substantive CV scoring (r.cv > 0, CV.out non-NULL).
 ## No duplication needed here; the P.3-P.6 fixture tests above guard
 ## against the simdata early-exit case.
+
+## =================================================================
+## Section M: MC Parallel CV (Phase 2)
+## =================================================================
+## Tests for the MC notyettreated parallel branch added in Phase 2.
+## Mirror the P-section style for numerical identity and the T/R-section
+## style for threshold gating and plan restoration.
+##
+## RNG discipline: set.seed() immediately before EVERY fect() call.
+## simdata is used throughout (small panel; Nco * TT < 20000 threshold).
+## parallel = "cv" overrides the threshold for MC explicitly.
+## =================================================================
+
+## -- M.1  MC notyettreated serial == parallel (numerical identity) --
+
+test_that("M.1: MC notyettreated serial == parallel (lambda.cv and CV.out.mc within 1e-10)", {
+
+  skip_on_cran()
+
+  set.seed(42)
+  fit_seq <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = simdata,
+      index     = c("id", "time"),
+      method    = "mc",
+      CV        = TRUE,
+      k         = 5,
+      time.component.from = "notyettreated",
+      se        = FALSE,
+      parallel  = FALSE
+    )
+  ))
+
+  set.seed(42)
+  fit_par <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = simdata,
+      index     = c("id", "time"),
+      method    = "mc",
+      CV        = TRUE,
+      k         = 5,
+      time.component.from = "notyettreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  ## lambda.cv: plain numeric (no name attribute needed for MC)
+  expect_equal(fit_seq$lambda.cv, fit_par$lambda.cv, tolerance = 1e-10)
+
+  ## CV.out.mc: parallel computes all lambdas; serial may break_check early, leaving some
+  ## rows at the 1e20 sentinel. Compare only the rows both paths computed (MSPE < 1e19).
+  ## The optimal lambda (lambda.cv) is selected from the rows both paths evaluated,
+  ## so numerical identity of that selection is the key correctness property.
+  both_computed <- fit_seq$CV.out.mc[, "MSPE"] < 1e19 & fit_par$CV.out.mc[, "MSPE"] < 1e19
+  if (any(both_computed)) {
+    cv_diff <- max(abs(
+      fit_seq$CV.out.mc[both_computed, ] - fit_par$CV.out.mc[both_computed, ]
+    ), na.rm = TRUE)
+    expect_true(cv_diff < 1e-10,
+      info = sprintf("CV.out.mc max diff (computed rows only) = %.2e (tolerance 1e-10)", cv_diff))
+  }
+
+  ## att.avg: same lambda.cv => same final model => identical
+  expect_equal(fit_seq$att.avg, fit_par$att.avg, tolerance = 1e-10)
+})
+
+## -- M.2  MC parallel: banner contains "Parallel CV (MC)" string ----
+
+test_that("M.2: parallel='cv' with method='mc' emits MC-specific banner", {
+
+  skip_on_cran()
+
+  msgs <- capture.output({
+    set.seed(42)
+    suppressWarnings(
+      fect::fect(
+        Y ~ D,
+        data      = simdata,
+        index     = c("id", "time"),
+        method    = "mc",
+        CV        = TRUE,
+        k         = 3,
+        time.component.from = "notyettreated",
+        se        = FALSE,
+        parallel  = "cv",
+        cores     = 2
+      )
+    )
+  }, type = "message")
+
+  ## Banner contains "Parallel CV (MC):" to distinguish from IFE banner
+  expect_true(any(grepl("Parallel CV \\(MC\\)", msgs)),
+    info = "Expected 'Parallel CV (MC)' banner when parallel='cv', method='mc'")
+})
+
+## -- M.3  MC parallel: threshold gate on small panel ---------------
+
+test_that("M.3: parallel=TRUE on small MC panel runs serially (no MC banner)", {
+
+  skip_on_cran()
+
+  ## simdata: Nco * TT well below 20,000 threshold => parallel=TRUE gates to serial
+  msgs <- capture.output({
+    set.seed(42)
+    suppressWarnings(
+      fect::fect(
+        Y ~ D,
+        data      = simdata,
+        index     = c("id", "time"),
+        method    = "mc",
+        CV        = TRUE,
+        k         = 5,
+        time.component.from = "notyettreated",
+        se        = FALSE,
+        parallel  = TRUE
+      )
+    )
+  }, type = "message")
+
+  expect_false(any(grepl("Parallel CV \\(MC\\)", msgs)),
+    info = "Threshold gate should suppress MC banner for small simdata panel")
+})
+
+## -- M.4  MC parallel: plan restored after normal return ------------
+
+test_that("M.4: future plan restored after MC parallel CV call", {
+
+  skip_on_cran()
+
+  future::plan(future::sequential)
+  plan_before_class <- class(future::plan())
+
+  set.seed(42)
+  suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = simdata,
+      index     = c("id", "time"),
+      method    = "mc",
+      CV        = TRUE,
+      k         = 5,
+      time.component.from = "notyettreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  plan_after_class <- class(future::plan())
+  expect_identical(plan_before_class, plan_after_class)
+
+  future::plan(future::sequential)  ## cleanup
+})
+
+## -- M.5  method = "both" with parallel = "cv" — LIFO plan restore --
+
+test_that("M.5: method='both' parallel='cv' restores plan correctly (LIFO)", {
+
+  skip_on_cran()
+
+  future::plan(future::sequential)
+  plan_before_class <- class(future::plan())
+
+  set.seed(42)
+  suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = simdata,
+      index     = c("id", "time"),
+      method    = "both",
+      r         = 0:2,
+      CV        = TRUE,
+      k         = 3,
+      time.component.from = "notyettreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  plan_after_class <- class(future::plan())
+  expect_identical(plan_before_class, plan_after_class)
+
+  future::plan(future::sequential)  ## cleanup
+})
+
+## -- M.6  MC reproducibility: two parallel runs bit-identical -------
+
+test_that("M.6: two MC parallel runs with same seed produce identical results", {
+
+  skip_on_cran()
+
+  set.seed(42)
+  fit_par1 <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = simdata,
+      index     = c("id", "time"),
+      method    = "mc",
+      CV        = TRUE,
+      k         = 5,
+      time.component.from = "notyettreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  set.seed(42)
+  fit_par2 <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D,
+      data      = simdata,
+      index     = c("id", "time"),
+      method    = "mc",
+      CV        = TRUE,
+      k         = 5,
+      time.component.from = "notyettreated",
+      se        = FALSE,
+      parallel  = "cv",
+      cores     = 2
+    )
+  ))
+
+  expect_identical(fit_par1$lambda.cv, fit_par2$lambda.cv)
+  expect_identical(fit_par1$CV.out.mc, fit_par2$CV.out.mc)
+})

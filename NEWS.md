@@ -22,6 +22,16 @@
 * Deferred to later phases: MC parallel CV (Phase 2), CFE parallel CV
   (Phase 3), `boot.R` modernization (Phase 4).
 
+### Parallel CV (Phase 2)
+
+* Cross-validation for the MC (matrix completion) model on the `notyettreated`
+  path (`R/cv.R`) now supports parallel execution via `future_lapply`. All
+  `(lambda, fold)` tasks are dispatched as a flat task list; the 1% rule for
+  lambda selection is applied sequentially in the master.
+* In parallel MC mode, all candidate lambda values are evaluated (no early
+  `break_check` stopping). In serial mode, the existing `break_check`
+  short-circuit is preserved unchanged.
+
 # fect 2.2.1
 
 * Fixed `Unsupported bootstrap method: fe` crash when `fect(method = "gsynth", CV = TRUE, se = TRUE, ...)` (or `method = "cfe"`) selected `r.cv = 0` via cross-validation. `fect_nevertreated()` used to relabel its outgoing `$method` to `"fe"` in that case, and `fect_boot()`'s per-iteration dispatcher had no `"fe"` branch. The fix keeps `$method` as `"gsynth"` (or `"cfe"`); the existing dispatcher branches already handle `r = 0` correctly. Reported against the `gsynth` wrapper, which delegates SE to fect.

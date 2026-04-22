@@ -94,7 +94,13 @@ engages only when \code{Nco * TT} exceeds the per-method threshold
 (\code{ife = 20000}, \code{cfe = 60000}). Explicit \code{"cv"} overrides
 the threshold. Nested parallelism (calling \code{fect()} from within a
 \code{future_lapply} or \code{foreach \%dopar\%} block) should use
-\code{parallel = FALSE} to avoid deadlock.}
+\code{parallel = FALSE} to avoid deadlock.
+When using \code{parallel} with \code{method = "mc"}, parallel CV computes
+all candidate lambda values without early stopping (the serial path uses a
+\code{break_check} short-circuit to skip lambdas with diminishing MSPE
+returns). This guarantees numerical identity between serial and parallel
+results but may compute a few extra lambda values compared to the serial
+path. Use \code{parallel = FALSE} to preserve the short-circuit behavior.}
 \item{cores}{an integer indicating the number of cores for parallel computing.}
 \item{tol}{a positive number indicating the tolerance level for EM updates.}
 \item{max.iteration}{the maximal number of iterations for the EM algorithm.}
