@@ -44,7 +44,7 @@
     } else {
         W.use2 <- as.matrix(0)
     }
-    est.cv.fit <- fect:::inter_fe_ub(
+    est.cv.fit <- inter_fe_ub(
         YY.cv, as.matrix(Y0CV[, , ii]), X, II.cv,
         W.use2, as.matrix(beta0CV[, , ii]),
         r, force, cv_tol, max.iteration
@@ -86,7 +86,7 @@
     } else {
         as.matrix(0)
     }
-    est.cv.fit <- fect:::inter_fe_mc(
+    est.cv.fit <- inter_fe_mc(
         YY.cv, as.matrix(Y0CV[, , ii]), X, II.cv,
         W.use2, as.matrix(beta0CV[, , ii]),
         1L, lambda_i, force, cv_tol, max.iteration
@@ -125,7 +125,7 @@
     } else {
         as.matrix(0)
     }
-    est.cv.fit <- fect:::inter_fe_ub(
+    est.cv.fit <- inter_fe_ub(
         YY.co.cv, as.matrix(Y0CV.co[, , ii]), X.co, II.co.cv,
         W.cv, as.matrix(beta0CV.co[, , ii]),
         r, force, cv_tol, max.iteration
@@ -230,7 +230,7 @@
     } else {
         as.matrix(0)
     }
-    est.cv.co <- fect:::complex_fe_ub(
+    est.cv.co <- complex_fe_ub(
         YY.co.cv, as.matrix(Y0CV.co[, , ii]), X.co,
         X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
         Zgamma.id, kappaQ.id,
