@@ -1,5 +1,10 @@
 # Welcome! {.unnumbered}
 
+```{r}
+#| include: false
+source("_common.R")
+```
+
 This Quarto book serves as a user manual for the **fect** package in R, which implements counterfactual (imputation) estimators for causal inference with panel data---without feedback---and performs diagnostic tests.
 
 **fect** covers a series of counterfactual estimators, including the five estimators from the last version and integrating the latest version of the **gsynth** package ([User Manual](https://yiqingxu.org/packages/gsynth/)) for the generalized synthetic control method (Gsynth). This Quarto book also facilitates the application of various new difference-in-differences (DID) estimators. For details of these methods, see
@@ -11,9 +16,11 @@ This Quarto book serves as a user manual for the **fect** package in R, which im
 -   @CLLX2026 for a survey of the new DID estimators \[<a href="https://www.cambridge.org/core/journals/american-political-science-review/article/causal-panel-analysis-under-parallel-trends-lessons-from-a-large-reanalysis-study/219275E0CE901F099F2CFFBA07079243" target="_blank">Paper</a>\]
 
 ::: {.callout-note appearance="simple"}
-### Source Code
+### Source Code and Version
 
 For those interested in exploring the algorithms used in **fect** for calculating estimates, please visit the source [GitHub Repo](https://github.com/xuyiqing/fect) for further details.
+
+This manual was rendered against **fect** `r read.dcf("../DESCRIPTION")[,"Version"]` on `r format(Sys.Date(), "%Y-%m-%d")`.
 :::
 
 ## Why Counterfactual Estimators?

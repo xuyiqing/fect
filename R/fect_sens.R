@@ -20,7 +20,7 @@ fect_sens <- function(
     periodMvec = c(0, 0.1), # Vector of M for Smoothness analysis
     parallel = FALSE,
     cores = NULL) {
-  if (parallel && is.null(cores)) {
+  if (!identical(parallel, FALSE) && is.null(cores)) {
     cores <- parallelly::availableCores(omit = 2, max = 8) # use at most 8 cores
     cl <- parallel::makeCluster(cores)
     doParallel::registerDoParallel(cl)
@@ -222,7 +222,7 @@ fect_sens <- function(
       periods = smooth_period_output
     )
   }
-  if (parallel) {
+  if (!identical(parallel, FALSE)) {
     stopCluster(cl)
   }
   # -------------------------------------------------------------------

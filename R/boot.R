@@ -113,12 +113,14 @@ fect_boot <- function(
   nboots = 200,
   parallel = TRUE,
   cores = NULL,
+  do_parallel_cv = FALSE,
   group.level = NULL,
   group = NULL,
   dis = 0,
   keep.sims = FALSE,
   time.component.from = "notyettreated"
 ) {
+  do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
   na.pos <- NULL
   TT <- dim(Y)[1]
   N <- dim(Y)[2]
@@ -386,7 +388,10 @@ fect_boot <- function(
         X.gamma = X.gamma,
         X.kappa = X.kappa,
         Zgamma.id = Zgamma.id,
-        kappaQ.id = kappaQ.id
+        kappaQ.id = kappaQ.id,
+        parallel = parallel,
+        cores = cores,
+        do_parallel_cv = do_parallel_cv
       )
 
       if (!is.null(out$method)) {
@@ -844,7 +849,7 @@ fect_boot <- function(
     }
 
     message("\rSimulating errors ...")
-    if (parallel == TRUE) {
+    if (do_parallel_boot) {
       error.tr <- suppressWarnings(foreach(
         j = 1:nboots,
         .combine = function(...) abind(..., along = 3),
@@ -1507,7 +1512,7 @@ fect_boot <- function(
       boot.id = NULL
     )
   }
-  if (parallel == TRUE) {
+  if (do_parallel_boot) {
     old_rng_misuse <- getOption("doFuture.rng.onMisuse")
     options(doFuture.rng.onMisuse = "ignore")
     on.exit(options(doFuture.rng.onMisuse = old_rng_misuse), add = TRUE)

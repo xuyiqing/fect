@@ -84,6 +84,18 @@ The key parameters that control **uncertainty estimation** are: `se` (enable sta
 
 ::: {.callout-note appearance="simple"}
 **Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
+
+The `parallel` argument accepts five forms, allowing users to enable parallelism for cross-validation and the bootstrap independently:
+
+| Value | CV | Bootstrap |
+|:------|:---|:----------|
+| `TRUE` (default) | Parallel (subject to auto-threshold) | Parallel |
+| `FALSE` | Serial | Serial |
+| `"cv"` | Parallel (overrides threshold) | Serial |
+| `"boot"` | Serial | Parallel |
+| `c("cv", "boot")` | Parallel | Parallel |
+
+When `parallel = TRUE`, CV parallelism auto-engages only on panels above a method-specific size threshold (see [Chapter @sec-ife-mc] for the CV thresholds). The string forms `"cv"` and `"boot"` bypass the threshold — useful when the user knows their panel will benefit from parallelism even at smaller sizes.
 :::
 
 ::: {.callout-note appearance="simple"}
