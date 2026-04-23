@@ -172,7 +172,7 @@ Below these thresholds, the CV runs serially even with `parallel = TRUE`. To for
 
 #### What runs in parallel
 
-The unit of parallel work is the (rank, fold) pair (or (lambda, fold) for MC), dispatched flat across workers via `future_lapply`. This gives near-linear speedup up to the number of total tasks: e.g., with `r = c(0,5)` and `k = 10`, there are 60 tasks per CV invocation. The `"treated_units"` masking strategy and the `"loo"` method are always sequential, because their per-fold computations depend on rank-specific quantities that cannot be batched.
+The unit of parallel work is the (rank, fold) pair (or (lambda, fold) for MC), dispatched flat across workers via `future_lapply`. This gives near-linear speedup up to the number of total tasks: e.g., with `r=c(0,5)` and `k=10`, there are 60 tasks per CV invocation. The `"treated_units"` masking strategy and the `"loo"` method are always sequential, because their per-fold computations depend on rank-specific quantities that cannot be batched.
 
 #### MC-specific note: `break_check` short-circuit
 
