@@ -1,62 +1,38 @@
 # fect 2.2.1
 
-* Fixed `Unsupported bootstrap method: fe` crash when `fect(method = "gsynth", CV = TRUE, se = TRUE, ...)` (or `method = "cfe"`) selected `r.cv = 0` via cross-validation. `fect_nevertreated()` used to relabel its outgoing `$method` to `"fe"` in that case, and `fect_boot()`'s per-iteration dispatcher had no `"fe"` branch. The fix keeps `$method` as `"gsynth"` (or `"cfe"`); the existing dispatcher branches already handle `r = 0` correctly. Reported against the `gsynth` wrapper, which delegates SE to fect.
-* Fixed parametric-bootstrap dispatcher so that `one.nonpara` routes to the correct estimator for `ife+notyettreated`, `cfe+nevertreated`, and `cfe+notyettreated` bootstraps. Previously Loop 2 called `fect_nevertreated()` unconditionally regardless of `method` / `time.component.from`, producing incorrect SEs for those combinations. Introduces internal helpers `impute_Y0()` and `valid_controls()`.
-* Added a hard gate that errors when `se = TRUE`, `vartype = "parametric"`, and `time.component.from = "notyettreated"` are combined. A coverage simulation showed ~80% empirical coverage versus 95% nominal for `ife+notyettreated+parametric` (EM-induced residual shrinkage, Loop 2 circularity, finite-sample EM loading bias). Users should switch to `time.component.from = "nevertreated"` or `vartype = "bootstrap"` / `"jackknife"` for that combination.
+Parametric-bootstrap fixes (`se = TRUE`, `vartype = "parametric"`):
 
-### Parallel CV (Phase 1)
+* Fixed `Unsupported bootstrap method: fe` crash when `method = "gsynth"` or
+  `"cfe"` and CV selected `r.cv = 0`. Reported against the `gsynth` wrapper,
+  which delegates SE to fect.
+* Fixed `one.nonpara` dispatcher so `ife+notyettreated`, `cfe+nevertreated`,
+  and `cfe+notyettreated` bootstraps route to the correct Loop-2 estimator;
+  previously all three produced incorrect SEs. Introduces internal helpers
+  `impute_Y0()` and `valid_controls()`.
+* Added hard gate erroring on `ife + notyettreated + parametric`; a coverage
+  simulation showed ~80% vs 95% nominal. Use `time.component.from = "nevertreated"`
+  or a non-parametric `vartype`.
 
+Parallel cross-validation:
+
+* IFE, MC, and CFE cross-validation now run in parallel via `future_lapply`,
+  dispatching `(r, fold)` (or `(lambda, fold)`) flat across workers. Auto-engages
+  above `Nco * TT > 20000` for IFE/MC, `> 60000` for CFE.
 * The `parallel` argument now accepts five forms: `TRUE`, `FALSE`, `"cv"`,
-  `"boot"`, and `c("cv", "boot")`. This allows parallelizing CV and bootstrap
-  independently. Existing `TRUE`/`FALSE` usage is fully backward-compatible.
-* Cross-validation for the IFE model on the `notyettreated` path (`R/cv.R`)
-  now supports parallel execution via `future_lapply`. All `(r, fold)` tasks
-  are dispatched as a flat task list; the 1% rank-selection rule is applied
-  sequentially in the master process, preserving numerical identity with the
-  serial path.
-* A size threshold (`Nco * TT > 20000`) governs auto-enable when
-  `parallel = TRUE`. Use `parallel = "cv"` to override and engage CV
-  parallelism on any panel size.
+  `"boot"`, `c("cv", "boot")`. Scalar forms are backward-compatible; string
+  forms bypass the auto-threshold.
+* MC-only tradeoff: `break_check` short-circuits in serial mode only; parallel
+  MC evaluates all candidate lambdas. Prefer `parallel = FALSE` for MC if the
+  search typically terminates early.
 * The future plan is saved and restored on exit (including error paths), so
-  scripts that set their own `future::plan()` are unaffected.
-* Internal helper functions (`.fect_cv_score_one_*`) extracted into
-  `R/cv-helpers.R` as the canonical single implementation of each CV scoring
-  step. `fect_nevertreated.R` fold-parallel branches migrated to use these
-  helpers, preserving exact numerical output.
-* Deferred to later phases: MC parallel CV (Phase 2), CFE parallel CV
-  (Phase 3), `boot.R` modernization (Phase 4).
-
-### Parallel CV (Phase 2)
-
-* Cross-validation for the MC (matrix completion) model on the `notyettreated`
-  path (`R/cv.R`) now supports parallel execution via `future_lapply`. All
-  `(lambda, fold)` tasks are dispatched as a flat task list; the 1% rule for
-  lambda selection is applied sequentially in the master.
-* In parallel MC mode, all candidate lambda values are evaluated (no early
-  `break_check` stopping). In serial mode, the existing `break_check`
-  short-circuit is preserved unchanged.
-
-### Parallel CV (Phase 3)
-
-* Cross-validation for the CFE model (complex fixed effects) in the
-  `nevertreated` path now uses the same flat `(r, fold)` parallel dispatch
-  as IFE and MC, via `future_lapply`. The auto-enable threshold is
-  `Nco * TT > 60000`; use `parallel = "cv"` to override.
-* The IFE and CFE parallel CV branches in `R/fect_nevertreated.R` have been
-  migrated from `foreach %dopar%` (k-fold only) to flat r×k `future_lapply`
-  dispatch, improving load balancing when multiple rank candidates are
-  evaluated.
-* Centralized threshold constants (`.CV_PARALLEL_THRESH`) are now used
-  consistently across both `R/cv.R` and `R/fect_nevertreated.R`.
-* Future plan lifecycle uses `on.exit(..., after = FALSE)` in both blocks,
-  ensuring correct LIFO restoration when IFE and CFE CV run sequentially.
-* The `doFuture::registerDoFuture()` call has been removed from both
-  `fect_nevertreated.R` parallel setup blocks; `future_lapply` dispatch does
-  not require a foreach backend.
-* Fix: the prior `foreach %dopar%` parallel CV path in `fect_nevertreated.R`
-  (`cv.method = "all_units"`) was non-functional — worker processes could not
-  resolve dot-prefix internal helpers by name. The migration to
-  `future_lapply(future.packages = "fect")` resolves worker visibility.
+  caller-set `future::plan()` is unaffected.
+* Internal: `(r, fold)` scoring extracted to `R/cv-helpers.R`;
+  `fect_nevertreated.R` parallel CV migrated from `foreach %dopar%` (fold-only)
+  to `future_lapply` (flat r × k). The migration also resolves a latent
+  worker-visibility issue in the prior `foreach` path.
+* Fix: vector `parallel = c("cv", "boot")` no longer errors in `fect_boot`,
+  `fit_test`, `permutation`, `fect_sens`, or `did_wrapper` — five sites had
+  legacy scalar `parallel == TRUE` / `if (parallel)` checks.
 
 # fect 2.2.0
 

@@ -108,7 +108,7 @@ fect_permu <- function(Y,
 
     att.avg.permu <- rep(NA, nboots)
 
-    if (parallel == TRUE) {
+    if (!identical(parallel, FALSE)) {
         permu.out <- foreach(
             j = 1:nboots,
             .inorder = FALSE,

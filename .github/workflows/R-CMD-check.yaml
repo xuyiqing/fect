@@ -7,6 +7,10 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: write     # needed to publish test results as PR check runs
+
 jobs:
   R-CMD-check:
     name: ${{ matrix.config.os }} (R ${{ matrix.config.r }})
@@ -135,6 +139,22 @@ jobs:
         shell: Rscript {0}
         run: |
           rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on = 'error', check_dir = 'check')
+
+      - name: Upload test results (JUnit XML)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-r${{ matrix.config.r }}-test-results
+          path: check/**/test-results.xml
+          if-no-files-found: ignore
+
+      - name: Publish test results to PR (Linux only)
+        if: ${{ always() && matrix.config.os == 'ubuntu-latest' }}
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: check/**/test-results.xml
+          check_name: "R CMD check — test results"
+          comment_mode: off
 
       - name: Upload check results
         if: failure()
