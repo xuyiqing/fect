@@ -41,7 +41,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     Zgamma.id = NULL,
                     kappaQ.id = NULL,
                     parallel = FALSE,
-                    cores = NULL) {
+                    cores = NULL,
+                    do_parallel_cv   = FALSE,   ## pre-computed flag from default.R
+                    do_parallel_boot = FALSE     ## threaded through; not used in cv.R
+                    ) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -204,7 +207,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 cv.method = cv.method, cv.nobs = cv.nobs,
                 cv.prop = cv.prop, cv.donut = cv.donut,
                 min.T0 = min.T0, k = k, criterion = criterion,
-                parallel = parallel, cores = cores
+                parallel = parallel, cores = cores,
+                do_parallel_cv = do_parallel_cv
             )
             return(out)
         }
@@ -225,7 +229,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 cv.method = cv.method, cv.nobs = cv.nobs,
                 cv.prop = cv.prop, cv.donut = cv.donut,
                 min.T0 = min.T0, k = k, criterion = criterion,
-                parallel = parallel, cores = cores
+                parallel = parallel, cores = cores,
+                do_parallel_cv = do_parallel_cv
             )
             return(out)
         }
@@ -250,7 +255,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 cv.method = cv.method, cv.nobs = cv.nobs,
                 cv.prop = cv.prop, cv.donut = cv.donut,
                 min.T0 = min.T0, k = k, criterion = criterion,
-                parallel = parallel, cores = cores
+                parallel = parallel, cores = cores,
+                do_parallel_cv = do_parallel_cv
             )
             return(out)
         }
@@ -429,6 +435,186 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             CV.out.ife[, "r"] <- c(r.old:r.max)
             CV.out.ife[, "PC"] <- CV.out.ife[, "GMoment"] <- CV.out.ife[, "Moment"] <- CV.out.ife[, "MAD"] <- CV.out.ife[, "MSPE"] <- CV.out.ife[, "WMSPE"] <- CV.out.ife[, "GMSPE"] <- CV.out.ife[, "WGMSPE"] <- 1e20
 
+            ## ---- Parallel CV setup (IFE, notyettreated) ---- ##
+            ## do_parallel_cv is TRUE when user said parallel=TRUE (auto mode) or parallel="cv" (explicit override).
+            ## When parallel=TRUE (auto), threshold gates; when parallel="cv" (explicit), threshold is bypassed.
+            ife_size <- Nco * TT
+            ife_threshold_met <- ife_size > .CV_PARALLEL_THRESH$ife
+            ## "cv" in as.character(parallel) but NOT isTRUE(parallel) → explicit override
+            use_explicit_cv <- "cv" %in% as.character(parallel) && !isTRUE(parallel)
+            cv_ife_parallel <- do_parallel_cv && (ife_threshold_met || use_explicit_cv)
+
+            if (cv_ife_parallel && k > 1 && criterion != "pc") {
+                if (is.null(cores)) {
+                    cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
+                }
+                old.future.plan.cv <- future::plan()
+                on.exit(future::plan(old.future.plan.cv), add = TRUE)
+                future::plan(future::multisession, workers = cores)
+                avail <- parallelly::availableCores()
+                msg_line <- sprintf("Parallel CV: using %d of %d available cores.", cores, avail)
+                pad <- strrep(" ", max(0, 56 - nchar(msg_line)))
+                message("\n",
+                    " +----------------------------------------------------------+\n",
+                    " | ", msg_line, pad, " |\n",
+                    " |                                                          |\n",
+                    " | To change: set cores = <n> in fect().                    |\n",
+                    " | Default: min(available - 2, 8).                          |\n",
+                    " +----------------------------------------------------------+\n")
+
+                ## Build flat r×k task list
+                r_seq <- CV.out.ife[, "r"]
+                tasks <- vector("list", length(r_seq) * k)
+                idx <- 1L
+                for (ri in seq_along(r_seq)) {
+                    for (ii in 1:k) {
+                        tasks[[idx]] <- list(r = r_seq[ri], ii = ii, ri = ri)
+                        idx <- idx + 1L
+                    }
+                }
+
+                ## Capture internal helper in closure so future workers can see it.
+                ## Internal (dot-prefix) functions are not exported and may not be found
+                ## by workers via package namespace lookup. Explicit capture ensures
+                ## the function body is serialized with the task closure.
+                .score_fn_ife <- .fect_cv_score_one_ife_all
+
+                ## --- Flat r×k parallel dispatch ---
+                fold_scores <- future.apply::future_lapply(
+                    tasks,
+                    FUN = function(task) {
+                        .score_fn_ife(
+                            ii       = task$ii,
+                            r        = task$r,
+                            YY       = YY,
+                            Y0CV     = Y0CV,
+                            X        = X,
+                            II       = II,
+                            W.use    = W.use,
+                            WW       = if (use_weight == 1) WW else NULL,
+                            beta0CV  = beta0CV,
+                            rmCV     = rmCV,
+                            estCV    = estCV,
+                            T.on     = T.on,
+                            force    = force,
+                            cv_tol   = cv_tol,
+                            max.iteration = max.iteration,
+                            use_weight    = use_weight
+                        )
+                    },
+                    future.seed = TRUE,
+                    future.packages = "fect"
+                )
+
+                ## --- Aggregate per-r MSPE sequentially; apply 1% rule in master ---
+                n_r <- length(r_seq)
+                for (i in seq_len(n_r)) {
+                    r <- r_seq[i]
+                    task_idx <- which(vapply(tasks, function(t) t$ri == i, logical(1)))
+                    all_resid    <- unlist(lapply(fold_scores[task_idx], `[[`, "resid"))
+                    all_time_idx <- unlist(lapply(fold_scores[task_idx], `[[`, "time_idx"))
+                    all_obs_w    <- if (use_weight == 1)
+                                        unlist(lapply(fold_scores[task_idx], `[[`, "obs_w"))
+                                    else c()
+
+                    scores <- .score_residuals(
+                        resid        = all_resid,
+                        obs_weights  = if (use_weight == 1) all_obs_w else NULL,
+                        time_index   = all_time_idx,
+                        count_weights = count.T.cv,
+                        norm.para    = NULL
+                    )
+                    MSPE    <- scores["MSPE"]
+                    WMSPE   <- scores["WMSPE"]
+                    GMSPE   <- scores["GMSPE"]
+                    WGMSPE  <- scores["WGMSPE"]
+                    MAD     <- scores["MAD"]
+                    moment  <- scores["Moment"]
+                    gmoment <- scores["GMoment"]
+
+                    ## Full-data fit for IC/PC/sigma2 — sequential in master
+                    est.cv <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r, force, cv_tol, max.iteration)
+                    sigma2 <- est.cv$sigma2
+                    IC <- est.cv$IC
+                    PC <- est.cv$PC
+
+                    eff.v.cv <- c(Y - est.cv$fit)[cv.pos]
+                    meff <- as.numeric(tapply(eff.v.cv, t.on.cv, mean))
+                    MSPTATT <- sum(meff^2 * count.on.cv) / sum(count.on.cv)
+                    MSE <- sum(eff.v.cv^2) / length(eff.v.cv)
+
+                    if (!is.null(norm.para)) {
+                        MSPE    <- MSPE    * (norm.para[1]^2)
+                        WMSPE   <- WMSPE   * (norm.para[1]^2)
+                        GMSPE   <- GMSPE   * (norm.para[1]^2)
+                        WGMSPE  <- WGMSPE  * (norm.para[1]^2)
+                        MAD     <- MAD     * (norm.para[1]^2)
+                        moment  <- moment  * (norm.para[1]^2)
+                        gmoment <- gmoment * (norm.para[1]^2)
+                        sigma2 <- sigma2 * (norm.para[1]^2)
+                        IC <- est.cv$IC - log(est.cv$sigma2) + log(sigma2)
+                        PC <- PC * (norm.para[1]^2)
+                    }
+
+                    if (criterion == "mspe") {
+                        if ((min(CV.out.ife[, "MSPE"]) - MSPE) > 0.01 * min(CV.out.ife[, "MSPE"])) {
+                            MSPE.best <- MSPE; est.best <- est.cv; r.cv <- r
+                        } else {
+                            if (r == r.cv + 1) message("*")
+                        }
+                    } else if (criterion == "wmspe") {
+                        if ((min(CV.out.ife[, "WMSPE"]) - WMSPE) > 0.01 * min(CV.out.ife[, "WMSPE"])) {
+                            WMSPE.best <- WMSPE; est.best <- est.cv; r.cv <- r
+                        } else {
+                            if (r == r.cv + 1) message("*")
+                        }
+                    } else if (criterion == "gmspe") {
+                        if ((min(CV.out.ife[, "GMSPE"]) - GMSPE) > 0.01 * min(CV.out.ife[, "GMSPE"])) {
+                            GMSPE.best <- GMSPE; est.best <- est.cv; r.cv <- r
+                        } else {
+                            if (r == r.cv + 1) message("*")
+                        }
+                    } else if (criterion == "wgmspe") {
+                        if ((min(CV.out.ife[, "WGMSPE"]) - WGMSPE) > 0.01 * min(CV.out.ife[, "WGMSPE"])) {
+                            WGMSPE.best <- WGMSPE; est.best <- est.cv; r.cv <- r
+                        } else {
+                            if (r == r.cv + 1) message("*")
+                        }
+                    } else if (criterion == "mad") {
+                        if ((min(CV.out.ife[, "MAD"]) - MAD) > 0.01 * min(CV.out.ife[, "MAD"])) {
+                            MAD.best <- MAD; est.best <- est.cv; r.cv <- r
+                        } else {
+                            if (r == r.cv + 1) message("*")
+                        }
+                    } else if (criterion == "moment") {
+                        if ((min(CV.out.ife[, "Moment"]) - moment) > 0.01 * min(CV.out.ife[, "Moment"])) {
+                            moment.best <- moment; est.best <- est.cv; r.cv <- r
+                        } else {
+                            if (r == r.cv + 1) message("*")
+                        }
+                    } else if (criterion == "gmoment") {
+                        if ((min(CV.out.ife[, "GMoment"]) - gmoment) > 0.01 * min(CV.out.ife[, "GMoment"])) {
+                            gmoment.best <- gmoment; est.best <- est.cv; r.cv <- r
+                        } else {
+                            if (r == r.cv + 1) message("*")
+                        }
+                    }
+
+                    CV.out.ife[i, 2:13] <- c(sigma2, IC, PC, MSPE, WMSPE, GMSPE, WGMSPE, MAD, moment, gmoment, MSPTATT, MSE)
+                    message(
+                        "r = ", r, "; sigma2 = ",
+                        sprintf("%.5f", sigma2), "; IC = ",
+                        sprintf("%.5f", IC), "; PC = ",
+                        sprintf("%.5f", PC), "; MSPE = ",
+                        sprintf("%.5f", MSPE)
+                    )
+                } ## end parallel aggregate loop
+                ## Ensure r.cv carries the name "r" to match the serial path's
+                ## CV.out.ife[i, "r"] extraction which preserves the column name.
+                names(r.cv) <- "r"
+
+            } else {
+            ## ---- Serial path (original code) ---- ##
             for (i in 1:dim(CV.out.ife)[1]) { ## cross-validation loop starts
                 ## inter FE based on control, before & after
                 r <- CV.out.ife[i, "r"]
@@ -438,29 +624,29 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     all_obs_w <- c()
                     all_time_idx <- c()
                     for (ii in 1:k) {
-                        II.cv <- II
-                        II.cv[rmCV[[ii]]] <- 0
-                        YY.cv <- YY
-                        YY.cv[rmCV[[ii]]] <- 0
-                        if (use_weight) {
-                            W.use2 <- W.use
-                            W.use2[rmCV[[ii]]] <- 0
-                        } else {
-                            W.use2 <- as.matrix(0)
-                        }
-                        est.cv.fit <- inter_fe_ub(
-                            YY.cv, as.matrix(Y0CV[, , ii]), X, II.cv,
-                            W.use2, as.matrix(beta0CV[, , ii]),
-                            r, force, cv_tol, max.iteration
-                        )$fit
-                        resid_ii <- YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
-                        all_resid <- c(all_resid, resid_ii)
+                        fold_result_ii <- .fect_cv_score_one_ife_all(
+                            ii       = ii,
+                            r        = r,
+                            YY       = YY,
+                            Y0CV     = Y0CV,
+                            X        = X,
+                            II       = II,
+                            W.use    = W.use,
+                            WW       = if (use_weight == 1) WW else NULL,
+                            beta0CV  = beta0CV,
+                            rmCV     = rmCV,
+                            estCV    = estCV,
+                            T.on     = T.on,
+                            force    = force,
+                            cv_tol   = cv_tol,
+                            max.iteration = max.iteration,
+                            use_weight    = use_weight
+                        )
+                        all_resid    <- c(all_resid, fold_result_ii$resid)
+                        all_time_idx <- c(all_time_idx, fold_result_ii$time_idx)
                         if (use_weight == 1) {
-                            all_obs_w <- c(all_obs_w, WW[estCV[[ii]]])
+                            all_obs_w <- c(all_obs_w, fold_result_ii$obs_w)
                         }
-                        idx_ii <- as.character(T.on[estCV[[ii]]])
-                        idx_ii[which(is.na(idx_ii))] <- "Control"
-                        all_time_idx <- c(all_time_idx, idx_ii)
                     }
                     scores <- .score_residuals(
                         resid = all_resid,
@@ -615,6 +801,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     )
                 }
             } ## end of while: search for r_star over
+            } ## end of serial/parallel if-else block
 
             # MSPE.best <- min(CV.out[,"MSPE"])
             # PC.best <- min(CV.out[,"PC"])
@@ -689,6 +876,174 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             CV.out.mc[, "lambda.norm"] <- c(lambda / max(eigen.all))
             CV.out.mc[, "GMoment"] <- CV.out.mc[, "Moment"] <- CV.out.mc[, "MAD"] <- CV.out.mc[, "WGMSPE"] <- CV.out.mc[, "WGMSPE"] <- CV.out.mc[, "GMSPE"] <- CV.out.mc[, "WMSPE"] <- CV.out.mc[, "MSPE"] <- 1e20
 
+            ## ---- Parallel CV setup (MC, notyettreated) ---- ##
+            ## do_parallel_cv is TRUE when user said parallel=TRUE (auto mode) or parallel="cv" (explicit override).
+            ## Threshold only governs auto mode: explicit "cv" bypasses it.
+            mc_size <- Nco * TT
+            mc_threshold_met <- mc_size > .CV_PARALLEL_THRESH$mc
+            ## Re-derive use_explicit_cv for the MC block. When method == "mc" only, the IFE block
+            ## did not run and use_explicit_cv (from the IFE block) is not in scope. Always use
+            ## use_explicit_cv_mc here — a locally-computed copy — to avoid R scoping issues.
+            use_explicit_cv_mc <- "cv" %in% as.character(parallel) && !isTRUE(parallel)
+            cv_mc_parallel <- do_parallel_cv && (mc_threshold_met || use_explicit_cv_mc)
+
+            if (cv_mc_parallel && k > 1) {
+                if (is.null(cores)) {
+                    cores <- max(1L, min(parallelly::availableCores(omit = 2L), 8L))
+                }
+                old.future.plan.mc <- future::plan()
+                ## Use after = FALSE to prepend this restore so it fires BEFORE the IFE
+                ## restore when method = "both" (both blocks register on.exit in the same
+                ## fect_cv call; the IFE block registers first so it fires last by default).
+                ## With after = FALSE, MC restore fires first (restoring to the IFE-activated
+                ## multisession plan), then IFE restore fires (restoring to the caller's
+                ## original plan). Net: caller's plan correctly preserved.
+                on.exit(future::plan(old.future.plan.mc), add = TRUE, after = FALSE)
+                future::plan(future::multisession, workers = cores)
+                avail <- parallelly::availableCores()
+                msg_line <- sprintf("Parallel CV (MC): using %d of %d available cores.", cores, avail)
+                pad <- strrep(" ", max(0, 56 - nchar(msg_line)))
+                message("\n",
+                    " +----------------------------------------------------------+\n",
+                    " | ", msg_line, pad, " |\n",
+                    " |                                                          |\n",
+                    " | To change: set cores = <n> in fect().                    |\n",
+                    " | Default: min(available - 2, 8).                          |\n",
+                    " +----------------------------------------------------------+\n")
+
+                ## Build flat lambda×k task list
+                tasks <- vector("list", length(lambda) * k)
+                idx <- 1L
+                for (li in seq_along(lambda)) {
+                    for (ii in 1:k) {
+                        tasks[[idx]] <- list(lambda_i = lambda[li], ii = ii, li = li)
+                        idx <- idx + 1L
+                    }
+                }
+
+                ## Capture MC helper in closure for worker serialization.
+                ## Internal (dot-prefix) helpers are not exported; closure capture ensures
+                ## the function body is serialized with the task, same pattern as Phase 1 IFE.
+                .score_fn_mc <- .fect_cv_score_one_mc_all
+
+                ## --- Flat lambda×k parallel dispatch ---
+                fold_scores <- future.apply::future_lapply(
+                    tasks,
+                    FUN = function(task) {
+                        .score_fn_mc(
+                            ii         = task$ii,
+                            lambda_i   = task$lambda_i,
+                            YY         = YY,
+                            Y0CV       = Y0CV,
+                            X          = X,
+                            II         = II,
+                            W.use      = W.use,
+                            WW         = if (use_weight == 1) WW else NULL,
+                            beta0CV    = beta0CV,
+                            rmCV       = rmCV,
+                            estCV      = estCV,
+                            T.on       = T.on,
+                            force      = force,
+                            cv_tol     = cv_tol,
+                            max.iteration = max.iteration,
+                            use_weight    = use_weight
+                        )
+                    },
+                    future.seed = TRUE,
+                    future.packages = "fect"
+                )
+
+                ## --- Aggregate per-lambda MSPE sequentially; apply 1% rule in master ---
+                ## break_check is NOT applied in parallel mode — all lambdas are computed.
+                for (i in seq_along(lambda)) {
+                    task_idx <- which(vapply(tasks, function(t) t$li == i, logical(1)))
+                    all_resid    <- unlist(lapply(fold_scores[task_idx], `[[`, "resid"))
+                    all_time_idx <- unlist(lapply(fold_scores[task_idx], `[[`, "time_idx"))
+                    all_obs_w    <- if (use_weight == 1)
+                                        unlist(lapply(fold_scores[task_idx], `[[`, "obs_w"))
+                                    else c()
+
+                    scores <- .score_residuals(
+                        resid        = all_resid,
+                        obs_weights  = if (use_weight == 1) all_obs_w else NULL,
+                        time_index   = all_time_idx,
+                        count_weights = count.T.cv,
+                        norm.para    = NULL
+                    )
+                    MSPE    <- scores["MSPE"]
+                    WMSPE   <- scores["WMSPE"]
+                    GMSPE   <- scores["GMSPE"]
+                    WGMSPE  <- scores["WGMSPE"]
+                    MAD     <- scores["MAD"]
+                    moment  <- scores["Moment"]
+                    gmoment <- scores["GMoment"]
+
+                    ## Full-data fit for MSPTATT/MSE — sequential in master (same as serial path)
+                    est.cv <- inter_fe_mc(
+                        YY, Y0, X, II, W.use, beta0,
+                        1, lambda[i],
+                        force, cv_tol, max.iteration
+                    )
+
+                    eff.v.cv <- c(Y - est.cv$fit)[cv.pos]
+                    meff <- as.numeric(tapply(eff.v.cv, t.on.cv, mean))
+                    MSPTATT <- sum(meff^2 * count.on.cv) / sum(count.on.cv)
+                    MSE <- sum(eff.v.cv^2) / length(eff.v.cv)
+
+                    if (!is.null(norm.para)) {
+                        MSPE   <- MSPE   * (norm.para[1]^2)
+                        WMSPE  <- WMSPE  * (norm.para[1]^2)
+                        GMSPE  <- GMSPE  * (norm.para[1]^2)
+                        WGMSPE <- WGMSPE * (norm.para[1]^2)
+                        MAD    <- MAD    * (norm.para[1]^2)
+                        moment <- moment * (norm.para[1]^2)
+                        gmoment <- gmoment * (norm.para[1]^2)
+                    }
+
+                    ## 1% rule — identical logic to serial path, but no break_check
+                    if (criterion == "mspe") {
+                        if ((min(CV.out.mc[, "MSPE"]) - MSPE) > 0.01 * min(CV.out.mc[, "MSPE"])) {
+                            MSPE.best <- MSPE; est.best <- est.cv; lambda.cv <- lambda[i]
+                        }
+                    } else if (criterion == "wmspe") {
+                        if ((min(CV.out.mc[, "WMSPE"]) - WMSPE) > 0.01 * min(CV.out.mc[, "WMSPE"])) {
+                            WMSPE.best <- WMSPE; est.best <- est.cv; lambda.cv <- lambda[i]
+                        }
+                    } else if (criterion == "gmspe") {
+                        if ((min(CV.out.mc[, "GMSPE"]) - GMSPE) > 0.01 * min(CV.out.mc[, "GMSPE"])) {
+                            GMSPE.best <- GMSPE; est.best <- est.cv; lambda.cv <- lambda[i]
+                        }
+                    } else if (criterion == "wgmspe") {
+                        if ((min(CV.out.mc[, "WGMSPE"]) - WGMSPE) > 0.01 * min(CV.out.mc[, "WGMSPE"])) {
+                            WGMSPE.best <- WGMSPE; est.best <- est.cv; lambda.cv <- lambda[i]
+                        }
+                    } else if (criterion == "mad") {
+                        if ((min(CV.out.mc[, "MAD"]) - MAD) > 0.01 * min(CV.out.mc[, "MAD"])) {
+                            MAD.best <- MAD; est.best <- est.cv; lambda.cv <- lambda[i]
+                        }
+                    } else if (criterion == "moment") {
+                        if ((min(CV.out.mc[, "Moment"]) - moment) > 0.01 * min(CV.out.mc[, "Moment"])) {
+                            moment.best <- moment; est.best <- est.cv; lambda.cv <- lambda[i]
+                        }
+                    } else if (criterion == "gmoment") {
+                        if ((min(CV.out.mc[, "GMoment"]) - gmoment) > 0.01 * min(CV.out.mc[, "GMoment"])) {
+                            gmoment.best <- gmoment; est.best <- est.cv; lambda.cv <- lambda[i]
+                        }
+                    }
+
+                    CV.out.mc[i, 2:10] <- c(MSPE, WMSPE, GMSPE, WGMSPE, MAD, moment, gmoment, MSPTATT, MSE)
+                    message("lambda.norm = ",
+                        sprintf("%.5f", lambda[i] / max(eigen.all)), "; MSPE = ",
+                        sprintf("%.5f", MSPE), "; MSPTATT = ",
+                        sprintf("%.5f", MSPTATT), "; MSE = ",
+                        sprintf("%.5f", MSE),
+                        sep = ""
+                    )
+                }
+                ## end parallel MC CV
+
+            } else {
+            ## ---- Serial path (existing code, UNCHANGED) ---- ##
             break_count <- 0
             break_check <- 0
             for (i in 1:length(lambda)) {
@@ -697,29 +1052,29 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 all_obs_w <- c()
                 all_time_idx <- c()
                 for (ii in 1:k) {
-                    II.cv <- II
-                    II.cv[rmCV[[ii]]] <- 0
-                    YY.cv <- YY
-                    YY.cv[rmCV[[ii]]] <- 0
-                    if (use_weight) {
-                        W.use2 <- W.use
-                        W.use2[rmCV[[ii]]] <- 0
-                    } else {
-                        W.use2 <- as.matrix(0)
-                    }
-                    est.cv.fit <- inter_fe_mc(
-                        YY.cv, as.matrix(Y0CV[, , ii]),
-                        X, II.cv, W.use2, as.matrix(beta0CV[, , ii]),
-                        1, lambda[i], force, cv_tol, max.iteration
-                    )$fit
-                    resid_ii <- YY[estCV[[ii]]] - est.cv.fit[estCV[[ii]]]
-                    all_resid <- c(all_resid, resid_ii)
+                    fold_result_ii <- .fect_cv_score_one_mc_all(
+                        ii        = ii,
+                        lambda_i  = lambda[i],
+                        YY        = YY,
+                        Y0CV      = Y0CV,
+                        X         = X,
+                        II        = II,
+                        W.use     = W.use,
+                        WW        = if (use_weight == 1) WW else NULL,
+                        beta0CV   = beta0CV,
+                        rmCV      = rmCV,
+                        estCV     = estCV,
+                        T.on      = T.on,
+                        force     = force,
+                        cv_tol    = cv_tol,
+                        max.iteration = max.iteration,
+                        use_weight    = use_weight
+                    )
+                    all_resid    <- c(all_resid, fold_result_ii$resid)
+                    all_time_idx <- c(all_time_idx, fold_result_ii$time_idx)
                     if (use_weight == 1) {
-                        all_obs_w <- c(all_obs_w, WW[estCV[[ii]]])
+                        all_obs_w <- c(all_obs_w, fold_result_ii$obs_w)
                     }
-                    idx_ii <- as.character(T.on[estCV[[ii]]])
-                    idx_ii[which(is.na(idx_ii))] <- "Control"
-                    all_time_idx <- c(all_time_idx, idx_ii)
                 }
                 scores <- .score_residuals(
                     resid = all_resid,
@@ -894,6 +1249,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     break
                 }
             }
+            } ## end else (serial MC CV)
             est.best.mc <- est.best
             MSPE.best.mc <- MSPE.best
             WMSPE.best.mc <- WMSPE.best

@@ -718,13 +718,24 @@ fect.default <- function(
     }
 
     ## parallel & cores
-    if (parallel == TRUE) {
-        if (is.null(cores) == FALSE) {
-            if (cores <= 0) {
-                stop(
-                    "\"cores\" option misspecified. Try, for example, cores = 2."
-                )
-            }
+    ## parallel accepts: TRUE, FALSE, "cv", "boot", c("cv","boot")
+    valid_parallel_strings <- c("cv", "boot")
+    if (!isTRUE(parallel) && !identical(parallel, FALSE)) {
+        parallel_chars <- as.character(parallel)
+        bad <- setdiff(parallel_chars, valid_parallel_strings)
+        if (length(bad) > 0) {
+            stop(
+                "\"parallel\" must be TRUE, FALSE, \"cv\", \"boot\", or c(\"cv\",\"boot\"). ",
+                "Got: ", paste0("\"", bad, "\"", collapse = ", ")
+            )
+        }
+    }
+    do_parallel_cv   <- isTRUE(parallel) || "cv"   %in% as.character(parallel)
+    do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
+
+    if ((do_parallel_cv || do_parallel_boot) && !is.null(cores)) {
+        if (!is.numeric(cores) || cores <= 0) {
+            stop("\"cores\" option misspecified. Try, for example, cores = 2.")
         }
     }
 
@@ -1981,14 +1992,14 @@ fect.default <- function(
 
     old.future.plan <- NULL
 
-    if ((se == TRUE | permute == TRUE) & parallel == FALSE) {
+    if ((se == TRUE | permute == TRUE) & !do_parallel_boot) {
         ## set seed
         if (is.null(seed) == FALSE) {
             set.seed(seed + 1)
         }
     }
 
-    if ((se == TRUE | permute == TRUE) & parallel == TRUE) {
+    if ((se == TRUE | permute == TRUE) & do_parallel_boot) {
         ## set seed
         if (is.null(seed) == FALSE) {
             set.seed(seed)
@@ -2063,7 +2074,9 @@ fect.default <- function(
                     Zgamma.id = Zgamma.id,
                     kappaQ.id = kappaQ.id,
                     parallel = parallel,
-                    cores = cores
+                    cores = cores,
+                    do_parallel_cv   = do_parallel_cv,
+                    do_parallel_boot = do_parallel_boot
                 )
             } else {
                 out <- fect_binary_cv(
@@ -2352,6 +2365,7 @@ fect.default <- function(
             nboots = nboots,
             parallel = parallel,
             cores = cores,
+            do_parallel_cv = do_parallel_cv,
             group.level = g.level,
             group = G,
             keep.sims = keep.sims,
