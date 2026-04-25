@@ -2,6 +2,11 @@
 
 Parametric-bootstrap fixes (`se = TRUE`, `vartype = "parametric"`):
 
+* Parametric bootstrap on unbalanced panels now correctly reflects
+  within-unit serial correlation. Prior versions used a diagonal residual
+  covariance in the Gaussian draw, under-estimating ATT standard errors on
+  serially correlated data by ≈ √((1+ρ)/(1-ρ)) at AR(1) coefficient ρ.
+  Balanced panels and `vartype` ∈ {"bootstrap", "jackknife"} are unaffected.
 * Fixed `Unsupported bootstrap method: fe` crash when `method = "gsynth"` or
   `"cfe"` and CV selected `r.cv = 0`. Reported against the `gsynth` wrapper,
   which delegates SE to fect.

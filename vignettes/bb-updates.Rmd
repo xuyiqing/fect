@@ -6,6 +6,7 @@
 
 Parametric-bootstrap fixes (`se = TRUE`, `vartype = "parametric"`):
 
+* Parametric bootstrap on unbalanced panels now correctly reflects within-unit serial correlation. Prior versions used a diagonal residual covariance in the Gaussian draw, under-estimating ATT standard errors on serially correlated data by ≈ $\sqrt{(1+\rho)/(1-\rho)}$ at AR(1) coefficient $\rho$. Balanced panels and `vartype` ∈ {`"bootstrap"`, `"jackknife"`} are unaffected.
 * Fixed `Unsupported bootstrap method: fe` crash when `method = "gsynth"` or `"cfe"` and CV selected $r_{\text{cv}} = 0$. Reported against the `gsynth` wrapper.
 * Fixed `one.nonpara` dispatcher so `ife+notyettreated`, `cfe+nevertreated`, and `cfe+notyettreated` bootstraps route to the correct Loop-2 estimator (previously all three produced incorrect SEs).
 * Added hard gate that errors on `ife + notyettreated + parametric` — a coverage simulation showed ~80% vs 95% nominal. Use `time.component.from = "nevertreated"` or a non-parametric `vartype`.

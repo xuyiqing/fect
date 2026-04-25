@@ -405,13 +405,43 @@ panelview(turnout ~ policy_edr + policy_mail_in + policy_motor,
 ### Estimation
 
 ```{r turnout_ub_est, cache = TRUE, message = FALSE}
-out_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor, 
-              data = turnout.ub,  index = c("abb","year"), 
-              se = TRUE, method = "gsynth", 
-              r = c(0, 5), CV = TRUE, force = "two-way", 
+out_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
+              data = turnout.ub,  index = c("abb","year"),
+              se = TRUE, method = "gsynth",
+              r = c(0, 5), CV = TRUE, force = "two-way",
               parallel = TRUE, cores = 16, min.T0 = 8,
               nboots = 1000, seed = 02139)
 ```
+
+### Parametric bootstrap on an unbalanced panel
+
+When the number of treated units is small, the parametric bootstrap (`vartype = "parametric"`) is the recommended uncertainty procedure for gsynth. It is available on unbalanced panels too, with a small technical adjustment.
+
+On a balanced panel, the parametric bootstrap resamples whole-$T$ residual vectors from the controls and adds them to the estimated counterfactual. On an unbalanced panel, individual residual vectors may have missing cells, so direct vector resampling is not always feasible. `fect` therefore replaces the empirical resample with a Gaussian approximation: it estimates the pairwise-complete empirical covariance matrix of the residuals, $\hat\Sigma \in \mathbb{R}^{T \times T}$, and draws each bootstrap perturbation from a multivariate Gaussian $\mathcal{N}(0, \hat\Sigma)$. The off-diagonal entries of $\hat\Sigma$ encode within-unit serial correlation, so the Gaussian draws inherit the same temporal-dependence structure as the data.
+
+The two procedures also condition on different objects. The parametric bootstrap is **conditional on the realized factors $\hat F$, loadings $\hat\Lambda$, covariates $X$, and treatment indicators $D$** --- it perturbs only the idiosyncratic error $\varepsilon$. The nonparametric `vartype = "bootstrap"` is **unconditional**: by resampling units with replacement, each draw redraws $(F_i, \Lambda_i, X_i, D_i)$ together, so its variance also reflects between-unit heterogeneity in those structural components. The two SEs answer different inferential questions and need not coincide even when both are correctly calibrated.
+
+```{r turnout_ub_param, cache = TRUE, message = FALSE}
+out_ub_param <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
+                     data = turnout.ub, index = c("abb","year"),
+                     se = TRUE, method = "gsynth", vartype = "parametric",
+                     r = c(0, 5), CV = TRUE, force = "two-way",
+                     parallel = TRUE, cores = 16, min.T0 = 8,
+                     nboots = 1000, seed = 02139)
+```
+
+Compare the average CI width of the period-by-period ATT under the two SE procedures on the same unbalanced panel:
+
+```{r turnout_ub_ci_compare}
+ci_width <- function(out) mean(out$est.att[, "CI.upper"] -
+                                out$est.att[, "CI.lower"], na.rm = TRUE)
+data.frame(
+  vartype  = c("bootstrap", "parametric"),
+  CI_width = c(ci_width(out_ub), ci_width(out_ub_param))
+)
+```
+
+Both should be of the same order of magnitude when both correctly capture the panel's clustering and serial-correlation structure.
 
 ### Visualizing results
 
@@ -437,10 +467,16 @@ plot(out_ub, type = "status", xlab = "Year", ylab = "State",
 
 ```
 
-We re-produce the gap plot with the unbalanced panel, here, we set the range of y in between $(-10,20)$.
+We re-produce the gap plot with the unbalanced panel, here, we set the range of y in between $(-10,15)$.
 
 ```{r turnout_ub_gap, fig.height=5, fig.width=7}
-plot(out_ub, type = "gap", ylim = c(-10, 20))
+plot(out_ub, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
+```
+
+The same gap plot under the parametric bootstrap on the same unbalanced panel:
+
+```{r turnout_ub_gap_param, fig.height=5, fig.width=7}
+plot(out_ub_param, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
 ```
 
 
