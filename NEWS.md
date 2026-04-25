@@ -1,5 +1,46 @@
 # fect 2.3.0 (development)
 
+## Rolling (forward-only) cross-validation
+
+* New exported function `r.cv.rolling()`: a standalone user-facing helper
+  for picking the number of factors `r` via deterministic forward-only CV.
+  For each unit, the LAST `cv.nobs` observations are held out; training
+  uses everything else (the unit's earlier observations + all other units'
+  full data). Unlike `fect()`'s default `cv.method = "all_units"` (random
+  contiguous-block masking), this design closes the forward-leakage channel
+  that AR-correlated residuals exploit at `cv.donut = 0` / `1`, and tends
+  to recover much smaller `r` on panels with serially correlated errors.
+
+* New internal helper `cv.sample.rolling()` (in `support.R`): builds the
+  deterministic forward-only fold (last `cv.nobs` per unit), respecting a
+  `min.T0` floor so units with too few observations are not masked.
+
+* Workflow: call `r.cv.rolling(formula, data, index, method = "ife", ...)`
+  to get the chosen `r.cv`, then pass that to `fect(..., CV = FALSE,
+  r = r.cv, se = TRUE)` for the inferential fit.
+
+* Currently supported only for `method = "ife"` with
+  `time.component.from = "notyettreated"` (the only fect path that
+  populates `Y.ct.full` at masked control positions). Other configurations
+  error with a migration message. Production support for the
+  nevertreated/GSC path is a planned follow-up that requires populating
+  `Y.ct.full` at masked control positions in fect's GSC code path.
+
+* Implemented as a standalone helper rather than as a new value of
+  `cv.method` to minimize integration risk with the existing fold-
+  aggregation machinery in `cv.R`. A future PR may promote it to a
+  `cv.method = "rolling"` option once the prediction-extraction path is
+  uniform across estimators.
+
+* Empirical motivation: on the Eibl & Hertog (2023) oil-rich panels with
+  residual AR(1) of 0.56--0.93, fect's default CV (random anchors,
+  `cv.donut` 0 or 1) pegs `r.cv = 5` on every (cell, estimator, rule)
+  combination, even at widened `cv.nobs = 6` --- the forward-leakage hides
+  the rank overfit. `r.cv.rolling()` with `cv.nobs = 3` recovers `r.cv = 1`
+  on health-equity, education-equity, and secondary-enrollment outcomes;
+  `r.cv = 0` on primary-enrollment --- matching the placebo-based preferred
+  rank to within one factor.
+
 ## Bounded factor loadings for GSC
 
 * New argument `loading.bound = "simplex"` (default `"none"`): constrains
