@@ -103,6 +103,22 @@ Parallel cross-validation:
   `fit_test`, `permutation`, `fect_sens`, or `did_wrapper` — five sites had
   legacy scalar `parallel == TRUE` / `if (parallel)` checks.
 
+## Bug fix: partition-coverage rejection sampler
+
+* Fixes a deterministic infinite loop in `fect_boot::draw.error()` for the
+  `parametric + notyettreated + split_residuals = TRUE` path. The random
+  `partition_controls(id.co, K = 2)` call could leave some time periods
+  with zero coverage in `id.co_A`; the `repeat`-loop coverage check then
+  never terminated. Now rejection-samples the K=2 partition until both
+  halves cover every TT (capped at 200 redraws, with a fallback to
+  no-split and a warning if exhausted).
+
+* Triggered on heavily-unbalanced panels where some time periods have
+  very few control observations. Discovered on EH 2023 sec_enrol where
+  year 2012 has only 3 controls observed and all 3 happen to fall into
+  one half at seed=100. Pre-fix: variant (iii) hung > 50 min. Post-fix:
+  B=1 at 8.65s, B=5 at 23.13s.
+
 # fect 2.2.0
 
 * Added CFE (Complex Fixed Effects) estimator (`method = "cfe"`)
