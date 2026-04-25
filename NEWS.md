@@ -1,3 +1,67 @@
+# fect 2.3.0 (development)
+
+## Bounded factor loadings for GSC
+
+* New argument `loading.bound = "simplex"` (default `"none"`): constrains
+  treated-unit factor loadings to the convex hull of control loadings via an
+  entropy-regularized simplex projection. Solves, per treated unit `i`:
+
+  ```text
+  minimize     (1/gamma) * KL(w || uniform) + || u_pre - F_pre %*% t(Lambda_co) %*% w ||^2
+  over w in Delta_{Nco}
+  lambda.tr_i = t(Lambda_co) %*% w_i
+  ```
+
+  By construction, `Y_hat(0) = F %*% lambda.tr` is a convex combination of
+  factor-implied control outcomes, so the counterfactual lies pointwise in
+  `conv({Y_hat_co_j})` for every time period. Applies only to
+  `method = "ife"` with `time.component.from = "nevertreated"` in this
+  version.
+
+* New argument `gamma.loading` (default `NULL`): scalar regularization
+  strength for the new `"simplex"` projection. `NULL` triggers 5-fold
+  cross-validation over a log-grid. When numeric, `gamma.loading` is used
+  directly.
+
+* New argument `gamma.loading.grid` (default `NULL`): user-supplied grid for
+  `gamma.loading` CV; `NULL` uses `10^seq(-2, 2, length.out = 9)`.
+
+* The unit-FE scalar `alpha.tr` is NOT bounded; under `loading.bound = "simplex"`
+  with `force %in% c("unit", "two-way")`, it is computed as the residual-mean
+  `mean(U.tr.pre - F.hat.pre %*% t(lambda.tr))` per treated unit.
+
+* Solver: softmax reparameterization with `stats::optim(method = "L-BFGS-B")`
+  and an analytic gradient; mirror-descent fallback on ill-conditioned
+  inputs. No new R dependencies.
+
+### Diagnostic outputs (under `loading.bound = "simplex"`)
+
+* `loading.bound`: character, records the setting used.
+* `gamma.loading`: the value used (CV-selected or user-supplied).
+* `loading.proj.resid`: `Ntr`-vector of `|| U.tr.pre - F.hat.pre %*% lambda.tr ||`
+  per treated unit. Values substantially above the control-fit RMSE flag
+  treated units lying near or outside `conv(Lambda_co)` (simplex constraint
+  binds).
+
+### Semantic change to `wgt.implied` (under `loading.bound = "simplex"` only)
+
+* `wgt.implied` becomes the `Ntr x Nco` simplex-weight matrix: each row sums
+  to 1 and is non-negative. This is a direct byproduct of the solver and
+  replaces the Moore-Penrose pseudo-inverse representation under the bound.
+  When `loading.bound = "none"` (default), `wgt.implied` is unchanged.
+
+### Known caveats
+
+* Percentile bootstrap intervals may under-cover when the simplex constraint
+  binds (true treated loading on the boundary of `conv(Lambda_co)`); this is
+  the Andrews (1999, 2001) non-standard-limit regime for constrained
+  estimators. Detect via `loading.proj.resid`. Boundary-corrected inference
+  is deferred to a later release.
+
+* v1 does not support the not-yet-treated IFE dispatch, the MC method, or
+  the CFE method. `loading.bound = "simplex"` errors cleanly when combined
+  with any of these.
+
 # fect 2.2.1
 
 Parametric-bootstrap fixes (`se = TRUE`, `vartype = "parametric"`):

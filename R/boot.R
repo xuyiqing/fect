@@ -118,7 +118,10 @@ fect_boot <- function(
   group = NULL,
   dis = 0,
   keep.sims = FALSE,
-  time.component.from = "notyettreated"
+  time.component.from = "notyettreated",
+  loading.bound = "none",
+  gamma.loading = NULL,
+  gamma.loading.grid = NULL
 ) {
   do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
   na.pos <- NULL
@@ -162,6 +165,18 @@ fect_boot <- function(
     Nco <- length(co)
   }
 
+  ## Internal: when `loading.bound != "none"`, normalize
+  ## `method = "ife"` + `time.component.from = "nevertreated"` to
+  ## `method = "gsynth"` so the bootstrap loop routes to fect_nevertreated
+  ## (which threads loading.bound) instead of fect_fe (which would silently
+  ## drop it). The default `loading.bound = "none"` path is left untouched
+  ## to preserve byte-identical RNG sequencing with pre-feature behavior.
+  if (!identical(loading.bound, "none") &&
+      identical(method, "ife") &&
+      identical(time.component.from, "nevertreated")) {
+      method <- "gsynth"
+  }
+
   ## estimation
   if (CV == 0) {
     if (method == "gsynth") {
@@ -191,7 +206,10 @@ fect_boot <- function(
         carryover.period = carryover.period,
         carryoverTest = carryoverTest,
         group.level = group.level,
-        group = group
+        group = group,
+        loading.bound      = loading.bound,
+        gamma.loading      = gamma.loading,
+        gamma.loading.grid = gamma.loading.grid
       )
     } else if (method == "ife") {
       out <- fect_fe(
@@ -501,6 +519,20 @@ fect_boot <- function(
     beta <- out$beta
   } else {
     beta <- matrix(0, 1, 0)
+  }
+
+  ## Cache the CV-selected gamma from the main fit, so bootstrap replications
+  ## reuse it instead of re-running CV each replication. Re-running CV per
+  ## bootstrap is both slow and numerically unstable (each resample constructs
+  ## its own fold set on perturbed data; at T0 >= 40 the inner solver
+  ## occasionally hits ill-conditioned cases). Using a fixed, main-fit-CV
+  ## gamma across bootstrap reps is the standard practice for nested
+  ## CV + bootstrap and matches how r is handled in IFE CV.
+  if (identical(loading.bound, "simplex") &&
+      is.null(gamma.loading) &&
+      !is.null(out$gamma.loading) &&
+      is.finite(out$gamma.loading)) {
+    gamma.loading <- out$gamma.loading
   }
 
   if (is.null(cl)) {
@@ -1280,7 +1312,10 @@ fect_boot <- function(
               group.level = group.level,
               group = boot.group,
               time.on.seq.group = group.time.on,
-              time.off.seq.group = group.time.off
+              time.off.seq.group = group.time.off,
+              loading.bound      = loading.bound,
+              gamma.loading      = gamma.loading,
+              gamma.loading.grid = gamma.loading.grid
             ),
             silent = TRUE
           )
