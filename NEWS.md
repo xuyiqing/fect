@@ -19,18 +19,22 @@
   to get the chosen `r.cv`, then pass that to `fect(..., CV = FALSE,
   r = r.cv, se = TRUE)` for the inferential fit.
 
-* Currently supported only for `method = "ife"` with
-  `time.component.from = "notyettreated"` (the only fect path that
-  populates `Y.ct.full` at masked control positions). Other configurations
-  error with a migration message. Production support for the
-  nevertreated/GSC path is a planned follow-up that requires populating
-  `Y.ct.full` at masked control positions in fect's GSC code path.
+* Supports `method = "ife"` (IFE-EM, internal
+  `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC,
+  internal `time.component.from = "nevertreated"`). Both paths populate
+  `Y.ct.full` at masked control positions: the IFE-EM path via EM
+  imputation, the GSC path via the model-implied factor product
+  `F * t(lambda_co)` (companion change to `R/fect_nevertreated.R`,
+  separately catalogued under "GSC: Y.ct.full populated at control
+  positions"). Other methods (e.g. `"mc"`) are not yet supported.
 
 * Implemented as a standalone helper rather than as a new value of
   `cv.method` to minimize integration risk with the existing fold-
-  aggregation machinery in `cv.R`. A future PR may promote it to a
-  `cv.method = "rolling"` option once the prediction-extraction path is
-  uniform across estimators.
+  aggregation machinery in `cv.R`. Promoting it to a
+  `cv.method = "rolling"` option inside the main `fect()` CV dispatcher
+  is deferred to a future release; for now use the standalone
+  `r.cv.rolling()` and feed the chosen rank to
+  `fect(..., CV = FALSE, r = r.cv)`.
 
 * Empirical motivation: on the Eibl & Hertog (2023) oil-rich panels with
   residual AR(1) of 0.56--0.93, fect's default CV (random anchors,
