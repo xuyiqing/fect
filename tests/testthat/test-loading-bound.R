@@ -221,3 +221,39 @@ test_that("I.9: fect() with se=TRUE runs with bounded loading (smoke)", {
     expect_false(is.null(fit$est.att))
     expect_true(is.finite(fit$att.avg))
 })
+
+## ---------------------------------------------------------------------------
+## I.10: loading.overlap plot type
+## ---------------------------------------------------------------------------
+
+test_that("I.10a: loading.overlap returns a ggplot for r >= 2", {
+    df <- make_factor_panel(N = 80, TT = 25, Ntr = 20, r = 2, seed = 7)
+    fit <- common_fit(df)
+    p <- plot(fit, type = "loading.overlap")
+    expect_s3_class(p, "ggplot")
+
+    rd <- plot(fit, type = "loading.overlap", return.data = TRUE)
+    expect_true(is.list(rd) || inherits(rd, "data.frame"))
+})
+
+test_that("I.10b: loading.overlap returns a ggplot for r == 1 (mirror histogram)", {
+    df <- make_factor_panel(N = 80, TT = 25, Ntr = 20, r = 1, seed = 8)
+    fit <- suppressMessages(suppressWarnings(fect::fect(
+        Y ~ D, data = df, index = c("id", "time"),
+        method = "ife", r = 1, CV = FALSE, se = FALSE,
+        parallel = FALSE, force = "two-way",
+        time.component.from = "nevertreated"
+    )))
+    p <- plot(fit, type = "loading.overlap")
+    expect_s3_class(p, "ggplot")
+})
+
+test_that("I.10c: loading.overlap errors when r == 0", {
+    df  <- make_factor_panel(N = 60, TT = 20, Ntr = 15, r = 1, seed = 9)
+    fit <- suppressMessages(suppressWarnings(fect::fect(
+        Y ~ D, data = df, index = c("id", "time"),
+        method = "fe", r = 0, CV = FALSE, se = FALSE,
+        parallel = FALSE, force = "two-way"
+    )))
+    expect_error(plot(fit, type = "loading.overlap"), regexp = "r >= 1")
+})

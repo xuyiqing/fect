@@ -43,8 +43,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     parallel = FALSE,
                     cores = NULL,
                     do_parallel_cv   = FALSE,   ## pre-computed flag from default.R
-                    do_parallel_boot = FALSE     ## threaded through; not used in cv.R
+                    do_parallel_boot = FALSE,    ## threaded through; not used in cv.R
+                    cv.rule = "1se"              ## "1se" (default), "min", or "1pct" (legacy)
                     ) {
+    cv.rule <- .fect_validate_cv_rule(cv.rule)
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -435,6 +437,16 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             CV.out.ife[, "r"] <- c(r.old:r.max)
             CV.out.ife[, "PC"] <- CV.out.ife[, "GMoment"] <- CV.out.ife[, "Moment"] <- CV.out.ife[, "MAD"] <- CV.out.ife[, "MSPE"] <- CV.out.ife[, "WMSPE"] <- CV.out.ife[, "GMSPE"] <- CV.out.ife[, "WGMSPE"] <- 1e20
 
+            ## Per-fold SE matrix parallel to CV.out.ife. Populated below in
+            ## both parallel and serial branches; consumed at the end of the
+            ## IFE CV block to apply `cv.rule` (see `.fect_apply_cv_rule`).
+            ## Rows correspond to r values (same indexing as CV.out.ife);
+            ## columns are criterion-specific SEs across folds. NA = not
+            ## computable (e.g., k = 1 or only one finite fold score).
+            CV.out.ife.se <- matrix(NA_real_, nrow(CV.out.ife), ncol(CV.out.ife))
+            colnames(CV.out.ife.se) <- colnames(CV.out.ife)
+            CV.out.ife.se[, "r"] <- CV.out.ife[, "r"]
+
             ## ---- Parallel CV setup (IFE, notyettreated) ---- ##
             ## do_parallel_cv is TRUE when user said parallel=TRUE (auto mode) or parallel="cv" (explicit override).
             ## When parallel=TRUE (auto), threshold gates; when parallel="cv" (explicit), threshold is bypassed.
@@ -507,23 +519,21 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 )
 
                 ## --- Aggregate per-r MSPE sequentially; apply 1% rule in master ---
+                ## (1-SE rule applied at the end via .fect_apply_cv_rule.)
                 n_r <- length(r_seq)
                 for (i in seq_len(n_r)) {
                     r <- r_seq[i]
                     task_idx <- which(vapply(tasks, function(t) t$ri == i, logical(1)))
-                    all_resid    <- unlist(lapply(fold_scores[task_idx], `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_scores[task_idx], `[[`, "time_idx"))
-                    all_obs_w    <- if (use_weight == 1)
-                                        unlist(lapply(fold_scores[task_idx], `[[`, "obs_w"))
-                                    else c()
 
-                    scores <- .score_residuals(
-                        resid        = all_resid,
-                        obs_weights  = if (use_weight == 1) all_obs_w else NULL,
-                        time_index   = all_time_idx,
-                        count_weights = count.T.cv,
-                        norm.para    = NULL
+                    ## Both pooled scores (back-compat MSPE values) and per-fold
+                    ## scores (for SE → 1-SE rule) are computed in one pass.
+                    agg <- .fect_cv_aggregate_folds(
+                        fold_list   = fold_scores[task_idx],
+                        count.T.cv  = count.T.cv,
+                        use_weight  = use_weight,
+                        norm.para   = NULL
                     )
+                    scores <- agg$pooled
                     MSPE    <- scores["MSPE"]
                     WMSPE   <- scores["WMSPE"]
                     GMSPE   <- scores["GMSPE"]
@@ -531,6 +541,19 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     MAD     <- scores["MAD"]
                     moment  <- scores["Moment"]
                     gmoment <- scores["GMoment"]
+
+                    ## Store per-fold SEs in CV.out.ife.se
+                    se_v <- agg$se
+                    if (!is.null(norm.para)) {
+                        se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] <-
+                            se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] *
+                            (norm.para[1]^2)
+                    }
+                    for (cn in c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")) {
+                        if (cn %in% colnames(CV.out.ife.se)) {
+                            CV.out.ife.se[i, cn] <- se_v[cn]
+                        }
+                    }
 
                     ## Full-data fit for IC/PC/sigma2 — sequential in master
                     est.cv <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r, force, cv_tol, max.iteration)
@@ -620,11 +643,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 r <- CV.out.ife[i, "r"]
                 ## k <- 5
                 if (criterion %in% c("mspe", "wmspe", "gmspe", "wgmspe", "mad", "moment", "gmoment")) {
-                    all_resid <- c()
-                    all_obs_w <- c()
-                    all_time_idx <- c()
+                    fold_list <- vector("list", k)
                     for (ii in 1:k) {
-                        fold_result_ii <- .fect_cv_score_one_ife_all(
+                        fold_list[[ii]] <- .fect_cv_score_one_ife_all(
                             ii       = ii,
                             r        = r,
                             YY       = YY,
@@ -642,19 +663,14 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                             max.iteration = max.iteration,
                             use_weight    = use_weight
                         )
-                        all_resid    <- c(all_resid, fold_result_ii$resid)
-                        all_time_idx <- c(all_time_idx, fold_result_ii$time_idx)
-                        if (use_weight == 1) {
-                            all_obs_w <- c(all_obs_w, fold_result_ii$obs_w)
-                        }
                     }
-                    scores <- .score_residuals(
-                        resid = all_resid,
-                        obs_weights = if (use_weight == 1) all_obs_w else NULL,
-                        time_index = all_time_idx,
-                        count_weights = count.T.cv,
-                        norm.para = NULL
+                    agg <- .fect_cv_aggregate_folds(
+                        fold_list   = fold_list,
+                        count.T.cv  = count.T.cv,
+                        use_weight  = use_weight,
+                        norm.para   = NULL
                     )
+                    scores <- agg$pooled
                     MSPE    <- scores["MSPE"]
                     WMSPE   <- scores["WMSPE"]
                     GMSPE   <- scores["GMSPE"]
@@ -662,6 +678,19 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     MAD     <- scores["MAD"]
                     moment  <- scores["Moment"]
                     gmoment <- scores["GMoment"]
+
+                    ## Store per-fold SEs in CV.out.ife.se for end-of-loop rule
+                    se_v <- agg$se
+                    if (!is.null(norm.para)) {
+                        se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] <-
+                            se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] *
+                            (norm.para[1]^2)
+                    }
+                    for (cn in c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")) {
+                        if (cn %in% colnames(CV.out.ife.se)) {
+                            CV.out.ife.se[i, cn] <- se_v[cn]
+                        }
+                    }
                 }
 
                 est.cv <- inter_fe_ub(
@@ -806,6 +835,58 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             # MSPE.best <- min(CV.out[,"MSPE"])
             # PC.best <- min(CV.out[,"PC"])
 
+            ## --- Apply cv.rule (added v2.3.0) -----------------------------
+            ## The in-loop assignments above use the legacy 1% rule. Override
+            ## r.cv here based on the user-selected rule, using full CV.out.ife
+            ## and CV.out.ife.se. Only applies to MSPE-family criteria; the
+            ## "pc" branch keeps its own argmin.
+            crit_col_map <- c(mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE",
+                              wgmspe = "WGMSPE", mad = "MAD",
+                              moment = "Moment", gmoment = "GMoment")
+            if (criterion %in% names(crit_col_map)) {
+                crit_col <- crit_col_map[[criterion]]
+                means <- CV.out.ife[, crit_col]
+                ses   <- CV.out.ife.se[, crit_col]
+                ## Treat the loop sentinel value (1e20) as missing for selection.
+                means[!is.finite(means) | means >= 1e19] <- NA_real_
+                i_pick <- .fect_apply_cv_rule(means, ses, rule = cv.rule)
+                if (!is.na(i_pick) && i_pick >= 1L && i_pick <= nrow(CV.out.ife)) {
+                    new_r_cv <- unname(CV.out.ife[i_pick, "r"])
+                    if (!is.null(new_r_cv) && is.finite(new_r_cv)) {
+                        if (new_r_cv != as.integer(unname(r.cv))) {
+                            message(sprintf(
+                                "  [cv.rule = %s] r.cv adjusted from %d to %d (1-SE band)\n",
+                                cv.rule,
+                                as.integer(unname(r.cv)),
+                                as.integer(new_r_cv)
+                            ))
+                        }
+                        ## Preserve the prior branch's names convention: the
+                        ## parallel branch sets names(r.cv) <- "r"; the serial
+                        ## branch leaves it unnamed. Carry forward whichever
+                        ## the loop produced rather than overwriting.
+                        had_name <- !is.null(names(r.cv))
+                        r.cv <- new_r_cv
+                        if (had_name) names(r.cv) <- "r"
+                        ## Refit at the chosen r so est.best matches r.cv.
+                        est.best <- inter_fe_ub(
+                            YY, Y0, X, II, W.use, beta0,
+                            as.integer(unname(r.cv)), force, cv_tol, max.iteration
+                        )
+                        if (!is.null(scores <- CV.out.ife[i_pick, ])) {
+                            MSPE.best   <- scores["MSPE"]
+                            WMSPE.best  <- scores["WMSPE"]
+                            GMSPE.best  <- scores["GMSPE"]
+                            WGMSPE.best <- scores["WGMSPE"]
+                            MAD.best    <- scores["MAD"]
+                            moment.best <- scores["Moment"]
+                            gmoment.best <- scores["GMoment"]
+                        }
+                    }
+                }
+            }
+            ## --------------------------------------------------------------
+
             ## compare
             if (criterion == "both") {
                 if (r.cv > r.pc) {
@@ -874,6 +955,13 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             CV.out.mc <- matrix(NA, length(lambda), 10)
             colnames(CV.out.mc) <- c("lambda.norm", "MSPE", "WMSPE", "GMSPE", "WGMSPE", "MAD", "Moment", "GMoment", "MSPTATT", "MSE")
             CV.out.mc[, "lambda.norm"] <- c(lambda / max(eigen.all))
+
+            ## Per-fold SE matrix parallel to CV.out.mc (added v2.3.0).
+            ## Same role as CV.out.ife.se: store per-fold SE per criterion so
+            ## the end-of-MC-block `cv.rule` override can apply 1-SE selection.
+            CV.out.mc.se <- matrix(NA_real_, length(lambda), 10)
+            colnames(CV.out.mc.se) <- colnames(CV.out.mc)
+            CV.out.mc.se[, "lambda.norm"] <- CV.out.mc[, "lambda.norm"]
             CV.out.mc[, "GMoment"] <- CV.out.mc[, "Moment"] <- CV.out.mc[, "MAD"] <- CV.out.mc[, "WGMSPE"] <- CV.out.mc[, "WGMSPE"] <- CV.out.mc[, "GMSPE"] <- CV.out.mc[, "WMSPE"] <- CV.out.mc[, "MSPE"] <- 1e20
 
             ## ---- Parallel CV setup (MC, notyettreated) ---- ##
@@ -954,22 +1042,19 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 )
 
                 ## --- Aggregate per-lambda MSPE sequentially; apply 1% rule in master ---
+                ## (1-SE rule applied at the end of the MC block via .fect_apply_cv_rule.)
                 ## break_check is NOT applied in parallel mode — all lambdas are computed.
                 for (i in seq_along(lambda)) {
                     task_idx <- which(vapply(tasks, function(t) t$li == i, logical(1)))
-                    all_resid    <- unlist(lapply(fold_scores[task_idx], `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_scores[task_idx], `[[`, "time_idx"))
-                    all_obs_w    <- if (use_weight == 1)
-                                        unlist(lapply(fold_scores[task_idx], `[[`, "obs_w"))
-                                    else c()
 
-                    scores <- .score_residuals(
-                        resid        = all_resid,
-                        obs_weights  = if (use_weight == 1) all_obs_w else NULL,
-                        time_index   = all_time_idx,
-                        count_weights = count.T.cv,
-                        norm.para    = NULL
+                    ## Per-fold + pooled aggregation (added v2.3.0).
+                    agg <- .fect_cv_aggregate_folds(
+                        fold_list   = fold_scores[task_idx],
+                        count.T.cv  = count.T.cv,
+                        use_weight  = use_weight,
+                        norm.para   = NULL
                     )
+                    scores <- agg$pooled
                     MSPE    <- scores["MSPE"]
                     WMSPE   <- scores["WMSPE"]
                     GMSPE   <- scores["GMSPE"]
@@ -998,6 +1083,19 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         MAD    <- MAD    * (norm.para[1]^2)
                         moment <- moment * (norm.para[1]^2)
                         gmoment <- gmoment * (norm.para[1]^2)
+                    }
+
+                    ## Persist per-fold SEs in CV.out.mc.se for end-of-block rule
+                    se_v <- agg$se
+                    if (!is.null(norm.para)) {
+                        se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] <-
+                            se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] *
+                            (norm.para[1]^2)
+                    }
+                    for (cn in c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")) {
+                        if (cn %in% colnames(CV.out.mc.se)) {
+                            CV.out.mc.se[i, cn] <- se_v[cn]
+                        }
                     }
 
                     ## 1% rule — identical logic to serial path, but no break_check
@@ -1043,16 +1141,14 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 ## end parallel MC CV
 
             } else {
-            ## ---- Serial path (existing code, UNCHANGED) ---- ##
+            ## ---- Serial path (existing code) ---- ##
             break_count <- 0
             break_check <- 0
             for (i in 1:length(lambda)) {
                 ## k <- 5
-                all_resid <- c()
-                all_obs_w <- c()
-                all_time_idx <- c()
+                fold_list <- vector("list", k)
                 for (ii in 1:k) {
-                    fold_result_ii <- .fect_cv_score_one_mc_all(
+                    fold_list[[ii]] <- .fect_cv_score_one_mc_all(
                         ii        = ii,
                         lambda_i  = lambda[i],
                         YY        = YY,
@@ -1070,19 +1166,15 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         max.iteration = max.iteration,
                         use_weight    = use_weight
                     )
-                    all_resid    <- c(all_resid, fold_result_ii$resid)
-                    all_time_idx <- c(all_time_idx, fold_result_ii$time_idx)
-                    if (use_weight == 1) {
-                        all_obs_w <- c(all_obs_w, fold_result_ii$obs_w)
-                    }
                 }
-                scores <- .score_residuals(
-                    resid = all_resid,
-                    obs_weights = if (use_weight == 1) all_obs_w else NULL,
-                    time_index = all_time_idx,
-                    count_weights = count.T.cv,
-                    norm.para = NULL
+                ## Per-fold + pooled aggregation (added v2.3.0)
+                agg_mc <- .fect_cv_aggregate_folds(
+                    fold_list   = fold_list,
+                    count.T.cv  = count.T.cv,
+                    use_weight  = use_weight,
+                    norm.para   = NULL
                 )
+                scores <- agg_mc$pooled
                 MSPE    <- scores["MSPE"]
                 WMSPE   <- scores["WMSPE"]
                 GMSPE   <- scores["GMSPE"]
@@ -1110,6 +1202,21 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     MAD <- MAD * (norm.para[1]^2)
                     moment <- moment * (norm.para[1]^2)
                     gmoment <- gmoment * (norm.para[1]^2)
+                }
+
+                ## Persist per-fold SEs in CV.out.mc.se (added v2.3.0)
+                {
+                    se_v <- agg_mc$se
+                    if (!is.null(norm.para)) {
+                        se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] <-
+                            se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] *
+                            (norm.para[1]^2)
+                    }
+                    for (cn in c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")) {
+                        if (cn %in% colnames(CV.out.mc.se)) {
+                            CV.out.mc.se[i, cn] <- se_v[cn]
+                        }
+                    }
                 }
 
                 if (criterion == "mspe") {
@@ -1250,6 +1357,38 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
             }
             } ## end else (serial MC CV)
+
+            ## --- Apply cv.rule to lambda selection (added v2.3.0) ----------
+            ## Mirrors the IFE end-of-loop override. Applies only to
+            ## MSPE-family criteria.
+            crit_col_map_mc <- c(mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE",
+                                 wgmspe = "WGMSPE", mad = "MAD",
+                                 moment = "Moment", gmoment = "GMoment")
+            if (criterion %in% names(crit_col_map_mc)) {
+                crit_col_mc <- crit_col_map_mc[[criterion]]
+                means_mc <- CV.out.mc[, crit_col_mc]
+                ses_mc   <- CV.out.mc.se[, crit_col_mc]
+                ## Treat NAs (lambdas where break_check skipped) as missing
+                means_mc[!is.finite(means_mc)] <- NA_real_
+                i_pick_mc <- .fect_apply_cv_rule(means_mc, ses_mc, rule = cv.rule)
+                if (!is.na(i_pick_mc) && i_pick_mc >= 1L && i_pick_mc <= length(lambda)) {
+                    new_lambda_cv <- lambda[i_pick_mc]
+                    if (!identical(new_lambda_cv, lambda.cv)) {
+                        message(sprintf(
+                            "  [cv.rule = %s] lambda.cv adjusted (1-SE band)",
+                            cv.rule
+                        ))
+                        est.best <- inter_fe_mc(
+                            YY, Y0, X, II, W.use, beta0,
+                            1, new_lambda_cv,
+                            force, cv_tol, max.iteration
+                        )
+                        lambda.cv <- new_lambda_cv
+                    }
+                }
+            }
+            ## --------------------------------------------------------------
+
             est.best.mc <- est.best
             MSPE.best.mc <- MSPE.best
             WMSPE.best.mc <- WMSPE.best

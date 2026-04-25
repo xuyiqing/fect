@@ -57,11 +57,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         do_parallel_cv = NULL,  ## pre-computed flag from default.R; NULL means derive from parallel
                         loading.bound = "none",
                         gamma.loading = NULL,
-                        gamma.loading.grid = NULL
+                        gamma.loading.grid = NULL,
+                        cv.rule = "1se"
                         ) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
+    cv.rule <- .fect_validate_cv_rule(cv.rule)
     carryover.pos <- placebo.pos <- na.pos <- NULL
     res.sd1 <- res.sd2 <- NULL
     ## unit id and time
@@ -331,6 +333,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             CV.out[, "PC"] <- 1e10
             r.pc <- est.co.pc.best <- NULL
 
+            ## Per-fold SE matrix parallel to CV.out (added v2.3.0). Populated
+            ## below in both parallel and serial CV branches; consumed at the
+            ## end of the IFE CV block to apply `cv.rule` (default "1se").
+            CV.out.se <- matrix(NA_real_, nrow(CV.out), ncol(CV.out))
+            colnames(CV.out.se) <- colnames(CV.out)
+            CV.out.se[, "r"] <- CV.out[, "r"]
+
             crit_col <- switch(criterion,
                 mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE", wgmspe = "WGMSPE",
                 mad = "MAD", moment = "Moment", gmoment = "GMoment", "MSPE")
@@ -597,14 +606,16 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     if (length(all_resid) == 0) {
                         scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                     MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                        se_v <- setNames(rep(NA_real_, length(scores)), names(scores))
                     } else {
-                        scores <- .score_residuals(
-                            all_resid,
-                            obs_weights   = if (!is.null(W)) all_obs_w else NULL,
-                            time_index    = all_time_idx,
-                            count_weights = count.T.cv,
-                            norm.para     = NULL
+                        agg <- .fect_cv_aggregate_folds(
+                            fold_list  = fold_scores_ife[task_idx],
+                            count.T.cv = count.T.cv,
+                            use_weight = as.integer(!is.null(W)),
+                            norm.para  = NULL
                         )
+                        scores <- agg$pooled
+                        se_v   <- agg$se
                     }
 
                     ## 1% rule — identical logic to serial path
@@ -620,6 +631,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     }
                     CV.out[i, 2:4] <- c(sigma2, IC, PC)
                     CV.out[i, score_names] <- scores[score_names]
+                    ## Persist per-fold SEs for end-of-loop cv.rule application
+                    for (cn in score_names) {
+                        if (cn %in% names(se_v)) CV.out.se[i, cn] <- se_v[cn]
+                    }
                     message("r = ", r, "; sigma2 = ",
                         sprintf("%.5f", sigma2), "; IC = ",
                         sprintf("%.5f", IC), "; PC = ",
@@ -830,20 +845,19 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         max.iteration = max.iteration
                     )
                 })
-                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                if (length(all_resid) == 0) {
+                if (length(fold_results) == 0L) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                    se_v <- setNames(rep(NA_real_, length(scores)), names(scores))
                 } else {
-                    scores <- .score_residuals(
-                        all_resid,
-                        obs_weights = if (!is.null(W)) all_obs_w else NULL,
-                        time_index = all_time_idx,
-                        count_weights = count.T.cv,
-                        norm.para = NULL
+                    agg <- .fect_cv_aggregate_folds(
+                        fold_list  = fold_results,
+                        count.T.cv = count.T.cv,
+                        use_weight = as.integer(!is.null(W)),
+                        norm.para  = NULL
                     )
+                    scores <- agg$pooled
+                    se_v   <- agg$se
                 }
 
               } else {
@@ -887,20 +901,19 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         Ntr      = Ntr
                     )
                 })
-                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                all_obs_w    <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                if (length(all_resid) == 0) {
+                if (length(fold_results) == 0L) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                    se_v <- setNames(rep(NA_real_, length(scores)), names(scores))
                 } else {
-                    scores <- .score_residuals(
-                        all_resid,
-                        obs_weights = if (!is.null(W.tr)) all_obs_w else NULL,
-                        time_index = if (length(all_time_idx) > 0) all_time_idx else NULL,
-                        count_weights = count.T.cv,
-                        norm.para = norm.para
+                    agg <- .fect_cv_aggregate_folds(
+                        fold_list  = fold_results,
+                        count.T.cv = count.T.cv,
+                        use_weight = as.integer(!is.null(W.tr)),
+                        norm.para  = norm.para
                     )
+                    scores <- agg$pooled
+                    se_v   <- agg$se
                 }
 
               } ## end cv.method branching
@@ -919,6 +932,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
                 CV.out[i, 2:4] <- c(sigma2, IC, PC)
                 CV.out[i, score_names] <- scores[score_names]
+                ## Persist per-fold SEs for end-of-loop cv.rule application.
+                ## Some serial paths (e.g., LOO branch) may leave se_v undefined;
+                ## existsCheck protects those cases.
+                if (exists("se_v", inherits = FALSE) && !is.null(se_v)) {
+                    for (cn in score_names) {
+                        if (cn %in% names(se_v)) CV.out.se[i, cn] <- se_v[cn]
+                    }
+                }
                 message("r = ", r, "; sigma2 = ",
                     sprintf("%.5f", sigma2), "; IC = ",
                     sprintf("%.5f", IC), "; PC = ",
@@ -931,6 +952,43 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             } ## end SERIAL BRANCH (IFE)
 
             MSPE.best <- min(CV.out[, "MSPE"])
+
+            ## --- Apply cv.rule (added v2.3.0) -----------------------------
+            ## Override r.cv based on the user-selected rule. The default "1se"
+            ## picks the smallest r within one fold-SE of the minimum-CV-error r;
+            ## "min" picks the argmin; "1pct" preserves the legacy 1% rule from
+            ## the in-loop assignments above.
+            if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
+                means <- CV.out[, crit_col]
+                ses   <- CV.out.se[, crit_col]
+                ## Treat sentinels (1e10, Inf, NA) as missing for selection.
+                means[!is.finite(means) | means >= 1e9] <- NA_real_
+                i_pick <- .fect_apply_cv_rule(means, ses, rule = cv.rule)
+                if (!is.na(i_pick) && i_pick >= 1L && i_pick <= nrow(CV.out)) {
+                    new_r_cv <- unname(CV.out[i_pick, "r"])
+                    if (!is.null(new_r_cv) && is.finite(new_r_cv)) {
+                        if (new_r_cv != as.integer(unname(r.cv))) {
+                            message(sprintf(
+                                "  [cv.rule = %s] r.cv adjusted from %d to %d (1-SE band)",
+                                cv.rule,
+                                as.integer(unname(r.cv)),
+                                as.integer(new_r_cv)
+                            ))
+                            est.co.best <- .estimate_co(
+                                YY.co, Y0.co, X.co, I.co, W.use, beta0,
+                                as.integer(new_r_cv), force, cv_tol, max.iteration
+                            )
+                        }
+                        ## Preserve the in-loop names convention: serial path
+                        ## leaves r.cv unnamed; parallel path sets names "r".
+                        had_name <- !is.null(names(r.cv))
+                        r.cv <- new_r_cv
+                        if (had_name) names(r.cv) <- "r"
+                    }
+                }
+            }
+            ## --------------------------------------------------------------
+
             if (r > (T0.min - 1)) {
                 message(" (r hits maximum)")
             }

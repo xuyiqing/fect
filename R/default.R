@@ -94,7 +94,8 @@ fect <- function(
     cm = FALSE, # causal moderation
     loading.bound = "none",           # simplex projection of treated loadings
     gamma.loading = NULL,             # scalar gamma for simplex; NULL = CV
-    gamma.loading.grid = NULL         # optional grid for gamma CV
+    gamma.loading.grid = NULL,        # optional grid for gamma CV
+    cv.rule = "1se"                   # CV selection rule: "1se", "min", "1pct"
 ) {
     UseMethod("fect")
 }
@@ -171,7 +172,8 @@ fect.formula <- function(
     cm = FALSE,
     loading.bound = "none",
     gamma.loading = NULL,
-    gamma.loading.grid = NULL
+    gamma.loading.grid = NULL,
+    cv.rule = "1se"
 ) {
     ## parsing
     varnames <- all.vars(formula)
@@ -278,7 +280,8 @@ fect.formula <- function(
         cm = cm,
         loading.bound      = loading.bound,
         gamma.loading      = gamma.loading,
-        gamma.loading.grid = gamma.loading.grid
+        gamma.loading.grid = gamma.loading.grid,
+        cv.rule            = cv.rule
     )
 
     out$call <- match.call()
@@ -359,11 +362,13 @@ fect.default <- function(
     cm=FALSE,
     loading.bound = "none",
     gamma.loading = NULL,
-    gamma.loading.grid = NULL
+    gamma.loading.grid = NULL,
+    cv.rule = "1se"
 ) {
     ## -------------------------------##
     ## Checking Parameters
     ## -------------------------------##
+    cv.rule <- .fect_validate_cv_rule(cv.rule)
     placeboEquiv <- loo
     permu.dimension <- "time"
 
@@ -753,8 +758,8 @@ fect.default <- function(
         stop("'loading.bound' must be one of 'none', 'simplex'.")
     }
     if (loading.bound == "simplex") {
-        if (!(method %in% c("ife"))) {
-            stop("'loading.bound = \"simplex\"' is only supported for method = \"ife\" in this version.")
+        if (!(method %in% c("ife", "gsynth"))) {
+            stop("'loading.bound = \"simplex\"' is only supported for method = \"ife\" or \"gsynth\" in this version.")
         }
         if (!identical(time.component.from, "nevertreated")) {
             stop("'loading.bound = \"simplex\"' requires time.component.from = \"nevertreated\". ",
@@ -2094,7 +2099,8 @@ fect.default <- function(
                     parallel = parallel,
                     cores = cores,
                     do_parallel_cv   = do_parallel_cv,
-                    do_parallel_boot = do_parallel_boot
+                    do_parallel_boot = do_parallel_boot,
+                    cv.rule = cv.rule
                 )
             } else {
                 out <- fect_binary_cv(
