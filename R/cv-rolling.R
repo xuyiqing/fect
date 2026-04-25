@@ -11,9 +11,10 @@
 ## the standard cv.method = "all_units" / "treated_units" leaves open at
 ## cv.donut = 0 / 1 under serially correlated residuals.
 ##
-## Currently supports method = "ife" with time.component.from = "notyettreated"
-## (the only fect path that populates Y.ct.full at masked control positions).
-## A migration message is emitted for unsupported configurations.
+## Supports method = "ife" (IFE-EM, time.component.from = "notyettreated")
+## and method = "gsynth" (GSC, time.component.from = "nevertreated"). The GSC
+## path now populates Y.ct.full at masked control positions via the Stage 2
+## patch in R/fect_nevertreated.R, so rolling CV can score MSPE there.
 ###################################################################
 
 #' Rolling (forward-only) CV for rank selection
@@ -30,10 +31,11 @@
 #' @param formula A model formula, e.g. `Y ~ D + X1 + X2`.
 #' @param data A long-format data frame.
 #' @param index Length-2 character vector: `c("unit", "time")`.
-#' @param method Estimator. Currently only `"ife"` (with
-#'   `time.component.from = "notyettreated"`) is supported. Other paths
-#'   error with a migration message because they don't populate
-#'   `Y.ct.full` at masked control positions.
+#' @param method Estimator. One of `"ife"` (IFE-EM,
+#'   `time.component.from = "notyettreated"`) or `"gsynth"` (GSC,
+#'   `time.component.from = "nevertreated"`). Both paths now populate
+#'   `Y.ct.full` at masked control positions, so rolling CV can score
+#'   them. The GSC path was enabled in fect 2.4.0.
 #' @param r.max Largest candidate rank to evaluate. CV is run over
 #'   `0:r.max`.
 #' @param cv.nobs Number of trailing observations per unit to hold out
@@ -69,7 +71,7 @@
 r.cv.rolling <- function(formula,
                           data,
                           index,
-                          method = "ife",
+                          method = c("ife", "gsynth"),
                           r.max = 5L,
                           cv.nobs = 3L,
                           cv.rule = c("1se", "min", "1pct"),
@@ -78,12 +80,12 @@ r.cv.rolling <- function(formula,
                           verbose = TRUE,
                           ...) {
     cv.rule <- match.arg(cv.rule)
-    if (!identical(method, "ife")) {
-        stop("r.cv.rolling: only method = 'ife' (with time.component.from = ",
-             "'notyettreated') is supported in this version. ",
-             "method = '", method, "' is not yet supported because that path ",
-             "does not populate Y.ct.full at masked control positions.")
-    }
+    method  <- match.arg(method)
+    ## Map user-facing method label to fect's (method, time.component.from).
+    ## "ife"    -> IFE-EM via notyettreated
+    ## "gsynth" -> GSC via nevertreated (Y.ct.full[, co] populated by Stage 2)
+    fect_method <- "ife"
+    fect_tcf <- if (identical(method, "gsynth")) "nevertreated" else "notyettreated"
     r.max <- as.integer(r.max)
     if (r.max < 0L) stop("r.max must be >= 0.")
     cv.nobs <- as.integer(cv.nobs)
@@ -167,7 +169,7 @@ r.cv.rolling <- function(formula,
         fit <- tryCatch(
             suppressWarnings(suppressMessages(fect(
                 formula = formula, data = data_masked, index = index,
-                method = "ife", time.component.from = "notyettreated",
+                method = fect_method, time.component.from = fect_tcf,
                 force = force, CV = FALSE, r = r_try,
                 min.T0 = min.T0, se = FALSE, na.rm = FALSE, ...))),
             error = function(e) {

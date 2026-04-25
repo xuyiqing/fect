@@ -182,7 +182,7 @@ fit <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
             CV = FALSE, r = res$r.cv, se = TRUE)
 ```
 
-`r.cv.rolling()` is currently supported only for `method = "ife"` with `time.component.from = "notyettreated"` (the only fect path that populates `Y.ct.full` at masked control positions). Other configurations error with a migration message.
+`r.cv.rolling()` supports `method = "ife"` (IFE-EM, internally `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC, internally `time.component.from = "nevertreated"`). Both paths populate `Y.ct.full` at masked control positions, so rolling CV can score MSPE on either estimator. Other methods (e.g., `"mc"`) are not yet supported.
 
 ::: {.callout-note appearance="simple"}
 
