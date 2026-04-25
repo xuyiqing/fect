@@ -8,7 +8,7 @@ r.cv.rolling(
   formula,
   data,
   index,
-  method = "ife",
+  method = c("ife", "gsynth"),
   r.max = 5L,
   cv.nobs = 3L,
   cv.rule = c("1se", "min", "1pct"),
@@ -25,10 +25,11 @@ r.cv.rolling(
 
 \item{index}{Length-2 character vector: `c("unit", "time")`.}
 
-\item{method}{Estimator. Currently only `"ife"` (with
-`time.component.from = "notyettreated"`) is supported. Other paths
-error with a migration message because they don't populate
-`Y.ct.full` at masked control positions.}
+\item{method}{Estimator. One of `"ife"` (IFE-EM,
+`time.component.from = "notyettreated"`) or `"gsynth"` (GSC,
+`time.component.from = "nevertreated"`). Both paths now populate
+`Y.ct.full` at masked control positions, so rolling CV can score
+them. The GSC path was enabled in fect 2.4.0.}
 
 \item{r.max}{Largest candidate rank to evaluate. CV is run over
 `0:r.max`.}
