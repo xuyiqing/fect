@@ -11,8 +11,8 @@ r.cv.rolling(
   method = c("ife", "gsynth"),
   r.max = 5L,
   cv.nobs = 3L,
-  cv.gap = 1L,
-  k = 5L,
+  cv.buffer = 1L,
+  k = 10L,
   cv.rule = c("1se", "min", "1pct"),
   min.T0 = 5L,
   force = "unit",
@@ -40,15 +40,17 @@ behavior is identical across the two estimators.}
 \item{cv.nobs}{Length of the held-out (scored) block per unit per
 fold. Default 3.}
 
-\item{cv.gap}{Number of observations immediately BEFORE the held-out
-block to drop from training (the gap buffer). Default 1. Analogous
-to `cv.donut` in the existing `cv.method = "all_units"` /
-`"treated_units"` strategies, but only applies to the past side
-because the future side is dropped by construction.}
+\item{cv.buffer}{Number of observations immediately BEFORE the
+held-out block to drop from training (the past-side buffer that
+attenuates AR-leakage). Default 1. Analogous to `cv.donut` in the
+existing `cv.method = "all_units"` / `"treated_units"` strategies,
+but applied only on the past side: the future side is dropped by
+construction.}
 
 \item{k}{Number of folds. Each fold draws a fresh set of per-unit
 anchors; the per-r MSPE is averaged across folds and the SE used
-by the `"1se"` rule reflects fold-to-fold variability. Default 5.}
+by the `"1se"` rule reflects fold-to-fold variability. Default 10
+(matches the default for the existing CV strategies).}
 
 \item{cv.rule}{Rule for picking `r` from the MSPE curve: `"1se"`
 (default), `"min"`, or `"1pct"`.}
@@ -74,7 +76,7 @@ List with components:
   - `mspe`: data.frame of per-r MSPE (averaged across folds), SE
     across folds, and held-out cell counts.
   - `mspe.per.fold`: r-by-k matrix of per-fold MSPE.
-  - `k`, `cv.nobs`, `cv.gap`: parameters used.
+  - `k`, `cv.nobs`, `cv.buffer`: parameters used.
   - `n.units.masked`: distinct units that contributed to at least
     one fold's holdout.
 }
@@ -82,11 +84,11 @@ List with components:
 Picks the number of factors `r` for an interactive-fixed-effects
 model via standard rolling-window cross-validation. For each of `k`
 folds and each eligible control unit, a random anchor time `t*` is
-sampled. The fold's training set excludes `t* - cv.gap, ..., t* - 1`
-(gap buffer), `t*, ..., t* + cv.nobs - 1` (the held-out, scored
-block), and `t* + cv.nobs, ..., last(t)` (rolling-window future
-drop). MSPE is scored at the held-out block only and averaged across
-folds.
+sampled. The fold's training set excludes
+`t* - cv.buffer, ..., t* - 1` (buffer), `t*, ..., t* + cv.nobs - 1`
+(the held-out, scored block), and `t* + cv.nobs, ..., last(t)`
+(rolling-window future drop). MSPE is scored at the held-out block
+only and averaged across folds.
 }
 \details{
 This is the standard time-series CV design (cf. `forecast::tsCV`,
@@ -100,7 +102,7 @@ from valid positions.
   data(simdata)
   res <- r.cv.rolling(Y ~ D, data = simdata, index = c("id", "time"),
                       method = "ife", r.max = 5,
-                      cv.nobs = 3, cv.gap = 1, k = 5)
+                      cv.nobs = 3, cv.buffer = 1, k = 10)
   res$r.cv
   ## then use the chosen r in a CV-disabled fit:
   fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),

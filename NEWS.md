@@ -7,7 +7,7 @@
   For each of `k` folds and each eligible control unit, a random anchor
   time `t*` is sampled. The fold's training set excludes:
     1. `cv.nobs` observations starting at `t*` (the held-out, scored block);
-    2. `cv.gap` observations immediately before `t*` (gap buffer, attenuates
+    2. `cv.buffer` observations immediately before `t*` (gap buffer, attenuates
        AR-leakage at the past-side train/test boundary --- analogous to
        `cv.donut` for the existing CV strategies, but only on the past side
        since the future side is dropped by construction);
@@ -18,9 +18,12 @@
   `tidymodels::sliding_window`, `caret::createTimeSlices`) adapted to
   panel data.
 
-* New parameters: `cv.gap` (default 1, past-side buffer length); `k`
-  (default 5, number of folds); `seed` (optional integer base seed for
-  reproducible per-fold anchor sampling).
+* New parameters: `cv.buffer` (default 1, past-side buffer length ---
+  analogous to `cv.donut` for the existing CV strategies, but only on
+  the past side because the future side is dropped by construction);
+  `k` (default 10 folds, matching the default for the existing CV
+  strategies); `seed` (optional integer base seed for reproducible
+  per-fold anchor sampling).
 
 * Closes the forward-leakage channel that the existing
   `cv.method = "all_units"` / `"treated_units"` (random contiguous-block
@@ -29,7 +32,7 @@
   future side is closed by construction.
 
 * Workflow: call
-  `r.cv.rolling(formula, data, index, method = "ife", cv.gap = 1, k = 5)`
+  `r.cv.rolling(formula, data, index, method = "ife", cv.buffer = 1, k = 10)`
   to get the chosen `r.cv`, then pass that to
   `fect(..., CV = FALSE, r = r.cv, se = TRUE)` for the inferential fit.
 
@@ -44,7 +47,7 @@
 * Return value is a list with `r.cv`, `cv.rule`, `mspe` (data.frame of
   per-r MSPE averaged across folds, plus fold-SE and held-out cell
   counts), `mspe.per.fold` (r-by-k matrix of per-fold MSPE), and the
-  chosen `k`, `cv.nobs`, `cv.gap`. Promoting the design to a
+  chosen `k`, `cv.nobs`, `cv.buffer`. Promoting the design to a
   `cv.method = "rolling"` option inside the main `fect()` CV dispatcher
   is deferred to a future release.
 

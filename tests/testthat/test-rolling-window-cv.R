@@ -4,10 +4,10 @@
 ## After the rewrite, r.cv.rolling implements the standard time-series
 ## rolling-window design (random anchors per unit per fold, with
 ## training restricted to observations strictly before each anchor;
-## an optional cv.gap excludes a buffer immediately before the anchor;
+## an optional cv.buffer excludes a buffer immediately before the anchor;
 ## all observations after anchor + cv.nobs are dropped from training).
 ##
-## Tests cover: new parameters (cv.gap, k, seed), reproducibility under
+## Tests cover: new parameters (cv.buffer, k, seed), reproducibility under
 ## a fixed seed, fold-aggregated MSPE structure, identical CV behavior
 ## across method = "ife" and method = "gsynth".
 ## ---------------------------------------------------------------
@@ -40,7 +40,7 @@
   df[!df_keys %in% drop_keys, ]
 }
 
-test_that("k and cv.gap parameters are honored", {
+test_that("k and cv.buffer parameters are honored", {
 
   skip_on_cran()
   df <- .make_unbalanced_panel(seed = 11)
@@ -49,13 +49,13 @@ test_that("k and cv.gap parameters are honored", {
   res_k5 <- suppressWarnings(suppressMessages(
     fect::r.cv.rolling(
       Y ~ D, data = df, index = c("id", "time"),
-      method = "ife", r.max = 2, cv.nobs = 2, cv.gap = 1,
+      method = "ife", r.max = 2, cv.nobs = 2, cv.buffer = 1,
       k = 5L, seed = 99,
       verbose = FALSE
     )
   ))
   expect_equal(res_k5$k, 5L)
-  expect_equal(res_k5$cv.gap, 1L)
+  expect_equal(res_k5$cv.buffer, 1L)
   expect_equal(res_k5$cv.nobs, 2L)
   expect_equal(dim(res_k5$mspe.per.fold),
                c(3L, 5L))    # (r.max + 1) rows x k columns
@@ -70,14 +70,14 @@ test_that("seed gives reproducible per-fold MSPE", {
   res_a <- suppressWarnings(suppressMessages(
     fect::r.cv.rolling(
       Y ~ D, data = df, index = c("id", "time"),
-      method = "ife", r.max = 2, cv.nobs = 2, cv.gap = 1,
+      method = "ife", r.max = 2, cv.nobs = 2, cv.buffer = 1,
       k = 3L, seed = 42L, verbose = FALSE
     )
   ))
   res_b <- suppressWarnings(suppressMessages(
     fect::r.cv.rolling(
       Y ~ D, data = df, index = c("id", "time"),
-      method = "ife", r.max = 2, cv.nobs = 2, cv.gap = 1,
+      method = "ife", r.max = 2, cv.nobs = 2, cv.buffer = 1,
       k = 3L, seed = 42L, verbose = FALSE
     )
   ))
@@ -98,21 +98,21 @@ test_that("rolling-window CV identical for method = 'ife' and 'gsynth' inner-cal
   res_ife <- suppressWarnings(suppressMessages(
     fect::r.cv.rolling(
       Y ~ D, data = df, index = c("id", "time"),
-      method = "ife", r.max = 1, cv.nobs = 2, cv.gap = 0,
+      method = "ife", r.max = 1, cv.nobs = 2, cv.buffer = 0,
       k = 2L, seed = 7L, verbose = FALSE
     )
   ))
   res_gsc <- suppressWarnings(suppressMessages(
     fect::r.cv.rolling(
       Y ~ D, data = df, index = c("id", "time"),
-      method = "gsynth", r.max = 1, cv.nobs = 2, cv.gap = 0,
+      method = "gsynth", r.max = 1, cv.nobs = 2, cv.buffer = 0,
       k = 2L, seed = 7L, verbose = FALSE
     )
   ))
   expect_equal(res_ife$n.units.masked, res_gsc$n.units.masked)
   expect_equal(res_ife$k, res_gsc$k)
   expect_equal(res_ife$cv.nobs, res_gsc$cv.nobs)
-  expect_equal(res_ife$cv.gap, res_gsc$cv.gap)
+  expect_equal(res_ife$cv.buffer, res_gsc$cv.buffer)
 })
 
 test_that("invalid arguments are rejected", {
@@ -130,9 +130,9 @@ test_that("invalid arguments are rejected", {
   expect_error(
     fect::r.cv.rolling(
       Y ~ D, data = df, index = c("id", "time"),
-      method = "ife", r.max = 1, cv.gap = -1, verbose = FALSE
+      method = "ife", r.max = 1, cv.buffer = -1, verbose = FALSE
     ),
-    regexp = "cv\\.gap must be"
+    regexp = "cv\\.buffer must be"
   )
   expect_error(
     fect::r.cv.rolling(

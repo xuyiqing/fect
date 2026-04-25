@@ -162,16 +162,17 @@ cat("cv.method = 'treated_units': r.cv =", out.tr$r.cv, "\n")
 
 Both strategies often agree, but they can select different `r` when the factor structure matters more for one group than the other.
 
-### Forward-only (rolling) CV via `r.cv.rolling()`
+### Rolling-window CV via `r.cv.rolling()`
 
-Both `"all_units"` and `"treated_units"` use random anchors to mask contiguous blocks of `cv.nobs` observations. With residuals that are temporally correlated, this design has a subtle problem: the blocks are immediately adjacent to training observations on both sides, so a high-rank model can "predict" the held-out block by exploiting the AR structure that leaks across the train/test boundary. Even widening `cv.nobs` and adding a `cv.donut` may not fully close this channel.
+Both `"all_units"` and `"treated_units"` use random anchors to mask contiguous blocks of `cv.nobs` observations. With residuals that are temporally correlated, this design has a subtle problem: the blocks are sandwiched between training observations on both sides, so a high-rank model can "predict" the held-out block by exploiting the AR structure that leaks across the train/test boundary. Even widening `cv.nobs` and adding a `cv.donut` may not fully close this channel.
 
-`r.cv.rolling()` is a deterministic alternative: for each unit, it holds out the **last `cv.nobs` observations** and trains on everything else (the unit's earlier observations plus all other units' full data). The future-side leakage channel is closed because the masked block is always the most recent observed window per unit.
+`r.cv.rolling()` implements the standard time-series rolling-window CV design (cf. `forecast::tsCV`, `tidymodels::sliding_window`, `caret::createTimeSlices`) adapted to panel data. For each of `k` folds and each eligible control unit, a random anchor time `t*` is sampled. The fold's training set excludes (i) the `cv.nobs` cells starting at `t*` (the held-out block, scored for MSPE), (ii) `cv.buffer` cells immediately before `t*` (past-side buffer, analogous to `cv.donut` but only on the past side), and (iii) all cells from `t* + cv.nobs` onward (rolling-window step --- training cannot see the future of the held-out block). MSPE is averaged across folds; the fold-SE feeds the `"1se"` rule.
 
 ```{r rcv_rolling_demo, eval=FALSE}
 res <- r.cv.rolling(Y ~ D + X1 + X2, data = simdata,
                     index = c("id", "time"),
-                    method = "ife", r.max = 5, cv.nobs = 3,
+                    method = "ife", r.max = 5,
+                    cv.nobs = 3, cv.buffer = 1, k = 10,
                     cv.rule = "1se", min.T0 = 5)
 res$r.cv      # selected r
 res$mspe      # per-r MSPE curve

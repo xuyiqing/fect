@@ -4,8 +4,8 @@
 ## Standalone user-facing wrapper. For each of `k` folds and each
 ## eligible control unit, samples a random anchor time `t*` and:
 ##   - holds out `cv.nobs` observations starting at `t*` (scored for MSPE)
-##   - drops `cv.gap` observations immediately before `t*` from training
-##     (gap buffer, attenuates AR-leakage from training to holdout)
+##   - drops `cv.buffer` observations immediately before `t*` from training
+##     (buffer, attenuates AR-leakage from training to holdout)
 ##   - drops ALL observations from `t* + cv.nobs` onward from training
 ##     (the rolling-window step --- training cannot see the future of
 ##     the held-out block)
@@ -30,11 +30,11 @@
 #' Picks the number of factors `r` for an interactive-fixed-effects
 #' model via standard rolling-window cross-validation. For each of `k`
 #' folds and each eligible control unit, a random anchor time `t*` is
-#' sampled. The fold's training set excludes `t* - cv.gap, ..., t* - 1`
-#' (gap buffer), `t*, ..., t* + cv.nobs - 1` (the held-out, scored
-#' block), and `t* + cv.nobs, ..., last(t)` (rolling-window future
-#' drop). MSPE is scored at the held-out block only and averaged across
-#' folds.
+#' sampled. The fold's training set excludes
+#' `t* - cv.buffer, ..., t* - 1` (buffer), `t*, ..., t* + cv.nobs - 1`
+#' (the held-out, scored block), and `t* + cv.nobs, ..., last(t)`
+#' (rolling-window future drop). MSPE is scored at the held-out block
+#' only and averaged across folds.
 #'
 #' This is the standard time-series CV design (cf. `forecast::tsCV`,
 #' `tidymodels::sliding_window`, `caret::createTimeSlices`) adapted to
@@ -53,14 +53,16 @@
 #'   `0:r.max`.
 #' @param cv.nobs Length of the held-out (scored) block per unit per
 #'   fold. Default 3.
-#' @param cv.gap Number of observations immediately BEFORE the held-out
-#'   block to drop from training (the gap buffer). Default 1. Analogous
-#'   to `cv.donut` in the existing `cv.method = "all_units"` /
-#'   `"treated_units"` strategies, but only applies to the past side
-#'   because the future side is dropped by construction.
+#' @param cv.buffer Number of observations immediately BEFORE the
+#'   held-out block to drop from training (the past-side buffer that
+#'   attenuates AR-leakage). Default 1. Analogous to `cv.donut` in the
+#'   existing `cv.method = "all_units"` / `"treated_units"` strategies,
+#'   but applied only on the past side: the future side is dropped by
+#'   construction.
 #' @param k Number of folds. Each fold draws a fresh set of per-unit
 #'   anchors; the per-r MSPE is averaged across folds and the SE used
-#'   by the `"1se"` rule reflects fold-to-fold variability. Default 5.
+#'   by the `"1se"` rule reflects fold-to-fold variability. Default 10
+#'   (matches the default for the existing CV strategies).
 #' @param cv.rule Rule for picking `r` from the MSPE curve: `"1se"`
 #'   (default), `"min"`, or `"1pct"`.
 #' @param min.T0 Minimum observations required strictly before the
@@ -79,7 +81,7 @@
 #'   - `mspe`: data.frame of per-r MSPE (averaged across folds), SE
 #'     across folds, and held-out cell counts.
 #'   - `mspe.per.fold`: r-by-k matrix of per-fold MSPE.
-#'   - `k`, `cv.nobs`, `cv.gap`: parameters used.
+#'   - `k`, `cv.nobs`, `cv.buffer`: parameters used.
 #'   - `n.units.masked`: distinct units that contributed to at least
 #'     one fold's holdout.
 #'
@@ -89,7 +91,7 @@
 #'   data(simdata)
 #'   res <- r.cv.rolling(Y ~ D, data = simdata, index = c("id", "time"),
 #'                       method = "ife", r.max = 5,
-#'                       cv.nobs = 3, cv.gap = 1, k = 5)
+#'                       cv.nobs = 3, cv.buffer = 1, k = 10)
 #'   res$r.cv
 #'   ## then use the chosen r in a CV-disabled fit:
 #'   fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
@@ -104,8 +106,8 @@ r.cv.rolling <- function(formula,
                           method = c("ife", "gsynth"),
                           r.max = 5L,
                           cv.nobs = 3L,
-                          cv.gap = 1L,
-                          k = 5L,
+                          cv.buffer = 1L,
+                          k = 10L,
                           cv.rule = c("1se", "min", "1pct"),
                           min.T0 = 5L,
                           force = "unit",
@@ -117,11 +119,11 @@ r.cv.rolling <- function(formula,
     fect_method <- "ife"
     fect_tcf <- if (identical(method, "gsynth")) "nevertreated" else "notyettreated"
 
-    r.max   <- as.integer(r.max);   if (r.max   < 0L) stop("r.max must be >= 0.")
-    cv.nobs <- as.integer(cv.nobs); if (cv.nobs < 1L) stop("cv.nobs must be >= 1.")
-    cv.gap  <- as.integer(cv.gap);  if (cv.gap  < 0L) stop("cv.gap must be >= 0.")
-    k       <- as.integer(k);       if (k       < 1L) stop("k must be >= 1.")
-    min.T0  <- as.integer(min.T0);  if (min.T0  < 1L) stop("min.T0 must be >= 1.")
+    r.max     <- as.integer(r.max);     if (r.max     < 0L) stop("r.max must be >= 0.")
+    cv.nobs   <- as.integer(cv.nobs);   if (cv.nobs   < 1L) stop("cv.nobs must be >= 1.")
+    cv.buffer <- as.integer(cv.buffer); if (cv.buffer < 0L) stop("cv.buffer must be >= 0.")
+    k         <- as.integer(k);         if (k         < 1L) stop("k must be >= 1.")
+    min.T0    <- as.integer(min.T0);    if (min.T0    < 1L) stop("min.T0 must be >= 1.")
 
     if (length(index) != 2L) stop("index must be a length-2 character vector.")
     if (!all(index %in% colnames(data))) {
@@ -161,8 +163,8 @@ r.cv.rolling <- function(formula,
 
     if (isTRUE(verbose)) {
         message(sprintf(
-            "r.cv.rolling: %d eligible control units; k = %d folds; cv.nobs = %d, cv.gap = %d.",
-            length(ctrl_obs_times), k, cv.nobs, cv.gap
+            "r.cv.rolling: %d eligible control units; k = %d folds; cv.nobs = %d, cv.buffer = %d.",
+            length(ctrl_obs_times), k, cv.nobs, cv.buffer
         ))
     }
 
@@ -192,8 +194,8 @@ r.cv.rolling <- function(formula,
             if (length(valid) == 0L) return(NULL)
             a_idx <- valid[sample.int(length(valid), 1L)]
             holdout_t <- obs_t[a_idx:(a_idx + cv.nobs - 1L)]
-            buf_t <- if (cv.gap > 0L) {
-                bs <- max(1L, a_idx - cv.gap)
+            buf_t <- if (cv.buffer > 0L) {
+                bs <- max(1L, a_idx - cv.buffer)
                 obs_t[bs:(a_idx - 1L)]
             } else integer(0)
             drop_t <- if ((a_idx + cv.nobs) <= n_obs) {
@@ -309,6 +311,6 @@ r.cv.rolling <- function(formula,
          mspe.per.fold = fold_mspe,
          k             = k,
          cv.nobs       = cv.nobs,
-         cv.gap        = cv.gap,
+         cv.buffer     = cv.buffer,
          n.units.masked = length(units_seen))
 }
