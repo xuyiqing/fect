@@ -755,7 +755,7 @@ fect_boot <- function(
       Nco_B <- length(id.co_B)
       ## Pre-compute vcov_co_split for the Gaussian draw path (unbalanced panels)
       if (0 %in% I) {
-        vcov_co_split <- res.vcov(res = error.co_split, cov.ar = 0)
+        vcov_co_split <- res.vcov(res = error.co_split, cov.ar = TT - 1L)
         vcov_co_split[is.na(vcov_co_split) | is.nan(vcov_co_split)] <- 0
       }
     }
