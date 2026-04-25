@@ -780,7 +780,36 @@ fect_boot <- function(
 
     ## --- Split-residual partition (POC: K=2) ---
     if (isTRUE(split_residuals)) {
-      .split <- partition_controls(id.co, K = 2L)
+      ## BUGFIX: rejection-sample the K=2 partition until BOTH halves cover
+      ## every time period.  When some year t has only k valid controls
+      ## (e.g. EH 2023 sec_enrol: year 2012 has 3), a uniform-random K=2
+      ## split lands all k in one half with probability 2 * (1/2)^k.  When
+      ## that happens, draw.error's `repeat { sample id.co.pseudo }` cannot
+      ## terminate (no permutation of half-A covers year t), and the
+      ## bootstrap hangs indefinitely.  Rejection-sampling the partition
+      ## itself preserves the K=2 cross-fitting design while ruling out
+      ## degenerate halves.  Fall back to no-split (full id.co) after a
+      ## bounded number of redraw attempts.
+      .max_partition_tries <- 200L
+      .partition_ok <- FALSE
+      for (.i in seq_len(.max_partition_tries)) {
+        .split  <- partition_controls(id.co, K = 2L)
+        .I_A    <- as.matrix(out$I[, .split$A, drop = FALSE])
+        .I_B    <- as.matrix(out$I[, .split$B, drop = FALSE])
+        .cov_A  <- rowSums(.I_A == 1)
+        .cov_B  <- rowSums(.I_B == 1)
+        if (all(.cov_A >= 1L) && all(.cov_B >= 1L)) {
+          .partition_ok <- TRUE
+          break
+        }
+      }
+      if (!.partition_ok) {
+        warning(sprintf(
+          "split_residuals: could not partition %d controls into two halves with full year coverage in %d tries; falling back to no-split (using full id.co for both halves).",
+          length(id.co), .max_partition_tries
+        ))
+        .split <- list(A = id.co, B = id.co)
+      }
       id.co_A <- .split$A
       id.co_B <- .split$B
       error.co_split <- out$res.full[, id.co_B, drop = FALSE]
