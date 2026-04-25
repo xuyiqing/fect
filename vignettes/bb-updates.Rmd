@@ -1,5 +1,27 @@
 # Changelog {#sec-changelog .unnumbered}
 
+## v2.3.0
+
+(2026-04-24)
+
+**Cross-validation: 1-SE rule is now the default for $r$ selection** (Breiman, Friedman, Olshen & Stone 1984; Hastie, Tibshirani & Friedman 2009 §7.10):
+
+* New `cv.rule` argument with three values: `"1se"` (default), `"min"`, or `"1pct"`. The 1-SE rule picks the smallest $r$ whose mean CV criterion sits within one fold-SE of the minimum-CV-error $r$. This biases selection toward parsimony in a fold-aware, statistically principled way --- when CV is precise (low fold-to-fold variance), the rule is permissive and allows larger $r$; when CV is noisy, it gravitates to simpler models.
+* The legacy 1% relative-tolerance heuristic remains available as `cv.rule = "1pct"` for byte-identical reproducibility of pre-2.3.0 fits.
+* Per-fold MSPE values are now retained alongside the pooled estimate so SEs across folds can be computed without changing the underlying CV machinery.
+* This is a default-flip: existing code that uses `CV = TRUE` will see different $r.cv$ values on the same data. Set `cv.rule = "1pct"` to recover the prior behavior.
+
+Bounded factor loadings for GSC (see [Chapter @sec-gsynth] for the objective and worked example):
+
+* New argument `loading.bound = "simplex"` (default `"none"`) constrains treated-unit factor loadings to the convex hull of control loadings via an entropy-regularized simplex projection. The imputed counterfactual $\hat{Y}_i(0) = F \hat\lambda_i$ lies pointwise in the convex hull of factor-implied control outcomes. Currently applies to `method = "ife"` (or `"gsynth"`) with `time.component.from = "nevertreated"`.
+* Companion arguments `gamma.loading` (regularization strength; default `NULL` triggers 5-fold cross-validation) and `gamma.loading.grid` (CV grid; default `10^seq(-2, 2, length.out = 9)`).
+* New diagnostic outputs under `loading.bound = "simplex"`: `wgt.implied` becomes the $N_{tr} \times N_{co}$ row-stochastic simplex-weight matrix; `gamma.loading` records the value used; `loading.proj.resid` is a per-treated-unit residual flagging units near or outside $\mathrm{conv}(\Lambda_{co})$.
+* Caveat: percentile-bootstrap intervals may under-cover when the simplex constraint binds (Andrews 1999, 2001 non-standard-limit regime). Boundary-corrected inference is deferred.
+
+New plot type:
+
+* `plot(..., type = "loading.overlap")` is a diagnostic for the bounded-loadings feature: factors 1 vs 2 with the convex hull of control loadings shaded ($r \geq 2$), or mirror histograms with a control-range band ($r = 1$). Treated units appear as red triangles in 2D; as a flipped histogram below the axis in 1D.
+
 ## v2.2.1
 
 (2026-04-22)

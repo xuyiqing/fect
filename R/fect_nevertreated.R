@@ -54,11 +54,16 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         kappaQ.id = NULL,         ## list mapping kappa groups to Q columns
                         parallel = TRUE,
                         cores = NULL,
-                        do_parallel_cv = NULL   ## pre-computed flag from default.R; NULL means derive from parallel
+                        do_parallel_cv = NULL,  ## pre-computed flag from default.R; NULL means derive from parallel
+                        loading.bound = "none",
+                        gamma.loading = NULL,
+                        gamma.loading.grid = NULL,
+                        cv.rule = "1se"
                         ) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
+    cv.rule <- .fect_validate_cv_rule(cv.rule)
     carryover.pos <- placebo.pos <- na.pos <- NULL
     res.sd1 <- res.sd2 <- NULL
     ## unit id and time
@@ -328,6 +333,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             CV.out[, "PC"] <- 1e10
             r.pc <- est.co.pc.best <- NULL
 
+            ## Per-fold SE matrix parallel to CV.out (added v2.3.0). Populated
+            ## below in both parallel and serial CV branches; consumed at the
+            ## end of the IFE CV block to apply `cv.rule` (default "1se").
+            CV.out.se <- matrix(NA_real_, nrow(CV.out), ncol(CV.out))
+            colnames(CV.out.se) <- colnames(CV.out)
+            CV.out.se[, "r"] <- CV.out[, "r"]
+
             crit_col <- switch(criterion,
                 mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE", wgmspe = "WGMSPE",
                 mad = "MAD", moment = "Moment", gmoment = "GMoment", "MSPE")
@@ -594,14 +606,16 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     if (length(all_resid) == 0) {
                         scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                     MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                        se_v <- setNames(rep(NA_real_, length(scores)), names(scores))
                     } else {
-                        scores <- .score_residuals(
-                            all_resid,
-                            obs_weights   = if (!is.null(W)) all_obs_w else NULL,
-                            time_index    = all_time_idx,
-                            count_weights = count.T.cv,
-                            norm.para     = NULL
+                        agg <- .fect_cv_aggregate_folds(
+                            fold_list  = fold_scores_ife[task_idx],
+                            count.T.cv = count.T.cv,
+                            use_weight = as.integer(!is.null(W)),
+                            norm.para  = NULL
                         )
+                        scores <- agg$pooled
+                        se_v   <- agg$se
                     }
 
                     ## 1% rule — identical logic to serial path
@@ -617,6 +631,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     }
                     CV.out[i, 2:4] <- c(sigma2, IC, PC)
                     CV.out[i, score_names] <- scores[score_names]
+                    ## Persist per-fold SEs for end-of-loop cv.rule application
+                    for (cn in score_names) {
+                        if (cn %in% names(se_v)) CV.out.se[i, cn] <- se_v[cn]
+                    }
                     message("r = ", r, "; sigma2 = ",
                         sprintf("%.5f", sigma2), "; IC = ",
                         sprintf("%.5f", IC), "; PC = ",
@@ -827,20 +845,19 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         max.iteration = max.iteration
                     )
                 })
-                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                if (length(all_resid) == 0) {
+                if (length(fold_results) == 0L) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                    se_v <- setNames(rep(NA_real_, length(scores)), names(scores))
                 } else {
-                    scores <- .score_residuals(
-                        all_resid,
-                        obs_weights = if (!is.null(W)) all_obs_w else NULL,
-                        time_index = all_time_idx,
-                        count_weights = count.T.cv,
-                        norm.para = NULL
+                    agg <- .fect_cv_aggregate_folds(
+                        fold_list  = fold_results,
+                        count.T.cv = count.T.cv,
+                        use_weight = as.integer(!is.null(W)),
+                        norm.para  = NULL
                     )
+                    scores <- agg$pooled
+                    se_v   <- agg$se
                 }
 
               } else {
@@ -884,20 +901,19 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         Ntr      = Ntr
                     )
                 })
-                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                all_obs_w    <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                if (length(all_resid) == 0) {
+                if (length(fold_results) == 0L) {
                     scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
                                 MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
+                    se_v <- setNames(rep(NA_real_, length(scores)), names(scores))
                 } else {
-                    scores <- .score_residuals(
-                        all_resid,
-                        obs_weights = if (!is.null(W.tr)) all_obs_w else NULL,
-                        time_index = if (length(all_time_idx) > 0) all_time_idx else NULL,
-                        count_weights = count.T.cv,
-                        norm.para = norm.para
+                    agg <- .fect_cv_aggregate_folds(
+                        fold_list  = fold_results,
+                        count.T.cv = count.T.cv,
+                        use_weight = as.integer(!is.null(W.tr)),
+                        norm.para  = norm.para
                     )
+                    scores <- agg$pooled
+                    se_v   <- agg$se
                 }
 
               } ## end cv.method branching
@@ -916,6 +932,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
                 CV.out[i, 2:4] <- c(sigma2, IC, PC)
                 CV.out[i, score_names] <- scores[score_names]
+                ## Persist per-fold SEs for end-of-loop cv.rule application.
+                ## Some serial paths (e.g., LOO branch) may leave se_v undefined;
+                ## existsCheck protects those cases.
+                if (exists("se_v", inherits = FALSE) && !is.null(se_v)) {
+                    for (cn in score_names) {
+                        if (cn %in% names(se_v)) CV.out.se[i, cn] <- se_v[cn]
+                    }
+                }
                 message("r = ", r, "; sigma2 = ",
                     sprintf("%.5f", sigma2), "; IC = ",
                     sprintf("%.5f", IC), "; PC = ",
@@ -928,6 +952,43 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             } ## end SERIAL BRANCH (IFE)
 
             MSPE.best <- min(CV.out[, "MSPE"])
+
+            ## --- Apply cv.rule (added v2.3.0) -----------------------------
+            ## Override r.cv based on the user-selected rule. The default "1se"
+            ## picks the smallest r within one fold-SE of the minimum-CV-error r;
+            ## "min" picks the argmin; "1pct" preserves the legacy 1% rule from
+            ## the in-loop assignments above.
+            if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
+                means <- CV.out[, crit_col]
+                ses   <- CV.out.se[, crit_col]
+                ## Treat sentinels (1e10, Inf, NA) as missing for selection.
+                means[!is.finite(means) | means >= 1e9] <- NA_real_
+                i_pick <- .fect_apply_cv_rule(means, ses, rule = cv.rule)
+                if (!is.na(i_pick) && i_pick >= 1L && i_pick <= nrow(CV.out)) {
+                    new_r_cv <- unname(CV.out[i_pick, "r"])
+                    if (!is.null(new_r_cv) && is.finite(new_r_cv)) {
+                        if (new_r_cv != as.integer(unname(r.cv))) {
+                            message(sprintf(
+                                "  [cv.rule = %s] r.cv adjusted from %d to %d (1-SE band)",
+                                cv.rule,
+                                as.integer(unname(r.cv)),
+                                as.integer(new_r_cv)
+                            ))
+                            est.co.best <- .estimate_co(
+                                YY.co, Y0.co, X.co, I.co, W.use, beta0,
+                                as.integer(new_r_cv), force, cv_tol, max.iteration
+                            )
+                        }
+                        ## Preserve the in-loop names convention: serial path
+                        ## leaves r.cv unnamed; parallel path sets names "r".
+                        had_name <- !is.null(names(r.cv))
+                        r.cv <- new_r_cv
+                        if (had_name) names(r.cv) <- "r"
+                    }
+                }
+            }
+            ## --------------------------------------------------------------
+
             if (r > (T0.min - 1)) {
                 message(" (r hits maximum)")
             }
@@ -1064,45 +1125,172 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             F.hat <- cbind(F.hat, rep(1, TT))
         }
 
+        ## Bounded-loading dispatch: resolves use_bounded, gamma_use, and
+        ## optional W_tr / loading.proj.resid diagnostics. See statsclaw-
+        ## workspace/fect/runs/REQ-bounded-loadings/spec.md for the design.
+        use_bounded <- identical(loading.bound, "simplex")
+        W_tr <- NULL
+        loading.proj.resid <- NULL
+
+        if (use_bounded) {
+            Lambda.co.raw <- as.matrix(est.co.best$lambda)   # Nco x r.cv (no intercept col)
+            F.hat.raw     <- as.matrix(est.co.best$factor)   # TT  x r.cv (no intercept col)
+            Nco_b         <- nrow(Lambda.co.raw)
+            gamma_grid_use <- if (!is.null(gamma.loading.grid)) gamma.loading.grid
+                              else .default_gamma_grid()
+            gamma_use <- gamma.loading
+            if (is.null(gamma_use)) {
+                balanced_pre <- max(T0) == T0.min & !0 %in% I.tr
+                if (balanced_pre) {
+                    cv_F_pre <- F.hat.raw[1:T0.min, , drop = FALSE]
+                    cv_U_pre <- U.tr.pre
+                } else if (!0 %in% I.tr) {
+                    ## Different T0 per unit; U.tr.pre is a list
+                    cv_F_pre <- lapply(U.tr.pre, function(vec)
+                        F.hat.raw[seq_along(vec), , drop = FALSE]
+                    )
+                    cv_U_pre <- lapply(U.tr.pre, as.numeric)
+                } else {
+                    ## Some missing observations in treated pre-period
+                    cv_F_pre <- lapply(seq_along(U.tr.pre), function(i.tr)
+                        F.hat.raw[time.pre[[i.tr]], , drop = FALSE]
+                    )
+                    cv_U_pre <- lapply(U.tr.pre, as.numeric)
+                }
+                gamma_use <- .cv_gamma_loading(
+                    U_tr_pre   = cv_U_pre,
+                    F_hat_pre  = cv_F_pre,
+                    Lambda_co  = Lambda.co.raw,
+                    gamma_grid = gamma_grid_use,
+                    cv_k       = 5L
+                )$gamma_cv
+            }
+        }
+
         ## Lambda_tr (Ntr*r) or (Ntr*(r+1))
         if (max(T0) == T0.min & (!0 %in% I.tr)) {
             F.hat.pre <- F.hat[1:T0.min, ]
-            lambda.tr <- try(solve(t(F.hat.pre) %*% F.hat.pre) %*% t(F.hat.pre) %*% U.tr.pre,
-                silent = TRUE
-            )
-            if ("try-error" %in% class(lambda.tr)) {
-                return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1)))
+            if (!use_bounded) {
+                lambda.tr <- try(solve(t(F.hat.pre) %*% F.hat.pre) %*% t(F.hat.pre) %*% U.tr.pre,
+                    silent = TRUE
+                )
+                if ("try-error" %in% class(lambda.tr)) {
+                    return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1)))
+                }
+            } else {
+                ## Bounded: solve simplex QP per treated unit on the r-col F block only
+                F.pre.r <- F.hat.raw[1:T0.min, , drop = FALSE]
+                lambda.tr.r <- matrix(NA_real_, nrow = r.cv, ncol = Ntr)
+                W_tr <- matrix(NA_real_, nrow = Ntr, ncol = Nco_b)
+                loading.proj.resid <- numeric(Ntr)
+                for (i.tr in seq_len(Ntr)) {
+                    sol <- .solve_bounded_loading(
+                        u_pre     = U.tr.pre[, i.tr],
+                        F_pre     = F.pre.r,
+                        Lambda_co = Lambda.co.raw,
+                        gamma     = gamma_use
+                    )
+                    lambda.tr.r[, i.tr] <- sol$lambda_hat
+                    W_tr[i.tr, ] <- sol$w
+                    loading.proj.resid[i.tr] <- sqrt(sum(
+                        (U.tr.pre[, i.tr] - F.pre.r %*% sol$lambda_hat)^2
+                    ))
+                }
+                if (force %in% c(1, 3)) {
+                    ## alpha.tr is residual-mean (NOT bounded; per locked decision)
+                    resid_mat <- U.tr.pre - F.pre.r %*% lambda.tr.r   # T0.min x Ntr
+                    alpha_row <- matrix(colMeans(resid_mat), nrow = 1L)
+                    lambda.tr <- rbind(lambda.tr.r, alpha_row)
+                } else {
+                    lambda.tr <- lambda.tr.r
+                }
             }
         } else {
             if (!0 %in% I.tr) {
-                lambda.tr <- try(as.matrix(sapply(U.tr.pre, function(vec) {
-                    F.hat.pre <- as.matrix(F.hat[1:length(vec), ])
-                    l.tr <- solve(t(F.hat.pre) %*% F.hat.pre) %*% t(F.hat.pre) %*% vec
-                    return(l.tr) ## a vector of each individual lambdas
-                })), silent = TRUE)
-                if ("try-error" %in% class(lambda.tr)) {
-                    return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1)))
-                    ## stop("Error occurs. Please set a smaller value of factor number.")
-                }
-                if ((r.cv == 1) & (force %in% c(0, 2))) {
-                    lambda.tr <- t(lambda.tr)
+                if (!use_bounded) {
+                    lambda.tr <- try(as.matrix(sapply(U.tr.pre, function(vec) {
+                        F.hat.pre <- as.matrix(F.hat[1:length(vec), ])
+                        l.tr <- solve(t(F.hat.pre) %*% F.hat.pre) %*% t(F.hat.pre) %*% vec
+                        return(l.tr) ## a vector of each individual lambdas
+                    })), silent = TRUE)
+                    if ("try-error" %in% class(lambda.tr)) {
+                        return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1)))
+                        ## stop("Error occurs. Please set a smaller value of factor number.")
+                    }
+                    if ((r.cv == 1) & (force %in% c(0, 2))) {
+                        lambda.tr <- t(lambda.tr)
+                    }
+                } else {
+                    lambda.tr.r <- matrix(NA_real_, nrow = r.cv, ncol = Ntr)
+                    W_tr <- matrix(NA_real_, nrow = Ntr, ncol = Nco_b)
+                    loading.proj.resid <- numeric(Ntr)
+                    alpha_vec <- numeric(Ntr)
+                    for (i.tr in seq_len(Ntr)) {
+                        vec <- U.tr.pre[[i.tr]]
+                        F.pre.i <- F.hat.raw[seq_along(vec), , drop = FALSE]
+                        sol <- .solve_bounded_loading(
+                            u_pre     = vec,
+                            F_pre     = F.pre.i,
+                            Lambda_co = Lambda.co.raw,
+                            gamma     = gamma_use
+                        )
+                        lambda.tr.r[, i.tr] <- sol$lambda_hat
+                        W_tr[i.tr, ] <- sol$w
+                        loading.proj.resid[i.tr] <- sqrt(sum(
+                            (vec - F.pre.i %*% sol$lambda_hat)^2
+                        ))
+                        alpha_vec[i.tr] <- mean(vec - F.pre.i %*% sol$lambda_hat)
+                    }
+                    if (force %in% c(1, 3)) {
+                        lambda.tr <- rbind(lambda.tr.r, matrix(alpha_vec, nrow = 1L))
+                    } else {
+                        lambda.tr <- lambda.tr.r
+                    }
                 }
             } else {
-                if (force %in% c(1, 3)) {
-                    lambda.tr <- matrix(NA, (r.cv + 1), Ntr)
+                if (!use_bounded) {
+                    if (force %in% c(1, 3)) {
+                        lambda.tr <- matrix(NA, (r.cv + 1), Ntr)
+                    } else {
+                        lambda.tr <- matrix(NA, r.cv, Ntr)
+                    }
+                    test <- try(
+                        for (i.tr in 1:Ntr) {
+                            F.hat.pre <- as.matrix(F.hat[time.pre[[i.tr]], ])
+                            lambda.tr[, i.tr] <- solve(t(F.hat.pre) %*% F.hat.pre) %*% t(F.hat.pre) %*% as.matrix(U.tr.pre[[i.tr]])
+                        },
+                        silent = TRUE
+                    )
+                    if ("try-error" %in% class(test)) {
+                        return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1), eff = matrix(NA, TT, Ntr)))
+                        ## stop("Error occurs. Please set a smaller value of factor number.")
+                    }
                 } else {
-                    lambda.tr <- matrix(NA, r.cv, Ntr)
-                }
-                test <- try(
-                    for (i.tr in 1:Ntr) {
-                        F.hat.pre <- as.matrix(F.hat[time.pre[[i.tr]], ])
-                        lambda.tr[, i.tr] <- solve(t(F.hat.pre) %*% F.hat.pre) %*% t(F.hat.pre) %*% as.matrix(U.tr.pre[[i.tr]])
-                    },
-                    silent = TRUE
-                )
-                if ("try-error" %in% class(test)) {
-                    return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1), eff = matrix(NA, TT, Ntr)))
-                    ## stop("Error occurs. Please set a smaller value of factor number.")
+                    lambda.tr.r <- matrix(NA_real_, nrow = r.cv, ncol = Ntr)
+                    W_tr <- matrix(NA_real_, nrow = Ntr, ncol = Nco_b)
+                    loading.proj.resid <- numeric(Ntr)
+                    alpha_vec <- numeric(Ntr)
+                    for (i.tr in seq_len(Ntr)) {
+                        vec    <- as.numeric(U.tr.pre[[i.tr]])
+                        F.pre.i <- F.hat.raw[time.pre[[i.tr]], , drop = FALSE]
+                        sol <- .solve_bounded_loading(
+                            u_pre     = vec,
+                            F_pre     = F.pre.i,
+                            Lambda_co = Lambda.co.raw,
+                            gamma     = gamma_use
+                        )
+                        lambda.tr.r[, i.tr] <- sol$lambda_hat
+                        W_tr[i.tr, ] <- sol$w
+                        loading.proj.resid[i.tr] <- sqrt(sum(
+                            (vec - F.pre.i %*% sol$lambda_hat)^2
+                        ))
+                        alpha_vec[i.tr] <- mean(vec - F.pre.i %*% sol$lambda_hat)
+                    }
+                    if (force %in% c(1, 3)) {
+                        lambda.tr <- rbind(lambda.tr.r, matrix(alpha_vec, nrow = 1L))
+                    } else {
+                        lambda.tr <- lambda.tr.r
+                    }
                 }
             }
         }
@@ -1114,13 +1302,17 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             lambda.tr <- lambda.tr[, 1:r.cv, drop = FALSE]
         }
         if (boot == 0) {
-            inv.tr <- try(
-                ginv(t(as.matrix(lambda.tr))),
-                silent = TRUE
-            )
+            if (use_bounded && !is.null(W_tr)) {
+                wgt.implied <- W_tr
+            } else {
+                inv.tr <- try(
+                    ginv(t(as.matrix(lambda.tr))),
+                    silent = TRUE
+                )
 
-            if (!"try-error" %in% class(inv.tr)) {
-                wgt.implied <- t(inv.tr %*% t(as.matrix(est.co.best$lambda)))
+                if (!"try-error" %in% class(inv.tr)) {
+                    wgt.implied <- t(inv.tr %*% t(as.matrix(est.co.best$lambda)))
+                }
             }
         }
     } ## end of r!=0 case
@@ -2950,9 +3142,21 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             lambda.tr = as.matrix(lambda.tr)
         ))
         if (boot == 0) {
-            if (!"try-error" %in% class(inv.tr)) {
+            if (exists("use_bounded", inherits = FALSE) && isTRUE(use_bounded)) {
+                out <- c(out, list(wgt.implied = wgt.implied))
+            } else if (exists("inv.tr", inherits = FALSE) &&
+                       !inherits(inv.tr, "try-error")) {
                 out <- c(out, list(wgt.implied = wgt.implied))
             }
+        }
+        if (exists("use_bounded", inherits = FALSE) && isTRUE(use_bounded)) {
+            out <- c(out, list(
+                loading.bound       = "simplex",
+                gamma.loading       = gamma_use,
+                loading.proj.resid  = loading.proj.resid
+            ))
+        } else {
+            out <- c(out, list(loading.bound = loading.bound))
         }
     }
 
