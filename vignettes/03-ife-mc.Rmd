@@ -162,6 +162,36 @@ cat("cv.method = 'treated_units': r.cv =", out.tr$r.cv, "\n")
 
 Both strategies often agree, but they can select different `r` when the factor structure matters more for one group than the other.
 
+### Forward-only (rolling) CV via `r.cv.rolling()`
+
+Both `"all_units"` and `"treated_units"` use random anchors to mask contiguous blocks of `cv.nobs` observations. With residuals that are temporally correlated, this design has a subtle problem: the blocks are immediately adjacent to training observations on both sides, so a high-rank model can "predict" the held-out block by exploiting the AR structure that leaks across the train/test boundary. Even widening `cv.nobs` and adding a `cv.donut` may not fully close this channel.
+
+`r.cv.rolling()` is a deterministic alternative: for each unit, it holds out the **last `cv.nobs` observations** and trains on everything else (the unit's earlier observations plus all other units' full data). The future-side leakage channel is closed because the masked block is always the most recent observed window per unit.
+
+```{r rcv_rolling_demo, eval=FALSE}
+res <- r.cv.rolling(Y ~ D + X1 + X2, data = simdata,
+                    index = c("id", "time"),
+                    method = "ife", r.max = 5, cv.nobs = 3,
+                    cv.rule = "1se", min.T0 = 5)
+res$r.cv      # selected r
+res$mspe      # per-r MSPE curve
+
+## Then use the chosen r in a CV-disabled fit:
+fit <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+            method = "ife", time.component.from = "notyettreated",
+            CV = FALSE, r = res$r.cv, se = TRUE)
+```
+
+`r.cv.rolling()` is currently supported only for `method = "ife"` with `time.component.from = "notyettreated"` (the only fect path that populates `Y.ct.full` at masked control positions). Other configurations error with a migration message.
+
+::: {.callout-note appearance="simple"}
+
+### When to prefer rolling CV
+
+If your residuals are notably autocorrelated (e.g., post-fit residual AR(1) above ~0.4), the random-anchor strategies can over-select `r` because the contiguous-block masking leaks correlated information. `r.cv.rolling()` is more conservative in those settings. For approximately i.i.d. residuals, the random-anchor strategies and rolling CV typically agree on `r.cv`.
+
+:::
+
 ### Sub-options
 
 The k-fold masking procedure is controlled by several sub-options that apply to both `"all_units"` and `"treated_units"`:
