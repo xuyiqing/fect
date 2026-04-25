@@ -107,6 +107,44 @@
   the CFE method. `loading.bound = "simplex"` errors cleanly when combined
   with any of these.
 
+## Parallelism cleanup (Phase A bootstrap)
+
+* Phase A's bootstrap error simulation (`R/boot.R::draw.error`) migrated
+  from `foreach %dopar%` to `future.apply::future_lapply`. The old
+  `%dopar%` inherited whatever backend was registered globally; after any
+  prior parallel fect call, `run_dopar_retry`'s `on.exit` left `doFuture`
+  registered, so a subsequent call's Phase A inherited a backend that
+  shipped heavy closures per iteration --- producing an ~8x slowdown on
+  variant (iii) bootstraps in multi-fit sessions (e.g., a forest plot run).
+
+* The `doFuture::registerDoFuture()` re-registration inside
+  `run_dopar_retry`'s `on.exit` was removed; it was the source of the
+  global state pollution. The function still falls back to `doParallel`
+  if the future backend errors; it just no longer leaves a global
+  doFuture registration behind.
+
+* New regression test (`tests/testthat/test-phase-a-future-state.R`):
+  asserts two consecutive `fect(parallel = TRUE)` calls in the same R
+  process have wall-time ratio < 3x.
+
+## GSC: Y.ct.full populated at control positions
+
+* On the GSC path (`method = "ife"` with
+  `time.component.from = "nevertreated"`), `Y.ct.full[, co]` is now
+  overwritten with the model-implied factor product `F * t(lambda_co)`
+  after the shared `Y.ct.full <- Y.ct` assignment (sourced from
+  `est.co.best$factor` and `est.co.best$lambda`, gated on dim agreement
+  and non-empty rank). Closes a gap that left `NA` at masked control
+  positions because the residual recipe `Y.co - residuals` propagates
+  `NA`. Enables user-space rolling CV (`r.cv.rolling()`) for
+  `method = "gsynth"`.
+
+* No change to ATT, gap, or `est.avg`: those are computed from
+  treated-unit positions and do not consume `Y.ct.full[, co]`. Verified
+  on the `simgsynth` anchor (set.seed(11), r=2, force="two-way"):
+  ATT.avg unchanged at 4.639593 vs unmodified dev; new control-column
+  contents match `F * t(lambda.co)` with max abs diff = 0.
+
 # fect 2.2.1
 
 Parametric-bootstrap fixes (`se = TRUE`, `vartype = "parametric"`):
