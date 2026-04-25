@@ -1,5 +1,50 @@
 # fect 2.3.0 (development)
 
+## Rolling (forward-only) cross-validation
+
+* New exported function `r.cv.rolling()`: a standalone user-facing helper
+  for picking the number of factors `r` via deterministic forward-only CV.
+  For each unit, the LAST `cv.nobs` observations are held out; training
+  uses everything else (the unit's earlier observations + all other units'
+  full data). Unlike `fect()`'s default `cv.method = "all_units"` (random
+  contiguous-block masking), this design closes the forward-leakage channel
+  that AR-correlated residuals exploit at `cv.donut = 0` / `1`, and tends
+  to recover much smaller `r` on panels with serially correlated errors.
+
+* New internal helper `cv.sample.rolling()` (in `support.R`): builds the
+  deterministic forward-only fold (last `cv.nobs` per unit), respecting a
+  `min.T0` floor so units with too few observations are not masked.
+
+* Workflow: call `r.cv.rolling(formula, data, index, method = "ife", ...)`
+  to get the chosen `r.cv`, then pass that to `fect(..., CV = FALSE,
+  r = r.cv, se = TRUE)` for the inferential fit.
+
+* Supports `method = "ife"` (IFE-EM, internal
+  `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC,
+  internal `time.component.from = "nevertreated"`). Both paths populate
+  `Y.ct.full` at masked control positions: the IFE-EM path via EM
+  imputation, the GSC path via the model-implied factor product
+  `F * t(lambda_co)` (companion change to `R/fect_nevertreated.R`,
+  separately catalogued under "GSC: Y.ct.full populated at control
+  positions"). Other methods (e.g. `"mc"`) are not yet supported.
+
+* Implemented as a standalone helper rather than as a new value of
+  `cv.method` to minimize integration risk with the existing fold-
+  aggregation machinery in `cv.R`. Promoting it to a
+  `cv.method = "rolling"` option inside the main `fect()` CV dispatcher
+  is deferred to a future release; for now use the standalone
+  `r.cv.rolling()` and feed the chosen rank to
+  `fect(..., CV = FALSE, r = r.cv)`.
+
+* Empirical motivation: on the Eibl & Hertog (2023) oil-rich panels with
+  residual AR(1) of 0.56--0.93, fect's default CV (random anchors,
+  `cv.donut` 0 or 1) pegs `r.cv = 5` on every (cell, estimator, rule)
+  combination, even at widened `cv.nobs = 6` --- the forward-leakage hides
+  the rank overfit. `r.cv.rolling()` with `cv.nobs = 3` recovers `r.cv = 1`
+  on health-equity, education-equity, and secondary-enrollment outcomes;
+  `r.cv = 0` on primary-enrollment --- matching the placebo-based preferred
+  rank to within one factor.
+
 ## Bounded factor loadings for GSC
 
 * New argument `loading.bound = "simplex"` (default `"none"`): constrains
@@ -61,6 +106,44 @@
 * v1 does not support the not-yet-treated IFE dispatch, the MC method, or
   the CFE method. `loading.bound = "simplex"` errors cleanly when combined
   with any of these.
+
+## Parallelism cleanup (Phase A bootstrap)
+
+* Phase A's bootstrap error simulation (`R/boot.R::draw.error`) migrated
+  from `foreach %dopar%` to `future.apply::future_lapply`. The old
+  `%dopar%` inherited whatever backend was registered globally; after any
+  prior parallel fect call, `run_dopar_retry`'s `on.exit` left `doFuture`
+  registered, so a subsequent call's Phase A inherited a backend that
+  shipped heavy closures per iteration --- producing an ~8x slowdown on
+  variant (iii) bootstraps in multi-fit sessions (e.g., a forest plot run).
+
+* The `doFuture::registerDoFuture()` re-registration inside
+  `run_dopar_retry`'s `on.exit` was removed; it was the source of the
+  global state pollution. The function still falls back to `doParallel`
+  if the future backend errors; it just no longer leaves a global
+  doFuture registration behind.
+
+* New regression test (`tests/testthat/test-phase-a-future-state.R`):
+  asserts two consecutive `fect(parallel = TRUE)` calls in the same R
+  process have wall-time ratio < 3x.
+
+## GSC: Y.ct.full populated at control positions
+
+* On the GSC path (`method = "ife"` with
+  `time.component.from = "nevertreated"`), `Y.ct.full[, co]` is now
+  overwritten with the model-implied factor product `F * t(lambda_co)`
+  after the shared `Y.ct.full <- Y.ct` assignment (sourced from
+  `est.co.best$factor` and `est.co.best$lambda`, gated on dim agreement
+  and non-empty rank). Closes a gap that left `NA` at masked control
+  positions because the residual recipe `Y.co - residuals` propagates
+  `NA`. Enables user-space rolling CV (`r.cv.rolling()`) for
+  `method = "gsynth"`.
+
+* No change to ATT, gap, or `est.avg`: those are computed from
+  treated-unit positions and do not consume `Y.ct.full[, co]`. Verified
+  on the `simgsynth` anchor (set.seed(11), r=2, force="two-way"):
+  ATT.avg unchanged at 4.639593 vs unmodified dev; new control-column
+  contents match `F * t(lambda.co)` with max abs diff = 0.
 
 # fect 2.2.1
 
