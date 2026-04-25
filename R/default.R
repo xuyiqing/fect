@@ -91,7 +91,11 @@ fect <- function(
     m = 2, ## block length
     normalize = FALSE, # accelerate option
     keep.sims = FALSE, # keep individual bootstrap/jackknife simulations
-    cm = FALSE # causal moderation
+    cm = FALSE, # causal moderation
+    loading.bound = "none",           # simplex projection of treated loadings
+    gamma.loading = NULL,             # scalar gamma for simplex; NULL = CV
+    gamma.loading.grid = NULL,        # optional grid for gamma CV
+    cv.rule = "1se"                   # CV selection rule: "1se", "min", "1pct"
 ) {
     UseMethod("fect")
 }
@@ -165,7 +169,11 @@ fect.formula <- function(
     m = 2, ## block length
     normalize = FALSE,
     keep.sims = FALSE,
-    cm = FALSE
+    cm = FALSE,
+    loading.bound = "none",
+    gamma.loading = NULL,
+    gamma.loading.grid = NULL,
+    cv.rule = "1se"
 ) {
     ## parsing
     varnames <- all.vars(formula)
@@ -269,7 +277,11 @@ fect.formula <- function(
         m = m,
         normalize = normalize,
         keep.sims = keep.sims,
-        cm = cm
+        cm = cm,
+        loading.bound      = loading.bound,
+        gamma.loading      = gamma.loading,
+        gamma.loading.grid = gamma.loading.grid,
+        cv.rule            = cv.rule
     )
 
     out$call <- match.call()
@@ -347,11 +359,16 @@ fect.default <- function(
     m = 2, ## block length
     normalize = FALSE,
     keep.sims = FALSE,
-    cm=FALSE
+    cm=FALSE,
+    loading.bound = "none",
+    gamma.loading = NULL,
+    gamma.loading.grid = NULL,
+    cv.rule = "1se"
 ) {
     ## -------------------------------##
     ## Checking Parameters
     ## -------------------------------##
+    cv.rule <- .fect_validate_cv_rule(cv.rule)
     placeboEquiv <- loo
     permu.dimension <- "time"
 
@@ -732,6 +749,33 @@ fect.default <- function(
     if ((do_parallel_cv || do_parallel_boot) && !is.null(cores)) {
         if (!is.numeric(cores) || cores <= 0) {
             stop("\"cores\" option misspecified. Try, for example, cores = 2.")
+        }
+    }
+
+    ## --- loading.bound validation (REQ-bounded-loadings) ---
+    if (!is.character(loading.bound) || length(loading.bound) != 1L ||
+        !(loading.bound %in% c("none", "simplex"))) {
+        stop("'loading.bound' must be one of 'none', 'simplex'.")
+    }
+    if (loading.bound == "simplex") {
+        if (!(method %in% c("ife", "gsynth"))) {
+            stop("'loading.bound = \"simplex\"' is only supported for method = \"ife\" or \"gsynth\" in this version.")
+        }
+        if (!identical(time.component.from, "nevertreated")) {
+            stop("'loading.bound = \"simplex\"' requires time.component.from = \"nevertreated\". ",
+                 "The not-yet-treated dispatch is not supported in this version.")
+        }
+    }
+    if (!is.null(gamma.loading)) {
+        if (!is.numeric(gamma.loading) || length(gamma.loading) != 1L ||
+            !is.finite(gamma.loading) || gamma.loading <= 0) {
+            stop("'gamma.loading' must be a single positive finite numeric, or NULL.")
+        }
+    }
+    if (!is.null(gamma.loading.grid)) {
+        if (!is.numeric(gamma.loading.grid) || any(!is.finite(gamma.loading.grid)) ||
+            any(gamma.loading.grid <= 0)) {
+            stop("'gamma.loading.grid' must be a positive finite numeric vector, or NULL.")
         }
     }
 
@@ -2055,7 +2099,8 @@ fect.default <- function(
                     parallel = parallel,
                     cores = cores,
                     do_parallel_cv   = do_parallel_cv,
-                    do_parallel_boot = do_parallel_boot
+                    do_parallel_boot = do_parallel_boot,
+                    cv.rule = cv.rule
                 )
             } else {
                 out <- fect_binary_cv(
@@ -2114,7 +2159,10 @@ fect.default <- function(
                     group.level = g.level,
                     group = G,
                     parallel = parallel,
-                    cores = cores
+                    cores = cores,
+                    loading.bound      = loading.bound,
+                    gamma.loading      = gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid
                 )
             } else if (method == "ife") {
                 out <- fect_fe(
@@ -2348,7 +2396,10 @@ fect.default <- function(
             group.level = g.level,
             group = G,
             keep.sims = keep.sims,
-            time.component.from = time.component.from
+            time.component.from = time.component.from,
+            loading.bound      = loading.bound,
+            gamma.loading      = gamma.loading,
+            gamma.loading.grid = gamma.loading.grid
         )
 
     }

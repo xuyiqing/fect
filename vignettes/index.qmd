@@ -133,14 +133,14 @@ The following individuals (and AI) have contributed to **gsynth** and **fect**, 
 
 To cite the **fect** package or this user manual, please use:
 
-> Xu, Yiqing, Licheng Liu, Ye Wang, Ziyi Liu, Shijian Liu, Tianzhu Qin, Jinwen Wu, and Rivka Lipkovitz. 2026. *fect: Fixed Effects Counterfactual Estimators --- User Manual (v2.2.0).* <https://yiqingxu.org/packages/fect/>
+> Xu, Yiqing, Licheng Liu, Ye Wang, Ziyi Liu, Shijian Liu, Tianzhu Qin, Jinwen Wu, and Rivka Lipkovitz. 2026. *fect: Fixed Effects Counterfactual Estimators --- User Manual (v2.3.0).* <https://yiqingxu.org/packages/fect/>
 
 ``` bibtex
 @manual{fect2026,
   title = {fect: Fixed Effects Counterfactual Estimators --- User Manual},
   author = {Xu, Yiqing and Liu, Licheng and Wang, Ye and Liu, Ziyi and Liu, Shijian and Qin, Tianzhu and Wu, Jinwen and Lipkovitz, Rivka},
   year = {2026},
-  note = {R package version 2.2.0},
+  note = {R package version 2.3.0},
   url = {https://yiqingxu.org/packages/fect/}
 }
 ```

@@ -9,9 +9,30 @@ set.seed(1234)
 data(simdata)
 ```
 
-When the parallel trends assumption is violated due to latent common factors with heterogeneous loadings, the FE estimator from [Chapter @sec-fect] is biased. This chapter introduces two methods that account for such latent factors: the **interactive fixed effects** (IFE) method, which explicitly models unit-specific factor loadings, and the **matrix completion** (MC) method, which uses nuclear-norm regularization to recover the low-rank structure of the untreated potential outcomes. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/03-ife-mc.R).
+When the parallel trends assumption is violated due to latent common factors with heterogeneous loadings, the FE estimator from [Chapter @sec-fect] is biased. This chapter introduces two methods that account for such latent factors: the **interactive fixed effects** (IFE) method, which explicitly models unit-specific factor loadings, and the **matrix completion** (MC) method, which uses nuclear-norm regularization to recover the low-rank structure of the untreated potential outcomes. The [R script for this chapter](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/03-ife-mc.R) is available for download.
 
 We use `simdata`, which includes two latent factors ($r = 2$). The FE estimator is biased on this dataset, while IFE and MC recover the correct ATT.
+
+Before running any estimation, it is good practice to visualize the panel structure: who is treated, when, and how the outcome varies over time. We use the **panelView** package for both views.
+
+```{r panelview-treatment-ifemc, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+library(panelView)
+panelview(Y ~ D, data = simdata, index = c("id", "time"),
+  axis.lab = "time", xlab = "Time", ylab = "Unit",
+  gridOff = TRUE, by.timing = TRUE,
+  background = "white", main = "simdata: Treatment Status")
+```
+
+`simdata` has 200 units across 35 periods, with treatment that can switch on and off (treatment reversal allowed) --- a typical DID/TWFE setting. Out of 200 units, 50 are pure controls (D = 0 throughout) and 150 receive treatment at some point. The status plot above shows the staggered, on-off pattern.
+
+```{r panelview-outcome-ifemc, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+panelview(Y ~ D, data = simdata, index = c("id", "time"),
+  axis.lab = "time", xlab = "Time", ylab = "Outcome",
+  theme.bw = TRUE, type = "outcome", by.group = FALSE,
+  main = "simdata: Outcome")
+```
+
+`by.group = FALSE` shows all unit trajectories overlaid (treated and control together) so the latent factor structure is visible to the eye. The outcome series clearly co-move in two distinct directions, foreshadowing $r = 2$ latent factors that the FE estimator cannot capture but IFE will.
 
 ## Interactive fixed effects
 
@@ -34,6 +55,34 @@ The figure below shows the estimated ATT using the IFE method. The cross-validat
 plot(out.ife, main = "Estimated ATT (IFEct)")
 ```
 
+We can also inspect the latent factors and the per-unit loadings directly. The **factors** plot shows the two estimated time-varying factors $F_1(t)$ and $F_2(t)$:
+
+```{r plot-factors-ifemc, fig.width = 6, fig.height = 4}
+plot(out.ife, type = "factors", main = "Estimated Factors")
+```
+
+The **loadings** plot shows the joint distribution of $\lambda_1$ and $\lambda_2$ across treated and control units (rendered as a `GGally::ggpairs` matrix when $r \geq 2$):
+
+```{r plot-loadings-ifemc, fig.width = 6, fig.height = 5}
+plot(out.ife, type = "loadings", main = "Factor Loadings")
+```
+
+The companion plot type `type = "loading.overlap"` visualizes whether treated-unit factor loadings lie inside the convex hull of control loadings --- a diagnostic for whether the synthetic-control intuition (imputing inside the donor pool's support) is reasonable for these data. With $r = 2$, the plot is a 2D scatter on factors 1 and 2, with the convex hull of controls shaded and treated units overlaid as red triangles:
+
+```{r plot-loading-overlap-ifemc, fig.width = 6, fig.height = 5}
+plot(out.ife, type = "loading.overlap")
+```
+
+The treated loadings extend well beyond the controls' convex hull, which is **expected for this dataset and consistent with the DGP**. `simdata` is built for the DID/TWFE regime: 200 units total, but only 50 are pure controls --- the remaining 150 receive treatment at some point, with reversals allowed. With three times more treated than control units in the panel, treated factor loadings naturally span a wider range than the controls' joint distribution. For the default `time.component.from = "notyettreated"` regime, this non-overlap is less concerning because factors are estimated from pre-treatment observations of *all* units (treated and control), not from the controls alone. The diagnostic is informative but not actionable here.
+
+::: {.callout-note appearance="simple"}
+
+### Bounded factor loadings (Synth setting only)
+
+When the diagnostic above shows treated units outside the hull *and* you are in the Synth setting (few treated, many controls, no reversal), the new argument `loading.bound = "simplex"` (introduced in v2.3.0) constrains each treated-unit loading to lie inside the convex hull of control loadings via an entropy-regularized simplex projection, recovering the synthetic-control intuition that the imputed counterfactual should sit inside the donor pool's support. The bound is currently restricted to the Synth setting (`time.component.from = "nevertreated"`) and is highly recommended for the `gsynth` method; see [Chapter @sec-gsynth] for the objective and a worked ON/OFF comparison.
+
+:::
+
 ------------------------------------------------------------------------
 
 ## Matrix completion
@@ -53,9 +102,11 @@ plot(out.mc, main = "Estimated ATT (MC)")
 ```
 
 ::: {.callout-note appearance="simple"}
+
 ### The `em` parameter
 
 By default, `em = TRUE` and the EM algorithm is used to estimate the factor model when the estimation sample has missing entries. This is always the case in the default DID setting (`time.component.from = "notyettreated"`), where treated post-treatment cells are unobserved under control. For the synthetic control setting, see [Chapter @sec-gsynth].
+
 :::
 
 ------------------------------------------------------------------------
@@ -79,18 +130,21 @@ cat("Selected r:", out.cv$r.cv, "\n")
 The `cv.method` parameter controls *which observations are masked* during cross-validation. Different masking strategies test different aspects of the model.
 
 | `cv.method` | What is masked | What it tests |
-|:---------------------|:-------------------------|:-----------------------|
+| :--- | :--- | :--- |
 | `"all_units"` | Random subsets of control observations across all units | Factor estimation quality on the full panel |
 | `"treated_units"` | Random subsets from eventually-treated units' pre-treatment observations only | Counterfactual prediction quality for the target units |
 | `"loo"` | One treated pre-treatment period at a time | Projection quality (legacy gsynth method) |
 
 ::: {.callout-note appearance="simple"}
+
 ### Which `cv.method` should I use?
 
 `"all_units"` (default for `fect_cv` and `fect_mspe`) is the general-purpose choice --- it tests whether the model can predict held-out control observations well, and is suitable when the panel is large and the factor structure is the main concern. `"treated_units"` (default for nevertreated/gsynth) directly tests counterfactual quality for the treated group, and is preferred when prediction accuracy for treated units is the priority. `"loo"` (nevertreated only) is the original gsynth leave-one-out method; it can be unstable with few pre-treatment periods, in which case `"treated_units"` is a more robust alternative.
+
 :::
 
 We provide an example below.
+
 ```{r cv_method_compare, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.all <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
                 method = "ife", CV = TRUE, r = c(0, 5),
@@ -113,7 +167,7 @@ Both strategies often agree, but they can select different `r` when the factor s
 The k-fold masking procedure is controlled by several sub-options that apply to both `"all_units"` and `"treated_units"`:
 
 | Option | Default | Description |
-|:-------------------|:----------------------|:-----------------------------|
+| :--- | :--- | :--- |
 | `k` | 10 | Number of cross-validation rounds |
 | `cv.prop` | 0.1 | Proportion of eligible observations held out per round |
 | `cv.nobs` | 3 | Block size for structured removal (consecutive observations) |
@@ -127,7 +181,7 @@ The block removal (`cv.nobs`) addresses serial correlation: instead of masking i
 The `criterion` parameter determines which scoring metric is used to select the best tuning parameter:
 
 | `criterion` | Description | When to use |
-|:------------------------|:-----------------------|:-----------------------|
+| :--- | :--- | :--- |
 | `"mspe"` (default) | Mean squared prediction error | General-purpose; best for prediction accuracy |
 | `"gmspe"` | Geometric mean SPE | Robust to outlier prediction errors |
 | `"pc"` | Information criterion (Bai & Ng) | Model selection based on penalized fit; does not require CV rounds |
@@ -149,9 +203,11 @@ cat("criterion = 'gmspe': r.cv =", out.pc$r.cv, "\n")
 ```
 
 ::: {.callout-tip appearance="simple"}
+
 ### Selection rule
 
 A candidate `r` is selected over a smaller value only if its criterion score improves by more than 1%. This prevents overfitting to marginal improvements.
+
 :::
 
 ### Parallel computing
@@ -163,7 +219,7 @@ Cross-validation can be computationally expensive, especially with `cv.method = 
 When `parallel = TRUE`, parallel CV auto-activates only when the control panel is large enough that worker startup and serialization overhead are amortized by per-fold compute time. The thresholds are method-specific:
 
 | Method | Auto-engage threshold ($N_{co} \times T$) | Notes |
-|:-------|:------------------------------------------|:------|
+| :--- | :--- | :--- |
 | `"ife"` | 20,000 | EM-based factor estimation; per-fit cost scales linearly |
 | `"mc"` | 20,000 | SVD-based; similar cost profile to IFE |
 | `"cfe"` | 60,000 | Higher per-fit overhead; smaller panels lose to serialization |
@@ -312,21 +368,23 @@ plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(5, 2.5))
 
 In the above plot, the three periods in blue are dropped from the first-stage estimation of the factor model while the periods in red are reserved for the (no) carryover effects test.
 
-### Summary 
+### Summary
 
 | Test | Purpose | Key arguments | Plot type | Statistics shown |
-|:-------------|:-------------|:-------------|:-------------|:-----------------|
+| :--- | :--- | :--- | :--- | :--- |
 | Placebo test | Tests whether the model produces zero ATT in withheld pre-treatment periods | `placeboTest = TRUE`, `placebo.period = c(a, b)` | `"gap"` (default) | `placebo.p`, `equiv.p` |
 | LOO pre-trend test | Out-of-sample check for pre-trends by leaving out one pre-treatment period at a time | `loo = TRUE` (in `fect()`), `loo = TRUE` (in `plot()`) | `"gap"` or `"equiv"` | `F.p`, `equiv.p` |
 | Joint pre-trend test (F + TOST) | Joint assessment: F test for zero residual averages; TOST for equivalence within a threshold | `type = "equiv"` in `plot()`, `tost.threshold` | `"equiv"` | `F.p`, `F.equiv.p`, `equiv.p` |
 | Carryover test | Tests whether treatment effects persist after treatment ends | `carryoverTest = TRUE`, `carryover.period = c(a, b)` | `"exit"` | `carryover.p`, `equiv.p` |
 
 ::: {.callout-tip appearance="simple"}
--   A **larger** F-test / placebo / carryover p-value suggests the model passes the test.
--   A **smaller** TOST / equivalence p-value suggests the pre-trends or carryover effects are within an acceptable range.
--   We recommend using `loo = TRUE` for pre-trend tests to avoid the false reassurance of in-sample fit.
--   The `proportion` option controls which pre-treatment periods are included in the tests (default: periods where the number of treated units exceeds `proportion` $\times$ total treated units).
--   The `tost.threshold` option sets the equivalence range for the TOST test (default: $0.36\hat{\sigma}_\epsilon$). Finding the "right" threshold is often a challenge in empirical research.
+
+- A **larger** F-test / placebo / carryover p-value suggests the model passes the test.
+- A **smaller** TOST / equivalence p-value suggests the pre-trends or carryover effects are within an acceptable range.
+- We recommend using `loo = TRUE` for pre-trend tests to avoid the false reassurance of in-sample fit.
+- The `proportion` option controls which pre-treatment periods are included in the tests (default: periods where the number of treated units exceeds `proportion` $\times$ total treated units).
+- The `tost.threshold` option sets the equivalence range for the TOST test (default: $0.36\hat{\sigma}_\epsilon$). Finding the "right" threshold is often a challenge in empirical research.
+
 :::
 
 ## How to Cite

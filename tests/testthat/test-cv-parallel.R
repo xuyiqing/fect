@@ -1484,6 +1484,7 @@ test_that("N.1: IFE nevertreated all_units parallel matches phase3 fixture (with
       method    = "ife",
       r         = 0:2,
       CV        = TRUE,
+      cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
       k         = 3,
       cv.method = "all_units",
       time.component.from = "nevertreated",
@@ -1526,6 +1527,7 @@ test_that("N.2: IFE nevertreated treated_units serial matches phase3 fixture (wi
       method    = "ife",
       r         = 0:2,
       CV        = TRUE,
+      cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
       k         = 3,
       cv.method = "treated_units",
       time.component.from = "nevertreated",

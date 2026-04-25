@@ -499,6 +499,18 @@ plot(out_ife, type = "loadings", main = "Factor Loadings")
 
 Note: `connected`, `plot.ci`, `show.count`, and most gap-plot styling parameters do not apply to factors or loadings plots.
 
+### Loading-overlap diagnostic
+
+The **loading.overlap** plot is a companion diagnostic to the bounded-loadings feature (see [Chapter @sec-gsynth] for the underlying simplex projection). It answers: do treated units lie inside the support of the controls in factor space?
+
+For models with $r \geq 2$, the plot shows factors 1 and 2 with the convex hull of control loadings shaded in light blue and treated units overlaid as red triangles. Treated units inside the hull are exactly recoverable as convex combinations of controls; treated units outside the hull are projected onto the boundary by the bounded estimator and produce large entries in `loading.proj.resid`.
+
+```{r plot-loading-overlap, fig.width = 6, fig.height = 5}
+plot(out_ife, type = "loading.overlap")
+```
+
+For $r = 1$, the same diagnostic is rendered as a mirror histogram: treated counts above the axis, control counts flipped below, with a vertical band marking the range of control loadings. The 1D analog of "outside the hull" is "outside the band." The plot is informative even when `loading.bound = "none"` --- it shows whether the constraint *would* bind if activated.
+
 ------------------------------------------------------------------------
 
 ## Standalone `esplot()` {#sec-esplot}

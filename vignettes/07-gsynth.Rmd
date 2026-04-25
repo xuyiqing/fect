@@ -7,7 +7,17 @@ source("_common.R")
 This chapter demonstrates the generalized synthetic control method, or Gsynth, proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\].
 
 ::: {.callout-tip appearance="simple"}
-The **gsynth** package as a standalone package still exists, but algorithmically is a wrapper of the **fect** package. Click [here](https://yiqingxu.org/packages/gsynth/) if you want to use the old syntax. 
+The **gsynth** package as a standalone package still exists, but algorithmically is a wrapper of the **fect** package. Click [here](https://yiqingxu.org/packages/gsynth/) if you want to use the old syntax.
+:::
+
+::: {.callout-tip}
+
+### Recommended in v2.3.0: bound treated loadings (`loading.bound = "simplex"`)
+
+We *strongly* recommend activating bounded factor loadings via `loading.bound = "simplex"` for the Synth setting. This constrains each treated unit's factor loading to a non-negative convex combination of control loadings, recovering the synthetic-control intuition that the imputed counterfactual should sit *inside* the support of the donor pool.
+
+The default `loading.bound = "none"` preserves the original Xu (2017) behavior --- an unconstrained least-squares projection. Activating the simplex bound is therefore opt-in (so prior results remain reproducible), but it is generally preferable, especially when the donor pool is small or convex-hull overlap is uncertain. See the **Bounded factor loadings** section below for the objective function, a worked ON/OFF comparison, and the companion `loading.overlap` diagnostic plot.
+
 :::
 
 Gsynth was originally implemented in the **gsynth** package but has now been fully integrated into the **fect** package. Gsynth (`method = "gsynth"`) and FEct/IFEct/MC (`method = "fe"/"ife"/"mc"`) are different in the following ways:
@@ -16,13 +26,16 @@ Gsynth was originally implemented in the **gsynth** package but has now been ful
 -   Gsynth is particularly suited for the Synth setting, where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
 -   Compared with IFEct (`method = "ife"`), Gsynth *does not* rely on pre-treatment data from the treated units to estimate time components (e.g., factors). Hence, `time.component.from = "nevertreated"`. This approach speeds up computation, improves stability, and is more suitable for predictive inference based on row exchangeability.
 
-Therefore, we recommend setting `method = "gsynth"` in **fect** for the synthetic control setting, where the treatment does not reverse (or is coded accordingly) and the number of treated units is small. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/07-gsynth.R).
+Therefore, we recommend setting `method = "gsynth"` in **fect** for the synthetic control setting, where the treatment does not reverse (or is coded accordingly) and the number of treated units is small. The [R script for this chapter](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/07-gsynth.R) is available for download.
 
 ::: {.callout-important appearance="simple"}
+
 ### Key Equivalence
+
 `fect(..., method = "gsynth")` is equivalent to `fect(..., method = "ife", time.component.from = "nevertreated")`.
 
 Gsynth is a procedure based on an IFE model estimated using only never-treated controls. The gsynth package was developed in the synthetic control setting, where a small number of treated units are compared with never-treated controls to learn latent time effects.
+
 :::
 
 Use `method = "gsynth"` (or equivalently `time.component.from = "nevertreated"`) when:
@@ -481,6 +494,136 @@ plot(out_ub_param, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
 
 
 ------------------------------------------------------------------------
+
+## Bounded factor loadings
+
+In the standard Gsynth setup, the treated-unit factor loading $\hat\lambda_i$ is obtained from an unconstrained least-squares projection of the pre-treatment residual onto the control-derived factor matrix. When few treated units lie inside the convex hull of control loadings, this projection can extrapolate aggressively, producing implied counterfactual paths that no individual control (or weighted average of them) could plausibly trace. Bounded factor loadings address this by constraining each treated loading to be a non-negative convex combination of control loadings, recovering the synthetic-control intuition that the imputed counterfactual should sit inside the support of the donor pool.
+
+### The simplex projection
+
+For each treated unit $i$, the bounded estimator solves
+
+$$
+\min_{w_i \in \Delta^{N_{co}}} \;\; \frac{1}{\gamma} \, \mathrm{KL}(w_i \,\|\, \tilde{w}) \; + \; \big\| u_i^{\mathrm{pre}} - F^{\mathrm{pre}} \Lambda_{co}^\top w_i \big\|_2^2
+$$
+
+where:
+
+- $w_i$ is the $N_{co}$-vector of simplex weights for treated unit $i$, with $w_{ij} \geq 0$ and $\sum_j w_{ij} = 1$;
+- $\tilde{w} = (1/N_{co}, \ldots, 1/N_{co})$ is the uniform reference and $\mathrm{KL}(w \,\|\, \tilde{w}) = \sum_j w_j \log(N_{co}\, w_j)$ is the entropy regularizer;
+- $\gamma > 0$ controls regularization strength: as $\gamma \to \infty$ the KL term vanishes and the solution approaches a pure simplex-constrained least-squares projection; as $\gamma \to 0$ weights are forced toward uniform;
+- $u_i^{\mathrm{pre}}$ is the pre-treatment residual after time and unit fixed effects for unit $i$;
+- $F^{\mathrm{pre}}$ is the $T_0 \times r$ matrix of estimated factors restricted to the pre-treatment window;
+- $\Lambda_{co}$ is the $N_{co} \times r$ matrix of estimated control loadings.
+
+The implied treated loading is $\hat\lambda_i = \Lambda_{co}^\top w_i$. Because $w_i$ lies in $\Delta^{N_{co}}$ and $\hat\lambda_i$ is therefore a convex combination of rows of $\Lambda_{co}$, the imputed counterfactual
+
+$$\hat Y_i(0) \;=\; F \, \hat\lambda_i$$
+
+lies pointwise in the convex hull of factor-implied control outcomes at every period.
+
+The objective is the standard quadratic-residual fit on the pre-period plus a KL penalty toward uniform. The KL term plays two roles: it stabilizes the optimization (the unconstrained simplex projection is degenerate when $N_{co}$ exceeds the number of pre-period observations) and it shrinks toward an "equal-weight donor pool" prior, which is sensible when controls are exchangeable. The solver uses a softmax reparameterization with `optim(method = "L-BFGS-B")` and an analytic gradient, with a mirror-descent fallback for ill-conditioned inputs.
+
+### Bounded vs. unbounded: a worked comparison
+
+The new argument `loading.bound = "simplex"` (default `"none"`) activates the constraint. Regularization strength $\gamma$ is selected by 5-fold cross-validation over a log-grid by default; supply `gamma.loading` directly to skip CV, or pass a custom grid via `gamma.loading.grid`. Bounded loadings is supported for `method = "gsynth"` (or equivalently `method = "ife", time.component.from = "nevertreated"`).
+
+We fit two specifications on `sim_gsynth` --- one unbounded (`loading.bound = "none"`, the default) and one bounded (`loading.bound = "simplex"`) --- everything else equal:
+
+```{r bounded-vs-unbounded-fit, eval = TRUE, cache = TRUE, message = FALSE, results = "hide"}
+# Unbounded gsynth (default v2.2.x behavior --- standard Xu 2017 estimator)
+out.unbounded <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
+                      method = "gsynth", r = 2,
+                      se = TRUE, vartype = "parametric", nboots = 100,
+                      CV = FALSE, parallel = FALSE)
+
+# Bounded gsynth (new in v2.3.0 --- simplex projection)
+out.bounded   <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
+                      method = "gsynth", r = 2,
+                      loading.bound = "simplex",
+                      se = TRUE, vartype = "parametric", nboots = 100,
+                      CV = FALSE, parallel = FALSE)
+```
+
+ATT comparison:
+
+```{r bounded-vs-unbounded-att}
+cat("Unbounded ATT =", round(out.unbounded$att.avg, 3), "\n")
+cat("Bounded   ATT =", round(out.bounded$att.avg,   3), "\n")
+cat("\ngamma.loading (CV-selected) =", round(out.bounded$gamma.loading, 4), "\n")
+cat("\nPer-treated projection residuals (loading.proj.resid):\n")
+print(round(out.bounded$loading.proj.resid, 3))
+```
+
+Large entries in `loading.proj.resid` (substantially above the control-fit RMSE) flag treated units near or outside the convex hull of control loadings --- the simplex constraint is binding for those units, and reported intervals may under-cover (the Andrews 1999, 2001 non-standard-limit regime for constrained estimators).
+
+#### Side-by-side gap plots
+
+```{r bounded-vs-unbounded-gap, fig.width = 9, fig.height = 4, message = FALSE}
+library(gridExtra)
+gap.un  <- plot(out.unbounded, type = "gap", main = "Unbounded gsynth")
+gap.bd  <- plot(out.bounded,   type = "gap", main = "Bounded gsynth (simplex)")
+grid.arrange(gap.un, gap.bd, ncol = 2)
+```
+
+#### Side-by-side `loading.overlap` plots
+
+The companion plot type `loading.overlap` displays factor 1 versus factor 2, with the convex hull of control loadings shaded and treated units overlaid as red triangles. The unbounded fit shows treated loadings *as estimated* (which can lie outside the hull); the bounded fit shows treated loadings *as projected* onto the simplex (always inside the hull or on its boundary).
+
+```{r bounded-vs-unbounded-overlap, fig.width = 9, fig.height = 4}
+ov.un <- plot(out.unbounded, type = "loading.overlap",
+              main = "Unbounded loadings")
+ov.bd <- plot(out.bounded,   type = "loading.overlap",
+              main = "Bounded loadings (projected)")
+grid.arrange(ov.un, ov.bd, ncol = 2)
+```
+
+For one-factor models ($r = 1$), the same `loading.overlap` diagnostic renders as a mirror histogram --- treated counts above the axis, control counts below, with a vertical band marking the range of control loadings. The 1D analog of "outside the hull" is "outside the band."
+
+#### Implicit donor weights: bounded vs. unbounded
+
+Each treated counterfactual $\hat Y_i(0) = F\,\hat\lambda_i$ is a linear combination of control-implied outcomes. The coefficients on the controls --- stored in `wgt.implied`, an $N_{tr} \times N_{co}$ matrix --- are the *implicit donor weights*. Under `loading.bound = "none"`, these come from the Moore-Penrose pseudo-inverse and may be negative, exceed one, or vary wildly with small perturbations. Under `loading.bound = "simplex"`, each row is non-negative and sums to one (a proper synthetic-control weighting). The scatter below shows every (treated unit, control unit) pair: x-axis is the unbounded weight, y-axis is the bounded weight.
+
+```{r bounded-vs-unbounded-weights, fig.width = 6.5, fig.height = 5, message = FALSE}
+library(ggplot2)
+W.un <- as.matrix(out.unbounded$wgt.implied)
+W.bd <- as.matrix(out.bounded$wgt.implied)
+df.w <- data.frame(
+  unbounded = as.numeric(W.un),
+  bounded   = as.numeric(W.bd)
+)
+
+ggplot(df.w, aes(x = unbounded, y = bounded)) +
+  geom_hline(yintercept = 0, color = "grey80", linewidth = 0.4) +
+  geom_vline(xintercept = 0, color = "grey80", linewidth = 0.4) +
+  geom_abline(slope = 1, intercept = 0,
+              color = "grey60", linetype = "dashed", linewidth = 0.4) +
+  geom_point(alpha = 0.4, size = 1.4, color = "#3F6A99") +
+  labs(x = "Unbounded weight (Moore-Penrose pseudo-inverse)",
+       y = "Bounded weight (simplex-projected)",
+       title = "Implicit donor weights: bounded vs unbounded",
+       subtitle = "One point per (treated, control) pair; dashed line is y = x") +
+  theme_bw(base_size = 11) +
+  theme(panel.grid.minor = element_blank())
+```
+
+Three behavioural patterns to look for:
+
+1. **Mass concentration near $y = 0$.** Bounded weights are sparse: most (treated, control) pairs get weight zero, with only a handful of donors getting meaningful weight per treated unit. The sparsity comes from the **simplex constraint**, not the regularizer --- non-negative least-squares on a probability simplex has an active-set property: at the optimum, many constraints $w_j = 0$ are active and only a small subset of donors carries positive weight. The entropy regularizer actually pulls weights *toward* uniform $(1/N_{co})$ and so works *against* sparsity; with moderate $\gamma$ the constraint dominates, and as $\gamma \to 0$ weights converge to uniform. Unbounded weights, in contrast, spread non-zero mass across the entire donor pool because the pseudo-inverse has no non-negativity constraint and no preference for sparsity.
+2. **Negative unbounded weights collapse to zero.** Points with $x < 0$ all sit at $y = 0$ (or near it). The simplex projection cannot represent negative weights --- it simply removes those donors from the pool. This is exactly the synthetic-control intuition: a counterfactual cannot be a *negative* combination of donors.
+3. **Bounded weights cap at one.** Points with $x > 1$ collapse to $y \leq 1$. When pseudo-inverse over-extrapolates a single donor, the simplex caps it; the rest of the row redistributes among other donors.
+
+The result is a fundamentally different counterfactual representation. Pseudo-inverse: dense, possibly extrapolating, sometimes counterintuitive. Simplex: sparse, interpolating-only, every weight has a synthetic-control interpretation.
+
+#### Reading the comparison
+
+Because `sim_gsynth` follows a clean IFE DGP and treated units sit reliably inside the convex hull of control loadings, the two fits give very similar ATTs --- the simplex constraint barely binds at the *loading* level. The *weight* representations differ substantially even when the implied counterfactuals do not, which is informative on its own: bounded loadings buy interpretability and robustness without paying much in fit on well-behaved data. Real datasets with sparse donor pools (few treated units alongside controls with disparate factor loadings) typically show larger ATT gaps; in those settings, the simplex bound corrects the extrapolation that pure least-squares performs and provides a more honest synthetic-control counterfactual.
+
+### Caveats
+
+- Currently restricted to `method = "ife"` or `"gsynth"` (equivalently, `time.component.from = "nevertreated"`).
+- Percentile-bootstrap intervals may under-cover when the simplex constraint binds (true treated loading on the boundary of $\mathrm{conv}(\Lambda_{co})$). Detect via `loading.proj.resid`. Boundary-corrected inference is deferred to a later release.
+- The unit fixed-effect scalar $\alpha_i$ is *not* bounded; under `force %in% c("unit", "two-way")` it is computed as the residual mean per treated unit.
 
 ## CFE with GSynth
 

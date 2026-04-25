@@ -409,8 +409,8 @@ plot.fect <- function(
     if (type == "hte") {
       type <- "heterogeneous"
     }
-    if (!type %in% c("status", "gap", "equiv", "exit", "factors", "loadings", "calendar", "box", "counterfactual", "sens", "sens_es", "cumul", "heterogeneous")) {
-      stop("\"type\" option misspecified. Must be one of the following:\"status\",\"gap\",\"equiv\",\"exit\",\"calendar\",\"box\",\"counterfactual\",\"equiv\",\"sens\",\"sens_es\",\"cumul\",\"heterogeneous\".")
+    if (!type %in% c("status", "gap", "equiv", "exit", "factors", "loadings", "loading.overlap", "calendar", "box", "counterfactual", "sens", "sens_es", "cumul", "heterogeneous")) {
+      stop("\"type\" option misspecified. Must be one of the following:\"status\",\"gap\",\"equiv\",\"exit\",\"calendar\",\"box\",\"counterfactual\",\"equiv\",\"sens\",\"sens_es\",\"cumul\",\"heterogeneous\",\"loadings\",\"loading.overlap\",\"factors\".")
     }
     if (type == "exit" && is.null(x$att.off)) {
       stop("No exiting treatment effect to be plotted.")
@@ -458,6 +458,97 @@ plot.fect <- function(
     }
   }
 
+
+  # convex-hull diagnostic for treated-vs-control loadings
+  if (type == "loading.overlap") {
+    if (!x$method %in% c("gsynth", "ife", "fe")) {
+      stop("Loading-overlap plot requires method 'gsynth', 'ife', or 'fe'.\n")
+    }
+    if (x$r.cv == 0) {
+      stop("Loading-overlap plot requires r >= 1; no factors estimated.\n")
+    }
+
+    L_co <- x$lambda.co
+    L_tr <- x$lambda.tr
+    r    <- x$r.cv
+
+    if (is.null(main)) {
+      main <- paste0("Loading overlap (", x$method, ", r = ", r, ")")
+    } else if (identical(main, "")) {
+      main <- NULL
+    }
+
+    if (r >= 2) {
+      hull_idx <- grDevices::chull(L_co[, 1L], L_co[, 2L])
+      hull_df  <- data.frame(L1 = L_co[hull_idx, 1L], L2 = L_co[hull_idx, 2L])
+      co_df    <- data.frame(L1 = L_co[, 1L], L2 = L_co[, 2L])
+      tr_df    <- data.frame(L1 = L_tr[, 1L], L2 = L_tr[, 2L])
+
+      if (is.null(xlab)) xlab <- "Factor loading 1"
+      if (is.null(ylab)) ylab <- "Factor loading 2"
+
+      p <- ggplot() +
+        geom_polygon(data = hull_df, aes(x = .data$L1, y = .data$L2),
+                     fill = "#5B7FA8", alpha = 0.20,
+                     color = "#3F6A99", linewidth = 0.6) +
+        geom_point(data = co_df, aes(x = .data$L1, y = .data$L2),
+                   color = "#3F6A99", alpha = 0.7, size = 2) +
+        geom_point(data = tr_df, aes(x = .data$L1, y = .data$L2),
+                   color = "#C0392B", shape = 17, size = 3) +
+        labs(title = main,
+             subtitle = "Blue shaded: convex hull of control loadings; red triangles: treated units",
+             x = xlab, y = ylab)
+      if (isTRUE(theme.bw)) p <- p + theme_bw()
+    } else {
+      ## r == 1: mirror histogram (treated up, control down) with control range band
+      co_vec   <- as.numeric(L_co[, 1L])
+      tr_vec   <- as.numeric(L_tr[, 1L])
+      co_range <- range(co_vec)
+
+      pool <- c(co_vec, tr_vec)
+      bw   <- 2 * stats::IQR(pool) / length(pool)^(1/3)
+      if (!is.finite(bw) || bw <= 0) bw <- diff(range(pool)) / 30
+
+      co_df <- data.frame(value = co_vec)
+      tr_df <- data.frame(value = tr_vec)
+
+      if (is.null(xlab)) xlab <- "Factor loading 1"
+      if (is.null(ylab)) ylab <- "Count (treated above, controls below)"
+
+      p <- ggplot() +
+        annotate("rect",
+                 xmin = co_range[1L], xmax = co_range[2L],
+                 ymin = -Inf, ymax = Inf,
+                 fill = "#5B7FA8", alpha = 0.15) +
+        geom_vline(xintercept = co_range, color = "#3F6A99",
+                   linetype = "dashed", linewidth = 0.4) +
+        geom_histogram(data = tr_df,
+                       aes(x = .data$value, y = after_stat(count)),
+                       fill = "#C0392B", color = "white",
+                       binwidth = bw, alpha = 0.85) +
+        geom_histogram(data = co_df,
+                       aes(x = .data$value, y = -after_stat(count)),
+                       fill = "#3F6A99", color = "white",
+                       binwidth = bw, alpha = 0.7) +
+        geom_hline(yintercept = 0, color = "gray40", linewidth = 0.4) +
+        scale_y_continuous(labels = function(y) abs(y)) +
+        labs(title = main,
+             subtitle = "Blue band: range of control loadings; treated above, controls below",
+             x = xlab, y = ylab)
+      if (isTRUE(theme.bw)) p <- p + theme_bw()
+    }
+
+    if (isTRUE(return.data)) {
+      ret_data <- if (r >= 2) {
+        list(controls = co_df, treated = tr_df, hull = hull_df)
+      } else {
+        list(controls = co_df, treated = tr_df, control_range = co_range)
+      }
+      ret_data$plot_type <- "loading.overlap"
+      return(finalize_plot_return(p, data = ret_data, test.out = test.out))
+    }
+    return(p)
+  }
 
   # factors, loadings, fe
   if (type %in% c("loadings", "factors")) {
