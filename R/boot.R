@@ -924,11 +924,11 @@ fect_boot <- function(
       }
       vcov_tr <- array(NA, dim = c(TT, TT, Ntr))
       for (i in 1:Ntr) {
-        vcov_tr[,, i] <- res.vcov(res = error.tr.adj[,, i], cov.ar = 0)
+        vcov_tr[,, i] <- res.vcov(res = error.tr.adj[,, i], cov.ar = TT - 1L)
         vcov_tr[,, i][is.na(vcov_tr[,, i]) | is.nan(vcov_tr[,, i])] <- 0
       }
       ## calculate vcov of e_co
-      vcov_co <- res.vcov(res = error.co, cov.ar = 0)
+      vcov_co <- res.vcov(res = error.co, cov.ar = TT - 1L)
       vcov_co[is.na(vcov_co) | is.nan(vcov_co)] <- 0
     }
 
