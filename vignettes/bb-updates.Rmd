@@ -2,7 +2,24 @@
 
 ## v2.3.0
 
-(2026-04-24)
+(2026-04-25)
+
+**Forward-only (rolling) cross-validation for rank selection**:
+
+* New exported function `r.cv.rolling()`: a standalone helper for picking the number of factors $r$ via deterministic forward-only CV. For each control unit, the LAST `cv.nobs` observations are held out; training uses everything else (the unit's earlier observations + all other units' full data). Closes the future-side leakage channel that AR-correlated residuals exploit at `cv.donut = 0` / `1` under the default contiguous-block masking, and tends to recover smaller $r$ on panels with serially correlated errors.
+* Supports `method = "ife"` (IFE-EM, internal `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC, internal `time.component.from = "nevertreated"`). Both paths populate `Y.ct.full` at masked control positions: the IFE-EM path via EM imputation, the GSC path via the model-implied factor product $F \hat\lambda_{co}$ (see "GSC: `Y.ct.full` populated at control positions" below).
+* Workflow: call `r.cv.rolling()` to get the chosen `r.cv`, then pass that to `fect(..., CV = FALSE, r = r.cv, se = TRUE)` for the inferential fit. Promoting it to a `cv.method = "rolling"` option inside the main `fect()` CV dispatcher is deferred to a future release.
+* Empirical motivation: on the Eibl & Hertog (2023) oil-rich panels with residual AR(1) of 0.56--0.93, the default contiguous-block CV pegs `r.cv` at `r.max` on every (cell, estimator, rule) combination even at widened `cv.nobs = 6`. `r.cv.rolling()` with `cv.nobs = 3` recovers `r.cv = 1` on three of the four outcomes, matching the placebo-based preferred rank.
+
+**GSC: `Y.ct.full` populated at control positions**:
+
+* On the GSC path (`method = "ife"` with `time.component.from = "nevertreated"`), `Y.ct.full[, co]` is now overwritten with the model-implied factor product $F \hat\lambda_{co}$ after the shared `Y.ct.full <- Y.ct` assignment. Closes a gap that left `NA` at masked control positions because the residual recipe `Y.co - residuals` propagates `NA` --- enables `r.cv.rolling()` to score MSPE for `method = "gsynth"`.
+* No change to ATT, gap, or `est.avg`: those are computed from treated-unit positions and do not consume `Y.ct.full[, co]`.
+
+**Parallelism cleanup (Phase A bootstrap)**:
+
+* Phase A's bootstrap error simulation (`R/boot.R::draw.error`) migrated from `foreach %dopar%` to `future.apply::future_lapply`. The old `%dopar%` inherited whatever backend was registered globally; after any prior parallel `fect` call, `run_dopar_retry`'s `on.exit` left `doFuture` registered, so a subsequent call's Phase A inherited a backend that shipped heavy closures per iteration --- producing an ~8x slowdown on variant (iii) parametric bootstraps in multi-fit sessions (e.g., a forest plot run).
+* Removed the `doFuture::registerDoFuture()` re-registration from `run_dopar_retry`'s `on.exit`. The function still falls back to `doParallel` if the future backend errors; it just no longer leaves a global doFuture registration behind.
 
 **Cross-validation: 1-SE rule is now the default for $r$ selection** (Breiman, Friedman, Olshen & Stone 1984; Hastie, Tibshirani & Friedman 2009 §7.10):
 

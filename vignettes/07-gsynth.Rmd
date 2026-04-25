@@ -154,6 +154,43 @@ Not all `cv.method` options are available in the Synth/Gsynth settings:
 
 The `"loo"` method is exclusive to Gsynth (`time.component.from = "nevertreated"`) because it requires factor estimation to be independent of the held-out treated observations. In the `"nevertreated"` setting, factors are estimated from control units only, so holding out treated pre-treatment periods does not compromise estimation. In the `"notyettreated"` setting, all units contribute to estimation, making LOO less clean; use `"treated_units"` instead.
 
+### Forward-only (rolling) CV via `r.cv.rolling()`
+
+The default Gsynth CV strategies (`"all_units"`, `"treated_units"`) hold out random contiguous blocks of `cv.nobs` observations. With residuals that are temporally correlated (a common feature of macro panels), this design has a subtle problem: the held-out blocks are immediately adjacent to training observations on both sides, so a high-rank model can "predict" the held-out block by exploiting the AR structure that leaks across the train/test boundary. Even widening `cv.nobs` and adding a `cv.donut` may not fully close this channel.
+
+`r.cv.rolling()` is a deterministic alternative: for each control unit, it holds out the **last `cv.nobs` observations** and trains on everything else (the unit's earlier observations plus all other units' full data). The future-side leakage channel is closed because the masked block is always the most recent observed window per unit.
+
+Starting in `r read.dcf("../DESCRIPTION")[,"Version"]`, `r.cv.rolling()` supports both estimators via the `method` argument:
+
+- `method = "ife"` --- IFE-EM, internally `time.component.from = "notyettreated"`.
+- `method = "gsynth"` --- GSC, internally `time.component.from = "nevertreated"`.
+
+Workflow:
+
+```{r rcv_rolling_gsc, eval = FALSE}
+res <- r.cv.rolling(Y ~ D + X1 + X2, data = sim_gsynth,
+                    index = c("id", "time"),
+                    method = "gsynth", r.max = 5, cv.nobs = 3,
+                    cv.rule = "1se", min.T0 = 5)
+res$r.cv      # selected r
+res$mspe      # per-r MSPE curve
+
+## Then use the chosen r in a CV-disabled fit:
+fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+            method = "gsynth", CV = FALSE, r = res$r.cv,
+            se = TRUE, vartype = "parametric")
+```
+
+::: {.callout-note appearance="simple"}
+
+### When to prefer rolling CV for Gsynth
+
+Gsynth applications often span macro panels (countries, states) with persistent residual shocks. If your post-fit residual AR(1) is above ~0.4, the default contiguous-block masking can over-select `r` (commonly pegging at `r.max`). `r.cv.rolling()` is more conservative in those settings; with approximately i.i.d. residuals, rolling CV and the default strategies typically agree on `r.cv`.
+
+The chosen rank can then be passed back into `fect()` with `CV = FALSE`, recovering the standard Gsynth inference (`vartype = "parametric"` or `"jackknife"`) on top of the more conservative rank choice.
+
+:::
+
 ### Visualizing Results
 
 By default, the `print` function produces a *gap* plot, equivalent to using `plot(out, type = "gap")`, and visualizes the estimated Average Treatment Effect on the Treated (ATT) by period. For reference, the true effects in `gsynth` range from 1 to 10 (with some added white noise) and take effect during periods 21 to 30.

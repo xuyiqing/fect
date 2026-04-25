@@ -3,21 +3,21 @@
 #' Implements the over-identification test described in the slide:
 #' run two auxiliary regressions of residualized outcomes on the moderator
 #' and covariates (including quadratic and interaction terms) with unit and
-#' time fixed effects, then test using \(n \times R^2 \sim \chi^2(df)\),
+#' time fixed effects, then test using \eqn{n \times R^2 \sim \chi^2(df)},
 #' where df is the number of *nonlinear* (quadratic + interaction) terms that
 #' remain in the fitted model.
 #'
 #' @param x A `fect` object. Must be estimated with `cm=TRUE` so that `x$est.cm` exists.
-#' @param moderator Character scalar. Name of the moderator \(M_{it}\) (must be in `x$X`).
-#' @param covariates Optional character vector. Names of other covariates \(X_{it}\).
+#' @param moderator Character scalar. Name of the moderator \eqn{M_{it}} (must be in `x$X`).
+#' @param covariates Optional character vector. Names of other covariates \eqn{X_{it}}.
 #'   Default is all covariates in `x$X` except `moderator`.
-#' @param quadratic Logical. Include quadratic terms \(M_{it}^2\) and \(X_{it}^2\). Default TRUE.
-#' @param interaction Logical. Include interaction terms \(M_{it} \times X_{it}\). Default TRUE.
+#' @param quadratic Logical. Include quadratic terms \eqn{M_{it}^2} and \eqn{X_{it}^2}. Default TRUE.
+#' @param interaction Logical. Include interaction terms \eqn{M_{it} \times X_{it}}. Default TRUE.
 #'
 #' @return A list with elements `e1` and `e0`, each containing:
 #'   - `n`: sample size used in the auxiliary regression
 #'   - `r2`: R-squared of the auxiliary regression
-#'   - `stat`: \(n \times R^2\)
+#'   - `stat`: \eqn{n \times R^2}
 #'   - `df`: degrees of freedom (# nonlinear terms kept)
 #'   - `p`: p-value from chi-square test
 #'   - `model`: the fitted `fixest` model
