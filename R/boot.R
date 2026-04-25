@@ -882,21 +882,15 @@ fect_boot <- function(
 
     message("\rSimulating errors ...")
     if (do_parallel_boot) {
-      error.tr <- suppressWarnings(foreach(
-        j = 1:nboots,
-        .combine = function(...) abind(..., along = 3),
-        .multicombine = TRUE,
-        .export = c("impute_Y0", "valid_controls",
-                     "fect_nevertreated", "fect_fe", "fect_cfe", "initialFit",
-                     ".reconstruct_gamma_fit_tr", ".reconstruct_kappa_fit",
-                     ".extract_and_apply_typeB_fe"),
-        .packages = c("fect", "mvtnorm", "fixest"),
-        .options.future = list(seed = TRUE),
-        .inorder = FALSE
-      ) %dopar%
-        {
-          return(draw.error())
-        })
+      ## Phase A: future_lapply (was foreach %dopar%, which inherited whatever
+      ## backend the global foreach registry held — see notes/ stage-1).
+      error.list <- future.apply::future_lapply(
+        seq_len(nboots),
+        FUN = function(j) draw.error(),
+        future.seed = TRUE,
+        future.packages = c("fect", "mvtnorm", "fixest")
+      )
+      error.tr <- abind(error.list, along = 3)
     } else {
       error.tr <- array(NA, dim = c(TT, Ntr, nboots))
       for (j in 1:nboots) {
@@ -1560,7 +1554,6 @@ fect_boot <- function(
       cl <- parallel::makePSOCKcluster(workers)
       on.exit({
         try(parallel::stopCluster(cl), silent = TRUE)
-        try(suppressWarnings(suppressPackageStartupMessages(doFuture::registerDoFuture())), silent = TRUE)
       }, add = TRUE)
       doParallel::registerDoParallel(cl)
       suppressWarnings(foreach(

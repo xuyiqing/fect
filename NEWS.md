@@ -103,6 +103,26 @@ Parallel cross-validation:
   `fit_test`, `permutation`, `fect_sens`, or `did_wrapper` — five sites had
   legacy scalar `parallel == TRUE` / `if (parallel)` checks.
 
+## Parallelism cleanup (Phase A bootstrap)
+
+* Phase A's bootstrap error simulation (`R/boot.R::draw.error`) migrated
+  from `foreach %dopar%` to `future.apply::future_lapply`. The old
+  `%dopar%` inherited whatever backend was registered globally; after any
+  prior parallel fect call, `run_dopar_retry`'s `on.exit` left `doFuture`
+  registered, so a subsequent call's Phase A inherited a backend that
+  shipped heavy closures per iteration --- producing an ~8x slowdown on
+  variant (iii) bootstraps in multi-fit sessions (e.g., a forest plot run).
+
+* The `doFuture::registerDoFuture()` re-registration inside
+  `run_dopar_retry`'s `on.exit` was removed; it was the source of the
+  global state pollution. The function still falls back to `doParallel`
+  if the future backend errors; it just no longer leaves a global
+  doFuture registration behind.
+
+* New regression test (`tests/testthat/test-phase-a-future-state.R`):
+  asserts two consecutive `fect(parallel = TRUE)` calls in the same R
+  process have wall-time ratio < 3x.
+
 ## GSC: Y.ct.full populated at control positions
 
 * On the GSC path (`method = "ife"` with
