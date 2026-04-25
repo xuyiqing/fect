@@ -2612,6 +2612,24 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
     ## 3. unbalanced output
     Y.ct.full <- Y.ct
+    ## Stage 2: populate Y.ct.full at control positions on the GSC path.
+    ## On the IFE-EM (notyettreated) path EM imputation already fills in
+    ## masked control positions, so user-space rolling CV can read off
+    ## fit$Y.ct.full there. On GSC the residual recipe `Y.co - residuals`
+    ## leaves NA at masked positions because Y.co is NA. Overwriting with
+    ## the model-implied F * t(lambda_co) closes that gap. ATT, gap, and
+    ## est.avg are computed from treated units only and are unaffected.
+    if (method == "ife" &&
+        !is.null(est.co.best$factor) &&
+        !is.null(est.co.best$lambda)) {
+        F.hat.ctf     <- as.matrix(est.co.best$factor)
+        Lambda.co.ctf <- as.matrix(est.co.best$lambda)
+        if (ncol(F.hat.ctf) > 0 &&
+            ncol(F.hat.ctf) == ncol(Lambda.co.ctf) &&
+            nrow(F.hat.ctf) == TT && nrow(Lambda.co.ctf) == Nco) {
+            Y.ct.full[, co] <- F.hat.ctf %*% t(Lambda.co.ctf)
+        }
+    }
     res.full <- Y - Y.ct
     if (0 %in% I) {
         eff[which(I == 0)] <- NA
