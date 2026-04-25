@@ -1,49 +1,68 @@
 # fect 2.3.0 (development)
 
-## Rolling (forward-only) cross-validation
+## Rolling-window cross-validation (standard ML design)
 
 * New exported function `r.cv.rolling()`: a standalone user-facing helper
-  for picking the number of factors `r` via deterministic forward-only CV.
-  For each unit, the LAST `cv.nobs` observations are held out; training
-  uses everything else (the unit's earlier observations + all other units'
-  full data). Unlike `fect()`'s default `cv.method = "all_units"` (random
-  contiguous-block masking), this design closes the forward-leakage channel
-  that AR-correlated residuals exploit at `cv.donut = 0` / `1`, and tends
-  to recover much smaller `r` on panels with serially correlated errors.
+  for picking the number of factors `r` via standard rolling-window CV.
+  For each of `k` folds and each eligible control unit, a random anchor
+  time `t*` is sampled. The fold's training set excludes:
+    1. `cv.nobs` observations starting at `t*` (the held-out, scored block);
+    2. `cv.gap` observations immediately before `t*` (gap buffer, attenuates
+       AR-leakage at the past-side train/test boundary --- analogous to
+       `cv.donut` for the existing CV strategies, but only on the past side
+       since the future side is dropped by construction);
+    3. all observations from `t* + cv.nobs` onward (the rolling-window
+       step --- training cannot see the future of the held-out block).
+  MSPE is scored at the held-out block only and averaged across folds.
+  This is the standard time-series CV design (cf. `forecast::tsCV`,
+  `tidymodels::sliding_window`, `caret::createTimeSlices`) adapted to
+  panel data.
 
-* New internal helper `cv.sample.rolling()` (in `support.R`): builds the
-  deterministic forward-only fold (last `cv.nobs` per unit), respecting a
-  `min.T0` floor so units with too few observations are not masked.
+* New parameters: `cv.gap` (default 1, past-side buffer length); `k`
+  (default 5, number of folds); `seed` (optional integer base seed for
+  reproducible per-fold anchor sampling).
 
-* Workflow: call `r.cv.rolling(formula, data, index, method = "ife", ...)`
-  to get the chosen `r.cv`, then pass that to `fect(..., CV = FALSE,
-  r = r.cv, se = TRUE)` for the inferential fit.
+* Closes the forward-leakage channel that the existing
+  `cv.method = "all_units"` / `"treated_units"` (random contiguous-block
+  masking) leaves open at `cv.donut = 0 / 1` under serially correlated
+  residuals: under rolling-window CV, the train/test boundary on the
+  future side is closed by construction.
 
-* Supports `method = "ife"` (IFE-EM, internal
+* Workflow: call
+  `r.cv.rolling(formula, data, index, method = "ife", cv.gap = 1, k = 5)`
+  to get the chosen `r.cv`, then pass that to
+  `fect(..., CV = FALSE, r = r.cv, se = TRUE)` for the inferential fit.
+
+* Identical CV behavior across `method = "ife"` (IFE-EM, internal
   `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC,
   internal `time.component.from = "nevertreated"`). Both paths populate
   `Y.ct.full` at masked control positions: the IFE-EM path via EM
   imputation, the GSC path via the model-implied factor product
-  `F * t(lambda_co)` (companion change to `R/fect_nevertreated.R`,
-  separately catalogued under "GSC: Y.ct.full populated at control
-  positions"). Other methods (e.g. `"mc"`) are not yet supported.
+  `F * t(lambda_co)` (see "GSC: Y.ct.full populated at control positions"
+  below). Other methods (e.g. `"mc"`) are not yet supported.
 
-* Implemented as a standalone helper rather than as a new value of
-  `cv.method` to minimize integration risk with the existing fold-
-  aggregation machinery in `cv.R`. Promoting it to a
+* Return value is a list with `r.cv`, `cv.rule`, `mspe` (data.frame of
+  per-r MSPE averaged across folds, plus fold-SE and held-out cell
+  counts), `mspe.per.fold` (r-by-k matrix of per-fold MSPE), and the
+  chosen `k`, `cv.nobs`, `cv.gap`. Promoting the design to a
   `cv.method = "rolling"` option inside the main `fect()` CV dispatcher
-  is deferred to a future release; for now use the standalone
-  `r.cv.rolling()` and feed the chosen rank to
-  `fect(..., CV = FALSE, r = r.cv)`.
+  is deferred to a future release.
 
 * Empirical motivation: on the Eibl & Hertog (2023) oil-rich panels with
   residual AR(1) of 0.56--0.93, fect's default CV (random anchors,
   `cv.donut` 0 or 1) pegs `r.cv = 5` on every (cell, estimator, rule)
   combination, even at widened `cv.nobs = 6` --- the forward-leakage hides
-  the rank overfit. `r.cv.rolling()` with `cv.nobs = 3` recovers `r.cv = 1`
-  on health-equity, education-equity, and secondary-enrollment outcomes;
-  `r.cv = 0` on primary-enrollment --- matching the placebo-based preferred
-  rank to within one factor.
+  the rank overfit. `r.cv.rolling()` recovers ranks consistent with the
+  placebo-passing preferred rank for each outcome.
+
+* **Behavior change vs the v2.3.0 development tip's tail-only design**:
+  the prior implementation deterministically masked the LAST `cv.nobs`
+  observations of each control unit (no folds, no random anchors).
+  This was simpler but gave a single MSPE estimate per `r` with no
+  fold-to-fold SE. Existing callers' `r.cv.rolling()` invocations will
+  produce different numerical results under the new design; the
+  selected `r.cv` is typically similar but no longer deterministic for
+  a fixed dataset (set `seed` for reproducibility).
 
 ## Bounded factor loadings for GSC
 
