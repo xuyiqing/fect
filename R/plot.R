@@ -524,12 +524,12 @@ plot.fect <- function(
                    linetype = "dashed", linewidth = 0.4) +
         geom_histogram(data = tr_df,
                        aes(x = .data$value, y = after_stat(count)),
-                       fill = "#C0392B", color = "white",
-                       binwidth = bw, alpha = 0.85) +
+                       fill = "#C0392B", color = "#7B1F12",
+                       binwidth = bw, alpha = 0.85, linewidth = 0.3) +
         geom_histogram(data = co_df,
                        aes(x = .data$value, y = -after_stat(count)),
-                       fill = "#3F6A99", color = "white",
-                       binwidth = bw, alpha = 0.7) +
+                       fill = "#3F6A99", color = "#1F3F5C",
+                       binwidth = bw, alpha = 0.7, linewidth = 0.3) +
         geom_hline(yintercept = 0, color = "gray40", linewidth = 0.4) +
         scale_y_continuous(labels = function(y) abs(y)) +
         labs(title = main,

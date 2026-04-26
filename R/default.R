@@ -42,10 +42,11 @@ fect <- function(
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
     k = 10, # times of CV
-    cv.prop = 0.1, ## proportion of CV counts
-    cv.method = "all_units", ## CV masking strategy
+    cv.prop = 0.2, ## fraction of eligible units sampled per fold (rolling) / proportion of obs masked per round (block)
+    cv.method = "rolling", ## CV masking strategy (default flipped from "all_units" in v2.3.0)
     cv.nobs = 3, ## cv taking consecutive units
-    cv.donut = 0, ## cv mspe
+    cv.donut = 1, ## cv mspe (default flipped from 0 to match cv.buffer = 1 in v2.3.0)
+    cv.buffer = 1, ## past-side buffer for cv.method = "rolling"
     criterion = "mspe", # for ife model: mspe, pc or both
     binary = FALSE, # probit model
     QR = FALSE, # QR or SVD for binary probit
@@ -120,10 +121,11 @@ fect.formula <- function(
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
     k = 10, # times of CV
-    cv.prop = 0.1, ## proportion of CV counts
-    cv.method = "all_units",
+    cv.prop = 0.2, ## fraction of eligible units sampled per fold (rolling) / proportion of obs masked per round (block)
+    cv.method = "rolling",
     cv.nobs = 3,
-    cv.donut = 0, ## cv mspe
+    cv.donut = 1, ## cv mspe (default flipped from 0 to match cv.buffer = 1 in v2.3.0)
+    cv.buffer = 1, ## past-side buffer for cv.method = "rolling"
     criterion = "mspe", # for ife model: mspe, pc or both
     binary = FALSE, # probit model
     QR = FALSE, # QR or SVD for binary probit
@@ -234,6 +236,7 @@ fect.formula <- function(
         cv.method = cv.method,
         cv.nobs = cv.nobs,
         cv.donut = cv.donut,
+        cv.buffer = cv.buffer,
         criterion = criterion,
         binary = binary,
         QR = QR,
@@ -310,10 +313,11 @@ fect.default <- function(
     nlambda = 0,
     CV = NULL, # cross-validation
     k = 10, # times of CV
-    cv.prop = 0.1,
+    cv.prop = 0.2,
     cv.method = "all_units",
     cv.nobs = 3,
     cv.donut = 1, ## cv mspe
+    cv.buffer = 1, ## past-side buffer for cv.method = "rolling"
     criterion = "mspe",
     binary = FALSE, # probit model
     QR = FALSE, # QR or SVD for binary probit
@@ -2075,6 +2079,7 @@ fect.default <- function(
                     cv.method = cv.method,
                     cv.nobs = cv.nobs,
                     cv.donut = cv.donut,
+                    cv.buffer = cv.buffer,
                     min.T0 = min.T0,
                     r = r,
                     r.end = r.end,
@@ -2115,6 +2120,8 @@ fect.default <- function(
                     cv.prop = cv.prop,
                     cv.method = cv.method,
                     cv.nobs = cv.nobs,
+                    cv.buffer = cv.buffer,
+                    min.T0 = min.T0,
                     r = r,
                     r.end = r.end,
                     QR = QR,

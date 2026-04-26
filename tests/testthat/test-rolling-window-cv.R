@@ -141,4 +141,76 @@ test_that("invalid arguments are rejected", {
     ),
     regexp = "k must be"
   )
+  expect_error(
+    fect::r.cv.rolling(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r.max = 1, cv.prop = 0, verbose = FALSE
+    ),
+    regexp = "cv\\.prop"
+  )
+  expect_error(
+    fect::r.cv.rolling(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r.max = 1, cv.prop = 1.5, verbose = FALSE
+    ),
+    regexp = "cv\\.prop"
+  )
+})
+
+test_that("cv.prop controls per-fold unit sampling", {
+
+  skip_on_cran()
+  ## With 30 units (25 controls + 5 treated, all 5 treated have at
+  ## least min.T0 + cv.nobs pre-treatment cells in the fixture), the
+  ## eligible pool covers controls AND treated pre-treatment.
+  df <- .make_unbalanced_panel(seed = 11)
+
+  ## Small cv.prop -> few units sampled per fold; capped at >= 1.
+  res_small <- suppressWarnings(suppressMessages(
+    fect::r.cv.rolling(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r.max = 1, cv.nobs = 2, cv.buffer = 1,
+      k = 2L, cv.prop = 0.05, seed = 17L, verbose = FALSE
+    )
+  ))
+  expect_equal(res_small$cv.prop, 0.05)
+  ## At cv.prop = 0.05 with ~30 eligible units -> max(1, round(1.5)) = 2
+  ## sampled per fold; with k = 2 folds, units_seen <= 4.
+  expect_lte(res_small$n.units.masked, 4L)
+  expect_gte(res_small$n.units.masked, 1L)
+
+  ## Full cv.prop -> every eligible unit sampled every fold.
+  res_full <- suppressWarnings(suppressMessages(
+    fect::r.cv.rolling(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r.max = 1, cv.nobs = 2, cv.buffer = 1,
+      k = 2L, cv.prop = 1.0, seed = 17L, verbose = FALSE
+    )
+  ))
+  expect_equal(res_full$cv.prop, 1.0)
+  ## n.units.masked at cv.prop = 1.0 should exceed n.units.masked at
+  ## cv.prop = 0.05 by a wide margin.
+  expect_gt(res_full$n.units.masked, res_small$n.units.masked)
+})
+
+test_that("treated pre-treatment cells are eligible for masking", {
+
+  skip_on_cran()
+  ## With cv.prop = 1.0, every eligible unit gets masked. We then
+  ## check that at least one treated unit appears in the holdout
+  ## (would be impossible under the old controls-only design).
+  df <- .make_unbalanced_panel(seed = 11)
+  treated_ids <- 26:30  # from .make_unbalanced_panel
+
+  res <- suppressWarnings(suppressMessages(
+    fect::r.cv.rolling(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", r.max = 1, cv.nobs = 2, cv.buffer = 1,
+      k = 2L, cv.prop = 1.0, seed = 21L, verbose = FALSE
+    )
+  ))
+  ## n.units.masked should include at least one treated unit (their
+  ## pre-treatment cells are eligible). Total eligible >= 25
+  ## controls + the treated units with sufficient pre-period.
+  expect_gt(res$n.units.masked, 25L)
 })

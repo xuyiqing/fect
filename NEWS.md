@@ -4,26 +4,40 @@
 
 * New exported function `r.cv.rolling()`: a standalone user-facing helper
   for picking the number of factors `r` via standard rolling-window CV.
-  For each of `k` folds and each eligible control unit, a random anchor
-  time `t*` is sampled. The fold's training set excludes:
+  For each of `k` folds, a fraction `cv.prop` of eligible units (controls
+  plus treated pre-treatment) is sampled; only sampled units carry a
+  mask in that fold. For each sampled unit, a random anchor time `t*` is
+  drawn and the fold's training set excludes:
     1. `cv.nobs` observations starting at `t*` (the held-out, scored block);
     2. `cv.buffer` observations immediately before `t*` (gap buffer, attenuates
        AR-leakage at the past-side train/test boundary --- analogous to
        `cv.donut` for the existing CV strategies, but only on the past side
        since the future side is dropped by construction);
-    3. all observations from `t* + cv.nobs` onward (the rolling-window
-       step --- training cannot see the future of the held-out block).
+    3. all observations from `t* + cv.nobs` through the unit's
+       end-of-eligible (the rolling-window step --- training cannot see
+       the future of the held-out block; for treated units, end-of-eligible
+       is the cell strictly before treatment onset, so post-treatment
+       cells are never masked).
   MSPE is scored at the held-out block only and averaged across folds.
   This is the standard time-series CV design (cf. `forecast::tsCV`,
   `tidymodels::sliding_window`, `caret::createTimeSlices`) adapted to
   panel data.
 
+* Per-fold unit sampling is required: masking every eligible unit at the
+  same time would leave no donor data at the masked time points and break
+  factor identification at the masked tails. With `cv.prop = 0.2`, every
+  eligible unit lands in the holdout roughly `k * cv.prop = 2` times in
+  expectation across `k` folds; unsampled units stay fully observed and
+  contribute training data at every period.
+
 * New parameters: `cv.buffer` (default 1, past-side buffer length ---
   analogous to `cv.donut` for the existing CV strategies, but only on
   the past side because the future side is dropped by construction);
   `k` (default 10 folds, matching the default for the existing CV
-  strategies); `seed` (optional integer base seed for reproducible
-  per-fold anchor sampling).
+  strategies); `cv.prop` (default 0.2, fraction of eligible units
+  sampled per fold; raised from 0.1 after small-panel stability tuning);
+  `seed` (optional integer base seed for reproducible per-fold sampling
+  and anchor selection).
 
 * Closes the forward-leakage channel that the existing
   `cv.method = "all_units"` / `"treated_units"` (random contiguous-block
@@ -32,24 +46,24 @@
   future side is closed by construction.
 
 * Workflow: call
-  `r.cv.rolling(formula, data, index, method = "ife", cv.buffer = 1, k = 10)`
+  `r.cv.rolling(formula, data, index, method = "ife", cv.buffer = 1, k = 10, cv.prop = 0.2)`
   to get the chosen `r.cv`, then pass that to
   `fect(..., CV = FALSE, r = r.cv, se = TRUE)` for the inferential fit.
 
 * Identical CV behavior across `method = "ife"` (IFE-EM, internal
   `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC,
   internal `time.component.from = "nevertreated"`). Both paths populate
-  `Y.ct.full` at masked control positions: the IFE-EM path via EM
-  imputation, the GSC path via the model-implied factor product
-  `F * t(lambda_co)` (see "GSC: Y.ct.full populated at control positions"
-  below). Other methods (e.g. `"mc"`) are not yet supported.
+  `Y.ct.full` at masked positions: the IFE-EM path via EM imputation,
+  the GSC path via the model-implied factor product `F * t(lambda_co)`
+  (see "GSC: Y.ct.full populated at control positions" below). Other
+  methods (e.g. `"mc"`) are not yet supported.
 
 * Return value is a list with `r.cv`, `cv.rule`, `mspe` (data.frame of
   per-r MSPE averaged across folds, plus fold-SE and held-out cell
   counts), `mspe.per.fold` (r-by-k matrix of per-fold MSPE), and the
-  chosen `k`, `cv.nobs`, `cv.buffer`. Promoting the design to a
-  `cv.method = "rolling"` option inside the main `fect()` CV dispatcher
-  is deferred to a future release.
+  chosen `k`, `cv.nobs`, `cv.buffer`, `cv.prop`. Promoting the design
+  to a `cv.method = "rolling"` option inside the main `fect()` CV
+  dispatcher is deferred to a future release.
 
 * Empirical motivation: on the Eibl & Hertog (2023) oil-rich panels with
   residual AR(1) of 0.56--0.93, fect's default CV (random anchors,
@@ -66,6 +80,38 @@
   produce different numerical results under the new design; the
   selected `r.cv` is typically similar but no longer deterministic for
   a fixed dataset (set `seed` for reproducibility).
+
+## CV API: cv.method = "rolling" in the main dispatcher (additive)
+
+* `fect(CV = TRUE, cv.method = "rolling", ...)` now wires rolling-window
+  cross-validation into the main `fect()` CV dispatcher for all factor-model
+  methods (ife, cfe, gsynth, mc, both). The same masking logic that powers
+  the standalone `r.cv.rolling()` is now available through the standard
+  CV API: per-fold sampling of `cv.prop` of eligible units (controls plus
+  treated pre-treatment), random anchors per sampled unit, `cv.nobs`-cell
+  scored holdout, `cv.buffer`-cell past-side buffer, drop-from-anchor-to-
+  end-of-eligible (rolling-window step). Treated post-treatment cells are
+  never masked.
+
+* New parameter `cv.buffer` (default 1) controls the past-side buffer for
+  rolling CV; replaces the role `cv.donut` plays for block CV. `cv.donut`
+  is unchanged for block strategies. Defaults are otherwise unchanged ---
+  the existing `cv.method = "all_units"` / `"treated_units"` defaults
+  still apply, so this is a fully additive change with no breaking
+  defaults.
+
+* `fect_mspe(out, cv.method = "rolling", cv.buffer = 1, ...)` for
+  rolling-window-CV-based model comparison.
+
+* `r.cv.rolling(method = "cfe", ...)` extends the standalone helper to
+  Complex Fixed Effects. CFE-specific args (Z, gamma, Q, Q.type, kappa,
+  extra index columns) are forwarded via `...` and held fixed; rolling
+  CV picks `r` only.
+
+* Default `cv.method` flips ("rolling" as the package-wide default),
+  `cv.donut → cv.buffer` rename, and `(cv.method, cv.units)` API
+  decomposition all remain deferred to a future "CV API unification"
+  PR per the plan at statsclaw-workspace/fect/ref/cv-unification-plan.md.
 
 ## Bounded factor loadings for GSC
 

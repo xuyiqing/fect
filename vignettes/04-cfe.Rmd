@@ -428,6 +428,28 @@ This means: the linear and quadratic trend bases are grouped by sector, while th
 
 ------------------------------------------------------------------------
 
+## Cross-validation
+
+The number of latent factors `r` in a CFE specification can be selected by cross-validation through the main `fect()` dispatcher --- set `CV = TRUE` and pass `cv.method = "rolling"` to use rolling-window CV (recommended on macro panels with serially correlated residuals; see [Chapter @sec-ife-mc]). CFE-specific structural arguments (`Z`, `gamma`, `Q`, `Q.type`, `kappa`, plus extra index columns for additional grouping FEs) are held fixed at the user-supplied spec; CV varies only `r`.
+
+```{r cfe-cv-dispatcher, eval = FALSE}
+fit.cfe <- fect(
+  Y ~ D, data = sim_region,
+  index   = c("id", "time", "region_time"),
+  method  = "cfe", force = "two-way",
+  CV      = TRUE, r = c(0, 3),
+  cv.method = "rolling",
+  cv.buffer = 1, cv.nobs = 3, k = 10, cv.prop = 0.2,
+  cv.rule = "1se",
+  se = TRUE, parallel = TRUE, cores = 16, nboots = 200
+)
+fit.cfe$r.cv  # selected r
+```
+
+Block CV (`cv.method = "block"`) is also available as a drop-in replacement; see the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv) for the full parameter reference and the deprecation plan for the legacy `"all_units"` / `"treated_units"` values.
+
+------------------------------------------------------------------------
+
 ## Summary of CFE-specific arguments
 
 | Argument | Type | Description |
