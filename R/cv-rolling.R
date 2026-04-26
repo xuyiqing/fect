@@ -89,16 +89,17 @@
 #' @param k Number of folds. Each fold draws a fresh sample of units
 #'   and a fresh set of per-unit anchors; the per-r MSPE is averaged
 #'   across folds and the SE used by the `"1se"` rule reflects
-#'   fold-to-fold variability. Default 10 (matches the default for
+#'   fold-to-fold variability. Default 20 (matches the default for
 #'   the existing CV strategies).
 #' @param cv.prop Fraction of eligible units sampled per fold. Only
 #'   sampled units receive a mask in that fold; the rest stay fully
 #'   observed and contribute training data at every period. Default
-#'   0.2. Across `k` folds, every eligible unit lands in the holdout
-#'   roughly `k * cv.prop` times in expectation. Must satisfy
-#'   `0 < cv.prop <= 1`. On small panels (n_eligible < 30) consider
-#'   raising further, since per-fold MSPE precision scales with
-#'   `cv.prop * n_eligible * cv.nobs`.
+#'   0.1 (paired with `k = 20` for ~2x coverage of every eligible
+#'   unit across folds). Across `k` folds, every eligible unit lands
+#'   in the holdout roughly `k * cv.prop` times in expectation. Must
+#'   satisfy `0 < cv.prop <= 1`. On small panels (n_eligible < 30)
+#'   consider raising further, since per-fold MSPE precision scales
+#'   with `cv.prop * n_eligible * cv.nobs`.
 #' @param cv.rule Rule for picking `r` from the MSPE curve: `"1se"`
 #'   (default), `"min"`, or `"1pct"`.
 #' @param min.T0 Minimum observations required strictly before the
@@ -130,7 +131,7 @@
 #'   data(simdata)
 #'   res <- r.cv.rolling(Y ~ D, data = simdata, index = c("id", "time"),
 #'                       method = "ife", r.max = 5,
-#'                       cv.nobs = 3, cv.buffer = 1, k = 10)
+#'                       cv.nobs = 3, cv.buffer = 1, k = 20)
 #'   res$r.cv
 #'   ## then use the chosen r in a CV-disabled fit:
 #'   fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
@@ -146,8 +147,8 @@ r.cv.rolling <- function(formula,
                           r.max = 5L,
                           cv.nobs = 3L,
                           cv.buffer = 1L,
-                          k = 10L,
-                          cv.prop = 0.2,
+                          k = 20L,
+                          cv.prop = 0.1,
                           cv.rule = c("1se", "min", "1pct"),
                           min.T0 = 5L,
                           force = "unit",

@@ -439,7 +439,7 @@ fit.cfe <- fect(
   method  = "cfe", force = "two-way",
   CV      = TRUE, r = c(0, 3),
   cv.method = "rolling",
-  cv.buffer = 1, cv.nobs = 3, k = 10, cv.prop = 0.2,
+  cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
   cv.rule = "1se",
   se = TRUE, parallel = TRUE, cores = 16, nboots = 200
 )

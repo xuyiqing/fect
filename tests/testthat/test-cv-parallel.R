@@ -1495,10 +1495,10 @@ test_that("N.1: IFE nevertreated all_units parallel matches phase3 fixture (with
       method    = "ife",
       r         = 0:2,
       CV        = TRUE,
-      cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
-      cv.prop   = 0.1,      # phase3 fixture pinned under pre-0.2 default
-      cv.donut  = 0,        # phase3 fixture pinned under pre-1 default
-      k         = 3,
+      cv.rule   = "1se",    # explicit pin (matches v2.3.0 default; future-proof)
+      cv.prop   = 0.1,      # explicit pin (matches v2.3.0 default)
+      cv.donut  = 1,        # explicit pin (matches v2.3.0 default)
+      k         = 20,       # explicit pin (matches v2.3.0 default; fixture regen under k=20)
       cv.method = "all_units",
       time.component.from = "nevertreated",
       se        = FALSE,
@@ -1540,10 +1540,10 @@ test_that("N.2: IFE nevertreated treated_units serial matches phase3 fixture (wi
       method    = "ife",
       r         = 0:2,
       CV        = TRUE,
-      cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
-      cv.prop   = 0.1,      # phase3 fixture pinned under pre-0.2 default
-      cv.donut  = 0,        # phase3 fixture pinned under pre-1 default
-      k         = 3,
+      cv.rule   = "1se",    # explicit pin (matches v2.3.0 default; future-proof)
+      cv.prop   = 0.1,      # explicit pin (matches v2.3.0 default)
+      cv.donut  = 1,        # explicit pin (matches v2.3.0 default)
+      k         = 20,       # explicit pin (matches v2.3.0 default; fixture regen under k=20)
       cv.method = "treated_units",
       time.component.from = "nevertreated",
       se        = FALSE,
@@ -1584,10 +1584,10 @@ test_that("N.3: CFE nevertreated all_units parallel matches phase3 fixture (with
       method    = "cfe",
       r         = 0:2,
       CV        = TRUE,
-      cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
-      cv.prop   = 0.1,      # phase3 fixture pinned under pre-0.2 default
-      cv.donut  = 0,        # phase3 fixture pinned under pre-1 default
-      k         = 3,
+      cv.rule   = "1se",    # explicit pin (matches v2.3.0 default; future-proof)
+      cv.prop   = 0.1,      # explicit pin (matches v2.3.0 default)
+      cv.donut  = 1,        # explicit pin (matches v2.3.0 default)
+      k         = 20,       # explicit pin (matches v2.3.0 default; fixture regen under k=20)
       cv.method = "all_units",
       time.component.from = "nevertreated",
       se        = FALSE,
@@ -1629,11 +1629,11 @@ test_that("N.4: CFE nevertreated treated_units serial matches phase3 fixture (wi
       method    = "cfe",
       r         = 0:2,
       CV        = TRUE,
-      k         = 3,
+      k         = 20,       # explicit pin (matches v2.3.0 default; fixture regen under k=20)
       cv.method = "treated_units",
-      cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
-      cv.prop   = 0.1,      # phase3 fixture pinned under pre-0.2 default
-      cv.donut  = 0,        # phase3 fixture pinned under pre-1 default
+      cv.rule   = "1se",    # explicit pin (matches v2.3.0 default; future-proof)
+      cv.prop   = 0.1,      # explicit pin (matches v2.3.0 default)
+      cv.donut  = 1,        # explicit pin (matches v2.3.0 default)
       time.component.from = "nevertreated",
       se        = FALSE,
       parallel  = FALSE

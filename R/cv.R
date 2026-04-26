@@ -14,8 +14,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     balance.period = NULL,
                     method = "ife",
                     criterion = "mspe",
-                    k = 5, # CV time
-                    cv.prop = 0.2,
+                    k = 20, # CV time
+                    cv.prop = 0.1,
                     cv.method = "rolling",
                     cv.nobs = 3,
                     cv.donut = 1,
