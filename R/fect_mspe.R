@@ -2,12 +2,13 @@ fect_mspe <- function(
     out.fect,
     seed        = NULL,
     ## ----- masking strategy ----- ##
-    cv.method   = "all_units",       # "all_units" or "treated_units"
+    cv.method   = "rolling",         # one of: "rolling" (default), "block", "all_units" (deprecated alias for "block"), "treated_units" (pending deprecation, see ?fect)
     cv.nobs     = 3,
     cv.donut    = 1,
-    cv.prop     = 0.1,
+    cv.buffer   = 1,
+    cv.prop = 0.1,
     min.T0      = 5,
-    k           = 5,
+    k           = 20,
     ## ----- scoring ----- ##
     criterion   = "mspe",         # "mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment"
     W           = NULL,           # TT x N observation weight matrix, or NULL
@@ -22,8 +23,12 @@ fect_mspe <- function(
     criterion <- match.arg(criterion, valid_criteria)
 
     ## ---- validate cv.method ---- ##
-    cv.method <- match.arg(cv.method, c("all_units", "treated_units"))
+    cv.method <- .fect_normalize_cv_method(
+        cv.method,
+        allowed = c("rolling", "block", "all_units", "treated_units")
+    )
     cv.treat <- (cv.method == "treated_units")
+    use_rolling <- (cv.method == "rolling")
 
     ## ---- helper functions (unchanged) ---- ##
     .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj, caller_env) {
@@ -128,7 +133,23 @@ fect_mspe <- function(
 
         rmCV <- list()
         estCV <- list()
+
+        ## ---- rolling-window pre-computation (cv.method = "rolling") ---- ##
+        rolling_folds <- NULL
+        if (use_rolling) {
+            rolling_folds <- .build_cv_mask_rolling(
+                II = II_mat, D = D_mat, k = k,
+                cv.nobs = cv.nobs, cv.buffer = cv.buffer,
+                cv.prop = cv.prop, min.T0 = min.T0, seed = seed
+            )
+        }
+
         for (ii in 1:k) {
+            if (use_rolling) {
+                rmCV[[ii]]  <- rolling_folds[[ii]]$cv.id
+                estCV[[ii]] <- rolling_folds[[ii]]$est.id
+                next
+            }
             cv.n <- 0
             repeat {
                 cv.n <- cv.n + 1
@@ -248,7 +269,12 @@ fect_mspe <- function(
                     if (!is.null(out_i$r.cv)) {
                         rerun_args$r <- out_i$r.cv
                     }
-                    out_new <- do.call(fect, rerun_args)
+                    ## Suppress messages from inner refits --- the
+                    ## "units dropped" message and similar warnings
+                    ## already fired when the user fit the original
+                    ## model; emitting them once per model x fold
+                    ## (= up to N_models * k times) is noise.
+                    out_new <- suppressMessages(do.call(fect, rerun_args))
 
                     ## collect residuals at estCV positions
                     ## est_pos are flat column-major indices into the

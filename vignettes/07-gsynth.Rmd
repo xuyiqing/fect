@@ -12,11 +12,13 @@ The **gsynth** package as a standalone package still exists, but algorithmically
 
 ::: {.callout-tip}
 
-### Recommended in v2.3.0: bound treated loadings (`loading.bound = "simplex"`)
+### Recommended changes in v2.3.0 for Gsynth users
 
-We *strongly* recommend activating bounded factor loadings via `loading.bound = "simplex"` for the Synth setting. This constrains each treated unit's factor loading to a non-negative convex combination of control loadings, recovering the synthetic-control intuition that the imputed counterfactual should sit *inside* the support of the donor pool.
+Two new defaults are strongly recommended for the Synth setting:
 
-The default `loading.bound = "none"` preserves the original Xu (2017) behavior --- an unconstrained least-squares projection. Activating the simplex bound is therefore opt-in (so prior results remain reproducible), but it is generally preferable, especially when the donor pool is small or convex-hull overlap is uncertain. See the **Bounded factor loadings** section below for the objective function, a worked ON/OFF comparison, and the companion `loading.overlap` diagnostic plot.
+**1. Use rolling-window CV (now the default) for rank selection.** Gsynth applications typically span macro panels with persistent residual shocks. Pre-v2.3.0 block CV suffered from AR leakage across the train/test boundary, systematically over-selecting `r` (often pegging at `r.max`). Rolling CV (`cv.method = "rolling"`) closes the future-side leakage by construction. On a Xu (2017) DGP with $r_{\text{true}} = 2$ and AR(1) $\rho = 0.8$ (K = 200 reps), rolling CV recovers the truth in 56% vs block CV's 15% (mean `r.cv` 1.58 vs 3.34). Use it whenever residuals are temporally correlated (post-fit residual AR(1) above ~0.4); under approximately i.i.d. residuals it agrees closely with block CV (`cv.method = "block"`, also available).
+
+**2. Bound treated loadings via `loading.bound = "simplex"`.** This constrains each treated unit's factor loading to a non-negative convex combination of control loadings, recovering the synthetic-control intuition that the imputed counterfactual should sit *inside* the support of the donor pool. The default `loading.bound = "none"` preserves the original Xu (2017) behavior --- an unconstrained least-squares projection. Activating the simplex bound is opt-in but generally preferable, especially when the donor pool is small or convex-hull overlap is uncertain. See the **Bounded factor loadings** section below and the companion `loading.overlap` diagnostic ([Chapter @sec-loading-overlap]).
 
 :::
 
@@ -144,15 +146,32 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
 
 ### Cross-validation
 
-Not all `cv.method` options are available in the Synth/Gsynth settings:
+`cv.method = "rolling"` is the new default across all CV entry points (DID/TWFE, Gsynth, and `fect_mspe`). `cv.method = "block"` is also available; `"loo"` is exclusive to Gsynth (`time.component.from = "nevertreated"`) because it requires factor estimation to be independent of the held-out treated observations.
 
 | | `fect_cv` (DID/TWFE) | CV in Gsynth | `fect_mspe` (post-hoc) |
 |:--|:--|:--|:--|
-| `"all_units"` | Default | Available | Default |
-| `"treated_units"` | Available | Default | Available |
+| `"rolling"` | **Default** | **Default** | **Default** |
+| `"block"` | Available | Available | Available |
 | `"loo"` | --- | Available | --- |
 
-The `"loo"` method is exclusive to Gsynth (`time.component.from = "nevertreated"`) because it requires factor estimation to be independent of the held-out treated observations. In the `"nevertreated"` setting, factors are estimated from control units only, so holding out treated pre-treatment periods does not compromise estimation. In the `"notyettreated"` setting, all units contribute to estimation, making LOO less clean; use `"treated_units"` instead.
+The legacy values `"all_units"` (now `"block"`) and `"treated_units"` (block masking restricted to treated pre-treatment cells) are still accepted but emit a deprecation message; both will be replaced by the unified `(cv.method, cv.units)` API in v2.4.0. See the [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv) for the deprecation plan.
+
+### Rolling-window CV via `cv.method = "rolling"`
+
+Set `cv.method = "rolling"` in the main `fect()` CV dispatcher to use rolling-window CV (the recommended default for serially correlated panels --- see the recommended-changes callout at the top of this chapter for the empirical motivation, and [Chapter @sec-ife-mc] for the design and the side-by-side figure).
+
+```{r rcv_dispatcher_gsc, eval = FALSE}
+fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+            method = "gsynth", force = "two-way",
+            CV = TRUE, r = c(0, 5),
+            cv.method = "rolling",
+            cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
+            cv.rule = "1se",
+            se = TRUE, vartype = "parametric")
+fit$r.cv     # selected r --- use this for downstream inference
+```
+
+CV behavior is identical across `method = "ife"` (IFE-EM, internal `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC, internal `time.component.from = "nevertreated"`); both populate `Y.ct.full` at masked positions, so the rolling design scores MSPE uniformly. The full parameter reference for all CV methods lives in the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv).
 
 ### Visualizing Results
 

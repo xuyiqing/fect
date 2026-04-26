@@ -499,17 +499,42 @@ plot(out_ife, type = "loadings", main = "Factor Loadings")
 
 Note: `connected`, `plot.ci`, `show.count`, and most gap-plot styling parameters do not apply to factors or loadings plots.
 
-### Loading-overlap diagnostic
+------------------------------------------------------------------------
 
-The **loading.overlap** plot is a companion diagnostic to the bounded-loadings feature (see [Chapter @sec-gsynth] for the underlying simplex projection). It answers: do treated units lie inside the support of the controls in factor space?
+## Loading-Overlap Diagnostic {#sec-loading-overlap}
 
-For models with $r \geq 2$, the plot shows factors 1 and 2 with the convex hull of control loadings shaded in light blue and treated units overlaid as red triangles. Treated units inside the hull are exactly recoverable as convex combinations of controls; treated units outside the hull are projected onto the boundary by the bounded estimator and produce large entries in `loading.proj.resid`.
+The **loading.overlap** plot is the companion diagnostic for the bounded-loadings feature in v2.3.0 (see [Chapter @sec-gsynth] for the underlying simplex projection). It answers a single question that determines whether the GSC counterfactual for a treated unit is interpolated (safe) or extrapolated (risky): **do treated units lie inside the support of the controls in factor space?**
+
+When a treated unit's factor loadings $\lambda_i$ lie inside the convex hull of control loadings $\{\lambda_j : j \in \text{controls}\}$, the GSC counterfactual $F \hat\lambda_i$ is a true interpolation: any prediction error reflects model misspecification, not extrapolation. When $\lambda_i$ is outside the hull, the unbounded estimator extrapolates and the bounded estimator (`loading.bound = "simplex"`) projects $\lambda_i$ onto the hull boundary, leaving a residual `loading.proj.resid` that measures the extent of the projection. Large `loading.proj.resid` for a treated unit is a flag that GSC is being asked to predict outside the support of controls.
+
+### Two-dimensional case ($r \geq 2$)
+
+For models with $r \geq 2$, the plot shows factors 1 and 2 with the convex hull of control loadings shaded in light blue and treated units overlaid as red triangles. Treated units inside the hull are exactly recoverable as convex combinations of controls; treated units outside the hull are projected onto the boundary by the bounded estimator and produce non-zero entries in `loading.proj.resid`.
 
 ```{r plot-loading-overlap, fig.width = 6, fig.height = 5}
 plot(out_ife, type = "loading.overlap")
 ```
 
-For $r = 1$, the same diagnostic is rendered as a mirror histogram: treated counts above the axis, control counts flipped below, with a vertical band marking the range of control loadings. The 1D analog of "outside the hull" is "outside the band." The plot is informative even when `loading.bound = "none"` --- it shows whether the constraint *would* bind if activated.
+For $r > 2$ the plot still shows only factors 1 and 2; the hull and overlap measure are computed on the full $r$-dimensional loading vectors, so the 2D scatter is a projection of the underlying multidimensional support check. Use `factors = c(i, j)` to view a different pair.
+
+### One-dimensional case ($r = 1$)
+
+For $r = 1$, the same diagnostic is rendered as a **mirror histogram**: treated counts above the axis, control counts flipped below, with a vertical band marking the range of control loadings. The 1D analog of "outside the hull" is "outside the band."
+
+```{r plot-loading-overlap-r1, fig.width = 6, fig.height = 5, cache = TRUE, message = FALSE, warning = FALSE}
+out_ife_r1 <- fect(nat_rate_ord ~ indirect, data = hh2019,
+                   index = c("bfs", "year"), method = "ife", r = 1,
+                   se = TRUE, parallel = TRUE, cores = 16, nboots = 500)
+plot(out_ife_r1, type = "loading.overlap")
+```
+
+### When to use it
+
+- **Before deciding `loading.bound`**: the plot is informative even when `loading.bound = "none"` --- it shows whether the constraint *would* bind if activated. If most treated units are inside the hull, the constraint would have minimal effect; if many are outside, the constraint would meaningfully change the estimates.
+- **As an extrapolation flag**: large `loading.proj.resid` paired with treated units far outside the hull means GSC is extrapolating beyond what the donor pool supports. Such estimates should be reported with caveats or trimmed.
+- **As a model-fit diagnostic**: a treated unit far outside the hull on multiple factors may indicate that the rank `r` was set too low, or that the treated unit has a structurally different factor exposure than any control.
+
+The plot does not require `loading.bound = "simplex"` to be active, only that the model was fit with `method = "ife"` (with `time.component.from = "nevertreated"`) or `method = "gsynth"`. The hull and projection are computed on the estimated loadings regardless of how they were estimated.
 
 ------------------------------------------------------------------------
 
