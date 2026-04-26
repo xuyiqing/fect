@@ -8,12 +8,13 @@ Evaluates the prediction accuracy of one or more \code{fect} model fits by hidin
 fect_mspe(
   out.fect,
   seed = NULL,
-  cv.method = "all_units",
+  cv.method = "rolling",
   cv.nobs = 3,
   cv.donut = 1,
+  cv.buffer = 1,
   cv.prop = 0.1,
   min.T0 = 5,
-  k = 5,
+  k = 20,
   criterion = "mspe",
   W = NULL,
   norm.para = NULL,
@@ -23,10 +24,11 @@ fect_mspe(
 \arguments{
   \item{out.fect}{A fitted \code{fect} object or a named list of fitted \code{fect} objects to compare.}
   \item{seed}{Optional integer; random seed for reproducibility.}
-  \item{cv.method}{Character; cross-validation masking strategy. Either \code{"all_units"} or \code{"treated_units"}. Default is \code{"all_units"}.}
+  \item{cv.method}{Character; cross-validation masking strategy. One of \code{"rolling"} (default), \code{"block"} (random scattered anchors with contiguous-block masking), or \code{"loo"}. Legacy aliases \code{"all_units"} (= \code{"block"}) and \code{"treated_units"} are still accepted but emit a deprecation message.}
   \item{cv.nobs}{Integer; number of observations to mask per unit per fold. Default is 3.}
-  \item{cv.donut}{Integer; number of periods around treatment onset to exclude from masking. Default is 1.}
-  \item{cv.prop}{Numeric; proportion of observations to mask. Default is 0.1.}
+  \item{cv.donut}{Integer; number of periods around treatment onset to exclude from masking. Used by block CV. Default is 1.}
+  \item{cv.buffer}{Integer; number of past-side cells masked from training (but not scored) before each rolling-window holdout. Used only by \code{cv.method = "rolling"}. Default is 1.}
+  \item{cv.prop}{Numeric; for block CV, proportion of observations to mask per round; for rolling CV, fraction of eligible units sampled per fold. Default is 0.2.}
   \item{min.T0}{Integer; minimum number of pre-treatment periods required. Default is 5.}
   \item{k}{Integer; number of cross-validation folds. Default is 5.}
   \item{criterion}{Character; scoring criterion. One of \code{"mspe"}, \code{"wmspe"}, \code{"gmspe"}, \code{"wgmspe"}, \code{"mad"}, \code{"moment"}, \code{"gmoment"}. Default is \code{"mspe"}.}

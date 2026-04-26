@@ -97,6 +97,100 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | `vartype` (otherwise) | Uncertainty estimator: "bootstrap" (default), "jackknife" | fe, ife, mc, cfe |
 | `criterion` | Model selection criterion: "mspe" (default), "gmspe", "moment", "pc". | ife, mc, cfe, gsynth |
 
+## Cross-Validation {#sec-cheatsheet-cv}
+
+Cross-validation in `fect()` selects the number of factors `r` (or the regularization `lambda` for MC) by minimizing held-out prediction error. As of v2.3.0, three masking strategies are exposed via `cv.method`:
+
+### Choosing the masking strategy
+
+| `cv.method` | Mask design | When to use |
+|:--|:--|:--|
+| **`"rolling"`** (default) | Per-fold sample of `cv.prop` of eligible units; per sampled unit a random anchor + `cv.nobs` scored holdout + `cv.buffer` past-side buffer + drop-future from anchor through end-of-eligible. Eligible units = controls + treated pre-treatment cells. | The recommended default. Closes the future-side leakage channel that block CV cannot, eliminating the over-selection pathology that pegs `r.cv = r.max` on serially correlated panels. |
+| `"block"` | Random scattered anchors; mask `cv.nobs` contiguous cells per anchor; `cv.donut` cells flanking each side excluded from training but not scored. Eligible units = controls. | Use under approximately i.i.d. residuals when forecast-style scoring is not needed. |
+| `"loo"` | Leave-one-out, one treated pre-treatment period at a time. | Legacy gsynth method; can be unstable with few pre-treatment periods. Available for `fect_nevertreated` (`time.component.from = "nevertreated"`) only. |
+
+::: {.callout-warning appearance="simple"}
+
+### Deprecation: `"all_units"` and `"treated_units"`
+
+Pre-v2.3.0 callers used `cv.method = "all_units"` (= the new `"block"`) or `cv.method = "treated_units"` (block masking with anchors restricted to treated pre-treatment cells). Both names still work and produce identical numerical behavior, but they emit a one-time deprecation message and will be removed in v2.4.0. The replacement plan: keep `cv.method = "block"` as the masking strategy and introduce a separate `cv.units` parameter (`"all"` / `"treated"` / `"control"`) for unit-scope selection. For now, replace `"all_units"` with `"block"` directly, and continue using `"treated_units"` until the cv.units parameter is available.
+
+:::
+
+### Sub-options (apply across `"all_units"`, `"treated_units"`, and `"rolling"` unless noted)
+
+| Option | Default | Applies to | Description |
+| :--- | :--- | :--- | :--- |
+| `k` | 20 | all | Number of CV folds |
+| `cv.prop` | 0.1 | all | For block: proportion of observations masked per round. For rolling: fraction of eligible units sampled per fold. The `(k = 20, cv.prop = 0.1)` pair gives ~2x coverage of every eligible unit across folds while keeping per-fold mask size moderate. |
+| `cv.nobs` | 3 | all | Block size for the held-out (scored) cells per anchor |
+| `cv.donut` | 1 | block only | Cells excluded around the holdout on each side, masked but not scored (attenuates AR leakage on both train/test boundaries; matches `cv.buffer` for rolling CV) |
+| `cv.buffer` | 1 | rolling only | Past-side buffer cells before the holdout, masked but not scored (the future side is dropped from training by construction) |
+| `cv.rule` | `"1se"` | all | Rule for picking `r` from the MSPE curve: `"1se"` (default; Hastie/Tibshirani/Friedman 2009 §7.10), `"min"`, or `"1pct"` (pre-v2.3.0 default) |
+| `min.T0` | 5 | all | Minimum pre-treatment observations required per unit |
+| `seed` | NULL | all | Optional integer seed for reproducible per-fold mask sampling |
+
+### Scoring criteria
+
+The `criterion` parameter determines which metric is used to select the tuning parameter:
+
+| `criterion` | Description | When to use |
+| :--- | :--- | :--- |
+| `"mspe"` (default) | Mean squared prediction error | General-purpose; best for prediction accuracy |
+| `"gmspe"` | Geometric mean SPE | Robust to outlier prediction errors |
+| `"pc"` | Information criterion (Bai & Ng) | Penalized fit; does not require CV rounds |
+| `"moment"` | Weighted period-wise residual averages | Selects for best pre-trend fit rather than prediction |
+
+### Workflow
+
+```{r cv-workflow, eval = FALSE}
+## Pick r via rolling CV (recommended)
+fit_cv <- fect(Y ~ D, data = simdata, index = c("id", "time"),
+               method = "ife", force = "two-way",
+               CV = TRUE, r = c(0, 3),
+               cv.method = "rolling",
+               cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
+               cv.rule = "1se", se = TRUE)
+fit_cv$r.cv  # selected r
+```
+
+Block-CV variants are drop-in replacements: change `cv.method` to `"all_units"` or `"treated_units"` and replace `cv.buffer` with `cv.donut` (the buffer-parameter analog for block CV).
+
+::: {.callout-note appearance="simple"}
+
+### Why we prefer rolling CV: empirical evidence
+
+When residuals are temporally correlated (post-fit residual AR(1) above ~0.4), block CV consistently over-selects `r`, often pegging at `r.max`. Rolling CV is the recommended choice in this regime; on approximately i.i.d. residuals the two designs agree closely.
+
+**Xu (2017) factor-model DGP**, $r_{\text{true}} = 2$, $K = 200$ replications per cell, default settings:
+
+| Errors | Rolling CV recovery | Mean rolling r.cv | Block CV recovery | Mean block r.cv |
+| :--- | ---: | ---: | ---: | ---: |
+| iid (ρ = 0) | 95.5% | 1.96 | 88.0% | 1.88 |
+| AR(1) ρ = 0.3 | 99.0% | 1.99 | 88.5% | 1.95 |
+| **AR(1) ρ = 0.8** | **56.2%** | **1.58** | **15.0%** | **3.34** |
+
+At ρ = 0.8, block CV picks `r.cv` ≥ 3 in 98.5% of IFE-EM reps and pegs at `r.max = 5` in 17.5%; rolling CV picks `r.cv` ≥ 3 in only 4% and never pegs.
+
+Rolling CV imposes essentially no penalty in the no-leakage regime and recovers the truth ~3.7× more often when leakage matters. Source script: `code/sims/sim-cv-comparison-K200.R`.
+
+:::
+
+The standalone `r.cv.rolling()` helper exists for users who want the per-fold MSPE matrix and other diagnostics returned in addition to `r.cv` --- but for normal use, the dispatcher path above is the recommended entry point.
+
+## Utility Functions
+
+In addition to the main `fect()` function, the package provides several utility functions:
+
+| **Function** | **Description** | **Key Arguments** |
+|:-------------|:----------------|:------------------|
+| `esplot()` | Standalone event study plot from a data frame. Does not require a `fect` object. | `data`, `Period`, `Estimate`, `CI.lower`, `CI.upper`, `connected`, `highlight.periods` |
+| `fect_mspe()` | Model comparison via cross-validated prediction error. Supports `cv.method = "rolling"` for AR-leakage-resistant scoring. | `out.fect`, `seed`, `cv.method`, `cv.buffer`, `criterion`, `k`, `cv.prop` |
+| `r.cv.rolling()` | Standalone rolling-window CV for selecting `r` (number of factors). Recommended over block CV when residuals are serially correlated. Supports `method ∈ {"ife", "gsynth", "cfe"}`. | `formula`, `data`, `index`, `method`, `r.max`, `cv.nobs`, `cv.buffer`, `k`, `cv.prop`, `cv.rule`, `seed` |
+| `get.cohort()` | Generate cohort indicators based on treatment timing. | `data`, `D`, `index`, `entry.time`, `start0` |
+| `att.cumu()` | Compute cumulative treatment effects over a specified period range. | `x` (fect object), `period`, `weighted`, `type` |
+| `effect()` | Compute cumulative or subgroup-averaged treatment effects. Requires `keep.sims = TRUE` in `fect()`. | `x` (fect object), `cumu`, `id`, `period`, `plot` |
+
 ## Notes
 
 -   Most methods share core inputs (`Y`, `D`, `X`, `data`, `index`).
@@ -117,22 +211,10 @@ A check mark (✓) indicates that the method requires or accepts the input.
 |:--:|:---|:--:|
 | `nboots` | Number of bootstrap runs (int) | 200 |
 | `k` | Sets the number of cross-validation rounds(int) | 10 |
-| `r` | Sets the number of factors | 0; c(0,5) when CV |
+| `r` | Sets the number of factors | 0; c(0,3) when CV |
 | `m` | Specifies the block length for the permutation test | 2 |
 | `nlambda` | Length of hyper-parameter sequence | 10 |
 
 -   With an integer input for `nlambda`, **fect** can randomly generate appropriate hyper-parameter sequence.
-
-## Utility Functions
-
-In addition to the main `fect()` function, the package provides several utility functions:
-
-| **Function** | **Description** | **Key Arguments** |
-|:-------------|:----------------|:------------------|
-| `esplot()` | Standalone event study plot from a data frame. Does not require a `fect` object. | `data`, `Period`, `Estimate`, `CI.lower`, `CI.upper`, `connected`, `highlight.periods` |
-| `fect_mspe()` | Model comparison via cross-validated prediction error. | `out.fect`, `seed`, `cv.method`, `criterion`, `k`, `cv.prop` |
-| `get.cohort()` | Generate cohort indicators based on treatment timing. | `data`, `D`, `index`, `entry.time`, `start0` |
-| `att.cumu()` | Compute cumulative treatment effects over a specified period range. | `x` (fect object), `period`, `weighted`, `type` |
-| `effect()` | Compute cumulative or subgroup-averaged treatment effects. Requires `keep.sims = TRUE` in `fect()`. | `x` (fect object), `cumu`, `id`, `period`, `plot` |
 
 Enjoy using **fect**!

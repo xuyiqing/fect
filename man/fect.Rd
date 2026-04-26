@@ -10,8 +10,8 @@ assumptions.}
             index, force = "two-way",
             time.component.from = "notyettreated", em = TRUE,
             r = 0, lambda = NULL, nlambda = 10,
-            CV = NULL, k = 10, cv.prop = 0.1, cv.method = "all_units",
-            cv.nobs = 3, cv.donut = 0, criterion = "mspe",
+            CV = NULL, k = 20, cv.prop = 0.1, cv.method = "rolling",
+            cv.nobs = 3, cv.donut = 1, cv.buffer = 1, criterion = "mspe",
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
             quantile.CI = FALSE, nboots = 200, alpha = 0.05,
@@ -52,11 +52,12 @@ assumptions.}
 \item{lambda}{a single or sequence of positive numbers specifying the hyper-parameter sequence for matrix completion method. If \code{lambda} is a sequence and \code{CV = 1}, cross-validation will be performed.}
 \item{nlambda}{an integer specifying the length of hyper-parameter sequence for matrix completion method. Default is \code{nlambda = 10}.}
 \item{CV}{a logical flag indicating whether cross-validation will be performed to select the optimal number of factors or hyper-parameter in matrix completion algorithm. If \code{r} is not specified, the procedure will search through \code{r = 0} to \code{5}.}
-\item{k}{an integer specifying number of cross-validation rounds. Default is \code{k = 10}.}
+\item{k}{an integer specifying number of cross-validation rounds. Default is \code{k = 20}.}
 \item{cv.prop}{a numerical value specifying the proportion of testing set compared to sample size during the cross-validation procedure.}
-\item{cv.method}{a string specifying the cross-validation masking strategy. \code{"all_units"} (default) masks observations across all units; \code{"treated_units"} masks only treated unit observations. For \code{fect_nevertreated}, \code{"loo"} (leave-one-out) is also supported.}
+\item{cv.method}{a string specifying the cross-validation masking strategy. One of \code{"rolling"} (default; standard time-series rolling-window CV), \code{"block"} (random scattered anchors with contiguous-block masking), or \code{"loo"} (leave-one-out, available for \code{fect_nevertreated}). The legacy aliases \code{"all_units"} (= \code{"block"}) and \code{"treated_units"} (block masking restricted to treated pre-treatment cells) are still accepted but emit a deprecation message; both will be replaced by the unified \code{(cv.method, cv.units)} API in v2.4.0.}
 \item{cv.nobs}{an integer specifying the length of continuous observations within a unit in the testing set. Default is \code{cv.nobs = 3}.}
-\item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}.}
+\item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}. Used by block CV (\code{cv.method = "block"}, or the legacy aliases \code{"all_units"}/\code{"treated_units"}). Default is 1 (matches \code{cv.buffer} for rolling CV).}
+\item{cv.buffer}{an integer specifying the length of past-side buffer cells masked from training (but not scored) immediately before each rolling-window holdout. Used only by \code{cv.method = "rolling"}; the future side is dropped from training by construction. Analogous to \code{cv.donut} for block CV but applied only on the past side. Default is 1.}
 \item{criterion}{criterion used for model selection. Default is "mspe".
   \code{"mspe"} for the mean squared prediction error,
   \code{"gmspe"} for the geometric-mean squared prediction errors,
