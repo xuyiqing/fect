@@ -165,7 +165,7 @@ fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
             method = "gsynth", force = "two-way",
             CV = TRUE, r = c(0, 5),
             cv.method = "rolling",
-            cv.buffer = 1, cv.nobs = 3, k = 10, cv.prop = 0.2,
+            cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
             cv.rule = "1se",
             se = TRUE, vartype = "parametric")
 fit$r.cv     # selected r --- use this for downstream inference

@@ -121,8 +121,8 @@ Pre-v2.3.0 callers used `cv.method = "all_units"` (= the new `"block"`) or `cv.m
 
 | Option | Default | Applies to | Description |
 | :--- | :--- | :--- | :--- |
-| `k` | 10 | all | Number of CV folds |
-| `cv.prop` | 0.2 | all | For block: proportion of observations masked per round. For rolling: fraction of eligible units sampled per fold. |
+| `k` | 20 | all | Number of CV folds |
+| `cv.prop` | 0.1 | all | For block: proportion of observations masked per round. For rolling: fraction of eligible units sampled per fold. The `(k = 20, cv.prop = 0.1)` pair gives ~2x coverage of every eligible unit across folds while keeping per-fold mask size moderate. |
 | `cv.nobs` | 3 | all | Block size for the held-out (scored) cells per anchor |
 | `cv.donut` | 1 | block only | Cells excluded around the holdout on each side, masked but not scored (attenuates AR leakage on both train/test boundaries; matches `cv.buffer` for rolling CV) |
 | `cv.buffer` | 1 | rolling only | Past-side buffer cells before the holdout, masked but not scored (the future side is dropped from training by construction) |
@@ -149,7 +149,7 @@ fit_cv <- fect(Y ~ D, data = simdata, index = c("id", "time"),
                method = "ife", force = "two-way",
                CV = TRUE, r = c(0, 3),
                cv.method = "rolling",
-               cv.buffer = 1, cv.nobs = 3, k = 10, cv.prop = 0.2,
+               cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
                cv.rule = "1se", se = TRUE)
 fit_cv$r.cv  # selected r
 ```

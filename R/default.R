@@ -41,8 +41,8 @@ fect <- function(
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
-    k = 10, # times of CV
-    cv.prop = 0.2, ## fraction of eligible units sampled per fold (rolling) / proportion of obs masked per round (block)
+    k = 20, # times of CV
+    cv.prop = 0.1, ## fraction of eligible units sampled per fold (rolling) / proportion of obs masked per round (block)
     cv.method = "rolling", ## CV masking strategy (default flipped from "all_units" in v2.3.0)
     cv.nobs = 3, ## cv taking consecutive units
     cv.donut = 1, ## cv mspe (default flipped from 0 to match cv.buffer = 1 in v2.3.0)
@@ -120,8 +120,8 @@ fect.formula <- function(
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
-    k = 10, # times of CV
-    cv.prop = 0.2, ## fraction of eligible units sampled per fold (rolling) / proportion of obs masked per round (block)
+    k = 20, # times of CV
+    cv.prop = 0.1, ## fraction of eligible units sampled per fold (rolling) / proportion of obs masked per round (block)
     cv.method = "rolling",
     cv.nobs = 3,
     cv.donut = 1, ## cv mspe (default flipped from 0 to match cv.buffer = 1 in v2.3.0)
@@ -312,8 +312,8 @@ fect.default <- function(
     lambda = NULL, ## mc method: regularization parameter
     nlambda = 0,
     CV = NULL, # cross-validation
-    k = 10, # times of CV
-    cv.prop = 0.2,
+    k = 20, # times of CV
+    cv.prop = 0.1,
     cv.method = "all_units",
     cv.nobs = 3,
     cv.donut = 1, ## cv mspe

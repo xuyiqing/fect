@@ -6,9 +6,9 @@ fect_mspe <- function(
     cv.nobs     = 3,
     cv.donut    = 1,
     cv.buffer   = 1,
-    cv.prop     = 0.2,
+    cv.prop = 0.1,
     min.T0      = 5,
-    k           = 5,
+    k           = 20,
     ## ----- scoring ----- ##
     criterion   = "mspe",         # "mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment"
     W           = NULL,           # TT x N observation weight matrix, or NULL
