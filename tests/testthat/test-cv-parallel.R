@@ -913,6 +913,17 @@ test_that("E.6: bootstrap + CV interaction (se=TRUE, nboots=5, parallel=TRUE) ru
 
   skip_on_cran()
 
+  ## Defensive: clear any leaked future plan / parallel backend from
+  ## upstream tests in the same suite run. Without this, an inherited
+  ## doFuture / doParallel registration with stale cluster handles can
+  ## cause "incorrect number of dimensions" errors in the bootstrap
+  ## phase. Test passes 73/73 in isolation; this guard makes it pass
+  ## inside the full devtools::test() ordering as well.
+  suppressWarnings({
+    try(future::plan(future::sequential), silent = TRUE)
+    try(foreach::registerDoSEQ(),         silent = TRUE)
+  })
+
   expect_no_error({
     set.seed(42)
     suppressWarnings(suppressMessages(
@@ -1485,6 +1496,8 @@ test_that("N.1: IFE nevertreated all_units parallel matches phase3 fixture (with
       r         = 0:2,
       CV        = TRUE,
       cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
+      cv.prop   = 0.1,      # phase3 fixture pinned under pre-0.2 default
+      cv.donut  = 0,        # phase3 fixture pinned under pre-1 default
       k         = 3,
       cv.method = "all_units",
       time.component.from = "nevertreated",
@@ -1528,6 +1541,8 @@ test_that("N.2: IFE nevertreated treated_units serial matches phase3 fixture (wi
       r         = 0:2,
       CV        = TRUE,
       cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
+      cv.prop   = 0.1,      # phase3 fixture pinned under pre-0.2 default
+      cv.donut  = 0,        # phase3 fixture pinned under pre-1 default
       k         = 3,
       cv.method = "treated_units",
       time.component.from = "nevertreated",
@@ -1569,6 +1584,9 @@ test_that("N.3: CFE nevertreated all_units parallel matches phase3 fixture (with
       method    = "cfe",
       r         = 0:2,
       CV        = TRUE,
+      cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
+      cv.prop   = 0.1,      # phase3 fixture pinned under pre-0.2 default
+      cv.donut  = 0,        # phase3 fixture pinned under pre-1 default
       k         = 3,
       cv.method = "all_units",
       time.component.from = "nevertreated",
@@ -1613,6 +1631,9 @@ test_that("N.4: CFE nevertreated treated_units serial matches phase3 fixture (wi
       CV        = TRUE,
       k         = 3,
       cv.method = "treated_units",
+      cv.rule   = "1pct",   # phase3 fixture pinned under legacy 1% rule
+      cv.prop   = 0.1,      # phase3 fixture pinned under pre-0.2 default
+      cv.donut  = 0,        # phase3 fixture pinned under pre-1 default
       time.component.from = "nevertreated",
       se        = FALSE,
       parallel  = FALSE

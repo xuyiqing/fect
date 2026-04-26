@@ -89,8 +89,8 @@ fect_boot <- function(
   criterion = "mspe",
   CV = 0,
   k = 10,
-  cv.prop = 0.1,
-  cv.method = "all_units",
+  cv.prop = 0.2,
+  cv.method = "rolling",
   cv.nobs = 3,
   r = 0,
   r.end = 3,
@@ -1555,6 +1555,12 @@ fect_boot <- function(
       on.exit({
         try(parallel::stopCluster(cl), silent = TRUE)
       }, add = TRUE)
+      ## Propagate parent .libPaths() so PSOCK workers can find fect
+      ## (and other user-installed packages) regardless of how the
+      ## parent R session was launched (e.g. Quarto render).
+      parent_libs <- .libPaths()
+      try(parallel::clusterCall(cl, function(p) .libPaths(p),
+                                p = parent_libs), silent = TRUE)
       doParallel::registerDoParallel(cl)
       suppressWarnings(foreach(
         j = idx,

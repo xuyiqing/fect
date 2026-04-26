@@ -127,95 +127,64 @@ cat("Selected r:", out.cv$r.cv, "\n")
 
 ### CV method
 
-The `cv.method` parameter controls *which observations are masked* during cross-validation. Different masking strategies test different aspects of the model.
+The `cv.method` parameter controls *which observations are masked* during cross-validation. As of v2.3.0, three masking strategies are exposed:
 
 | `cv.method` | What is masked | What it tests |
 | :--- | :--- | :--- |
-| `"all_units"` | Random subsets of control observations across all units | Factor estimation quality on the full panel |
-| `"treated_units"` | Random subsets from eventually-treated units' pre-treatment observations only | Counterfactual prediction quality for the target units |
-| `"loo"` | One treated pre-treatment period at a time | Projection quality (legacy gsynth method) |
+| **`"rolling"`** (default) | Per-unit anchor with `cv.nobs` scored holdout, `cv.buffer` past-side buffer, and drop-future from anchor onward; samples `cv.prop` of eligible units per fold (controls + treated pre-treatment) | Forecast-style prediction quality with no future-side leakage; closes the AR-leakage channel that block CV cannot |
+| `"block"` | Random scattered anchors over control observations; mask `cv.nobs` contiguous cells per anchor; `cv.donut` cells flank each side excluded from training but not scored | Factor estimation quality on the full panel under approximately i.i.d. residuals |
+| `"loo"` | One treated pre-treatment period at a time | Projection quality (legacy gsynth method); available for `fect_nevertreated` only |
 
 ::: {.callout-note appearance="simple"}
 
 ### Which `cv.method` should I use?
 
-`"all_units"` (default for `fect_cv` and `fect_mspe`) is the general-purpose choice --- it tests whether the model can predict held-out control observations well, and is suitable when the panel is large and the factor structure is the main concern. `"treated_units"` (default for nevertreated/gsynth) directly tests counterfactual quality for the treated group, and is preferred when prediction accuracy for treated units is the priority. `"loo"` (nevertreated only) is the original gsynth leave-one-out method; it can be unstable with few pre-treatment periods, in which case `"treated_units"` is a more robust alternative.
+`"rolling"` is the new default and the recommended choice in nearly all settings. It is essential when residuals are temporally correlated (post-fit residual AR(1) above ~0.4); under approximately i.i.d. residuals, it agrees closely with block CV (no penalty for the safer choice). `"block"` is available when a forecast-style holdout is not needed --- e.g., for benchmarking against pre-v2.3.0 fits. `"loo"` (nevertreated only) is the original gsynth leave-one-out method; it can be unstable with few pre-treatment periods.
+
+The legacy values `"all_units"` (= the new `"block"`) and `"treated_units"` (block masking restricted to treated pre-treatment cells) are still accepted but emit a deprecation message and will be removed in v2.4.0; see the [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv) for the deprecation plan.
 
 :::
 
-We provide an example below.
+We compare the new rolling default with the block strategy below:
 
 ```{r cv_method_compare, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
-out.all <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-                method = "ife", CV = TRUE, r = c(0, 5),
-                cv.method = "all_units", se = FALSE, parallel = TRUE, cores = 16)
+out.roll <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+                 method = "ife", CV = TRUE, r = c(0, 5),
+                 cv.method = "rolling", se = FALSE, parallel = TRUE, cores = 16)
 
-out.tr <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-               method = "ife", CV = TRUE, r = c(0, 5),
-               cv.method = "treated_units", se = FALSE, parallel = TRUE, cores = 16)
+out.block <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
+                  method = "ife", CV = TRUE, r = c(0, 5),
+                  cv.method = "block", se = FALSE, parallel = TRUE, cores = 16)
 ```
 
 ```{r print-cv-method-compare}
-cat("cv.method = 'all_units':     r.cv =", out.all$r.cv, "\n")
-cat("cv.method = 'treated_units': r.cv =", out.tr$r.cv, "\n")
+cat("cv.method = 'rolling': r.cv =", out.roll$r.cv, "\n")
+cat("cv.method = 'block':   r.cv =", out.block$r.cv, "\n")
 ```
 
-Both strategies often agree, but they can select different `r` when the factor structure matters more for one group than the other.
+The two strategies often agree on i.i.d.-residual panels but diverge when residuals are temporally correlated (block CV tends to over-select; see the empirical evidence in the [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv)).
 
-### Forward-only (rolling) CV via `r.cv.rolling()`
+### Rolling-window CV at a glance
 
-Both `"all_units"` and `"treated_units"` use random anchors to mask contiguous blocks of `cv.nobs` observations. With residuals that are temporally correlated, this design has a subtle problem: the blocks are immediately adjacent to training observations on both sides, so a high-rank model can "predict" the held-out block by exploiting the AR structure that leaks across the train/test boundary. Even widening `cv.nobs` and adding a `cv.donut` may not fully close this channel.
+Block CV (`cv.method = "block"`) and rolling CV (`cv.method = "rolling"`) differ in how the holdout cells are positioned within each unit's time series. Block CV drops random scattered anchors and masks `cv.nobs` contiguous cells flanked on both sides by training observations, which lets serially correlated residuals leak across the train/test boundary and inflate the apparent accuracy of high-rank models. Rolling CV positions the holdout at a per-unit anchor and drops everything from the anchor onward through the unit's end-of-eligible, so training never sees the future of the held-out block; the past side carries a small `cv.buffer` to attenuate same-side AR leakage. The figure below shows both designs side-by-side.
 
-`r.cv.rolling()` is a deterministic alternative: for each unit, it holds out the **last `cv.nobs` observations** and trains on everything else (the unit's earlier observations plus all other units' full data). The future-side leakage channel is closed because the masked block is always the most recent observed window per unit.
+```{r cv-strategies-fig, echo=FALSE, out.width='100%', fig.cap='Block CV (left) versus rolling-window CV (right) on a synthetic 40-unit panel with staggered treatment timing. Both panels use the same random missing pattern. Block CV (panel a) drops random anchors and masks contiguous holdouts (red) flanked by donut buffer (orange). Rolling CV (panel b) samples a fraction of eligible units per fold; for each sampled unit it masks a past-side buffer (orange), a scored holdout (red), and drops everything from the holdout onward (purple). Treated post-treatment cells (dark blue) are never masked.'}
+knitr::include_graphics("fig/cv-strategies.png")
+```
 
-```{r rcv_rolling_demo, eval=FALSE}
-res <- r.cv.rolling(Y ~ D + X1 + X2, data = simdata,
-                    index = c("id", "time"),
-                    method = "ife", r.max = 5, cv.nobs = 3,
-                    cv.rule = "1se", min.T0 = 5)
-res$r.cv      # selected r
-res$mspe      # per-r MSPE curve
+Both designs are wired into the main `fect()` dispatcher; switch between them by setting `cv.method`. The `"rolling"` strategy is supported for `method ∈ {"ife", "gsynth", "cfe", "mc", "both"}`.
 
-## Then use the chosen r in a CV-disabled fit:
+```{r rcv_dispatcher_demo, eval=FALSE}
 fit <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
-            method = "ife", time.component.from = "notyettreated",
-            CV = FALSE, r = res$r.cv, se = TRUE)
+            method = "ife", force = "two-way",
+            CV = TRUE, r = c(0, 5),
+            cv.method = "rolling",
+            cv.buffer = 1, cv.nobs = 3, k = 10, cv.prop = 0.2,
+            cv.rule = "1se", se = TRUE)
+fit$r.cv      # selected r
 ```
 
-`r.cv.rolling()` supports `method = "ife"` (IFE-EM, internally `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC, internally `time.component.from = "nevertreated"`). Both paths populate `Y.ct.full` at masked control positions, so rolling CV can score MSPE on either estimator. Other methods (e.g., `"mc"`) are not yet supported.
-
-::: {.callout-note appearance="simple"}
-
-### When to prefer rolling CV
-
-If your residuals are notably autocorrelated (e.g., post-fit residual AR(1) above ~0.4), the random-anchor strategies can over-select `r` because the contiguous-block masking leaks correlated information. `r.cv.rolling()` is more conservative in those settings. For approximately i.i.d. residuals, the random-anchor strategies and rolling CV typically agree on `r.cv`.
-
-:::
-
-### Sub-options
-
-The k-fold masking procedure is controlled by several sub-options that apply to both `"all_units"` and `"treated_units"`:
-
-| Option | Default | Description |
-| :--- | :--- | :--- |
-| `k` | 10 | Number of cross-validation rounds |
-| `cv.prop` | 0.1 | Proportion of eligible observations held out per round |
-| `cv.nobs` | 3 | Block size for structured removal (consecutive observations) |
-| `cv.donut` | 0 | Periods excluded around treatment onset in the evaluation set to minimize contamination |
-| `min.T0` | 5 | Minimum pre-treatment observations required per unit |
-
-The block removal (`cv.nobs`) addresses serial correlation: instead of masking individual observations, we mask blocks of consecutive observations. The `cv.donut` option further excludes observations near the treatment boundary from the test set to avoid contamination due to temporal correlation in data.
-
-### Scoring criteria
-
-The `criterion` parameter determines which scoring metric is used to select the best tuning parameter:
-
-| `criterion` | Description | When to use |
-| :--- | :--- | :--- |
-| `"mspe"` (default) | Mean squared prediction error | General-purpose; best for prediction accuracy |
-| `"gmspe"` | Geometric mean SPE | Robust to outlier prediction errors |
-| `"pc"` | Information criterion (Bai & Ng) | Model selection based on penalized fit; does not require CV rounds |
-| `"moment"` | Weighted period-wise residual averages | Selects for best pre-trend fitting rather than prediction |
+For the full parameter reference (`k`, `cv.prop`, `cv.nobs`, `cv.donut`, `cv.buffer`, `cv.rule`, `min.T0`, `seed`), the scoring-criterion options, and the K=200 simulation evidence that motivates rolling as the recommended default, see the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv).
 
 ```{r criterion_compare, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.mspe <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
@@ -242,7 +211,7 @@ A candidate `r` is selected over a smaller value only if its criterion score imp
 
 ### Parallel computing
 
-Cross-validation can be computationally expensive, especially with `cv.method = "all_units"` (which re-estimates the full factor or low-rank model `k` times per candidate tuning parameter). Parallel computing is enabled by default (`parallel = TRUE`); on large panels, the CV step engages multiple workers automatically.
+Cross-validation can be computationally expensive, especially with `cv.method = "block"` or `"rolling"` (which re-estimate the full factor or low-rank model `k` times per candidate tuning parameter). Parallel computing is enabled by default (`parallel = TRUE`); on large panels, the CV step engages multiple workers automatically.
 
 #### Auto-threshold
 
@@ -258,7 +227,7 @@ Below these thresholds, the CV runs serially even with `parallel = TRUE`. To for
 
 #### What runs in parallel
 
-The unit of parallel work is the (rank, fold) pair (or (lambda, fold) for MC), dispatched flat across workers via `future_lapply`. This gives near-linear speedup up to the number of total tasks: e.g., with `r=c(0,5)` and `k=10`, there are 60 tasks per CV invocation. The `"treated_units"` masking strategy and the `"loo"` method are always sequential, because their per-fold computations depend on rank-specific quantities that cannot be batched.
+The unit of parallel work is the (rank, fold) pair (or (lambda, fold) for MC), dispatched flat across workers via `future_lapply`. This gives near-linear speedup up to the number of total tasks: e.g., with `r=c(0,5)` and `k=10`, there are 60 tasks per CV invocation. The `"loo"` method (and the legacy `"treated_units"` value) are always sequential, because their per-fold computations depend on rank-specific quantities that cannot be batched.
 
 #### MC-specific note: `break_check` short-circuit
 

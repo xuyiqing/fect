@@ -13,11 +13,12 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         balance.period = NULL,
                         CV = TRUE,
                         criterion = "mspe",
-                        cv.method = "treated_units",
+                        cv.method = "rolling",
                         k = 5,
-                        cv.prop = 0.1,
+                        cv.prop = 0.2,
                         cv.nobs = 3,
                         cv.donut = 1,
+                        cv.buffer = 1,
                         min.T0 = 5,
                         r = 0, # r.end when CV==TRUE
                         r.end = 3,
@@ -186,7 +187,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     }
 
     ## ---- cv.method validation ---- ##
-    cv.method <- match.arg(cv.method, c("treated_units", "all_units", "loo"))
+    cv.method <- .fect_normalize_cv_method(
+        cv.method,
+        allowed = c("rolling", "block", "all_units", "treated_units", "loo")
+    )
 
     ## ---- W for treated units (scoring) ---- ##
     if (!is.null(W)) {
@@ -346,9 +350,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             ## ---- cv.sample pre-computation (IFE) ---- ##
             if (cv.method != "loo" && r.max > 0) {
-                if (cv.method == "all_units") {
+                if (cv.method %in% c("all_units", "rolling")) {
                     rm.count.co <- floor(sum(II.co) * cv.prop)
-                    if (rm.count.co == 0) {
+                    if (rm.count.co == 0 && cv.method == "all_units") {
                         message("cv.prop too small for control panel; falling back to LOO.")
                         cv.method <- "loo"
                     } else {
@@ -376,38 +380,65 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                             beta0CV.co <- array(0, dim = c(1, 0, k))
                         }
                         flag.cv <- 0
+
+                        ## ---- rolling-window pre-computation ---- ##
+                        ## When rolling, masks come from .build_cv_mask_rolling
+                        ## (per-fold sampling of cv.prop of eligible control
+                        ## units; per-unit random anchor + cv.nobs scored
+                        ## holdout + cv.buffer past-side buffer + drop-future
+                        ## as the rolling-window step). Skip the con1/con2
+                        ## block-CV feasibility checks --- rolling preserves
+                        ## per-time donor coverage by construction via
+                        ## per-fold unit sampling.
+                        rolling_folds <- NULL
+                        if (cv.method == "rolling") {
+                            rolling_folds <- .build_cv_mask_rolling(
+                                II = II.co, D = D.co.fake, k = k,
+                                cv.nobs = cv.nobs, cv.buffer = cv.buffer,
+                                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                            )
+                        }
+
                         for (i.cv in 1:k) {
-                            cv.n <- 0
-                            repeat {
-                                cv.n <- cv.n + 1
-                                get.cv <- cv.sample(II.co, D.co.fake,
-                                    count = rm.count.co,
-                                    cv.count = cv.nobs,
-                                    cv.treat = FALSE,
-                                    cv.donut = cv.donut)
-                                cv.id <- get.cv$cv.id
-                                II.co.cv <- II.co
-                                II.co.cv[cv.id] <- 0
-                                II.co.cv.valid <- II.co
-                                II.co.cv.valid[cv.id] <- -1
-                                con1 <- sum(apply(II.co.cv, 1, sum) >= 1) == TT
-                                con2 <- sum(apply(II.co.cv, 2, sum) >= min.T0) == Nco
-                                if (con1 && con2) break
-                                if (cv.n >= 200) {
-                                    flag.cv <- 1
-                                    keep.1 <- which(apply(II.co.cv, 1, sum) < 1)
-                                    keep.2 <- which(apply(II.co.cv, 2, sum) < min.T0)
-                                    II.co.cv[keep.1, ] <- II.co[keep.1, ]
-                                    II.co.cv[, keep.2] <- II.co[, keep.2]
-                                    II.co.cv.valid[keep.1, ] <- II.co[keep.1, ]
-                                    II.co.cv.valid[, keep.2] <- II.co[, keep.2]
-                                    cv.id <- which(II.co.cv.valid != II.co)
-                                    break
+                            if (cv.method == "rolling") {
+                                cv.n <- 0
+                                cv.id  <- rolling_folds[[i.cv]]$cv.id
+                                est.id <- rolling_folds[[i.cv]]$est.id
+                            } else {
+                                cv.n <- 0
+                                repeat {
+                                    cv.n <- cv.n + 1
+                                    get.cv <- cv.sample(II.co, D.co.fake,
+                                        count = rm.count.co,
+                                        cv.count = cv.nobs,
+                                        cv.treat = FALSE,
+                                        cv.donut = cv.donut)
+                                    cv.id <- get.cv$cv.id
+                                    II.co.cv <- II.co
+                                    II.co.cv[cv.id] <- 0
+                                    II.co.cv.valid <- II.co
+                                    II.co.cv.valid[cv.id] <- -1
+                                    con1 <- sum(apply(II.co.cv, 1, sum) >= 1) == TT
+                                    con2 <- sum(apply(II.co.cv, 2, sum) >= min.T0) == Nco
+                                    if (con1 && con2) break
+                                    if (cv.n >= 200) {
+                                        flag.cv <- 1
+                                        keep.1 <- which(apply(II.co.cv, 1, sum) < 1)
+                                        keep.2 <- which(apply(II.co.cv, 2, sum) < min.T0)
+                                        II.co.cv[keep.1, ] <- II.co[keep.1, ]
+                                        II.co.cv[, keep.2] <- II.co[, keep.2]
+                                        II.co.cv.valid[keep.1, ] <- II.co[keep.1, ]
+                                        II.co.cv.valid[, keep.2] <- II.co[, keep.2]
+                                        cv.id <- which(II.co.cv.valid != II.co)
+                                        break
+                                    }
                                 }
                             }
                             rmCV[[i.cv]] <- cv.id
                             ociCV[[i.cv]] <- setdiff(oci.co, cv.id)
-                            if (cv.n < 200) {
+                            if (cv.method == "rolling") {
+                                estCV[[i.cv]] <- est.id
+                            } else if (cv.n < 200) {
                                 estCV[[i.cv]] <- get.cv$est.id
                             } else {
                                 cv.diff <- setdiff(get.cv$cv.id, cv.id)
@@ -510,7 +541,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 use_explicit_cv_ife <- "cv" %in% as.character(parallel) && !isTRUE(parallel)
                 ## Centralized threshold gate — replaces bespoke Nco * TT > 20000 check
                 ife_threshold_met <- (Nco * TT) > .CV_PARALLEL_THRESH$ife
-                cv_ife_parallel <- (cv.method == "all_units") &&
+                cv_ife_parallel <- (cv.method %in% c("all_units", "rolling")) &&
                                    (ife_threshold_met || use_explicit_cv_ife) &&
                                    (k > 1)
             }
@@ -520,7 +551,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
                 old.future.plan.ife <- future::plan()
                 on.exit(future::plan(old.future.plan.ife), add = TRUE, after = FALSE)
-                future::plan(future::multisession, workers = cores)
+                future::plan(future::cluster, workers = .fect_make_future_cluster(cores))
                 ## doFuture::registerDoFuture() removed — not needed for future_lapply dispatch
                 avail <- parallelly::availableCores()
                 msg_line <- sprintf("Parallel CV: using %d of %d available cores.", cores, avail)
@@ -825,8 +856,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     )
                 }
 
-              } else if (cv.method == "all_units") {
-                ## ---- cv.sample "all_units" IFE CV (serial path — lapply only) ---- ##
+              } else if (cv.method %in% c("all_units", "rolling")) {
+                ## ---- cv.sample "all_units" / "rolling" IFE CV (serial path — lapply only) ---- ##
+                ## Rolling reuses the all_units scoring helper; only the rmCV/estCV
+                ## fold construction differs (built via .build_cv_mask_rolling above).
                 fold_results <- lapply(1:k, function(ii) {
                     .fect_cv_score_one_ife_nt_all(
                         ii       = ii,
@@ -1403,9 +1436,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             ## ---- cv.sample pre-computation (CFE) ---- ##
             if (cv.method != "loo" && r.max > 0) {
-                if (cv.method == "all_units") {
+                if (cv.method %in% c("all_units", "rolling")) {
                     rm.count.co <- floor(sum(II.co) * cv.prop)
-                    if (rm.count.co == 0) {
+                    if (rm.count.co == 0 && cv.method == "all_units") {
                         message("cv.prop too small for control panel; falling back to LOO.")
                         cv.method <- "loo"
                     } else {
@@ -1421,38 +1454,57 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                             beta0CV.co <- array(0, dim = c(1, 0, k))
                         }
                         flag.cv <- 0
+
+                        ## ---- rolling-window pre-computation (CFE) ---- ##
+                        rolling_folds <- NULL
+                        if (cv.method == "rolling") {
+                            rolling_folds <- .build_cv_mask_rolling(
+                                II = II.co, D = D.co.fake, k = k,
+                                cv.nobs = cv.nobs, cv.buffer = cv.buffer,
+                                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                            )
+                        }
+
                         for (i.cv in 1:k) {
-                            cv.n <- 0
-                            repeat {
-                                cv.n <- cv.n + 1
-                                get.cv <- cv.sample(II.co, D.co.fake,
-                                    count = rm.count.co,
-                                    cv.count = cv.nobs,
-                                    cv.treat = FALSE,
-                                    cv.donut = cv.donut)
-                                cv.id <- get.cv$cv.id
-                                II.co.cv <- II.co
-                                II.co.cv[cv.id] <- 0
-                                II.co.cv.valid <- II.co
-                                II.co.cv.valid[cv.id] <- -1
-                                con1 <- sum(apply(II.co.cv, 1, sum) >= 1) == TT
-                                con2 <- sum(apply(II.co.cv, 2, sum) >= min.T0) == Nco
-                                if (con1 && con2) break
-                                if (cv.n >= 200) {
-                                    flag.cv <- 1
-                                    keep.1 <- which(apply(II.co.cv, 1, sum) < 1)
-                                    keep.2 <- which(apply(II.co.cv, 2, sum) < min.T0)
-                                    II.co.cv[keep.1, ] <- II.co[keep.1, ]
-                                    II.co.cv[, keep.2] <- II.co[, keep.2]
-                                    II.co.cv.valid[keep.1, ] <- II.co[keep.1, ]
-                                    II.co.cv.valid[, keep.2] <- II.co[, keep.2]
-                                    cv.id <- which(II.co.cv.valid != II.co)
-                                    break
+                            if (cv.method == "rolling") {
+                                cv.n <- 0
+                                cv.id  <- rolling_folds[[i.cv]]$cv.id
+                                est.id <- rolling_folds[[i.cv]]$est.id
+                            } else {
+                                cv.n <- 0
+                                repeat {
+                                    cv.n <- cv.n + 1
+                                    get.cv <- cv.sample(II.co, D.co.fake,
+                                        count = rm.count.co,
+                                        cv.count = cv.nobs,
+                                        cv.treat = FALSE,
+                                        cv.donut = cv.donut)
+                                    cv.id <- get.cv$cv.id
+                                    II.co.cv <- II.co
+                                    II.co.cv[cv.id] <- 0
+                                    II.co.cv.valid <- II.co
+                                    II.co.cv.valid[cv.id] <- -1
+                                    con1 <- sum(apply(II.co.cv, 1, sum) >= 1) == TT
+                                    con2 <- sum(apply(II.co.cv, 2, sum) >= min.T0) == Nco
+                                    if (con1 && con2) break
+                                    if (cv.n >= 200) {
+                                        flag.cv <- 1
+                                        keep.1 <- which(apply(II.co.cv, 1, sum) < 1)
+                                        keep.2 <- which(apply(II.co.cv, 2, sum) < min.T0)
+                                        II.co.cv[keep.1, ] <- II.co[keep.1, ]
+                                        II.co.cv[, keep.2] <- II.co[, keep.2]
+                                        II.co.cv.valid[keep.1, ] <- II.co[keep.1, ]
+                                        II.co.cv.valid[, keep.2] <- II.co[, keep.2]
+                                        cv.id <- which(II.co.cv.valid != II.co)
+                                        break
+                                    }
                                 }
                             }
                             rmCV[[i.cv]] <- cv.id
                             ociCV[[i.cv]] <- setdiff(oci.co, cv.id)
-                            if (cv.n < 200) {
+                            if (cv.method == "rolling") {
+                                estCV[[i.cv]] <- est.id
+                            } else if (cv.n < 200) {
                                 estCV[[i.cv]] <- get.cv$est.id
                             } else {
                                 cv.diff <- setdiff(get.cv$cv.id, cv.id)
@@ -1550,7 +1602,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 use_explicit_cv_cfe <- "cv" %in% as.character(parallel) && !isTRUE(parallel)
                 ## Centralized threshold gate: CFE threshold is 60000L (higher overhead per fit)
                 cfe_threshold_met <- (Nco * TT) > .CV_PARALLEL_THRESH$cfe
-                cv_cfe_parallel <- (cv.method == "all_units") &&
+                cv_cfe_parallel <- (cv.method %in% c("all_units", "rolling")) &&
                                    (cfe_threshold_met || use_explicit_cv_cfe) &&
                                    (k > 1)
             }
@@ -1560,7 +1612,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
                 old.future.plan.cfe <- future::plan()
                 on.exit(future::plan(old.future.plan.cfe), add = TRUE, after = FALSE)
-                future::plan(future::multisession, workers = cores)
+                future::plan(future::cluster, workers = .fect_make_future_cluster(cores))
                 ## doFuture::registerDoFuture() removed — not needed for future_lapply dispatch
                 avail <- parallelly::availableCores()
                 msg_line <- sprintf("Parallel CV (CFE): using %d of %d available cores.", cores, avail)
@@ -1894,8 +1946,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     )
                 }
 
-              } else if (cv.method == "all_units") {
-                ## ---- cv.sample "all_units" CFE CV (serial path — lapply only) ---- ##
+              } else if (cv.method %in% c("all_units", "rolling")) {
+                ## ---- cv.sample "all_units" / "rolling" CFE CV (serial path — lapply only) ---- ##
+                ## Rolling reuses the all_units CFE scoring helper; only rmCV/estCV
+                ## fold construction differs (built via .build_cv_mask_rolling above).
                 fold_results <- lapply(1:k, function(ii) {
                     .fect_cv_score_one_cfe_nt_all(
                         ii              = ii,

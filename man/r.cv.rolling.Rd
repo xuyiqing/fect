@@ -2,18 +2,22 @@
 % Please edit documentation in R/cv-rolling.R
 \name{r.cv.rolling}
 \alias{r.cv.rolling}
-\title{Rolling (forward-only) CV for rank selection}
+\title{Rolling-window cross-validation for rank selection}
 \usage{
 r.cv.rolling(
   formula,
   data,
   index,
-  method = c("ife", "gsynth"),
+  method = c("ife", "gsynth", "cfe"),
   r.max = 5L,
   cv.nobs = 3L,
+  cv.buffer = 1L,
+  k = 10L,
+  cv.prop = 0.2,
   cv.rule = c("1se", "min", "1pct"),
   min.T0 = 5L,
   force = "unit",
+  seed = NULL,
   verbose = TRUE,
   ...
 )
@@ -23,58 +27,116 @@ r.cv.rolling(
 
 \item{data}{A long-format data frame.}
 
-\item{index}{Length-2 character vector: `c("unit", "time")`.}
+\item{index}{Character vector identifying the panel structure. For
+`method = "ife"` and `method = "gsynth"`, length 2:
+`c("unit", "time")`. For `method = "cfe"`, length >= 2: the first
+two entries are `c("unit", "time")` and any additional entries are
+extra grouping fixed-effect columns forwarded to the inner
+`fect()` call's `index =` argument.}
 
-\item{method}{Estimator. One of `"ife"` (IFE-EM,
-`time.component.from = "notyettreated"`) or `"gsynth"` (GSC,
-`time.component.from = "nevertreated"`). Both paths now populate
-`Y.ct.full` at masked control positions, so rolling CV can score
-them. The GSC path was enabled in fect 2.4.0.}
+\item{method}{Estimator. One of `"ife"` (IFE-EM, internally
+`time.component.from = "notyettreated"`), `"gsynth"` (GSC,
+internally `time.component.from = "nevertreated"`), or `"cfe"`
+(Complex Fixed Effects, internally
+`time.component.from = "notyettreated"`). All three paths populate
+`Y.ct.full` at masked positions, so MSPE scoring works uniformly.
+For CFE, rolling CV picks `r` only; CFE-specific arguments
+(`Z`, `gamma`, `Q`, `Q.type`, `kappa`, extra index columns) are
+forwarded via `...` and held fixed at their user-supplied values.}
 
 \item{r.max}{Largest candidate rank to evaluate. CV is run over
 `0:r.max`.}
 
-\item{cv.nobs}{Number of trailing observations per unit to hold out
-(default 3).}
+\item{cv.nobs}{Length of the held-out (scored) block per unit per
+fold. Default 3.}
+
+\item{cv.buffer}{Number of observations immediately BEFORE the
+held-out block to drop from training (the past-side buffer that
+attenuates AR-leakage). Default 1. Analogous to `cv.donut` in the
+existing `cv.method = "all_units"` / `"treated_units"` strategies,
+but applied only on the past side: the future side is dropped by
+construction.}
+
+\item{k}{Number of folds. Each fold draws a fresh sample of units
+and a fresh set of per-unit anchors; the per-r MSPE is averaged
+across folds and the SE used by the `"1se"` rule reflects
+fold-to-fold variability. Default 10 (matches the default for
+the existing CV strategies).}
+
+\item{cv.prop}{Fraction of eligible units sampled per fold. Only
+sampled units receive a mask in that fold; the rest stay fully
+observed and contribute training data at every period. Default
+0.2. Across `k` folds, every eligible unit lands in the holdout
+roughly `k * cv.prop` times in expectation. Must satisfy
+`0 < cv.prop <= 1`. On small panels (n_eligible < 30) consider
+raising further, since per-fold MSPE precision scales with
+`cv.prop * n_eligible * cv.nobs`.}
 
 \item{cv.rule}{Rule for picking `r` from the MSPE curve: `"1se"`
 (default), `"min"`, or `"1pct"`.}
 
-\item{min.T0}{Minimum pre-treatment observations per unit. Units with
-fewer than `min.T0 + cv.nobs` total observations are not masked
-(mirrors fect's existing safety check).}
+\item{min.T0}{Minimum observations required strictly before the
+anchor. Sets the lower bound on valid anchor positions. Default 5.}
 
 \item{force}{One of `"none"`, `"unit"`, `"time"`, `"two-way"`. Default
 `"unit"`.}
 
-\item{verbose}{If TRUE (default), print per-r MSPE.}
+\item{seed}{Optional integer base seed; per-fold seeds derive from
+`seed + fold_id` for reproducibility. Default `NULL` (use the
+ambient RNG).}
 
-\item{...}{Additional arguments forwarded to `fect()` (e.g. `covs`).}
+\item{verbose}{If TRUE (default), print per-fold per-r MSPE.}
+
+\item{...}{Additional arguments forwarded to `fect()`. For
+`method = "cfe"`, the user holds CFE structural arguments (`Z`,
+`gamma`, `Q`, `Q.type`, `Q.bspline.degree`, `kappa`, etc.) fixed
+at their spec via `...`; rolling CV varies only `r`.}
 }
 \value{
-List with components: `r.cv` (chosen rank), `cv.rule` (rule
-  used), `mspe` (data.frame of per-r MSPE + SE + n_holdout),
-  `n.units.masked` (number of units contributing to the held-out set).
+List with components:
+  - `r.cv`: chosen rank.
+  - `cv.rule`: rule applied.
+  - `mspe`: data.frame of per-r MSPE (averaged across folds), SE
+    across folds, and held-out cell counts.
+  - `mspe.per.fold`: r-by-k matrix of per-fold MSPE.
+  - `k`, `cv.nobs`, `cv.buffer`, `cv.prop`: parameters used.
+  - `n.units.masked`: distinct units that contributed to at least
+    one fold's holdout.
 }
 \description{
-Picks the number of factors `r` for an interactive-fixed-effects model
-via deterministic forward-only cross-validation. For each unit, the
-LAST `cv.nobs` observations are held out; training uses everything else
-(the unit's earlier observations + all other units' full data). Unlike
-`fect`'s default `cv.method = "all_units"` (random contiguous-block
-masking), this design closes the forward-leakage channel that AR-
-correlated residuals exploit at `cv.donut = 0` / `1`, and tends to
-recover much smaller `r` on panels with serially correlated errors.
+Picks the number of factors `r` for an interactive-fixed-effects
+model via standard rolling-window cross-validation. For each of `k`
+folds, a fraction `cv.prop` of eligible units (controls plus
+treated pre-treatment) is sampled; only sampled units carry a mask.
+For each sampled unit, a random anchor time `t*` is drawn and the
+fold's training set excludes `t* - cv.buffer, ..., t* - 1` (buffer),
+`t*, ..., t* + cv.nobs - 1` (the held-out, scored block), and
+`t* + cv.nobs, ..., end_of_eligible(t)` (rolling-window future drop;
+for treated units, `end_of_eligible` is the cell strictly before
+treatment onset). MSPE is scored at the held-out block only and
+averaged across folds.
+}
+\details{
+Per-fold unit sampling is required: masking every eligible unit at
+the same time leaves no donor data at the masked time points and
+breaks factor identification. Sampling `cv.prop` of units per fold
+keeps unsampled units fully observed at all periods.
+
+This is the standard time-series CV design (cf. `forecast::tsCV`,
+`tidymodels::sliding_window`, `caret::createTimeSlices`) adapted to
+panel data: each sampled unit gets its own anchor per fold, drawn
+uniformly from valid positions.
 }
 \examples{
 \dontrun{
   library(fect)
-  data(simdata1)
-  res <- r.cv.rolling(Y ~ D, data = simdata1, index = c("id", "time"),
-                      method = "ife", r.max = 5, cv.nobs = 3)
+  data(simdata)
+  res <- r.cv.rolling(Y ~ D, data = simdata, index = c("id", "time"),
+                      method = "ife", r.max = 5,
+                      cv.nobs = 3, cv.buffer = 1, k = 10)
   res$r.cv
   ## then use the chosen r in a CV-disabled fit:
-  fit <- fect(Y ~ D, data = simdata1, index = c("id", "time"),
+  fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
               method = "ife", time.component.from = "notyettreated",
               CV = FALSE, r = res$r.cv, se = TRUE)
 }

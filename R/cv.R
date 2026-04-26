@@ -15,10 +15,11 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     method = "ife",
                     criterion = "mspe",
                     k = 5, # CV time
-                    cv.prop = 0.1,
-                    cv.method = "all_units",
+                    cv.prop = 0.2,
+                    cv.method = "rolling",
                     cv.nobs = 3,
                     cv.donut = 1,
+                    cv.buffer = 1,
                     min.T0 = 5,
                     r = 0, # initial number of factors considered if CV==1
                     r.end,
@@ -207,7 +208,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 norm.para = norm.para,
                 group.level = group.level, group = group,
                 cv.method = cv.method, cv.nobs = cv.nobs,
-                cv.prop = cv.prop, cv.donut = cv.donut,
+                cv.prop = cv.prop, cv.donut = cv.donut, cv.buffer = cv.buffer,
                 min.T0 = min.T0, k = k, criterion = criterion,
                 parallel = parallel, cores = cores,
                 do_parallel_cv = do_parallel_cv
@@ -229,7 +230,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 norm.para = norm.para,
                 group.level = group.level, group = group,
                 cv.method = cv.method, cv.nobs = cv.nobs,
-                cv.prop = cv.prop, cv.donut = cv.donut,
+                cv.prop = cv.prop, cv.donut = cv.donut, cv.buffer = cv.buffer,
                 min.T0 = min.T0, k = k, criterion = criterion,
                 parallel = parallel, cores = cores,
                 do_parallel_cv = do_parallel_cv
@@ -255,7 +256,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 X.gamma = X.gamma, X.kappa = X.kappa,
                 Zgamma.id = Zgamma.id, kappaQ.id = kappaQ.id,
                 cv.method = cv.method, cv.nobs = cv.nobs,
-                cv.prop = cv.prop, cv.donut = cv.donut,
+                cv.prop = cv.prop, cv.donut = cv.donut, cv.buffer = cv.buffer,
                 min.T0 = min.T0, k = k, criterion = criterion,
                 parallel = parallel, cores = cores,
                 do_parallel_cv = do_parallel_cv
@@ -264,8 +265,12 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         }
 
         ## ---- cv.method → cv.treat mapping (after nevertreated delegation) ---- ##
-        cv.method <- match.arg(cv.method, c("all_units", "treated_units"))
+        cv.method <- .fect_normalize_cv_method(
+            cv.method,
+            allowed = c("rolling", "block", "all_units", "treated_units")
+        )
         cv.treat <- (cv.method == "treated_units")
+        use_rolling <- (cv.method == "rolling")
 
         ## ----- ##
         ## ------------- initialize ------------ ##
@@ -295,45 +300,68 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             beta0CV <- array(0, dim = c(1, 0, k)) ## store initial beta0
         }
 
+        ## ---- rolling-window pre-computation (cv.method = "rolling") ---- ##
+        ## When rolling, masks are constructed via .build_cv_mask_rolling
+        ## (per-fold sampling of cv.prop of eligible units; per-unit random
+        ## anchor; cv.nobs scored holdout, cv.buffer past-side buffer,
+        ## drop-future as the rolling-window step). The con1/con2
+        ## block-CV feasibility checks are skipped --- rolling preserves
+        ## per-time donor coverage by construction via per-fold unit
+        ## sampling (unsampled units stay fully observed).
+        rolling_folds <- NULL
+        if (use_rolling) {
+            rolling_folds <- .build_cv_mask_rolling(
+                II = II, D = D, k = k,
+                cv.nobs = cv.nobs, cv.buffer = cv.buffer,
+                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+            )
+        }
+
         ## cv.id.all <- c()
         flag <- 0
         for (i in 1:k) {
-            cv.n <- 0
-            repeat{
-                cv.n <- cv.n + 1
-                # cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
-                get.cv <- cv.sample(II, D,
-                    count = rm.count,
-                    cv.count = cv.nobs,
-                    cv.treat = cv.treat,
-                    cv.donut = cv.donut
-                )
-                cv.id <- get.cv$cv.id
-                ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
-                II.cv.valid <- II.cv <- II
-                II.cv[cv.id] <- 0
-                II.cv.valid[cv.id] <- -1
-                ## ziyi: if certain rows or columns doesn't satisfy con1 or con2,
-                ## replace the row or column of II.cv using the corresponding rows or columns in II
+            if (use_rolling) {
+                cv.n <- 0
+                cv.id <- rolling_folds[[i]]$cv.id
+                est.id <- rolling_folds[[i]]$est.id
+            } else {
+                cv.n <- 0
+                repeat{
+                    cv.n <- cv.n + 1
+                    # cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
+                    get.cv <- cv.sample(II, D,
+                        count = rm.count,
+                        cv.count = cv.nobs,
+                        cv.treat = cv.treat,
+                        cv.donut = cv.donut
+                    )
+                    cv.id <- get.cv$cv.id
+                    ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
+                    II.cv.valid <- II.cv <- II
+                    II.cv[cv.id] <- 0
+                    II.cv.valid[cv.id] <- -1
+                    ## ziyi: if certain rows or columns doesn't satisfy con1 or con2,
+                    ## replace the row or column of II.cv using the corresponding rows or columns in II
 
-                con1 <- sum(apply(II.cv, 1, sum) >= 1) == TT
-                con2 <- sum(apply(II.cv, 2, sum) >= min.T0) == N
+                    con1 <- sum(apply(II.cv, 1, sum) >= 1) == TT
+                    con2 <- sum(apply(II.cv, 2, sum) >= min.T0) == N
 
-                if (con1 == TRUE & con2 == TRUE) {
-                    break
-                }
+                    if (con1 == TRUE & con2 == TRUE) {
+                        break
+                    }
 
-                if (cv.n >= 200) {
-                    flag <- 1
-                    # message("Some units have too few pre-treatment observations. Remove them automatically in Cross-Validation.")
-                    keep.1 <- which(apply(II.cv, 1, sum) < 1)
-                    keep.2 <- which(apply(II.cv, 2, sum) < min.T0)
-                    II.cv[keep.1, ] <- II[keep.1, ]
-                    II.cv[, keep.2] <- II[, keep.2]
-                    II.cv.valid[keep.1, ] <- II[keep.1, ]
-                    II.cv.valid[, keep.2] <- II[, keep.2]
-                    cv.id <- which(II.cv.valid != II)
-                    break
+                    if (cv.n >= 200) {
+                        flag <- 1
+                        # message("Some units have too few pre-treatment observations. Remove them automatically in Cross-Validation.")
+                        keep.1 <- which(apply(II.cv, 1, sum) < 1)
+                        keep.2 <- which(apply(II.cv, 2, sum) < min.T0)
+                        II.cv[keep.1, ] <- II[keep.1, ]
+                        II.cv[, keep.2] <- II[, keep.2]
+                        II.cv.valid[keep.1, ] <- II[keep.1, ]
+                        II.cv.valid[, keep.2] <- II[, keep.2]
+                        cv.id <- which(II.cv.valid != II)
+                        break
+                    }
                 }
             }
 
@@ -348,7 +376,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 W.estCV <- list()
             }
 
-            if (cv.n < 200) {
+            if (use_rolling) {
+                estCV <- c(estCV, list(est.id))
+            } else if (cv.n < 200) {
                 estCV <- c(estCV, list(get.cv$est.id))
             } else {
                 cv.id.old <- get.cv$cv.id
@@ -462,7 +492,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
                 old.future.plan.cv <- future::plan()
                 on.exit(future::plan(old.future.plan.cv), add = TRUE)
-                future::plan(future::multisession, workers = cores)
+                future::plan(future::cluster, workers = .fect_make_future_cluster(cores))
                 avail <- parallelly::availableCores()
                 msg_line <- sprintf("Parallel CV: using %d of %d available cores.", cores, avail)
                 pad <- strrep(" ", max(0, 56 - nchar(msg_line)))
@@ -987,7 +1017,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 ## multisession plan), then IFE restore fires (restoring to the caller's
                 ## original plan). Net: caller's plan correctly preserved.
                 on.exit(future::plan(old.future.plan.mc), add = TRUE, after = FALSE)
-                future::plan(future::multisession, workers = cores)
+                future::plan(future::cluster, workers = .fect_make_future_cluster(cores))
                 avail <- parallelly::availableCores()
                 msg_line <- sprintf("Parallel CV (MC): using %d of %d available cores.", cores, avail)
                 pad <- strrep(" ", max(0, 56 - nchar(msg_line)))

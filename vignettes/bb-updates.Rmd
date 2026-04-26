@@ -2,25 +2,32 @@
 
 ## v2.3.0
 
-(2026-04-24)
+(2026-04-25)
 
-**Cross-validation: 1-SE rule is now the default for $r$ selection** (Breiman, Friedman, Olshen & Stone 1984; Hastie, Tibshirani & Friedman 2009 §7.10):
+**Rolling-window cross-validation** ([Chapter @sec-ife-mc], [Chapter @sec-gsynth]):
 
-* New `cv.rule` argument with three values: `"1se"` (default), `"min"`, or `"1pct"`. The 1-SE rule picks the smallest $r$ whose mean CV criterion sits within one fold-SE of the minimum-CV-error $r$. This biases selection toward parsimony in a fold-aware, statistically principled way --- when CV is precise (low fold-to-fold variance), the rule is permissive and allows larger $r$; when CV is noisy, it gravitates to simpler models.
-* The legacy 1% relative-tolerance heuristic remains available as `cv.rule = "1pct"` for byte-identical reproducibility of pre-2.3.0 fits.
-* Per-fold MSPE values are now retained alongside the pooled estimate so SEs across folds can be computed without changing the underlying CV machinery.
-* This is a default-flip: existing code that uses `CV = TRUE` will see different $r.cv$ values on the same data. Set `cv.rule = "1pct"` to recover the prior behavior.
+* New `cv.method = "rolling"` in the main `fect()` CV dispatcher (also exposed as standalone `r.cv.rolling()`) implements the standard time-series rolling-window CV design adapted to panel data. Recommended default for serially correlated panels; closes the AR-leakage channel that causes block CV to over-select `r` (often pegging at `r.max`). Supports `method` in {`"ife"`, `"gsynth"`, `"cfe"`, `"mc"`, `"both"`}. New parameters: `cv.buffer` (default 1, past-side buffer) and `cv.prop` (default raised to 0.2 from 0.1, fraction of eligible units sampled per fold). Empirical validation: on a Xu (2017) DGP with $r_{\text{true}} = 2$ and AR(1) $\rho = 0.8$ (K = 200 reps), rolling CV recovers truth in 56% vs block CV's 15% (mean `r.cv` = 1.58 vs 3.34).
 
-Bounded factor loadings for GSC (see [Chapter @sec-gsynth] for the objective and worked example):
+**1-SE rule is the new default for `r` selection** (Hastie/Tibshirani/Friedman 2009 §7.10):
 
-* New argument `loading.bound = "simplex"` (default `"none"`) constrains treated-unit factor loadings to the convex hull of control loadings via an entropy-regularized simplex projection. The imputed counterfactual $\hat{Y}_i(0) = F \hat\lambda_i$ lies pointwise in the convex hull of factor-implied control outcomes. Currently applies to `method = "ife"` (or `"gsynth"`) with `time.component.from = "nevertreated"`.
-* Companion arguments `gamma.loading` (regularization strength; default `NULL` triggers 5-fold cross-validation) and `gamma.loading.grid` (CV grid; default `10^seq(-2, 2, length.out = 9)`).
-* New diagnostic outputs under `loading.bound = "simplex"`: `wgt.implied` becomes the $N_{tr} \times N_{co}$ row-stochastic simplex-weight matrix; `gamma.loading` records the value used; `loading.proj.resid` is a per-treated-unit residual flagging units near or outside $\mathrm{conv}(\Lambda_{co})$.
-* Caveat: percentile-bootstrap intervals may under-cover when the simplex constraint binds (Andrews 1999, 2001 non-standard-limit regime). Boundary-corrected inference is deferred.
+* `cv.rule = "1se"` (default) picks the smallest `r` within one fold-SE of the minimum-CV-error `r`. Legacy `cv.rule = "1pct"` remains available for byte-identical reproducibility of pre-2.3.0 fits.
+* Default flip: existing `CV = TRUE` calls will produce different `r.cv` on the same data. Set `cv.rule = "1pct"` to recover prior behavior.
 
-New plot type:
+**Bounded factor loadings for GSC** (see [Chapter @sec-gsynth]):
 
-* `plot(..., type = "loading.overlap")` is a diagnostic for the bounded-loadings feature: factors 1 vs 2 with the convex hull of control loadings shaded ($r \geq 2$), or mirror histograms with a control-range band ($r = 1$). Treated units appear as red triangles in 2D; as a flipped histogram below the axis in 1D.
+* New `loading.bound = "simplex"` (default `"none"`) constrains treated-unit loadings to the convex hull of control loadings via an entropy-regularized simplex projection. Companion arguments: `gamma.loading` (regularization strength; `NULL` triggers 5-fold CV) and `gamma.loading.grid`. Diagnostic outputs: `wgt.implied` (row-stochastic simplex weights), `loading.proj.resid` (extrapolation flag per treated unit). Currently `method = "ife"`/`"gsynth"` with `time.component.from = "nevertreated"` only.
+* Caveat: percentile-bootstrap intervals may under-cover when the constraint binds; boundary-corrected inference is deferred.
+* Companion plot: `plot(..., type = "loading.overlap")` shows treated loadings vs the control convex hull ($r \geq 2$) or mirror histogram with control-range band ($r = 1$). See [Chapter @sec-loading-overlap].
+
+**Other changes**:
+
+* `cv.method` default flipped from `"all_units"` (or `"treated_units"` in `fect_nevertreated`) to `"rolling"` across all CV entry points. Existing block-CV behavior remains available via the new `cv.method = "block"` value (renamed from `"all_units"`); the legacy values `"all_units"` and `"treated_units"` are still accepted but emit a one-time deprecation message and will be removed in v2.4.0 (replaced by the unified `(cv.method, cv.units)` API).
+* GSC path now populates `Y.ct.full[, co]` from $F \hat\lambda_{co}$ at masked control positions (was `NA`); enables rolling CV scoring for `method = "gsynth"`. ATT/gap/est.avg unchanged.
+* `cv.prop` default raised from 0.1 to 0.2 across all CV entry points (`fect`, `fect_cv`, `fect_binary_cv`, `fect_nevertreated`, `fect_mspe`, `r.cv.rolling`); improves stability on small panels.
+* `r.cv.rolling()` extended to `method = "cfe"`. CFE-specific args (`Z`, `gamma`, `Q`, `Q.type`, `kappa`, extra index columns) are forwarded via `...` and held fixed; rolling CV varies only `r`.
+* `fect_mspe()` accepts `cv.method = "rolling"` for AR-leakage-resistant model comparison.
+* PSOCK worker `.libPaths()` propagation fix: `parallelly::makeClusterPSOCK(rscript_libs = .libPaths())` used wherever `future::plan(future::multisession, ...)` previously appeared. Resolves "no package called 'fect'" errors during Quarto book render and intermittent CRAN-check failures.
+* Phase A bootstrap (`R/boot.R::draw.error`) migrated from `foreach %dopar%` to `future.apply::future_lapply`; removes a stale `doFuture::registerDoFuture()` re-registration that caused an ~8× slowdown on variant (iii) parametric bootstraps in multi-fit sessions.
 
 ## v2.2.1
 
