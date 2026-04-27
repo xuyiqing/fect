@@ -699,13 +699,13 @@ plot.fect <- function(
                 df <- data.frame(x = 1, y = seq_along(lbls), lbl = lbls,
                                   col = cols, stringsAsFactors = FALSE)
               }
-              ggplot(df, aes(x = .data$x, y = -.data$y)) +
-                geom_text(aes(label = .data$lbl, colour = .data$lbl),
-                          show.legend = FALSE, hjust = 0.5, size = 3.4) +
+              ggplot2::ggplot(df, ggplot2::aes(x = .data$x, y = -.data$y)) +
+                ggplot2::geom_text(ggplot2::aes(label = .data$lbl, colour = .data$lbl),
+                                   show.legend = FALSE, hjust = 0.5, size = 3.4) +
                 ggplot2::scale_colour_manual(values = setNames(df$col, df$lbl)) +
                 ggplot2::scale_x_continuous(limits = c(0, 2), expand = c(0, 0)) +
                 ggplot2::scale_y_continuous(limits = c(-(nrow(df) + 1), 0), expand = c(0, 0)) +
-                theme_void()
+                ggplot2::theme_void()
             }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group, fill = .data$group),
@@ -4914,8 +4914,8 @@ plot.fect <- function(
       axis.text = element_text(size = cex.axis),
       plot.title = element_text(
         size = cex.main,
-        hjust = 0.5,
-        face = "bold",
+        hjust = if (use_modern_recipe) 0 else 0.5,
+        face = if (use_modern_recipe) "plain" else "bold",
       )
     )
 

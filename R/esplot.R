@@ -25,7 +25,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    highlight.shapes  = NULL,    # integer shape for each highlight time (17=triangle, 18=diamond, etc.)
                    lcolor = NULL,
                    lwidth = NULL,
-                   ltype = c("solid", "solid"),
+                   ltype = NULL,
                    connected = FALSE,    # if TRUE => line + ribbon
                    ci.outline = FALSE,
                    main      = NULL,
@@ -63,6 +63,11 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   ##  - classic   (theme.bw = TRUE,  legacy.style = TRUE):  pre-2.3.1 white-panel default
   ##  - gray      (theme.bw = FALSE):                       legacy gray-panel look
   use_modern_recipe <- isTRUE(theme.bw) && !isTRUE(legacy.style)
+
+  ## Default ltype: modern uses dashed vline at treatment onset; legacy uses solid.
+  if (is.null(ltype)) {
+    ltype <- if (use_modern_recipe) c("solid", "dashed") else c("solid", "solid")
+  }
 
   if (is.null(est.lwidth) || is.null(est.pointsize)) {
     default_est_lwidth <- .8
@@ -103,6 +108,8 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     data <- fect_att
   } else if (inherits(data, "did_wrapper")) {
     data <- data$est.att
+    if (is.null(Count) && "count" %in% names(data)) Count <- "count"
+    if (is.null(Count) && "count.on" %in% names(data)) Count <- "count.on"
   }
   data <- as.data.frame(data)
 
