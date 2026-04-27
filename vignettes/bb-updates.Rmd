@@ -1,5 +1,17 @@
 # Changelog {#sec-changelog .unnumbered}
 
+## v2.3.1
+
+(2026-04-26)
+
+**Modern visual defaults for `plot.fect()`**:
+
+* All 14 plot types under the default `theme.bw = TRUE` now render in a publication-ready aesthetic: white panel, `theme_bw(base_size = 11)`, no minor grid, no x-axis major grid, plain left-aligned title, thin grey reference lines, dashed treatment-onset vline at `x = 0.5`, smaller axis text (cex.main = 11, cex.lab = 9, cex.axis = 8), proportional top/bottom padding, and pre/post lightness contrast (grey50 / grey20). Placebo / carryover plots draw a peach (`#F5C8A8`) background rectangle behind the highlight period with orange (`#E07A2B`) points inside.
+* This is a **visual breaking change** for any user of the default. Pass `legacy.style = TRUE` for byte-identical pre-2.3.1 reproduction (works regardless of `theme.bw`).
+* `theme.bw = FALSE` is soft-deprecated --- emits a one-time message and is slated for removal in v2.5.0. Use `legacy.style = TRUE` (with `theme.bw = FALSE` if the gray-panel look is wanted) instead.
+* `loadings` (ggpairs) plot: correlation panel reformatted with overall + per-group entries; per-group label colors match the density-plot fills exactly.
+* Compact legends (smaller text, smaller keys, tighter top margin) so plots remain readable as subfigures in papers.
+
 ## v2.3.0
 
 (2026-04-25)

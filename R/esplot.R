@@ -36,6 +36,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    gridOff   = FALSE,
                    stats.pos = NULL,
                    theme.bw  = TRUE,
+                   legacy.style = FALSE,
                    cex.main  = NULL,
                    cex.axis  = NULL,
                    cex.lab   = NULL,
@@ -57,6 +58,12 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    post.label = "Post-treatment"
 )
 {
+  ## Three visual modes:
+  ##  - modern    (theme.bw = TRUE,  legacy.style = FALSE): 2.3.1 default
+  ##  - classic   (theme.bw = TRUE,  legacy.style = TRUE):  pre-2.3.1 white-panel default
+  ##  - gray      (theme.bw = FALSE):                       legacy gray-panel look
+  use_modern_recipe <- isTRUE(theme.bw) && !isTRUE(legacy.style)
+
   if (is.null(est.lwidth) || is.null(est.pointsize)) {
     default_est_lwidth <- .8
     default_est_pointsize <- 3
@@ -99,7 +106,10 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   }
   data <- as.data.frame(data)
 
-  ## Resolve pre/post colors
+  ## Resolve pre/post colors. Both modern and legacy keep a lightness contrast
+  ## (pre = "grey50", post = color) so pre-treatment and post-treatment points
+  ## are visually distinguishable. fect convention: with start0 = FALSE
+  ## (default), period 0 is the LAST pre-treatment period; first post is t=1.
   if (is.null(post.color)) post.color <- color
   if (is.null(pre.color))  pre.color  <- "gray50"
 
@@ -291,7 +301,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   if (!is.null(cex.main)) {
     if (!is.numeric(cex.main)) stop("\"cex.main\" must be numeric.")
   } else {
-    cex.main <- 16
+    cex.main <- if (use_modern_recipe) 11 else 16
   }
 
   if (!is.null(xlab) && !is.character(xlab)) stop("\"xlab\" is not a string.")
@@ -300,19 +310,19 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   if (!is.null(cex.lab)) {
     if (!is.numeric(cex.lab)) stop("\"cex.lab\" must be numeric.")
   } else {
-    cex.lab <- 15
+    cex.lab <- if (use_modern_recipe) 10 else 15
   }
 
   if (!is.null(cex.axis)) {
     if (!is.numeric(cex.axis)) stop("\"cex.axis\" must be numeric.")
   } else {
-    cex.axis <- 15
+    cex.axis <- if (use_modern_recipe) 9 else 15
   }
 
   if (!is.null(cex.text)) {
     if (!is.numeric(cex.text)) stop("\"cex.text\" must be numeric.")
   } else {
-    cex.text <- 5
+    cex.text <- if (use_modern_recipe) 3.0 else 5
   }
 
   # Stats
@@ -381,8 +391,10 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   }
 
   if (is.null(lcolor)) {
-    if (theme.bw) {
-      lcolor <- "#AAAAAA70"
+    if (use_modern_recipe) {
+      lcolor <- "grey75"
+    } else if (isTRUE(theme.bw)) {
+      lcolor <- "#AAAAAA70"  # pre-2.3.1 default for theme.bw=TRUE (classic mode)
     } else {
       lcolor <- "white" # This might be invisible on a white background if not theme_bw
     }
@@ -394,8 +406,10 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     stop("\"lcolor\" must be a numeric vector of length 1 or 2.")
   }
   if (is.null(lwidth)) {
-    if (theme.bw) {
-      lwidth <- 1.5
+    if (use_modern_recipe) {
+      lwidth <- 0.4
+    } else if (isTRUE(theme.bw)) {
+      lwidth <- 1.5  # pre-2.3.1 default for theme.bw=TRUE (classic mode)
     } else {
       lwidth <- 2
     }
@@ -598,7 +612,10 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     range_val <- y_max_data - y_min_data
     if (!is.finite(range_val) || range_val == 0) range_val <- 1
 
-    top_expand_factor <- 0
+    ## Modern recipe: small top padding so the highest CI doesn't graze the panel
+    ## ceiling, larger top padding when stats annotation is drawn at top-left.
+    ## Legacy: keep zero top padding (preserve the pre-2.3.1 layout).
+    top_expand_factor <- if (use_modern_recipe) 0.08 else 0
     bot_expand_factor <- 0
 
     p_label_text_for_ylim_calc <- function(stats_vals, labs_vals) {
@@ -611,13 +628,19 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     }
     if (!is.null(stats)) {
       num_stat_lines <- ceiling(length(unlist(strsplit(p_label_text_for_ylim_calc(stats, stats.labs), "\n"))))
-      # top_expand_factor <- top_expand_factor # No change, already 0
+      ## Reserve room for the stats annotation block at the top
+      if (use_modern_recipe) {
+        top_expand_factor <- top_expand_factor + 0.06 * num_stat_lines
+      }
     }
     if (show.count && !is.null(Count) && Count %in% names(plot_data)) {
       idx_valid_count_plot_data <- !is.na(plot_data[[Count]]) & plot_data[[Count]] > 0
       if (any(idx_valid_count_plot_data)) {
         bot_expand_factor <- bot_expand_factor + 0.35
       }
+    } else if (use_modern_recipe) {
+      ## No count bars => still reserve a small bottom margin for breathing room
+      bot_expand_factor <- bot_expand_factor + 0.06
     }
 
     final_ylim <- c(
@@ -634,14 +657,35 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   p <- ggplot(data = plot_data)
 
 
-  if (theme.bw) {
-    p <- p + theme_bw()
+  if (use_modern_recipe) {
+    p <- p + .modern_theme(base_size = 11)
+  } else if (isTRUE(theme.bw)) {
+    p <- p + ggplot2::theme_bw()
   }
   if (gridOff) {
     p <- p + theme(
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank()
     )
+  }
+
+  ## Modern: peach (or auto-lightened) rectangle behind highlight periods.
+  ## Drawn before data layers so points/lines paint on top.
+  if (use_modern_recipe && !is.null(highlight.periods) && length(highlight.periods) > 0) {
+    hl_n <- length(highlight.periods)
+    hl_pt_colors <- if (!is.null(highlight.colors) && length(highlight.colors) == hl_n) {
+      highlight.colors
+    } else {
+      rep(.MODERN_PLACEBO_PT, hl_n)
+    }
+    for (i in seq_len(hl_n)) {
+      hl_fill_i <- .lighten_color(hl_pt_colors[i], amount = 0.70)
+      p <- p + annotate("rect",
+                        xmin = as.numeric(highlight.periods[i]) - 0.5,
+                        xmax = as.numeric(highlight.periods[i]) + 0.5,
+                        ymin = -Inf, ymax = Inf,
+                        fill = hl_fill_i, alpha = 0.55)
+    }
   }
 
   p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
@@ -849,8 +893,14 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     }
   }
 
-  # Build shape legend when highlight shapes differ from base circle
-  if (!is.null(highlight.shapes) && any(highlight.shapes != 19) && !legendOff) {
+  # Build shape legend when highlight shapes differ from base circle.
+  # Modern theme suppresses this legend when the highlight rect is drawn ---
+  # the peach/blue background + colored points self-document, and the
+  # pre/post legend entries are misleading (both render in grey20).
+  modern_suppresses_legend <- use_modern_recipe &&
+    !is.null(highlight.periods) && length(highlight.periods) > 0
+  if (!is.null(highlight.shapes) && any(highlight.shapes != 19) &&
+      !legendOff && !modern_suppresses_legend) {
     unique_shapes <- unique(highlight.shapes[highlight.shapes != 19])
 
     # Standard shape label map
@@ -930,13 +980,17 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
             plot.margin = margin(5, 5, 15, 5))
   }
 
+  ## Title styling: modern recipe is plain + left-aligned; legacy is bold + centered.
+  modern_title_face  <- if (use_modern_recipe) "plain" else "bold"
+  modern_title_hjust <- if (use_modern_recipe) 0     else 0.5
+
   p <- p +
     xlab(xlab) + ylab(ylab) +
     theme(
       axis.title  = element_text(size = cex.lab),
       axis.text   = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(angle = angle, vjust = x.v, hjust = x.h),
-      plot.title  = element_text(size = cex.main, hjust = 0.5, face = "bold")
+      plot.title  = element_text(size = cex.main, hjust = modern_title_hjust, face = modern_title_face)
     )
 
 
@@ -1044,7 +1098,11 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       current_y_range <- y_max_for_stats - y_min_for_stats
       if (!is.finite(current_y_range) || current_y_range <= 1e-9) current_y_range <- 1
 
-      padding_x_factor <- 0.02
+      ## Modern: smaller x-padding so the visible left gap matches the top gap.
+      ## (coord_cartesian adds a 0.2-unit expand on x; the ATT plot is wider
+      ## than tall, so 2% of the x-range looks larger as a pixel gap than
+      ## 2% of the y-range. Compensate by halving the x-padding factor.)
+      padding_x_factor <- if (use_modern_recipe) 0.005 else 0.02
       padding_y_factor <- 0.02
 
       actual_stats_pos <- c(

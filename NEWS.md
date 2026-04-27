@@ -1,4 +1,69 @@
-# fect 2.3.0 (development)
+# fect 2.3.1 (development)
+
+## Modern visual defaults for `plot.fect()`
+
+This is a **visual breaking change** for users of the default `theme.bw = TRUE`
+(every figure looks different on rerun). See *Reproducing pre-2.3.1 figures*
+below for the migration path.
+
+* Default visual overhaul of `plot.fect()` across all 14 plot types under the
+  default `theme.bw = TRUE`. Recipe: white panel background with
+  `theme_bw(base_size = 11)`, no minor grid, no x-axis major grid, plain
+  left-aligned title (`face = "plain"`, `hjust = 0`), thin grey reference
+  lines (`grey75`, `linewidth = 0.4`), dashed treatment-onset vline at
+  `x = 0.5`, smaller publication-sized axis text (`cex.main = 11`,
+  `cex.lab = 9`, `cex.axis = 8`, `cex.text = 3.0`), and proportional top /
+  bottom padding so estimates do not graze the panel edges. Pre-treatment
+  errorbars / lines render in `grey50`, post-treatment in `grey20`; both
+  honour explicit `pre.color` / `post.color` overrides.
+* Placebo / carryover plots now draw a peach (`#F5C8A8`) background rectangle
+  behind the highlight period, with orange (`#E07A2B`) points inside; carryover
+  periods get a complementary blue (`#2B6CB0`). The rectangle fill is
+  auto-derived as a lightened version of the highlight color, so user-supplied
+  `placebo.color` / `carryover.color` still work.
+* The pre/post + highlight legend is suppressed by default in modern plots
+  when the highlight rectangle is drawn --- the rectangle and accent-color
+  points self-document. Pass `legendOff = FALSE` to re-enable.
+* Legends shrink in vertical footprint (smaller text, smaller keys, tighter
+  margin against the panel) so they do not dominate when plots are placed as
+  subfigures in papers.
+* `loadings` (ggpairs) plot: correlation panel reformatted with overall +
+  per-group entries, where per-group label colors match the density-plot
+  fills exactly. Drops significance stars for a cleaner look.
+
+## Reproducing pre-2.3.1 figures
+
+* New argument `legacy.style = FALSE`. Set `legacy.style = TRUE` to reproduce
+  pre-2.3.1 visual defaults regardless of `theme.bw`:
+    * `legacy.style = TRUE` + `theme.bw = TRUE` (or unset): pre-2.3.1
+      white-panel default (bold centered title, larger axis sizes, solid
+      vline, blue placebo triangles, no peach rectangle).
+    * `legacy.style = TRUE` + `theme.bw = FALSE`: pre-2.3.1 gray-panel look.
+* Use `legacy.style = TRUE` on a per-call basis if you have figures embedded
+  in a paper under review, slides, or a vignette and need byte-identical
+  rendering until you can re-render with the modern defaults.
+
+## `theme.bw = FALSE` is soft-deprecated
+
+* Setting `theme.bw = FALSE` now emits a one-time message per session:
+  `theme.bw = FALSE` is slated for removal in v2.5.0. The gray-panel look it
+  produces was always a less-polished alternative to the white-panel default;
+  modern data-visualization conventions have moved decisively toward a white
+  panel + minimal grid. Users who explicitly want the gray-panel look can:
+    1. apply `+ ggplot2::theme_gray()` to the returned plot themselves, or
+    2. pass `legacy.style = TRUE` (which honors `theme.bw = FALSE` and
+       reproduces the pre-2.3.1 gray-panel look exactly).
+* Internally, `theme.bw = FALSE` continues to work for one minor-version
+  cycle (2.3.x and 2.4.x). It will be removed in v2.5.0.
+
+## Other plot defaults
+
+* No new package dependencies.
+* `show.count = TRUE` remains the default --- count bars at the bottom of
+  the gap / equiv / exit / placebo plots are essential for interpreting how
+  the treated sample varies by event time.
+
+# fect 2.3.0
 
 ## Rolling-window cross-validation (standard ML design)
 
