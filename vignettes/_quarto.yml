@@ -35,6 +35,14 @@ format:
     code-tools: true
     code-link: true
     toc-depth: 3
+    # Default rendered figure dimensions for HTML output. Tuned so that the
+    # PNG width at retina dpi is close to the cosmo theme's content-column
+    # width (~700-800 px), minimizing browser downscaling that would shrink
+    # axis / title / stats text below the readable threshold. Per-chunk
+    # `fig.width` / `fig.height` overrides still win.
+    fig-width: 5.5
+    fig-height: 4
+    fig-format: svg
 
 knitr:
   opts_chunk:

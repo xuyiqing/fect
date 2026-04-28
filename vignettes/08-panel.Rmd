@@ -224,11 +224,24 @@ As a result, there is no need to shift the period index, as it already aligns wi
 
 ```{r hh_twfeplot3, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
 twfe.output <- as.data.frame(twfe.est$coeftable)
-twfe.output$Time <- c(c(-18:-2),c(0:17)) 
+twfe.output$Time <- c(c(-18:-2),c(0:17))
 p.twfe <- esplot(twfe.output, Period = 'Time',
-                 Estimate = 'Estimate', SE = 'Std. Error', 
+                 Estimate = 'Estimate', SE = 'Std. Error',
                  xlim = c(-12,10),start0 = TRUE)
 p.twfe
+```
+
+#### Connected event-study plot
+
+By default `esplot()` draws each period as a discrete point-range. Pass `connected = TRUE` to render the dynamic effects as a line with a confidence ribbon, which is often easier to read when periods are dense or when the trajectory itself is the main message. Pre-treatment is drawn as a long-dashed line (gray); post-treatment as a solid line (the accent color); a short dashed bridge segment links the two at the treatment-onset boundary. Set `show.points = FALSE` to suppress the integer-period markers entirely if you only want the line + ribbon.
+
+```{r hh_twfeplot_connected, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE}
+p.twfe.connected <- esplot(twfe.output, Period = 'Time',
+                           Estimate = 'Estimate', SE = 'Std. Error',
+                           xlim = c(-12, 10), start0 = TRUE,
+                           connected = TRUE,
+                           main = "TWFE event study (connected)")
+p.twfe.connected
 ```
 
 ### Stacked DID

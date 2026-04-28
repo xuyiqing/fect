@@ -184,12 +184,6 @@ a <- plot(out) # by default, type = "gap"
 print(a)
 ```
 
-Setting `theme.bw = FALSE` sets the plotting style to the default *ggplot2* theme.
-
-```{r sim_gap1a, fig.height=5, fig.width=7}
-plot(out, theme.bw = FALSE) 
-```
-
 By switching on `connected`, the confidence interval of the ATT estimates will be represented by a shaded area.
 
 ```{r sim-gap-connected, fig.height=5, fig.width=7}
@@ -317,13 +311,12 @@ panelview(turnout ~ policy_edr, data = turnout,
           by.timing = TRUE) 
 ```
 
-**panelView** can visualize the outcome variable by group, using colored lines to represent changes in treatment status.
+**panelView** can visualize the outcome variable using colored lines to represent changes in treatment status.
 
 ```{r turnout-panelview-outcome, cache = FALSE, warning =FALSE, fig.height=5, fig.width=7}
 panelview(turnout ~ policy_edr, data = turnout,
           index = c("abb","year"), type = "outcome", 
-          main = "EDR Reform and Turnout", 
-          by.group = TRUE)
+          main = "EDR Reform and Turnout")
 ```
 
 ### Estimation w/o factors
@@ -368,7 +361,7 @@ sort(out_turnout$wgt.implied[,8])
 Like we have demonstrated with the multiperiod DID analysis, we also use the gap (default) plot to visualize the ATT.
 
 ```{r turnout_gap, fig.height=5, fig.width=7}
-plot(out_turnout, xlim = c(-10, 5), ylim=c(-15, 10))
+plot(out_turnout, xlim = c(-10, 5), ylim=c(-10, 10))
 ```
 
 For staggered DID, a status plot can be generated after estimation. Here, we use `xlab`, `ylab`, and `main` to modify the axis labels and the graph title, respectively. Additionally, `xangle` and `yangle` can tilt the numeric labels to improve readability. Note that the values provided for these options specify the degree of tilt.
@@ -393,7 +386,7 @@ plot(out_turnout, type = "counterfactual", id = "WI", main = "Wisconsin")
 
 As we have seen in the last example, due to the small number of treated units, the box plot reduces to a scatter plot.
 
-```{r turnout_box, fig.height=4, fig.width=8}
+```{r turnout_box, fig.height=5, fig.width=7}
 plot(out_turnout, type = "box", 
      xticklabels=c("-20", "-15", "-10", "-5","0","5","10"))
 ```
