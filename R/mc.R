@@ -34,7 +34,8 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
                     group.level = NULL,
                     group = NULL,
                     time.on.seq.group = NULL,
-                    time.off.seq.group = NULL) {
+                    time.off.seq.group = NULL,
+                    W.in.fit = TRUE) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -65,7 +66,9 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
-    if (is.null(W)) {
+    if (is.null(W) || !W.in.fit) {
+        ## When W.in.fit = FALSE (W.agg supplied alone), the outcome model
+        ## is fit unweighted; W is still used at the aggregation step below.
         W.use <- as.matrix(0)
     } else {
         W.use <- W

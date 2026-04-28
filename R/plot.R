@@ -330,12 +330,15 @@ plot.fect <- function(
     }
   }
 
-  if (is.null(weight)) {
-    if (!is.null(x$W)) {
-      weight <- TRUE
-    } else {
-      weight <- FALSE
-    }
+  if (!is.null(weight)) {
+    warning(
+      "The `weight` argument to plot.fect() is deprecated as of fect 2.3.1 ",
+      "and will be removed in v2.5.0. When the fit was constructed with ",
+      "non-NULL `W`, all reported quantities (per-period ATT, aggregate ATT, ",
+      "CIs, p-values) are now sample-weighted (W-weighted) by default. ",
+      "Refit with `W = NULL` if you want the unweighted view.",
+      call. = FALSE
+    )
   }
 
   if (is.null(lwidth) == TRUE) {
@@ -1229,26 +1232,11 @@ plot.fect <- function(
     use.balance <- TRUE
   }
 
-  use.weight <- FALSE
-  if (!is.null(x$W) & weight == TRUE) {
-    x$att <- x$att.on.W
-    x$time <- x$time.on.W
-    x$count <- x$count.on.W
-    x$att.avg <- x$att.avg.W
-    x$est.att <- x$est.att.W
-    x$att.bound <- x$att.W.bound
-    x$att.boot <- x$att.W.boot
-    x$est.placebo <- x$est.placebo.W
-
-    x$att.off <- x$att.off.W
-    x$time.off <- x$time.off.W
-    x$count.off <- x$count.off.W
-    x$att.off.bound <- x$att.off.W.bound
-    x$est.att.off <- x$est.att.off.W
-    x$est.carryover <- x$est.carryover.W
-
-    use.weight <- TRUE
-  }
+  ## As of fect 2.3.1, when W is supplied at fit time, all canonical slots
+  ## (att, time, count, att.avg, est.att, est.avg, att.boot, att.bound,
+  ## est.placebo, est.carryover, and off variants) already carry W-weighted
+  ## values. No swap needed here.
+  use.weight <- !is.null(x$W)
 
 
   if (!is.null(x$est.att)) { # have uncertainty estimation

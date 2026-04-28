@@ -121,7 +121,9 @@ fect_boot <- function(
   time.component.from = "notyettreated",
   loading.bound = "none",
   gamma.loading = NULL,
-  gamma.loading.grid = NULL
+  gamma.loading.grid = NULL,
+  W.in.fit = TRUE,
+  W.in.agg = TRUE
 ) {
   do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
   na.pos <- NULL
@@ -185,6 +187,7 @@ fect_boot <- function(
         X = X,
         D = D,
         W = W,
+        W.in.fit = W.in.fit,
         I = I,
         II = II,
         T.on = T.on,
@@ -217,6 +220,7 @@ fect_boot <- function(
         X = X,
         D = D,
         W = W,
+        W.in.fit = W.in.fit,
         I = I,
         II = II,
         cm = cm,
@@ -249,6 +253,7 @@ fect_boot <- function(
           X = X,
           D = D,
           W = W,
+          W.in.fit = W.in.fit,
           I = I,
           II = II,
           T.on = T.on,
@@ -282,6 +287,7 @@ fect_boot <- function(
           X = X,
           D = D,
           W = W,
+          W.in.fit = W.in.fit,
           I = I,
           II = II,
           T.on = T.on,
@@ -326,6 +332,7 @@ fect_boot <- function(
           X = X,
           D = D,
           W = W,
+          W.in.fit = W.in.fit,
           X.extra.FE = X.extra.FE,
           X.Z = X.Z,
           X.Q = X.Q,
@@ -375,6 +382,7 @@ fect_boot <- function(
         X = X,
         D = D,
         W = W,
+        W.in.fit = W.in.fit,
         I = I,
         II = II,
         T.on = T.on,
@@ -684,6 +692,7 @@ fect_boot <- function(
           X = X,
           D = D,
           W = W,
+          W.in.fit = W.in.fit,
           I = I,
           II = II,
           cm = cm,
@@ -1277,6 +1286,7 @@ fect_boot <- function(
               X = X.boot,
               D = D.boot,
               W = W.boot,
+              W.in.fit = W.in.fit,
               I = I.boot,
               II = II[, boot.id],
               T.on = T.on[, boot.id],
@@ -1320,6 +1330,7 @@ fect_boot <- function(
               X = X.boot,
               D = D.boot,
               W = W.boot,
+              W.in.fit = W.in.fit,
               I = I.boot,
               II = II[, boot.id],
               cm = cm,
@@ -1363,6 +1374,7 @@ fect_boot <- function(
               X = X.boot,
               D = D[, boot.id],
               W = W.boot,
+              W.in.fit = W.in.fit,
               I = I[, boot.id],
               II = II[, boot.id],
               T.on = T.on[, boot.id],
@@ -1408,6 +1420,7 @@ fect_boot <- function(
               X = X.boot,
               D = D.boot,
               W = W.boot,
+              W.in.fit = W.in.fit,
               X.extra.FE = X.extra.FE.boot,
               X.Z = X.Z.boot,
               X.Q = X.Q.boot,
@@ -3057,6 +3070,23 @@ fect_boot <- function(
       colnames(att.W.bound) <- c("CI.lower", "CI.upper")
       rownames(att.W.bound) <- time.on.W
 
+      est.att90.W <- cbind(
+        att.on.W,
+        att.on.W.j$se,
+        att.W.bound,
+        att.on.W.j$P,
+        count.on.W
+      )
+      colnames(est.att90.W) <- c(
+        "ATT",
+        "S.E.",
+        "CI.lower",
+        "CI.upper",
+        "p.value",
+        "count"
+      )
+      rownames(est.att90.W) <- time.on.W
+
       if (!is.null(placebo.period) & placeboTest == TRUE) {
         att.placebo.W.j <- jackknifed(
           att.placebo.W,
@@ -3840,6 +3870,23 @@ fect_boot <- function(
       colnames(att.W.bound) <- c("CI.lower", "CI.upper")
       rownames(att.W.bound) <- time.on.W
 
+      est.att90.W <- cbind(
+        att.on.W,
+        se.att.W,
+        att.W.bound,
+        pvalue.att.W,
+        count.on.W
+      )
+      colnames(est.att90.W) <- c(
+        "ATT",
+        "S.E.",
+        "CI.lower",
+        "CI.upper",
+        "p.value",
+        "count"
+      )
+      rownames(est.att90.W) <- time.on.W
+
       if (!is.null(placebo.period) & placeboTest == TRUE) {
         # att.placebo.W.boot
         se.placebo.W <- sd(att.placebo.W.boot, na.rm = TRUE)
@@ -4532,6 +4579,21 @@ fect_boot <- function(
   }
 
   ## storage
+  ## When W is supplied AND aggregation should reflect those weights
+  ## (W or W.agg supplied), route the W-weighted aggregations into the
+  ## canonical slot names. When only W.est is supplied (W in fit only),
+  ## the canonical aggregation stays unweighted. The fect.default() tail
+  ## does the same role-gated routing for the per-method on/off/avg
+  ## vectors.
+  if (!is.null(W) && isTRUE(W.in.agg)) {
+    est.avg      <- est.avg.W
+    att.bound    <- att.W.bound
+    att.avg.boot <- att.avg.W.boot
+    est.att      <- est.att.W
+    est.att90    <- est.att90.W
+    att.boot     <- att.on.W.boot
+    vcov.att     <- vcov.att.W
+  }
   result <- list(
     est.avg = est.avg,
     att.bound = att.bound,
@@ -4568,6 +4630,12 @@ fect_boot <- function(
     }
   }
   if (hasRevs == 1) {
+    if (!is.null(W) && isTRUE(W.in.agg)) {
+      est.att.off  <- est.att.off.W
+      att.off.boot <- att.off.W.boot
+      vcov.att.off <- vcov.att.off.W
+      att.off.bound <- att.off.W.bound
+    }
     result <- c(
       result,
       list(
@@ -4608,34 +4676,11 @@ fect_boot <- function(
       )
     }
   }
-  if (!is.null(W)) {
-    # att.avg.W.boot
-    result <- c(result, list(est.avg.W = est.avg.W))
-    result <- c(result, list(est.att.W = est.att.W))
-    result <- c(result, list(att.W.bound = att.W.bound))
-    result <- c(
-      result,
-      list(att.W.boot = att.on.W.boot, att.W.vcov = vcov.att.W)
-    )
-    if (!is.null(placebo.period) & placeboTest == TRUE) {
-      result <- c(result, list(est.placebo.W = est.placebo.W))
-    }
-    if (hasRevs == 1) {
-      result <- c(
-        result,
-        list(
-          est.att.off.W = est.att.off.W,
-          att.off.W.bound = att.off.W.bound,
-          att.off.W.vcov = vcov.att.off.W
-        )
-      )
-      if (!is.null(carryover.period) & carryoverTest == TRUE) {
-        result <- c(result, list(est.carryover.W = est.carryover.W))
-      }
-    }
-  }
-
   if (!is.null(placebo.period) & placeboTest == TRUE) {
+    if (!is.null(W) && isTRUE(W.in.agg)) {
+      est.placebo       <- est.placebo.W
+      att.placebo.boot  <- att.placebo.W.boot
+    }
     result <- c(
       result,
       list(est.placebo = est.placebo, att.placebo.boot = att.placebo.boot)
@@ -4643,6 +4688,10 @@ fect_boot <- function(
   }
 
   if (!is.null(carryover.period) & carryoverTest == TRUE) {
+    if (!is.null(W) && isTRUE(W.in.agg)) {
+      est.carryover       <- est.carryover.W
+      att.carryover.boot  <- att.carryover.W.boot
+    }
     result <- c(
       result,
       list(

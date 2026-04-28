@@ -5,7 +5,8 @@
 \description{Implements counterfactual estimators in TSCS data analysis and statistical tools to test their identification
 assumptions.}
 \usage{fect(formula = NULL, data, Y, D, X = NULL,
-            W = NULL, group = NULL,
+            W = NULL, W.est = NULL, W.agg = NULL,
+            group = NULL,
             na.rm = FALSE,
             index, force = "two-way",
             time.component.from = "notyettreated", em = TRUE,
@@ -41,7 +42,16 @@ assumptions.}
 \item{Y}{the outcome indicator.}
 \item{D}{the treatment indicator. The treatment should be binary (0 and 1).}
 \item{X}{time-varying covariates. Covariates that have perfect collinearity with specified fixed effects are dropped automatically.}
-\item{W}{the weight indicator. If specified, the program will fit the data with a weighted outcome model and calculate weighted average and dynamic treatment effect.}
+\item{W}{a string giving the column name of a weight variable. Convenience default that populates both \code{W.est} and \code{W.agg} when those are left \code{NULL}. Suitable for survey or sample weights, where the same column applies to both the outcome-model fit and the across-treated-obs aggregation.}
+
+\item{W.est}{a string giving the column name of a weight variable that enters the outcome-model fit (the weighted least squares applied inside the IFE / MC / CFE solver). When \code{NULL}, falls back to \code{W}. Use this (with \code{W.agg = NULL}) when the weight reflects fit-side considerations and the estimand is the unweighted average ATT across treated cells.}
+
+\item{W.agg}{a string giving the column name of a weight variable that enters the across-treated-obs aggregation (\code{att.on}, \code{est.avg}, \code{est.att}). When \code{NULL}, falls back to \code{W}. Use this (with \code{W.est = NULL}) when the user's estimand differs from "ATT for the treated units in the analysis sample" --- common cases include calibration weights to a target population or post-stratification weights that should adjust the summary but not the model fit.
+
+A clean in-package solution for inverse-probability weights for confounding adjustment is under development for fect 3.0 (a cross-fit doubly-robust path); \code{W.agg} is not a substitute for that work and does not deliver the doubly-robust properties an IPW user expects.
+
+In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the same column; truly distinct columns for fit vs. aggregation (e.g. combined survey x IPW designs) are scheduled for v2.4.0.}
+
 \item{group}{the group indicator. If specified, the group-wise ATT will be estimated.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
 \item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Every observation should be uniquely defined by the pair of the unit and time indicator.}
