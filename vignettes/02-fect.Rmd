@@ -66,8 +66,7 @@ The key parameters that control the **model** are: `method` (estimator choice), 
 We can use the `plot` function to visualize the estimation results. By default, it produces a "gap" plot --- `plot(out.fect, type = "gap")` --- which shows the estimated period-wise ATT (dynamic treatment effects). The true population average effects in `sim_base` go from 1 to 3 from the 1st to the 10th post-treatment period.
 
 ```{r fect_plot_nose, fig.width = 6, fig.height = 4.5}
-plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
-  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y")
 ```
 
 In the gap plot, pre-treatment estimates appear in gray (in-sample) while post-treatment estimates appear in black (out-of-sample). This visual distinction highlights that pre-treatment "effects" should be near zero if the model is well-specified, while post-treatment effects are the quantities of interest. When `loo = TRUE` is used in the plot call, all points appear in black because both pre- and post-treatment estimates are out-of-sample. The uncertainty estimates are unavailable in the plot above because, by default, `se = FALSE` to save computational power. See [Chapter @sec-plots] for more visualization options.
@@ -157,14 +156,14 @@ The `plot()` function can visualize the estimated period-wise ATTs as well as th
 
 ```{r fect_plot_nse, fig.width = 6, fig.height = 4.5}
 plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
-  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")
+  stats = "F.p")
 ```
 
 ### Exiting the treatment
 
 **fect** allows the treatment to switch back and forth and provides diagnostic tools for this setting. After the estimation, we can visualize the period-wise ATTs relative to the `exit` of treatments by setting `type = "exit"`. The x-axis is then realigned based on the timing of the treatment's exit, not onset, e.g., 1 represents 1 period after the treatment ends. In the exit plot, the color convention is reversed: pre-exit estimates appear in black (out-of-sample) and post-exit estimates appear in gray (in-sample).
 
-```{r exit_fect, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+```{r exit_fect, eval = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.fect, type = "exit", main = "Exit Plot (FEct)")
 ```
 
@@ -202,12 +201,21 @@ Once we have point estimates and uncertainty estimates, we conduct diagnostic ch
 
 We provide a placebo test for a settled model by setting `placeboTest = TRUE`. We specify a range of pretreatment periods as "placebo periods" in option `placebo.period` to remove observations in the specified range for model fitting, and then test whether the estimated ATT in this range is significantly different from zero. Below, we set `c(-2, 0)` as the placebo periods.
 
-```{r fect_placebo, eval=TRUE, cache=TRUE, message=FALSE, results='hide', fig.width=6, fig.height=4.5}
+```{r fect_placebo_fit, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.fect.placebo <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   force = "two-way", method = "fe",
   se = TRUE, nboots = 1000, parallel = TRUE, cores = 16,
   placeboTest = TRUE, placebo.period = c(-2, 0))
-plot(out.fect.placebo, cex.text = 0.8)
+```
+
+```{r fect_placebo_plot, eval=TRUE, fig.width=6, fig.height=4.5}
+plot(out.fect.placebo)
+```
+
+By default the placebo periods render as orange triangles on a plain panel. Pass `highlight.fill = TRUE` to add a lightened-tone background rectangle behind the placebo window --- useful for slide / talk figures where the rectangle helps a remote audience locate the window. Pass `highlight = FALSE` to suppress the highlight entirely and render every period as a plain pre/post circle.
+
+```{r fect_placebo_plot_fill, eval=TRUE, fig.width=6, fig.height=4.5}
+plot(out.fect.placebo, highlight.fill = TRUE)
 ```
 
 For more detail on placebo tests, including IFE and MC examples, see [Chapter @sec-ife-mc].
@@ -225,8 +233,28 @@ out.fect.carry <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   carryoverTest = TRUE, carryover.period = c(1, 3))
 ```
 
-```{r fect_carryover_plot, eval=TRUE, cache=TRUE, warning=FALSE, fig.width=6, fig.height=5}
-plot(out.fect.carry, type = "exit", cex.text = 0.8, main = "Carryover Effects (FEct)")
+```{r fect_carryover_plot, eval=TRUE, warning=FALSE, fig.width=6, fig.height=5}
+plot(out.fect.carry, type = "exit", main = "Carryover Effects (FEct)")
+```
+
+By default, the three carryover-test periods render as blue diamonds on a plain panel. The same `highlight` / `highlight.fill` controls used in the placebo plot apply here.
+
+To draw a lightened-tone background rectangle behind the carryover window (useful for slide / talk figures where the rectangle helps locate the window), set `highlight.fill = TRUE`:
+
+```{r fect_carryover_plot_fill, eval=TRUE, warning=FALSE, fig.width=6, fig.height=5}
+plot(out.fect.carry, type = "exit",
+     highlight.fill = TRUE,
+     main = "Carryover Effects (FEct), with rectangle")
+```
+
+When the fit has multiple test types active at once (e.g., both `carryoverTest = TRUE` and a non-zero `carryover.rm`), the accent treatment can be restricted to one of them via `highlight = "carryover"` or `highlight = "carryover.rm"`. The unselected type then renders as plain pre/post circles. See [Chapter @sec-ife-mc] for a worked `carryover.rm` example, and [Chapter @sec-plots] for the full table of highlight patterns.
+
+To suppress the highlight entirely (every period rendered as a plain pre/post circle), pass `highlight = FALSE`:
+
+```{r fect_carryover_plot_off, eval=TRUE, warning=FALSE, fig.width=6, fig.height=5}
+plot(out.fect.carry, type = "exit",
+     highlight = FALSE,
+     main = "Carryover Effects (FEct), no highlight")
 ```
 
 For more detail on carryover tests with IFE and MC, see [Chapter @sec-ife-mc].
@@ -252,8 +280,7 @@ out.fect.loo <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
 The event study plot utilizing leave-one-out for pretreatment estimates is shown below. This graph is fairly similar to the graphics we presented earlier without using leave-one-out. However, this is not always true.
 
 ```{r plot-gap-loo, fig.width = 6, fig.height = 4.5}
-plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO",
-  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO")
 ```
 
 ------------------------------------------------------------------------
@@ -277,7 +304,7 @@ cumu.out <- effect(out)
 
 Print and plot cumulative effects
 
-```{r cumu_effect_plot, cache = TRUE}
+```{r cumu_effect_plot}
 print(cumu.out)
 plot(cumu.out)
 ```
@@ -296,21 +323,27 @@ effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
 
 `effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
 
-```{r effect-mc, cache = TRUE}
+```{r effect-mc-fit, cache = TRUE}
 out_mc <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 1000, vartype = 'bootstrap',
                         parallel = TRUE, cores = 16, keep.sims=TRUE)
+```
+
+```{r effect-mc}
 plot(effect(out_mc))
 ```
 
 We can also use jackknife instead of bootstrap for inference:
 
-```{r effect-jackknife, cache = TRUE}
+```{r effect-jackknife-fit, cache = TRUE}
 out_jack <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
                         se = TRUE, nboots = 1000, vartype = 'jackknife',
                         parallel = TRUE, cores = 16, keep.sims=TRUE)
+```
+
+```{r effect-jackknife}
 plot(effect(out_jack))
 ```
 
@@ -318,7 +351,7 @@ plot(effect(out_jack))
 
 ## Other estimands
 
-After obtaining the individual treatment effects using one of the counterfactual estimators, we can weight these estimates using a constructed balanced treated sample or other user-supplied weighting schemes.
+Beyond the standard ATT, **fect** supports several estimand variants: the **balanced treated sample** ATT (estimated only on treated units with complete data in a specified window), the **average cohort treatment effect** (estimated separately for each cohort of treatment adoption), and **user-supplied weighted ATTs** (where a user-provided weight column is applied to the across-treated-obs aggregation).
 
 ### Balanced treated sample
 
@@ -378,14 +411,14 @@ out.fe.g <- fect(Y ~ D + X1 + X2, data = sim_base.cohort, index = c("id","time")
 
 Then one can draw the gap plot for each sub-group. Here we present the gap plot for Cohort 22.
 
-```{r cohort_plot1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+```{r cohort_plot1, eval = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.fe.g, show.group = "Cohort:22",
           xlim = c(-15, 10), ylim = c(-10, 10))
 ```
 
 ### User-supplied weights
 
-The package offers the option `W` to calculate the weighted average treatment effects. The weighting variable does not affect the estimation of fixed effects or factors. Only the weighted average treatment effects or weighted dynamic treatment effects are obtained by aggregating the treatment effects using the weight `W`.
+Passing a weight column via `W` produces a weighted ATT. When `W` is supplied, every reported quantity on the returned fit object reflects those weights: `print(fit)`, `plot(fit)`, `fit$est.att`, `fit$est.avg`, and the bootstrap surfaces all carry the same W-weighted aggregation.
 
 ```{r simdata_w, eval=TRUE, cache = TRUE}
 sim_base$Weight <- abs(rnorm(n = dim(sim_base)[1]))
@@ -394,12 +427,11 @@ out.w <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   CV = FALSE, r = 2, se = TRUE, nboots = 1000, parallel = TRUE, cores = 16)
 ```
 
-We can then visualize the weighted dynamic treatment effects using the inbuilt function `plot`, it by default shows the weighted dynamic treatment effects.
-
 ```{r plot-weighted-att, fig.width = 6, fig.height = 4.5}
 plot(out.w, main = "Estimated Weighted ATT")
 ```
 
+For finer control --- separating the weight that enters the outcome-model fit (`W.est`) from the weight that enters the aggregation (`W.agg`) --- and for important caveats when the weight is an inverse-probability weight, see [Chapter @sec-ife-mc] §Weights.
 
 ## Additional notes
 

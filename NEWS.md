@@ -1,4 +1,53 @@
-# fect 2.3.1 (development)
+<!-- markdownlint-disable MD025 -->
+# fect 2.3.2 (development)
+
+## Modern visual defaults for `plot.fect()` (visual breaking change)
+
+* Default visual overhaul across all 14 plot types under
+  `theme.bw = TRUE`: white panel, plain left-aligned title, thin grey
+  reference lines, dashed treatment-onset vline, pre/post lightness
+  contrast (`grey50` / `grey20`), publication-sized axis text
+  (`cex.main = 11`, `cex.lab = 9`, `cex.axis = 8`, `cex.text = 3.0`),
+  and compact legends.
+* Placebo / carryover plots render highlighted periods as a single
+  accent glyph (orange triangle for placebo, blue diamond for
+  carryover, orange triangle for `carryover.rm`) instead of a stacked
+  pair of circle + accent. Background rectangle behind each highlight
+  period is opt-in via `highlight.fill = TRUE` --- default is glyph
+  only, which keeps figures clean for print and grayscale.
+* `highlight` argument extended to accept a character subset of
+  `c("placebo", "carryover", "carryover.rm")` for selective
+  per-test-type highlighting (e.g., `highlight = "placebo"` to
+  render carryover periods as plain circles when both tests ran at
+  fit time). Backward-compatible: `NULL` / `TRUE` / `FALSE` still
+  behave as before.
+* Stats annotation block (placebo / carryover / F / equivalence
+  p-values) sits at the top-left panel corner with symmetric 2.5%
+  inset and `2 × num_stat_lines` top padding so it never grazes the
+  leftmost CI. Sized at `cex.text * 1.0` so it does not overpower
+  the title. User-supplied `stats.pos` still wins.
+* `loadings` (ggpairs) plot: correlation panel reformatted with
+  overall + per-group entries; per-group label colors match the
+  density-plot fills.
+* Migrated off ggplot2 4.0's deprecated `fatten` / `lwd` arguments
+  to the `size` / `linewidth` aesthetics. Clears the per-plot
+  deprecation warnings.
+
+## `legacy.style = TRUE` escape hatch
+
+New `legacy.style` argument (default `FALSE`). Pass
+`legacy.style = TRUE` for byte-identical reproduction of pre-2.3.1
+figures (bold centered title, larger axis sizes, solid vline, blue
+placebo triangles, no peach rectangle), regardless of `theme.bw`.
+
+## `theme.bw = FALSE` soft-deprecated
+
+Setting `theme.bw = FALSE` now emits a one-time per-session message
+flagging removal in v2.5.0. Users who want the gray-panel look
+should pass `legacy.style = TRUE` (which honors `theme.bw = FALSE`
+exactly), or apply `+ ggplot2::theme_gray()` to the returned plot.
+
+# fect 2.3.1
 
 ## New: `W.est` and `W.agg` arguments distinguish survey weights from IPW / balancing weights
 
@@ -84,7 +133,7 @@ The C++ matrix-completion / IFE / CFE solvers (`inter_fe_mc`,
 weighted-least-squares weight in 2.3.0; this release does not change the
 fit, only the result-object surface.
 
-# fect 2.3.0 (development)
+# fect 2.3.0
 
 ## Rolling-window cross-validation (standard ML design)
 

@@ -267,15 +267,17 @@ The placebo test conducts two types of tests:
 
 By default, the plot will display the p-value of the $t$-test (`stats = "placebo.p"`). Users can also add the p-value of a corresponding TOST test by setting `stats = c("placebo.p","equiv.p")`. A larger placebo p-value from a t-test and a smaller placebo TOST p-value are preferred.
 
-```{r placebo_ife_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+```{r placebo_ife_plot, eval = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.ife.p, ylab = "Effect of D on Y", main = "Estimated ATT (IFE)",
-     cex.text = 0.8, stats = c("placebo.p","equiv.p"))
+     stats = c("placebo.p","equiv.p"))
 ```
 
-```{r placebo_mc_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
-plot(out.mc.p, cex.text = 0.8, stats = c("placebo.p","equiv.p"),
+```{r placebo_mc_plot, eval = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
+plot(out.mc.p, stats = c("placebo.p","equiv.p"),
      main = "Estimated ATT (MC)")
 ```
+
+The placebo periods render as orange triangles on a plain panel. Pass `highlight.fill = TRUE` to add a lightened-tone background rectangle behind the placebo window (useful for slide / talk figures) or `highlight = FALSE` to suppress the accent entirely.
 
 The results in the placebo test confirm that IFEct is a better model than MC for this particular DGP.
 
@@ -310,14 +312,14 @@ Below, we visualize the result of the joint pre-trend test for each of the two e
 In-sample pre-trend estimates can be misleadingly close to zero because the model is fitted to these same observations. LOO provides genuine out-of-sample estimates, giving a more honest assessment of whether the parallel trends assumption holds.
 :::
 
-```{r pretrend_ife, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5, warning = FALSE}
+```{r pretrend_ife, eval = TRUE, fig.width = 6, fig.height = 4.5, warning = FALSE}
 plot(out.ife.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
-     cex.legend = 0.6, main = "Testing Pre-Trend (IFEct)", cex.text = 0.8)
+     main = "Testing Pre-Trend (IFEct)")
 ```
 
-```{r pretrend_mc, eval = TRUE, cache = TRUE, fig.width = 6, fig.height = 4.5, warning = FALSE}
+```{r pretrend_mc, eval = TRUE, fig.width = 6, fig.height = 4.5, warning = FALSE}
 plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
-     cex.legend = 0.6, main = "Testing Pre-Trend (MC)", cex.text = 0.8)
+     main = "Testing Pre-Trend (MC)")
 ```
 
 From the above plots, we see that IFEct passes both tests using a conventional test size (5%); and MC fails the F tests, but passes the TOST (equivalence) test. Hence, we may conclude that IFEct is a more suitable model.
@@ -342,30 +344,59 @@ out.mc.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
 
 Like the placebo test, the plot will display the p-value of the carryover effect test (`stats = "carryover.p"`). Users can also add the p-value of a corresponding TOST test by setting `stats = c("carryover.p","equiv.p")`. In exit plots, pre-exit estimates are shown in black (out-of-sample) and post-exit estimates in gray (in-sample).
 
-```{r carryover_ife_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 5}
-plot(out.ife.c, type = "exit", ylim = c(-2.5,4.5),
-          cex.text = 0.8, main = "Carryover Effects (IFE)")
+```{r carryover_ife_plot, eval = TRUE, warning = FALSE, fig.width = 6, fig.height = 5}
+plot(out.ife.c, type = "exit", main = "Carryover Effects (IFE)")
 ```
 
-```{r carryover_mc_plot, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 5}
+```{r carryover_mc_plot, eval = TRUE, warning = FALSE, fig.width = 6, fig.height = 5}
 plot(out.mc.c, type = "exit", ylim = c(-2.5,4.5),
-          cex.text = 0.8, main = "Carryover Effects (MC)")
+          main = "Carryover Effects (MC)")
 ```
+
+Carryover periods render as blue diamonds. As with the placebo plot, pass `highlight.fill = TRUE` to add a background rectangle. When several test types are active on the same fit (placebo + carryover, or carryover + `carryover.rm`), `highlight = "carryover"` (a character subset of `c("placebo", "carryover", "carryover.rm")`) restricts the accent treatment to a single type --- the others render as plain pre/post circles.
 
 Once again, the IFE estimator outperforms the other two.
 
 Using real-world data, researchers will likely find that carryover effects exist. If such effects are limited, researchers can consider removing a few periods after the treatment ended for the treated units from the first-stage estimation (using the `carryover.period` option) and re-estimated the model (and re-conduct the test). We provide such an example in the paper. Here, we illustrate the option using `simdata`.
 
-```{r carryover_rm, eval = TRUE, cache = TRUE, message = FALSE, results='hide', fig.width = 6, fig.height = 4.5}
+```{r carryover_rm_fit, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
 out.ife.rm.test <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife", r = 2, CV = 0,
   parallel = TRUE, cores = 16, se = TRUE,  carryover.rm = 3,
   nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))# remove three periods
-
-plot(out.ife.rm.test, cex.text = 0.8, stats.pos = c(5, 2.5))
 ```
 
-In the above plot, the three periods in blue are dropped from the first-stage estimation of the factor model while the periods in red are reserved for the (no) carryover effects test.
+```{r carryover_rm, eval = TRUE, fig.width = 6, fig.height = 4.5}
+plot(out.ife.rm.test)
+```
+
+This fit has **two** test-type periods active at once:
+
+* the three `carryover.rm` periods that were *removed* from the first-stage factor-model estimation, rendered as orange **triangles**, and
+* the three `carryover.period` periods that were *kept* and used to test for residual carryover, rendered as blue **diamonds**.
+
+The shape distinction (triangle vs diamond) holds across modern and legacy recipes, so it survives grayscale printing.
+
+When you only need to draw attention to one of the two types, pass `highlight = "carryover"` or `highlight = "carryover.rm"`; the unselected type then renders as a plain pre/post circle:
+
+```{r carryover_rm_only_test, eval = TRUE, fig.width = 6, fig.height = 4.5}
+plot(out.ife.rm.test, highlight = "carryover",
+     main = "Highlight only the carryover-test periods (blue diamonds)")
+```
+
+```{r carryover_rm_only_removed, eval = TRUE, fig.width = 6, fig.height = 4.5}
+plot(out.ife.rm.test, highlight = "carryover.rm",
+     main = "Highlight only the removed periods (orange triangles)")
+```
+
+To add the lightened-tone background rectangle behind every highlight period (slide / talk style), pass `highlight.fill = TRUE`:
+
+```{r carryover_rm_fill, eval = TRUE, fig.width = 6, fig.height = 4.5}
+plot(out.ife.rm.test, highlight.fill = TRUE,
+     main = "Both test types highlighted, with rectangles")
+```
+
+See [Chapter @sec-plots] for the full table of `highlight` / `highlight.fill` patterns.
 
 ### Summary
 
@@ -390,7 +421,7 @@ In the above plot, the three periods in blue are dropped from the first-stage es
 
 ## Weights
 
-`fect()` accepts a weight column via `W`. As of v2.3.1, two additional arguments, `W.est` and `W.agg`, let the user separately control whether the weight enters the outcome-model fit and whether it enters the across-treated-obs aggregation. Both default to `NULL` and fall back to `W` when unset, so single-column callers see no change in behavior.
+`fect()` accepts a weight column via `W`, plus two finer-grained arguments, `W.est` and `W.agg`, that separately control whether the weight enters the outcome-model fit and whether it enters the across-treated-obs aggregation. `W.est` and `W.agg` default to `NULL` and fall back to `W` when unset, so single-column callers see the simple W-weighted behavior. For a worked example, see [Chapter @sec-fect] §User-supplied weights.
 
 * **Survey or sample weights.** Pass `W = "ws"`. The same column applies to both the model fit and the aggregation. This is the standard treatment when the weight reflects the sampling design.
 * **Weight only in the outcome-model fit.** Pass `W.est = "wr"` alone. The weight enters the IFE / MC / CFE solver but the across-treated-obs aggregation gives each treated cell weight 1. Use this when the weight reflects fit-side considerations (e.g., a precision weight specific to the outcome model) and the estimand is the unweighted average ATT across treated cells.

@@ -186,6 +186,51 @@ plot(out,
      main = "Text and Theme Customization")
 ```
 
+### Title style {#sec-title-style}
+
+`plot.fect()` returns a `ggplot` object, so the title's *style* (alignment, weight, font face) is best customized by composing a `ggplot2::theme()` onto the returned plot rather than via a dedicated argument. The modern v2.3.1 default is **plain, left-aligned** (`hjust = 0`, `face = "plain"`); to recover the pre-2.3.1 **bold, centered** look, override `plot.title`:
+
+```{r title-bold-centered}
+plot(out, main = "Bold Centered Title") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+```
+
+Common variations:
+
+- **Centered, plain** (most journals): `theme(plot.title = element_text(hjust = 0.5))`
+- **Bold, left-aligned** (modern emphasis): `theme(plot.title = element_text(face = "bold"))`
+- **Italic, left-aligned**: `theme(plot.title = element_text(face = "italic"))`
+- **Larger title** (without `cex.main`): `theme(plot.title = element_text(size = 16))`
+- **Custom font family**: `theme(plot.title = element_text(family = "serif"))`
+
+`element_text()` arguments compose, so multiple tweaks combine in a single call:
+
+```{r title-multi}
+plot(out, main = "Centered, Bold, Larger") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+```
+
+The same pattern works for axis labels (`axis.title.x`, `axis.title.y`), tick text (`axis.text`), and legend text (`legend.text`); see `?ggplot2::theme` for the full list.
+
+### Reproducing pre-2.3.1 figures {#sec-legacy-style}
+
+If you have figures embedded in a paper under review, slides, or an existing manuscript and need them to look exactly the way they did before fect 2.3.1, pass `legacy.style = TRUE`:
+
+```{r legacy-style-default}
+plot(out, legacy.style = TRUE)
+```
+
+`legacy.style = TRUE` is a single-argument escape hatch that restores the **entire** pre-2.3.1 visual recipe in one call: bold centered title, larger axis text (cex.main = 16, cex.lab / cex.axis = 15), solid treatment-onset vline (no dashed), gray-50 pre-treatment / black post-treatment colors, blue placebo triangles (no peach highlight rectangle), and the classic ggplot2 `theme_bw()` panel with grid. It does not require touching `theme.bw`, individual `cex.*`, or any color argument --- and it works regardless of how `theme.bw` is set:
+
+* `legacy.style = TRUE` + `theme.bw = TRUE` (or unset) reproduces the pre-2.3.1 white-panel default.
+* `legacy.style = TRUE` + `theme.bw = FALSE` reproduces the pre-2.3.1 gray-panel `theme_gray()` look.
+
+Use this for byte-identical regeneration of submitted-version figures, not for new work --- the modern recipe (the v2.3.1 default) is recommended for any figure you are rendering for the first time.
+
+::: {.callout-note appearance="simple"}
+`theme.bw = FALSE` (the pre-2.3.1 gray-panel look without `legacy.style`) is soft-deprecated and will be removed in v2.5.0. If you need that aesthetic, use `legacy.style = TRUE` + `theme.bw = FALSE`, which is preserved indefinitely.
+:::
+
 ### Reference lines
 
 The `lcolor`, `lwidth`, and `ltype` parameters control the horizontal (zero) and vertical (treatment onset) reference lines. Each accepts a vector of length two; if a single value is given, it applies to both lines.
@@ -267,13 +312,15 @@ We provide two tests that shed light on the parallel trends assumption: the plac
 
 A placebo test artificially assigns treatment during pre-treatment periods and estimates the "placebo effect" in those periods. The model must be re-estimated with `placeboTest = TRUE`.
 
-```{r placebo, cache = TRUE}
+```{r placebo_fit, cache = TRUE}
 out_fe_placebo <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020,
                        index = c("district_final", "cycle"), force = "two-way",
                        method = "fe", CV = FALSE, parallel = TRUE, cores = 16,
                        se = TRUE, nboots = 1000, placeboTest = TRUE,
                        placebo.period = c(-2, 0))
+```
 
+```{r placebo}
 plot(out_fe_placebo)
 ```
 
@@ -290,6 +337,29 @@ The color of the placebo period markers can be changed with the `placebo.color` 
 
 ```{r plot-placebo-color}
 plot(out_fe_placebo, placebo.color = "green4")
+```
+
+#### Highlighting controls {#sec-highlight-controls}
+
+Two arguments compose to control how test periods are visually distinguished:
+
+- `highlight` selects **which test types** receive the accent treatment. Accepts:
+  - `NULL` (default): every test type that ran at fit time --- placebo, carryover, and `carryover.rm` cells.
+  - `TRUE` / `FALSE`: explicit on / off.
+  - A character subset of `c("placebo", "carryover", "carryover.rm")`: e.g. `highlight = "placebo"` restricts the accent to placebo periods on a fit that has both `placeboTest = TRUE` and `carryoverTest = TRUE`; carryover periods then render as plain post-treatment circles.
+- `highlight.fill` controls whether the **background rectangle** is drawn behind highlighted periods (in a lightened tone of the period's accent color). Default is `FALSE` --- the colored glyph alone signals "this period is in a test window," and the glyph-only look survives grayscale printing. Set `TRUE` for slide / talk figures where the rectangle helps a remote audience locate the window.
+
+| Goal | Call |
+|------|------|
+| Default --- highlight every detected test type, no rectangle | `plot(fit)` |
+| Add the background rectangle | `plot(fit, highlight.fill = TRUE)` |
+| Only placebo periods, no rectangle | `plot(fit, highlight = "placebo")` |
+| Only carryover periods, with rectangle | `plot(fit, highlight = "carryover", highlight.fill = TRUE)` |
+| No highlighting at all (every period plain) | `plot(fit, highlight = FALSE)` |
+
+```{r plot-placebo-fill}
+plot(out_fe_placebo, highlight.fill = TRUE,
+     main = "Placebo test with background rectangle")
 ```
 
 ### Joint pre-trend test
@@ -343,12 +413,15 @@ plot(out_fe_placebo, type = "exit")
 
 The carryover test examines whether the treatment effect persists after treatment ends. By setting `carryoverTest = TRUE` and specifying `carryover.period`, we designate post-exit periods as a "placebo" window.
 
-```{r carryover, cache = TRUE}
+```{r carryover_fit, cache = TRUE}
 out_fe_carryover <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020,
                        index = c("district_final", "cycle"), force = "two-way",
                          parallel = TRUE, cores = 16, se = TRUE, CV = FALSE,
                          nboots = 1000, carryoverTest = TRUE,
                          carryover.period = c(1, 3))
+```
+
+```{r carryover}
 plot(out_fe_carryover)
 ```
 
@@ -521,10 +594,13 @@ For $r > 2$ the plot still shows only factors 1 and 2; the hull and overlap meas
 
 For $r = 1$, the same diagnostic is rendered as a **mirror histogram**: treated counts above the axis, control counts flipped below, with a vertical band marking the range of control loadings. The 1D analog of "outside the hull" is "outside the band."
 
-```{r plot-loading-overlap-r1, fig.width = 6, fig.height = 5, cache = TRUE, message = FALSE, warning = FALSE}
+```{r loading-overlap-r1-fit, cache = TRUE, message = FALSE, warning = FALSE}
 out_ife_r1 <- fect(nat_rate_ord ~ indirect, data = hh2019,
                    index = c("bfs", "year"), method = "ife", r = 1,
                    se = TRUE, parallel = TRUE, cores = 16, nboots = 500)
+```
+
+```{r plot-loading-overlap-r1, fig.width = 6, fig.height = 5, message = FALSE, warning = FALSE}
 plot(out_ife_r1, type = "loading.overlap")
 ```
 
@@ -548,8 +624,7 @@ The `esplot()` function creates event study plots directly from a data frame or 
 
 ```{r esplot-basic, fig.width = 6, fig.height = 4.5}
 # Create example data from a fect result
-es_data <- data.frame(
-  Time = as.numeric(rownames(out$est.att)),
+es_data <- data.frame(Time = as.numeric(rownames(out$est.att)),
   ATT = out$est.att[, "ATT"],
   CI.lower = out$est.att[, "CI.lower"],
   CI.upper = out$est.att[, "CI.upper"]
@@ -584,7 +659,9 @@ esplot(es_data, Period = "Time",
 
 ### Highlighting periods
 
-The `highlight.periods` argument highlights specific time periods, which is useful for drawing attention to placebo or treatment windows:
+The `highlight.periods` argument highlights specific time periods, which is useful for drawing attention to placebo or treatment windows. `highlight.colors` is paired element-wise with `highlight.periods` --- the i-th color is applied to the i-th period. Multiple periods can share a color, in which case they appear in the same hue but are still listed separately so each gets its own background rectangle.
+
+In the example below, three periods are highlighted with two distinct colors: periods -2 and -1 in orange, and period 0 in red. Each highlighted point sits on a lighter-shade rectangle of the same hue (auto-derived from `highlight.colors`).
 
 ```{r esplot-highlight, fig.width = 6, fig.height = 4.5}
 esplot(es_data, Period = "Time",

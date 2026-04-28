@@ -1,5 +1,18 @@
 # Changelog {#sec-changelog .unnumbered}
 
+## v2.3.2
+
+(2026-04-28)
+
+**Modern visual defaults for `plot.fect()`** (visual breaking change):
+
+* All 14 plot types now render with a publication-ready recipe: white panel, plain left-aligned title, dashed treatment-onset vline, peach highlight rectangle behind placebo / carryover periods, pre/post lightness contrast, and compact legends.
+* Pass `legacy.style = TRUE` for byte-identical pre-2.3.1 reproduction. `theme.bw = FALSE` is soft-deprecated (removal in v2.5.0).
+* Placebo and carryover periods now render as a single accent glyph (orange triangle / blue diamond) per period, sized so the glyph reads as the same visual weight as the surrounding circles. Background rectangle behind each highlight period is opt-in via `highlight.fill = TRUE`; default is glyph only, which keeps figures clean for print and grayscale.
+* `highlight` argument now also accepts a character subset of `c("placebo", "carryover", "carryover.rm")` for per-test-type selective highlighting (e.g., `highlight = "placebo"` on a fit with both tests renders carryover periods as plain circles).
+* Stats-annotation block (placebo / carryover / F / equivalence p-values) sits at the top-left panel corner with symmetric inset and enough top padding to never graze the leftmost CI. Sized so it does not overpower the title.
+* Internal: migrated off the ggplot2 4.0 deprecated `fatten` / `lwd` arguments to the `size` / `linewidth` aesthetics.
+
 ## v2.3.1
 
 (2026-04-27)

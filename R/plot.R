@@ -11,7 +11,8 @@ plot.fect <- function(
     type = NULL, # gap, equiv, status, exit, factors, loadings, calendar, counterfactual, heterogeneous
     restrict = "rm",
     loo = FALSE,
-    highlight = NULL, ## for carryover test and placebo test
+    highlight = NULL, ## TRUE / FALSE / NULL (auto) / character subset of c("placebo", "carryover", "carryover.rm")
+    highlight.fill = FALSE, ## TRUE: draw a lightened background rectangle behind each highlighted period; default FALSE keeps the glyph-only minimal look.
     plot.ci = NULL, ## "0.9", "0.95", "none"
     show.points = TRUE,
     loess.fit = TRUE,
@@ -117,6 +118,14 @@ plot.fect <- function(
     pretreatment = FALSE,
     num.pretreatment = 3,
     cm = FALSE,
+    legacy.style = FALSE,
+    ## When TRUE, reproduces the pre-2.3.1 visual recipe (bold centered title,
+    ## larger axis sizes, solid pre-treatment vline, stronger pre/post color
+    ## split, no peach placebo rectangle) regardless of theme.bw. Combine with
+    ## theme.bw = TRUE for the pre-2.3.1 default (white panel) or
+    ## theme.bw = FALSE for the pre-2.3.1 gray-panel look. Use this for
+    ## byte-identical reproduction of figures rendered with fect <= 2.3.0;
+    ## remove once you have re-rendered with the modern defaults.
     ...) {
 
   rbind_fill_fect_plot <- function(...) {
@@ -178,17 +187,47 @@ plot.fect <- function(
     if (is.logical(count) && missing(show.count)) show.count <- count
   }
   use_loess <- isTRUE(loess.fit)
+  ## Three visual modes:
+  ##  - modern    (theme.bw = TRUE,  legacy.style = FALSE): 2.3.1 default
+  ##  - classic   (theme.bw = TRUE,  legacy.style = TRUE):  pre-2.3.1 white-panel default
+  ##  - gray      (theme.bw = FALSE):                       legacy gray-panel look (soft-deprecated)
+  use_modern_recipe <- isTRUE(theme.bw) && !isTRUE(legacy.style)
+
+  ## Soft-deprecate theme.bw = FALSE: emit once per session. The gray-panel
+  ## look is preserved for now but slated for removal in v2.5.0.
+  if (!isTRUE(theme.bw) && !isTRUE(getOption("fect.theme.bw.deprecated.notified", FALSE))) {
+    message("Note: `theme.bw = FALSE` is soft-deprecated. The modern style ",
+            "is now the default; pass `legacy.style = TRUE` for byte-",
+            "identical pre-2.3.1 reproduction. `theme.bw` is slated for ",
+            "removal in v2.5.0.")
+    options(fect.theme.bw.deprecated.notified = TRUE)
+  }
   if (is.null(preset)) {
     if (is.null(connected)) connected <- FALSE
-    if (is.null(ltype)) ltype <- c("solid", "solid")
     if (is.null(gridOff)) gridOff <- FALSE
-    if (is.null(color)) color <- "black"
     if (is.null(count.color)) count.color <- "gray70"
     if (is.null(count.alpha)) count.alpha <- 0.4
     if (is.null(count.outline.color)) count.outline.color <- "gray69"
-    if (is.null(placebo.color)) placebo.color <- "blue"
-    if (is.null(carryover.color)) carryover.color <- "red"
-    if (is.null(carryover.rm.color)) carryover.rm.color <- "blue"
+
+    ## Modern (use_modern_recipe = TRUE) vs legacy defaults.
+    ## legacy.style = TRUE forces legacy values even with theme.bw = TRUE.
+    if (use_modern_recipe) {
+      if (is.null(ltype)) ltype <- c("solid", "dashed")
+      if (is.null(color)) color <- "grey20"
+      if (is.null(placebo.color)) placebo.color <- "#E07A2B"
+      if (is.null(carryover.color)) carryover.color <- "#2B6CB0"
+      if (is.null(carryover.rm.color)) carryover.rm.color <- "#E07A2B"
+    } else {
+      if (is.null(ltype)) ltype <- c("solid", "solid")
+      if (is.null(color)) color <- "black"
+      if (is.null(placebo.color)) placebo.color <- "blue"
+      if (is.null(carryover.color)) carryover.color <- "red"
+      if (is.null(carryover.rm.color)) carryover.rm.color <- "blue"
+    }
+    if (is.null(pre.color) && !use_modern_recipe && isTRUE(theme.bw)) {
+      ## Classic mode (theme.bw=TRUE + legacy.style=TRUE): explicit gray50 pre-color
+      pre.color <- "gray50"
+    }
     if (is.null(sens.original.color)) sens.original.color <- "darkblue"
     if (is.null(sens.colors)) sens.colors <- c("#218C23", "#FF34B4", "#FF521B", "#2B59C3")
 
@@ -343,8 +382,10 @@ plot.fect <- function(
 
   if (is.null(lwidth) == TRUE) {
     lwidth <- 2
-    if (theme.bw == TRUE) {
-      lwidth <- 1.5
+    if (use_modern_recipe) {
+      lwidth <- 0.4
+    } else if (isTRUE(theme.bw)) {
+      lwidth <- 1.5  # pre-2.3.1 default for theme.bw=TRUE
     }
   }
   if (length(as.vector(lwidth)) == 1) {
@@ -368,8 +409,10 @@ plot.fect <- function(
   ## y=0 line type
   if (is.null(lcolor) == TRUE) {
     lcolor <- "white"
-    if (theme.bw == TRUE) {
-      lcolor <- "#AAAAAA70"
+    if (use_modern_recipe) {
+      lcolor <- "grey75"
+    } else if (isTRUE(theme.bw)) {
+      lcolor <- "#AAAAAA70"  # pre-2.3.1 default for theme.bw=TRUE
     }
   }
   if (length(as.vector(lcolor)) == 1) {
@@ -501,7 +544,8 @@ plot.fect <- function(
         labs(title = main,
              subtitle = "Blue shaded: convex hull of control loadings; red triangles: treated units",
              x = xlab, y = ylab)
-      if (isTRUE(theme.bw)) p <- p + theme_bw()
+      if (isTRUE(theme.bw)) p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
+
     } else {
       ## r == 1: mirror histogram (treated up, control down) with control range band
       co_vec   <- as.numeric(L_co[, 1L])
@@ -538,7 +582,8 @@ plot.fect <- function(
         labs(title = main,
              subtitle = "Blue band: range of control loadings; treated above, controls below",
              x = xlab, y = ylab)
-      if (isTRUE(theme.bw)) p <- p + theme_bw()
+      if (isTRUE(theme.bw)) p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
+
     }
 
     if (isTRUE(return.data)) {
@@ -631,15 +676,59 @@ plot.fect <- function(
                 geom_point(..., alpha = 0.4, size = 1.2) +
                 scale_color_manual(values = loadings_colors)
             }
+            ## Custom correlation panel: show overall + per-group correlations
+            ## with text colors matching the density-plot fills exactly.
+            ## (ggally_cor's default per-group palette is salmon/cyan and ignores
+            ## scale_color_manual, so we render the panel by hand.)
+            my_cor <- function(data, mapping, ...) {
+              x_var <- rlang::as_name(mapping$x)
+              y_var <- rlang::as_name(mapping$y)
+              xv <- data[[x_var]]
+              yv <- data[[y_var]]
+              gv <- if ("group" %in% names(data)) data$group else NULL
+              overall_r <- suppressWarnings(stats::cor(xv, yv, use = "pairwise.complete.obs"))
+              if (is.null(gv)) {
+                lbl <- sprintf("r = %.3f", overall_r)
+                df <- data.frame(x = 1, y = 1, lbl = lbl, col = "black")
+              } else {
+                lvls <- levels(factor(gv))
+                per_r <- vapply(lvls, function(lv) {
+                  ix <- gv == lv
+                  if (sum(ix, na.rm = TRUE) < 3) return(NA_real_)
+                  suppressWarnings(stats::cor(xv[ix], yv[ix], use = "pairwise.complete.obs"))
+                }, numeric(1))
+                lbls <- c(sprintf("Overall: %.3f", overall_r),
+                          sprintf("%s: %.3f", lvls, per_r))
+                cols <- c("grey20", unname(loadings_colors[lvls]))
+                df <- data.frame(x = 1, y = seq_along(lbls), lbl = lbls,
+                                  col = cols, stringsAsFactors = FALSE)
+              }
+              ggplot2::ggplot(df, ggplot2::aes(x = .data$x, y = -.data$y)) +
+                ggplot2::geom_text(ggplot2::aes(label = .data$lbl, colour = .data$lbl),
+                                   show.legend = FALSE, hjust = 0.5, size = 3.4) +
+                ggplot2::scale_colour_manual(values = setNames(df$col, df$lbl)) +
+                ggplot2::scale_x_continuous(limits = c(0, 2), expand = c(0, 0)) +
+                ggplot2::scale_y_continuous(limits = c(-(nrow(df) + 1), 0), expand = c(0, 0)) +
+                ggplot2::theme_void()
+            }
             p <- GGally::ggpairs(data,
               mapping = aes(color = .data$group, fill = .data$group),
               columns = 1:nfactors,
               columnLabels = Llabel[1:nfactors],
               diag = list(continuous = my_dens),
               lower = list(continuous = my_scatter),
+              upper = list(continuous = my_cor),
               title = main
-            ) +
-              theme(plot.title = element_text(hjust = 0.5))
+            )
+            ## Apply modern theme across all panels (ggpairs is a ggmatrix;
+            ## `+ theme()` propagates to every panel). Legacy keeps the default
+            ## ggpairs gray-panel look.
+            if (use_modern_recipe) {
+              p <- p + .modern_theme(11) +
+                theme(plot.title = element_text(size = cex.main, face = "plain", hjust = 0))
+            } else {
+              p <- p + theme(plot.title = element_text(hjust = 0.5))
+            }
           } else if (x$Ntr > 1) {
             my_dens <- function(data, mapping, ...) {
               ggplot(data = data, mapping = mapping) +
@@ -658,6 +747,10 @@ plot.fect <- function(
               lower = list(continuous = my_scatter),
               title = main
             )
+            if (use_modern_recipe) {
+              p <- p + .modern_theme(11) +
+                theme(plot.title = element_text(size = cex.main, face = "plain", hjust = 0))
+            }
           } else {
             my_dens <- function(data, mapping, ...) {
               ggplot(data = data, mapping = mapping) +
@@ -670,6 +763,10 @@ plot.fect <- function(
               diag = list(continuous = my_dens),
               title = main
             )
+            if (use_modern_recipe) {
+              p <- p + .modern_theme(11) +
+                theme(plot.title = element_text(size = cex.main, face = "plain", hjust = 0))
+            }
           }
         }
         # suppressWarnings(print(p))
@@ -763,7 +860,7 @@ plot.fect <- function(
         ## theme
         p <- ggplot(data)
         if (theme.bw == TRUE) {
-          p <- p + theme_bw()
+          p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
         }
         if (gridOff == TRUE) {
           p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
@@ -774,9 +871,9 @@ plot.fect <- function(
             legend.position = legend.pos,
             axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
             plot.title = element_text(
-              size = 20,
-              hjust = 0.5,
-              face = "bold",
+              size = if (use_modern_recipe) cex.main else 20,
+              hjust = if (use_modern_recipe) 0 else 0.5,
+              face = if (use_modern_recipe) "plain" else "bold",
               margin = margin(10, 0, 10, 0)
             )
           )
@@ -888,13 +985,43 @@ plot.fect <- function(
   #     plot.ci <- "both"
   # }
 
-  if (is.null(highlight)) {
-    if (placeboTest | carryoverTest) {
-      highlight <- TRUE
-    } else {
-      highlight <- FALSE
+  ## Resolve `highlight`: NULL / TRUE / FALSE / character subset of
+  ## c("placebo", "carryover", "carryover.rm"). The character form selects
+  ## which test types receive the colored-glyph (and optional rectangle)
+  ## treatment; other test periods render as plain circles.
+  ## carryover.rm has no dedicated slot on the fit object; recover the
+  ## value the user passed via fit$call.
+  has_rm_cells <- tryCatch({
+    arg <- as.list(x$call)$carryover.rm
+    if (is.null(arg)) FALSE else {
+      val <- suppressWarnings(as.integer(eval(arg)))
+      length(val) == 1L && !is.na(val) && val > 0
     }
+  }, error = function(e) FALSE)
+
+  highlight.types <- character(0)
+  if (is.null(highlight)) {
+    ## auto: highlight every test type that ran at fit time
+    if (placeboTest)    highlight.types <- c(highlight.types, "placebo")
+    if (carryoverTest)  highlight.types <- c(highlight.types, "carryover")
+    if (has_rm_cells)   highlight.types <- c(highlight.types, "carryover.rm")
+    highlight <- length(highlight.types) > 0
+  } else if (is.character(highlight)) {
+    valid_types <- c("placebo", "carryover", "carryover.rm", "none")
+    bad <- setdiff(highlight, valid_types)
+    if (length(bad) > 0) {
+      stop("`highlight` must be NULL, TRUE, FALSE, or a character subset of ",
+           paste(sQuote(valid_types[-length(valid_types)]), collapse = ", "),
+           ". Got: ", paste(sQuote(bad), collapse = ", "), ".")
+    }
+    highlight.types <- setdiff(highlight, "none")
+    highlight <- length(highlight.types) > 0
+  } else if (isTRUE(highlight)) {
+    if (placeboTest)    highlight.types <- c(highlight.types, "placebo")
+    if (carryoverTest)  highlight.types <- c(highlight.types, "carryover")
+    if (has_rm_cells)   highlight.types <- c(highlight.types, "carryover.rm")
   }
+  ## isFALSE(highlight): highlight.types stays character(0); nothing highlighted.
 
   if (is.null(bound) == FALSE) {
     if (!bound %in% c("none", "min", "equiv", "both")) {
@@ -1109,59 +1236,67 @@ plot.fect <- function(
   }
 
   #### font size
+  ## Defaults differ by recipe: modern (theme.bw + !legacy.style) is
+  ## publication-sized; legacy / classic preserve the larger pre-2.3.1 sizes.
+  .cex_main_default    <- if (use_modern_recipe) 11 else 16
+  .cex_lab_default     <- if (use_modern_recipe) 9  else 15
+  .cex_axis_default    <- if (use_modern_recipe) 8  else 15
+  .cex_legend_default  <- if (use_modern_recipe) 9  else 15
+  .cex_text_default    <- if (use_modern_recipe) 3.0 else 5
+
   ## title
   if (is.null(cex.main) == FALSE) {
     if (is.numeric(cex.main) == FALSE) {
       stop("\"cex.main\" is not numeric.")
     }
-    cex.main <- 16 * cex.main
+    cex.main <- .cex_main_default * cex.main
   } else {
-    cex.main <- 16
+    cex.main <- .cex_main_default
   }
   ## subtitle
   if (is.null(cex.main.sub) == FALSE) {
     if (is.numeric(cex.main.sub) == FALSE) {
       stop("\"cex.main.sub\" is not numeric.")
     }
-    cex.main.sub <- 16 * cex.main.sub
+    cex.main.sub <- .cex_main_default * cex.main.sub
   } else {
-    cex.main.sub <- 16
+    cex.main.sub <- .cex_main_default
   }
   ## axis label
   if (is.null(cex.lab) == FALSE) {
     if (is.numeric(cex.lab) == FALSE) {
       stop("\"cex.lab\" is not numeric.")
     }
-    cex.lab <- 15 * cex.lab
+    cex.lab <- .cex_lab_default * cex.lab
   } else {
-    cex.lab <- 15
+    cex.lab <- .cex_lab_default
   }
   ## axis number
   if (is.null(cex.axis) == FALSE) {
     if (is.numeric(cex.axis) == FALSE) {
       stop("\"cex.axis\" is not numeric.")
     }
-    cex.axis <- 15 * cex.axis
+    cex.axis <- .cex_axis_default * cex.axis
   } else {
-    cex.axis <- 15
+    cex.axis <- .cex_axis_default
   }
   ## legend
   if (is.null(cex.legend) == FALSE) {
     if (is.numeric(cex.legend) == FALSE) {
       stop("\"cex.legend\" is not numeric.")
     }
-    cex.legend <- 15 * cex.legend
+    cex.legend <- .cex_legend_default * cex.legend
   } else {
-    cex.legend <- 15
+    cex.legend <- .cex_legend_default
   }
   ## text
   if (is.null(cex.text) == FALSE) {
     if (is.numeric(cex.text) == FALSE) {
       stop("\"cex.text\" is not numeric.")
     }
-    cex.text <- 5 * cex.text
+    cex.text <- .cex_text_default * cex.text
   } else {
-    cex.text <- 5
+    cex.text <- .cex_text_default
   }
 
   ## text label position
@@ -1830,16 +1965,16 @@ plot.fect <- function(
           set.linewidth <- c(lw[1], lw[1], lw[2], lw[2])
         }
       }
-      p <- p + xlab(xlab_final) + ylab(ylab_final) + theme(legend.position = legend.pos, axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v), axis.text = element_text(size = cex.axis), axis.title = element_text(size = cex.lab), plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)))
+      p <- p + xlab(xlab_final) + ylab(ylab_final) + theme(legend.position = legend.pos, axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v), axis.text = element_text(size = cex.axis), axis.title = element_text(size = cex.lab), plot.title = element_text(size = cex.main, hjust = if (use_modern_recipe) 0 else 0.5, face = if (use_modern_recipe) "plain" else "bold", margin = margin(10, 0, 10, 0)))
       if (theme.bw == TRUE) {
-        p <- p + theme_bw()
+        p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
       }
       p <- p + theme(
         legend.position = legend.pos,
         axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
         axis.text = element_text(size = cex.axis), # This sets axis text generally
         axis.title = element_text(size = cex.lab),
-        plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+        plot.title = element_text(size = cex.main, hjust = if (use_modern_recipe) 0 else 0.5, face = if (use_modern_recipe) "plain" else "bold", margin = margin(10, 0, 10, 0))
       )
       if (!is.na(vline_pos_abs)) {
         p <- p + geom_vline(xintercept = vline_pos_abs, colour = lcolor[2], linewidth = lwidth[2], linetype = ltype[2])
@@ -2153,17 +2288,17 @@ plot.fect <- function(
           axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
           axis.text = element_text(size = cex.axis),
           axis.title = element_text(size = cex.lab),
-          plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+          plot.title = element_text(size = cex.main, hjust = if (use_modern_recipe) 0 else 0.5, face = if (use_modern_recipe) "plain" else "bold", margin = margin(10, 0, 10, 0))
         )
       if (theme.bw == TRUE) {
-        p <- p + theme_bw()
+        p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
       }
       p <- p + theme(
         legend.position = legend.pos,
         axis.text.x = element_text(angle = angle, hjust = x.h, vjust = x.v),
         axis.text = element_text(size = cex.axis),
         axis.title = element_text(size = cex.lab),
-        plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0))
+        plot.title = element_text(size = cex.main, hjust = if (use_modern_recipe) 0 else 0.5, face = if (use_modern_recipe) "plain" else "bold", margin = margin(10, 0, 10, 0))
       )
       if (shade.post == TRUE) {
         p <- p + annotate("rect", xmin = vline_pos_for_plot_axis, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "grey80", alpha = .3)
@@ -2735,7 +2870,7 @@ plot.fect <- function(
 
     ## theme
     if (theme.bw == TRUE) {
-      p <- p + theme_bw()
+      p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
     }
 
 
@@ -2990,6 +3125,7 @@ plot.fect <- function(
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         stats.pos = stats.pos,
         theme.bw = theme.bw,
+        legacy.style = legacy.style,
         only.pre = type == "equiv",
         xangle = xangle,
         yangle = yangle,
@@ -3020,9 +3156,14 @@ plot.fect <- function(
         count = if (!is.null(data$count)) data$count else NA
       )
 
-      # highlight the placebo interval [placebo.period[1], placebo.period[2]]
+      # highlight the placebo interval [placebo.period[1], placebo.period[2]],
+      # but only if "placebo" was selected in `highlight.types`.
       placebo_seq <- seq(placebo.period[1], placebo.period[2])
       n_placebo <- length(placebo_seq)
+      hl_on <- "placebo" %in% highlight.types
+      hl_periods <- if (hl_on) placebo_seq else NULL
+      hl_colors  <- if (hl_on) rep(placebo.color, n_placebo) else NULL
+      hl_shapes  <- if (hl_on) rep(17L, n_placebo) else NULL
       p <- esplot(
         data_es,
         Period = "Period",
@@ -3039,9 +3180,10 @@ plot.fect <- function(
         count.outline.color = count.outline.color,
         show.points = show.points,
         ci.outline = ci.outline,
-        highlight.periods = placebo_seq,
-        highlight.colors = rep(placebo.color, n_placebo),
-        highlight.shapes = rep(17L, n_placebo),
+        highlight.periods = hl_periods,
+        highlight.colors = hl_colors,
+        highlight.shapes = hl_shapes,
+        highlight.fill = highlight.fill,
         xlab = xlab,
         ylab = ylab,
         main = main,
@@ -3064,6 +3206,7 @@ plot.fect <- function(
         stats = if (exists("stats_values")) stats_values else NULL,
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         theme.bw = theme.bw,
+        legacy.style = legacy.style,
         stats.pos = stats.pos,
         only.pre = type == "equiv",
         xangle = xangle,
@@ -3077,14 +3220,31 @@ plot.fect <- function(
       #
       # --- CARRYOVER TEST OR EXITING TREATMENT ---
       #
-      if (is.null(x$est.carryover)) {
+      ## Detect carryover.rm value (number of post-treatment periods treated
+      ## as carryover) from the fit's stored call. With carryover.rm = K,
+      ## those K cells get the orange triangle "removed" glyph and the
+      ## carryover-test window is shifted by K periods. Default 0 (none).
+      carryover_rm_K <- 0L
+      tryCatch({
+        arg <- as.list(x$call)$carryover.rm
+        if (!is.null(arg)) {
+          val <- suppressWarnings(as.integer(eval(arg)))
+          if (length(val) == 1L && !is.na(val) && val > 0) carryover_rm_K <- val
+        }
+      }, error = function(e) NULL)
+
+      if (is.null(x$est.carryover) || carryover_rm_K == 0L) {
         placebo_seq <- c()
-        n_placebo <- 0
-        shift <- 0
+        n_placebo  <- 0
+        shift      <- 0
       } else {
-        placebo_seq <- seq(carryover.period[1], carryover.period[1] - 1 + dim(x$est.carryover)[1])
-        n_placebo <- length(placebo_seq)
-        shift <- dim(x$est.carryover)[1]
+        ## carryover.rm = K places K removed cells at original time 1..K,
+        ## and shifts the carryover-test window by K. The legacy code
+        ## erroneously used dim(x$est.carryover)[1] (always 1, since the
+        ## slot stores the aggregate carryover effect as a 1-row tibble).
+        placebo_seq <- seq_len(carryover_rm_K)
+        n_placebo   <- carryover_rm_K
+        shift       <- carryover_rm_K
       }
 
       data_es <- data.frame(
@@ -3108,6 +3268,20 @@ plot.fect <- function(
       carry_seq <- seq(carryover.period[1] + shift, carryover.period[2] + shift)
       n_carry <- length(carry_seq)
 
+      ## Selectively include carryover.rm (placebo_seq local var, triangles)
+      ## and carryover (carry_seq, diamonds) based on `highlight.types`.
+      include_rm    <- "carryover.rm" %in% highlight.types && n_placebo > 0
+      include_carry <- "carryover"    %in% highlight.types && n_carry   > 0
+      hl_periods <- c(if (include_rm)    placebo_seq,
+                      if (include_carry) carry_seq)
+      hl_colors  <- c(if (include_rm)    rep(carryover.rm.color, n_placebo),
+                      if (include_carry) rep(carryover.color,    n_carry))
+      hl_shapes  <- c(if (include_rm)    rep(17L, n_placebo),
+                      if (include_carry) rep(18L, n_carry))
+      if (length(hl_periods) == 0) {
+        hl_periods <- NULL; hl_colors <- NULL; hl_shapes <- NULL
+      }
+
       p <- esplot(
         data_es,
         Period = "Period",
@@ -3124,9 +3298,10 @@ plot.fect <- function(
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
-        highlight.periods = c(placebo_seq, carry_seq),
-        highlight.colors = c(rep(carryover.rm.color, n_placebo), rep(carryover.color, n_carry)),
-        highlight.shapes = c(rep(17L, n_placebo), rep(18L, n_carry)),
+        highlight.periods = hl_periods,
+        highlight.colors  = hl_colors,
+        highlight.shapes  = hl_shapes,
+        highlight.fill    = highlight.fill,
         xlab = xlab,
         ylab = ylab,
         main = main,
@@ -3150,6 +3325,7 @@ plot.fect <- function(
         stats = if (exists("stats_values")) stats_values else NULL,
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         theme.bw = theme.bw,
+        legacy.style = legacy.style,
         stats.pos = stats.pos,
         xangle = xangle,
         yangle = yangle,
@@ -3661,7 +3837,7 @@ plot.fect <- function(
 
     ## theme
     if (theme.bw == TRUE) {
-      p <- p + theme_bw()
+      p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
     }
 
     ## grid
@@ -3833,7 +4009,7 @@ plot.fect <- function(
       axis.text = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
       axis.text.y = element_text(size = cex.axis),
-      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)),
+      plot.title = element_text(size = cex.main, hjust = if (use_modern_recipe) 0 else 0.5, face = if (use_modern_recipe) "plain" else "bold", margin = margin(10, 0, 10, 0)),
       plot.margin = margin(15, 5.5, 5.5, 5.5, "pt")
     )
 
@@ -4018,7 +4194,7 @@ plot.fect <- function(
 
       ## theme
       if (theme.bw == TRUE) {
-        p <- p + theme_bw()
+        p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
       }
 
       ## grid
@@ -4144,7 +4320,7 @@ plot.fect <- function(
 
       ## theme
       if (theme.bw == TRUE) {
-        p <- p + theme_bw()
+        p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
       }
 
       ## grid
@@ -4234,7 +4410,7 @@ plot.fect <- function(
       axis.text = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
       axis.text.y = element_text(size = cex.axis),
-      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)),
+      plot.title = element_text(size = cex.main, hjust = if (use_modern_recipe) 0 else 0.5, face = if (use_modern_recipe) "plain" else "bold", margin = margin(10, 0, 10, 0)),
       plot.margin = margin(15, 5.5, 5.5, 5.5, "pt")
     )
 
@@ -4287,7 +4463,7 @@ plot.fect <- function(
 
     ## theme
     if (theme.bw == TRUE) {
-      p <- p + theme_bw()
+      p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
     }
 
     ## title
@@ -4458,7 +4634,7 @@ plot.fect <- function(
       axis.text = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
       axis.text.y = element_text(size = cex.axis),
-      plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(10, 0, 10, 0)),
+      plot.title = element_text(size = cex.main, hjust = if (use_modern_recipe) 0 else 0.5, face = if (use_modern_recipe) "plain" else "bold", margin = margin(10, 0, 10, 0)),
       plot.margin = margin(15, 5.5, 5.5, 5.5, "pt")
     )
 
@@ -4630,7 +4806,7 @@ plot.fect <- function(
         x = xlab, y = ylab,
         title = main
       ) +
-      theme_bw() +
+      (if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()) +
       scale_fill_manual(NA, breaks = breaks, values = col, labels = label)
 
     # if(4%in%all) {
@@ -4652,13 +4828,14 @@ plot.fect <- function(
         axis.text = element_text(color = "black", size = cex.axis),
         axis.text.x = element_text(size = cex.axis, angle = angle, hjust = x.h, vjust = x.v),
         axis.text.y = element_text(size = cex.axis),
-        plot.background = element_rect(fill = status.background.color),
-        legend.background = element_rect(fill = status.background.color),
+        ## Modern: white plot background instead of the legacy gray90.
+        plot.background = element_rect(fill = if (use_modern_recipe) "white" else status.background.color),
+        legend.background = element_rect(fill = if (use_modern_recipe) "white" else status.background.color),
         legend.position = legend.pos,
         legend.margin = margin(0, 5, 5, 0),
         legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
         legend.title = element_blank(),
-        plot.title = element_text(size = cex.main, hjust = 0.5, face = "bold", margin = margin(8, 0, 8, 0))
+        plot.title = element_text(size = cex.main, hjust = if (use_modern_recipe) 0 else 0.5, face = if (use_modern_recipe) "plain" else "bold", margin = margin(8, 0, 8, 0))
       )
 
     if (is.null(xticklabels) == FALSE) {
@@ -4759,7 +4936,7 @@ plot.fect <- function(
     p <- ggplot(data_combined, aes(x = .data[[x_var_name]]))
 
     if (theme.bw == TRUE) {
-      p <- p + theme_bw()
+      p <- p + if (use_modern_recipe) .modern_theme(11) else ggplot2::theme_bw()
     }
     if (gridOff == TRUE) {
       p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
@@ -4794,8 +4971,8 @@ plot.fect <- function(
       axis.text = element_text(size = cex.axis),
       plot.title = element_text(
         size = cex.main,
-        hjust = 0.5,
-        face = "bold",
+        hjust = if (use_modern_recipe) 0 else 0.5,
+        face = if (use_modern_recipe) "plain" else "bold",
       )
     )
 
@@ -4857,8 +5034,9 @@ plot.fect <- function(
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
-        highlight.periods = x$placebo.period[1]:x$placebo.period[2],
-        highlight.colors = rep(placebo.color, x$placebo.period[2] - x$placebo.period[1] + 1),
+        highlight.periods = if ("placebo" %in% highlight.types) x$placebo.period[1]:x$placebo.period[2] else NULL,
+        highlight.colors = if ("placebo" %in% highlight.types) rep(placebo.color, x$placebo.period[2] - x$placebo.period[1] + 1) else NULL,
+        highlight.fill = highlight.fill,
         xlab = xlab,
         ylab = ylab,
         main = main,
@@ -4877,6 +5055,7 @@ plot.fect <- function(
         start0 = start0,
         est.lwidth = est.lwidth,
         theme.bw = theme.bw,
+        legacy.style = legacy.style,
         est.pointsize = est.pointsize,
         stats = if (exists("stats_values")) stats_values else NULL,
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
@@ -4961,8 +5140,9 @@ plot.fect <- function(
         count.color = count.color,
         count.alpha = count.alpha,
         count.outline.color = count.outline.color,
-        highlight.periods = x$placebo.period[1]:x$placebo.period[2],
-        highlight.colors = rep(placebo.color, x$placebo.period[2] - x$placebo.period[1] + 1),
+        highlight.periods = if ("placebo" %in% highlight.types) x$placebo.period[1]:x$placebo.period[2] else NULL,
+        highlight.colors = if ("placebo" %in% highlight.types) rep(placebo.color, x$placebo.period[2] - x$placebo.period[1] + 1) else NULL,
+        highlight.fill = highlight.fill,
         xlab = xlab,
         ylab = ylab,
         main = main,
@@ -4980,6 +5160,7 @@ plot.fect <- function(
         axis.adjust = axis.adjust,
         start0 = start0,
         theme.bw = theme.bw,
+        legacy.style = legacy.style,
         est.lwidth = est.lwidth,
         est.pointsize = est.pointsize,
         stats = if (exists("stats_values")) stats_values else NULL,
@@ -5058,6 +5239,7 @@ plot.fect <- function(
       count.alpha = count.alpha,
       count.outline.color = count.outline.color,
       theme.bw = theme.bw,
+      legacy.style = legacy.style,
       connected = connected,
       only.post = TRUE,
       gridOff = gridOff,
