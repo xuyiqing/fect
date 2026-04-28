@@ -386,6 +386,22 @@ In the above plot, the three periods in blue are dropped from the first-stage es
 
 :::
 
+------------------------------------------------------------------------
+
+## Weights
+
+`fect()` accepts a weight column via `W`. As of v2.3.1, two additional arguments, `W.est` and `W.agg`, let the user separately control whether the weight enters the outcome-model fit and whether it enters the across-treated-obs aggregation. Both default to `NULL` and fall back to `W` when unset, so single-column callers see no change in behavior.
+
+* **Survey or sample weights.** Pass `W = "ws"`. The same column applies to both the model fit and the aggregation. This is the standard treatment when the weight reflects the sampling design.
+* **Weight only in the outcome-model fit.** Pass `W.est = "wr"` alone. The weight enters the IFE / MC / CFE solver but the across-treated-obs aggregation gives each treated cell weight 1. Use this when the weight reflects fit-side considerations (e.g., a precision weight specific to the outcome model) and the estimand is the unweighted average ATT across treated cells.
+* **Weight only in the aggregation.** Pass `W.agg = "your_column"` alone. The outcome model is fit unweighted and the weight is applied only when summarizing across treated cells. Common cases include calibration weights to a target population, or post-stratification weights that should adjust the summary but not the model fit.
+
+::: callout-warning
+## If your weights are inverse-probability weights for confounding adjustment
+
+A clean in-package solution is **under development** for fect 3.0 (a cross-fit doubly-robust path). fect 2.3.1 does not include a recommended IPW-for-confounding workflow, and `W.agg` should not be used as a substitute --- it does not deliver the doubly-robust properties an IPW user expects. If you need to ship analysis before v3.0 lands, see standard textbook treatments (e.g., trimming on extreme propensities) and document your design choice; we'll point users to the in-package option once it is available.
+:::
+
 ## How to Cite
 
 If you find these methods helpful, you can cite @LWX2024.

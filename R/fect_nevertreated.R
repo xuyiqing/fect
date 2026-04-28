@@ -59,7 +59,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         loading.bound = "none",
                         gamma.loading = NULL,
                         gamma.loading.grid = NULL,
-                        cv.rule = "1se"
+                        cv.rule = "1se",
+                        W.in.fit = TRUE
                         ) {
     ## -------------------------------##
     ## Parsing data
@@ -179,7 +180,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
-    if (is.null(W)) {
+    if (is.null(W) || !W.in.fit) {
         W.use <- as.matrix(0)
     } else {
         W.use <- as.matrix(W[, co, drop = FALSE])
@@ -286,7 +287,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         ## observed Y0 indicator:
         initialOut <- Y0.co <- beta0 <- FE0 <- xi0 <- factor0 <- NULL
         oci <- which(c(II.co) == 1)
-        if (is.null(W)) {
+        if (is.null(W) || !W.in.fit) {
             initialOut <- initialFit(data = data.ini, force = force, oci = oci)
         } else {
             initialOut <- initialFit(data = data.ini, force = force, w = c(W.use), oci = oci)
@@ -444,7 +445,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                                 cv.diff <- setdiff(get.cv$cv.id, cv.id)
                                 estCV[[i.cv]] <- setdiff(get.cv$est.id, cv.diff)
                             }
-                            if (is.null(W)) {
+                            if (is.null(W) || !W.in.fit) {
                                 initialOutCv <- initialFit(data = data.ini, force = force, oci = ociCV[[i.cv]])
                             } else {
                                 initialOutCv <- initialFit(data = data.ini, force = force, w = c(W.use), oci = ociCV[[i.cv]])
@@ -1510,7 +1511,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                                 cv.diff <- setdiff(get.cv$cv.id, cv.id)
                                 estCV[[i.cv]] <- setdiff(get.cv$est.id, cv.diff)
                             }
-                            if (is.null(W)) {
+                            if (is.null(W) || !W.in.fit) {
                                 initialOutCv <- initialFit(data = data.ini, force = force, oci = ociCV[[i.cv]])
                             } else {
                                 initialOutCv <- initialFit(data = data.ini, force = force, w = c(W.use), oci = ociCV[[i.cv]])

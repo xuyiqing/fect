@@ -47,7 +47,8 @@ fect_cfe <- function(
     group.level = NULL,
     group = NULL,
     time.on.seq.group = NULL,
-    time.off.seq.group = NULL
+    time.off.seq.group = NULL,
+    W.in.fit = TRUE
 ) {
     ## -------------------------------##
     ## Parsing data
@@ -132,7 +133,7 @@ fect_cfe <- function(
     ## observed Y0 indicator:
     initialOut <- Y0 <- beta0 <- NULL
     oci <- which(c(II) == 1)
-    if (!is.null(W)) {
+    if (!is.null(W) && isTRUE(W.in.fit)) {
         initialOut <- initialFit(
             data = data.ini,
             force = force,
@@ -153,7 +154,7 @@ fect_cfe <- function(
         beta0[which(is.na(beta0))] <- 0
     }
 
-    if (is.null(W)) {
+    if (is.null(W) || !W.in.fit) {
         W.use <- as.matrix(0)
     } else {
         W.use <- W

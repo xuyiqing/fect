@@ -39,7 +39,8 @@ fect_polynomial <- function(Y, # Outcome variable, (T*N) matrix
                             group.level = NULL,
                             group = NULL,
                             time.on.seq.group = NULL,
-                            time.off.seq.group = NULL) {
+                            time.off.seq.group = NULL,
+                            W.in.fit = TRUE) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -72,7 +73,7 @@ fect_polynomial <- function(Y, # Outcome variable, (T*N) matrix
     }
     ## observed Y0 indicator:
     oci <- which(c(II) == 1)
-    if (!is.null(W)) {
+    if (!is.null(W) && isTRUE(W.in.fit)) {
         initialOut <- initialFit(data = data.ini, force = force, w = c(W), oci = oci)
     } else {
         initialOut <- initialFit(data = data.ini, force = force, oci = oci)
@@ -85,7 +86,7 @@ fect_polynomial <- function(Y, # Outcome variable, (T*N) matrix
         beta0[which(is.na(beta0))] <- 0
     }
 
-    if (is.null(W)) {
+    if (is.null(W) || !W.in.fit) {
         W.use <- as.matrix(0)
         use_weight <- 0
     } else {

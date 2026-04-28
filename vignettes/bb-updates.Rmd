@@ -1,5 +1,15 @@
 # Changelog {#sec-changelog .unnumbered}
 
+## v2.3.1
+
+(2026-04-27)
+
+**Consistent ATT surface when `W` is supplied.** `fit$est.att`, `fit$est.avg`, `plot(fit)`, and `print(fit)` now all report the same W-weighted aggregation. The redundant `*.W` parallel slots are no longer attached to the fit object. To see the unweighted view, refit with `W = NULL`.
+
+**New `W.est` and `W.agg` arguments.** Both default to `NULL` and fall back to `W`. Use `W.est` alone when the weight should enter the outcome-model fit only, or `W.agg` alone when it should enter the aggregation only. See [Chapter @sec-ife-mc] §3.5 for details. A clean fect-internal solution for inverse-probability weights for confounding adjustment is under development for v3.0.
+
+**Deprecations.** The `weight` argument to `plot.fect()` is now a no-op (the canonical slots are already W-weighted when `W` is supplied). It emits a one-time warning and is slated for removal in v2.5.0.
+
 ## v2.3.0
 
 (2026-04-25)

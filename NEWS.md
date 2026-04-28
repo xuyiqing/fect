@@ -1,3 +1,89 @@
+# fect 2.3.1 (development)
+
+## New: `W.est` and `W.agg` arguments distinguish survey weights from IPW / balancing weights
+
+`fect()` and `fect.formula()` gain two new arguments that control where
+the weight column enters the estimator:
+
+* `W.est` --- weight column for the outcome-model fit (the weighted least
+  squares applied inside the IFE / MC / CFE solver).
+* `W.agg` --- weight column for the across-treated-obs aggregation
+  (`att.on`, `est.avg`, `est.att`).
+
+Both default to `NULL` and fall back to the existing `W` argument when
+left unset, so callers who pass only `W = "col"` get the same behavior as
+v2.3.0 + the consistency fix below (W enters both fit and aggregation).
+Pass the per-role arguments to specify finer behavior:
+
+* Survey / sample weights: `W = "ws"` (or equivalently
+  `W.est = W.agg = "ws"`). W enters both fit and aggregation.
+* Robust-regression / heteroskedasticity / GLS weights: `W.est = "wr"`
+  alone. The fit is weighted, the aggregation is unweighted.
+* Inverse-probability / balancing / post-stratification weights:
+  `W.agg = "ipw"` alone. The outcome model is fit unweighted (preserving
+  doubly-robust properties), and the aggregation is weighted by IPW.
+
+In v2.3.1, `W.est` and `W.agg` (when both supplied) must point to the
+same column. Truly distinct columns for fit vs. aggregation (e.g. a
+combined survey x IPW design where the outcome model uses survey weights
+and the aggregation uses survey x IPW) are scheduled for v2.4.0; the
+v2.3.1 design errors with an instructive message if requested.
+
+**Caveat for IPW users.** `W.agg = "ipw"` fits the outcome model
+unweighted and applies IPW only at the across-treated-obs aggregation.
+This is closer to a doubly-robust estimator than v2.3.0's silent
+everywhere-weighting --- but it is not a fully cross-fit doubly-robust
+estimator. Residuals on never-treated controls used in any de-bias term
+inherit in-sample shrinkage from the outcome fit, which DR theory
+requires cross-fitting to eliminate. A fully cross-fit DR path is
+scheduled for v3.0.
+
+## Breaking change: weighted fits now have a single, consistent ATT surface
+
+When `W = "<column>"` is supplied to `fect()`, every reported quantity on
+the returned fit object now reflects those weights. Prior versions
+maintained two parallel ATT pipelines on weighted fits: an unweighted one
+(populated into `est.att`, `est.avg`, `att.boot`, `att.vcov`, etc.) and a
+W-weighted one (populated into the parallel `est.att.W`, `est.avg.W`,
+`att.W.boot`, `att.W.vcov` slots). `plot(fit)` silently substituted the
+W-weighted pipeline for rendering while `print(fit)` and `fit$est.att`
+returned the unweighted pipeline --- so the same fit object reported
+different per-period ATTs and aggregate CIs depending on which surface
+the user looked at.
+
+As of 2.3.1, when `W` is non-NULL:
+
+* `fit$est.att`, `fit$est.avg`, `fit$est.att90`, `fit$att.bound`,
+  `fit$att.boot`, `fit$att.vcov`, `fit$est.placebo`, `fit$est.carryover`,
+  and the `*.off` reverse-treatment counterparts all carry the
+  W-weighted aggregations.
+* `fit$att`, `fit$time`, `fit$count`, `fit$att.avg`, `fit$att.off`,
+  `fit$time.off`, `fit$count.off`, `fit$att.placebo`, `fit$att.carryover`
+  similarly carry the W-weighted aggregations from the per-method
+  estimator.
+* `print(fit)` now labels the obs-level row as `Tr obs sample-weighted (W)`
+  (instead of `Tr obs equally weighted`) when W was supplied.
+* The redundant `*.W` slots (`est.att.W`, `est.avg.W`, `att.W.boot`,
+  `att.W.vcov`, `att.W.bound`, `att.on.W`, `time.on.W`, `count.on.W`,
+  `att.avg.W`, `att.on.sum.W`, `W.on.sum`, `att.off.W`, `time.off.W`,
+  `count.off.W`, `att.off.sum.W`, `W.off.sum`, `att.placebo.W`,
+  `att.carryover.W`, `est.placebo.W`, `est.carryover.W`, `est.att.off.W`,
+  `att.off.W.bound`, `att.off.W.vcov`) are no longer present on the
+  returned fit object.
+
+If you want the unweighted view of the same fit, refit with `W = NULL`.
+
+The `weight` argument to `plot.fect()` is now a no-op (deprecated),
+slated for removal in v2.5.0; passing it emits a deprecation warning.
+Internally `plot.fect()` no longer auto-flips between two pipelines ---
+it reads the canonical slots, which are already W-weighted when W was
+supplied at fit time.
+
+The C++ matrix-completion / IFE / CFE solvers (`inter_fe_mc`,
+`inter_fe_ub`, `inter_fe_cfe`) already used W as a fit-time
+weighted-least-squares weight in 2.3.0; this release does not change the
+fit, only the result-object surface.
+
 # fect 2.3.0 (development)
 
 ## Rolling-window cross-validation (standard ML design)

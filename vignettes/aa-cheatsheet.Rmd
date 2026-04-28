@@ -70,7 +70,9 @@ A check mark (✓) indicates that the method requires or accepts the input.
 
 | **Input** | **fe** | **ife** | **mc** | **gsynth** | **cfe** |
 |:----------|:----------|:---------:|:---------:|:---------:|:---------:|
-| `W` (weight) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `W` (weight column; convenience default for both `W.est` and `W.agg`) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `W.est` (weight column for outcome-model fit only) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `W.agg` (weight column for ATT aggregation only) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `time.component.from` (time component source) | – | ✓ | ✓ | ✓ | ✓ |
 | `em` (EM algorithm) | – | ✓ | – | – | ✓ |
 | `se` (uncertainty) | ✓ | ✓ | ✓ | ✓ | ✓ |

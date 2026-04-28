@@ -30,7 +30,11 @@ fect <- function(
     Y, # outcome
     D, # treatment
     X = NULL, # time-varying covariates
-    W = NULL, # weight
+    W = NULL, # weight column name; convenience default for both roles
+    W.est = NULL, # weight column for outcome-model fit (overrides W);
+                  # NULL falls back to W
+    W.agg = NULL, # weight column for ATT aggregation (overrides W);
+                  # NULL falls back to W
     group = NULL, # cohort
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
@@ -109,7 +113,9 @@ fect.formula <- function(
     Y, # outcome
     D, # treatment
     X = NULL, # time-varying covariates
-    W = NULL, # weights
+    W = NULL, # weights; convenience default for both roles
+    W.est = NULL, # weight column for outcome-model fit; see fect()
+    W.agg = NULL, # weight column for ATT aggregation; see fect()
     group = NULL, # cohort
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
@@ -219,6 +225,8 @@ fect.formula <- function(
         D = Dname,
         X = Xname,
         W = W,
+        W.est = W.est,
+        W.agg = W.agg,
         group = group,
         na.rm = na.rm,
         balance.period = balance.period,
@@ -301,7 +309,9 @@ fect.default <- function(
     Y, # outcome
     D, # treatment
     X = NULL, # time-varying covariates
-    W = NULL, # weights
+    W = NULL, # weights; convenience default for both roles
+    W.est = NULL, # weight column for outcome-model fit; see fect()
+    W.agg = NULL, # weight column for ATT aggregation; see fect()
     group = NULL, # cohort
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
@@ -422,23 +432,58 @@ fect.default <- function(
         }
     }
 
-    if (!is.null(W)) {
-        if (length(W) != 1) {
-            stop("\"W\" should have only one element.")
+    ## Default: W populates both roles (back-compat for callers that just set W).
+    if (is.null(W.est)) W.est <- W
+    if (is.null(W.agg)) W.agg <- W
+
+    ## Validate the resolved weight columns.
+    validate_weight_col <- function(col, label) {
+        if (is.null(col)) return(invisible())
+        if (length(col) != 1 || !is.character(col)) {
+            stop("`", label, "` must be a single column name.")
         }
-        if (!W %in% colnames(data)) {
-            stop("\"W\" is not in the dataset.")
+        if (!col %in% colnames(data)) {
+            stop("`", label, "` (\"", col, "\") is not in the dataset.")
         }
-        if (is.numeric(data[, W]) == FALSE) {
-            stop("\"W\" should be numeric.")
+        if (!is.numeric(data[, col])) {
+            stop("`", label, "` (\"", col, "\") must be numeric.")
         }
-        if (sum(data[, W] < 0) > 0) {
-            stop("\"W\" must be strictly positive.")
-        }
-        if (0 %in% data[, W]) {
-            data <- data[which(data[, W] > 0), ]
+        if (any(data[, col] < 0, na.rm = TRUE)) {
+            stop("`", label, "` (\"", col, "\") must be non-negative.")
         }
     }
+    validate_weight_col(W,     "W")
+    validate_weight_col(W.est, "W.est")
+    validate_weight_col(W.agg, "W.agg")
+
+    ## v2.3.1 supports only a single weight column (with role gating). Truly
+    ## different columns for fit vs aggregation (e.g. survey weights x IPW)
+    ## requires carrying two parallel matrices through the dispatcher and is
+    ## scheduled for v2.4.0. Stop with an informative message if requested now.
+    if (!is.null(W.est) && !is.null(W.agg) && !identical(W.est, W.agg)) {
+        stop(
+            "Distinct weight columns for `W.est` and `W.agg` are scheduled ",
+            "for fect v2.4.0. v2.3.1 supports a single weight column with ",
+            "role-gated routing: set `W.est = W.agg = \"col\"` (or `W = \"col\"`) ",
+            "for survey/sample weights, `W.agg = \"col\"` alone for IPW / ",
+            "balancing weights, or `W.est = \"col\"` alone for ",
+            "robust-regression / heteroskedasticity weights."
+        )
+    }
+
+    ## Resolve a single column name `Wname` for downstream code paths. The
+    ## per-role flags `use.W.in.fit` and `use.W.in.agg` carry the role
+    ## information.
+    if (is.null(W) && !is.null(W.est)) W <- W.est
+    if (is.null(W) && !is.null(W.agg)) W <- W.agg
+
+    ## Drop rows where the weight column is exactly 0.
+    if (!is.null(W) && any(data[, W] == 0, na.rm = TRUE)) {
+        data <- data[data[, W] > 0, , drop = FALSE]
+    }
+
+    use.W.in.fit <- !is.null(W.est)
+    use.W.in.agg <- !is.null(W.agg)
 
     ## check duplicated observations
     unique_label <- unique(paste(
@@ -2065,6 +2110,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2141,6 +2187,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     cm=cm,
@@ -2177,6 +2224,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2207,6 +2255,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2247,6 +2296,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     X.extra.FE = X.extra.FE,
                     X.Z = X.Z,
                     X.Q = X.Q,
@@ -2283,6 +2333,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2314,6 +2365,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2349,6 +2401,8 @@ fect.default <- function(
             D = D,
             X = X,
             W = W,
+            W.in.fit = use.W.in.fit,
+            W.in.agg = use.W.in.agg,
             I = I,
             II = II,
             cm = cm,
@@ -2611,6 +2665,8 @@ fect.default <- function(
                     D = pD,
                     X = pX,
                     W = pW,
+                    W.in.fit = use.W.in.fit,
+                    W.in.agg = use.W.in.agg,
                     I = pI,
                     II = pII,
                     T.on = pT.on,
@@ -2904,6 +2960,10 @@ fect.default <- function(
             D = Dname,
             X = Xname,
             W = Wname,
+            W.est.col = if (use.W.in.fit) Wname else NULL,
+            W.agg.col = if (use.W.in.agg) Wname else NULL,
+            W.in.fit = use.W.in.fit,
+            W.in.agg = use.W.in.agg,
             T.on = T.on,
             G = G.old,
             balance.period = balance.period,
@@ -2999,6 +3059,38 @@ fect.default <- function(
     }
 
     output <- c(output, list(call = match.call()))
+
+    ## When W is supplied AND the aggregation surface should be weighted
+    ## (W or W.agg supplied), route the W-weighted aggregations into the
+    ## canonical slot names so fit$att, fit$time, fit$count, fit$att.avg,
+    ## fit$att.off etc. agree with fit$est.att, fit$est.avg, plot(fit), and
+    ## print(fit). When only W.est is supplied, the aggregation surface
+    ## stays unweighted (canonical slots untouched). Either way, strip the
+    ## redundant *.W slots from the user-facing fit object so there is only
+    ## one canonical aggregation. (Inferential slots --- est.att, est.avg,
+    ## est.att90, att.bound, att.boot, att.vcov, est.placebo, est.carryover,
+    ## off variants --- are routed inside fect_boot() before reaching here.)
+    if (!is.null(Wname) && isTRUE(use.W.in.agg)) {
+        if (!is.null(output$att.on.W))      output$att        <- output$att.on.W
+        if (!is.null(output$time.on.W))     output$time       <- output$time.on.W
+        if (!is.null(output$count.on.W))    output$count      <- output$count.on.W
+        if (!is.null(output$att.avg.W))     output$att.avg    <- output$att.avg.W
+        if (!is.null(output$att.off.W))     output$att.off    <- output$att.off.W
+        if (!is.null(output$time.off.W))    output$time.off   <- output$time.off.W
+        if (!is.null(output$count.off.W))   output$count.off  <- output$count.off.W
+        if (!is.null(output$att.placebo.W))   output$att.placebo   <- output$att.placebo.W
+        if (!is.null(output$att.carryover.W)) output$att.carryover <- output$att.carryover.W
+    }
+    if (!is.null(Wname)) {
+        output[c(
+            "att.on.W", "time.on.W", "count.on.W", "att.avg.W",
+            "att.on.sum.W", "W.on.sum",
+            "att.off.W", "time.off.W", "count.off.W",
+            "att.off.sum.W", "W.off.sum",
+            "att.placebo.W", "att.carryover.W"
+        )] <- NULL
+    }
+
     class(output) <- "fect"
     return(output)
 } ## Program fect ends

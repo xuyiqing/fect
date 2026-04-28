@@ -37,7 +37,8 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
                     group.level = NULL,
                     group = NULL,
                     time.on.seq.group = NULL,
-                    time.off.seq.group = NULL) {
+                    time.off.seq.group = NULL,
+                    W.in.fit = TRUE) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -84,7 +85,7 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
 
         oci <- if (is.null(oci_override)) which(c(II) == 1) else oci_override
         if (binary == FALSE) {
-            if (!is.null(W)) {
+            if (!is.null(W) && isTRUE(W.in.fit)) {
                 initialOut <- initialFit(data = data.ini, force = force, w = c(W), oci = oci)
             } else {
                 initialOut <- initialFit(data = data.ini, force = force, w = NULL, oci = oci)
@@ -113,7 +114,7 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
 
         est.fect <- NULL
 
-        if (is.null(W)) {
+        if (is.null(W) || !W.in.fit) {
             W.use <- as.matrix(0)
         } else {
             W.use <- W
