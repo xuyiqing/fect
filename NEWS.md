@@ -1,4 +1,51 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.0 (development)
+
+## New: post-hoc estimands API
+
+* New `estimand(fit, type, by, ...)` typed dispatcher computes
+  alternative estimands directly from any fect imputation fit. Shipped
+  types: `"att"` (default per-event-time ATT, byte-identical to
+  `fit$est.att`), `"att.cumu"` (cumulative ATT, replaces `effect()`),
+  `"aptt"` (average proportional treatment effect on the treated;
+  Chen & Roth 2024), `"log.att"` (mean log-scale treatment effect).
+  Shipped `by` axes: `"event.time"`, `"overall"`, plus reserved
+  canonical values `"cohort"` / `"calendar.time"` for future commits.
+  Returns a tidy data frame with consistent columns
+  `(<by_key>, estimate, se, ci.lo, ci.hi, n_cells, vartype)` regardless
+  of `type`. See `?estimand` and the new "Alternative estimands"
+  vignette chapter for worked examples and the design rationale.
+* New `imputed_outcomes(fit, cells, replicates, direction)` low-level
+  accessor returns the cell-level imputed potential-outcome surface as
+  a long-form data frame with documented columns
+  `(id, time, event.time, cohort, treated, Y_obs, Y0_hat, eff,
+  eff_debias, W.agg, [replicate])`. Use this for custom estimands the
+  dispatcher does not ship; pipe to dplyr / data.table for arbitrary
+  aggregation.
+* `cells = ` filter argument on both `imputed_outcomes()` and
+  `estimand()` accepts NULL (default), a logical vector, or a one-sided
+  formula evaluated against the long-form data
+  (e.g. `~ event.time %in% 1:5 & !id %in% bad_ids`). The
+  `window = c(L, R)` argument on `estimand()` is sugar over
+  `cells = ~ event.time >= L & event.time <= R`.
+* `direction = c("on", "off")` on both functions selects the event-time
+  grid for reversal panels.
+* New `eff_debias` reserved slot on the fit object (NULL for plain
+  imputation estimators; populated by future doubly-robust estimators)
+  so DR scores can be added to the surface without breaking the
+  long-form schema.
+
+## Soft-deprecation: `effect()` and `att.cumu()`
+
+* `effect()` and `att.cumu()` continue to work byte-identically to
+  v2.3.x and emit a one-time-per-session message pointing at the
+  unified `estimand()` API. Removal not before v3.0.0. Migration:
+  - `effect(fit, cumu = TRUE)` → `estimand(fit, "att.cumu", "event.time")`
+  - `effect(fit, cumu = FALSE)` → `estimand(fit, "att", "event.time")`
+  - `att.cumu(fit, period = c(L, R))` →
+    `estimand(fit, "att.cumu", "overall", window = c(L, R))`
+  Numerical equality is asserted by package tests.
+
 # fect 2.3.3 (development)
 
 ## Bug fixes

@@ -431,13 +431,16 @@ Carryover test periods are marked with **diamonds** (shape 18), while placebo te
 
 ## Cumulative Effects {#sec-cumul}
 
-The cumulative effect plot displays the running sum of per-period treatment effects. This is only well-defined when there are no treatment reversals---that is, all treated units remain treated for the duration of the study. The model must be estimated with `keep.sims = TRUE`.
+This section shows how to *visualize* cumulative treatment effects. For the underlying estimand and the unified API that produces it, see [Chapter @sec-estimands]. The cumulative effect is only well-defined when there are no treatment reversals --- that is, all treated units remain treated for the duration of the study. The model must be estimated with `keep.sims = TRUE`.
 
 We first apply it to `hh2019`, which has no treatment reversals.
 
 ```{r plot-cumulative-hh}
-plot(effect(out.hh), main = "Cumulative Effect of Indirect Democracy",
-     ylab = "Cumulative Effect on Naturalization Rate")
+cumu.hh <- estimand(out.hh, "att.cumu", "event.time")
+esplot(cumu.hh, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       main = "Cumulative Effect of Indirect Democracy",
+       ylab = "Cumulative Effect on Naturalization Rate")
 ```
 
 Since the `gs2020` dataset has treatment reversals, we subset to units that remained treated throughout.
@@ -470,7 +473,10 @@ out_no_reversals <- fect(Y = "general_sharetotal_A_all",
 ```
 
 ```{r cumulative-effects}
-plot(effect(out_no_reversals), xlim = c(1, 2))
+cumu.gs <- estimand(out_no_reversals, "att.cumu", "event.time")
+esplot(cumu.gs, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       xlim = c(1, 2))
 ```
 
 ------------------------------------------------------------------------
