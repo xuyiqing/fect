@@ -12,6 +12,12 @@ effect <- function(x, ## a fect object
                    xlab = NULL,
                    ylab = NULL,
                    main = NULL) {
+  ## v2.4.0: soft-deprecated in favor of estimand(). Continues to work
+  ## byte-identical to today; one-time-per-session message points users
+  ## at the unified API. Removal not before v3.0.0. Suppressed when
+  ## called internally from .compute_att_cumu_event_time().
+  .fect_deprecation_message_once("effect")
+
   if (is.null(x$eff.boot)){
     stop("No bootstrap/jackknife results available. Choose keep.sims = TRUE in fect().")
   }

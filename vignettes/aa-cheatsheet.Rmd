@@ -32,7 +32,7 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 | **status** | Treatment status by period for all units. | fe, ife, mc, gsynth, cfe |
 | **sens** | Rambachan & Roth (2023) sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, cfe |
 | **sens_es** | Event-study sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, cfe |
-| **cumul** | Cumulative treatment effects over time. | `effect()` function applied to fe, ife, mc, gsynth, cfe |
+| **cumul** | Cumulative treatment effects over time. | `estimand(fit, "att.cumu", "event.time")`; see [Chapter @sec-estimands]. |
 
 ## Tests as Options
 
@@ -190,8 +190,10 @@ In addition to the main `fect()` function, the package provides several utility 
 | `fect_mspe()` | Model comparison via cross-validated prediction error. Supports `cv.method = "rolling"` for AR-leakage-resistant scoring. | `out.fect`, `seed`, `cv.method`, `cv.buffer`, `criterion`, `k`, `cv.prop` |
 | `r.cv.rolling()` | Standalone rolling-window CV for selecting `r` (number of factors). Recommended over block CV when residuals are serially correlated. Supports `method ∈ {"ife", "gsynth", "cfe"}`. | `formula`, `data`, `index`, `method`, `r.max`, `cv.nobs`, `cv.buffer`, `k`, `cv.prop`, `cv.rule`, `seed` |
 | `get.cohort()` | Generate cohort indicators based on treatment timing. | `data`, `D`, `index`, `entry.time`, `start0` |
-| `att.cumu()` | Compute cumulative treatment effects over a specified period range. | `x` (fect object), `period`, `weighted`, `type` |
-| `effect()` | Compute cumulative or subgroup-averaged treatment effects. Requires `keep.sims = TRUE` in `fect()`. | `x` (fect object), `cumu`, `id`, `period`, `plot` |
+| `estimand()` | Unified post-hoc estimand dispatcher: per-event-time and overall ATT, cumulative ATT, APTT, log-ATT, with bootstrap or jackknife CIs. See [Chapter @sec-estimands]. | `fit`, `type`, `by`, `cells`, `weights`, `window`, `direction`, `vartype`, `conf.level`, `ci.method` |
+| `imputed_outcomes()` | Long-form accessor: cell-level imputed potential-outcome surface for custom estimands. | `fit`, `cells`, `replicates`, `direction` |
+| `att.cumu()` | (Soft-deprecated; use `estimand(fit, "att.cumu", "overall", window = ...)`.) Cumulative treatment effects over a specified period range. | `x`, `period`, `weighted`, `type` |
+| `effect()` | (Soft-deprecated; use `estimand(fit, "att.cumu", "event.time")` or `estimand(fit, "att", "event.time")`.) Cumulative or subgroup-averaged treatment effects; requires `keep.sims = TRUE`. | `x`, `cumu`, `id`, `period`, `plot` |
 
 ## Notes
 

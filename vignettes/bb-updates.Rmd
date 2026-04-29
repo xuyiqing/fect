@@ -1,5 +1,42 @@
 # Changelog {#sec-changelog .unnumbered}
 
+## v2.4.0
+
+(2026-04-29)
+
+**New: post-hoc estimands API.** Two new public functions and one new
+dedicated chapter in the user manual.
+
+* `estimand(fit, type, by, ...)` typed dispatcher returns a tidy data
+  frame with consistent columns regardless of estimand type. Shipped
+  types:
+  * `"att"` — default per-event-time ATT; byte-identical to
+    `fit$est.att`.
+  * `"att.cumu"` — cumulative ATT; replaces `effect()`.
+  * `"aptt"` — average proportional treatment effect on the treated
+    (Chen and Roth 2024 QJE).
+  * `"log.att"` — mean log-scale treatment effect.
+* `imputed_outcomes(fit, ...)` low-level accessor returns the cell-level
+  potential-outcome surface as a long-form data frame for custom
+  estimands. Pipe to dplyr / data.table for arbitrary aggregation.
+* `cells = ` filter (logical / formula) on both functions, with
+  `window = c(L, R)` sugar on `estimand()` for the common
+  event-time-window case.
+* `direction = c("on", "off")` selects the event-time grid for reversal
+  panels.
+* New chapter [@sec-estimands] in the user manual walks through all six
+  worked examples plus the migration table.
+
+**Soft-deprecation.** `effect()` and `att.cumu()` emit a
+one-time-per-session message pointing at `estimand()`. They continue
+to work byte-identically; removal not before v3.0.0. Numerical
+equality with `estimand()` is asserted by package tests.
+
+**Internal slot reservation.** `eff_debias` slot on the fit object is
+now reserved (NULL for plain imputation estimators); populated by
+future doubly-robust estimators so DR scores can be added without
+breaking the long-form schema.
+
 ## v2.3.3
 
 (2026-04-28)

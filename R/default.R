@@ -2986,6 +2986,13 @@ fect.default <- function(
             ## re-parse `x$call` — robust under do.call(), positional
             ## args, and call-rewriting wrappers.
             carryover.rm = carryover.rm,
+            ## Reserved slot for the post-hoc estimand API (v2.4.0+).
+            ## NULL for plain imputation estimators (FE / IFE / MC / CFE /
+            ## GSC); future doubly-robust estimators will populate this
+            ## with the per-cell debias correction so that
+            ## eff = (Y_obs - Y0_hat) + eff_debias is the cell-level
+            ## score. See ref/po-estimands-contract.md §3.
+            eff_debias = NULL,
             unit.type = unit.type,
             obs.missing = obs.missing,
             obs.missing.balance = obs.missing.balance,

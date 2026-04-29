@@ -287,65 +287,7 @@ plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO")
 
 ## Cumulative effects
 
-Users can use `effect()` to calculate cumulative treatment effects. The behavior of `effect()` is similar to the function of the same name in `gsynth`. Calculation of cumulative effects will need unit-time level bootstrap results. Choose the option `keep.sims=TRUE` to record them.
-
-::: {.callout-note appearance="simple"}
-The example below uses `method = "ife"` with `time.component.from = "nevertreated"`, which is equivalent to `method = "gsynth"` (see [Chapter @sec-gsynth]). We use the explicit form here for clarity.
-:::
-
-```{r cumu_effect, cache = TRUE}
-out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-                        method = "ife", time.component.from = "nevertreated",
-                        force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 1000, vartype = 'bootstrap',
-                        parallel = TRUE, cores = 16, keep.sims=TRUE)
-cumu.out <- effect(out)
-```
-
-Print and plot cumulative effects
-
-```{r cumu_effect_plot}
-print(cumu.out)
-plot(cumu.out)
-```
-
-Users can choose to calculate by-period average effects by setting `cumu=FALSE`.
-
-```{r cumu_effect_byperiod, cache = TRUE}
-effect(out, cumu=FALSE)
-```
-
-Calculate the cumulative effect of certain units at certain periods.
-
-```{r cumu_effect_subset, cache = TRUE}
-effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
-```
-
-`effect()` also accepts results from other estimation and inference methods. For example, we can use matrix completion:
-
-```{r effect-mc-fit, cache = TRUE}
-out_mc <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 1000, vartype = 'bootstrap',
-                        parallel = TRUE, cores = 16, keep.sims=TRUE)
-```
-
-```{r effect-mc}
-plot(effect(out_mc))
-```
-
-We can also use jackknife instead of bootstrap for inference:
-
-```{r effect-jackknife-fit, cache = TRUE}
-out_jack <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 1000, vartype = 'jackknife',
-                        parallel = TRUE, cores = 16, keep.sims=TRUE)
-```
-
-```{r effect-jackknife}
-plot(effect(out_jack))
-```
+Cumulative treatment effects through each event time, and over a specified window, are computed via the unified post-hoc estimand interface introduced in v2.4.0. Both the per-event-time series and the overall window form are one-line calls. See [Chapter @sec-estimands] for the full surface, worked examples, and the migration table from the legacy `effect()` and `att.cumu()` functions.
 
 ------------------------------------------------------------------------
 
@@ -433,57 +375,9 @@ plot(out.w, main = "Estimated Weighted ATT")
 
 For finer control --- separating the weight that enters the outcome-model fit (`W.est`) from the weight that enters the aggregation (`W.agg`) --- and for important caveats when the weight is an inverse-probability weight, see [Chapter @sec-ife-mc] §Weights.
 
-### Post-hoc estimands from imputed potential outcomes
+### Post-hoc estimands
 
-The fit object exposes the full imputed counterfactual surface, so users can derive estimands beyond the default level-scale ATT --- for example the **average proportional treatment effect on the treated** (APTT) of @chen2024logs,
-
-$$
-\text{APTT}_t \;=\; \frac{\mathbb{E}\!\left[\,Y_{it} - \widehat{Y}_{it}(0) \mid D_{it}=1, t\,\right]}{\mathbb{E}\!\left[\,\widehat{Y}_{it}(0) \mid D_{it}=1, t\,\right]}.
-$$
-
-What's on the fit object: `Y.dat` and `D.dat` are the panel; `eff` is $Y_{it} - \widehat{Y}_{it}(0)$ at every cell, so $\widehat{Y}_{it}(0) = \texttt{Y.dat} - \texttt{eff}$; `T.on` is event time at each cell; `time` is the event-time grid. With `se = TRUE`, `att.boot` is a `length(time) × nboots` matrix of bootstrap level-ATT replicates by event time.
-
-A worked APTT example using `out.fect` (fit above with `nboots = 1000`):
-
-```{r aptt_example, eval = TRUE, message = FALSE}
-suppressPackageStartupMessages(library(dplyr))
-
-Don <- out.fect$D.dat == 1
-Y0  <- out.fect$Y.dat - out.fect$eff   # imputed Y(0) at every cell
-Ton <- out.fect$T.on                   # event time at every cell
-
-# Point APTT per event time (treated cells only)
-aptt_pt <- data.frame(
-  evt   = Ton[Don],
-  Y_obs = out.fect$Y.dat[Don],
-  Y0    = Y0[Don]
-) |>
-  group_by(evt) |>
-  summarise(att     = mean(Y_obs - Y0),
-            y0_mean = mean(Y0),
-            APTT    = att / y0_mean,
-            n_cells = dplyr::n(),
-            .groups = "drop")
-
-# Bootstrap CIs from att.boot, holding the denominator fixed at its
-# point estimate (conservative when imputation variance is small
-# relative to ATT sampling variance, which is typical for IFE).
-ti_grid     <- out.fect$time
-denom_byevt <- setNames(aptt_pt$y0_mean, aptt_pt$evt)
-denom_vec   <- denom_byevt[as.character(ti_grid)]
-APTT_boot   <- sweep(out.fect$att.boot, 1, denom_vec, "/")
-
-aptt_ci <- data.frame(
-  event.time = ti_grid,
-  APTT       = out.fect$att / denom_vec,
-  ci.lo      = apply(APTT_boot, 1, quantile, 0.025, na.rm = TRUE),
-  ci.hi      = apply(APTT_boot, 1, quantile, 0.975, na.rm = TRUE),
-  se         = apply(APTT_boot, 1, sd,             na.rm = TRUE)
-)
-head(na.omit(aptt_ci), 10)   # first 10 event times where APTT is computable
-```
-
-The same template --- read $(Y_{it}, \widehat{Y}_{it}(0))$ off the fit and aggregate by event time --- generalizes to log-scale ATTs (`log(Y_obs) - log(Y0)`), level-scale ATTs (the default), and any other functional of treated-cell outcomes. Native wrappers for these post-hoc estimands are planned for a future release.
+The fit object exposes the full imputed counterfactual surface, so users can compute estimands beyond the default level-scale ATT directly from the fit. **fect** v2.4.0 ships a typed dispatcher `estimand()` for the common cases — APTT [@chen2024logs], log-scale ATT, cumulative ATT, window-restricted ATT — plus a low-level accessor `imputed_outcomes()` for custom estimands the dispatcher does not ship. See [Chapter @sec-estimands] for the full chapter with worked examples and the migration table from `effect()` / `att.cumu()`.
 
 ## Additional notes
 

@@ -3,6 +3,8 @@
 ## slots are stripped from the user-facing fit object.
 
 test_that("weighted fit: plot trajectory == fit$est.att (W-weighted)", {
+  skip_on_cran()
+
   suppressWarnings(try(data("turnout", package = "fect"), silent = TRUE))
   expect_true(exists("turnout"))
 
@@ -39,6 +41,8 @@ test_that("weighted fit: plot trajectory == fit$est.att (W-weighted)", {
 })
 
 test_that("weighted fit: *.W parallel slots are stripped", {
+  skip_on_cran()
+
   suppressWarnings(try(data("turnout", package = "fect"), silent = TRUE))
   set.seed(123456)
   ub <- turnout[
@@ -76,6 +80,8 @@ test_that("weighted fit: *.W parallel slots are stripped", {
 })
 
 test_that("weighted fit: print() aggregate equals est.avg (W-weighted)", {
+  skip_on_cran()
+
   suppressWarnings(try(data("turnout", package = "fect"), silent = TRUE))
   set.seed(123456)
   ub <- turnout[
@@ -99,6 +105,8 @@ test_that("weighted fit: print() aggregate equals est.avg (W-weighted)", {
 })
 
 test_that("W.est alone: aggregation unweighted, label unweighted", {
+  skip_on_cran()
+
   suppressWarnings(try(data("turnout", package = "fect"), silent = TRUE))
   set.seed(123456)
   ub <- turnout[
@@ -131,6 +139,8 @@ test_that("W.est alone: aggregation unweighted, label unweighted", {
 })
 
 test_that("W.agg alone: fit matches W=NULL fit; aggregation is W-weighted", {
+  skip_on_cran()
+
   suppressWarnings(try(data("turnout", package = "fect"), silent = TRUE))
   set.seed(123456)
   ub <- turnout[
@@ -175,6 +185,8 @@ test_that("W.agg alone: fit matches W=NULL fit; aggregation is W-weighted", {
 })
 
 test_that("Distinct W.est and W.agg columns: errors in v2.3.1", {
+  skip_on_cran()
+
   suppressWarnings(try(data("turnout", package = "fect"), silent = TRUE))
   set.seed(123456)
   ub <- turnout[
@@ -198,6 +210,8 @@ test_that("Distinct W.est and W.agg columns: errors in v2.3.1", {
 
 
 test_that("unweighted fit (W = NULL): unchanged label, no *.W slots either", {
+  skip_on_cran()
+
   suppressWarnings(try(data("turnout", package = "fect"), silent = TRUE))
   set.seed(123456)
   ub <- turnout[

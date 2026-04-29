@@ -10,13 +10,14 @@ book:
     - index.qmd
     - 01-start.Rmd
     - 02-fect.Rmd
-    - 03-ife-mc.Rmd
-    - 04-cfe.Rmd
-    - 05-hte.Rmd
-    - 06-plots.Rmd
-    - 07-gsynth.Rmd
-    - 08-panel.Rmd
-    - 09-sens.Rmd
+    - 03-estimands.Rmd
+    - 04-ife-mc.Rmd
+    - 05-cfe.Rmd
+    - 06-hte.Rmd
+    - 07-plots.Rmd
+    - 08-gsynth.Rmd
+    - 09-panel.Rmd
+    - 10-sens.Rmd
     - aa-cheatsheet.Rmd
     - references.qmd
     - bb-updates.Rmd
