@@ -989,15 +989,10 @@ plot.fect <- function(
   ## c("placebo", "carryover", "carryover.rm"). The character form selects
   ## which test types receive the colored-glyph (and optional rectangle)
   ## treatment; other test periods render as plain circles.
-  ## carryover.rm has no dedicated slot on the fit object; recover the
-  ## value the user passed via fit$call.
-  has_rm_cells <- tryCatch({
-    arg <- as.list(x$call)$carryover.rm
-    if (is.null(arg)) FALSE else {
-      val <- suppressWarnings(as.integer(eval(arg)))
-      length(val) == 1L && !is.na(val) && val > 0
-    }
-  }, error = function(e) FALSE)
+  has_rm_cells <- {
+    K <- x$carryover.rm
+    is.numeric(K) && length(K) == 1L && !is.na(K) && K > 0
+  }
 
   highlight.types <- character(0)
   if (is.null(highlight)) {
@@ -3220,18 +3215,17 @@ plot.fect <- function(
       #
       # --- CARRYOVER TEST OR EXITING TREATMENT ---
       #
-      ## Detect carryover.rm value (number of post-treatment periods treated
-      ## as carryover) from the fit's stored call. With carryover.rm = K,
-      ## those K cells get the orange triangle "removed" glyph and the
-      ## carryover-test window is shifted by K periods. Default 0 (none).
-      carryover_rm_K <- 0L
-      tryCatch({
-        arg <- as.list(x$call)$carryover.rm
-        if (!is.null(arg)) {
-          val <- suppressWarnings(as.integer(eval(arg)))
-          if (length(val) == 1L && !is.na(val) && val > 0) carryover_rm_K <- val
+      ## With carryover.rm = K, those K cells get the orange triangle
+      ## "removed" glyph and the carryover-test window is shifted by K
+      ## periods. Default 0 (none). Read from the fit's stored slot.
+      carryover_rm_K <- {
+        K <- x$carryover.rm
+        if (is.numeric(K) && length(K) == 1L && !is.na(K) && K > 0) {
+          as.integer(K)
+        } else {
+          0L
         }
-      }, error = function(e) NULL)
+      }
 
       if (is.null(x$est.carryover) || carryover_rm_K == 0L) {
         placebo_seq <- c()

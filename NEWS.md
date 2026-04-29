@@ -1,4 +1,31 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.3.3 (development)
+
+## Bug fixes
+
+* Fix `"incorrect number of dimensions"` crash in `diagtest()` that
+  surfaced intermittently with `parallel = TRUE` + small `nboots`.
+  Two layers: (a) `R/diagtest.R` now uses `drop = FALSE` when filtering
+  bootstrap columns by all-non-NA, so a single surviving column stays
+  a matrix; (b) the bootstrap parallel path in `R/boot.R` now builds
+  the PSOCK cluster via `parallelly::makeClusterPSOCK(rscript_libs =
+  .libPaths())` (the same robust pattern used by the CV path),
+  wrapped in a 3-attempt retry-with-backoff. If `doParallel` cluster
+  init exhausts retries the bootstrap now degrades to sequential
+  rather than crashing.
+* `carryover.rm` is now stored on the fit object. `plot.fect()` no
+  longer reads it from `as.list(x$call)$carryover.rm` (which silently
+  gave the wrong K under `do.call()`, programmatic wrappers, or any
+  call-rewriting code path). Behaviorally a no-op for fits built via
+  named-argument `fect(...)`; correct under any other construction.
+
+## Documentation
+
+* Chapter 2 §Other estimands gains a worked example for post-hoc
+  estimands derived from the imputed potential-outcome surface,
+  showing APTT (Chen & Roth 2024) with bootstrap CIs from the
+  existing fit slots. Issue #126 (ajunquera).
+
 # fect 2.3.2 (development)
 
 ## Modern visual defaults for `plot.fect()` (visual breaking change)

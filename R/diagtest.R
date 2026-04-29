@@ -63,7 +63,12 @@ diagtest <- function(
         max.pre.periods <- sum(x$time <= 0)
         pre.pos <- intersect(c(1:dim(x$pre.att.boot)[1]), which(x$time %in% pre.periods))
         res_boot <- x$pre.att.boot
-        res_boot <- res_boot[, which(apply(!is.na(res_boot), 2, all))]
+        ## Preserve matrix shape when only one bootstrap column passes
+        ## the all-non-NA filter; otherwise res_boot collapses to a
+        ## vector and the row-subset on the next branch errors with
+        ## "incorrect number of dimensions".
+        res_boot <- res_boot[, which(apply(!is.na(res_boot), 2, all)),
+                             drop = FALSE]
         if (length(pre.pos) == max.pre.periods) {
             pre.pos <- pre.pos[-1]
             #message("Cannot use full pre-treatment periods in F-test. The first period is removed.\n")
@@ -138,7 +143,12 @@ diagtest <- function(
         }
 
         res_boot <- x$att.boot
-        res_boot <- res_boot[, which(apply(!is.na(res_boot), 2, all))]
+        ## drop = FALSE keeps res_boot a matrix even when only one
+        ## bootstrap column survives the all-non-NA filter (can occur
+        ## when small nboots interacts with NA-filled iterations from
+        ## parallel-worker errors).
+        res_boot <- res_boot[, which(apply(!is.na(res_boot), 2, all)),
+                             drop = FALSE]
         nboots <- ncol(res_boot)
         if (length(pre.pos) > 1) {
             res_boot <- res_boot[pre.pos, ]

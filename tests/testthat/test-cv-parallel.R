@@ -943,6 +943,49 @@ test_that("E.6: bootstrap + CV interaction (se=TRUE, nboots=5, parallel=TRUE) ru
   })
 })
 
+## -- E.7  Boot under stale future plan: simulate the CV→boot plan-leak
+##         that produced the E.6 PSOCK race. Set up a cluster plan,
+##         stop its workers behind future's back, then run boot. The
+##         cluster-init retry loop in run_dopar_retry should recover.
+test_that("E.7: bootstrap survives a stale future::plan() with dead workers", {
+
+  skip_on_cran()
+
+  ## Save / restore plan around the test.
+  old_plan <- future::plan()
+  on.exit(suppressWarnings(future::plan(old_plan)), add = TRUE)
+
+  ## Install a fresh PSOCK cluster, then forcibly kill its workers
+  ## while the plan still points at it. Mirrors the post-CV state the
+  ## bootstrap path inherits when CV's on.exit restores a plan whose
+  ## underlying cluster was stopped.
+  cl <- parallelly::makeClusterPSOCK(
+    workers      = 2L,
+    rscript_libs = .libPaths(),
+    autoStop     = TRUE
+  )
+  suppressWarnings(future::plan(future::cluster, workers = cl))
+  try(parallel::stopCluster(cl), silent = TRUE)
+
+  expect_no_error({
+    set.seed(42)
+    suppressWarnings(suppressMessages(
+      fect::fect(
+        Y ~ D,
+        data      = simdata,
+        index     = c("id", "time"),
+        method    = "ife",
+        r         = 0:1,
+        CV        = FALSE,
+        force     = "two-way",
+        se        = TRUE,
+        nboots    = 5,
+        parallel  = TRUE
+      )
+    ))
+  })
+})
+
 ## =================================================================
 ## Section G: Regression guard — nevertreated parallel paths
 ## =================================================================
