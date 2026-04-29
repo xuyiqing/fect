@@ -157,3 +157,45 @@ test_that("AC.5: cumulative without keep.sims errors with the locked wording", {
     fixed = FALSE
   )
 })
+
+
+## -- AC.6  n_cells populated from fit$est.att[, "count"] -----------
+
+test_that("AC.6: cumulative event.time n_cells matches fit$est.att counts", {
+
+  skip_on_cran()
+
+  fit <- .fit_no_reversal()
+  est <- fect::estimand(fit, "att.cumu", "event.time")
+
+  expect_true(is.integer(est$n_cells))
+  expect_false(any(is.na(est$n_cells)))
+  expect_true(all(est$n_cells > 0L))
+
+  ## Each event-time row's n_cells equals the corresponding count in
+  ## fit$est.att (same per-period treated-cell count as the level ATT
+  ## --- esplot's bottom-bar panel reads from this column).
+  count_lookup <- as.integer(fit$est.att[, "count"])
+  names(count_lookup) <- rownames(fit$est.att)
+  expected <- unname(count_lookup[as.character(est$event.time)])
+  expect_equal(est$n_cells, expected)
+})
+
+
+test_that("AC.6b: cumulative overall n_cells equals window-summed count", {
+
+  skip_on_cran()
+
+  fit <- .fit_no_reversal()
+  period <- c(1, 5)
+
+  est <- fect::estimand(fit, "att.cumu", "overall", window = period)
+
+  expect_true(is.integer(est$n_cells))
+  expect_false(any(is.na(est$n_cells)))
+
+  et <- as.numeric(rownames(fit$est.att))
+  in_window <- !is.na(et) & et >= period[1] & et <= period[2]
+  expected <- as.integer(sum(fit$est.att[in_window, "count"], na.rm = TRUE))
+  expect_equal(est$n_cells, expected)
+})
