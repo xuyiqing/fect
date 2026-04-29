@@ -1,4 +1,24 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.1 (development)
+
+## New: parametric variance support in `estimand()`
+
+* `estimand()`'s `vartype` argument now accepts `"parametric"` in
+  addition to `"bootstrap"`, `"jackknife"`, and `"none"`. When the
+  fit was produced with `fect(..., vartype = "parametric",
+  keep.sims = TRUE)`, all four `type` values (`"att"`, `"att.cumu"`,
+  `"aptt"`, `"log.att"`) work without modification, sourcing
+  replicates from the parametric `fit$eff.boot` surface populated
+  by the existing fit-time machinery.
+* Byte-equality between `estimand(fit, "att", "event.time")` and
+  `fit$est.att` is preserved under parametric (asserted by tests).
+* The output `vartype` column reports the variance method actually
+  used at fit time (read from `fit$vartype`), which may differ from
+  the user-supplied `vartype` argument; the argument is informational
+  and does not re-aggregate replicates.
+* No changes to fit-time machinery, slot semantics, or the v2.4.0
+  contract documented in `statsclaw-workspace/fect/ref/po-estimands-contract.md`.
+
 # fect 2.4.0 (development)
 
 ## New: post-hoc estimands API

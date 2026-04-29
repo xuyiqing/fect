@@ -408,8 +408,13 @@ imputed_outcomes <- function(fit,
 #'   sugar for \code{cells = ~ event.time >= L & event.time <= R}.
 #' @param direction Either \code{"on"} (default) or \code{"off"}; see
 #'   \code{\link{imputed_outcomes}}.
-#' @param vartype \code{"bootstrap"} (default), \code{"jackknife"}, or
-#'   \code{"none"}.
+#' @param vartype \code{"bootstrap"} (default), \code{"jackknife"},
+#'   \code{"parametric"}, or \code{"none"}. Selects which variance method
+#'   to source replicates from. The output \code{vartype} column reports
+#'   the method actually used at fit time (read from \code{fit$vartype}),
+#'   which may differ from this argument value if the fit was produced
+#'   with a different setting --- the argument is informational and does
+#'   not re-aggregate replicates.
 #' @param conf.level Two-sided confidence level. Defaults to 0.95.
 #' @param ci.method \code{"basic"} (reflected; matches fect's existing
 #'   \code{est.att} convention; default) or \code{"percentile"}.
@@ -449,7 +454,7 @@ estimand <- function(fit,
                      weights     = NULL,
                      window      = NULL,
                      direction   = c("on", "off"),
-                     vartype     = c("bootstrap", "jackknife", "none"),
+                     vartype     = c("bootstrap", "jackknife", "parametric", "none"),
                      conf.level  = 0.95,
                      ci.method   = c("basic", "percentile")) {
 
@@ -755,13 +760,14 @@ estimand <- function(fit,
     }
 
     M <- out_eff$effect.est.att
+    counts <- fit$est.att[match(rownames(M), rownames(fit$est.att)), "count"]
     data.frame(
         event.time = as.numeric(rownames(M)),
         estimate   = unname(M[, "ATT"]),
         se         = unname(M[, "S.E."]),
         ci.lo      = unname(M[, "CI.lower"]),
         ci.hi      = unname(M[, "CI.upper"]),
-        n_cells    = NA_integer_,
+        n_cells    = as.integer(unname(counts)),
         vartype    = if (is.null(fit$vartype)) "bootstrap" else fit$vartype,
         stringsAsFactors = FALSE
     )
@@ -790,12 +796,16 @@ estimand <- function(fit,
 
     has_se <- "S.E." %in% names(final)
 
+    et <- as.numeric(rownames(fit$est.att))
+    in_window <- !is.na(et) & et >= window[1] & et <= window[2]
+    n_cells_window <- sum(fit$est.att[in_window, "count"], na.rm = TRUE)
+
     data.frame(
         estimate = unname(final[catt_col]),
         se       = if (has_se) unname(final["S.E."])     else NA_real_,
         ci.lo    = if (has_se) unname(final["CI.lower"]) else NA_real_,
         ci.hi    = if (has_se) unname(final["CI.upper"]) else NA_real_,
-        n_cells  = NA_integer_,
+        n_cells  = as.integer(n_cells_window),
         vartype  = if (is.null(fit$vartype)) "bootstrap" else fit$vartype,
         stringsAsFactors = FALSE
     )

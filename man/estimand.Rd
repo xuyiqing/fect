@@ -19,7 +19,7 @@ estimand(
   weights     = NULL,
   window      = NULL,
   direction   = c("on", "off"),
-  vartype     = c("bootstrap", "jackknife", "none"),
+  vartype     = c("bootstrap", "jackknife", "parametric", "none"),
   conf.level  = 0.95,
   ci.method   = c("basic", "percentile")
 )
@@ -54,8 +54,13 @@ estimand(
   \item{direction}{Either \code{"on"} (default) or \code{"off"}; see
     \code{\link{imputed_outcomes}}.}
 
-  \item{vartype}{\code{"bootstrap"} (default), \code{"jackknife"}, or
-    \code{"none"}.}
+  \item{vartype}{\code{"bootstrap"} (default), \code{"jackknife"},
+    \code{"parametric"}, or \code{"none"}. Selects which variance
+    method to source replicates from. The output \code{vartype}
+    column reports the method actually used at fit time (read from
+    \code{fit$vartype}), which may differ from this argument value
+    if the fit was produced with a different setting --- the argument
+    is informational and does not re-aggregate replicates.}
 
   \item{conf.level}{Two-sided confidence level. Defaults to 0.95.}
 

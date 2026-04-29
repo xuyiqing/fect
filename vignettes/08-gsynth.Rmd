@@ -407,6 +407,21 @@ plot(out_turnout, type = "factors", xlab = "Year")
 plot(out_turnout, type = "loadings")
 ```
 
+### Cumulative Effects
+
+For staggered adoption without treatment reversals, the cumulative ATT summarizes how the total treatment dose accumulates over relative time — useful for outcomes where each additional treated period adds to a running total (e.g., cumulative voter mobilization). Because `out_turnout` was estimated with `keep.sims = TRUE` and `vartype = "parametric"`, the per-cell replicate surface needed for `estimand()` is available.
+
+```{r turnout-cumulative, fig.height=5, fig.width=7}
+cumu.turnout <- estimand(out_turnout, "att.cumu", "event.time")
+esplot(cumu.turnout, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       Count = "n_cells",
+       main = "Cumulative Effect of EDR Reform on Turnout",
+       ylab = "Cumulative ATT")
+```
+
+See [Chapter @sec-estimands] (Alternative Estimands) for the full `estimand()` API including parametric variance, log-scale ATT, and APTT.
+
 ------------------------------------------------------------------------
 
 ## Unbalanced panels
