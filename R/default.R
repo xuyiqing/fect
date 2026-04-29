@@ -2982,6 +2982,10 @@ fect.default <- function(
             placebo.period = placebo.period,
             carryoverTest = carryoverTest,
             carryover.period = carryover.period,
+            ## Stored on the fit object so plot logic does not need to
+            ## re-parse `x$call` — robust under do.call(), positional
+            ## args, and call-rewriting wrappers.
+            carryover.rm = carryover.rm,
             unit.type = unit.type,
             obs.missing = obs.missing,
             obs.missing.balance = obs.missing.balance,

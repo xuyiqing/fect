@@ -1564,16 +1564,34 @@ fect_boot <- function(
     }
 
     run_dopar_retry <- function(idx, workers) {
-      cl <- parallel::makePSOCKcluster(workers)
+      ## Build the PSOCK cluster via the package helper, which bakes
+      ## .libPaths() into worker startup (rscript_libs) — eliminating
+      ## the post-construction `clusterCall(.libPaths)` race that
+      ## occasionally killed a worker before iter 1 in mixed CV+boot
+      ## test runs (E.6 in test-cv-parallel.R). Retry-with-backoff on
+      ## socket-init failure; shrink workers between attempts.
+      cl <- NULL
+      init_err <- NULL
+      try_workers <- max(1L, as.integer(workers))
+      for (attempt in seq_len(3L)) {
+        cl <- tryCatch(
+          .fect_make_future_cluster(try_workers),
+          error = function(e) {
+            init_err <<- e
+            NULL
+          }
+        )
+        if (!is.null(cl)) break
+        Sys.sleep(0.5 * attempt)
+        try_workers <- max(1L, try_workers - 1L)
+      }
+      if (is.null(cl)) {
+        stop("PSOCK cluster initialization failed: ",
+             conditionMessage(init_err))
+      }
       on.exit({
         try(parallel::stopCluster(cl), silent = TRUE)
       }, add = TRUE)
-      ## Propagate parent .libPaths() so PSOCK workers can find fect
-      ## (and other user-installed packages) regardless of how the
-      ## parent R session was launched (e.g. Quarto render).
-      parent_libs <- .libPaths()
-      try(parallel::clusterCall(cl, function(p) .libPaths(p),
-                                p = parent_libs), silent = TRUE)
       doParallel::registerDoParallel(cl)
       suppressWarnings(foreach(
         j = idx,
@@ -1638,7 +1656,23 @@ fect_boot <- function(
           workers <- max(1L, min(raw_cores, 8L))
         }
         workers <- max(1L, as.integer(workers))
-        run_dopar_retry(1:nboots, workers)
+        ## If doParallel ALSO can't bring up a cluster (cluster-init
+        ## storm after CV plan teardown, etc.), degrade to sequential
+        ## rather than letting fect() die. Bootstrap completes with
+        ## reduced throughput; downstream aggregation is unaffected.
+        tryCatch(
+          run_dopar_retry(1:nboots, workers),
+          error = function(e2) {
+            warning(
+              paste0(
+                "doParallel backend also failed (",
+                conditionMessage(e2),
+                "). Falling back to sequential bootstrap."
+              )
+            )
+            lapply(seq_len(nboots), quiet_nonpara)
+          }
+        )
       }
     )
 

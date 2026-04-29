@@ -1,5 +1,17 @@
 # Changelog {#sec-changelog .unnumbered}
 
+## v2.3.3
+
+(2026-04-28)
+
+**Bug fixes.**
+
+* `diagtest()` no longer crashes with "incorrect number of dimensions" when only one bootstrap column survives the all-non-NA filter (`drop = FALSE` at both filter sites in `R/diagtest.R`).
+* Bootstrap PSOCK cluster init now uses the shared `rscript_libs = .libPaths()` helper, wrapped in a 3-attempt retry-with-backoff. Eliminates the intermittent PSOCK race that surfaced in mixed CV+boot test runs; falls back to sequential bootstrap if `doParallel` also fails.
+* `carryover.rm` is now stored on the fit object. `plot.fect()` reads it from the slot rather than re-parsing `x$call`; correct under `do.call()`, programmatic wrappers, and any call-rewriting code path.
+
+**Documentation.** Chapter 2 §Other estimands gains a worked example for post-hoc estimands derived from the imputed potential-outcome surface, showing APTT [@chen2024logs] with bootstrap CIs from the existing fit slots.
+
 ## v2.3.2
 
 (2026-04-28)
