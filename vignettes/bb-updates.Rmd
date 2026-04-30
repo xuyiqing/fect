@@ -2,27 +2,18 @@
 
 ## v2.4.1
 
-(2026-04-29)
+(2026-04-30) CRAN release.
 
-**New: parametric variance support in `estimand()`.** The `vartype`
-argument on `estimand()` now accepts `"parametric"` in addition to
-`"bootstrap"`, `"jackknife"`, and `"none"`. When the fit was produced
-with `fect(..., vartype = "parametric", keep.sims = TRUE)`, all four
-`type` values (`"att"`, `"att.cumu"`, `"aptt"`, `"log.att"`) work
-without modification, sourcing replicates from the parametric
-`fit$eff.boot` surface that the existing fit-time machinery already
-populates. Byte-equality between `estimand(fit, "att", "event.time")`
-and `fit$est.att` is preserved under parametric (asserted by tests).
+**Enhancement.** `estimand()`'s `vartype` argument now accepts
+`"parametric"` in addition to `"bootstrap"`, `"jackknife"`, and
+`"none"`. Works for all four `type` values when the fit was produced
+with `fect(..., vartype = "parametric", keep.sims = TRUE)`. See
+@sec-estimands for a worked example.
 
-The output `vartype` column reports the variance method actually used
-at fit time (read from `fit$vartype`), which may differ from the
-user-supplied `vartype` argument; the argument is informational and
-does not re-aggregate replicates.
-
-No fit-time machinery changed in v2.4.1: the v2.4.0 slot contract
-holds verbatim. The single user-visible change is the wider
-`match.arg` enum on `estimand()`'s `vartype` argument and a small
-section in @sec-estimands walking through a parametric example.
+**Bug fix.** `estimand(fit, "att.cumu", ...)` now populates `n_cells`
+on both event-time and overall paths, so
+`esplot(..., Count = "n_cells")` draws the bottom-bar treated-cell
+panel for cumulative plots.
 
 ## v2.4.0
 

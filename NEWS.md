@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD025 -->
-# fect 2.4.1 (development)
+# fect 2.4.1
 
 ## New: parametric variance support in `estimand()`
 
@@ -19,7 +19,7 @@
 * No changes to fit-time machinery, slot semantics, or the v2.4.0
   contract documented in `statsclaw-workspace/fect/ref/po-estimands-contract.md`.
 
-# fect 2.4.0 (development)
+# fect 2.4.0
 
 ## New: post-hoc estimands API
 
@@ -66,7 +66,7 @@
     `estimand(fit, "att.cumu", "overall", window = c(L, R))`
   Numerical equality is asserted by package tests.
 
-# fect 2.3.3 (development)
+# fect 2.3.3
 
 ## Bug fixes
 
@@ -93,7 +93,7 @@
   showing APTT (Chen & Roth 2024) with bootstrap CIs from the
   existing fit slots. Issue #126 (ajunquera).
 
-# fect 2.3.2 (development)
+# fect 2.3.2
 
 ## Modern visual defaults for `plot.fect()` (visual breaking change)
 
