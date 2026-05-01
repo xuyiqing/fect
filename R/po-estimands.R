@@ -456,12 +456,24 @@ estimand <- function(fit,
                      direction   = c("on", "off"),
                      vartype     = c("bootstrap", "jackknife", "parametric", "none"),
                      conf.level  = 0.95,
-                     ci.method   = c("basic", "percentile")) {
+                     ci.method   = NULL) {
 
     type      <- match.arg(type)
     direction <- match.arg(direction)
     vartype   <- match.arg(vartype)
-    ci.method <- match.arg(ci.method)
+
+    ## ci.method = NULL triggers per-type defaults (v2.4.2+).
+    ## See statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md.
+    if (is.null(ci.method)) {
+        ci.method <- switch(type,
+            "att"      = "normal",      ## matches what fit$est.att uses (Wald: theta +- z*SE)
+            "att.cumu" = "percentile",  ## matches att.cumu() internals
+            "aptt"     = "bc",          ## ratio estimator: bias-corrected for skew
+            "log.att"  = "bc"           ## log estimator: bias-corrected for skew
+        )
+    }
+    ci.method <- match.arg(ci.method,
+                           c("basic", "percentile", "bc", "normal"))
 
     by_canon <- c("event.time", "cohort", "calendar.time", "overall")
     if (length(by) > 1L) {
@@ -533,13 +545,14 @@ estimand <- function(fit,
     ##   - weights = NULL (use fit's W.agg if any)
     ##   - direction = "on"
     ##   - conf.level = 0.95 (fit$est.att uses 95% by default)
-    ##   - ci.method = "basic" (fect's convention)
+    ##   - ci.method = "normal" (fit$est.att uses Wald: theta +- z*SE)
+    ##                          --- this is the v2.4.2 default for type="att"
     is_fast_path <- by == "event.time" &&
                     is.null(cells) &&
                     is.null(weights) &&
                     direction == "on" &&
                     abs(conf.level - 0.95) < 1e-12 &&
-                    ci.method == "basic"
+                    ci.method == "normal"
 
     if (is_fast_path) {
         return(.estimand_att_fast_event_time(fit))
@@ -621,17 +634,10 @@ estimand <- function(fit,
             mean(fit$eff.boot[, , b][cell_mask], na.rm = TRUE)
         }, numeric(1))
 
-        se_val <- stats::sd(att_b, na.rm = TRUE)
-        alpha  <- 1 - conf.level
-        probs  <- c(alpha / 2, 1 - alpha / 2)
-        qs     <- stats::quantile(att_b, probs = probs, na.rm = TRUE)
-        if (ci.method == "percentile") {
-            ci_lo <- unname(qs[1])
-            ci_hi <- unname(qs[2])
-        } else {
-            ci_lo <- 2 * estimate - unname(qs[2])
-            ci_hi <- 2 * estimate - unname(qs[1])
-        }
+        ci <- .compute_ci(estimate, att_b, ci.method, conf.level)
+        se_val <- ci$se
+        ci_lo  <- ci$ci.lo
+        ci_hi  <- ci$ci.hi
     }
 
     used_vartype <- if (vartype == "none") "none"
@@ -902,15 +908,10 @@ estimand <- function(fit,
             aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
                        colMeans(Y0_boot,        na.rm = TRUE)
 
-            se_vec[k] <- stats::sd(aptt_b, na.rm = TRUE)
-            qs <- stats::quantile(aptt_b, probs = probs, na.rm = TRUE)
-            if (ci.method == "percentile") {
-                ci_lo[k] <- unname(qs[1])
-                ci_hi[k] <- unname(qs[2])
-            } else {
-                ci_lo[k] <- 2 * estimate[k] - unname(qs[2])
-                ci_hi[k] <- 2 * estimate[k] - unname(qs[1])
-            }
+            ci <- .compute_ci(estimate[k], aptt_b, ci.method, conf.level)
+            se_vec[k] <- ci$se
+            ci_lo[k]  <- ci$ci.lo
+            ci_hi[k]  <- ci$ci.hi
         }
     }
 
@@ -1040,15 +1041,10 @@ estimand <- function(fit,
             log_diff_b <- log_Y - log_Y0_b
             logatt_b  <- colMeans(log_diff_b, na.rm = TRUE)
 
-            se_vec[k] <- stats::sd(logatt_b, na.rm = TRUE)
-            qs <- stats::quantile(logatt_b, probs = probs, na.rm = TRUE)
-            if (ci.method == "percentile") {
-                ci_lo[k] <- unname(qs[1])
-                ci_hi[k] <- unname(qs[2])
-            } else {
-                ci_lo[k] <- 2 * estimate[k] - unname(qs[2])
-                ci_hi[k] <- 2 * estimate[k] - unname(qs[1])
-            }
+            ci <- .compute_ci(estimate[k], logatt_b, ci.method, conf.level)
+            se_vec[k] <- ci$se
+            ci_lo[k]  <- ci$ci.lo
+            ci_hi[k]  <- ci$ci.hi
         }
     }
 
@@ -1079,6 +1075,66 @@ estimand <- function(fit,
 ## ---------------------------------------------------------------------------
 ## Internal helpers
 ## ---------------------------------------------------------------------------
+
+## Compute SE and (lo, hi) confidence-interval bounds from a bootstrap
+## distribution `boot` (a numeric vector of replicate-level estimates),
+## a point `estimate`, and a chosen `ci.method`.
+##
+## Supports four methods:
+##   - "basic":     ci = (2*est - q_hi, 2*est - q_lo) [reflected]
+##   - "percentile": ci = (q_lo, q_hi)
+##   - "bc":        bias-corrected percentile (z0 only, no acceleration)
+##                  ci = (q_{Phi(2*z0 + z_alpha/2)},
+##                        q_{Phi(2*z0 + z_{1-alpha/2})})
+##                  where z0 = Phi^-1(mean(boot < est)).
+##   - "normal":    ci = est +/- z_{1-alpha/2} * SE   [Wald]
+##
+## Returns a list with elements `se`, `ci.lo`, `ci.hi`.
+##
+## See statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md
+## for the design rationale and per-type defaults.
+.compute_ci <- function(estimate, boot, ci.method, conf.level) {
+    alpha <- 1 - conf.level
+    se    <- stats::sd(boot, na.rm = TRUE)
+
+    if (ci.method == "normal") {
+        z <- stats::qnorm(1 - alpha / 2)
+        return(list(se    = se,
+                    ci.lo = estimate - z * se,
+                    ci.hi = estimate + z * se))
+    }
+
+    probs <- c(alpha / 2, 1 - alpha / 2)
+    qs    <- stats::quantile(boot, probs = probs, na.rm = TRUE)
+
+    if (ci.method == "percentile") {
+        return(list(se = se, ci.lo = unname(qs[1]), ci.hi = unname(qs[2])))
+    }
+    if (ci.method == "basic") {
+        return(list(se    = se,
+                    ci.lo = 2 * estimate - unname(qs[2]),
+                    ci.hi = 2 * estimate - unname(qs[1])))
+    }
+    if (ci.method == "bc") {
+        valid <- !is.na(boot)
+        if (sum(valid) == 0L) {
+            return(list(se = NA_real_, ci.lo = NA_real_, ci.hi = NA_real_))
+        }
+        ## z0 = bias correction = Phi^-1(P(boot < estimate))
+        p_below <- mean(boot[valid] < estimate)
+        ## Clamp to avoid +/-Inf at the boundaries
+        p_below <- pmin(pmax(p_below, 1e-6), 1 - 1e-6)
+        z0      <- stats::qnorm(p_below)
+        z_lo    <- stats::qnorm(alpha / 2)
+        z_hi    <- stats::qnorm(1 - alpha / 2)
+        a_lo    <- stats::pnorm(2 * z0 + z_lo)
+        a_hi    <- stats::pnorm(2 * z0 + z_hi)
+        bc_qs   <- stats::quantile(boot, probs = c(a_lo, a_hi), na.rm = TRUE)
+        return(list(se = se, ci.lo = unname(bc_qs[1]), ci.hi = unname(bc_qs[2])))
+    }
+    stop("Unknown ci.method = \"", ci.method, "\".", call. = FALSE)
+}
+
 
 ## Apply a `cells` filter (NULL, logical, or one-sided formula/function)
 ## against a long-form data frame. Returns the filtered data frame.

@@ -59,7 +59,7 @@ fect <- function(
     vartype = "bootstrap", # bootstrap or jackknife
     cl = NULL,
     quantile.CI = FALSE,
-    nboots = 200, # number of bootstraps
+    nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
@@ -140,7 +140,7 @@ fect.formula <- function(
     vartype = "bootstrap", # bootstrap or jackknife
     cl = NULL,
     quantile.CI = FALSE,
-    nboots = 200, # number of bootstraps
+    nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
@@ -336,7 +336,7 @@ fect.default <- function(
     vartype = "bootstrap", # bootstrap or jackknife
     cl = NULL,
     quantile.CI = FALSE,
-    nboots = 200, # number of bootstraps
+    nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
@@ -776,7 +776,7 @@ fect.default <- function(
 
     ## nboots
     if (se == TRUE & nboots <= 0) {
-        stop("\"nboots\" option misspecified. Try, for example, nboots = 200.")
+        stop("\"nboots\" option misspecified. Try, for example, nboots = 1000.")
     }
 
     ## parallel & cores
