@@ -109,6 +109,7 @@ fect_boot <- function(
   carryoverTest = 0,
   carryover.period = NULL,
   vartype = "bootstrap",
+  para.error = "auto",
   quantile.CI = FALSE,
   nboots = 200,
   parallel = TRUE,
@@ -658,8 +659,6 @@ fect_boot <- function(
   if (dis) {
     if (vartype == "jackknife") {
       message("Jackknife estimates ... ")
-    } else if (vartype == "wild") {
-      message("Wild bootstrap (unit-level Rademacher) for uncertainties ... ")
     } else {
       message("Bootstrapping for uncertainties ... ")
     }
@@ -774,7 +773,13 @@ fect_boot <- function(
   } else if (
     binary == FALSE & method %in% c("gsynth", "ife", "cfe") & vartype == "parametric"
   ) {
-    message("Parametric Bootstrap \n")
+    ## Resolve para.error = "auto" to the concrete mode for this dataset.
+    para.error.resolved <- if (identical(para.error, "auto")) {
+        if (0 %in% I) "ar" else "empirical"
+    } else {
+        para.error
+    }
+    message("Parametric Bootstrap (para.error = \"", para.error.resolved, "\") \n")
     sum.D <- colSums(out$D)
     id.tr <- which(sum.D > 0)
     I.tr <- as.matrix(out$I[, id.tr])
@@ -914,7 +919,7 @@ fect_boot <- function(
       }
     }
 
-    if (0 %in% I) {
+    if (para.error.resolved == "ar") {
       ## calculate vcov of ep_tr
       na.sum <- sapply(1:nboots, function(vec) {
         sum(is.na(c(error.tr[,, vec])))
@@ -961,7 +966,9 @@ fect_boot <- function(
 
       ## get the error for the treated and control
       error.tr.boot <- matrix(NA, TT, Ntr)
-      if (0 %in% I) {
+      if (para.error.resolved == "ar") {
+        ## Path AR: draw from MVN with AR-vcov estimated from Loop 1 pool.
+        ## Works for fully-observed and missing-data panels.
         for (w in 1:Ntr) {
           error.tr.boot[, w] <- t(rmvnorm(
             n = 1,
@@ -978,7 +985,10 @@ fect_boot <- function(
           method = "svd"
         ))
         error.co.boot[which(as.matrix(I[, fake.co]) == 0)] <- 0
-      } else {
+
+      } else if (para.error.resolved == "empirical") {
+        ## Path empirical: column-resample from the Loop 1 pool.
+        ## Requires fully-observed panel (validated at fit time).
         for (w in 1:Ntr) {
           error.tr.boot[, w] <- error.tr[,
             w,
@@ -986,6 +996,27 @@ fect_boot <- function(
           ]
         }
         error.co.boot <- error.co[, sample(1:Nco, Nco, replace = TRUE)]
+
+      } else {
+        ## Path wild: unit-level Rademacher sign-flip on Loop 1 pool draws.
+        ## Preserves within-unit AR structure (sign applied to entire time series).
+        ## Requires fully-observed panel (validated at fit time).
+        ## This is variant-(i): treated cells receive error.tr.boot (from Loop 1 pool),
+        ## NOT the observed treatment effect. The bootstrap distribution is H0-centered.
+        ## The po-estimands.R location-shift (commit b4e9fbf) re-centers at theta-hat.
+        signs    <- sample(c(-1, 1), Ntr, replace = TRUE)
+        co_signs <- sample(c(-1, 1), Nco, replace = TRUE)
+
+        for (w in 1:Ntr) {
+          j <- sample(1:dim(error.tr)[3], 1, replace = TRUE)
+          error.tr.boot[, w] <- signs[w] * error.tr[, w, j]
+        }
+
+        co_picks      <- sample(1:Nco, Nco, replace = TRUE)
+        error.co.boot <- error.co[, co_picks, drop = FALSE]
+        ## Apply per-unit sign to entire column (unit's full time series).
+        ## t(t(M) * v) multiplies column k of M by v[k].
+        error.co.boot <- t(t(error.co.boot) * co_signs)
       }
 
       Y.boot <- fit.out[, id.boot]
@@ -1132,31 +1163,9 @@ fect_boot <- function(
   } else {
     one.nonpara <- function(num = NULL) {
       ## Y.input is what gets passed to the per-method bootstrap refit.
-      ## For case bootstrap and jackknife it is just the original Y; for
-      ## wild bootstrap it is the imputed surface plus Rademacher-sign-
-      ## perturbed residuals on observed control cells.
+      ## For case bootstrap and jackknife it is just the original Y.
       Y.input <- Y
-      if (vartype == "wild") {
-        ## Wild bootstrap (Liu 1988; Mammen 1993; cluster extension
-        ## Cameron-Gelbach-Miller 2008). Keep all units; perturb the
-        ## residuals from the main fit by unit-level Rademacher signs
-        ## (one sign per unit, applied to all of unit i's residuals).
-        ## Suitable for panel data with within-unit dependence; preserves
-        ## the treated/control composition exactly (no unit dropout).
-        boot.id <- seq_len(N)
-        boot.group <- group
-        signs <- sample(c(-1, 1), N, replace = TRUE)
-        sign_mat <- matrix(rep(signs, each = TT), nrow = TT, ncol = N)
-        res_mask <- (D == 0) & (I == 1)
-        e_mat <- matrix(0, TT, N)
-        e_mat[res_mask] <- (Y - fit.out)[res_mask]
-        Y.input <- fit.out + sign_mat * e_mat
-        ## Treated post-treatment cells keep observed Y (they are masked
-        ## from the imputation anyway via D = 1, but we leave Y_obs
-        ## intact so the resulting eff = Y_obs - Y0_b is interpretable).
-        treat_mask <- (D == 1)
-        Y.input[treat_mask] <- Y[treat_mask]
-      } else if (is.null(num)) {
+      if (is.null(num)) {
         ## case bootstrap (resample units with replacement)
         if (is.null(cl)) {
           if (hasRevs == 0) {
@@ -2133,7 +2142,7 @@ fect_boot <- function(
     if (!is.character(vartype) || length(vartype) != 1) {
       stop("'vartype' must be a single string.")
     }
-    valid_vartypes <- c("bootstrap", "jackknife", "wild") # Only non-parametric types are valid here
+    valid_vartypes <- c("bootstrap", "jackknife") # Only non-parametric types are valid here
     if (!(vartype %in% valid_vartypes)) {
       stop(paste(
         "'vartype' must be one of:",
@@ -2663,7 +2672,7 @@ fect_boot <- function(
       dimnames = list(NULL, c("lower", "upper"))
     )
 
-    if (vartype == "bootstrap" || vartype == "wild") {
+    if (vartype == "bootstrap") {
       if (n_replicates > 0 && num_periods_out > 0) {
         if (
           nrow(repl_tr) != num_periods_out || nrow(repl_cf) != num_periods_out
@@ -4671,7 +4680,8 @@ fect_boot <- function(
     att.boot.original = att.boot.original,
     att.vcov = vcov.att,
     att.count.boot = att.count.boot,
-    vartype = vartype
+    vartype = vartype,
+    para.error = if (vartype == "parametric" && exists("para.error.resolved")) para.error.resolved else NULL
   )
   if (keep.sims) {
     result = c(

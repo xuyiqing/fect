@@ -57,6 +57,7 @@ fect <- function(
     method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
+    para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
     quantile.CI = FALSE,
     nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
@@ -138,6 +139,7 @@ fect.formula <- function(
     method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
+    para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
     quantile.CI = FALSE,
     nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
@@ -251,6 +253,7 @@ fect.formula <- function(
         method = method,
         se = se,
         vartype = vartype,
+        para.error = para.error,
         cl = cl,
         quantile.CI = quantile.CI,
         nboots = nboots,
@@ -334,6 +337,7 @@ fect.default <- function(
     method = "fe", # method: ife for interactive fe; mc for matrix completion
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
+    para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
     quantile.CI = FALSE,
     nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
@@ -421,19 +425,40 @@ fect.default <- function(
         stop("\"cm\" option is only available for the \"fe\" and \"ife\" methods.")
     }
 
+    ## Deprecation: vartype = "wild" is now an alias for
+    ## vartype = "parametric" + para.error = "wild".
+    if (isTRUE(vartype == "wild")) {
+        warning(
+            "vartype = \"wild\" is deprecated as a standalone vartype. ",
+            "It has been folded into the parametric bootstrap as ",
+            "para.error = \"wild\". ",
+            "Setting vartype = \"parametric\"; para.error = \"wild\" automatically. ",
+            "Update your code: fect(..., vartype = \"parametric\", para.error = \"wild\"). ",
+            "The standalone vartype = \"wild\" alias will be removed in fect v2.5.0.",
+            call. = FALSE
+        )
+        vartype    <- "parametric"
+        para.error <- "wild"
+    }
+
     if (se == 1) {
-        if (!vartype %in% c("bootstrap", "jackknife", "parametric",
-                            "wild")) {
-            stop("\"vartype\" option misspecified.")
+        if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
+            stop(
+                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", or \"parametric\". ",
+                "(\"wild\" is now para.error = \"wild\" inside vartype = \"parametric\"; ",
+                "see ?fect for details.)",
+                call. = FALSE
+            )
         }
         if (vartype == "parametric" && method %in% c("mc", "both")) {
             stop(
                 "The \"parametric\" option is not available for the \"mc\" or \"both\" methods."
             )
         }
-        if (vartype == "wild" && binary == TRUE) {
+        if (!para.error %in% c("auto", "ar", "empirical", "wild")) {
             stop(
-                "The \"wild\" vartype is not supported for binary outcomes."
+                "\"para.error\" must be one of \"auto\", \"ar\", \"empirical\", or \"wild\".",
+                call. = FALSE
             )
         }
     }
@@ -1854,6 +1879,19 @@ fect.default <- function(
             "controls are available) or vartype = \"bootstrap\" or \"jackknife\"."
         )
     }
+    ## para.error = "empirical" or "wild" requires fully-observed panel.
+    if (se == 1 && vartype == "parametric" &&
+        para.error %in% c("empirical", "wild") &&
+        (0 %in% I)) {
+        stop(
+            "para.error = \"", para.error, "\" requires a fully-observed panel ",
+            "(no missing cells in the observation matrix I). ",
+            "The current data has unobserved cells. ",
+            "Use para.error = \"ar\" or para.error = \"auto\" (which selects \"ar\" automatically ",
+            "when missing data are present).",
+            call. = FALSE
+        )
+    }
 
     ## 5. switch-off periods
     T.off <- NULL
@@ -2462,6 +2500,7 @@ fect.default <- function(
             carryoverTest = carryoverTest,
             carryover.period = carryover.period,
             vartype = vartype,
+            para.error = para.error,
             quantile.CI = quantile.CI,
             nboots = nboots,
             parallel = parallel,
