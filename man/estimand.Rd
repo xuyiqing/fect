@@ -21,7 +21,7 @@ estimand(
   direction   = c("on", "off"),
   vartype     = c("bootstrap", "jackknife", "parametric", "none"),
   conf.level  = 0.95,
-  ci.method   = c("basic", "percentile")
+  ci.method   = NULL
 )
 }
 
@@ -64,8 +64,16 @@ estimand(
 
   \item{conf.level}{Two-sided confidence level. Defaults to 0.95.}
 
-  \item{ci.method}{\code{"basic"} (reflected; matches fect's existing
-    \code{est.att} convention; default) or \code{"percentile"}.}
+  \item{ci.method}{One of \code{"basic"}, \code{"percentile"},
+    \code{"bc"} (bias-corrected percentile), or \code{"normal"}
+    (Wald: \eqn{\hat\theta \pm z \cdot SE}). Default is \code{NULL},
+    which triggers a per-type default: \code{"att"} -> \code{"normal"}
+    (matches what \code{fit$est.att} already uses internally),
+    \code{"att.cumu"} -> \code{"percentile"} (matches what
+    \code{att.cumu()} does internally), \code{"aptt"} -> \code{"bc"}
+    and \code{"log.att"} -> \code{"bc"} (ratio / log estimators
+    benefit from bias correction when the bootstrap distribution is
+    skewed). Pass an explicit value to override.}
 }
 
 \value{

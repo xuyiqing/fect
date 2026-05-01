@@ -416,8 +416,17 @@ imputed_outcomes <- function(fit,
 #'   with a different setting --- the argument is informational and does
 #'   not re-aggregate replicates.
 #' @param conf.level Two-sided confidence level. Defaults to 0.95.
-#' @param ci.method \code{"basic"} (reflected; matches fect's existing
-#'   \code{est.att} convention; default) or \code{"percentile"}.
+#' @param ci.method One of \code{"basic"} (reflected),
+#'   \code{"percentile"} (raw bootstrap quantiles), \code{"bc"}
+#'   (bias-corrected percentile; Efron 1987 minus the acceleration),
+#'   or \code{"normal"} (Wald: \eqn{\hat\theta \pm z \cdot SE}).
+#'   Default is \code{NULL}, which triggers a per-type default:
+#'   \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
+#'   already uses), \code{"att.cumu"} -> \code{"percentile"} (matches
+#'   what \code{att.cumu()} does internally), \code{"aptt"} ->
+#'   \code{"bc"} and \code{"log.att"} -> \code{"bc"} (ratio / log
+#'   estimators benefit from bias correction when the bootstrap
+#'   distribution is skewed). Pass an explicit value to override.
 #'
 #' @return A data frame with columns \code{<by_key>}, \code{estimate},
 #'   \code{se}, \code{ci.lo}, \code{ci.hi}, \code{n_cells}, and
