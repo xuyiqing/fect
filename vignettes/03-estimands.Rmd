@@ -24,7 +24,10 @@ df <- expand.grid(id = 1:N, time = 1:TT)
 treat_start <- sample(c(NA, 8:18), N, replace = TRUE)
 df$D <- ifelse(is.na(treat_start[df$id]) | df$time < treat_start[df$id],
                0, 1)
-df$Y <- exp(0.5 + 0.05 * df$time + 0.3 * df$D + rnorm(nrow(df), sd = 0.2))
+## Higher intercept (2.0) and smaller noise (sd = 0.1) keep Y safely
+## positive throughout, so the v2.4.2+ cell-drop hard-error in
+## log.att / aptt does not fire on benign bootstrap noise.
+df$Y <- exp(2.0 + 0.05 * df$time + 0.3 * df$D + rnorm(nrow(df), sd = 0.1))
 
 fit <- fect(Y ~ D, data = df, index = c("id", "time"),
             method = "fe", force = "two-way",
@@ -106,7 +109,9 @@ estimand(fit, "log.att", "event.time") |>
   head(8)
 ```
 
-The mean log-scale treatment effect: at each event time, the average over treated cells of $\log Y_{it} - \log \widehat{Y}_{it}(0)$. Cells where either the observed outcome or the imputed counterfactual is non-positive are dropped from the aggregation, since the logarithm is undefined there. A single warning per call reports how many cells were excluded.
+The mean log-scale treatment effect: at each event time, the average over treated cells of $\log Y_{it} - \log \widehat{Y}_{it}(0)$. Cells where either the observed outcome or the imputed counterfactual is non-positive are dropped from the point estimate, since the logarithm is undefined there.
+
+Starting in v2.4.2, when a cell used in the point estimate has $\widehat{Y}_{it}(0)_b \le 0$ in more than 5% of bootstrap replicates, `estimand("log.att", ...)` errors with actionable guidance (filter the unstable cells, transform the outcome, or use a different estimand) instead of silently dropping the cell from the per-replicate average. The pre-v2.4.2 silent-drop behavior contaminated the bootstrap distribution and produced meaningless inference for users whose data had near-zero $\widehat{Y}(0)$ cells. The example DGP above uses an exponential-link outcome with a high enough intercept that no cell's bootstrap distribution crosses zero.
 
 ```{r plot-log-att-event-time, eval = TRUE, fig.width = 6, fig.height = 4.5}
 log_att <- estimand(fit, "log.att", "event.time")
