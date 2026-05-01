@@ -398,6 +398,17 @@ imputed_outcomes <- function(fit,
 #'   per-event-time series), \code{"cohort"}, \code{"calendar.time"},
 #'   \code{"overall"} (one row), or any column name resolvable in the
 #'   fit's panel data.
+#' @param test Selects which subset of cells to aggregate over (v2.4.3+).
+#'   \code{"none"} (default) uses standard treated post-treatment
+#'   cells. \code{"placebo"} restricts to pre-treatment cells in
+#'   \code{fit$placebo.period} that were masked-and-imputed during the
+#'   placebo fit; produces e.g.\ a per-event-time placebo APTT series
+#'   for credibility checks. Requires \code{placeboTest = TRUE} at fit
+#'   time; forces \code{direction = "on"}. \code{"carryover"} is the
+#'   analogous extension on the reversal side; requires
+#'   \code{carryoverTest = TRUE} + a panel with reversals; forces
+#'   \code{direction = "off"}. Both incompatible with
+#'   \code{type = "att.cumu"}.
 #' @param cells Optional filter on which treated cells to include.
 #'   Accepts \code{NULL} (default; all treated cells), a logical vector,
 #'   or a one-sided formula. See \code{\link{imputed_outcomes}}.
@@ -459,6 +470,7 @@ estimand <- function(fit,
                      type   = c("att", "att.cumu", "aptt", "log.att"),
                      by     = c("event.time", "cohort", "calendar.time",
                                 "overall"),
+                     test        = c("none", "placebo", "carryover"),
                      cells       = NULL,
                      weights     = NULL,
                      window      = NULL,
@@ -468,8 +480,27 @@ estimand <- function(fit,
                      ci.method   = NULL) {
 
     type      <- match.arg(type)
-    direction <- match.arg(direction)
+    test      <- match.arg(test)
     vartype   <- match.arg(vartype)
+
+    ## test = "placebo" / "carryover": auto-set direction to the semantic
+    ## default. Users should not need to remember the pairing.
+    if (test == "placebo") {
+        direction <- "on"
+    } else if (test == "carryover") {
+        direction <- "off"
+    } else {
+        direction <- match.arg(direction)
+    }
+
+    ## Cumulative semantics are undefined for placebo / carryover cells.
+    if (test != "none" && type == "att.cumu") {
+        stop("estimand(type = \"att.cumu\") is incompatible with ",
+             "test = \"", test, "\". Cumulative effects are defined ",
+             "relative to treatment onset; placebo and carryover cells ",
+             "do not have a meaningful cumulative anchor.",
+             call. = FALSE)
+    }
 
     ## ci.method = NULL triggers per-type defaults (v2.4.2+).
     ## See statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md.
@@ -521,7 +552,7 @@ estimand <- function(fit,
 
     if (type == "att") {
         return(.estimand_att(fit, by, cells, weights, direction,
-                             vartype, conf.level, ci.method))
+                             vartype, conf.level, ci.method, test))
     }
     if (type == "att.cumu") {
         return(.estimand_att_cumu(fit, by, cells, weights, direction,
@@ -529,11 +560,11 @@ estimand <- function(fit,
     }
     if (type == "aptt") {
         return(.estimand_aptt(fit, by, cells, weights, direction,
-                              vartype, conf.level, ci.method))
+                              vartype, conf.level, ci.method, test))
     }
     if (type == "log.att") {
         return(.estimand_log_att(fit, by, cells, weights, direction,
-                                 vartype, conf.level, ci.method))
+                                 vartype, conf.level, ci.method, test))
     }
 
     stop("type = \"", type, "\" is part of the v2.4.0 API surface but ",
@@ -544,7 +575,7 @@ estimand <- function(fit,
 
 ## Internal: type = "att" dispatcher.
 .estimand_att <- function(fit, by, cells, weights, direction,
-                          vartype, conf.level, ci.method) {
+                          vartype, conf.level, ci.method, test = "none") {
 
     ## Fast path: by = "event.time" + default args + direction = "on".
     ## Reads directly from fit$est.att for byte-equality with the existing
@@ -561,15 +592,23 @@ estimand <- function(fit,
                     is.null(weights) &&
                     direction == "on" &&
                     abs(conf.level - 0.95) < 1e-12 &&
-                    ci.method == "normal"
+                    ci.method == "normal" &&
+                    test == "none"
 
     if (is_fast_path) {
         return(.estimand_att_fast_event_time(fit))
     }
 
+    if (by == "event.time" && test != "none") {
+        return(.estimand_att_event_time(fit, cells, weights, direction,
+                                        vartype, conf.level, ci.method,
+                                        test))
+    }
+
     if (by == "overall") {
         return(.estimand_att_overall(fit, cells, weights, direction,
-                                     vartype, conf.level, ci.method))
+                                     vartype, conf.level, ci.method,
+                                     test))
     }
 
     stop("estimand(type = \"att\") with by = \"", by, "\" is part of ",
@@ -580,25 +619,103 @@ estimand <- function(fit,
 }
 
 
+## Per-event-time ATT slow path. Used when test = "placebo" /
+## "carryover" forces per-cell aggregation.
+.estimand_att_event_time <- function(fit, cells, weights, direction,
+                                     vartype, conf.level, ci.method,
+                                     test) {
+
+    if (!is.null(weights)) {
+        stop("estimand(\"att\", \"event.time\", test = \"", test, "\") ",
+             "with non-default weights is not yet supported.",
+             call. = FALSE)
+    }
+    if (!is.null(cells)) {
+        stop("estimand(\"att\", \"event.time\", test = \"", test, "\") ",
+             "with `cells` filter is not yet supported.",
+             call. = FALSE)
+    }
+
+    mask_info <- .test_cell_mask(fit, test, direction)
+    base_mask <- mask_info$mask
+    Tev       <- mask_info$Tev
+
+    ets <- sort(unique(Tev[base_mask]))
+    if (length(ets) == 0) {
+        stop("No cells satisfy test = \"", test, "\".", call. = FALSE)
+    }
+
+    nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+
+    estimate <- numeric(length(ets))
+    se_vec   <- rep(NA_real_, length(ets))
+    ci_lo    <- rep(NA_real_, length(ets))
+    ci_hi    <- rep(NA_real_, length(ets))
+    n_cells  <- integer(length(ets))
+
+    for (k in seq_along(ets)) {
+        et <- ets[k]
+        cell_mask <- base_mask & Tev == et
+        n_cells[k] <- sum(cell_mask)
+
+        eff_t <- fit$eff[cell_mask]
+        estimate[k] <- mean(eff_t, na.rm = TRUE)
+
+        if (nboots > 0L && vartype != "none") {
+            eff_boot_cells <- apply(fit$eff.boot, 3,
+                                    function(eb) eb[cell_mask])
+            if (!is.matrix(eff_boot_cells)) {
+                eff_boot_cells <- matrix(eff_boot_cells,
+                                         nrow = sum(cell_mask))
+            }
+            att_b <- colMeans(eff_boot_cells, na.rm = TRUE)
+
+            ci <- .compute_ci(estimate[k], att_b, ci.method, conf.level)
+            se_vec[k] <- ci$se
+            ci_lo[k]  <- ci$ci.lo
+            ci_hi[k]  <- ci$ci.hi
+        }
+    }
+
+    used_vartype <- if (vartype == "none") "none"
+                    else if (is.null(fit$vartype)) "bootstrap"
+                    else fit$vartype
+
+    data.frame(
+        event.time = ets,
+        estimate   = estimate,
+        se         = se_vec,
+        ci.lo      = ci_lo,
+        ci.hi      = ci_hi,
+        n_cells    = n_cells,
+        vartype    = used_vartype,
+        stringsAsFactors = FALSE
+    )
+}
+
+
 ## Compute overall ATT (single scalar) over treated cells, optionally
 ## filtered. Reads from fit$eff and fit$D.dat directly; bootstrap from
 ## fit$eff.boot if available, else delegates to the pre-aggregated
 ## fit$att.avg.boot when no cells filter is active.
 .estimand_att_overall <- function(fit, cells, weights, direction,
-                                  vartype, conf.level, ci.method) {
+                                  vartype, conf.level, ci.method,
+                                  test = "none") {
 
     if (!is.null(weights)) {
         stop("estimand(\"att\", \"overall\") with non-default weights ",
              "is not yet supported in v2.4.0.", call. = FALSE)
     }
-
-    Tev <- if (direction == "on") fit$T.on else fit$T.off
-    if (is.null(Tev)) {
-        stop("direction = \"off\" requested, but fit$T.off is NULL.",
+    if (test != "none" && !is.null(cells)) {
+        stop("estimand(\"att\", \"overall\") with both test = \"", test,
+             "\" and `cells` is not supported. The test = ... argument ",
+             "already filters cells to the placebo / carryover window.",
              call. = FALSE)
     }
 
-    treated_mask <- !is.na(fit$D.dat) & fit$D.dat == 1 & !is.na(Tev)
+    mask_info <- .test_cell_mask(fit, test, direction)
+    treated_mask <- mask_info$mask
+    Tev          <- mask_info$Tev
 
     ## Apply cells filter at the event-time / id level, not via long-form
     ## conversion (faster). Build a per-cell mask matching shape(eff).
@@ -836,7 +953,7 @@ estimand <- function(fit,
 ## replicate, so the bootstrap distribution is the distribution of
 ## ratios, not the ratio of mean distributions.
 .estimand_aptt <- function(fit, by, cells, weights, direction,
-                           vartype, conf.level, ci.method) {
+                           vartype, conf.level, ci.method, test = "none") {
 
     if (!is.null(weights)) {
         stop("estimand(\"aptt\") with non-default weights is not yet ",
@@ -854,7 +971,7 @@ estimand <- function(fit,
 
     if (by == "event.time") {
         return(.compute_aptt_event_time(fit, conf.level, ci.method,
-                                        vartype, direction))
+                                        vartype, direction, test))
     }
 
     stop("estimand(\"aptt\") with by = \"", by, "\" is not yet ",
@@ -865,20 +982,15 @@ estimand <- function(fit,
 
 ## Compute per-event-time APTT with bootstrap CI.
 .compute_aptt_event_time <- function(fit, conf.level, ci.method, vartype,
-                                      direction) {
+                                      direction, test = "none") {
 
-    Tev <- if (direction == "on") fit$T.on else fit$T.off
-    if (is.null(Tev)) {
-        stop("direction = \"off\" requested, but fit$T.off is NULL.",
-             call. = FALSE)
-    }
-
-    treated_mask <- !is.na(fit$D.dat) & fit$D.dat == 1 & !is.na(Tev)
+    mask_info <- .test_cell_mask(fit, test, direction)
+    treated_mask <- mask_info$mask
+    Tev          <- mask_info$Tev
 
     ets <- sort(unique(Tev[treated_mask]))
     if (length(ets) == 0) {
-        stop("No treated cells with non-NA event time found.",
-             call. = FALSE)
+        stop("No cells satisfy test = \"", test, "\".", call. = FALSE)
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
@@ -965,7 +1077,8 @@ estimand <- function(fit,
 ## Cells where Y_obs <= 0 or Y0_hat <= 0 are dropped from the
 ## aggregation with a one-time warning per call.
 .estimand_log_att <- function(fit, by, cells, weights, direction,
-                              vartype, conf.level, ci.method) {
+                              vartype, conf.level, ci.method,
+                              test = "none") {
 
     if (!is.null(weights)) {
         stop("estimand(\"log.att\") with non-default weights is not ",
@@ -983,7 +1096,7 @@ estimand <- function(fit,
 
     if (by == "event.time") {
         return(.compute_log_att_event_time(fit, conf.level, ci.method,
-                                           vartype, direction))
+                                           vartype, direction, test))
     }
 
     stop("estimand(\"log.att\") with by = \"", by, "\" is not yet ",
@@ -995,20 +1108,16 @@ estimand <- function(fit,
 ## Compute per-event-time log-ATT. Drops cells where either Y_obs or
 ## Y0_hat is non-positive (would give -Inf or NaN under log).
 .compute_log_att_event_time <- function(fit, conf.level, ci.method,
-                                         vartype, direction) {
+                                         vartype, direction,
+                                         test = "none") {
 
-    Tev <- if (direction == "on") fit$T.on else fit$T.off
-    if (is.null(Tev)) {
-        stop("direction = \"off\" requested, but fit$T.off is NULL.",
-             call. = FALSE)
-    }
-
-    treated_mask <- !is.na(fit$D.dat) & fit$D.dat == 1 & !is.na(Tev)
+    mask_info <- .test_cell_mask(fit, test, direction)
+    treated_mask <- mask_info$mask
+    Tev          <- mask_info$Tev
 
     ets <- sort(unique(Tev[treated_mask]))
     if (length(ets) == 0) {
-        stop("No treated cells with non-NA event time found.",
-             call. = FALSE)
+        stop("No cells satisfy test = \"", test, "\".", call. = FALSE)
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
@@ -1182,6 +1291,84 @@ estimand <- function(fit,
         return(list(se = se, ci.lo = unname(bc_qs[1]), ci.hi = unname(bc_qs[2])))
     }
     stop("Unknown ci.method = \"", ci.method, "\".", call. = FALSE)
+}
+
+
+## Build the cell-level base mask for a given test (none / placebo /
+## carryover) and direction. Returns a list with `mask` (logical
+## matrix matching shape(fit$D.dat)) and `Tev` (the relevant event-
+## time matrix from fit$T.on or fit$T.off).
+##
+## test = "none":      treated post-treatment cells (the default ATT
+##                     surface): D.dat == 1 with non-NA Tev.
+## test = "placebo":   pre-treatment cells masked during the placebo
+##                     fit, identified by Tev within fit$placebo.period.
+##                     Requires fit$placeboTest == TRUE.
+## test = "carryover": early post-reversal cells masked during the
+##                     carryover fit, identified by Tev within
+##                     fit$carryover.period (Tev = T.off). Requires
+##                     fit$carryoverTest == TRUE and hasRevs.
+##
+## v2.4.3+ (closes issue #131, ajunquera).
+.test_cell_mask <- function(fit, test, direction) {
+
+    Tev <- if (direction == "on") fit$T.on else fit$T.off
+    if (is.null(Tev)) {
+        stop("direction = \"", direction, "\" requested, but fit$T.",
+             direction, " is NULL.", call. = FALSE)
+    }
+
+    if (test == "none") {
+        return(list(
+            mask = !is.na(fit$D.dat) & fit$D.dat == 1 & !is.na(Tev),
+            Tev  = Tev
+        ))
+    }
+
+    if (test == "placebo") {
+        if (!isTRUE(as.logical(fit$placeboTest)) ||
+            is.null(fit$placebo.period)) {
+            stop("test = \"placebo\" requires the fit to have been run ",
+                 "with placeboTest = TRUE. The placebo estimand is only ",
+                 "meaningful when the placebo cells were masked from the ",
+                 "fit (out-of-sample predictions); a standard fit's ",
+                 "pre-treatment residuals are in-sample and would not be ",
+                 "an honest credibility check. Refit with: ",
+                 "fect(..., placeboTest = TRUE, placebo.period = c(L, R)).",
+                 call. = FALSE)
+        }
+        pp <- fit$placebo.period
+        if (length(pp) == 1L) pp <- c(pp, pp)
+        return(list(
+            mask = !is.na(Tev) & Tev >= pp[1] & Tev <= pp[2],
+            Tev  = Tev
+        ))
+    }
+
+    if (test == "carryover") {
+        if (!isTRUE(as.logical(fit$carryoverTest)) ||
+            is.null(fit$carryover.period)) {
+            stop("test = \"carryover\" requires the fit to have been run ",
+                 "with carryoverTest = TRUE. The carryover estimand is ",
+                 "only meaningful when the early post-reversal cells were ",
+                 "masked from the fit (out-of-sample predictions). Refit ",
+                 "with: fect(..., carryoverTest = TRUE, ",
+                 "carryover.period = c(L, R)).",
+                 call. = FALSE)
+        }
+        if (!isTRUE(fit$hasRevs == 1)) {
+            stop("test = \"carryover\" requires a panel with treatment ",
+                 "reversals (fit$hasRevs == 1).", call. = FALSE)
+        }
+        cp <- fit$carryover.period
+        if (length(cp) == 1L) cp <- c(cp, cp)
+        return(list(
+            mask = !is.na(Tev) & Tev >= cp[1] & Tev <= cp[2],
+            Tev  = Tev
+        ))
+    }
+
+    stop("Unknown test = \"", test, "\".", call. = FALSE)
 }
 
 

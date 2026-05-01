@@ -1,5 +1,11 @@
 # Changelog {#sec-changelog .unnumbered}
 
+## v2.4.3
+
+(2026-05-01)
+
+**New: `test = "placebo" / "carryover"` on `estimand()` (closes issue #131).** `estimand()` gains a `test = c("none", "placebo", "carryover")` argument, generalizing the existing scalar `att.placebo` / `att.carryover` slots to the full alternative-estimand surface. For example, `estimand(fit, "aptt", "event.time", test = "placebo")` returns a per-event-time placebo APTT series for credibility checks on the identification assumption (closes issue #131; ajunquera). Requires the corresponding test flag (`placeboTest = TRUE` / `carryoverTest = TRUE`) at fit time --- standard fits hard-error with actionable refit guidance. Auto-sets direction (placebo → "on", carryover → "off"). `type = "att.cumu"` is rejected with a clear error when `test != "none"` since cumulative semantics are defined relative to treatment onset.
+
 ## v2.4.2
 
 (2026-05-01)
