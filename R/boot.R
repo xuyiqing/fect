@@ -658,6 +658,8 @@ fect_boot <- function(
   if (dis) {
     if (vartype == "jackknife") {
       message("Jackknife estimates ... ")
+    } else if (vartype == "wild") {
+      message("Wild bootstrap (unit-level Rademacher) for uncertainties ... ")
     } else {
       message("Bootstrapping for uncertainties ... ")
     }
@@ -1129,8 +1131,33 @@ fect_boot <- function(
     }
   } else {
     one.nonpara <- function(num = NULL) {
-      ## bootstrap
-      if (is.null(num)) {
+      ## Y.input is what gets passed to the per-method bootstrap refit.
+      ## For case bootstrap and jackknife it is just the original Y; for
+      ## wild bootstrap it is the imputed surface plus Rademacher-sign-
+      ## perturbed residuals on observed control cells.
+      Y.input <- Y
+      if (vartype == "wild") {
+        ## Wild bootstrap (Liu 1988; Mammen 1993; cluster extension
+        ## Cameron-Gelbach-Miller 2008). Keep all units; perturb the
+        ## residuals from the main fit by unit-level Rademacher signs
+        ## (one sign per unit, applied to all of unit i's residuals).
+        ## Suitable for panel data with within-unit dependence; preserves
+        ## the treated/control composition exactly (no unit dropout).
+        boot.id <- seq_len(N)
+        boot.group <- group
+        signs <- sample(c(-1, 1), N, replace = TRUE)
+        sign_mat <- matrix(rep(signs, each = TT), nrow = TT, ncol = N)
+        res_mask <- (D == 0) & (I == 1)
+        e_mat <- matrix(0, TT, N)
+        e_mat[res_mask] <- (Y - fit.out)[res_mask]
+        Y.input <- fit.out + sign_mat * e_mat
+        ## Treated post-treatment cells keep observed Y (they are masked
+        ## from the imputation anyway via D = 1, but we leave Y_obs
+        ## intact so the resulting eff = Y_obs - Y0_b is interpretable).
+        treat_mask <- (D == 1)
+        Y.input[treat_mask] <- Y[treat_mask]
+      } else if (is.null(num)) {
+        ## case bootstrap (resample units with replacement)
         if (is.null(cl)) {
           if (hasRevs == 0) {
             if (Nco > 0) {
@@ -1284,7 +1311,7 @@ fect_boot <- function(
         if (method == "gsynth") {
           boot <- try(
             fect_nevertreated(
-              Y = Y[, boot.id],
+              Y = Y.input[, boot.id],
               X = X.boot,
               D = D.boot,
               W = W.boot,
@@ -1328,7 +1355,7 @@ fect_boot <- function(
         } else if (method == "ife") {
           boot <- try(
             fect_fe(
-              Y = Y[, boot.id],
+              Y = Y.input[, boot.id],
               X = X.boot,
               D = D.boot,
               W = W.boot,
@@ -1372,7 +1399,7 @@ fect_boot <- function(
         } else if (method == "mc") {
           boot <- try(
             fect_mc(
-              Y = Y[, boot.id],
+              Y = Y.input[, boot.id],
               X = X.boot,
               D = D[, boot.id],
               W = W.boot,
@@ -1418,7 +1445,7 @@ fect_boot <- function(
           X.kappa.boot <- X.kappa[, boot.id, , drop = FALSE]
           boot <- try(
             fect_cfe(
-              Y = Y[, boot.id],
+              Y = Y.input[, boot.id],
               X = X.boot,
               D = D.boot,
               W = W.boot,
@@ -2106,7 +2133,7 @@ fect_boot <- function(
     if (!is.character(vartype) || length(vartype) != 1) {
       stop("'vartype' must be a single string.")
     }
-    valid_vartypes <- c("bootstrap", "jackknife") # Only non-parametric types are valid here
+    valid_vartypes <- c("bootstrap", "jackknife", "wild") # Only non-parametric types are valid here
     if (!(vartype %in% valid_vartypes)) {
       stop(paste(
         "'vartype' must be one of:",
@@ -2636,7 +2663,7 @@ fect_boot <- function(
       dimnames = list(NULL, c("lower", "upper"))
     )
 
-    if (vartype == "bootstrap") {
+    if (vartype == "bootstrap" || vartype == "wild") {
       if (n_replicates > 0 && num_periods_out > 0) {
         if (
           nrow(repl_tr) != num_periods_out || nrow(repl_cf) != num_periods_out

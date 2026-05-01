@@ -422,12 +422,18 @@ fect.default <- function(
     }
 
     if (se == 1) {
-        if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
+        if (!vartype %in% c("bootstrap", "jackknife", "parametric",
+                            "wild")) {
             stop("\"vartype\" option misspecified.")
         }
         if (vartype == "parametric" && method %in% c("mc", "both")) {
             stop(
                 "The \"parametric\" option is not available for the \"mc\" or \"both\" methods."
+            )
+        }
+        if (vartype == "wild" && binary == TRUE) {
+            stop(
+                "The \"wild\" vartype is not supported for binary outcomes."
             )
         }
     }

@@ -508,12 +508,12 @@ estimand <- function(fit,
         ci.method <- switch(type,
             "att"      = "normal",      ## matches what fit$est.att uses (Wald: theta +- z*SE)
             "att.cumu" = "percentile",  ## matches att.cumu() internals
-            "aptt"     = "bc",          ## ratio estimator: bias-corrected for skew
-            "log.att"  = "bc"           ## log estimator: bias-corrected for skew
+            "aptt"     = "bca",         ## ratio: bootstrap-bias + skew -> BCa (Efron 1987)
+            "log.att"  = "bca"          ## log: same rationale
         )
     }
     ci.method <- match.arg(ci.method,
-                           c("basic", "percentile", "bc", "normal"))
+                           c("basic", "percentile", "bc", "bca", "normal"))
 
     by_canon <- c("event.time", "cohort", "calendar.time", "overall")
     if (length(by) > 1L) {
@@ -670,7 +670,12 @@ estimand <- function(fit,
             }
             att_b <- colMeans(eff_boot_cells, na.rm = TRUE)
 
-            ci <- .compute_ci(estimate[k], att_b, ci.method, conf.level)
+            jack_v <- if (ci.method == "bca") {
+                .cell_jackknife("att", eff = eff_t)
+            } else NULL
+
+            ci <- .compute_ci(estimate[k], att_b, ci.method, conf.level,
+                              jack = jack_v)
             se_vec[k] <- ci$se
             ci_lo[k]  <- ci$ci.lo
             ci_hi[k]  <- ci$ci.hi
@@ -760,7 +765,12 @@ estimand <- function(fit,
             mean(fit$eff.boot[, , b][cell_mask], na.rm = TRUE)
         }, numeric(1))
 
-        ci <- .compute_ci(estimate, att_b, ci.method, conf.level)
+        jack_v <- if (ci.method == "bca") {
+            .cell_jackknife("att", eff = fit$eff[cell_mask])
+        } else NULL
+
+        ci <- .compute_ci(estimate, att_b, ci.method, conf.level,
+                          jack = jack_v)
         se_val <- ci$se
         ci_lo  <- ci$ci.lo
         ci_hi  <- ci$ci.hi
@@ -1047,7 +1057,14 @@ estimand <- function(fit,
             aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
                        mean_Y0_per_rep
 
-            ci <- .compute_ci(estimate[k], aptt_b, ci.method, conf.level)
+            ## Cell-level jackknife for the BCa acceleration parameter.
+            ## Only computed when bca is requested (cheap; no model refits).
+            jack_v <- if (ci.method == "bca") {
+                .cell_jackknife("aptt", eff = eff_t, Y0 = Y0_t)
+            } else NULL
+
+            ci <- .compute_ci(estimate[k], aptt_b, ci.method, conf.level,
+                              jack = jack_v)
             se_vec[k] <- ci$se
             ci_lo[k]  <- ci$ci.lo
             ci_hi[k]  <- ci$ci.hi
@@ -1074,8 +1091,10 @@ estimand <- function(fit,
 ## Internal: type = "log.att" dispatcher.
 ##
 ## logATT_g = mean_g(log(Y_obs) - log(Y0_hat)) over treated cells.
-## Cells where Y_obs <= 0 or Y0_hat <= 0 are dropped from the
-## aggregation with a one-time warning per call.
+## Hard-stops if any cell included in the aggregation has Y_obs <= 0 or
+## Y0_hat <= 0 (log undefined). Caller must pre-transform the outcome
+## (e.g. log(Y + c) inside fect) so that all imputed and observed
+## outcomes are strictly positive before requesting log.att.
 .estimand_log_att <- function(fit, by, cells, weights, direction,
                               vartype, conf.level, ci.method,
                               test = "none") {
@@ -1092,6 +1111,28 @@ estimand <- function(fit,
         stop("No bootstrap/jackknife results available. ",
              "Choose keep.sims = TRUE in fect().",
              call. = FALSE)
+    }
+
+    ## Hard-stop on Y <= 0 / Y0_hat <= 0 at the point-estimate level.
+    ## log.att is mathematically undefined for non-positive imputed or
+    ## observed outcomes; silently dropping cells contaminates both the
+    ## point estimate and the bootstrap distribution. Force the caller
+    ## to pre-transform (typical fix: log(Y + c) for some c > 0 chosen
+    ## so all Y0_hat > 0; refit; then re-call estimand).
+    mask_info  <- .test_cell_mask(fit, test, direction)
+    cells_mask <- mask_info$mask
+    Y_chk  <- fit$Y.dat[cells_mask]
+    Y0_chk <- Y_chk - fit$eff[cells_mask]
+    n_bad_Y  <- sum(!is.na(Y_chk)  & Y_chk  <= 0)
+    n_bad_Y0 <- sum(!is.na(Y0_chk) & Y0_chk <= 0)
+    if (n_bad_Y + n_bad_Y0 > 0L) {
+        min_Y  <- if (n_bad_Y  > 0L) min(Y_chk[!is.na(Y_chk)],   na.rm = TRUE) else NA_real_
+        min_Y0 <- if (n_bad_Y0 > 0L) min(Y0_chk[!is.na(Y0_chk)], na.rm = TRUE) else NA_real_
+        stop(sprintf(
+            "log.att requires Y > 0 and Y0_hat > 0 in all treated cells.\n  Found %d cell(s) with Y <= 0 (min Y = %s) and %d cell(s) with Y0_hat <= 0 (min Y0_hat = %s).\n  log(Y) and log(Y0_hat) are undefined; silent dropping would bias the point estimate.\n\n  Fix: refit fect on a strictly-positive outcome, e.g.\n      data$Y_pos <- data$Y + (abs(min(data$Y)) + 1)\n      fit <- fect(Y_pos ~ D, ...)\n      estimand(fit, \"log.att\", \"event.time\")\n  Then back out the original-scale interpretation as needed.",
+            n_bad_Y,  if (is.na(min_Y))  "NA" else sprintf("%.4f", min_Y),
+            n_bad_Y0, if (is.na(min_Y0)) "NA" else sprintf("%.4f", min_Y0)
+        ), call. = FALSE)
     }
 
     if (by == "event.time") {
@@ -1131,8 +1172,6 @@ estimand <- function(fit,
     alpha <- 1 - conf.level
     probs <- c(alpha / 2, 1 - alpha / 2)
 
-    n_dropped_total <- 0L
-
     for (k in seq_along(ets)) {
         et <- ets[k]
         cell_mask <- treated_mask & Tev == et
@@ -1141,9 +1180,9 @@ estimand <- function(fit,
         Y_t   <- fit$Y.dat[cell_mask]
         Y0_t  <- Y_t - eff_t
 
-        ## Drop non-positive cells (log undefined).
-        ok <- !is.na(Y_t) & !is.na(Y0_t) & Y_t > 0 & Y0_t > 0
-        n_dropped_total <- n_dropped_total + sum(!ok)
+        ## Caller-level hard-stop in .estimand_log_att already guarantees
+        ## all cells have Y > 0 and Y0_hat > 0; only NA filtering needed.
+        ok <- !is.na(Y_t) & !is.na(Y0_t)
         n_cells[k] <- sum(ok)
 
         if (sum(ok) == 0L) {
@@ -1199,18 +1238,17 @@ estimand <- function(fit,
             log_diff_b <- log_Y - log_Y0_b
             logatt_b  <- colMeans(log_diff_b, na.rm = TRUE)
 
-            ci <- .compute_ci(estimate[k], logatt_b, ci.method, conf.level)
+            ## Cell-level jackknife on the per-cell log-diff vector.
+            jack_v <- if (ci.method == "bca") {
+                .cell_jackknife("log.att", log_diff = log_diff)
+            } else NULL
+
+            ci <- .compute_ci(estimate[k], logatt_b, ci.method, conf.level,
+                              jack = jack_v)
             se_vec[k] <- ci$se
             ci_lo[k]  <- ci$ci.lo
             ci_hi[k]  <- ci$ci.hi
         }
-    }
-
-    if (n_dropped_total > 0L) {
-        warning(sprintf(
-            "log.att: dropped %d treated cell(s) with Y_obs <= 0 or Y0_hat <= 0.",
-            n_dropped_total
-        ), call. = FALSE)
     }
 
     used_vartype <- if (vartype == "none") "none"
@@ -1238,20 +1276,31 @@ estimand <- function(fit,
 ## distribution `boot` (a numeric vector of replicate-level estimates),
 ## a point `estimate`, and a chosen `ci.method`.
 ##
-## Supports four methods:
+## Supports five methods:
 ##   - "basic":     ci = (2*est - q_hi, 2*est - q_lo) [reflected]
 ##   - "percentile": ci = (q_lo, q_hi)
 ##   - "bc":        bias-corrected percentile (z0 only, no acceleration)
 ##                  ci = (q_{Phi(2*z0 + z_alpha/2)},
 ##                        q_{Phi(2*z0 + z_{1-alpha/2})})
 ##                  where z0 = Phi^-1(mean(boot < est)).
-##   - "normal":    ci = est +/- z_{1-alpha/2} * SE   [Wald]
+##   - "bca":       bias-corrected accelerated (Efron 1987 full BCa).
+##                  Requires `jack` (a numeric vector of leave-one-out
+##                  point estimates over the cells in the aggregation
+##                  group) to compute the acceleration parameter.
+##                  Cutoffs: a_lo = Phi(z0 + (z0+z_alpha/2) /
+##                                          (1 - a*(z0+z_alpha/2)))
+##                  Handles bootstrap-bias + bootstrap-skew jointly;
+##                  default for ratio (aptt) and log (log.att) estimands
+##                  where the bootstrap distribution is inherently
+##                  skewed and bc alone degenerates at the boundary.
+##   - "normal":    ci = est +/- z_{1-alpha/2} * SE   [Wald, symmetric]
+##
+## `jack` is the per-cell leave-one-out vector of within-group point
+## estimates; required for "bca", ignored otherwise. The acceleration
+## is a = sum((mean(jack) - jack)^3) / (6 * (sum(...^2))^1.5).
 ##
 ## Returns a list with elements `se`, `ci.lo`, `ci.hi`.
-##
-## See statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md
-## for the design rationale and per-type defaults.
-.compute_ci <- function(estimate, boot, ci.method, conf.level) {
+.compute_ci <- function(estimate, boot, ci.method, conf.level, jack = NULL) {
     alpha <- 1 - conf.level
     se    <- stats::sd(boot, na.rm = TRUE)
 
@@ -1290,7 +1339,89 @@ estimand <- function(fit,
         bc_qs   <- stats::quantile(boot, probs = c(a_lo, a_hi), na.rm = TRUE)
         return(list(se = se, ci.lo = unname(bc_qs[1]), ci.hi = unname(bc_qs[2])))
     }
+    if (ci.method == "bca") {
+        if (is.null(jack)) {
+            stop("ci.method = \"bca\" requires the per-cell jackknife ",
+                 "vector via the `jack` argument; the caller must compute ",
+                 "leave-one-out within-group estimates and pass them.",
+                 call. = FALSE)
+        }
+        valid <- !is.na(boot)
+        jack_valid <- !is.na(jack)
+        if (sum(valid) == 0L || sum(jack_valid) < 2L) {
+            return(list(se = NA_real_, ci.lo = NA_real_, ci.hi = NA_real_))
+        }
+        ## z0: bias correction
+        p_below <- mean(boot[valid] < estimate)
+        p_below <- pmin(pmax(p_below, 1e-6), 1 - 1e-6)
+        z0      <- stats::qnorm(p_below)
+        ## a: acceleration via cell-level jackknife
+        jack_v   <- jack[jack_valid]
+        jack_bar <- mean(jack_v)
+        dev      <- jack_bar - jack_v
+        num      <- sum(dev^3)
+        den      <- 6 * (sum(dev^2))^1.5
+        a        <- if (den > 1e-12) num / den else 0
+        ## BCa cutoffs: handles z0 -> +/- inf via the (1 - a*z) denominator
+        z_lo  <- stats::qnorm(alpha / 2)
+        z_hi  <- stats::qnorm(1 - alpha / 2)
+        adjust <- function(z_q) {
+            denom <- 1 - a * (z0 + z_q)
+            ## Guard against a*(z0+z_q) -> 1 (denom -> 0); fall back to bc.
+            if (abs(denom) < 1e-8) {
+                return(stats::pnorm(2 * z0 + z_q))
+            }
+            stats::pnorm(z0 + (z0 + z_q) / denom)
+        }
+        a_lo  <- adjust(z_lo)
+        a_hi  <- adjust(z_hi)
+        bca_qs <- stats::quantile(boot, probs = c(a_lo, a_hi), na.rm = TRUE)
+        return(list(se = se, ci.lo = unname(bca_qs[1]), ci.hi = unname(bca_qs[2])))
+    }
     stop("Unknown ci.method = \"", ci.method, "\".", call. = FALSE)
+}
+
+
+## Compute the per-cell jackknife vector for a within-group functional T.
+## For aptt: T(eff, Y0) = mean(eff) / mean(Y0). leave-one-out:
+##   theta_jack[i] = mean(eff[-i]) / mean(Y0[-i])
+## For log.att: T(Y, Y0) = mean(log(Y) - log(Y0)). leave-one-out:
+##   theta_jack[i] = mean(log(Y[-i]) - log(Y0[-i]))
+## For att (level): T = mean(eff). theta_jack[i] = mean(eff[-i]).
+##
+## Used for the BCa acceleration parameter without requiring model refits
+## (the influence is computed at the aggregation step, holding the model
+## fixed). This is the standard practice for BCa when leave-one-unit-out
+## refits are too expensive.
+.cell_jackknife <- function(type, ...) {
+    args <- list(...)
+    if (type == "aptt") {
+        eff <- args$eff; Y0 <- args$Y0
+        n   <- length(eff)
+        if (n < 2L) return(rep(NA_real_, n))
+        sum_eff <- sum(eff, na.rm = TRUE)
+        sum_Y0  <- sum(Y0,  na.rm = TRUE)
+        ## leave-one-out means: (sum - eff_i) / (n - 1)
+        num <- (sum_eff - eff) / (n - 1)
+        den <- (sum_Y0  - Y0)  / (n - 1)
+        return(num / den)
+    }
+    if (type == "log.att") {
+        ld <- args$log_diff
+        n  <- length(ld)
+        if (n < 2L) return(rep(NA_real_, n))
+        ## leave-one-out mean of log_diff
+        sum_ld <- sum(ld, na.rm = TRUE)
+        return((sum_ld - ld) / (n - 1))
+    }
+    if (type == "att") {
+        eff <- args$eff
+        n   <- length(eff)
+        if (n < 2L) return(rep(NA_real_, n))
+        sum_eff <- sum(eff, na.rm = TRUE)
+        return((sum_eff - eff) / (n - 1))
+    }
+    stop("Unknown jackknife type = \"", type, "\".", call. = FALSE)
 }
 
 

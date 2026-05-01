@@ -78,7 +78,34 @@ The package can produce uncertainty estimates when `se = TRUE`. The default is t
 ::: {.callout-tip appearance="simple"}
 ### Inference parameters
 
-The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These parameters do not affect point estimates. `"parametric"` is only available in the Synth setting, i.e., when `time.component.from = "nevertreated"`.
+The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, `"parametric"`, or `"wild"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These parameters do not affect point estimates.
+:::
+
+::: {.callout-note appearance="simple"}
+**Variance methods at a glance.** Four `vartype` values are supported. They differ in *what* gets randomized per replicate, *how* the unit composition is preserved, and *what* the relative computational cost is (in multiples of one model refit on the full data). Each replicate refits the model end-to-end; `cost` below is the multiple of `nboots` refits incurred relative to `bootstrap`.
+
+| `vartype` | Per-replicate randomization | Unit composition | Cost vs `bootstrap` | Notes |
+|-----------|-----------------------------|------------------|---------------------|-------|
+| `"bootstrap"` (default) | Resample units with replacement (case bootstrap) | Resampled (units may drop in / out) | 1x | Fully nonparametric; clusters at unit level by default; respects `cl` |
+| `"jackknife"` | Leave-one-unit-out (deterministic) | One unit removed each replicate | `N / nboots`x of refits (overrides `nboots`) | Best when `N` treated is small; ignores `nboots` |
+| `"parametric"` | Draw model errors from estimated covariance and re-impute | Pseudo-treated drawn from never-treated pool | ≈ 1x | Synth setting only; `time.component.from = "nevertreated"`, no reversal, not MC. See [Section @sec-parametric-regimes] |
+| `"wild"` (new in v2.4.2) | Unit-level Rademacher signs ±1 on main-fit residuals (`D = 0` cells) | Preserved exactly --- no unit dropout | 1x | Continuous outcomes; `method ∈ {fe, ife, mc, gsynth, cfe}`; respects within-unit dependence |
+
+The default `"bootstrap"` is robust and the right starting point. Switch to `"jackknife"` when `N` treated is small (single digits). Switch to `"wild"` when unit resampling would distort cohort balance --- e.g., very few treated units in some cohorts. Switch to `"parametric"` only inside the gsynth-style regime where the assumptions in [Section @sec-parametric-regimes] hold.
+:::
+
+::: {.callout-note appearance="simple"}
+**Confidence intervals.** Variance methods generate the bootstrap distribution; `ci.method` (a `estimand()` argument, not `fect()`) decides how that distribution becomes a confidence interval. Five values are supported. None of these add per-replicate cost --- they are post-hoc operations on the already-stored `eff.boot` surface (`bca` adds a cheap cell-level jackknife with no extra refits).
+
+| `ci.method` | Formula | Extra cost | When to prefer |
+|-------------|---------|------------|----------------|
+| `"normal"` | `θ̂ ± z · SE` (Wald) | 0x refits | Symmetric distributions; matches `fit$est.att` |
+| `"basic"` | `(2θ̂ − q_{1−α/2}, 2θ̂ − q_{α/2})` | 0x refits | Reflected percentile; theoretical default |
+| `"percentile"` | `(q_{α/2}, q_{1−α/2})` | 0x refits | Mildly skewed; matches `att.cumu()` |
+| `"bc"` | Bias-corrected percentile (Efron 1987 minus acceleration); cutoffs shifted by `2 z₀` | 0x refits | Skewed distributions where the bootstrap median is biased |
+| `"bca"` (new in v2.4.2) | Bias-corrected accelerated (Efron 1987 in full); adds an acceleration parameter via cell-level jackknife | 0x refits (cell-level jackknife is closed-form arithmetic) | Skewed *and* heavy-tailed; degrades gracefully when `bc` collapses (e.g. point estimate above all bootstrap replicates) |
+
+`ci.method` defaults to `NULL` in `estimand()`, which triggers a per-type default: `att` → `"normal"`, `att.cumu` → `"percentile"`, `aptt` → `"bca"`, `log.att` → `"bca"`. Pass an explicit value to override.
 :::
 
 ::: {.callout-note appearance="simple"}
