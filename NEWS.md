@@ -1,4 +1,86 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.2
+
+## New: `ci.method = "bc"` and `"normal"` in `estimand()`; per-type defaults
+
+* `estimand()`'s `ci.method` enum is extended from
+  `c("basic", "percentile")` to
+  `c("basic", "percentile", "bc", "normal")`.
+* `"bc"` is the bias-corrected percentile bootstrap (Efron 1987 minus
+  the acceleration). It shifts the percentile cutoffs by `2 z0` where
+  `z0 = Φ⁻¹(P(boot < est))` to compensate when the bootstrap median
+  is biased relative to the point estimate. Free (one extra `Φ⁻¹`
+  call); compatible with all `vartype` values.
+* `"normal"` is the textbook Wald CI: `θ̂ ± z·SE`. This is what
+  `fit$est.att` already uses internally for both bootstrap and
+  jackknife (`R/boot.R` populates `att ± qnorm(1 − α/2) · SE`).
+* **`ci.method` now defaults to `NULL`, which triggers a per-type
+  default:**
+    * `type = "att"` → `"normal"` (corrects v2.4.1's mislabeled
+      "basic" fast-path passthrough; numerically unchanged because
+      `fit$est.att` already uses normal CIs)
+    * `type = "att.cumu"` → `"percentile"` (matches what
+      `att.cumu()` does internally)
+    * `type = "aptt"` → `"bc"` (ratio estimator → skewed bootstrap
+      → bias correction helps)
+    * `type = "log.att"` → `"bc"` (log estimator → same)
+* Existing scripts that pass `ci.method = ...` explicitly are
+  unaffected. Callers that omit `ci.method` will see different CI
+  bounds for `att.cumu` / `aptt` / `log.att` (point estimate and SE
+  unchanged); the change is in the direction of more sensible
+  intervals (basic CI was producing CIs that didn't contain the point
+  estimate when bootstrap was skewed --- discovered while building
+  `test = "placebo"` in v2.4.3 development; see
+  `statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md`).
+
+## New: hard-error on bootstrap cell-drop pathology in `log.att` / `aptt`
+
+* When a cell used in the point estimate has `Y0_b ≤ 0` in a
+  non-trivial fraction of bootstrap replicates (`> 5%` for `log.att`,
+  any replicate where `E(Y0_b) ≈ 0` for `aptt`), the previous v2.4.1
+  behavior silently dropped those replicates' contributions via
+  `colMeans(..., na.rm = TRUE)`, contaminating the bootstrap
+  distribution.
+* v2.4.2 hard-errors on this pathology with actionable guidance:
+  filter near-zero cells, transform the outcome, or use a different
+  estimand. The previous silent-drop behavior produced meaningless
+  inference (the point estimator computed over N cells; bootstrap
+  averages over N, N-1, ..., 0 cells per replicate).
+
+## Default `nboots` raised from 200 to 1000
+
+* The default value of `nboots` in `fect()`, `fect.formula()`, and
+  `fect.default()` is now `1000` (was `200`). With the alternative-
+  estimand API increasingly used for percentile-based inference, 200
+  replicates produced noisy quantile estimates at the tails. Existing
+  scripts that explicitly pass `nboots = ...` are unaffected.
+
+## Internal: warm-start infrastructure (not user-visible)
+
+* `inter_fe_ub`, `inter_fe_mc`, and the inner `fe_ad_inter_iter` /
+  `fe_ad_inter_covar_iter` C++ helpers gain an optional
+  `Rcpp::Nullable<Rcpp::NumericMatrix> fit_init = R_NilValue`
+  parameter; `fect_fe()` and `fect_mc()` R wrappers gain a matching
+  `fit.init = NULL` argument. NULL preserves pre-2.4.2 cold-start
+  behavior exactly (verified by tests).
+* Bootstrap activation was tested empirically (cold vs warm
+  comparison on simdata + IFE) and produced materially different
+  bootstrap distributions (max abs diff in `eff.boot` of 11.05;
+  S.E. relative diff up to 250%). The non-convex EM converges to
+  different stationary points under different starts. **Activation
+  deferred to v2.5.0** with a properly designed approach (damped
+  warm-start? coverage-based calibration?). The infrastructure is
+  in place but unused; no behavioral change for users.
+* Full investigation: `statsclaw-workspace/fect/ref/warm-start-audit-2026-05-01.md`.
+
+## Bug fix: clearer message for singular-covariance F-test failure
+
+* `R/diagtest.R` previously reported "F-test Failed. The estimated
+  covariance matrix is singular." This conflated two distinct
+  inferential statements (failed-to-reject vs could-not-be-computed).
+  Updated to "F-test could not be computed: the estimated covariance
+  matrix is singular."
+
 # fect 2.4.1
 
 ## New: parametric variance support in `estimand()`

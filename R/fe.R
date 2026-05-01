@@ -38,7 +38,8 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
                     group = NULL,
                     time.on.seq.group = NULL,
                     time.off.seq.group = NULL,
-                    W.in.fit = TRUE) {
+                    W.in.fit = TRUE,
+                    fit.init = NULL) { ## warm-start matrix for inter_fe_ub (v2.4.2+)
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -125,11 +126,14 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         YY[which(II == 0)] <- 0 ## reset to 0
 
         if (binary == FALSE) {
-            est.best <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r.cv, force = force, tol, max.iteration)
+            est.best <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r.cv, force = force, tol, max.iteration,
+                                    fit_init = fit.init)
             if (boot == FALSE) {
                 if (r.cv == 0) {
                     est.fect <- est.best
                 } else {
+                    ## r.cv = 0 sub-fit (no factors) cannot reuse a factor-model
+                    ## warm-start; pass NULL to keep cold-start behavior.
                     est.fect <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force = force, tol, max.iteration)
                 }
             }

@@ -893,11 +893,13 @@ fect_boot <- function(
     if (do_parallel_boot) {
       ## Phase A: future_lapply (was foreach %dopar%, which inherited whatever
       ## backend the global foreach registry held — see notes/ stage-1).
-      error.list <- future.apply::future_lapply(
-        seq_len(nboots),
-        FUN = function(j) draw.error(),
-        future.seed = TRUE,
-        future.packages = c("fect", "mvtnorm", "fixest")
+      error.list <- .fect_with_quiet_pkg_warnings(
+        future.apply::future_lapply(
+          seq_len(nboots),
+          FUN = function(j) draw.error(),
+          future.seed = TRUE,
+          future.packages = c("fect", "mvtnorm", "fixest")
+        )
       )
       error.tr <- abind(error.list, along = 3)
     } else {

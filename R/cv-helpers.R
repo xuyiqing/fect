@@ -23,10 +23,52 @@
 ## for calling `future::plan(future::cluster, workers = cl)` and the
 ## subsequent on.exit cleanup.
 .fect_make_future_cluster <- function(cores) {
-    parallelly::makeClusterPSOCK(
+    cl <- parallelly::makeClusterPSOCK(
         workers      = cores,
         rscript_libs = .libPaths(),
         autoStop     = TRUE
+    )
+    ## Pre-load packages on workers with messages + warnings suppressed
+    ## (v2.4.2+). Without this, each worker fires "package was built under
+    ## R version X.Y.Z" warnings from the user's local R / package skew on
+    ## first use of mvtnorm / future / etc., once per worker. These are
+    ## informational, not actionable, but they clutter user-facing output
+    ## (especially under parametric bootstrap where mvtnorm::rmvnorm
+    ## fires per worker).
+    parallel::clusterEvalQ(cl, {
+        suppressPackageStartupMessages({
+            suppressWarnings({
+                ## Pre-load packages used inside parallel paths.
+                requireNamespace("mvtnorm",       quietly = TRUE)
+                requireNamespace("future",        quietly = TRUE)
+                requireNamespace("future.apply",  quietly = TRUE)
+                requireNamespace("doParallel",    quietly = TRUE)
+                requireNamespace("foreach",       quietly = TRUE)
+            })
+        })
+        ## Suppress "built under R version" warnings for any subsequent
+        ## library() / requireNamespace() inside this worker.
+        options(warn.conflicts = FALSE)
+    })
+    cl
+}
+
+
+## Run `expr` with "package was built under R version" warnings
+## suppressed (they fire from parallel workers loading packages
+## compiled against a slightly newer R; informational, not actionable).
+## Other warnings pass through normally. Use to wrap parallel-execution
+## entry points (future_lapply / foreach calls) so user-facing output
+## isn't cluttered. Added v2.4.2.
+.fect_with_quiet_pkg_warnings <- function(expr) {
+    withCallingHandlers(
+        expr,
+        warning = function(w) {
+            msg <- conditionMessage(w)
+            if (grepl("was built under R version", msg, fixed = TRUE)) {
+                invokeRestart("muffleWarning")
+            }
+        }
     )
 }
 

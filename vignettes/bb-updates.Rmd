@@ -1,5 +1,47 @@
 # Changelog {#sec-changelog .unnumbered}
 
+## v2.4.2
+
+(2026-05-01)
+
+**New ci.methods + per-type defaults.** `estimand()`'s `ci.method`
+enum gains two values: `"bc"` (bias-corrected percentile, Efron 1987
+minus the acceleration correction) and `"normal"` (Wald: `θ̂ ± z·SE`,
+what `fit$est.att` already uses internally). The default is now
+`NULL`, which triggers per-type defaults: `att` → `normal`,
+`att.cumu` → `percentile`, `aptt` → `bc`, `log.att` → `bc`. Existing
+scripts that pass `ci.method = ...` explicitly are unaffected;
+callers that omit it will see different CI bounds for
+`att.cumu` / `aptt` / `log.att` (point estimate and SE unchanged).
+
+**Hard-error on bootstrap cell-drop pathology.** When a cell used in
+the point estimate has `Y0_b ≤ 0` in `> 5%` of bootstrap replicates
+for `log.att` (or any replicate where `E(Y0_b) ≈ 0` for `aptt`),
+v2.4.2 now hard-errors with actionable guidance instead of silently
+dropping cells in the per-replicate average. The silent-drop
+behavior contaminated the bootstrap distribution and produced
+meaningless inference.
+
+**Default `nboots` raised from 200 to 1000.** Affects `fect()`,
+`fect.formula()`, `fect.default()`. Improves percentile-based
+inference at the tails. Existing scripts that explicitly pass
+`nboots = ...` are unaffected.
+
+**Internal: warm-start infrastructure.** C++ solvers
+(`inter_fe_ub`, `inter_fe_mc`) and the inner EM helpers gain an
+optional `fit_init` parameter for warm-starting from a prior
+prediction surface. Activation in `boot.R` was tested empirically
+(cold vs warm comparison) and produced materially different
+bootstrap distributions due to the non-convex EM converging to
+different stationary points; activation deferred to v2.5.0 with a
+properly designed approach. The infrastructure is in place but
+unused by default; no behavioral change for users.
+
+**Bug fix.** `R/diagtest.R`'s "F-test Failed. The estimated
+covariance matrix is singular." message reworded to "F-test could
+not be computed: the estimated covariance matrix is singular." The
+previous wording conflated failure-to-reject with numerical failure.
+
 ## v2.4.1
 
 (2026-04-30) CRAN release.

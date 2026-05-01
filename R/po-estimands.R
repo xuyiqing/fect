@@ -416,8 +416,17 @@ imputed_outcomes <- function(fit,
 #'   with a different setting --- the argument is informational and does
 #'   not re-aggregate replicates.
 #' @param conf.level Two-sided confidence level. Defaults to 0.95.
-#' @param ci.method \code{"basic"} (reflected; matches fect's existing
-#'   \code{est.att} convention; default) or \code{"percentile"}.
+#' @param ci.method One of \code{"basic"} (reflected),
+#'   \code{"percentile"} (raw bootstrap quantiles), \code{"bc"}
+#'   (bias-corrected percentile; Efron 1987 minus the acceleration),
+#'   or \code{"normal"} (Wald: \eqn{\hat\theta \pm z \cdot SE}).
+#'   Default is \code{NULL}, which triggers a per-type default:
+#'   \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
+#'   already uses), \code{"att.cumu"} -> \code{"percentile"} (matches
+#'   what \code{att.cumu()} does internally), \code{"aptt"} ->
+#'   \code{"bc"} and \code{"log.att"} -> \code{"bc"} (ratio / log
+#'   estimators benefit from bias correction when the bootstrap
+#'   distribution is skewed). Pass an explicit value to override.
 #'
 #' @return A data frame with columns \code{<by_key>}, \code{estimate},
 #'   \code{se}, \code{ci.lo}, \code{ci.hi}, \code{n_cells}, and
@@ -456,12 +465,24 @@ estimand <- function(fit,
                      direction   = c("on", "off"),
                      vartype     = c("bootstrap", "jackknife", "parametric", "none"),
                      conf.level  = 0.95,
-                     ci.method   = c("basic", "percentile")) {
+                     ci.method   = NULL) {
 
     type      <- match.arg(type)
     direction <- match.arg(direction)
     vartype   <- match.arg(vartype)
-    ci.method <- match.arg(ci.method)
+
+    ## ci.method = NULL triggers per-type defaults (v2.4.2+).
+    ## See statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md.
+    if (is.null(ci.method)) {
+        ci.method <- switch(type,
+            "att"      = "normal",      ## matches what fit$est.att uses (Wald: theta +- z*SE)
+            "att.cumu" = "percentile",  ## matches att.cumu() internals
+            "aptt"     = "bc",          ## ratio estimator: bias-corrected for skew
+            "log.att"  = "bc"           ## log estimator: bias-corrected for skew
+        )
+    }
+    ci.method <- match.arg(ci.method,
+                           c("basic", "percentile", "bc", "normal"))
 
     by_canon <- c("event.time", "cohort", "calendar.time", "overall")
     if (length(by) > 1L) {
@@ -533,13 +554,14 @@ estimand <- function(fit,
     ##   - weights = NULL (use fit's W.agg if any)
     ##   - direction = "on"
     ##   - conf.level = 0.95 (fit$est.att uses 95% by default)
-    ##   - ci.method = "basic" (fect's convention)
+    ##   - ci.method = "normal" (fit$est.att uses Wald: theta +- z*SE)
+    ##                          --- this is the v2.4.2 default for type="att"
     is_fast_path <- by == "event.time" &&
                     is.null(cells) &&
                     is.null(weights) &&
                     direction == "on" &&
                     abs(conf.level - 0.95) < 1e-12 &&
-                    ci.method == "basic"
+                    ci.method == "normal"
 
     if (is_fast_path) {
         return(.estimand_att_fast_event_time(fit))
@@ -621,17 +643,10 @@ estimand <- function(fit,
             mean(fit$eff.boot[, , b][cell_mask], na.rm = TRUE)
         }, numeric(1))
 
-        se_val <- stats::sd(att_b, na.rm = TRUE)
-        alpha  <- 1 - conf.level
-        probs  <- c(alpha / 2, 1 - alpha / 2)
-        qs     <- stats::quantile(att_b, probs = probs, na.rm = TRUE)
-        if (ci.method == "percentile") {
-            ci_lo <- unname(qs[1])
-            ci_hi <- unname(qs[2])
-        } else {
-            ci_lo <- 2 * estimate - unname(qs[2])
-            ci_hi <- 2 * estimate - unname(qs[1])
-        }
+        ci <- .compute_ci(estimate, att_b, ci.method, conf.level)
+        se_val <- ci$se
+        ci_lo  <- ci$ci.lo
+        ci_hi  <- ci$ci.hi
     }
 
     used_vartype <- if (vartype == "none") "none"
@@ -899,18 +914,31 @@ estimand <- function(fit,
                                          nrow = sum(cell_mask))
             }
             Y0_boot <- Y_t - eff_boot_cells
-            aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
-                       colMeans(Y0_boot,        na.rm = TRUE)
 
-            se_vec[k] <- stats::sd(aptt_b, na.rm = TRUE)
-            qs <- stats::quantile(aptt_b, probs = probs, na.rm = TRUE)
-            if (ci.method == "percentile") {
-                ci_lo[k] <- unname(qs[1])
-                ci_hi[k] <- unname(qs[2])
-            } else {
-                ci_lo[k] <- 2 * estimate[k] - unname(qs[2])
-                ci_hi[k] <- 2 * estimate[k] - unname(qs[1])
+            ## Hard-error on cell-drop pathology (v2.4.2+).
+            ## See .compute_log_att_event_time for the full rationale.
+            ## For APTT specifically: when E(Y0_b) crosses zero in any
+            ## replicate, the denominator blows up (or flips sign),
+            ## producing wildly unstable per-replicate APTT values.
+            mean_Y0_per_rep <- colMeans(Y0_boot, na.rm = TRUE)
+            n_bad_reps <- sum(abs(mean_Y0_per_rep) < 1e-10 |
+                              is.na(mean_Y0_per_rep))
+            if (n_bad_reps > 0L) {
+                pct_bad <- 100 * n_bad_reps / length(mean_Y0_per_rep)
+                stop(sprintf(
+                    "APTT bootstrap is unreliable at event time %s\n  (E(Y0_hat) at the point = %.4f, but %d of %d bootstrap replicates\n  (%.1f%%) have E(Y0_b) ~ 0, blowing up the APTT denominator and\n  producing wildly unstable per-replicate ratios).\n\n  Options:\n    1. Filter out cells where E(Y0_hat) is small relative to E(Y):\n         estimand(fit, \"aptt\", \"event.time\",\n                  cells = ~ abs(Y0_hat) > <threshold>)\n    2. Transform the outcome to keep Y0_hat away from zero\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this denominator instability",
+                    as.character(et), den, n_bad_reps,
+                    length(mean_Y0_per_rep), pct_bad
+                ), call. = FALSE)
             }
+
+            aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
+                       mean_Y0_per_rep
+
+            ci <- .compute_ci(estimate[k], aptt_b, ci.method, conf.level)
+            se_vec[k] <- ci$se
+            ci_lo[k]  <- ci$ci.lo
+            ci_hi[k]  <- ci$ci.hi
         }
     }
 
@@ -1024,31 +1052,48 @@ estimand <- function(fit,
                 eff_boot_cells <- matrix(eff_boot_cells,
                                          nrow = sum(cell_mask))
             }
-            ## Restrict to ok cells. Y_t is constant; Y0_boot varies
-            ## per replicate, so the per-replicate "ok" mask depends
-            ## on Y0_boot[, b]. To keep this tractable, we condition
-            ## on the point-estimate ok mask (drop cells whose POINT
-            ## Y0 is non-positive). This is what users typically
-            ## want for log-ATT inference.
             eff_ok    <- eff_boot_cells[ok, , drop = FALSE]
             Y_ok      <- Y_t[ok]
             Y0_b_ok   <- Y_ok - eff_ok
-            ## Per-replicate: drop replicates where any Y0_b <= 0 in
-            ## the ok set; alternatively, treat as NA and propagate.
-            log_Y0_b  <- suppressWarnings(log(Y0_b_ok))
+
+            ## Hard-error on cell-drop pathology (v2.4.2+).
+            ##
+            ## When a cell used in the point estimate has Y0_b <= 0 in
+            ## a non-trivial fraction of bootstrap replicates, log(Y0_b)
+            ## returns NaN and colMeans(..., na.rm = TRUE) silently
+            ## averages over fewer cells in that replicate, breaking
+            ## the basic bootstrap principle and contaminating the
+            ## bootstrap distribution.
+            ##
+            ## Threshold: trigger when the WORST cell has Y0_b <= 0 in
+            ## > 5% of replicates. Sub-threshold cells are tolerated
+            ## (small dropping is benign at the bootstrap-distribution
+            ## scale; >5% indicates a genuinely unstable cell that
+            ## needs filtering or a different estimand).
+            n_reps_per_cell <- rowSums(Y0_b_ok <= 0, na.rm = TRUE)
+            n_total_reps    <- ncol(Y0_b_ok)
+            drop_frac       <- n_reps_per_cell / n_total_reps
+            worst_idx       <- which.max(drop_frac)
+            worst_frac      <- drop_frac[worst_idx]
+            if (length(worst_frac) && worst_frac > 0.05) {
+                worst_Y0 <- Y0_t[ok][worst_idx]
+                stop(sprintf(
+                    "log-ATT bootstrap is unreliable at event time %s.\n  The worst cell has Y0_hat = %.4f but %d of %d bootstrap replicates\n  (%.1f%%) have Y0_b <= 0 for it, so log(Y0_b) is undefined and the\n  per-replicate average silently drops the cell. This contaminates the\n  bootstrap distribution and yields meaningless inference.\n\n  Options:\n    1. Filter out unstable cells:\n         estimand(fit, \"log.att\", \"event.time\",\n                  cells = ~ Y0_hat > <threshold>)\n    2. Transform the outcome before fect: log(Y + c) for some c > 0\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this pathology",
+                    as.character(et), worst_Y0,
+                    n_reps_per_cell[worst_idx], n_total_reps,
+                    100 * worst_frac
+                ), call. = FALSE)
+            }
+
+            log_Y0_b  <- log(Y0_b_ok)
             log_Y     <- log(Y_ok)
             log_diff_b <- log_Y - log_Y0_b
             logatt_b  <- colMeans(log_diff_b, na.rm = TRUE)
 
-            se_vec[k] <- stats::sd(logatt_b, na.rm = TRUE)
-            qs <- stats::quantile(logatt_b, probs = probs, na.rm = TRUE)
-            if (ci.method == "percentile") {
-                ci_lo[k] <- unname(qs[1])
-                ci_hi[k] <- unname(qs[2])
-            } else {
-                ci_lo[k] <- 2 * estimate[k] - unname(qs[2])
-                ci_hi[k] <- 2 * estimate[k] - unname(qs[1])
-            }
+            ci <- .compute_ci(estimate[k], logatt_b, ci.method, conf.level)
+            se_vec[k] <- ci$se
+            ci_lo[k]  <- ci$ci.lo
+            ci_hi[k]  <- ci$ci.hi
         }
     }
 
@@ -1079,6 +1124,66 @@ estimand <- function(fit,
 ## ---------------------------------------------------------------------------
 ## Internal helpers
 ## ---------------------------------------------------------------------------
+
+## Compute SE and (lo, hi) confidence-interval bounds from a bootstrap
+## distribution `boot` (a numeric vector of replicate-level estimates),
+## a point `estimate`, and a chosen `ci.method`.
+##
+## Supports four methods:
+##   - "basic":     ci = (2*est - q_hi, 2*est - q_lo) [reflected]
+##   - "percentile": ci = (q_lo, q_hi)
+##   - "bc":        bias-corrected percentile (z0 only, no acceleration)
+##                  ci = (q_{Phi(2*z0 + z_alpha/2)},
+##                        q_{Phi(2*z0 + z_{1-alpha/2})})
+##                  where z0 = Phi^-1(mean(boot < est)).
+##   - "normal":    ci = est +/- z_{1-alpha/2} * SE   [Wald]
+##
+## Returns a list with elements `se`, `ci.lo`, `ci.hi`.
+##
+## See statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md
+## for the design rationale and per-type defaults.
+.compute_ci <- function(estimate, boot, ci.method, conf.level) {
+    alpha <- 1 - conf.level
+    se    <- stats::sd(boot, na.rm = TRUE)
+
+    if (ci.method == "normal") {
+        z <- stats::qnorm(1 - alpha / 2)
+        return(list(se    = se,
+                    ci.lo = estimate - z * se,
+                    ci.hi = estimate + z * se))
+    }
+
+    probs <- c(alpha / 2, 1 - alpha / 2)
+    qs    <- stats::quantile(boot, probs = probs, na.rm = TRUE)
+
+    if (ci.method == "percentile") {
+        return(list(se = se, ci.lo = unname(qs[1]), ci.hi = unname(qs[2])))
+    }
+    if (ci.method == "basic") {
+        return(list(se    = se,
+                    ci.lo = 2 * estimate - unname(qs[2]),
+                    ci.hi = 2 * estimate - unname(qs[1])))
+    }
+    if (ci.method == "bc") {
+        valid <- !is.na(boot)
+        if (sum(valid) == 0L) {
+            return(list(se = NA_real_, ci.lo = NA_real_, ci.hi = NA_real_))
+        }
+        ## z0 = bias correction = Phi^-1(P(boot < estimate))
+        p_below <- mean(boot[valid] < estimate)
+        ## Clamp to avoid +/-Inf at the boundaries
+        p_below <- pmin(pmax(p_below, 1e-6), 1 - 1e-6)
+        z0      <- stats::qnorm(p_below)
+        z_lo    <- stats::qnorm(alpha / 2)
+        z_hi    <- stats::qnorm(1 - alpha / 2)
+        a_lo    <- stats::pnorm(2 * z0 + z_lo)
+        a_hi    <- stats::pnorm(2 * z0 + z_hi)
+        bc_qs   <- stats::quantile(boot, probs = c(a_lo, a_hi), na.rm = TRUE)
+        return(list(se = se, ci.lo = unname(bc_qs[1]), ci.hi = unname(bc_qs[2])))
+    }
+    stop("Unknown ci.method = \"", ci.method, "\".", call. = FALSE)
+}
+
 
 ## Apply a `cells` filter (NULL, logical, or one-sided formula/function)
 ## against a long-form data frame. Returns the filtered data frame.

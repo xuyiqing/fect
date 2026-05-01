@@ -539,12 +539,12 @@ test_that("H2: vartype='jackknife' works for FE and IFE", {
     expect_true(!is.null(out_ife$est.att))
 })
 
-test_that("H3: nboots default is 200", {
+test_that("H3: nboots default is 1000 (raised from 200 in v2.4.2)", {
 
   skip_on_cran()
     ## Check default via formals
     defs <- formals(fect)
-    expect_equal(defs$nboots, 200)
+    expect_equal(defs$nboots, 1000)
 })
 
 

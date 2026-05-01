@@ -2,13 +2,20 @@
 
 // matrix completion
 
-/* Interactive Fixed Effects: matrix completion */
+/* Interactive Fixed Effects: matrix completion
+ *
+ * fit_init: optional warm-start matrix (TT x N) forwarded to the
+ * inner EM via fe_ad_inter_iter. NULL (default) preserves the
+ * pre-2.4.2 cold-start behavior. See inter_fe_ub doc for the
+ * rationale.
+ */
 // [[Rcpp::export]]
 List inter_fe_mc(
     const arma::mat& Y, const arma::mat& Y0, const arma::cube& X, const arma::mat& I, const arma::mat& W_in,
     const arma::mat& beta0,
     int r, // r > 0, the outcome has a factor-type fixed effect; r = 0 else
-    double lambda, int force, double tol = 1e-5, int max_iter = 1000) {
+    double lambda, int force, double tol = 1e-5, int max_iter = 1000,
+    Rcpp::Nullable<Rcpp::NumericMatrix> fit_init = R_NilValue) {
   
   arma::mat W = W_in;
   /* Dimensions */
@@ -88,7 +95,7 @@ List inter_fe_mc(
 
       // soft impute as starting value
       List fe_ad_inter =
-          fe_ad_inter_iter(YY, Y0, I, W, force, 1, 1, 0, lambda, tol, max_iter);
+          fe_ad_inter_iter(YY, Y0, I, W, force, 1, 1, 0, lambda, tol, max_iter, fit_init);
 
       // fit = as<arma::mat>(fe_ad_inter["fit"]) ;
       // hard impute
@@ -155,7 +162,7 @@ List inter_fe_mc(
       // soft impute as starting value
       List fe_ad_inter_covar =
           fe_ad_inter_covar_iter(XX, invXX, YY, Y0, I, W, beta0, force, 1, 1, 0,
-                                 lambda, tol, max_iter);
+                                 lambda, tol, max_iter, fit_init);
       beta = as<arma::mat>(fe_ad_inter_covar["beta"]);
       fit = as<arma::mat>(fe_ad_inter_covar["fit"]);
 

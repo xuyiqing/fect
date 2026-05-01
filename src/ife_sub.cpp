@@ -189,13 +189,25 @@ List fe_ad_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::
   return (result);
 }
 
-/* Obtain additive fe for ub data; assume r>0 but p=0*/
+/* Obtain additive fe for ub data; assume r>0 but p=0
+ *
+ * fit_init: optional warm-start matrix (TT x N) to seed the EM loop
+ *   from the prediction surface of a previous fit (typically the main
+ *   real-data fit, when this function is called inside a bootstrap
+ *   replicate). If non-null and dimensions match Y, replaces the
+ *   default `fit = Y0` initialization. NULL (default) preserves the
+ *   pre-2.4.2 cold-start behavior. See statsclaw-workspace/fect/ref/
+ *   warm-start-audit-2026-05-01.md for the statistical justification
+ *   (prediction surface uniquely identified for IFE / MC; warm-start
+ *   is variance-neutral).
+ */
 // [[Rcpp::export]]
 List fe_ad_inter_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W,
                       int force,
                       int mc, // whether pca or mc method
                       int r, int hard, double lambda, double tolerate,
-                      int max_iter = 1000) {
+                      int max_iter = 1000,
+                      Rcpp::Nullable<Rcpp::NumericMatrix> fit_init = R_NilValue) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   double mu = 0;
@@ -234,8 +246,19 @@ List fe_ad_inter_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& 
   List pf;
   List ife_inner;
 
+  // Warm-start init: if fit_init is provided and shape matches, seed
+  // the EM with it; otherwise fall back to fit = Y0 (cold-start).
+  arma::mat warm_init = Y0;
+  if (fit_init.isNotNull()) {
+    arma::mat fi = Rcpp::as<arma::mat>(fit_init);
+    if (fi.n_rows == static_cast<arma::uword>(T) &&
+        fi.n_cols == static_cast<arma::uword>(N)) {
+      warm_init = fi;
+    }
+  }
+
   // initial value for ife
-  fit = Y0;
+  fit = warm_init;
   fit_old = fit;
   int stop_burnin = 0;
   while (dif > tolerate && niter <= max_iter) {
@@ -289,7 +312,7 @@ List fe_ad_inter_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& 
       stop_burnin = 1;
       dif = 1.0;
       niter = 0;
-      fit = Y0;
+      fit = warm_init;  // post-burnin restart honors warm-start
       fit_old = fit;
     }
   }
@@ -326,14 +349,20 @@ List fe_ad_inter_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& 
   return (result);
 }
 
-/* Obtain additive fe for ub data; assume r>0 p>0*/
+/* Obtain additive fe for ub data; assume r>0 p>0
+ *
+ * fit_init: optional warm-start matrix (TT x N). See fe_ad_inter_iter
+ * docstring. Same semantics: NULL = cold-start, non-null = seed EM
+ * from a prior prediction surface.
+ */
 // [[Rcpp::export]]
 List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::mat& Y,
                             const arma::mat& Y0, const arma::mat& I, const arma::mat& W,
                             const arma::mat& beta0, int force,
                             int mc, // whether pca or mc method
                             int r, int hard, double lambda, double tolerate,
-                            int max_iter = 1000) {
+                            int max_iter = 1000,
+                            Rcpp::Nullable<Rcpp::NumericMatrix> fit_init = R_NilValue) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   int p = XX.n_slices;
@@ -379,6 +408,17 @@ List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const 
   // double dif_FE_inter_use = 1.0;
   // initial value for ife
 
+  // Warm-start init: if fit_init is provided and shape matches, seed
+  // the EM with it; otherwise fall back to fit = Y0 (cold-start).
+  arma::mat warm_init = Y0;
+  if (fit_init.isNotNull()) {
+    arma::mat fi = Rcpp::as<arma::mat>(fit_init);
+    if (fi.n_rows == static_cast<arma::uword>(T) &&
+        fi.n_cols == static_cast<arma::uword>(N)) {
+      warm_init = fi;
+    }
+  }
+
   // if (hard == 0) {
   //   U = FE_adj(Y - Y0, I) ;
   //   if (mc == 0) {
@@ -393,7 +433,7 @@ List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const 
   //   fit = Y0 + FE_inter_use ;
   //   fit_old = fit ;
   // } else {
-  fit = Y0;
+  fit = warm_init;
   fit_old = fit;
   //}
 
@@ -472,7 +512,7 @@ List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const 
       stop_burnin = 1;
       dif = 1.0;
       niter = 0;
-      fit = Y0;
+      fit = warm_init;  // post-burnin restart honors warm-start
       fit_old = fit;
     }
   }
