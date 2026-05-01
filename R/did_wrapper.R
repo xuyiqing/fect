@@ -538,7 +538,7 @@ did_wrapper <- function(
       run_estimator_once(d_b)
     }
 
-    if (parallel) {
+    if (!identical(parallel, FALSE)) {
       if (is.null(core)) core <- parallelly::availableCores(omit = 1)
       future::plan(future::multisession, workers = core) # Use future::multisession
       # Ensure seed is handled correctly for parallel processing

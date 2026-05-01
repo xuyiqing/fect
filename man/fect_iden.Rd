@@ -4,35 +4,40 @@
 \alias{fect_iden}
 \title{Over-identification test for causal moderation (cm)}
 \usage{
-fect_iden(x, moderator, covariates = NULL, quadratic = TRUE, interaction = TRUE)
+fect_iden(
+  x,
+  moderator,
+  covariates = NULL,
+  quadratic = TRUE,
+  interaction = TRUE
+)
 }
 \arguments{
-\item{x}{A \code{fect} object. Must be estimated with \code{cm=TRUE} so that \code{x$est.cm} exists.}
+\item{x}{A `fect` object. Must be estimated with `cm=TRUE` so that `x$est.cm` exists.}
 
-\item{moderator}{Character scalar. Name of the moderator \eqn{M_{it}} (must be in \code{x$X}).}
+\item{moderator}{Character scalar. Name of the moderator \eqn{M_{it}} (must be in `x$X`).}
 
 \item{covariates}{Optional character vector. Names of other covariates \eqn{X_{it}}.
-Default is all covariates in \code{x$X} except \code{moderator}.}
+Default is all covariates in `x$X` except `moderator`.}
 
 \item{quadratic}{Logical. Include quadratic terms \eqn{M_{it}^2} and \eqn{X_{it}^2}. Default TRUE.}
 
 \item{interaction}{Logical. Include interaction terms \eqn{M_{it} \times X_{it}}. Default TRUE.}
 }
 \value{
-A list with elements \code{e1} and \code{e0}, each containing:
-\describe{
-  \item{n}{sample size used in the auxiliary regression}
-  \item{r2}{R-squared of the auxiliary regression}
-  \item{stat}{\eqn{n \times R^2}}
-  \item{df}{degrees of freedom (number of nonlinear terms kept)}
-  \item{p}{p-value from chi-square test}
-  \item{model}{the fitted \code{fixest} model}
-}
+A list with elements `e1` and `e0`, each containing:
+  - `n`: sample size used in the auxiliary regression
+  - `r2`: R-squared of the auxiliary regression
+  - `stat`: \eqn{n \times R^2}
+  - `df`: degrees of freedom (# nonlinear terms kept)
+  - `p`: p-value from chi-square test
+  - `model`: the fitted `fixest` model
 }
 \description{
-Implements the over-identification test: run two auxiliary regressions of
-residualized outcomes on the moderator and covariates (including quadratic
-and interaction terms) with unit and time fixed effects, then test using
-\eqn{n \times R^2 \sim \chi^2(df)}, where df is the number of nonlinear
-(quadratic + interaction) terms that remain in the fitted model.
+Implements the over-identification test described in the slide:
+run two auxiliary regressions of residualized outcomes on the moderator
+and covariates (including quadratic and interaction terms) with unit and
+time fixed effects, then test using \eqn{n \times R^2 \sim \chi^2(df)},
+where df is the number of *nonlinear* (quadratic + interaction) terms that
+remain in the fitted model.
 }

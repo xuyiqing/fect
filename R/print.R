@@ -86,8 +86,16 @@ print.fect <- function(x,
         cat("\nATT:\n")
         att.out <- rbind.data.frame(c(x$est.avg), c(x$est.avg.unit))
         colnames(att.out) <- c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value")
+        ## When W is supplied AND enters the aggregation, the obs-level row
+        ## reports the sample-weighted aggregate. Otherwise (no W, or W only
+        ## entered the outcome-model fit), the row is the unweighted average.
+        first.row <- if (isTRUE(x$W.in.agg)) {
+            "Tr obs sample-weighted (W)"
+        } else {
+            "Tr obs equally weighted"
+        }
         rownames(att.out) <- c(
-            "Tr obs equally weighted",
+            first.row,
             "Tr units equally weighted")
         print(att.out, digits = 4)
         # if (switch.on == TRUE) {

@@ -5,13 +5,14 @@
 \description{Implements counterfactual estimators in TSCS data analysis and statistical tools to test their identification
 assumptions.}
 \usage{fect(formula = NULL, data, Y, D, X = NULL,
-            W = NULL, group = NULL,
+            W = NULL, W.est = NULL, W.agg = NULL,
+            group = NULL,
             na.rm = FALSE,
             index, force = "two-way",
             time.component.from = "notyettreated", em = TRUE,
             r = 0, lambda = NULL, nlambda = 10,
-            CV = NULL, k = 10, cv.prop = 0.1, cv.method = "all_units",
-            cv.nobs = 3, cv.donut = 0, criterion = "mspe",
+            CV = NULL, k = 20, cv.prop = 0.1, cv.method = "rolling",
+            cv.nobs = 3, cv.donut = 1, cv.buffer = 1, criterion = "mspe",
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
             quantile.CI = FALSE, nboots = 200, alpha = 0.05,
@@ -31,14 +32,26 @@ assumptions.}
             carryoverTest = FALSE, carryover.period = NULL, carryover.rm = NULL,
             loo = FALSE, permute = FALSE, m = 2,
             normalize = FALSE, keep.sims = FALSE,
-            cm = FALSE)}
+            cm = FALSE,
+            loading.bound = "none", gamma.loading = NULL,
+            gamma.loading.grid = NULL,
+            cv.rule = "1se")}
 \arguments{
 \item{formula}{an object of class "formula": a symbolic description of the model to be fitted, e.g, Y~D+X1+X2}
 \item{data}{a data frame, can be a balanced or unbalanced panel data.}
 \item{Y}{the outcome indicator.}
 \item{D}{the treatment indicator. The treatment should be binary (0 and 1).}
 \item{X}{time-varying covariates. Covariates that have perfect collinearity with specified fixed effects are dropped automatically.}
-\item{W}{the weight indicator. If specified, the program will fit the data with a weighted outcome model and calculate weighted average and dynamic treatment effect.}
+\item{W}{a string giving the column name of a weight variable. Convenience default that populates both \code{W.est} and \code{W.agg} when those are left \code{NULL}. Suitable for survey or sample weights, where the same column applies to both the outcome-model fit and the across-treated-obs aggregation.}
+
+\item{W.est}{a string giving the column name of a weight variable that enters the outcome-model fit (the weighted least squares applied inside the IFE / MC / CFE solver). When \code{NULL}, falls back to \code{W}. Use this (with \code{W.agg = NULL}) when the weight reflects fit-side considerations and the estimand is the unweighted average ATT across treated cells.}
+
+\item{W.agg}{a string giving the column name of a weight variable that enters the across-treated-obs aggregation (\code{att.on}, \code{est.avg}, \code{est.att}). When \code{NULL}, falls back to \code{W}. Use this (with \code{W.est = NULL}) when the user's estimand differs from "ATT for the treated units in the analysis sample" --- common cases include calibration weights to a target population or post-stratification weights that should adjust the summary but not the model fit.
+
+A clean in-package solution for inverse-probability weights for confounding adjustment is under development for fect 3.0 (a cross-fit doubly-robust path); \code{W.agg} is not a substitute for that work and does not deliver the doubly-robust properties an IPW user expects.
+
+In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the same column; truly distinct columns for fit vs. aggregation (e.g. combined survey x IPW designs) are scheduled for v2.4.0.}
+
 \item{group}{the group indicator. If specified, the group-wise ATT will be estimated.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
 \item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Every observation should be uniquely defined by the pair of the unit and time indicator.}
@@ -49,11 +62,12 @@ assumptions.}
 \item{lambda}{a single or sequence of positive numbers specifying the hyper-parameter sequence for matrix completion method. If \code{lambda} is a sequence and \code{CV = 1}, cross-validation will be performed.}
 \item{nlambda}{an integer specifying the length of hyper-parameter sequence for matrix completion method. Default is \code{nlambda = 10}.}
 \item{CV}{a logical flag indicating whether cross-validation will be performed to select the optimal number of factors or hyper-parameter in matrix completion algorithm. If \code{r} is not specified, the procedure will search through \code{r = 0} to \code{5}.}
-\item{k}{an integer specifying number of cross-validation rounds. Default is \code{k = 10}.}
+\item{k}{an integer specifying number of cross-validation rounds. Default is \code{k = 20}.}
 \item{cv.prop}{a numerical value specifying the proportion of testing set compared to sample size during the cross-validation procedure.}
-\item{cv.method}{a string specifying the cross-validation masking strategy. \code{"all_units"} (default) masks observations across all units; \code{"treated_units"} masks only treated unit observations. For \code{fect_nevertreated}, \code{"loo"} (leave-one-out) is also supported.}
+\item{cv.method}{a string specifying the cross-validation masking strategy. One of \code{"rolling"} (default; standard time-series rolling-window CV), \code{"block"} (random scattered anchors with contiguous-block masking), or \code{"loo"} (leave-one-out, available for \code{fect_nevertreated}). The legacy aliases \code{"all_units"} (= \code{"block"}) and \code{"treated_units"} (block masking restricted to treated pre-treatment cells) are still accepted but emit a deprecation message; both will be replaced by the unified \code{(cv.method, cv.units)} API in v2.4.0.}
 \item{cv.nobs}{an integer specifying the length of continuous observations within a unit in the testing set. Default is \code{cv.nobs = 3}.}
-\item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}.}
+\item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}. Used by block CV (\code{cv.method = "block"}, or the legacy aliases \code{"all_units"}/\code{"treated_units"}). Default is 1 (matches \code{cv.buffer} for rolling CV).}
+\item{cv.buffer}{an integer specifying the length of past-side buffer cells masked from training (but not scored) immediately before each rolling-window holdout. Used only by \code{cv.method = "rolling"}; the future side is dropped from training by construction. Analogous to \code{cv.donut} for block CV but applied only on the past side. Default is 1.}
 \item{criterion}{criterion used for model selection. Default is "mspe".
   \code{"mspe"} for the mean squared prediction error,
   \code{"gmspe"} for the geometric-mean squared prediction errors,
@@ -65,12 +79,42 @@ assumptions.}
   \code{"fe"}, \code{"ife"}, \code{"mc"},
   \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
-\item{vartype}{a string specifying the type of variance estimator, e.g. \code{"bootstrap"}.}
+\item{vartype}{a string specifying the type of variance estimator, e.g.
+  \code{"bootstrap"}. Three values are supported:
+  \code{"bootstrap"} (nonparametric cluster-bootstrap; the safe default),
+  \code{"jackknife"} (leave-one-unit-out), and
+  \code{"parametric"} (two-stage pseudo-treated parametric bootstrap).
+  The \code{"parametric"} option is restricted to the
+  gsynth-style regime: it requires
+  \code{time.component.from = "nevertreated"}, no treatment reversal,
+  and \code{method} not in \code{c("mc", "both")}.
+  These three conditions correspond to Gates A, B, and C in the
+  three-gate defense system (see \code{ARCHITECTURE.md}).
+  For all other settings, \code{vartype = "bootstrap"} is recommended.}
 \item{cl}{a string specifying the cluster for cluster bootstrapping.}
 \item{quantile.CI}{a logical flag indicating whether to use quantile confidence intervals when bootstrapping.}
 \item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}.}
 \item{alpha}{the significance level for hypothesis tests and confidence intervals. Default \code{0.05}.}
-\item{parallel}{a logical flag indicating whether parallel computing will be used in bootstrapping or cross-validation.}
+\item{parallel}{controls which operations run in parallel. Accepted values:
+\describe{
+  \item{\code{TRUE}}{Enable parallel computing for both CV and bootstrap (default in \code{fect()}).}
+  \item{\code{FALSE}}{Disable all parallel computing.}
+  \item{\code{"cv"}}{Enable parallel CV only; bootstrap runs serially.}
+  \item{\code{"boot"}}{Enable parallel bootstrap only; CV runs serially.}
+  \item{\code{c("cv","boot")}}{Explicit form of \code{TRUE}: parallel for both.}
+}
+When \code{parallel = TRUE}, auto-enable thresholds apply: CV parallelism
+engages only when \code{Nco * TT} exceeds the per-method threshold
+(\code{ife = 20000}, \code{mc = 20000}, \code{cfe = 60000}). Explicit \code{"cv"} overrides
+the threshold. Nested parallelism (calling \code{fect()} from within a
+\code{future_lapply} or \code{foreach \%dopar\%} block) should use
+\code{parallel = FALSE} to avoid deadlock.
+When using \code{parallel} with \code{method = "mc"}, parallel CV computes
+all candidate lambda values without early stopping (the serial path uses a
+\code{break_check} short-circuit to skip lambdas with diminishing MSPE
+returns). This guarantees numerical identity between serial and parallel
+results but may compute a few extra lambda values compared to the serial
+path. Use \code{parallel = FALSE} to preserve the short-circuit behavior.}
 \item{cores}{an integer indicating the number of cores for parallel computing.}
 \item{tol}{a positive number indicating the tolerance level for EM updates.}
 \item{max.iteration}{the maximal number of iterations for the EM algorithm.}
@@ -106,6 +150,16 @@ assumptions.}
 \item{normalize}{a logical flag indicating whether to scale outcome and covariates.}
 \item{keep.sims}{a logical flag indicating whether to save unit-time level bootstrap effects. Default \code{keep.sims = FALSE}. If \code{se = FALSE}, this argument is ignored.}
 \item{cm}{a logical flag indicating whether to enable causal moderation analysis. When \code{TRUE}, the estimator decomposes the treatment effect into effect modification and causal moderation components. Currently available for \code{method = "fe"} and \code{method = "ife"}. Default is \code{FALSE}.}
+\item{loading.bound}{a string controlling whether treated-unit factor loadings are bounded inside the convex hull of control loadings. \code{"none"} (default) reproduces standard GSC behavior. \code{"simplex"} constrains each treated unit's loading to be a non-negative convex combination of control loadings via an entropy-regularized simplex projection, ensuring the imputed counterfactual lies pointwise in the convex hull of factor-implied control outcomes. Currently applies only to \code{method = "ife"} or \code{method = "gsynth"} (equivalent forms), and requires \code{time.component.from = "nevertreated"}.}
+\item{gamma.loading}{scalar regularization strength for the \code{"simplex"} projection. \code{NULL} (default) triggers 5-fold cross-validation over \code{gamma.loading.grid}. A numeric value is used directly. Ignored when \code{loading.bound = "none"}.}
+\item{gamma.loading.grid}{a numeric vector of candidate \code{gamma.loading} values for cross-validation. \code{NULL} (default) uses \code{10^seq(-2, 2, length.out = 9)}. Ignored when \code{loading.bound = "none"} or when \code{gamma.loading} is supplied.}
+\item{cv.rule}{a string selecting the cross-validation rule for choosing the number of factors \code{r} (or matrix-completion penalty \code{lambda}). One of:
+\describe{
+  \item{\code{"1se"} (default)}{The 1-SE rule (Breiman, Friedman, Olshen and Stone 1984; Hastie, Tibshirani and Friedman 2009, Section 7.10): pick the smallest \code{r} whose mean CV criterion is within one fold-SE of the minimum-CV-error \code{r}. Biases toward parsimony in a fold-aware way --- when CV is precise, it allows larger \code{r}; when CV is noisy, it gravitates to simpler models.}
+  \item{\code{"min"}}{Pick the \code{r} that minimizes the mean CV criterion (no tolerance).}
+  \item{\code{"1pct"}}{Legacy pre-2.3.0 heuristic: pick the smallest \code{r} within 1\% relative tolerance of the best mean CV criterion. Use this for byte-identical reproducibility of pre-2.3.0 fits.}
+}
+Ignored when \code{CV = FALSE}.}
 }
 \details{
   \code{fect} implements counterfactual estimators for TSCS data. It first imputes counterfactuals by fitting an outcome model using untreated observations, then estimates the individual treatment effect as the difference between observed and predicted outcomes. Finally, it computes average treatment effects on the treated (ATT) and period-specific ATTs. Placebo and equivalence tests help evaluate identification assumptions.

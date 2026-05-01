@@ -1,3 +1,7 @@
+# Test output
+test-results.xml
+tests/testthat/test-results.xml
+
 # History files
 .Rhistory
 .Rapp.history

@@ -1,5 +1,142 @@
 # Changelog {#sec-changelog .unnumbered}
 
+## v2.4.1
+
+(2026-04-30) CRAN release.
+
+**Enhancement.** `estimand()`'s `vartype` argument now accepts
+`"parametric"` in addition to `"bootstrap"`, `"jackknife"`, and
+`"none"`. Works for all four `type` values when the fit was produced
+with `fect(..., vartype = "parametric", keep.sims = TRUE)`. See
+@sec-estimands for a worked example.
+
+**Bug fix.** `estimand(fit, "att.cumu", ...)` now populates `n_cells`
+on both event-time and overall paths, so
+`esplot(..., Count = "n_cells")` draws the bottom-bar treated-cell
+panel for cumulative plots.
+
+## v2.4.0
+
+(2026-04-29)
+
+**New: post-hoc estimands API.** Two new public functions and one new
+dedicated chapter in the user manual.
+
+* `estimand(fit, type, by, ...)` typed dispatcher returns a tidy data
+  frame with consistent columns regardless of estimand type. Shipped
+  types:
+  * `"att"` — default per-event-time ATT; byte-identical to
+    `fit$est.att`.
+  * `"att.cumu"` — cumulative ATT; replaces `effect()`.
+  * `"aptt"` — average proportional treatment effect on the treated
+    (Chen and Roth 2024 QJE).
+  * `"log.att"` — mean log-scale treatment effect.
+* `imputed_outcomes(fit, ...)` low-level accessor returns the cell-level
+  potential-outcome surface as a long-form data frame for custom
+  estimands. Pipe to dplyr / data.table for arbitrary aggregation.
+* `cells = ` filter (logical / formula) on both functions, with
+  `window = c(L, R)` sugar on `estimand()` for the common
+  event-time-window case.
+* `direction = c("on", "off")` selects the event-time grid for reversal
+  panels.
+* New chapter [@sec-estimands] in the user manual walks through all six
+  worked examples plus the migration table.
+
+**Soft-deprecation.** `effect()` and `att.cumu()` emit a
+one-time-per-session message pointing at `estimand()`. They continue
+to work byte-identically; removal not before v3.0.0. Numerical
+equality with `estimand()` is asserted by package tests.
+
+**Internal slot reservation.** `eff_debias` slot on the fit object is
+now reserved (NULL for plain imputation estimators); populated by
+future doubly-robust estimators so DR scores can be added without
+breaking the long-form schema.
+
+## v2.3.3
+
+(2026-04-28)
+
+**Bug fixes.**
+
+* `diagtest()` no longer crashes with "incorrect number of dimensions" when only one bootstrap column survives the all-non-NA filter (`drop = FALSE` at both filter sites in `R/diagtest.R`).
+* Bootstrap PSOCK cluster init now uses the shared `rscript_libs = .libPaths()` helper, wrapped in a 3-attempt retry-with-backoff. Eliminates the intermittent PSOCK race that surfaced in mixed CV+boot test runs; falls back to sequential bootstrap if `doParallel` also fails.
+* `carryover.rm` is now stored on the fit object. `plot.fect()` reads it from the slot rather than re-parsing `x$call`; correct under `do.call()`, programmatic wrappers, and any call-rewriting code path.
+
+**Documentation.** Chapter 2 §Other estimands gains a worked example for post-hoc estimands derived from the imputed potential-outcome surface, showing APTT [@chen2024logs] with bootstrap CIs from the existing fit slots.
+
+## v2.3.2
+
+(2026-04-28)
+
+**Modern visual defaults for `plot.fect()`** (visual breaking change):
+
+* All 14 plot types now render with a publication-ready recipe: white panel, plain left-aligned title, dashed treatment-onset vline, peach highlight rectangle behind placebo / carryover periods, pre/post lightness contrast, and compact legends.
+* Pass `legacy.style = TRUE` for byte-identical pre-2.3.1 reproduction. `theme.bw = FALSE` is soft-deprecated (removal in v2.5.0).
+* Placebo and carryover periods now render as a single accent glyph (orange triangle / blue diamond) per period, sized so the glyph reads as the same visual weight as the surrounding circles. Background rectangle behind each highlight period is opt-in via `highlight.fill = TRUE`; default is glyph only, which keeps figures clean for print and grayscale.
+* `highlight` argument now also accepts a character subset of `c("placebo", "carryover", "carryover.rm")` for per-test-type selective highlighting (e.g., `highlight = "placebo"` on a fit with both tests renders carryover periods as plain circles).
+* Stats-annotation block (placebo / carryover / F / equivalence p-values) sits at the top-left panel corner with symmetric inset and enough top padding to never graze the leftmost CI. Sized so it does not overpower the title.
+* Internal: migrated off the ggplot2 4.0 deprecated `fatten` / `lwd` arguments to the `size` / `linewidth` aesthetics.
+
+## v2.3.1
+
+(2026-04-27)
+
+**Consistent ATT surface when `W` is supplied.** `fit$est.att`, `fit$est.avg`, `plot(fit)`, and `print(fit)` now all report the same W-weighted aggregation. The redundant `*.W` parallel slots are no longer attached to the fit object. To see the unweighted view, refit with `W = NULL`.
+
+**New `W.est` and `W.agg` arguments.** Both default to `NULL` and fall back to `W`. Use `W.est` alone when the weight should enter the outcome-model fit only, or `W.agg` alone when it should enter the aggregation only. See [Chapter @sec-ife-mc] §3.5 for details. A clean fect-internal solution for inverse-probability weights for confounding adjustment is under development for v3.0.
+
+**Deprecations.** The `weight` argument to `plot.fect()` is now a no-op (the canonical slots are already W-weighted when `W` is supplied). It emits a one-time warning and is slated for removal in v2.5.0.
+
+## v2.3.0
+
+(2026-04-25)
+
+**Rolling-window cross-validation** ([Chapter @sec-ife-mc], [Chapter @sec-gsynth]):
+
+* New `cv.method = "rolling"` in the main `fect()` CV dispatcher (also exposed as standalone `r.cv.rolling()`) implements the standard time-series rolling-window CV design adapted to panel data. Recommended default for serially correlated panels; closes the AR-leakage channel that causes block CV to over-select `r` (often pegging at `r.max`). Supports `method` in {`"ife"`, `"gsynth"`, `"cfe"`, `"mc"`, `"both"`}. New parameter `cv.buffer` (default 1, past-side buffer). Empirical validation: on a Xu (2017) DGP with $r_{\text{true}} = 2$ and AR(1) $\rho = 0.8$ (K = 200 reps), rolling CV recovers truth in 56% vs block CV's 15% (mean `r.cv` = 1.58 vs 3.34).
+
+**1-SE rule is the new default for `r` selection** (Hastie/Tibshirani/Friedman 2009 §7.10):
+
+* `cv.rule = "1se"` (default) picks the smallest `r` within one fold-SE of the minimum-CV-error `r`. Legacy `cv.rule = "1pct"` remains available for byte-identical reproducibility of pre-2.3.0 fits.
+* Default flip: existing `CV = TRUE` calls will produce different `r.cv` on the same data. Set `cv.rule = "1pct"` to recover prior behavior.
+
+**Bounded factor loadings for GSC** (see [Chapter @sec-gsynth]):
+
+* New `loading.bound = "simplex"` (default `"none"`) constrains treated-unit loadings to the convex hull of control loadings via an entropy-regularized simplex projection. Companion arguments: `gamma.loading` (regularization strength; `NULL` triggers 5-fold CV) and `gamma.loading.grid`. Diagnostic outputs: `wgt.implied` (row-stochastic simplex weights), `loading.proj.resid` (extrapolation flag per treated unit). Currently `method = "ife"`/`"gsynth"` with `time.component.from = "nevertreated"` only.
+* Caveat: percentile-bootstrap intervals may under-cover when the constraint binds; boundary-corrected inference is deferred.
+* Companion plot: `plot(..., type = "loading.overlap")` shows treated loadings vs the control convex hull ($r \geq 2$) or mirror histogram with control-range band ($r = 1$). See [Chapter @sec-loading-overlap].
+
+**Other changes**:
+
+* `cv.method` default flipped from `"all_units"` (or `"treated_units"` in `fect_nevertreated`) to `"rolling"` across all CV entry points. Existing block-CV behavior remains available via the new `cv.method = "block"` value (renamed from `"all_units"`); the legacy values `"all_units"` and `"treated_units"` are still accepted but emit a one-time deprecation message and will be removed in v2.4.0 (replaced by the unified `(cv.method, cv.units)` API).
+* GSC path now populates `Y.ct.full[, co]` from $F \hat\lambda_{co}$ at masked control positions (was `NA`); enables rolling CV scoring for `method = "gsynth"`. ATT/gap/est.avg unchanged.
+* CV default flips paired for stable iid recovery: `cv.prop = 0.1` and `k = 20` across all CV entry points (`fect`, `fect_cv`, `fect_binary_cv`, `fect_nevertreated`, `fect_mspe`, `r.cv.rolling`). The `(cv.prop = 0.1, k = 20)` pair gives ~2× coverage of every eligible unit across folds while keeping per-fold mask size moderate. Sharpens the MSPE curve enough that the 1-SE rule recovers `r_true` reliably on iid panels with at-least-moderate factor signal-to-noise.
+* `cv.donut` default raised from 0 to 1 to match `cv.buffer = 1` for rolling CV.
+* `simdata` regenerated with the latent factor contribution scaled by 2 (vs the original Liu-Wang-Xu 2024 DGP). The doubling raises factor signal-to-noise from 2.7 to 10.9, which makes the latent factor structure clearly recoverable by cross-validated rank selection on this dataset (the original simdata's signal was comparable to noise, so MSPE-based rank selection landed within the 1-SE band of the truth without converging on it). All other DGP components (covariates, fixed effects, treatment effect, error) are unchanged. Existing user code that loads `simdata` will see different numerical Y values.
+* `r.cv.rolling()` extended to `method = "cfe"`. CFE-specific args (`Z`, `gamma`, `Q`, `Q.type`, `kappa`, extra index columns) are forwarded via `...` and held fixed; rolling CV varies only `r`.
+* `fect_mspe()` accepts `cv.method = "rolling"` for AR-leakage-resistant model comparison.
+* PSOCK worker `.libPaths()` propagation fix: `parallelly::makeClusterPSOCK(rscript_libs = .libPaths())` used wherever `future::plan(future::multisession, ...)` previously appeared. Resolves "no package called 'fect'" errors during Quarto book render and intermittent CRAN-check failures.
+* Phase A bootstrap (`R/boot.R::draw.error`) migrated from `foreach %dopar%` to `future.apply::future_lapply`; removes a stale `doFuture::registerDoFuture()` re-registration that caused an ~8× slowdown on variant (iii) parametric bootstraps in multi-fit sessions.
+
+## v2.2.1
+
+(2026-04-22)
+
+Parametric-bootstrap fixes (`se = TRUE`, `vartype = "parametric"`):
+
+* Parametric bootstrap on unbalanced panels now correctly reflects within-unit serial correlation. Prior versions used a diagonal residual covariance in the Gaussian draw, under-estimating ATT standard errors on serially correlated data by ≈ $\sqrt{(1+\rho)/(1-\rho)}$ at AR(1) coefficient $\rho$. Balanced panels and `vartype` ∈ {`"bootstrap"`, `"jackknife"`} are unaffected.
+* Fixed `Unsupported bootstrap method: fe` crash when `method = "gsynth"` or `"cfe"` and CV selected $r_{\text{cv}} = 0$. Reported against the `gsynth` wrapper.
+* Fixed `one.nonpara` dispatcher so `ife+notyettreated`, `cfe+nevertreated`, and `cfe+notyettreated` bootstraps route to the correct Loop-2 estimator (previously all three produced incorrect SEs).
+* Added hard gate that errors on `ife + notyettreated + parametric` — a coverage simulation showed ~80% vs 95% nominal. Use `time.component.from = "nevertreated"` or a non-parametric `vartype`.
+
+Parallel cross-validation:
+
+* IFE, MC, and CFE cross-validation now run in parallel via `future_lapply`, dispatching `(r, fold)` (or `(lambda, fold)`) flat across workers. Auto-engages above $N_{co} \times T \geq 20{,}000$ for IFE/MC and $\geq 60{,}000$ for CFE.
+* The `parallel` argument now accepts five forms: `TRUE`, `FALSE`, `"cv"`, `"boot"`, `c("cv", "boot")`. Scalar forms are backward-compatible; string forms bypass the auto-threshold.
+* MC-only tradeoff: `break_check` short-circuit applies in serial mode only; parallel MC evaluates all candidate lambdas. Prefer `parallel = FALSE` for MC if the search typically terminates early.
+* Internal: extracted `(rank, fold)` logic into `R/cv-helpers.R`; `fect_nevertreated.R` parallel CV migrated from `foreach %dopar%` (fold-only) to `future_lapply` (flat `r×k`), which also resolves a latent worker-visibility issue in the prior `foreach` path.
+* Fix: vector `parallel = c("cv", "boot")` no longer errors in `fect_boot`, `fit_test`, `permutation`, `fect_sens`, or `did_wrapper` — five sites had legacy scalar `parallel == TRUE` / `if (parallel)` checks.
+
 ## v2.2.0
 
 (2026-03-27) CRAN release.

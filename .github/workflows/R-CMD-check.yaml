@@ -7,26 +7,30 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: write     # needed to publish test results as PR check runs
+
 jobs:
   R-CMD-check:
     name: ${{ matrix.config.os }} (R ${{ matrix.config.r }})
     runs-on: ${{ matrix.config.os }}
     strategy:
       fail-fast: false
+      # Matrix scope and per-OS NOT_CRAN gating:
+      #   - pull_request -> Ubuntu only, NOT_CRAN="false" (matches CRAN's farm; fast feedback).
+      #   - push to master / workflow_dispatch -> full 3-OS matrix.
+      #     Ubuntu and Windows run with NOT_CRAN="false" (CRAN-style; skip_on_cran skips heavy tests).
+      #     macOS runs with NOT_CRAN="true" so the byte-equality fixture tests
+      #     (test-paraboot-parity.R PAR-1..7, test-cv-parallel.R P.3-P.6) execute on
+      #     the OS where their RDS baselines were captured. Non-Apple BLAS produces
+      #     bit-different results, so those tests are gated to macOS only.
+      #
+      # The matrix carries the per-OS not_cran value which we pass directly to
+      # rcmdcheck::rcmdcheck(env = ...) below — see the Check step for why we
+      # cannot rely on the workflow-level env: setup-r-dependencies overwrites it.
       matrix:
-        config:
-          - os: ubuntu-latest
-            r: "release"
-            use_public_rspm: true
-            pkg_type: ""
-          - os: macos-latest
-            r: "release"
-            use_public_rspm: true
-            pkg_type: "binary"
-          - os: windows-latest
-            r: "release"
-            use_public_rspm: true
-            pkg_type: "binary"
+        config: ${{ fromJSON(github.event_name == 'pull_request' && '[{"os":"ubuntu-latest","r":"release","use_public_rspm":true,"pkg_type":"","not_cran":"false"}]' || '[{"os":"ubuntu-latest","r":"release","use_public_rspm":true,"pkg_type":"","not_cran":"false"},{"os":"macos-latest","r":"release","use_public_rspm":true,"pkg_type":"binary","not_cran":"true"},{"os":"windows-latest","r":"release","use_public_rspm":true,"pkg_type":"binary","not_cran":"false"}]') }}
 
     env:
       R_KEEP_PKG_SOURCE: yes
@@ -35,6 +39,11 @@ jobs:
       RGL_USE_NULL: true
       R_PKG_TYPE: ${{ matrix.config.pkg_type }}
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      # NB: r-lib/actions/setup-r-dependencies@v2 unconditionally writes
+      # NOT_CRAN=true to $GITHUB_ENV during its run, so any workflow-level
+      # NOT_CRAN: setting here is overwritten before the check step. We do
+      # not set it here (would be misleading); see the Check step for the
+      # actual per-OS gate via rcmdcheck's env= parameter.
       # Put pak/pkgcache download cache in a known, cleanable place.
       # (Use workspace path; `runner.temp` is not a supported context.)
       PKGCACHE_DIR: ${{ github.workspace }}/.pkgcache
@@ -130,11 +139,45 @@ jobs:
         shell: Rscript {0}
         run: |
           sessionInfo()
+          cat("Parent process NOT_CRAN: '", Sys.getenv("NOT_CRAN"),
+              "'  (will be overridden via rcmdcheck env= below)\n", sep = "")
 
       - name: Check (CRAN-like)
         shell: Rscript {0}
         run: |
-          rcmdcheck::rcmdcheck(args = c('--no-manual','--as-cran'), error_on = 'error', check_dir = 'check')
+          # r-lib/actions/setup-r-dependencies@v2 writes NOT_CRAN=true to
+          # $GITHUB_ENV unconditionally, so the parent R process always sees
+          # NOT_CRAN=true regardless of workflow-level env settings. Pass the
+          # matrix-controlled value via rcmdcheck's `env=` parameter (forwarded
+          # to callr::rcmd, which uses its `env` vector as the COMPLETE child
+          # environment, not as a merge with the parent). The child R CMD check
+          # process therefore sees NOT_CRAN exactly as we set it here, and
+          # testthat's skip_on_cran() gates correctly per matrix entry.
+          # Verified: callr::rcmd_safe_env() lists 4 baseline keys (CYGWIN,
+          # R_TESTS, R_BROWSER, R_PDFVIEWER); rcmdcheck appends `env` on top.
+          cat("Passing NOT_CRAN='${{ matrix.config.not_cran }}' to rcmdcheck via env=\n")
+          rcmdcheck::rcmdcheck(
+            args = c('--no-manual','--as-cran'),
+            error_on = 'error',
+            check_dir = 'check',
+            env = c(NOT_CRAN = "${{ matrix.config.not_cran }}")
+          )
+
+      - name: Upload test results (JUnit XML)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-r${{ matrix.config.r }}-test-results
+          path: check/**/test-results.xml
+          if-no-files-found: ignore
+
+      - name: Publish test results to PR (Linux only)
+        if: ${{ always() && matrix.config.os == 'ubuntu-latest' }}
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: check/**/test-results.xml
+          check_name: "R CMD check — test results"
+          comment_mode: off
 
       - name: Upload check results
         if: failure()
@@ -158,4 +201,3 @@ jobs:
             exit 1
           fi
           echo "All matrix jobs passed"
-

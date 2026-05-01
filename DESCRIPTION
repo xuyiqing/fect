@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactual Estimators
-Version: 2.2.0
-Date: 2026-03-20
+Version: 2.4.1
+Date: 2026-04-29
 Authors@R: 
     c(person("Licheng", "Liu", , "lichengl@stanford.edu", role = c("aut")), 
       person("Ziyi", "Liu", , "zyliu2023@berkeley.edu", role = c("aut")),
@@ -51,7 +51,7 @@ Suggests:
     HonestDiDFEct
 Depends: R (>= 4.1.0)
 LinkingTo: Rcpp, RcppArmadillo
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Packaged: 2024-01-26 03:25:56 UTC; ziyil
 Encoding: UTF-8
 Config/testthat/edition: 3

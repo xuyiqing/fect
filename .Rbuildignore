@@ -16,3 +16,6 @@
 ^architecture\.md$
 ^log$
 ^data-raw$
+^cell-D1\.rds$
+^fect_.*\.tar\.gz$
+^fect\.Rcheck$

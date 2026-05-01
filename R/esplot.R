@@ -23,9 +23,11 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    highlight.periods = NULL,  # numeric vector of times to highlight
                    highlight.colors  = NULL,    # color for each highlight time
                    highlight.shapes  = NULL,    # integer shape for each highlight time (17=triangle, 18=diamond, etc.)
+                   highlight.fill    = FALSE,   # if TRUE, draw a lightened-tone background rectangle behind each highlighted period
+
                    lcolor = NULL,
                    lwidth = NULL,
-                   ltype = c("solid", "solid"),
+                   ltype = NULL,
                    connected = FALSE,    # if TRUE => line + ribbon
                    ci.outline = FALSE,
                    main      = NULL,
@@ -36,6 +38,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    gridOff   = FALSE,
                    stats.pos = NULL,
                    theme.bw  = TRUE,
+                   legacy.style = FALSE,
                    cex.main  = NULL,
                    cex.axis  = NULL,
                    cex.lab   = NULL,
@@ -57,6 +60,17 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    post.label = "Post-treatment"
 )
 {
+  ## Three visual modes:
+  ##  - modern    (theme.bw = TRUE,  legacy.style = FALSE): 2.3.1 default
+  ##  - classic   (theme.bw = TRUE,  legacy.style = TRUE):  pre-2.3.1 white-panel default
+  ##  - gray      (theme.bw = FALSE):                       legacy gray-panel look
+  use_modern_recipe <- isTRUE(theme.bw) && !isTRUE(legacy.style)
+
+  ## Default ltype: modern uses dashed vline at treatment onset; legacy uses solid.
+  if (is.null(ltype)) {
+    ltype <- if (use_modern_recipe) c("solid", "dashed") else c("solid", "solid")
+  }
+
   if (is.null(est.lwidth) || is.null(est.pointsize)) {
     default_est_lwidth <- .8
     default_est_pointsize <- 3
@@ -96,10 +110,15 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     data <- fect_att
   } else if (inherits(data, "did_wrapper")) {
     data <- data$est.att
+    if (is.null(Count) && "count" %in% names(data)) Count <- "count"
+    if (is.null(Count) && "count.on" %in% names(data)) Count <- "count.on"
   }
   data <- as.data.frame(data)
 
-  ## Resolve pre/post colors
+  ## Resolve pre/post colors. Both modern and legacy keep a lightness contrast
+  ## (pre = "grey50", post = color) so pre-treatment and post-treatment points
+  ## are visually distinguishable. fect convention: with start0 = FALSE
+  ## (default), period 0 is the LAST pre-treatment period; first post is t=1.
   if (is.null(post.color)) post.color <- color
   if (is.null(pre.color))  pre.color  <- "gray50"
 
@@ -291,7 +310,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   if (!is.null(cex.main)) {
     if (!is.numeric(cex.main)) stop("\"cex.main\" must be numeric.")
   } else {
-    cex.main <- 16
+    cex.main <- if (use_modern_recipe) 11 else 16
   }
 
   if (!is.null(xlab) && !is.character(xlab)) stop("\"xlab\" is not a string.")
@@ -300,19 +319,19 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   if (!is.null(cex.lab)) {
     if (!is.numeric(cex.lab)) stop("\"cex.lab\" must be numeric.")
   } else {
-    cex.lab <- 15
+    cex.lab <- if (use_modern_recipe) 10 else 15
   }
 
   if (!is.null(cex.axis)) {
     if (!is.numeric(cex.axis)) stop("\"cex.axis\" must be numeric.")
   } else {
-    cex.axis <- 15
+    cex.axis <- if (use_modern_recipe) 9 else 15
   }
 
   if (!is.null(cex.text)) {
     if (!is.numeric(cex.text)) stop("\"cex.text\" must be numeric.")
   } else {
-    cex.text <- 5
+    cex.text <- if (use_modern_recipe) 3.0 else 5
   }
 
   # Stats
@@ -381,8 +400,10 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   }
 
   if (is.null(lcolor)) {
-    if (theme.bw) {
-      lcolor <- "#AAAAAA70"
+    if (use_modern_recipe) {
+      lcolor <- "grey75"
+    } else if (isTRUE(theme.bw)) {
+      lcolor <- "#AAAAAA70"  # pre-2.3.1 default for theme.bw=TRUE (classic mode)
     } else {
       lcolor <- "white" # This might be invisible on a white background if not theme_bw
     }
@@ -394,8 +415,10 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     stop("\"lcolor\" must be a numeric vector of length 1 or 2.")
   }
   if (is.null(lwidth)) {
-    if (theme.bw) {
-      lwidth <- 1.5
+    if (use_modern_recipe) {
+      lwidth <- 0.4
+    } else if (isTRUE(theme.bw)) {
+      lwidth <- 1.5  # pre-2.3.1 default for theme.bw=TRUE (classic mode)
     } else {
       lwidth <- 2
     }
@@ -598,7 +621,10 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     range_val <- y_max_data - y_min_data
     if (!is.finite(range_val) || range_val == 0) range_val <- 1
 
-    top_expand_factor <- 0
+    ## Modern recipe: small top padding so the highest CI doesn't graze the panel
+    ## ceiling, larger top padding when stats annotation is drawn at top-left.
+    ## Legacy: keep zero top padding (preserve the pre-2.3.1 layout).
+    top_expand_factor <- if (use_modern_recipe) 0.08 else 0
     bot_expand_factor <- 0
 
     p_label_text_for_ylim_calc <- function(stats_vals, labs_vals) {
@@ -611,13 +637,22 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     }
     if (!is.null(stats)) {
       num_stat_lines <- ceiling(length(unlist(strsplit(p_label_text_for_ylim_calc(stats, stats.labs), "\n"))))
-      # top_expand_factor <- top_expand_factor # No change, already 0
+      ## Reserve room for the stats annotation block at the top.
+      ## Per-line factor accounts for the 1.25x text size used below;
+      ## doubled from 0.06 to 0.12 so stats text doesn't graze the
+      ## leftmost CIs on data with high pre-treatment estimates.
+      if (use_modern_recipe) {
+        top_expand_factor <- top_expand_factor + 0.12 * num_stat_lines
+      }
     }
     if (show.count && !is.null(Count) && Count %in% names(plot_data)) {
       idx_valid_count_plot_data <- !is.na(plot_data[[Count]]) & plot_data[[Count]] > 0
       if (any(idx_valid_count_plot_data)) {
         bot_expand_factor <- bot_expand_factor + 0.35
       }
+    } else if (use_modern_recipe) {
+      ## No count bars => still reserve a small bottom margin for breathing room
+      bot_expand_factor <- bot_expand_factor + 0.06
     }
 
     final_ylim <- c(
@@ -634,14 +669,39 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   p <- ggplot(data = plot_data)
 
 
-  if (theme.bw) {
-    p <- p + theme_bw()
+  if (use_modern_recipe) {
+    p <- p + .modern_theme(base_size = 11)
+  } else if (isTRUE(theme.bw)) {
+    p <- p + ggplot2::theme_bw()
   }
   if (gridOff) {
     p <- p + theme(
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank()
     )
+  }
+
+  ## Modern: peach (or auto-lightened) rectangle behind highlight periods,
+  ## drawn before data layers so points/lines paint on top. Opt-in via
+  ## `highlight.fill = TRUE`. Default is FALSE: the colored glyph alone is
+  ## sufficient signal that a period is part of a test window, and the
+  ## glyph-only look survives grayscale printing without surprise.
+  if (use_modern_recipe && isTRUE(highlight.fill) &&
+      !is.null(highlight.periods) && length(highlight.periods) > 0) {
+    hl_n <- length(highlight.periods)
+    hl_pt_colors <- if (!is.null(highlight.colors) && length(highlight.colors) == hl_n) {
+      highlight.colors
+    } else {
+      rep(.MODERN_PLACEBO_PT, hl_n)
+    }
+    for (i in seq_len(hl_n)) {
+      hl_fill_i <- .lighten_color(hl_pt_colors[i], amount = 0.70)
+      p <- p + annotate("rect",
+                        xmin = as.numeric(highlight.periods[i]) - 0.5,
+                        xmax = as.numeric(highlight.periods[i]) + 0.5,
+                        ymin = -Inf, ymax = Inf,
+                        fill = hl_fill_i, alpha = 0.55)
+    }
   }
 
   p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
@@ -726,7 +786,11 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       if (nrow(df_int) > 0) {
         ## Non-circle shapes (triangles, diamonds) appear smaller at the same
         ## nominal size; scale up by 1.5× so they match circle visual weight
-        pt_size <- if (point.shape != 19) est.pointsize * 1.5 else est.pointsize
+        ## Triangle (17) and diamond (18) glyphs render at a larger visual
+        ## area than circle (19) at the same size aesthetic. Scale them down
+        ## by 0.85 so highlight overlays look slightly smaller (not larger)
+        ## than the base circles in the same plot.
+        pt_size <- if (point.shape != 19) est.pointsize * 0.85 else est.pointsize
         p <- p + geom_point(data = df_int, aes(x = .data[[Period]], y = .data[[Estimate]]),
                             size = pt_size, color = col, shape = point.shape,
                             inherit.aes = FALSE, na.rm = TRUE)
@@ -800,20 +864,32 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       }
     }
   } else { # Not connected
+    ## When highlight overlays will be drawn, exclude those periods from
+    ## the base pre/post layer so we don't render two stacked symbols
+    ## (a base circle peeking out from under the highlight triangle / diamond).
+    base_pre  <- data_pre
+    base_post <- data_post
+    if (!is.null(highlight.periods) && length(highlight.periods) > 0) {
+      hp_set <- as.numeric(highlight.periods)
+      base_pre  <- base_pre[!(as.numeric(base_pre[[Period]])  %in% hp_set), ]
+      base_post <- base_post[!(as.numeric(base_post[[Period]]) %in% hp_set), ]
+    }
     ## Pre-treatment points
-    if (nrow(data_pre) > 0) {
+    if (nrow(base_pre) > 0) {
       p <- p + geom_pointrange(
-        data = data_pre,
+        data = base_pre,
         aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
-        lwd = est.lwidth, color = pre.color, fill = pre.color, fatten = est.pointsize,
+        linewidth = est.lwidth, color = pre.color, fill = pre.color,
+        size = est.pointsize / 6,
         inherit.aes = FALSE, na.rm = TRUE)
     }
     ## Post-treatment points
-    if (nrow(data_post) > 0) {
+    if (nrow(base_post) > 0) {
       p <- p + geom_pointrange(
-        data = data_post,
+        data = base_post,
         aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
-        lwd = est.lwidth, color = post.color, fill = post.color, fatten = est.pointsize,
+        linewidth = est.lwidth, color = post.color, fill = post.color,
+        size = est.pointsize / 6,
         inherit.aes = FALSE, na.rm = TRUE)
     }
 
@@ -831,17 +907,22 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
             p <- p + geom_linerange(
               data = sub_data_point,
               aes(x = .data[[Period]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
-              lwd = est.lwidth, color = hp_color, inherit.aes = FALSE, na.rm = TRUE)
+              linewidth = est.lwidth, color = hp_color, inherit.aes = FALSE, na.rm = TRUE)
             p <- p + geom_point(
               data = sub_data_point,
               aes(x = .data[[Period]], y = .data[[Estimate]]),
-              size = est.pointsize * 1.5, color = hp_color, shape = hp_shape,
+              ## Diamonds (shape 18) have less glyph area than triangles (17)
+              ## at the same nominal size, so scale them up to match the
+              ## triangle's visual weight.
+              size = if (hp_shape == 18) est.pointsize * 1.3 else est.pointsize * 0.9,
+              color = hp_color, shape = hp_shape,
               inherit.aes = FALSE, na.rm = TRUE)
           } else {
             p <- p + geom_pointrange(
               data = sub_data_point,
               aes(x = .data[[Period]], y = .data[[Estimate]], ymin = .data[[CI.lower]], ymax = .data[[CI.upper]]),
-              lwd = est.lwidth, color = hp_color, fill = hp_color, fatten = est.pointsize,
+              linewidth = est.lwidth, color = hp_color, fill = hp_color,
+              size = est.pointsize / 6,
               inherit.aes = FALSE, na.rm = TRUE)
           }
         }
@@ -849,8 +930,14 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     }
   }
 
-  # Build shape legend when highlight shapes differ from base circle
-  if (!is.null(highlight.shapes) && any(highlight.shapes != 19) && !legendOff) {
+  # Build shape legend when highlight shapes differ from base circle.
+  # Modern theme suppresses this legend when the highlight rect is drawn ---
+  # the peach/blue background + colored points self-document, and the
+  # pre/post legend entries are misleading (both render in grey20).
+  modern_suppresses_legend <- use_modern_recipe &&
+    !is.null(highlight.periods) && length(highlight.periods) > 0
+  if (!is.null(highlight.shapes) && any(highlight.shapes != 19) &&
+      !legendOff && !modern_suppresses_legend) {
     unique_shapes <- unique(highlight.shapes[highlight.shapes != 19])
 
     # Standard shape label map
@@ -930,13 +1017,17 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
             plot.margin = margin(5, 5, 15, 5))
   }
 
+  ## Title styling: modern recipe is plain + left-aligned; legacy is bold + centered.
+  modern_title_face  <- if (use_modern_recipe) "plain" else "bold"
+  modern_title_hjust <- if (use_modern_recipe) 0     else 0.5
+
   p <- p +
     xlab(xlab) + ylab(ylab) +
     theme(
       axis.title  = element_text(size = cex.lab),
       axis.text   = element_text(color = "black", size = cex.axis),
       axis.text.x = element_text(angle = angle, vjust = x.v, hjust = x.h),
-      plot.title  = element_text(size = cex.main, hjust = 0.5, face = "bold")
+      plot.title  = element_text(size = cex.main, hjust = modern_title_hjust, face = modern_title_face)
     )
 
 
@@ -1044,8 +1135,14 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
       current_y_range <- y_max_for_stats - y_min_for_stats
       if (!is.finite(current_y_range) || current_y_range <= 1e-9) current_y_range <- 1
 
-      padding_x_factor <- 0.02
-      padding_y_factor <- 0.02
+      ## Modern: symmetric inset from the top-left panel corner so the
+      ## stats block looks anchored, not floating mid-panel. Both factors
+      ## are 2.5% of their respective ranges; the slight pixel asymmetry
+      ## from non-square panels (width:height ~ 1.33 for typical fect
+      ## plots) is small enough to read as visually symmetric. Legacy
+      ## keeps its pre-2.3.1 0.02/0.02 placement.
+      padding_x_factor <- if (use_modern_recipe) 0.025 else 0.02
+      padding_y_factor <- if (use_modern_recipe) 0.025 else 0.02
 
       actual_stats_pos <- c(
         x_min_for_stats + padding_x_factor * current_x_range,
@@ -1065,7 +1162,7 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
     p <- p + annotate("text",
                       x = actual_stats_pos[1], y = actual_stats_pos[2],
                       label = p_label_text,
-                      size = cex.text,
+                      size = if (use_modern_recipe) cex.text * 1.0 else cex.text,
                       hjust = stats_hjust_val,
                       vjust = stats_vjust_val,
                       lineheight = .8)

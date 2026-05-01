@@ -658,6 +658,63 @@ res.vcov <- function(res, ## TT*Nboots
 }
 
 
+## ---------------------------------------------------------------------------
+## Rolling (forward-only) cross-validation fold construction.
+##
+## For each unit (column of II), masks the LAST `cv.count` observed positions
+## (in time order). Training uses everything else: the unit's earlier
+## observations + all other units' full data. This closes the forward-leakage
+## channel that the random-anchor cv.sample() leaves open at cv.donut = 0/1
+## under serially correlated residuals.
+##
+## Arguments
+##   II         TT x N integer matrix; II[t, i] = 1 if unit i is observed at t.
+##   D          TT x N treatment indicator (0/1). When cv.treat = FALSE
+##              (default for rolling on controls), D is ignored.
+##   cv.count   integer; number of observations to mask per unit (default 3).
+##   cv.treat   logical; if TRUE restrict masking to treated units only.
+##              Default FALSE (mask control units).
+##
+## Returns a list with the same shape as cv.sample():
+##   cv.id      integer vector of masked positions (1-indexed into vec(II))
+##   rm.id.use  identical to cv.id (no donut shaving — every masked position
+##              is scored, since rolling already prevents forward leakage).
+##
+## Deterministic: no random sampling. The same II + cv.count always produces
+## the same cv.id. Callers therefore typically use k = 1 fold.
+## ---------------------------------------------------------------------------
+cv.sample.rolling <- function(II, D = NULL,
+                              cv.count = 3,
+                              cv.treat = FALSE,
+                              min.T0 = 5L) {
+    TT <- dim(II)[1]
+    N  <- dim(II)[2]
+    cv.id <- integer(0)
+
+    ## Identify units to mask.
+    if (isTRUE(cv.treat) && !is.null(D)) {
+        ever_treat <- apply(D, 2, function(v) any(!is.na(v) & v >= 1))
+        unit_idx   <- which(ever_treat)
+    } else {
+        unit_idx   <- seq_len(N)
+    }
+
+    ## Only mask units that retain >= min.T0 observations after masking.
+    ## (Otherwise the downstream con2 check restores them and the rolling
+    ## fold collapses to a tiny set of effective masks.)
+    threshold <- min.T0 + cv.count
+    for (j in unit_idx) {
+        obs_t <- which(II[, j] == 1L)
+        if (length(obs_t) >= threshold) {
+            mask_t <- utils::tail(obs_t, cv.count)
+            ## Convert (t, j) to a 1-indexed position into vec(II).
+            cv.id <- c(cv.id, (j - 1L) * TT + mask_t)
+        }
+    }
+    list(cv.id = cv.id, rm.id.use = cv.id)
+}
+
+
 v_replace <- function(needle, haystack) {
     sieved <- which(haystack == needle[1L])
     for (i in seq.int(1L, length(needle) - 1L)) {

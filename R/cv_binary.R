@@ -8,10 +8,12 @@ fect_binary_cv <- function(Y, # Outcome variable, (T*N) matrix
                            II, 
                            T.on, 
                            T.off = NULL, 
-                           k = 5, # CV time
+                           k = 20, # CV time
                            cv.prop = 0.1,
-                           cv.method = "all_units",
+                           cv.method = "rolling",
                            cv.nobs = 3,
+                           cv.buffer = 1,
+                           min.T0 = 5,
                            r = 0, # initial number of factors considered if CV==1
                            r.end,
                            QR = FALSE, 
@@ -27,8 +29,12 @@ fect_binary_cv <- function(Y, # Outcome variable, (T*N) matrix
     ##-------------------------------##
 
     ## ---- cv.method → cv.treat mapping ---- ##
-    cv.method <- match.arg(cv.method, c("all_units", "treated_units"))
+    cv.method <- .fect_normalize_cv_method(
+        cv.method,
+        allowed = c("rolling", "block", "all_units", "treated_units")
+    )
     cv.treat <- (cv.method == "treated_units")
+    use_rolling <- (cv.method == "rolling")
 
     ## unit id and time
     TT <- dim(Y)[1]
@@ -139,33 +145,47 @@ fect_binary_cv <- function(Y, # Outcome variable, (T*N) matrix
             beta0CV <- array(0, dim = c(1, 0, k)) ## store initial beta0
         }
         
+        ## ---- rolling-window pre-computation (cv.method = "rolling") ---- ##
+        rolling_folds <- NULL
+        if (use_rolling) {
+            rolling_folds <- .build_cv_mask_rolling(
+                II = II, D = D, k = k,
+                cv.nobs = cv.nobs, cv.buffer = cv.buffer,
+                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+            )
+        }
+
         for (i in 1:k) {
-            cv.n <- 0
-            repeat{
-                cv.n <- cv.n + 1
-                cv.id <- cv.sample(II, D, rm.count, cv.nobs, cv.treat)
-                ## cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
-                ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
-                #II.cv <- II
-                #II.cv[cv.id] <- 0
-                II.cv.valid <- II.cv <- II
-                II.cv[cv.id] <- 0
-                II.cv.valid[cv.id] <- -1
-                con1 <- sum(apply(II.cv, 1, sum) >= 1) == TT
-                con2 <- sum(apply(II.cv, 2, sum) >= 1) == N
-                if (con1 & con2) {
-                    break
-                }
-                if (cv.n>=100) {
-                    message("Some units have too few pre-treatment observations. Remove them automatically.")
-                    keep.1 <- which(apply(II.cv, 1, sum) < 1)
-                    keep.2 <- which(apply(II.cv, 2, sum) < 1)
-                    II.cv[keep.1,] <- II[keep.1,]
-                    II.cv[,keep.2] <- II[,keep.2]
-                    II.cv.valid[keep.1,] <- II[keep.1,]
-                    II.cv.valid[,keep.2] <- II[,keep.2]
-                    cv.id <- which(II.cv.valid!=II)
-                    break
+            if (use_rolling) {
+                cv.id <- rolling_folds[[i]]$cv.id
+            } else {
+                cv.n <- 0
+                repeat{
+                    cv.n <- cv.n + 1
+                    cv.id <- cv.sample(II, D, rm.count, cv.nobs, cv.treat)
+                    ## cv.id <- cv.sample(II, as.integer(sum(II) - cv.count))
+                    ## cv.id <- sample(oci, as.integer(sum(II) - cv.count), replace = FALSE)
+                    #II.cv <- II
+                    #II.cv[cv.id] <- 0
+                    II.cv.valid <- II.cv <- II
+                    II.cv[cv.id] <- 0
+                    II.cv.valid[cv.id] <- -1
+                    con1 <- sum(apply(II.cv, 1, sum) >= 1) == TT
+                    con2 <- sum(apply(II.cv, 2, sum) >= 1) == N
+                    if (con1 & con2) {
+                        break
+                    }
+                    if (cv.n>=100) {
+                        message("Some units have too few pre-treatment observations. Remove them automatically.")
+                        keep.1 <- which(apply(II.cv, 1, sum) < 1)
+                        keep.2 <- which(apply(II.cv, 2, sum) < 1)
+                        II.cv[keep.1,] <- II[keep.1,]
+                        II.cv[,keep.2] <- II[,keep.2]
+                        II.cv.valid[keep.1,] <- II[keep.1,]
+                        II.cv.valid[,keep.2] <- II[,keep.2]
+                        cv.id <- which(II.cv.valid!=II)
+                        break
+                    }
                 }
             }
             rmCV[[i]] <- cv.id

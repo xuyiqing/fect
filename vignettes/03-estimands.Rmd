@@ -1,0 +1,239 @@
+# Alternative Estimands {#sec-estimands}
+
+The default output of `fect()` is the per-event-time average treatment effect on the treated (ATT). This chapter introduces the unified post-hoc estimand interface in v2.4.0. It comprises a typed dispatcher, `estimand()`, which computes alternative estimands directly from a fitted model, and a low-level accessor, `imputed_outcomes()`, which exposes the cell-level potential-outcome surface for users who want to compose estimands the dispatcher does not ship.
+
+The dispatcher handles the four common alternative-estimand requests as one-line calls: cumulative ATT, average proportional treatment effect on the treated [APTT, @chen2024logs], log-scale ATT, and the level ATT restricted to a window of event times. Each returns a tidy data frame ready for direct plotting via fect's `esplot()`. Anything beyond those is a few lines of standard data wrangling against the long-form data the accessor returns.
+
+## Beyond the default ATT
+
+Reach for the dispatcher when you want any of the following: the default per-event-time level ATT in a tidy data frame instead of the legacy matrix shape; the cumulative ATT through each event time, or summed over a fixed window; the average proportional treatment effect on the treated [APTT, @chen2024logs]; the log-scale ATT; or a level ATT restricted to a window of event times --- say, the first five post-treatment periods.
+
+For estimands the dispatcher does not ship, the accessor returns the cell-level data in long form and aggregation is up to you.
+
+## Setup
+
+The examples below use a small synthetic panel with positive outcomes so that log-scale calculations are well defined. The fit sets `keep.sims = TRUE` so that the per-cell bootstrap counterfactual surface is retained on the fit object. That surface is what the dispatcher needs to recompute non-linear functionals such as APTT and log-scale ATT inside each bootstrap replicate. For the default per-event-time level ATT and for cumulative ATT, the pre-aggregated bootstrap is enough and the default for `keep.sims` is fine.
+
+```{r setup-estimand, eval = TRUE, message = FALSE, results = 'hide'}
+library(fect)
+library(dplyr)
+
+set.seed(1)
+N <- 60; TT <- 25
+df <- expand.grid(id = 1:N, time = 1:TT)
+treat_start <- sample(c(NA, 8:18), N, replace = TRUE)
+df$D <- ifelse(is.na(treat_start[df$id]) | df$time < treat_start[df$id],
+               0, 1)
+df$Y <- exp(0.5 + 0.05 * df$time + 0.3 * df$D + rnorm(nrow(df), sd = 0.2))
+
+fit <- fect(Y ~ D, data = df, index = c("id", "time"),
+            method = "fe", force = "two-way",
+            se = TRUE, nboots = 200, parallel = FALSE,
+            keep.sims = TRUE)
+```
+
+## Per-event-time level ATT
+
+```{r est-att-event-time, eval = TRUE}
+estimand(fit, "att", "event.time") |>
+  head(8)
+```
+
+Each row is one event time. The columns hold the point estimate, the standard error, the bounds of the confidence interval, the number of treated cells that contributed at that event time, and the variance type used for inference. The numbers match the legacy slot `fit$est.att` to all decimals. The only difference is the tidy shape, which composes naturally with downstream plotting and aggregation tools --- including fect's own `esplot()`:
+
+```{r plot-att-event-time, eval = TRUE, fig.width = 6, fig.height = 4.5}
+est <- estimand(fit, "att", "event.time")
+esplot(est, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       Count = "n_cells",
+       main = "Per-event-time ATT")
+```
+
+## Cumulative ATT
+
+```{r est-cumu-event-time, eval = TRUE}
+estimand(fit, "att.cumu", "event.time") |>
+  head(8)
+```
+
+The cumulative ATT through each event time. Each row reports the running sum of the per-period average effect, computed cell-by-cell per the canonical formula. This call replaces the legacy `effect()` function and produces identical numbers.
+
+```{r plot-cumu-event-time, eval = TRUE, fig.width = 6, fig.height = 4.5}
+cumu <- estimand(fit, "att.cumu", "event.time")
+esplot(cumu, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       Count = "n_cells",
+       main = "Cumulative ATT",
+       ylab = "Cumulative Effect")
+```
+
+For a single overall window, request the overall grouping axis instead:
+
+```{r est-cumu-overall, eval = TRUE}
+estimand(fit, "att.cumu", "overall", window = c(1, 5))
+```
+
+The result is the cumulative effect over the first five post-treatment periods. It matches the final row of the legacy `att.cumu(fit, period = c(1, 5))` output.
+
+## APTT
+
+```{r est-aptt, eval = TRUE}
+estimand(fit, "aptt", "event.time") |>
+  head(8)
+```
+
+The average proportional treatment effect on the treated [@chen2024logs]:
+
+$$
+\text{APTT}_t \;=\; \frac{\mathbb{E}[\,Y - \widehat{Y}(0) \mid D = 1, t\,]}{\mathbb{E}[\,\widehat{Y}(0) \mid D = 1, t\,]}.
+$$
+
+Inside the bootstrap loop, both the numerator and the denominator are recomputed at each replicate and the ratio is taken inside the replicate. The bootstrap distribution of the estimand is therefore a distribution of ratios, not a ratio of distributions of means. Computing this requires the per-cell counterfactual surface, which is why APTT needs `keep.sims = TRUE` at fit time.
+
+```{r plot-aptt-event-time, eval = TRUE, fig.width = 6, fig.height = 4.5}
+aptt <- estimand(fit, "aptt", "event.time")
+esplot(aptt, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       Count = "n_cells",
+       main = "APTT by event time",
+       ylab = "Average Proportional TE on the Treated")
+```
+
+## Log-scale ATT
+
+```{r est-log-att, eval = TRUE}
+estimand(fit, "log.att", "event.time") |>
+  head(8)
+```
+
+The mean log-scale treatment effect: at each event time, the average over treated cells of $\log Y_{it} - \log \widehat{Y}_{it}(0)$. Cells where either the observed outcome or the imputed counterfactual is non-positive are dropped from the aggregation, since the logarithm is undefined there. A single warning per call reports how many cells were excluded.
+
+```{r plot-log-att-event-time, eval = TRUE, fig.width = 6, fig.height = 4.5}
+log_att <- estimand(fit, "log.att", "event.time")
+esplot(log_att, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       Count = "n_cells",
+       main = "Log-scale ATT",
+       ylab = "Mean log(Y) − log(Y0)")
+```
+
+## Window-restricted ATT
+
+Pass a window argument to focus on a subset of event times. The dispatcher reads it as a filter on the underlying cell set --- keep cells whose event time falls inside the closed interval.
+
+```{r est-window-overall, eval = TRUE}
+estimand(fit, "att", "overall", window = c(1, 5))
+```
+
+The result is a single overall ATT averaged over treated cells with event time between one and five. This is the right call when the question is "what is the average ATT for the first five post-treatment years?" and a per-event-time series is not needed. Because the answer is one scalar with one confidence interval, no series plot is appropriate; if multiple windows are of interest, build a small data frame of `(window_label, estimate, ci.lo, ci.hi)` and pass it to `esplot()` with `Period = "window_label"`.
+
+## Custom estimands
+
+If the functional you need is not on the dispatcher's list, the underlying long-form data is one call away.
+
+```{r imp-out-glance, eval = TRUE}
+po <- imputed_outcomes(fit)
+head(po)
+```
+
+Each row is one treated cell. The columns hold the panel coordinates, the observed outcome, the imputed counterfactual, the cell-level score (the cell's contribution to the ATT estimator), and the aggregation weight. Setting `replicates = TRUE` expands the data by bootstrap replicate, one row per cell per replicate.
+
+```{r imp-out-rep, eval = TRUE}
+po_rep <- imputed_outcomes(fit, replicates = TRUE)
+nrow(po_rep) == nrow(po) * 200    # one row per (cell, replicate)
+```
+
+A custom example: the per-event-time standard deviation of the cell-level treatment effect, a simple heterogeneity diagnostic.
+
+```{r custom-estimand, eval = TRUE}
+po |>
+  group_by(event.time) |>
+  summarise(sd_eff = sd(eff, na.rm = TRUE),
+            n     = dplyr::n(),
+            .groups = "drop") |>
+  head(8)
+```
+
+For a custom functional with bootstrap confidence intervals, group the replicate-expanded data by event time and replicate, compute the functional inside each group, then take the appropriate quantiles across replicates. The accessor does not block any composition. ggplot2 is the most flexible path for custom plots; the tidy schema keeps the plot code as short as the aggregation code.
+
+## Save bootstrap runs
+
+Setting `keep.sims = TRUE` at fit time saves the full per-cell bootstrap counterfactual surface on the fit object --- a three-dimensional array of dimension $T \times N \times \text{nboots}$. Some estimands need it, others do not.
+
+The level ATT and the cumulative ATT (over either the event-time axis or an overall window) work without it because they read the pre-aggregated bootstrap that fect always retains. The other shipped types --- APTT, log-scale ATT, and any path that filters cells or groups by something other than event time --- recompute aggregations over the per-cell surface and therefore need the saved runs.
+
+A back-of-envelope memory cost:
+
+| Panel size (T × N) | nboots | Memory cost |
+| --- | --- | --- |
+| 1,000 | 200 | 1.6 MB |
+| 10,000 | 200 | 16 MB |
+| 50,000 | 200 | 80 MB |
+| 50,000 | 500 | 200 MB |
+| 200,000 | 500 | 800 MB |
+
+If you fit without saving the bootstrap surface and then call an estimand that needs it, the dispatcher errors with a clear pointer back to the option.
+
+```{r keep-sims-error, eval = FALSE}
+# No bootstrap/jackknife results available. Choose keep.sims = TRUE in fect().
+```
+
+## Parametric variance
+
+Parametric bootstrap (`vartype = "parametric"`) is one of fect's
+fit-time variance options alongside `"bootstrap"` (the default) and
+`"jackknife"`. The parametric path resamples residuals from a fitted
+factor model rather than resampling units; it is restricted to
+`time.component.from = "nevertreated"` (gates A/B/C, see
+@sec-cfe).
+
+The unified estimand API treats parametric replicates the same as
+bootstrap or jackknife replicates: they live in `fit$eff.boot` and
+all four `type` values consume them through the same code path. The
+only addition in v2.4.1 is that `estimand()`'s `vartype` argument now
+accepts `"parametric"` explicitly, so callers can name the method
+they expect.
+
+```{r parametric-att, eval = FALSE}
+fit_para <- fect(Y ~ D, data = sim_linear, index = c("id", "time"),
+                 method = "ife", force = "two-way",
+                 r = 2, CV = FALSE, se = TRUE, nboots = 200,
+                 keep.sims = TRUE,
+                 vartype = "parametric",
+                 time.component.from = "nevertreated",
+                 parallel = FALSE)
+
+est <- estimand(fit_para, "att", "event.time")
+head(est)
+#>   event.time     estimate        se      ci.lo     ci.hi n_cells    vartype
+#> 1        -39 -0.019958112 0.2427538 -0.4957469 0.4558307      80 parametric
+#> 2        -38 -0.006695018 0.1693391 -0.3385935 0.3252035      80 parametric
+#> ...
+```
+
+The `vartype` column reports `"parametric"` --- the method actually
+used at fit time --- regardless of what the user passes as the
+`vartype` argument. The argument is informational; it does not
+re-aggregate replicates. The estimand output is byte-identical to
+`fit_para$est.att` for the per-event-time path.
+
+For non-fast paths (`"att.cumu"`, `"aptt"`, `"log.att"`, and
+`"att" + "overall"`), `estimand()` aggregates over `fit$eff.boot`
+quantiles. Under parametric the simulated distribution is centered
+on the parametric DGP's mean rather than on the deterministic point;
+quantile-based confidence intervals therefore reflect the parametric
+sampling distribution, not a reflection around the deterministic
+point. This matches how `fit$est.att` reports SE/CI under parametric
+and is consistent with the slot contract.
+
+## Migration
+
+The legacy functions `effect()` and `att.cumu()` continue to work byte-identically and now emit a one-time-per-session deprecation message pointing here. The direct migration table:
+
+| Today | Replacement |
+| --- | --- |
+| `effect(fit, cumu = TRUE)` | `estimand(fit, "att.cumu", "event.time")` |
+| `effect(fit, cumu = FALSE)` | `estimand(fit, "att", "event.time")` |
+| `att.cumu(fit, period = c(L, R))` | `estimand(fit, "att.cumu", "overall", window = c(L, R))` |
+
+Outputs from the dispatcher and the legacy functions match to all decimals, asserted by package tests. The user-facing difference is purely the tidy shape.

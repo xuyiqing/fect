@@ -30,7 +30,11 @@ fect <- function(
     Y, # outcome
     D, # treatment
     X = NULL, # time-varying covariates
-    W = NULL, # weight
+    W = NULL, # weight column name; convenience default for both roles
+    W.est = NULL, # weight column for outcome-model fit (overrides W);
+                  # NULL falls back to W
+    W.agg = NULL, # weight column for ATT aggregation (overrides W);
+                  # NULL falls back to W
     group = NULL, # cohort
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
@@ -41,11 +45,12 @@ fect <- function(
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
-    k = 10, # times of CV
-    cv.prop = 0.1, ## proportion of CV counts
-    cv.method = "all_units", ## CV masking strategy
+    k = 20, # times of CV
+    cv.prop = 0.1, ## fraction of eligible units sampled per fold (rolling) / proportion of obs masked per round (block)
+    cv.method = "rolling", ## CV masking strategy (default flipped from "all_units" in v2.3.0)
     cv.nobs = 3, ## cv taking consecutive units
-    cv.donut = 0, ## cv mspe
+    cv.donut = 1, ## cv mspe (default flipped from 0 to match cv.buffer = 1 in v2.3.0)
+    cv.buffer = 1, ## past-side buffer for cv.method = "rolling"
     criterion = "mspe", # for ife model: mspe, pc or both
     binary = FALSE, # probit model
     QR = FALSE, # QR or SVD for binary probit
@@ -91,7 +96,11 @@ fect <- function(
     m = 2, ## block length
     normalize = FALSE, # accelerate option
     keep.sims = FALSE, # keep individual bootstrap/jackknife simulations
-    cm = FALSE # causal moderation
+    cm = FALSE, # causal moderation
+    loading.bound = "none",           # simplex projection of treated loadings
+    gamma.loading = NULL,             # scalar gamma for simplex; NULL = CV
+    gamma.loading.grid = NULL,        # optional grid for gamma CV
+    cv.rule = "1se"                   # CV selection rule: "1se", "min", "1pct"
 ) {
     UseMethod("fect")
 }
@@ -104,7 +113,9 @@ fect.formula <- function(
     Y, # outcome
     D, # treatment
     X = NULL, # time-varying covariates
-    W = NULL, # weights
+    W = NULL, # weights; convenience default for both roles
+    W.est = NULL, # weight column for outcome-model fit; see fect()
+    W.agg = NULL, # weight column for ATT aggregation; see fect()
     group = NULL, # cohort
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
@@ -115,11 +126,12 @@ fect.formula <- function(
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
-    k = 10, # times of CV
-    cv.prop = 0.1, ## proportion of CV counts
-    cv.method = "all_units",
+    k = 20, # times of CV
+    cv.prop = 0.1, ## fraction of eligible units sampled per fold (rolling) / proportion of obs masked per round (block)
+    cv.method = "rolling",
     cv.nobs = 3,
-    cv.donut = 0, ## cv mspe
+    cv.donut = 1, ## cv mspe (default flipped from 0 to match cv.buffer = 1 in v2.3.0)
+    cv.buffer = 1, ## past-side buffer for cv.method = "rolling"
     criterion = "mspe", # for ife model: mspe, pc or both
     binary = FALSE, # probit model
     QR = FALSE, # QR or SVD for binary probit
@@ -165,7 +177,11 @@ fect.formula <- function(
     m = 2, ## block length
     normalize = FALSE,
     keep.sims = FALSE,
-    cm = FALSE
+    cm = FALSE,
+    loading.bound = "none",
+    gamma.loading = NULL,
+    gamma.loading.grid = NULL,
+    cv.rule = "1se"
 ) {
     ## parsing
     varnames <- all.vars(formula)
@@ -209,6 +225,8 @@ fect.formula <- function(
         D = Dname,
         X = Xname,
         W = W,
+        W.est = W.est,
+        W.agg = W.agg,
         group = group,
         na.rm = na.rm,
         balance.period = balance.period,
@@ -226,6 +244,7 @@ fect.formula <- function(
         cv.method = cv.method,
         cv.nobs = cv.nobs,
         cv.donut = cv.donut,
+        cv.buffer = cv.buffer,
         criterion = criterion,
         binary = binary,
         QR = QR,
@@ -269,7 +288,11 @@ fect.formula <- function(
         m = m,
         normalize = normalize,
         keep.sims = keep.sims,
-        cm = cm
+        cm = cm,
+        loading.bound      = loading.bound,
+        gamma.loading      = gamma.loading,
+        gamma.loading.grid = gamma.loading.grid,
+        cv.rule            = cv.rule
     )
 
     out$call <- match.call()
@@ -286,7 +309,9 @@ fect.default <- function(
     Y, # outcome
     D, # treatment
     X = NULL, # time-varying covariates
-    W = NULL, # weights
+    W = NULL, # weights; convenience default for both roles
+    W.est = NULL, # weight column for outcome-model fit; see fect()
+    W.agg = NULL, # weight column for ATT aggregation; see fect()
     group = NULL, # cohort
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
@@ -297,11 +322,12 @@ fect.default <- function(
     lambda = NULL, ## mc method: regularization parameter
     nlambda = 0,
     CV = NULL, # cross-validation
-    k = 10, # times of CV
+    k = 20, # times of CV
     cv.prop = 0.1,
     cv.method = "all_units",
     cv.nobs = 3,
     cv.donut = 1, ## cv mspe
+    cv.buffer = 1, ## past-side buffer for cv.method = "rolling"
     criterion = "mspe",
     binary = FALSE, # probit model
     QR = FALSE, # QR or SVD for binary probit
@@ -347,11 +373,16 @@ fect.default <- function(
     m = 2, ## block length
     normalize = FALSE,
     keep.sims = FALSE,
-    cm=FALSE
+    cm=FALSE,
+    loading.bound = "none",
+    gamma.loading = NULL,
+    gamma.loading.grid = NULL,
+    cv.rule = "1se"
 ) {
     ## -------------------------------##
     ## Checking Parameters
     ## -------------------------------##
+    cv.rule <- .fect_validate_cv_rule(cv.rule)
     placeboEquiv <- loo
     permu.dimension <- "time"
 
@@ -401,23 +432,58 @@ fect.default <- function(
         }
     }
 
-    if (!is.null(W)) {
-        if (length(W) != 1) {
-            stop("\"W\" should have only one element.")
+    ## Default: W populates both roles (back-compat for callers that just set W).
+    if (is.null(W.est)) W.est <- W
+    if (is.null(W.agg)) W.agg <- W
+
+    ## Validate the resolved weight columns.
+    validate_weight_col <- function(col, label) {
+        if (is.null(col)) return(invisible())
+        if (length(col) != 1 || !is.character(col)) {
+            stop("`", label, "` must be a single column name.")
         }
-        if (!W %in% colnames(data)) {
-            stop("\"W\" is not in the dataset.")
+        if (!col %in% colnames(data)) {
+            stop("`", label, "` (\"", col, "\") is not in the dataset.")
         }
-        if (is.numeric(data[, W]) == FALSE) {
-            stop("\"W\" should be numeric.")
+        if (!is.numeric(data[, col])) {
+            stop("`", label, "` (\"", col, "\") must be numeric.")
         }
-        if (sum(data[, W] < 0) > 0) {
-            stop("\"W\" must be strictly positive.")
-        }
-        if (0 %in% data[, W]) {
-            data <- data[which(data[, W] > 0), ]
+        if (any(data[, col] < 0, na.rm = TRUE)) {
+            stop("`", label, "` (\"", col, "\") must be non-negative.")
         }
     }
+    validate_weight_col(W,     "W")
+    validate_weight_col(W.est, "W.est")
+    validate_weight_col(W.agg, "W.agg")
+
+    ## v2.3.1 supports only a single weight column (with role gating). Truly
+    ## different columns for fit vs aggregation (e.g. survey weights x IPW)
+    ## requires carrying two parallel matrices through the dispatcher and is
+    ## scheduled for v2.4.0. Stop with an informative message if requested now.
+    if (!is.null(W.est) && !is.null(W.agg) && !identical(W.est, W.agg)) {
+        stop(
+            "Distinct weight columns for `W.est` and `W.agg` are scheduled ",
+            "for fect v2.4.0. v2.3.1 supports a single weight column with ",
+            "role-gated routing: set `W.est = W.agg = \"col\"` (or `W = \"col\"`) ",
+            "for survey/sample weights, `W.agg = \"col\"` alone for IPW / ",
+            "balancing weights, or `W.est = \"col\"` alone for ",
+            "robust-regression / heteroskedasticity weights."
+        )
+    }
+
+    ## Resolve a single column name `Wname` for downstream code paths. The
+    ## per-role flags `use.W.in.fit` and `use.W.in.agg` carry the role
+    ## information.
+    if (is.null(W) && !is.null(W.est)) W <- W.est
+    if (is.null(W) && !is.null(W.agg)) W <- W.agg
+
+    ## Drop rows where the weight column is exactly 0.
+    if (!is.null(W) && any(data[, W] == 0, na.rm = TRUE)) {
+        data <- data[data[, W] > 0, , drop = FALSE]
+    }
+
+    use.W.in.fit <- !is.null(W.est)
+    use.W.in.agg <- !is.null(W.agg)
 
     ## check duplicated observations
     unique_label <- unique(paste(
@@ -714,13 +780,51 @@ fect.default <- function(
     }
 
     ## parallel & cores
-    if (parallel == TRUE) {
-        if (is.null(cores) == FALSE) {
-            if (cores <= 0) {
-                stop(
-                    "\"cores\" option misspecified. Try, for example, cores = 2."
-                )
-            }
+    ## parallel accepts: TRUE, FALSE, "cv", "boot", c("cv","boot")
+    valid_parallel_strings <- c("cv", "boot")
+    if (!isTRUE(parallel) && !identical(parallel, FALSE)) {
+        parallel_chars <- as.character(parallel)
+        bad <- setdiff(parallel_chars, valid_parallel_strings)
+        if (length(bad) > 0) {
+            stop(
+                "\"parallel\" must be TRUE, FALSE, \"cv\", \"boot\", or c(\"cv\",\"boot\"). ",
+                "Got: ", paste0("\"", bad, "\"", collapse = ", ")
+            )
+        }
+    }
+    do_parallel_cv   <- isTRUE(parallel) || "cv"   %in% as.character(parallel)
+    do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
+
+    if ((do_parallel_cv || do_parallel_boot) && !is.null(cores)) {
+        if (!is.numeric(cores) || cores <= 0) {
+            stop("\"cores\" option misspecified. Try, for example, cores = 2.")
+        }
+    }
+
+    ## --- loading.bound validation (REQ-bounded-loadings) ---
+    if (!is.character(loading.bound) || length(loading.bound) != 1L ||
+        !(loading.bound %in% c("none", "simplex"))) {
+        stop("'loading.bound' must be one of 'none', 'simplex'.")
+    }
+    if (loading.bound == "simplex") {
+        if (!(method %in% c("ife", "gsynth"))) {
+            stop("'loading.bound = \"simplex\"' is only supported for method = \"ife\" or \"gsynth\" in this version.")
+        }
+        if (!identical(time.component.from, "nevertreated")) {
+            stop("'loading.bound = \"simplex\"' requires time.component.from = \"nevertreated\". ",
+                 "The not-yet-treated dispatch is not supported in this version.")
+        }
+    }
+    if (!is.null(gamma.loading)) {
+        if (!is.numeric(gamma.loading) || length(gamma.loading) != 1L ||
+            !is.finite(gamma.loading) || gamma.loading <= 0) {
+            stop("'gamma.loading' must be a single positive finite numeric, or NULL.")
+        }
+    }
+    if (!is.null(gamma.loading.grid)) {
+        if (!is.numeric(gamma.loading.grid) || any(!is.finite(gamma.loading.grid)) ||
+            any(gamma.loading.grid <= 0)) {
+            stop("'gamma.loading.grid' must be a positive finite numeric vector, or NULL.")
         }
     }
 
@@ -1731,6 +1835,19 @@ fect.default <- function(
     if (hasRevs == TRUE & method == "gsynth") {
         stop("Gsynth can't be used when treatments have reversals.")
     }
+    if (se == 1 && vartype == "parametric" && hasRevs == TRUE) {
+        stop(
+            "Parametric bootstrap is not valid when treatment reversal is present. ",
+            "Use vartype='bootstrap' or 'jackknife'."
+        )
+    }
+    if (se == 1 && vartype == "parametric" && time.component.from == "notyettreated") {
+        stop(
+            "Parametric bootstrap is not valid when \"time.component.from\" is ",
+            "\"notyettreated\". Use time.component.from = \"nevertreated\" (if never-treated ",
+            "controls are available) or vartype = \"bootstrap\" or \"jackknife\"."
+        )
+    }
 
     ## 5. switch-off periods
     T.off <- NULL
@@ -1947,14 +2064,14 @@ fect.default <- function(
 
     old.future.plan <- NULL
 
-    if ((se == TRUE | permute == TRUE) & parallel == FALSE) {
+    if ((se == TRUE | permute == TRUE) & !do_parallel_boot) {
         ## set seed
         if (is.null(seed) == FALSE) {
             set.seed(seed + 1)
         }
     }
 
-    if ((se == TRUE | permute == TRUE) & parallel == TRUE) {
+    if ((se == TRUE | permute == TRUE) & do_parallel_boot) {
         ## set seed
         if (is.null(seed) == FALSE) {
             set.seed(seed)
@@ -1993,6 +2110,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2007,6 +2125,7 @@ fect.default <- function(
                     cv.method = cv.method,
                     cv.nobs = cv.nobs,
                     cv.donut = cv.donut,
+                    cv.buffer = cv.buffer,
                     min.T0 = min.T0,
                     r = r,
                     r.end = r.end,
@@ -2029,7 +2148,10 @@ fect.default <- function(
                     Zgamma.id = Zgamma.id,
                     kappaQ.id = kappaQ.id,
                     parallel = parallel,
-                    cores = cores
+                    cores = cores,
+                    do_parallel_cv   = do_parallel_cv,
+                    do_parallel_boot = do_parallel_boot,
+                    cv.rule = cv.rule
                 )
             } else {
                 out <- fect_binary_cv(
@@ -2044,6 +2166,8 @@ fect.default <- function(
                     cv.prop = cv.prop,
                     cv.method = cv.method,
                     cv.nobs = cv.nobs,
+                    cv.buffer = cv.buffer,
+                    min.T0 = min.T0,
                     r = r,
                     r.end = r.end,
                     QR = QR,
@@ -2063,6 +2187,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     cm=cm,
@@ -2088,7 +2213,10 @@ fect.default <- function(
                     group.level = g.level,
                     group = G,
                     parallel = parallel,
-                    cores = cores
+                    cores = cores,
+                    loading.bound      = loading.bound,
+                    gamma.loading      = gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid
                 )
             } else if (method == "ife") {
                 out <- fect_fe(
@@ -2096,6 +2224,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2126,6 +2255,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2166,6 +2296,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     X.extra.FE = X.extra.FE,
                     X.Z = X.Z,
                     X.Q = X.Q,
@@ -2202,6 +2333,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2233,6 +2365,7 @@ fect.default <- function(
                     D = D,
                     X = X,
                     W = W,
+                    W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
                     T.on = T.on,
@@ -2268,6 +2401,8 @@ fect.default <- function(
             D = D,
             X = X,
             W = W,
+            W.in.fit = use.W.in.fit,
+            W.in.agg = use.W.in.agg,
             I = I,
             II = II,
             cm = cm,
@@ -2318,10 +2453,14 @@ fect.default <- function(
             nboots = nboots,
             parallel = parallel,
             cores = cores,
+            do_parallel_cv = do_parallel_cv,
             group.level = g.level,
             group = G,
             keep.sims = keep.sims,
-            time.component.from = time.component.from
+            time.component.from = time.component.from,
+            loading.bound      = loading.bound,
+            gamma.loading      = gamma.loading,
+            gamma.loading.grid = gamma.loading.grid
         )
 
     }
@@ -2526,6 +2665,8 @@ fect.default <- function(
                     D = pD,
                     X = pX,
                     W = pW,
+                    W.in.fit = use.W.in.fit,
+                    W.in.agg = use.W.in.agg,
                     I = pI,
                     II = pII,
                     T.on = pT.on,
@@ -2819,6 +2960,10 @@ fect.default <- function(
             D = Dname,
             X = Xname,
             W = Wname,
+            W.est.col = if (use.W.in.fit) Wname else NULL,
+            W.agg.col = if (use.W.in.agg) Wname else NULL,
+            W.in.fit = use.W.in.fit,
+            W.in.agg = use.W.in.agg,
             T.on = T.on,
             G = G.old,
             balance.period = balance.period,
@@ -2837,6 +2982,17 @@ fect.default <- function(
             placebo.period = placebo.period,
             carryoverTest = carryoverTest,
             carryover.period = carryover.period,
+            ## Stored on the fit object so plot logic does not need to
+            ## re-parse `x$call` — robust under do.call(), positional
+            ## args, and call-rewriting wrappers.
+            carryover.rm = carryover.rm,
+            ## Reserved slot for the post-hoc estimand API (v2.4.0+).
+            ## NULL for plain imputation estimators (FE / IFE / MC / CFE /
+            ## GSC); future doubly-robust estimators will populate this
+            ## with the per-cell debias correction so that
+            ## eff = (Y_obs - Y0_hat) + eff_debias is the cell-level
+            ## score. See ref/po-estimands-contract.md §3.
+            eff_debias = NULL,
             unit.type = unit.type,
             obs.missing = obs.missing,
             obs.missing.balance = obs.missing.balance,
@@ -2914,6 +3070,38 @@ fect.default <- function(
     }
 
     output <- c(output, list(call = match.call()))
+
+    ## When W is supplied AND the aggregation surface should be weighted
+    ## (W or W.agg supplied), route the W-weighted aggregations into the
+    ## canonical slot names so fit$att, fit$time, fit$count, fit$att.avg,
+    ## fit$att.off etc. agree with fit$est.att, fit$est.avg, plot(fit), and
+    ## print(fit). When only W.est is supplied, the aggregation surface
+    ## stays unweighted (canonical slots untouched). Either way, strip the
+    ## redundant *.W slots from the user-facing fit object so there is only
+    ## one canonical aggregation. (Inferential slots --- est.att, est.avg,
+    ## est.att90, att.bound, att.boot, att.vcov, est.placebo, est.carryover,
+    ## off variants --- are routed inside fect_boot() before reaching here.)
+    if (!is.null(Wname) && isTRUE(use.W.in.agg)) {
+        if (!is.null(output$att.on.W))      output$att        <- output$att.on.W
+        if (!is.null(output$time.on.W))     output$time       <- output$time.on.W
+        if (!is.null(output$count.on.W))    output$count      <- output$count.on.W
+        if (!is.null(output$att.avg.W))     output$att.avg    <- output$att.avg.W
+        if (!is.null(output$att.off.W))     output$att.off    <- output$att.off.W
+        if (!is.null(output$time.off.W))    output$time.off   <- output$time.off.W
+        if (!is.null(output$count.off.W))   output$count.off  <- output$count.off.W
+        if (!is.null(output$att.placebo.W))   output$att.placebo   <- output$att.placebo.W
+        if (!is.null(output$att.carryover.W)) output$att.carryover <- output$att.carryover.W
+    }
+    if (!is.null(Wname)) {
+        output[c(
+            "att.on.W", "time.on.W", "count.on.W", "att.avg.W",
+            "att.on.sum.W", "W.on.sum",
+            "att.off.W", "time.off.W", "count.off.W",
+            "att.off.sum.W", "W.off.sum",
+            "att.placebo.W", "att.carryover.W"
+        )] <- NULL
+    }
+
     class(output) <- "fect"
     return(output)
 } ## Program fect ends

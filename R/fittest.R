@@ -210,7 +210,7 @@ fect_test <- function(
     #}
     
     ## computing
-    if (parallel == TRUE) { 
+    if (!identical(parallel, FALSE)) {
         boot.out <- foreach(j=1:nboots, 
                             .inorder = FALSE,
                             .export = c("fect_fe", "fect_mc", "get_term"),

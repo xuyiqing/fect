@@ -107,10 +107,9 @@ out.fe.only <- fect(Y ~ D, data = sim_region,
 ```
 
 ```{r cfe-42-fe-only-plot, fig.width = 6, fig.height = 4.5}
-plot(out.fe.only, cex.text = 0.8,
+plot(out.fe.only, 
      stats = c("placebo.p", "equiv.p"),
-     main = "FE Only — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "FE Only — Placebo Test")
 ```
 
 The placebo test detects significant pre-trends (low p-value) because the model fails to account for region-level confounding. In the unbalanced panel, group-level time trends $\delta_{g(i),t}$ interact with the differential entry times across regions to create spurious pre-trends that the standard two-way fixed effects model cannot absorb.
@@ -128,10 +127,9 @@ out.cfe.region <- fect(Y ~ D, data = sim_region,
 ```
 
 ```{r cfe-42-with-region-plot, fig.width = 6, fig.height = 4.5}
-plot(out.cfe.region, cex.text = 0.8,
+plot(out.cfe.region, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE with Region×Time FE — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE with Region×Time FE — Placebo Test")
 ```
 
 The placebo test now passes (high p-value), confirming that the region×time fixed effects absorb the group-level confounding. By including the interacted `region_time` variable in the `index` argument, the CFE estimator absorbs the full set of region-specific time shocks $\delta_{g(i),t}$ during counterfactual imputation, removing the bias that was driving the spurious pre-trends.
@@ -161,10 +159,9 @@ out.fe.base <- fect(Y ~ D + X1 + X2, data = simdata,
 ```
 
 ```{r cfe-43-fe-baseline-plot, fig.width = 6, fig.height = 4.5}
-plot(out.fe.base, cex.text = 0.8,
+plot(out.fe.base, 
      stats = c("placebo.p", "equiv.p"),
-     main = "FE Only (simdata) — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "FE Only (simdata) — Placebo Test")
 ```
 
 The FE estimator fails the placebo test because it cannot account for the interactive term $L_1 \cdot F_1$. Now we include $L_1$ as a time-invariant covariate with time-varying coefficients. We create a `gamma` variable --- here we use `time` itself as the grouping variable, which gives the most flexible specification (one coefficient per period):
@@ -183,10 +180,9 @@ out.cfe.z <- fect(Y ~ D + X1 + X2, data = simdata,
 ```
 
 ```{r cfe-43-with-z-plot, fig.width = 6, fig.height = 4.5}
-plot(out.cfe.z, cex.text = 0.8,
+plot(out.cfe.z, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE with Z = L1 — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE with Z = L1 — Placebo Test")
 ```
 
 By allowing $L_1$'s coefficient to vary across time periods, CFE approximates the true interactive structure $L_{1,i} \cdot F_{1,t}$. The placebo test shows improvement. However, there is still a second latent factor $L_2 \cdot F_2$ that is not captured --- we will address this in Section 4.5.
@@ -222,10 +218,9 @@ out.fe.lin <- fect(Y ~ D, data = sim_linear,
 ```
 
 ```{r cfe-44-lin-fe-only-plot, fig.width = 6, fig.height = 4.5}
-plot(out.fe.lin, cex.text = 0.8,
+plot(out.fe.lin, 
      stats = c("placebo.p", "equiv.p"),
-     main = "FE Only (Linear Trend DGP) — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "FE Only (Linear Trend DGP) — Placebo Test")
 ```
 
 Now we use `Q.type = "linear"` to allow unit-specific loadings on a linear time basis. Because the true DGP is exactly linear, this specification matches perfectly:
@@ -240,10 +235,9 @@ out.cfe.lin <- fect(Y ~ D, data = sim_linear,
 ```
 
 ```{r cfe-44-lin-cfe-plot, fig.width = 6, fig.height = 4.5}
-plot(out.cfe.lin, cex.text = 0.8,
+plot(out.cfe.lin, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE with Linear Trend — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE with Linear Trend — Placebo Test")
 ```
 
 The placebo test passes because the linear basis exactly matches the true trend shape, and the CFE estimator correctly recovers each unit's slope $\kappa_i$.
@@ -269,10 +263,9 @@ out.fe.trend <- fect(Y ~ D, data = sim_trend,
 ```
 
 ```{r cfe-44-sin-fe-only-plot, fig.width = 6, fig.height = 4.5}
-plot(out.fe.trend, cex.text = 0.8,
+plot(out.fe.trend, 
      stats = c("placebo.p", "equiv.p"),
-     main = "FE Only (Sin Trend DGP) — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "FE Only (Sin Trend DGP) — Placebo Test")
 ```
 
 Now we use `Q.type = "bspline"`, which generates a B-spline basis that can approximate smooth nonlinear functions:
@@ -287,10 +280,9 @@ out.cfe.bs <- fect(Y ~ D, data = sim_trend,
 ```
 
 ```{r cfe-44-sin-bspline-plot, fig.width = 6, fig.height = 4.5}
-plot(out.cfe.bs, cex.text = 0.8,
+plot(out.cfe.bs, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE with B-spline Trend — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE with B-spline Trend — Placebo Test")
 ```
 
 The B-spline specification should pass or nearly pass the placebo test. Some bias may remain because B-splines approximate the true sinusoidal trend rather than matching it exactly.
@@ -348,8 +340,7 @@ out.ife.r2 <- fect(Y ~ D + X1 + X2, data = simdata,
 ```
 
 ```{r cfe-45-mspe, eval = TRUE, cache = TRUE}
-mspe.out <- fect_mspe(
-  list(FE = out.fe,
+mspe.out <- fect_mspe(list(FE = out.fe,
        CFE_Z = out.cfe.z.only,
        CFE_Z_F1 = out.cfe.z.f1,
        IFE_r2 = out.ife.r2),
@@ -372,10 +363,9 @@ out.cfe.best <- fect(Y ~ D + X1 + X2, data = simdata,
 ```
 
 ```{r cfe-45-best-placebo-plot, fig.width = 6, fig.height = 4.5}
-plot(out.cfe.best, cex.text = 0.8,
+plot(out.cfe.best, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE (Z + 1 Factor) — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE (Z + 1 Factor) — Placebo Test")
 ```
 
 The placebo test passes, confirming that the CFE model with one observed loading and one latent factor adequately captures the DGP.
@@ -425,6 +415,27 @@ This means: the linear and quadratic trend bases are grouped by sector, while th
 ::: {.callout-note appearance="simple"}
 `Z.param` and `Q.param` are optional. Without them, all $Z$ (or $Q$) variables are assigned to all gamma (or kappa) groupings. Use them to impose structure when you have domain knowledge about which covariates should share which groupings.
 :::
+
+------------------------------------------------------------------------
+
+## Cross-validation
+
+The number of latent factors `r` in a CFE specification can be selected by cross-validation through the main `fect()` dispatcher --- set `CV = TRUE` and pass `cv.method = "rolling"` to use rolling-window CV (recommended on macro panels with serially correlated residuals; see [Chapter @sec-ife-mc]). CFE-specific structural arguments (`Z`, `gamma`, `Q`, `Q.type`, `kappa`, plus extra index columns for additional grouping FEs) are held fixed at the user-supplied spec; CV varies only `r`.
+
+```{r cfe-cv-dispatcher, eval = FALSE}
+fit.cfe <- fect(Y ~ D, data = sim_region,
+  index   = c("id", "time", "region_time"),
+  method  = "cfe", force = "two-way",
+  CV      = TRUE, r = c(0, 3),
+  cv.method = "rolling",
+  cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
+  cv.rule = "1se",
+  se = TRUE, parallel = TRUE, cores = 16, nboots = 200
+)
+fit.cfe$r.cv  # selected r
+```
+
+Block CV (`cv.method = "block"`) is also available as a drop-in replacement; see the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv) for the full parameter reference and the deprecation plan for the legacy `"all_units"` / `"treated_units"` values.
 
 ------------------------------------------------------------------------
 
