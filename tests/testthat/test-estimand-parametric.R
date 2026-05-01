@@ -89,13 +89,18 @@ test_that("att.cumu / aptt / att-overall work on parametric fits", {
   expect_true(any(!is.na(r3$estimate)))
 })
 
-test_that("log.att works on parametric fits (negative-Y warning expected)", {
+test_that("log.att hard-errors on parametric fits with negative Y (v2.4.2+)", {
   skip_on_cran()
   fit <- .make_parametric_fit()
-  ## sim_linear has negative Y, so log.att warns about dropped cells.
-  r4 <- suppressWarnings(estimand(fit, "log.att", "event.time"))
-  expect_true(all(r4$vartype == "parametric"))
-  expect_true(any(!is.na(r4$estimate)))
+  ## sim_linear has many negative Y cells, so log.att now hard-errors
+  ## on the bootstrap cell-drop pathology (v2.4.2+). The previous
+  ## v2.4.1 behavior of silently warning + dropping cells produced
+  ## meaningless inference; the hard-error redirects users to the
+  ## actionable options.
+  expect_error(
+    estimand(fit, "log.att", "event.time"),
+    "log-ATT bootstrap is unreliable"
+  )
 })
 
 test_that("vartype = 'none' under parametric returns NA SE/CI", {

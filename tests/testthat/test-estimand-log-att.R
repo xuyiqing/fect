@@ -16,7 +16,10 @@
   treat_start <- sample(c(NA, 8:15), N, replace = TRUE)
   df$D <- ifelse(is.na(treat_start[df$id]) | df$time < treat_start[df$id],
                  0, 1)
-  df$Y <- exp(0.5 + 0.05 * df$time + 0.3 * df$D + rnorm(nrow(df), sd = 0.2))
+  ## Higher intercept (2.0) and smaller noise (0.1) keep Y comfortably
+  ## positive so the v2.4.2 cell-drop hard-error doesn't fire on benign
+  ## bootstrap noise.
+  df$Y <- exp(2.0 + 0.05 * df$time + 0.3 * df$D + rnorm(nrow(df), sd = 0.1))
   set.seed(42)
   suppressWarnings(suppressMessages(
     fect::fect(
@@ -89,13 +92,16 @@ test_that("LA.3: log.att without keep.sims errors with the locked wording", {
 })
 
 
-## -- LA.4  Negative Y cells: warning + drop -------------------------
+## -- LA.4  Negative Y cells trigger the v2.4.2 hard-error -----------
 
-test_that("LA.4: negative Y cells trigger a one-time warning and are dropped", {
+test_that("LA.4: negative Y cells trigger the cell-drop hard-error (v2.4.2+)", {
 
   skip_on_cran()
 
-  ## simdata has negative Y values.
+  ## simdata has negative Y values, so log-ATT triggers the hard-error
+  ## on bootstrap cell-drop pathology. (Pre-2.4.2 the same condition
+  ## merely warned and silently dropped cells, producing meaningless
+  ## bootstrap inference.)
   data("simdata", package = "fect")
   set.seed(42)
   fit_neg <- suppressWarnings(suppressMessages(
@@ -105,9 +111,8 @@ test_that("LA.4: negative Y cells trigger a one-time warning and are dropped", {
                keep.sims = TRUE)
   ))
 
-  expect_warning(
+  expect_error(
     fect::estimand(fit_neg, "log.att", "event.time"),
-    "dropped",
-    fixed = FALSE
+    "log-ATT bootstrap is unreliable"
   )
 })
