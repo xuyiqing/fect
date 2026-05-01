@@ -161,8 +161,8 @@ inter_fe <- function(Y, X, r, force, beta0_in, tol = 1e-5, max_iter = 500L) {
     .Call(`_fect_inter_fe`, Y, X, r, force, beta0_in, tol, max_iter)
 }
 
-inter_fe_ub <- function(Y, Y0, X, I, W_in, beta0, r, force, tol = 1e-5, max_iter = 1000L) {
-    .Call(`_fect_inter_fe_ub`, Y, Y0, X, I, W_in, beta0, r, force, tol, max_iter)
+inter_fe_ub <- function(Y, Y0, X, I, W_in, beta0, r, force, tol = 1e-5, max_iter = 1000L, fit_init = NULL) {
+    .Call(`_fect_inter_fe_ub`, Y, Y0, X, I, W_in, beta0, r, force, tol, max_iter, fit_init)
 }
 
 fe_ad_iter <- function(Y, Y0, I, W, force, tolerate, max_iter = 500L) {
@@ -173,19 +173,19 @@ fe_ad_covar_iter <- function(XX, xxinv, Y, Y0, I, beta0, W, force, tolerate, max
     .Call(`_fect_fe_ad_covar_iter`, XX, xxinv, Y, Y0, I, beta0, W, force, tolerate, max_iter)
 }
 
-fe_ad_inter_iter <- function(Y, Y0, I, W, force, mc, r, hard, lambda, tolerate, max_iter = 1000L) {
-    .Call(`_fect_fe_ad_inter_iter`, Y, Y0, I, W, force, mc, r, hard, lambda, tolerate, max_iter)
+fe_ad_inter_iter <- function(Y, Y0, I, W, force, mc, r, hard, lambda, tolerate, max_iter = 1000L, fit_init = NULL) {
+    .Call(`_fect_fe_ad_inter_iter`, Y, Y0, I, W, force, mc, r, hard, lambda, tolerate, max_iter, fit_init)
 }
 
-fe_ad_inter_covar_iter <- function(XX, xxinv, Y, Y0, I, W, beta0, force, mc, r, hard, lambda, tolerate, max_iter = 1000L) {
-    .Call(`_fect_fe_ad_inter_covar_iter`, XX, xxinv, Y, Y0, I, W, beta0, force, mc, r, hard, lambda, tolerate, max_iter)
+fe_ad_inter_covar_iter <- function(XX, xxinv, Y, Y0, I, W, beta0, force, mc, r, hard, lambda, tolerate, max_iter = 1000L, fit_init = NULL) {
+    .Call(`_fect_fe_ad_inter_covar_iter`, XX, xxinv, Y, Y0, I, W, beta0, force, mc, r, hard, lambda, tolerate, max_iter, fit_init)
 }
 
 beta_iter <- function(X, xxinv, Y, r, tolerate, beta0, max_iter) {
     .Call(`_fect_beta_iter`, X, xxinv, Y, r, tolerate, beta0, max_iter)
 }
 
-inter_fe_mc <- function(Y, Y0, X, I, W_in, beta0, r, lambda, force, tol = 1e-5, max_iter = 1000L) {
-    .Call(`_fect_inter_fe_mc`, Y, Y0, X, I, W_in, beta0, r, lambda, force, tol, max_iter)
+inter_fe_mc <- function(Y, Y0, X, I, W_in, beta0, r, lambda, force, tol = 1e-5, max_iter = 1000L, fit_init = NULL) {
+    .Call(`_fect_inter_fe_mc`, Y, Y0, X, I, W_in, beta0, r, lambda, force, tol, max_iter, fit_init)
 }
 
