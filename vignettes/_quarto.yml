@@ -16,8 +16,9 @@ book:
     - 06-hte.Rmd
     - 07-plots.Rmd
     - 08-gsynth.Rmd
-    - 09-panel.Rmd
-    - 10-sens.Rmd
+    - 09-inference.Rmd
+    - 10-panel.Rmd
+    - 11-sens.Rmd
     - aa-cheatsheet.Rmd
     - references.qmd
     - bb-updates.Rmd
