@@ -15,6 +15,7 @@ estimand(
   fit,
   type   = c("att", "att.cumu", "aptt", "log.att"),
   by     = c("event.time", "cohort", "calendar.time", "overall"),
+  test        = c("none", "placebo", "carryover"),
   cells       = NULL,
   weights     = NULL,
   window      = NULL,
@@ -39,6 +40,21 @@ estimand(
   \item{by}{Grouping axis. One of \code{"event.time"} (default),
     \code{"cohort"}, \code{"calendar.time"}, \code{"overall"}, or any
     column name resolvable in the fit's panel data.}
+
+  \item{test}{Selects which subset of cells to aggregate over.
+    \code{"none"} (default) uses the standard treated post-treatment
+    cells. \code{"placebo"} restricts aggregation to the
+    pre-treatment cells in \code{fit$placebo.period} that were
+    masked-and-imputed during the placebo fit; e.g.\
+    \code{estimand(fit, "aptt", "event.time", test = "placebo")}
+    returns a per-event-time placebo APTT series. Requires
+    \code{placeboTest = TRUE} at fit time and forces
+    \code{direction = "on"}. \code{"carryover"} is the analogous
+    extension for early post-reversal cells in
+    \code{fit$carryover.period}; requires \code{carryoverTest = TRUE}
+    at fit time, a panel with reversals, and forces
+    \code{direction = "off"}. Both are incompatible with
+    \code{type = "att.cumu"}.}
 
   \item{cells}{Optional filter on which treated cells to include.
     Accepts \code{NULL} (default), a logical vector, or a one-sided

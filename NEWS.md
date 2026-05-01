@@ -1,4 +1,34 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.3
+
+## New: `test = "placebo"` and `"carryover"` arg on `estimand()` (closes #131)
+
+* `estimand()` gains a `test = c("none", "placebo", "carryover")`
+  argument. When `test = "placebo"`, the requested estimand
+  (`"att"` / `"aptt"` / `"log.att"`) is evaluated at the
+  pre-treatment cells in `fit$placebo.period` --- producing, for
+  example, a per-event-time placebo APTT series for credibility
+  checks on the identification assumption. Closes issue #131
+  (ajunquera, "Pre-treatment estimates for APTT estimand").
+* `test = "carryover"` is the analogous extension on the reversal
+  side: requires `carryoverTest = TRUE` and a panel with
+  treatment reversals. The estimand is evaluated at the early
+  post-reversal cells in `fit$carryover.period`.
+* `test = "placebo"` and `test = "carryover"` automatically use
+  `direction = "on"` and `direction = "off"` respectively, so
+  callers do not need to remember the pairing.
+* Both auto-validate the fit: `test = "placebo"` requires
+  `placeboTest = TRUE` at fit time; `test = "carryover"` requires
+  `carryoverTest = TRUE` + a panel with reversals. Standard fits
+  hard-error with actionable refit guidance.
+* `type = "att.cumu"` is intentionally rejected with a clear
+  error when `test != "none"` --- cumulative semantics are
+  defined relative to treatment onset and have no meaning at
+  placebo / carryover cells.
+* For `type = "att"` with `test = "placebo"`, the per-event-time
+  estimates are byte-identical to the existing `fit$est.att`
+  rows at placebo event times.
+
 # fect 2.4.2
 
 ## New: `ci.method = "bc"` and `"normal"` in `estimand()`; per-type defaults
