@@ -1137,44 +1137,25 @@ fect_boot <- function(
       ## perturbed residuals on observed control cells.
       Y.input <- Y
       if (vartype == "wild") {
-        ## Wild bootstrap (Liu 1988; Mammen 1993; CGM 2008).
-        ## Perturbs residuals on ALL observed cells — control (D=0, I=1) and
-        ## treated (D=1, I=1) — using unit-level Rademacher signs.
-        ##
-        ## H1 semantics: on treated cells the fitted value is
-        ##   Y0_hat[t,i] + att_period[T.on[t,i]]
-        ## (Y0 imputation + per-event-time ATT from the main fit). The residual
-        ## is eff[t,i] - att_period[T.on[t,i]], i.e., the per-cell deviation
-        ## from the event-time mean. This follows CGM 2008: Y_b = fitted + sign*e_hat.
-        boot.id    <- seq_len(N)
+        ## Wild bootstrap (Liu 1988; Mammen 1993; cluster extension
+        ## Cameron-Gelbach-Miller 2008). Keep all units; perturb the
+        ## residuals from the main fit by unit-level Rademacher signs
+        ## (one sign per unit, applied to all of unit i's residuals).
+        ## Suitable for panel data with within-unit dependence; preserves
+        ## the treated/control composition exactly (no unit dropout).
+        boot.id <- seq_len(N)
         boot.group <- group
-        signs    <- sample(c(-1, 1), N, replace = TRUE)
+        signs <- sample(c(-1, 1), N, replace = TRUE)
         sign_mat <- matrix(rep(signs, each = TT), nrow = TT, ncol = N)
-
-        ## Build per-event-time ATT lookup matrix (TT x N).
-        att_period_mat <- matrix(0, nrow = TT, ncol = N)
-        if (length(att) > 0 && length(time.on) > 0) {
-          ton_idx        <- match(c(T.on), time.on)
-          att_lookup     <- ifelse(is.na(ton_idx), att.avg, att[ton_idx])
-          att_period_mat[] <- att_lookup
-        }
-        treat_mask <- (D == 1)
-        att_period_mat[!treat_mask] <- 0
-
-        ## Residuals on control cells: identical to previous code.
         res_mask <- (D == 0) & (I == 1)
-        e_mat    <- matrix(0, nrow = TT, ncol = N)
+        e_mat <- matrix(0, TT, N)
         e_mat[res_mask] <- (Y - fit.out)[res_mask]
-
-        ## Residuals on treated cells: deviation from event-time mean.
-        treat_and_obs <- treat_mask & (I == 1)
-        eff_guarded   <- eff.out
-        eff_guarded[is.na(eff_guarded)] <- 0   # guard: NA eff cells get residual = 0
-        e_mat[treat_and_obs] <- (eff_guarded - att_period_mat)[treat_and_obs]
-
-        ## Perturb: Y_b = fitted_full + sign * residual.
-        Y.input <- fit.out + att_period_mat + sign_mat * e_mat
-        Y.input[I == 0] <- 0
+        Y.input <- fit.out + sign_mat * e_mat
+        ## Treated post-treatment cells keep observed Y (they are masked
+        ## from the imputation anyway via D = 1, but we leave Y_obs
+        ## intact so the resulting eff = Y_obs - Y0_b is interpretable).
+        treat_mask <- (D == 1)
+        Y.input[treat_mask] <- Y[treat_mask]
       } else if (is.null(num)) {
         ## case bootstrap (resample units with replacement)
         if (is.null(cl)) {
