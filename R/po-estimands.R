@@ -905,8 +905,26 @@ estimand <- function(fit,
                                          nrow = sum(cell_mask))
             }
             Y0_boot <- Y_t - eff_boot_cells
+
+            ## Hard-error on cell-drop pathology (v2.4.2+).
+            ## See .compute_log_att_event_time for the full rationale.
+            ## For APTT specifically: when E(Y0_b) crosses zero in any
+            ## replicate, the denominator blows up (or flips sign),
+            ## producing wildly unstable per-replicate APTT values.
+            mean_Y0_per_rep <- colMeans(Y0_boot, na.rm = TRUE)
+            n_bad_reps <- sum(abs(mean_Y0_per_rep) < 1e-10 |
+                              is.na(mean_Y0_per_rep))
+            if (n_bad_reps > 0L) {
+                pct_bad <- 100 * n_bad_reps / length(mean_Y0_per_rep)
+                stop(sprintf(
+                    "APTT bootstrap is unreliable at event time %s\n  (E(Y0_hat) at the point = %.4f, but %d of %d bootstrap replicates\n  (%.1f%%) have E(Y0_b) ~ 0, blowing up the APTT denominator and\n  producing wildly unstable per-replicate ratios).\n\n  Options:\n    1. Filter out cells where E(Y0_hat) is small relative to E(Y):\n         estimand(fit, \"aptt\", \"event.time\",\n                  cells = ~ abs(Y0_hat) > <threshold>)\n    2. Transform the outcome to keep Y0_hat away from zero\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this denominator instability",
+                    as.character(et), den, n_bad_reps,
+                    length(mean_Y0_per_rep), pct_bad
+                ), call. = FALSE)
+            }
+
             aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
-                       colMeans(Y0_boot,        na.rm = TRUE)
+                       mean_Y0_per_rep
 
             ci <- .compute_ci(estimate[k], aptt_b, ci.method, conf.level)
             se_vec[k] <- ci$se
@@ -1025,18 +1043,40 @@ estimand <- function(fit,
                 eff_boot_cells <- matrix(eff_boot_cells,
                                          nrow = sum(cell_mask))
             }
-            ## Restrict to ok cells. Y_t is constant; Y0_boot varies
-            ## per replicate, so the per-replicate "ok" mask depends
-            ## on Y0_boot[, b]. To keep this tractable, we condition
-            ## on the point-estimate ok mask (drop cells whose POINT
-            ## Y0 is non-positive). This is what users typically
-            ## want for log-ATT inference.
             eff_ok    <- eff_boot_cells[ok, , drop = FALSE]
             Y_ok      <- Y_t[ok]
             Y0_b_ok   <- Y_ok - eff_ok
-            ## Per-replicate: drop replicates where any Y0_b <= 0 in
-            ## the ok set; alternatively, treat as NA and propagate.
-            log_Y0_b  <- suppressWarnings(log(Y0_b_ok))
+
+            ## Hard-error on cell-drop pathology (v2.4.2+).
+            ##
+            ## When a cell used in the point estimate has Y0_b <= 0 in
+            ## a non-trivial fraction of bootstrap replicates, log(Y0_b)
+            ## returns NaN and colMeans(..., na.rm = TRUE) silently
+            ## averages over fewer cells in that replicate, breaking
+            ## the basic bootstrap principle and contaminating the
+            ## bootstrap distribution.
+            ##
+            ## Threshold: trigger when the WORST cell has Y0_b <= 0 in
+            ## > 5% of replicates. Sub-threshold cells are tolerated
+            ## (small dropping is benign at the bootstrap-distribution
+            ## scale; >5% indicates a genuinely unstable cell that
+            ## needs filtering or a different estimand).
+            n_reps_per_cell <- rowSums(Y0_b_ok <= 0, na.rm = TRUE)
+            n_total_reps    <- ncol(Y0_b_ok)
+            drop_frac       <- n_reps_per_cell / n_total_reps
+            worst_idx       <- which.max(drop_frac)
+            worst_frac      <- drop_frac[worst_idx]
+            if (length(worst_frac) && worst_frac > 0.05) {
+                worst_Y0 <- Y0_t[ok][worst_idx]
+                stop(sprintf(
+                    "log-ATT bootstrap is unreliable at event time %s.\n  The worst cell has Y0_hat = %.4f but %d of %d bootstrap replicates\n  (%.1f%%) have Y0_b <= 0 for it, so log(Y0_b) is undefined and the\n  per-replicate average silently drops the cell. This contaminates the\n  bootstrap distribution and yields meaningless inference.\n\n  Options:\n    1. Filter out unstable cells:\n         estimand(fit, \"log.att\", \"event.time\",\n                  cells = ~ Y0_hat > <threshold>)\n    2. Transform the outcome before fect: log(Y + c) for some c > 0\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this pathology",
+                    as.character(et), worst_Y0,
+                    n_reps_per_cell[worst_idx], n_total_reps,
+                    100 * worst_frac
+                ), call. = FALSE)
+            }
+
+            log_Y0_b  <- log(Y0_b_ok)
             log_Y     <- log(Y_ok)
             log_diff_b <- log_Y - log_Y0_b
             logatt_b  <- colMeans(log_diff_b, na.rm = TRUE)
