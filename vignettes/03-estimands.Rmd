@@ -12,10 +12,13 @@ For estimands the dispatcher does not ship, the accessor returns the cell-level 
 
 ## Setup
 
+```{r .common, include = FALSE}
+source("_common.R")
+```
+
 The examples below use a small synthetic panel with positive outcomes so that log-scale calculations are well defined. The fit sets `keep.sims = TRUE` so that the per-cell bootstrap counterfactual surface is retained on the fit object. That surface is what the dispatcher needs to recompute non-linear functionals such as APTT and log-scale ATT inside each bootstrap replicate. For the default per-event-time level ATT and for cumulative ATT, the pre-aggregated bootstrap is enough and the default for `keep.sims` is fine.
 
 ```{r setup-estimand, eval = TRUE, message = FALSE, results = 'hide'}
-library(fect)
 library(dplyr)
 
 set.seed(1)

@@ -93,13 +93,12 @@ test_that("log.att hard-errors on parametric fits with negative Y (v2.4.2+)", {
   skip_on_cran()
   fit <- .make_parametric_fit()
   ## sim_linear has many negative Y cells, so log.att now hard-errors
-  ## on the bootstrap cell-drop pathology (v2.4.2+). The previous
-  ## v2.4.1 behavior of silently warning + dropping cells produced
-  ## meaningless inference; the hard-error redirects users to the
-  ## actionable options.
+  ## at point-estimate level (v2.4.2+). The previous v2.4.1 behavior of
+  ## silently warning + dropping cells produced meaningless inference;
+  ## the hard-error redirects users to the actionable options.
   expect_error(
     estimand(fit, "log.att", "event.time"),
-    "log-ATT bootstrap is unreliable"
+    "log\\.att requires Y > 0"
   )
 })
 

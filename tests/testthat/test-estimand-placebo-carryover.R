@@ -148,12 +148,13 @@ test_that("PC.5: placebo att returns rows in placebo window; placebo log.att har
   pp <- fit$placebo.period
   expect_true(all(est_att$event.time >= pp[1] & est_att$event.time <= pp[2]))
 
-  ## log.att on this DGP triggers v2.4.2's cell-drop hard-error because
-  ## simdata has Y values where Y0_b crosses zero in many bootstrap
-  ## replicates. This is the EXPECTED behavior.
+  ## log.att on simdata triggers v2.4.2's point-level hard-error because
+  ## simdata has Y <= 0 cells. This is the EXPECTED behavior --- the
+  ## point-level check fires before any bootstrap work, with a clearer
+  ## actionable message than the bootstrap-level pathology message.
   expect_error(
     fect::estimand(fit, "log.att", "event.time", test = "placebo"),
-    "log-ATT bootstrap is unreliable"
+    "log\\.att requires Y > 0"
   )
 })
 

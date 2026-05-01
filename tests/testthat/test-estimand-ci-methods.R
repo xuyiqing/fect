@@ -178,16 +178,19 @@ test_that("CI.6: vartype column reports the fit-time vartype regardless of ci.me
 
 ## -- CI.7 cell-drop hard-error fires for log.att on negative-Y data --
 
-test_that("CI.7: log.att on simdata triggers cell-drop hard-error (v2.4.2+)", {
+test_that("CI.7: log.att on simdata triggers point-level hard-error (v2.4.2+)", {
 
   skip_on_cran()
 
-  ## simdata has many cells where Y < 0 or where Y0_b can cross zero
-  ## under bootstrap. The v2.4.2 hard-error catches this.
+  ## simdata has cells with Y <= 0 in the treated post-treatment window;
+  ## v2.4.2's point-estimate-level hard-error fires before any bootstrap
+  ## work. The bootstrap-level "log-ATT bootstrap is unreliable" message
+  ## remains in R/po-estimands.R for strictly-positive panels where
+  ## Y0_b crosses zero only in some replicates.
   fit_neg <- .fit_canonical()
   expect_error(
     fect::estimand(fit_neg, "log.att", "event.time"),
-    "log-ATT bootstrap is unreliable"
+    "log\\.att requires Y > 0"
   )
 })
 
