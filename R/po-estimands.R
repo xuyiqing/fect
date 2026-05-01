@@ -670,6 +670,16 @@ estimand <- function(fit,
             }
             att_b <- colMeans(eff_boot_cells, na.rm = TRUE)
 
+            ## PARAMETRIC SHIFT (v2.4.2 fix): center att_b at the point estimate.
+            ## For parametric vartype, eff.boot is H0-centered; only ci.method="normal"
+            ## uses sd() and is unaffected by centering. All other ci.methods require
+            ## the distribution to be centered near estimate. The shift preserves sd().
+            is_parametric <- isTRUE(fit$vartype == "parametric") ||
+                             isTRUE(vartype == "parametric")
+            if (is_parametric) {
+                att_b <- att_b - mean(att_b, na.rm = TRUE) + estimate[k]
+            }
+
             jack_v <- if (ci.method == "bca") {
                 .cell_jackknife("att", eff = eff_t)
             } else NULL
@@ -764,6 +774,13 @@ estimand <- function(fit,
         att_b  <- vapply(seq_len(nboots), function(b) {
             mean(fit$eff.boot[, , b][cell_mask], na.rm = TRUE)
         }, numeric(1))
+
+        ## PARAMETRIC SHIFT (v2.4.2 fix)
+        is_parametric <- isTRUE(fit$vartype == "parametric") ||
+                         isTRUE(vartype == "parametric")
+        if (is_parametric) {
+            att_b <- att_b - mean(att_b, na.rm = TRUE) + estimate
+        }
 
         jack_v <- if (ci.method == "bca") {
             .cell_jackknife("att", eff = fit$eff[cell_mask])
@@ -1057,6 +1074,13 @@ estimand <- function(fit,
             aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
                        mean_Y0_per_rep
 
+            ## PARAMETRIC SHIFT (v2.4.2 fix)
+            is_parametric <- isTRUE(fit$vartype == "parametric") ||
+                             isTRUE(vartype == "parametric")
+            if (is_parametric) {
+                aptt_b <- aptt_b - mean(aptt_b, na.rm = TRUE) + estimate[k]
+            }
+
             ## Cell-level jackknife for the BCa acceleration parameter.
             ## Only computed when bca is requested (cheap; no model refits).
             jack_v <- if (ci.method == "bca") {
@@ -1237,6 +1261,17 @@ estimand <- function(fit,
             log_Y     <- log(Y_ok)
             log_diff_b <- log_Y - log_Y0_b
             logatt_b  <- colMeans(log_diff_b, na.rm = TRUE)
+
+            ## PARAMETRIC SHIFT (v2.4.2 fix)
+            ## Note: log.att with parametric vartype requires strictly positive Y0_hat,
+            ## which is only reachable when the outcome has been transformed (e.g. log(Y+c)).
+            ## When reachable, eff.boot is H0-centered so logatt_b ≈ 0; the shift
+            ## centers it at estimate[k] (the true log-ATT). The shift preserves sd().
+            is_parametric <- isTRUE(fit$vartype == "parametric") ||
+                             isTRUE(vartype == "parametric")
+            if (is_parametric) {
+                logatt_b <- logatt_b - mean(logatt_b, na.rm = TRUE) + estimate[k]
+            }
 
             ## Cell-level jackknife on the per-cell log-diff vector.
             jack_v <- if (ci.method == "bca") {
