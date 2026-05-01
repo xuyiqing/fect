@@ -87,7 +87,7 @@ diagtest <- function(
         if ("try-error" %in% class(psi)) {
             message("\n")
             #message("The estimated covariance matrix is irreversible.")
-            message("F-test Failed. The estimated covariance matrix is singular.")
+            message("F-test could not be computed: the estimated covariance matrix is singular.")
             message("\n")
             f.stat <- f.p <- f.equiv.p <- f.threshold <- NA
         } else {
@@ -165,7 +165,7 @@ diagtest <- function(
         if ("try-error" %in% class(psi)) {
             message("\n")
             #message("The estimated covariance matrix is irreversible.")
-            message("F-test Failed. The estimated covariance matrix is singular.")
+            message("F-test could not be computed: the estimated covariance matrix is singular.")
             message("\n")
             f.stat <- f.p <- f.equiv.p <- f.threshold <- NA
         } else {
