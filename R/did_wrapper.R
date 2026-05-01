@@ -540,11 +540,14 @@ did_wrapper <- function(
 
     if (!identical(parallel, FALSE)) {
       if (is.null(core)) core <- parallelly::availableCores(omit = 1)
-      future::plan(future::multisession, workers = core) # Use future::multisession
+      ## v2.4.2+: route through helper to pre-load packages silently.
+      future::plan(future::cluster, workers = .fect_make_future_cluster(core))
       # Ensure seed is handled correctly for parallel processing
-      rep_list <- future.apply::future_lapply(seq_len(nboots), boot_fun,
-        future.seed = TRUE
-      ) # future.seed=TRUE is good
+      rep_list <- .fect_with_quiet_pkg_warnings(
+        future.apply::future_lapply(seq_len(nboots), boot_fun,
+          future.seed = TRUE
+        )
+      )
       future::plan(future::sequential) # Reset plan
     } else {
       rep_list <- lapply(seq_len(nboots), boot_fun)

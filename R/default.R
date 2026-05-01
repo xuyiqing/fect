@@ -2081,7 +2081,14 @@ fect.default <- function(
         }
         old.future.plan <- future::plan()
         suppressWarnings(suppressPackageStartupMessages({
-            future::plan(future::multisession, workers = cores)
+            ## v2.4.2+: route through .fect_make_future_cluster so workers
+            ## pre-load mvtnorm / future / etc. silently. Avoids the
+            ## "package was built under R version X.Y.Z" warnings firing
+            ## per worker on first parallel package use (especially under
+            ## parametric bootstrap where mvtnorm::rmvnorm fires on every
+            ## worker for every replicate).
+            future::plan(future::cluster,
+                         workers = .fect_make_future_cluster(cores))
             doFuture::registerDoFuture()
         }))
         if (is.null(seed) == FALSE) {
