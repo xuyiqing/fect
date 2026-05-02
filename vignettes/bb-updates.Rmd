@@ -1,4 +1,4 @@
-# Changelog {#sec-changelog .unnumbered}
+# Changelog {#sec-changelog}
 
 ## v2.4.2
 
