@@ -12,15 +12,19 @@
 ## ============================================================================
 
 ## DGP-A: additive TWFE, IID Gaussian, true ATT = 3.0, fully observed
+##
+## Treatment block is FIXED at units 1:Ntr (deterministic). The parametric
+## bootstrap targets the conditional variance V_t(Lambda, F, X, D); a coverage
+## simulation that re-randomizes the treatment assignment D across replications
+## adds Var_{D}[b_t] to the marginal variance the bootstrap is being judged
+## against, biasing measured coverage downward (see gsynth-note section 2).
 dgp_a <- function(seed) {
     set.seed(seed)
     N <- 40; TT <- 20; T0 <- 12; Ntr <- 12
     alpha_i <- rnorm(N, 0, 2)
     xi_t    <- rnorm(TT, 0, 1)
     eps     <- matrix(rnorm(N * TT, 0, 1), TT, N)
-    id_tr   <- sample(1:N, Ntr)
-    D <- matrix(0, TT, N)
-    for (i in id_tr) D[(T0 + 1):TT, i] <- 1
+    D <- matrix(0L, TT, N); D[(T0 + 1):TT, 1:Ntr] <- 1L
     Y <- outer(xi_t, rep(1, N)) + outer(rep(1, TT), alpha_i) + 3 * D + eps
     data.frame(
         id   = rep(1:N, each = TT),
@@ -31,6 +35,7 @@ dgp_a <- function(seed) {
 }
 
 ## DGP-A8: additive TWFE, AR(1) rho=0.8, true ATT = 3.0
+## Treatment block fixed (see dgp_a comment).
 dgp_a8 <- function(seed) {
     set.seed(seed)
     N <- 40; TT <- 20; T0 <- 12; Ntr <- 12
@@ -42,9 +47,7 @@ dgp_a8 <- function(seed) {
         eps[1, i] <- e[1] / sqrt(1 - 0.64)   # stationary init
         for (t in 2:TT) eps[t, i] <- 0.8 * eps[t - 1, i] + e[t]
     }
-    id_tr <- sample(1:N, Ntr)
-    D <- matrix(0, TT, N)
-    for (i in id_tr) D[(T0 + 1):TT, i] <- 1
+    D <- matrix(0L, TT, N); D[(T0 + 1):TT, 1:Ntr] <- 1L
     Y <- outer(xi_t, rep(1, N)) + outer(rep(1, TT), alpha_i) + 3 * D + eps
     data.frame(
         id   = rep(1:N, each = TT),
@@ -55,15 +58,14 @@ dgp_a8 <- function(seed) {
 }
 
 ## DGP-B: positive Y, multiplicative treatment (for aptt / log.att)
+## Treatment block fixed (see dgp_a comment).
 dgp_b <- function(seed) {
     set.seed(seed)
     N <- 40; TT <- 20; T0 <- 12; Ntr <- 12
     alpha_i <- rnorm(N, 0, 0.5)
     xi_t    <- rnorm(TT, 0, 0.3)
     eps     <- matrix(rnorm(N * TT, 0, 0.5), TT, N)
-    id_tr   <- sample(1:N, Ntr)
-    D <- matrix(0, TT, N)
-    for (i in id_tr) D[(T0 + 1):TT, i] <- 1
+    D <- matrix(0L, TT, N); D[(T0 + 1):TT, 1:Ntr] <- 1L
     Y0 <- 20 + outer(rep(1, TT), alpha_i) + outer(xi_t, rep(1, N)) + eps
     Y  <- Y0 * ifelse(D == 1, 1.3, 1)
     Y  <- pmax(Y, 0.01)
@@ -406,200 +408,22 @@ test_that("T18: CI width parity — wild/empirical ratio in [0.70, 1.30]", {
 })
 
 ## ============================================================================
-## T19: Coverage simulation on DGP-A — all 3 modes × 5 ci.methods >= 0.91
+## T19, T20, T21 (spec) --- coverage validation simulations
+##
+## MOVED to tests/coverage-study/run_para_error_coverage.R
+##
+## These three Monte-Carlo studies (T19: 100 reps x 1000 nboots x 15 cells on
+## DGP-A IID; T20: same on DGP-A8 AR(1) rho=0.8; T21: 50 reps x 500 nboots
+## width parity) take ~30 min wall and are not appropriate for routine
+## devtools::test() runs.  They live alongside the coverage-study artifacts.
+##
+## Run them via:  Rscript tests/coverage-study/run_para_error_coverage.R
+##
+## When to run: any change to R/boot.R parametric branch, R/po-estimands.R
+## location-shift code, the vartype / ci.method / para.error machinery,
+## jackknife dispatch, or eff.boot construction.  See the README in that
+## directory for full trigger list and acceptance criteria.
 ## ============================================================================
-
-test_that("T19: coverage >= 0.91 on DGP-A (IID) for all para.error x ci.method cells", {
-    skip_on_cran()
-
-    n_reps      <- 100
-    nboots      <- 1000
-    ci_methods  <- c("basic", "percentile", "bc", "bca", "normal")
-    para_modes  <- c("ar", "empirical", "wild")
-    true_att    <- 3.0
-
-    ## Collect coverage matrix: para_modes x ci_methods
-    cov_mat <- matrix(NA_real_,
-                      nrow = length(para_modes),
-                      ncol = length(ci_methods),
-                      dimnames = list(para_modes, ci_methods))
-    ## Also store exact coverage for reporting
-    raw_covers <- array(NA, dim = c(n_reps, length(para_modes), length(ci_methods)),
-                        dimnames = list(NULL, para_modes, ci_methods))
-
-    for (r in seq_len(n_reps)) {
-        df <- dgp_a(seed = r * 100)
-        for (pm in para_modes) {
-            fit <- suppressMessages(
-                fect(
-                    Y ~ D, data = df, index = c("id", "time"),
-                    method = "fe", force = "two-way",
-                    se = TRUE, vartype = "parametric", para.error = pm,
-                    nboots = nboots, parallel = TRUE, cores = 4,
-                    time.component.from = "nevertreated",
-                    keep.sims = TRUE, CV = FALSE
-                )
-            )
-            for (m in ci_methods) {
-                est <- estimand(fit, "att", "overall",
-                                window = c(1, 8), ci.method = m)
-                covers <- (est$ci.lo <= true_att) && (est$ci.hi >= true_att)
-                raw_covers[r, pm, m] <- as.integer(covers)
-            }
-        }
-    }
-
-    ## Compute and assert coverage for each cell
-    for (pm in para_modes) {
-        for (m in ci_methods) {
-            coverage <- mean(raw_covers[, pm, m], na.rm = TRUE)
-            cov_mat[pm, m] <- coverage
-            expect_gte(coverage, 0.91,
-                label = sprintf(
-                    "T19 DGP-A coverage: para.error=%s, ci.method=%s: coverage=%.3f (threshold=0.91)",
-                    pm, m, coverage
-                ))
-            expect_lte(coverage, 0.99,
-                label = sprintf(
-                    "T19 DGP-A coverage: para.error=%s, ci.method=%s: coverage=%.3f (upper threshold=0.99)",
-                    pm, m, coverage
-                ))
-        }
-    }
-    ## Print exact coverage table for audit record
-    message("\n=== T19 DGP-A Coverage Table (n_reps=", n_reps, ", nboots=", nboots, ") ===")
-    for (pm in para_modes) {
-        for (m in ci_methods) {
-            message(sprintf("  para.error=%-10s ci.method=%-12s coverage=%.3f",
-                            pm, m, cov_mat[pm, m]))
-        }
-    }
-})
-
-## ============================================================================
-## T20: Coverage simulation on DGP-A8 — AR(1) stress test >= 0.91
-## ============================================================================
-
-test_that("T20: coverage >= 0.91 on DGP-A8 (AR1 rho=0.8) for all para.error x ci.method cells", {
-    skip_on_cran()
-
-    n_reps      <- 100
-    nboots      <- 1000
-    ci_methods  <- c("basic", "percentile", "bc", "bca", "normal")
-    para_modes  <- c("ar", "empirical", "wild")
-    true_att    <- 3.0
-
-    cov_mat <- matrix(NA_real_,
-                      nrow = length(para_modes),
-                      ncol = length(ci_methods),
-                      dimnames = list(para_modes, ci_methods))
-    raw_covers <- array(NA, dim = c(n_reps, length(para_modes), length(ci_methods)),
-                        dimnames = list(NULL, para_modes, ci_methods))
-
-    for (r in seq_len(n_reps)) {
-        df <- dgp_a8(seed = r * 100)
-        for (pm in para_modes) {
-            fit <- suppressMessages(
-                fect(
-                    Y ~ D, data = df, index = c("id", "time"),
-                    method = "fe", force = "two-way",
-                    se = TRUE, vartype = "parametric", para.error = pm,
-                    nboots = nboots, parallel = TRUE, cores = 4,
-                    time.component.from = "nevertreated",
-                    keep.sims = TRUE, CV = FALSE
-                )
-            )
-            for (m in ci_methods) {
-                est <- estimand(fit, "att", "overall",
-                                window = c(1, 8), ci.method = m)
-                covers <- (est$ci.lo <= true_att) && (est$ci.hi >= true_att)
-                raw_covers[r, pm, m] <- as.integer(covers)
-            }
-        }
-    }
-
-    for (pm in para_modes) {
-        for (m in ci_methods) {
-            coverage <- mean(raw_covers[, pm, m], na.rm = TRUE)
-            cov_mat[pm, m] <- coverage
-            expect_gte(coverage, 0.91,
-                label = sprintf(
-                    "T20 DGP-A8 coverage: para.error=%s, ci.method=%s: coverage=%.3f (threshold=0.91)",
-                    pm, m, coverage
-                ))
-        }
-    }
-    ## Print exact coverage table for audit record
-    message("\n=== T20 DGP-A8 Coverage Table (n_reps=", n_reps, ", nboots=", nboots, ") ===")
-    for (pm in para_modes) {
-        for (m in ci_methods) {
-            message(sprintf("  para.error=%-10s ci.method=%-12s coverage=%.3f",
-                            pm, m, cov_mat[pm, m]))
-        }
-    }
-})
-
-## ============================================================================
-## T21: Width-parity invariant — wild/empirical CI width ratio in [0.70, 1.30]
-##      across all 5 ci.methods (simulation-level, 50 reps)
-## ============================================================================
-
-test_that("T21: width parity wild/empirical in [0.70, 1.30] across all ci.methods (50 reps)", {
-    skip_on_cran()
-
-    n_reps     <- 50
-    nboots     <- 500
-    ci_methods <- c("basic", "percentile", "bc", "bca", "normal")
-    true_att   <- 3.0
-
-    width_emp_list <- vector("list", length(ci_methods))
-    width_wld_list <- vector("list", length(ci_methods))
-    names(width_emp_list) <- ci_methods
-    names(width_wld_list) <- ci_methods
-    for (m in ci_methods) {
-        width_emp_list[[m]] <- numeric(n_reps)
-        width_wld_list[[m]] <- numeric(n_reps)
-    }
-
-    for (r in seq_len(n_reps)) {
-        df <- dgp_a(seed = r * 77)
-        fit_emp <- suppressMessages(
-            fect(Y ~ D, data = df, index = c("id", "time"),
-                 method = "fe", force = "two-way",
-                 se = TRUE, vartype = "parametric", para.error = "empirical",
-                 nboots = nboots, parallel = TRUE, cores = 4,
-                 time.component.from = "nevertreated",
-                 keep.sims = TRUE, CV = FALSE)
-        )
-        fit_wld <- suppressMessages(
-            fect(Y ~ D, data = df, index = c("id", "time"),
-                 method = "fe", force = "two-way",
-                 se = TRUE, vartype = "parametric", para.error = "wild",
-                 nboots = nboots, parallel = TRUE, cores = 4,
-                 time.component.from = "nevertreated",
-                 keep.sims = TRUE, CV = FALSE)
-        )
-        for (m in ci_methods) {
-            est_e <- estimand(fit_emp, "att", "overall", window = c(1, 8), ci.method = m)
-            est_w <- estimand(fit_wld, "att", "overall", window = c(1, 8), ci.method = m)
-            width_emp_list[[m]][r] <- est_e$ci.hi - est_e$ci.lo
-            width_wld_list[[m]][r] <- est_w$ci.hi - est_w$ci.lo
-        }
-    }
-
-    message("\n=== T21 CI Width Parity (wild/empirical) across 50 reps ===")
-    for (m in ci_methods) {
-        mean_w_emp <- mean(width_emp_list[[m]])
-        mean_w_wld <- mean(width_wld_list[[m]])
-        ratio <- mean_w_wld / mean_w_emp
-        message(sprintf("  ci.method=%-12s mean_width_emp=%.4f  mean_width_wld=%.4f  ratio=%.4f",
-                        m, mean_w_emp, mean_w_wld, ratio))
-        expect_gte(ratio, 0.70,
-            label = sprintf("T21 ci.method=%s: wild/emp ratio=%.4f >= 0.70", m, ratio))
-        expect_lte(ratio, 1.30,
-            label = sprintf("T21 ci.method=%s: wild/emp ratio=%.4f <= 1.30", m, ratio))
-    }
-})
 
 ## ============================================================================
 ## E2: para.error = "wild" with nboots = 200 completes with >= 95% success rate
