@@ -14,8 +14,9 @@ assumptions.}
             CV = NULL, k = 20, cv.prop = 0.1, cv.method = "rolling",
             cv.nobs = 3, cv.donut = 1, cv.buffer = 1, criterion = "mspe",
             binary = FALSE, QR = FALSE,
-            method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
-            quantile.CI = FALSE, nboots = 200, alpha = 0.05,
+            method = "fe",  se = FALSE, vartype = "bootstrap",
+            para.error = "auto", cl = NULL,
+            quantile.CI = FALSE, nboots = 1000, alpha = 0.05,
             parallel = TRUE, cores = NULL, tol = 1e-3,
             max.iteration = 1000, seed = NULL,
             min.T0 = NULL, max.missing = NULL,
@@ -91,9 +92,20 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   These three conditions correspond to Gates A, B, and C in the
   three-gate defense system (see \code{ARCHITECTURE.md}).
   For all other settings, \code{vartype = "bootstrap"} is recommended.}
+\item{para.error}{a string specifying the residual-error model used by
+  the parametric bootstrap path; sub-option of \code{vartype = "parametric"}
+  (silently ignored otherwise). One of \code{"auto"}, \code{"ar"},
+  \code{"empirical"}, or \code{"wild"}. Default \code{"auto"} resolves at
+  fit time to \code{"empirical"} on a fully-observed panel and \code{"ar"}
+  on a panel with missing cells; the resolved label is stored on
+  \code{fit$para.error}. \code{"ar"} estimates an AR(1) error process from
+  control residuals (works on any panel shape); \code{"empirical"}
+  resamples residuals i.i.d. from the main-fit pool (requires fully-
+  observed panel); \code{"wild"} applies unit-level Rademacher sign-flips
+  over the empirical residual pool (requires fully-observed panel).}
 \item{cl}{a string specifying the cluster for cluster bootstrapping.}
 \item{quantile.CI}{a logical flag indicating whether to use quantile confidence intervals when bootstrapping.}
-\item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}.}
+\item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}. Default \code{1000} (raised from 200 in v2.4.2 for percentile-based inference reliability).}
 \item{alpha}{the significance level for hypothesis tests and confidence intervals. Default \code{0.05}.}
 \item{parallel}{controls which operations run in parallel. Accepted values:
 \describe{

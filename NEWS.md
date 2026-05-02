@@ -1,106 +1,92 @@
 <!-- markdownlint-disable MD025 -->
 # fect 2.4.2
 
-## New: `test = "placebo"` and `"carryover"` arg on `estimand()` (closes #131)
+## New: alternative-estimand additions in `estimand()`
 
-* `estimand()` gains a `test = c("none", "placebo", "carryover")`
-  argument. When `test = "placebo"`, the requested estimand
-  (`"att"` / `"aptt"` / `"log.att"`) is evaluated at the
-  pre-treatment cells in `fit$placebo.period` --- producing, for
-  example, a per-event-time placebo APTT series for credibility
-  checks on the identification assumption. Closes issue #131
-  (ajunquera, "Pre-treatment estimates for APTT estimand").
-* `test = "carryover"` is the analogous extension on the reversal
-  side: requires `carryoverTest = TRUE` and a panel with
-  treatment reversals. The estimand is evaluated at the early
-  post-reversal cells in `fit$carryover.period`.
-* `test = "placebo"` and `test = "carryover"` automatically use
-  `direction = "on"` and `direction = "off"` respectively, so
-  callers do not need to remember the pairing.
-* Both auto-validate the fit: `test = "placebo"` requires
-  `placeboTest = TRUE` at fit time; `test = "carryover"` requires
-  `carryoverTest = TRUE` + a panel with reversals. Standard fits
-  hard-error with actionable refit guidance.
-* `type = "att.cumu"` is intentionally rejected with a clear
-  error when `test != "none"` --- cumulative semantics are
-  defined relative to treatment onset and have no meaning at
-  placebo / carryover cells.
-
-## New: `ci.method = "bc"`, `"bca"`, and `"normal"` in `estimand()`; per-type defaults
-
-* `estimand()`'s `ci.method` enum is extended from
-  `c("basic", "percentile")` to
-  `c("basic", "percentile", "bc", "bca", "normal")`.
-* `"bc"` is the bias-corrected percentile bootstrap (Efron 1987 minus
-  the acceleration). It shifts the percentile cutoffs by `2 z0` where
-  `z0 = Φ⁻¹(P(boot < est))` to compensate when the bootstrap median
-  is biased relative to the point estimate.
-* `"bca"` is the bias-corrected accelerated bootstrap (Efron 1987 in
-  full): adds an acceleration parameter `a` computed via a cell-level
-  jackknife (no model refits required) on top of `z0`. Handles
-  bootstrap-bias and bootstrap-skew jointly; degrades gracefully when
-  `bc` collapses (e.g. when the point estimate is above all bootstrap
-  replicates and `z0 → ∞`).
-* `"normal"` is the textbook Wald CI: `θ̂ ± z·SE`. This is what
-  `fit$est.att` already uses internally for both bootstrap and
-  jackknife.
-* **`ci.method` now defaults to `NULL`, which triggers a per-type
-  default:**
-    * `type = "att"` → `"normal"` (matches what `fit$est.att`
-      already uses)
-    * `type = "att.cumu"` → `"percentile"` (matches `att.cumu()`)
-    * `type = "aptt"` → `"bca"` (ratio: bias + skew jointly)
-    * `type = "log.att"` → `"bca"` (log: same rationale)
-* Existing scripts that pass `ci.method = ...` explicitly are
-  unaffected.
+* New `test = c("none", "placebo", "carryover")` argument evaluates the
+  requested estimand at pre-treatment placebo cells or early
+  post-reversal carryover cells, producing a per-event-time series for
+  credibility checks. Closes issue #131. Auto-pairs `direction = "on"`
+  with placebo and `direction = "off"` with carryover; auto-validates
+  the fit (placebo requires `placeboTest = TRUE` at fit time; carryover
+  requires `carryoverTest = TRUE` + a reversal panel).
+* `type = "att.cumu"` rejected with a clear error when `test != "none"` ---
+  cumulative semantics are defined relative to treatment onset.
+* `ci.method` enum extended from `c("basic", "percentile")` to
+  `c("basic", "percentile", "bc", "bca", "normal")`. New methods:
+  - `"bc"` --- bias-corrected percentile (Efron 1987 minus acceleration)
+  - `"bca"` --- bias-corrected accelerated (Efron 1987 in full); cell-level
+    jackknife computes the acceleration with no extra refits
+  - `"normal"` --- Wald CI `θ̂ ± z · SE`
+* `ci.method` now defaults to `NULL`, which triggers a per-type default:
+  - `"att"` → `"normal"`
+  - `"att.cumu"` → `"percentile"`
+  - `"aptt"` → `"bca"`
+  - `"log.att"` → `"bca"`
+  Existing scripts that pass `ci.method` explicitly are unaffected.
 
 ## New: `para.error` argument for `vartype = "parametric"`
 
 * `fect()` gains a `para.error = c("auto", "ar", "empirical", "wild")`
-  argument that selects the residual-error model used to draw bootstrap
-  replicates inside the parametric path. Replaces the implicit, panel-
-  shape-driven dispatch in v2.4.1.
-* `"auto"` (default) resolves at fit time: `"empirical"` on a fully-
-  observed panel, `"ar"` on a panel with missing cells. Stored on the
-  fit as the resolved label, so `fit$para.error` is always one of
-  `"ar"`, `"empirical"`, or `"wild"`.
-* `"ar"` --- the v2.4.1 behavior: estimate an AR(1) error process and
-  draw correlated residuals. Available on any panel shape.
-* `"empirical"` --- resample residuals i.i.d. from the main-fit
-  residual pool. Requires a fully-observed panel; hard-errors otherwise.
-* `"wild"` --- Liu (1988) / Mammen (1993) / Cameron-Gelbach-Miller (2008)
-  unit-level Rademacher sign-flipping over the empirical residual pool.
-  Preserves the marginal residual distribution and within-unit dependence
-  while respecting the parametric Loop-1 / Loop-2 architecture (the
-  bootstrap distribution is centered at the point estimate via the
-  same location-shift used by `"ar"` and `"empirical"`). Requires a
-  fully-observed panel.
+  argument selecting the residual-error model the parametric bootstrap
+  draws from. Replaces the implicit panel-shape-driven dispatch.
+* `"auto"` (default) resolves at fit time and stores the resolved label
+  on `fit$para.error`:
+  - `"empirical"` on a fully-observed panel
+  - `"ar"` on a panel with missing cells
+* `"ar"` --- the v2.4.1 behavior: AR(1) error process estimated from
+  control residuals. Works on any panel shape.
+* `"empirical"` --- i.i.d. column-resample from the main-fit residual
+  pool. Requires a fully-observed panel.
+* `"wild"` --- Liu 1988 / Mammen 1993 / Cameron-Gelbach-Miller 2008
+  unit-level Rademacher sign-flips over the empirical residual pool.
+  Requires a fully-observed panel; preserves within-unit dependence.
 * `para.error` is silently ignored when `vartype != "parametric"`.
 
-## New: hard-error on bootstrap cell-drop pathology in `log.att` / `aptt`
+## Bug fixes
 
-* When a cell used in the point estimate has `Y0_b ≤ 0` in a
-  non-trivial fraction of bootstrap replicates (`> 5%` for `log.att`,
-  any replicate where `E(Y0_b) ≈ 0` for `aptt`), the previous v2.4.1
-  behavior silently dropped those replicates' contributions via
-  `colMeans(..., na.rm = TRUE)`, contaminating the bootstrap
-  distribution. v2.4.2 hard-errors on this pathology with actionable
-  guidance: filter near-zero cells, transform the outcome, or use a
-  different estimand.
-* `estimand(fit, "log.att", ...)` additionally hard-errors at the
+* `vartype = "parametric"` × `ci.method ∈ {"basic", "percentile", "bc",
+  "bca"}` produced 0% coverage CIs through v2.4.1 (the bootstrap
+  distribution is H₀-centered, but reflection-based CIs assume centering
+  at θ̂). `estimand()` now applies a variance-preserving location shift
+  for parametric fits. The `"normal"` ci.method is byte-stable; the
+  other four now produce nominal coverage.
+* `vartype = "jackknife"` was previously rejected by `estimand()` with a
+  slot-contract error. The slot contract is relaxed; only `ci.method =
+  "normal"` is accepted (the Wald-style CI from the Tukey SE), with
+  hard-error guidance pointing at `"bootstrap"` for the full ci.method
+  surface.
+* `log.att` and `aptt` silently dropped bootstrap replicates with
+  `Y0_b ≤ 0` via `colMeans(..., na.rm = TRUE)`, contaminating the
+  bootstrap distribution. Both now hard-error with actionable guidance
+  (pre-transform Y, filter near-zero cells, or use a different
+  estimand). `estimand("log.att", ...)` additionally hard-errors at the
   point-estimate level when any treated cell has `Y_obs ≤ 0` or
-  `Y0_hat ≤ 0`. `log` is undefined on non-positive values; silent
-  cell-dropping would bias both the point estimate and the bootstrap
-  distribution. Caller must pre-transform (e.g. `log(Y + c)`) and
-  refit before calling `log.att`.
+  `Y0_hat ≤ 0`.
+* `vartype = "parametric"` with default `time.component.from =
+  "notyettreated"` now produces a clearer error that names the user's
+  literal `method` argument (was: "Parametric bootstrap is not valid
+  when ..."; now: "vartype = 'parametric' requires time.component.from
+  = 'nevertreated'. Your call: method = 'fe', time.component.from =
+  'notyettreated'."). The reversal-check gate continues to fire first
+  on reversal panels.
+* `R/diagtest.R` "F-test Failed" message → "F-test could not be
+  computed" --- the test never "failed" in any standard sense; the
+  matrix arithmetic was undefined for the input.
+* Parallel-worker package version warnings (e.g. "package 'mvtnorm'
+  was built under R version X.Y.Z") suppressed via `clusterEvalQ`
+  pre-load + targeted `withCallingHandlers`.
 
-## Default `nboots` raised from 200 to 1000
+## Other changes
 
-* The default value of `nboots` in `fect()`, `fect.formula()`, and
-  `fect.default()` is now `1000` (was `200`). With the alternative-
-  estimand API increasingly used for percentile-based inference, 200
-  replicates produced noisy quantile estimates at the tails. Existing
-  scripts that explicitly pass `nboots = ...` are unaffected.
+* Default `nboots` raised from 200 to 1000 in `fect()`,
+  `fect.formula()`, and `fect.default()`. Improves percentile-based
+  inference at the tails, matching the literature recommendation for
+  bc/bca methods. Existing scripts that pass `nboots` explicitly are
+  unaffected.
+* New internal warm-start C++ infrastructure on `inter_fe_ub` /
+  `inter_fe_mc` / inner EM helpers (NULL default = pre-2.4.2 cold
+  start). Activation is deferred to v2.5.0.
 
 # fect 2.4.1
 
