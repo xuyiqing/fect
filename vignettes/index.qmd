@@ -129,8 +129,8 @@ The user guide is structured into four parts. Most users only need the **Basics*
 -   [Chapter @sec-cheatsheet]\
     Quick reference for methods, parameters, plotting, and diagnostics.
 
--   [Chapter @sec-changelog]\
-    Version-by-version changes.
+-   Changelog\
+    Version-by-version changes (back matter; see sidebar).
 
 ## Contributors
 

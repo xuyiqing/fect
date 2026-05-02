@@ -1,46 +1,18 @@
-# Changelog {#sec-changelog}
+# Changelog {.unnumbered}
 
 ## v2.4.2
 
 (2026-05-01)
 
-**Alternative-estimand additions in `estimand()`.**
-
-* New `test = c("none", "placebo", "carryover")` argument:
-  * `test = "placebo"` evaluates the requested estimand at pre-treatment
-    cells in `fit$placebo.period`. Requires `placeboTest = TRUE` at fit time.
-  * `test = "carryover"` evaluates at early post-reversal cells in
-    `fit$carryover.period`. Requires `carryoverTest = TRUE` + reversal panel.
-  * Auto-pairs `direction = "on"` (placebo) and `direction = "off"` (carryover).
-  * `type = "att.cumu"` rejected when `test != "none"`.
-  * Closes issue #131.
-* `ci.method` enum extended with three new values:
-  * `"bc"` --- bias-corrected percentile (Efron 1987 minus acceleration).
-  * `"bca"` --- bias-corrected accelerated; cell-level jackknife computes
-    the acceleration with no extra refits.
-  * `"normal"` --- Wald CI `θ̂ ± z·SE`.
-* `ci.method` defaults to `NULL`, triggering per-type defaults:
-  * `"att"` → `"normal"`
-  * `"att.cumu"` → `"percentile"`
-  * `"aptt"` → `"bca"`
-  * `"log.att"` → `"bca"`
-
-**`para.error` argument for `vartype = "parametric"`.**
-
-* `para.error = c("auto", "ar", "empirical", "wild")` selects the residual-error
-  model the parametric bootstrap draws from. Replaces the implicit panel-shape
-  dispatch.
-* `"auto"` (default) resolves at fit time:
-  * `"empirical"` on a fully-observed panel.
-  * `"ar"` on a missing-data panel.
-* `"ar"` --- v2.4.1 behavior (AR(1) draws). Works on any panel shape.
-* `"empirical"` --- i.i.d. column-resample. Fully-observed only.
-* `"wild"` --- Liu 1988 / Mammen 1993 / CGM 2008 unit-level Rademacher
-  sign-flips. Fully-observed only.
-* `fit$para.error` stores the resolved label.
-* Silently ignored when `vartype != "parametric"`.
-
-**Various bug fixes.**
+* New `test = c("none", "placebo", "carryover")` argument on `estimand()`
+  closes issue #131. See [Chapter @sec-estimands].
+* New `ci.method` values `"bc"`, `"bca"`, `"normal"`; per-type defaults
+  updated. See [Chapter @sec-estimands] and [Chapter @sec-inference].
+* New `para.error` argument for `vartype = "parametric"` selects the
+  residual-error model: `"auto"`, `"ar"`, `"empirical"`, `"wild"`. See
+  [Chapter @sec-inference].
+* Default `nboots` raised from 200 to 1000.
+* Various bug fixes.
 
 ## v2.4.1
 
