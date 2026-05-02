@@ -425,6 +425,11 @@ fect.default <- function(
         stop("\"cm\" option is only available for the \"fe\" and \"ife\" methods.")
     }
 
+    ## Save user's literal method argument before any silent coercion (e.g.
+    ## fe -> ife r=0 below). Referenced by the parametric/nevertreated gate
+    ## further down so error messages name the user's actual method = "fe".
+    method_arg <- method
+
     if (se == 1) {
         if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
             stop(
@@ -578,23 +583,6 @@ fect.default <- function(
             time.component.from <- "nevertreated"
         }
         em <- FALSE
-    }
-
-    ## Parametric bootstrap requires nevertreated control-pool isolation.
-    ## Placed BEFORE the fe -> ife r=0 coercion below so the error names the
-    ## user's literal method argument (method = "fe" rather than "ife").
-    if (se == 1 && vartype == "parametric" && time.component.from != "nevertreated") {
-        stop(sprintf(
-            paste0(
-                "vartype = \"parametric\" requires time.component.from = \"nevertreated\".\n",
-                "  Your call: method = \"%s\", time.component.from = \"%s\".\n\n",
-                "The parametric pseudo-treated bootstrap requires a control pool ",
-                "isolated from treated-unit pre-treatment cells. Pass ",
-                "time.component.from = \"nevertreated\" (if never-treated controls ",
-                "exist) or use vartype = \"bootstrap\" or \"jackknife\"."
-            ),
-            method, time.component.from
-        ), call. = FALSE)
     }
 
     if (is.null(min.T0)) {
@@ -1871,9 +1859,24 @@ fect.default <- function(
             "Use vartype='bootstrap' or 'jackknife'."
         )
     }
-    ## (Old Gate C check at this site removed: replaced by the early-gate
-    ## variant near line 580 that fires before the fe -> ife coercion and
-    ## therefore reports the user's literal method = "fe" in the error.)
+    ## Parametric bootstrap requires nevertreated control-pool isolation.
+    ## Placed AFTER the reversal-check gate so reversal users get the more
+    ## actionable reversal message first. Uses method_arg (saved before the
+    ## silent fe -> ife coercion) so the message names the user's literal
+    ## method argument.
+    if (se == 1 && vartype == "parametric" && time.component.from != "nevertreated") {
+        stop(sprintf(
+            paste0(
+                "vartype = \"parametric\" requires time.component.from = \"nevertreated\".\n",
+                "  Your call: method = \"%s\", time.component.from = \"%s\".\n\n",
+                "The parametric pseudo-treated bootstrap requires a control pool ",
+                "isolated from treated-unit pre-treatment cells. Pass ",
+                "time.component.from = \"nevertreated\" (if never-treated controls ",
+                "exist) or use vartype = \"bootstrap\" or \"jackknife\"."
+            ),
+            method_arg, time.component.from
+        ), call. = FALSE)
+    }
     ## para.error = "empirical" or "wild" requires fully-observed panel.
     if (se == 1 && vartype == "parametric" &&
         para.error %in% c("empirical", "wild") &&
