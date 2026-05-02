@@ -2,7 +2,7 @@
 suppress-bibliography: false
 ---
 
-# References {.unnumbered}
+# Bibliography {.unnumbered}
 
 ::: {#refs}
 :::

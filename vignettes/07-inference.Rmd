@@ -1,4 +1,4 @@
-# Bootstrap Inference Internals {#sec-inference}
+# Inference {#sec-inference}
 
 ```{r .common, include = FALSE}
 source("_common.R")

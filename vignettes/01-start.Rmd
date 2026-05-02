@@ -39,14 +39,9 @@ installed.packages()["fect", "Version"]
 For reference, here are the latest **CRAN release** and **`dev` branch** versions (queried live):
 
 ```{r check-latest-versions, message = FALSE, warning = FALSE, cache = FALSE}
-cran_ver <- tryCatch(
-  available.packages(repos = "https://cloud.r-project.org")["fect", "Version"],
-  error = function(e) "<unable to fetch>"
-)
-dev_ver <- tryCatch({
-  desc <- readLines("https://raw.githubusercontent.com/xuyiqing/fect/dev/DESCRIPTION")
-  sub("^Version: ", "", desc[grep("^Version: ", desc)])
-}, error = function(e) "<unable to fetch>")
+cran_ver <- available.packages(repos = "https://cloud.r-project.org")["fect", "Version"]
+desc <- readLines("https://raw.githubusercontent.com/xuyiqing/fect/dev/DESCRIPTION")
+dev_ver <- sub("^Version: ", "", desc[grep("^Version: ", desc)])
 cat(sprintf("CRAN release: %s\n", cran_ver))
 cat(sprintf("Dev branch:   %s\n", dev_ver))
 ```
