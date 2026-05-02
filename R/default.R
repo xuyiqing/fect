@@ -580,6 +580,23 @@ fect.default <- function(
         em <- FALSE
     }
 
+    ## Parametric bootstrap requires nevertreated control-pool isolation.
+    ## Placed BEFORE the fe -> ife r=0 coercion below so the error names the
+    ## user's literal method argument (method = "fe" rather than "ife").
+    if (se == 1 && vartype == "parametric" && time.component.from != "nevertreated") {
+        stop(sprintf(
+            paste0(
+                "vartype = \"parametric\" requires time.component.from = \"nevertreated\".\n",
+                "  Your call: method = \"%s\", time.component.from = \"%s\".\n\n",
+                "The parametric pseudo-treated bootstrap requires a control pool ",
+                "isolated from treated-unit pre-treatment cells. Pass ",
+                "time.component.from = \"nevertreated\" (if never-treated controls ",
+                "exist) or use vartype = \"bootstrap\" or \"jackknife\"."
+            ),
+            method, time.component.from
+        ), call. = FALSE)
+    }
+
     if (is.null(min.T0)) {
         if (method == "fe") {
             min.T0 <- 1
@@ -1854,13 +1871,9 @@ fect.default <- function(
             "Use vartype='bootstrap' or 'jackknife'."
         )
     }
-    if (se == 1 && vartype == "parametric" && time.component.from == "notyettreated") {
-        stop(
-            "Parametric bootstrap is not valid when \"time.component.from\" is ",
-            "\"notyettreated\". Use time.component.from = \"nevertreated\" (if never-treated ",
-            "controls are available) or vartype = \"bootstrap\" or \"jackknife\"."
-        )
-    }
+    ## (Old Gate C check at this site removed: replaced by the early-gate
+    ## variant near line 580 that fires before the fe -> ife coercion and
+    ## therefore reports the user's literal method = "fe" in the error.)
     ## para.error = "empirical" or "wild" requires fully-observed panel.
     if (se == 1 && vartype == "parametric" &&
         para.error %in% c("empirical", "wild") &&
