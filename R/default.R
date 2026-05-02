@@ -425,28 +425,10 @@ fect.default <- function(
         stop("\"cm\" option is only available for the \"fe\" and \"ife\" methods.")
     }
 
-    ## Deprecation: vartype = "wild" is now an alias for
-    ## vartype = "parametric" + para.error = "wild".
-    if (isTRUE(vartype == "wild")) {
-        warning(
-            "vartype = \"wild\" is deprecated as a standalone vartype. ",
-            "It has been folded into the parametric bootstrap as ",
-            "para.error = \"wild\". ",
-            "Setting vartype = \"parametric\"; para.error = \"wild\" automatically. ",
-            "Update your code: fect(..., vartype = \"parametric\", para.error = \"wild\"). ",
-            "The standalone vartype = \"wild\" alias will be removed in fect v2.5.0.",
-            call. = FALSE
-        )
-        vartype    <- "parametric"
-        para.error <- "wild"
-    }
-
     if (se == 1) {
         if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
             stop(
-                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", or \"parametric\". ",
-                "(\"wild\" is now para.error = \"wild\" inside vartype = \"parametric\"; ",
-                "see ?fect for details.)",
+                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", or \"parametric\".",
                 call. = FALSE
             )
         }

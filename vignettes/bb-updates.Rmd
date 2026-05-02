@@ -18,18 +18,23 @@ Existing scripts that pass `ci.method = ...` explicitly are
 unaffected; callers that omit it will see different CI bounds for
 `att.cumu` / `aptt` / `log.att` (point estimate and SE unchanged).
 
-**New `vartype = "wild"`.** `fect()` now supports unit-level
-Rademacher wild bootstrap (Liu 1988; Mammen 1993; cluster-robust
-extension by Cameron, Gelbach, and Miller 2008). Wild keeps the unit
-composition fixed and perturbs main-fit residuals on observed
-control cells (`D = 0`, `I = 1`) by ±1 signs drawn once per unit.
-Compared to case bootstrap, wild preserves the treated/control
-composition exactly (no unit dropout) and respects within-unit
-dependence; compared to parametric, it is fully nonparametric.
-Supported for continuous outcomes with `method ∈ {fe, ife, mc,
-gsynth, cfe}`; rejected for binary. Storage layout matches
-`vartype = "bootstrap"`; `estimand()` consumes wild fits
-transparently.
+**New `para.error` argument for parametric bootstrap.** `fect()` gains
+a `para.error = c("auto", "ar", "empirical", "wild")` argument that
+selects the residual-error model used to draw bootstrap replicates
+inside `vartype = "parametric"`. `"auto"` (default) resolves at fit
+time: `"empirical"` on a fully-observed panel, `"ar"` on a panel with
+missing cells; the resolved label is stored on `fit$para.error`.
+`"ar"` is the v2.4.1 behavior (estimate an AR(1) process and draw
+correlated residuals; available on any panel shape). `"empirical"`
+resamples residuals i.i.d. from the main-fit residual pool.
+`"wild"` applies Liu (1988) / Mammen (1993) / Cameron-Gelbach-Miller
+(2008) unit-level Rademacher sign-flips over the empirical residual
+pool; it preserves the marginal residual distribution and within-unit
+dependence while sharing the parametric Loop-1 / Loop-2 architecture
+(the bootstrap distribution is centered at the point estimate via the
+same location-shift used by `"ar"` and `"empirical"`). `"empirical"`
+and `"wild"` require a fully-observed panel; `"ar"` is the universal
+fallback.
 
 **Hard-error on bootstrap cell-drop pathology.** When a cell used in
 the point estimate has `Y0_b ≤ 0` in `> 5%` of bootstrap replicates

@@ -54,24 +54,28 @@
 * Existing scripts that pass `ci.method = ...` explicitly are
   unaffected.
 
-## New: `vartype = "wild"` (unit-level Rademacher wild bootstrap)
+## New: `para.error` argument for `vartype = "parametric"`
 
-* `fect()`'s `vartype` enum is extended to accept `"wild"`. Wild
-  bootstrap (Liu 1988; Mammen 1993; cluster-robust extension by
-  Cameron, Gelbach, and Miller 2008) keeps the unit composition
-  fixed and perturbs residuals from the main fit by unit-level
-  Rademacher signs (one ±1 per unit, applied to all of that unit's
-  residuals on observed control cells: `D = 0`, `I = 1`).
-* Compared to case (`vartype = "bootstrap"`) bootstrap, wild
-  preserves the treated/control composition exactly (no unit
-  dropout) and respects within-unit dependence. Compared to
-  parametric, it is fully nonparametric. Suitable for panels where
-  unit resampling distorts cohort balance.
-* Supported for `method ∈ {fe, ife, mc, gsynth, cfe}` with continuous
-  outcomes; rejected for binary outcomes (use `vartype = "parametric"`
-  on imputation methods, or case bootstrap).
-* Storage layout matches `vartype = "bootstrap"` (TT × N × nboots
-  for `eff.boot`); `estimand()` consumes wild fits transparently.
+* `fect()` gains a `para.error = c("auto", "ar", "empirical", "wild")`
+  argument that selects the residual-error model used to draw bootstrap
+  replicates inside the parametric path. Replaces the implicit, panel-
+  shape-driven dispatch in v2.4.1.
+* `"auto"` (default) resolves at fit time: `"empirical"` on a fully-
+  observed panel, `"ar"` on a panel with missing cells. Stored on the
+  fit as the resolved label, so `fit$para.error` is always one of
+  `"ar"`, `"empirical"`, or `"wild"`.
+* `"ar"` --- the v2.4.1 behavior: estimate an AR(1) error process and
+  draw correlated residuals. Available on any panel shape.
+* `"empirical"` --- resample residuals i.i.d. from the main-fit
+  residual pool. Requires a fully-observed panel; hard-errors otherwise.
+* `"wild"` --- Liu (1988) / Mammen (1993) / Cameron-Gelbach-Miller (2008)
+  unit-level Rademacher sign-flipping over the empirical residual pool.
+  Preserves the marginal residual distribution and within-unit dependence
+  while respecting the parametric Loop-1 / Loop-2 architecture (the
+  bootstrap distribution is centered at the point estimate via the
+  same location-shift used by `"ar"` and `"empirical"`). Requires a
+  fully-observed panel.
+* `para.error` is silently ignored when `vartype != "parametric"`.
 
 ## New: hard-error on bootstrap cell-drop pathology in `log.att` / `aptt`
 

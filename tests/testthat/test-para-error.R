@@ -5,13 +5,12 @@
 ##   2. para.error = "empirical" runs without error on fully-observed panel
 ##   3. para.error = "wild" runs without error on fully-observed panel, all 5
 ##      ci.methods return CIs containing the true ATT
-##   4. vartype = "wild" (deprecated alias) emits a warning and produces
-##      fit$vartype == "parametric" and fit$para.error == "wild"
-##   5. para.error = "wild" hard-errors on missing-data panel
-##   6. para.error = "empirical" hard-errors on missing-data panel
-##   7. Invalid para.error value produces a clear error message
-##   8. para.error is ignored when vartype != "parametric"
-##   9. para.error = "ar" works on fully-observed panel
+##   4. para.error = "wild" hard-errors on missing-data panel
+##   5. para.error = "empirical" hard-errors on missing-data panel
+##   6. Invalid para.error value produces a clear error message
+##   7. para.error is ignored when vartype != "parametric"
+##   8. para.error = "ar" works on fully-observed panel
+##   9. para.error = "auto" resolves to "ar" on missing-data panel
 
 ## -----------------------------------------------------------------------
 ## Shared test fixture
@@ -122,40 +121,7 @@ test_that("para.error = 'wild' runs on fully-observed panel and all ci.methods w
 })
 
 ## -----------------------------------------------------------------------
-## Test 4: vartype = "wild" deprecated alias — warning emitted, correct routing
-## -----------------------------------------------------------------------
-
-test_that("vartype = 'wild' emits deprecation warning and routes to parametric + wild", {
-    skip_on_cran()
-    d <- make_panel()
-    fit <- NULL
-    expect_warning(
-        {
-            set.seed(42)
-            fit <- suppressMessages(fect(
-                Y ~ D,
-                data   = d,
-                index  = c("id", "time"),
-                method = "fe",
-                force  = "two-way",
-                time.component.from = "nevertreated",
-                se      = TRUE,
-                vartype = "wild",
-                nboots  = 100,
-                parallel = FALSE,
-                keep.sims = TRUE,
-                CV = FALSE
-            ))
-        },
-        regexp = "deprecated",
-        fixed  = FALSE
-    )
-    expect_equal(fit$vartype,    "parametric")
-    expect_equal(fit$para.error, "wild")
-})
-
-## -----------------------------------------------------------------------
-## Test 5: para.error = "wild" hard-errors on missing-data panel
+## Test 4: para.error = "wild" hard-errors on missing-data panel
 ## -----------------------------------------------------------------------
 
 test_that("para.error = 'wild' hard-errors on missing-data panel", {

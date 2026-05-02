@@ -163,17 +163,17 @@ Is treated-unit count Ntr small (< 10)?
     │   └── No: vartype = "bootstrap" (case bootstrap)
     │            Use bca for aptt / log.att
     │            Use normal for att
-    └── (Avoid vartype = "wild" until v2.5+ unless cohort-balance is essential
-         and you understand the conservative semantics)
+    └── (Within vartype = "parametric": use para.error = "auto" by default;
+         set para.error = "wild" or "empirical" only if you have a fully-
+         observed panel and a reason to override the resolved default)
 ```
 
 ## v2.4.2 caveats summary
 
-| issue | symptom | release for fix |
+| issue | symptom | status |
 |---|---|---|
-| Wild bootstrap under-covers | 71–78 % vs nominal 95 % on DGP-A `att` | v2.5+ planned |
-| Jackknife rejected by `estimand()` | Slot-contract error on `eff.boot` shape | v2.4.3 candidate |
-| Pre-v2.4.2 parametric × {basic, percentile, bc, bca} | 0 % coverage | **fixed in v2.4.2** (location-shift in `estimand()`) |
+| Pre-v2.4.2 parametric × {basic, percentile, bc, bca} | 0 % coverage (location-shift bug) | **fixed in v2.4.2** |
+| Pre-v2.4.2 jackknife rejected by `estimand()` | Slot-contract error on `eff.boot` shape | **fixed in v2.4.2** (jackknife restricted to `ci.method = "normal"`; non-normal hard-errors with guidance) |
 | `estimand()` does not yet emit `p.value` | Users must compute test-inverted p from `fit$eff.boot` | Future release |
 
 ## References

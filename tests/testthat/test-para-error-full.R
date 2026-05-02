@@ -221,94 +221,10 @@ test_that("T7: para.error = 'ar' succeeds on missing-data panel", {
 })
 
 ## ============================================================================
-## T9: vartype = "wild" deprecation -> results identical to explicit para.error = "wild"
-## ============================================================================
-
-test_that("T9: deprecated vartype='wild' produces same results as explicit para.error='wild'", {
-    skip_on_cran()
-    df <- dgp_a(seed = 42)
-    fit_dep <- suppressWarnings(suppressMessages(
-        fect(
-            Y ~ D,
-            data   = df,
-            index  = c("id", "time"),
-            method = "fe",
-            force  = "two-way",
-            time.component.from = "nevertreated",
-            se      = TRUE,
-            vartype = "wild",
-            nboots  = 200,
-            parallel = FALSE,
-            keep.sims = TRUE,
-            seed    = 42,
-            CV      = FALSE
-        )
-    ))
-    fit_exp <- suppressMessages(
-        fect(
-            Y ~ D,
-            data   = df,
-            index  = c("id", "time"),
-            method = "fe",
-            force  = "two-way",
-            time.component.from = "nevertreated",
-            se      = TRUE,
-            vartype = "parametric",
-            para.error = "wild",
-            nboots  = 200,
-            parallel = FALSE,
-            keep.sims = TRUE,
-            seed    = 42,
-            CV      = FALSE
-        )
-    )
-    ## att.avg must be equal
-    expect_equal(fit_dep$att.avg, fit_exp$att.avg,
-        tolerance = 1e-10,
-        label = "att.avg: deprecated vs explicit para.error='wild'")
-    ## att.avg.boot: check dimensions match and values are equal
-    expect_equal(dim(fit_dep$att.avg.boot), dim(fit_exp$att.avg.boot),
-        label = "att.avg.boot dimensions must match")
-    expect_equal(fit_dep$att.avg.boot, fit_exp$att.avg.boot,
-        tolerance = 1e-6,
-        label = "att.avg.boot: deprecated vs explicit para.error='wild'")
-})
-
-## ============================================================================
-## T10: vartype = "wild" produces a warning, NOT an error (soft deprecation)
-## ============================================================================
-
-test_that("T10: vartype='wild' (deprecated) emits warning and completes, not stops", {
-    skip_on_cran()
-    df <- dgp_a(seed = 42)
-    ## Must produce a warning
-    expect_warning(
-        suppressMessages(
-            fit <- fect(
-                Y ~ D,
-                data   = df,
-                index  = c("id", "time"),
-                method = "fe",
-                force  = "two-way",
-                time.component.from = "nevertreated",
-                se      = TRUE,
-                vartype = "wild",
-                nboots  = 50,
-                parallel = FALSE,
-                CV      = FALSE
-            )
-        ),
-        regexp = "deprecated",
-        fixed  = FALSE
-    )
-    ## Fit must have completed (no error)
-    expect_true(is.numeric(fit$att.avg) && !is.na(fit$att.avg),
-        label = "fit$att.avg must be a valid finite number after deprecation path")
-    expect_equal(fit$vartype, "parametric")
-    expect_equal(fit$para.error, "wild")
-})
-
-## ============================================================================
+## T9, T10 (spec) — vartype = "wild" deprecation alias
+## REMOVED: vartype = "wild" was never released as a standalone vartype, so
+## there is no caller to deprecate. The redesign exposes para.error directly.
+##
 ## T11 (spec) / covered in builder file — verify fit$para.error stores resolved value
 ## Already in test-para-error.R (Test 1), not repeated here.
 
