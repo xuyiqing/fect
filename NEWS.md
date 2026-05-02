@@ -84,9 +84,6 @@
   inference at the tails, matching the literature recommendation for
   bc/bca methods. Existing scripts that pass `nboots` explicitly are
   unaffected.
-* New internal warm-start C++ infrastructure on `inter_fe_ub` /
-  `inter_fe_mc` / inner EM helpers (NULL default = pre-2.4.2 cold
-  start). Activation is deferred to v2.5.0.
 
 # fect 2.4.1
 
