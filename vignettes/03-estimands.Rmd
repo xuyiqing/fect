@@ -273,7 +273,7 @@ fit-time variance options alongside `"bootstrap"` (the default) and
 `"jackknife"`. The parametric path resamples residuals from a fitted
 factor model rather than resampling units; it is restricted to
 `time.component.from = "nevertreated"` (gates A/B/C, see
-@sec-cfe).
+[Section @sec-parametric-regimes] in [Chapter @sec-fect]).
 
 The unified estimand API treats parametric replicates the same as
 bootstrap or jackknife replicates: they live in `fit$eff.boot` and
@@ -281,6 +281,10 @@ all four `type` values consume them through the same code path. The
 only addition in v2.4.1 is that `estimand()`'s `vartype` argument now
 accepts `"parametric"` explicitly, so callers can name the method
 they expect.
+
+For details on how `vartype`, `ci.method`, and the parametric `para.error`
+sub-option compose into the bootstrap distribution, see
+[Chapter @sec-inference].
 
 ```{r parametric-att, eval = FALSE}
 fit_para <- fect(Y ~ D, data = sim_linear, index = c("id", "time"),

@@ -8,20 +8,28 @@ book:
     background: light
   chapters:
     - index.qmd
-    - 01-start.Rmd
-    - 02-fect.Rmd
-    - 03-estimands.Rmd
-    - 04-ife-mc.Rmd
-    - 05-cfe.Rmd
-    - 06-hte.Rmd
-    - 07-plots.Rmd
-    - 08-gsynth.Rmd
-    - 09-inference.Rmd
-    - 10-panel.Rmd
-    - 11-sens.Rmd
-    - aa-cheatsheet.Rmd
-    - references.qmd
-    - bb-updates.Rmd
+    - part: "Basics"
+      chapters:
+        - 01-start.Rmd
+        - 02-fect.Rmd
+        - 03-estimands.Rmd
+    - part: "Advanced estimators and inference"
+      chapters:
+        - 04-ife-mc.Rmd
+        - 05-cfe.Rmd
+        - 06-gsynth.Rmd
+        - 07-inference.Rmd
+    - part: "Diagnostics and extensions"
+      chapters:
+        - 08-hte.Rmd
+        - 09-panel.Rmd
+        - 10-sens.Rmd
+    - part: "Reference"
+      chapters:
+        - 11-plots.Rmd
+        - aa-cheatsheet.Rmd
+        - bb-updates.Rmd
+        - cc-references.qmd
 
 bibliography: references.bib
 

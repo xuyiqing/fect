@@ -116,6 +116,8 @@ The default `"bootstrap"` is robust and the right starting point. Switch to `"ja
 | `"bca"` (new in v2.4.2) | Bias-corrected accelerated (Efron 1987 in full); adds an acceleration parameter via cell-level jackknife | 0x refits (cell-level jackknife is closed-form arithmetic) | Skewed *and* heavy-tailed; degrades gracefully when `bc` collapses (e.g. point estimate above all bootstrap replicates) |
 
 `ci.method` defaults to `NULL` in `estimand()`, which triggers a per-type default: `att` → `"normal"`, `att.cumu` → `"percentile"`, `aptt` → `"bca"`, `log.att` → `"bca"`. Pass an explicit value to override.
+
+**For most users, the defaults above are what you want.** The deep-dive on bootstrap-distribution semantics, the (vartype × ci.method × `para.error`) interaction, parametric-bootstrap mechanics, and a coverage study is in [Chapter @sec-inference]; that chapter is most useful after [Chapter @sec-gsynth] introduces the regime where parametric bootstrap is the default.
 :::
 
 ::: {.callout-note appearance="simple"}

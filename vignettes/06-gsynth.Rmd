@@ -718,6 +718,11 @@ Since `sim_gsynth` follows a pure IFE data generating process with two factors, 
 3.  **Setting `min.T0`**: Setting `min.T0` to a positive value helps. The algorithm will automatically exclude treated units with too few pre-treatment periods. A larger $T_0$ reduces bias in causal estimates and minimizes the risk of severe extrapolation. When running cross-validation to select the number of factors, `min.T0` must be equal to or greater than (`r.max` + 2). Errors frequently occur when there are too few pre-treatment periods, so ensuring adequate $T_0$ (e.g. setting `min.T0 = 5`) is crucial.
 
 
+## Inference
+
+The default `vartype` for the gsynth-style regime is `"parametric"` --- a two-stage pseudo-treated bootstrap that targets the conditional variance $V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D)$ on small-$N_{\text{tr}}$ panels where the standard nonparametric bootstrap is unreliable. The `para.error` argument (introduced in v2.4.2) chooses how the residual error process is resampled: `"auto"` (default, resolves to `"empirical"` on a fully-observed panel and `"ar"` on a missing-data panel), `"ar"` (the v2.4.1 behavior), `"empirical"`, or `"wild"`. The (`vartype` × `ci.method` × `para.error`) interaction, parametric-bootstrap mechanics, and an empirical coverage study live in [Chapter @sec-inference], which is the natural next read after this chapter.
+
+
 ## How to Cite
 
 If you find this method helpful, you can cite @Xu2017.
