@@ -43,6 +43,41 @@
   Requires a fully-observed panel; preserves within-unit dependence.
 * `para.error` is silently ignored when `vartype != "parametric"`.
 
+## Changed: tighter EM convergence defaults
+
+* `tol`: default flipped from `1e-3` to **`1e-5`**.
+* `max.iteration`: default flipped from `1000` to **`5000`**.
+
+The pre-v2.4.2 default `tol = 1e-3` halted IFE/CFE EM well before
+convergence: on factor-DGP simdata the EM stopped at iteration 116
+with `att.avg = 2.87`, while running to `tol = 1e-7` (~2000 iters)
+produces `att.avg = 2.43` --- an 18% gap between two valid stopping
+points of the same procedure on the same data. CFE was worse
+(40% gap). The new defaults stop the EM after it has actually
+stabilized.
+
+* **Inference at the old default was already correct.** Coverage
+  simulations (K=80, known-truth DGP, true τ=3) show empirical
+  coverage of 0.96 at both old and new defaults for IFE; bootstrap
+  SE matches empirical SE in both. The fix improves
+  *reproducibility* and *point-estimate stability across
+  versions/machines*, not coverage validity.
+* **What this means for users**: numerical output from prior versions
+  remains valid inferentially (CIs still cover correctly), but the
+  point-estimate values will shift on rerun under v2.4.2 --- typically
+  by a few percent on canonical IFE, up to 40% on factor-heavy CFE.
+  The new numbers are closer to the EM's actual converged minimum.
+* **Speed cost**: ~2-5x slower main fit and bootstrap on
+  factor-DGP IFE/CFE because EM iterates more (994 iters at 1e-5
+  vs 116 at 1e-3 on simdata). GSC and MC paths unaffected
+  (they were already converging within the old defaults).
+* New `warning()` when EM hits `max.iteration` without satisfying
+  the tol gate --- alerts users to under-converged fits on hard
+  cases (e.g., very large N panels, near-collinear factors).
+
+Set `tol = 1e-3, max.iteration = 1000` explicitly to reproduce
+pre-v2.4.2 numerical output exactly.
+
 ## Bug fixes
 
 * `vartype = "parametric"` × `ci.method ∈ {"basic", "percentile", "bc",
@@ -84,6 +119,11 @@
   inference at the tails, matching the literature recommendation for
   bc/bca methods. Existing scripts that pass `nboots` explicitly are
   unaffected.
+* `complex_fe_ub` and `cfe_iter` C++ entries gain optional `fit_init`
+  parameter (NULL default preserves pre-existing cold-start behavior).
+  This mirrors the existing warm-start infrastructure on
+  `inter_fe_ub` / `inter_fe_mc` / inner EM helpers. Not exposed to
+  the public API; reserved for future deferred features.
 
 # fect 2.4.1
 

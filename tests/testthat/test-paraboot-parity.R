@@ -69,12 +69,17 @@ test_that("PAR-2: ife+nevertreated+parametric parity (byte-identical; must equal
   baseline <- load_baseline()
   d <- make_fixture_data()
 
+  ## Pin pre-2.4.3 EM defaults: baseline rds was captured at tol=1e-3,
+  ## max.iteration=1000 (v2.4.2 defaults). v2.4.3 tightened defaults to
+  ## tol=1e-5/max.iteration=5000. Test preserves byte-equality contract
+  ## against the existing baseline by passing legacy values explicitly.
   set.seed(2026)
   out <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = d, index = c("id", "time"),
     method = "ife", time.component.from = "nevertreated",
     r = 1, se = TRUE, vartype = "parametric", nboots = 50,
-    CV = FALSE, parallel = FALSE
+    CV = FALSE, parallel = FALSE,
+    tol = 1e-3, max.iteration = 1000
   )))
 
   expect_true(identical(out$att.avg, baseline$ife_nev_para$att.avg))
@@ -90,11 +95,13 @@ test_that("PAR-3: bootstrap vartype parity — ife+notyettreated", {
   baseline <- load_baseline()
   d <- make_fixture_data()
 
+  ## Pin pre-2.4.3 EM defaults; see PAR-2.
   set.seed(2026)
   out <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = d, index = c("id", "time"),
     method = "ife", r = 1, se = TRUE,
-    vartype = "bootstrap", nboots = 50, CV = FALSE, parallel = FALSE
+    vartype = "bootstrap", nboots = 50, CV = FALSE, parallel = FALSE,
+    tol = 1e-3, max.iteration = 1000
   )))
 
   expect_true(identical(out$att.avg, baseline$ife_nt_boot$att.avg))
@@ -109,11 +116,13 @@ test_that("PAR-4: bootstrap vartype parity — ife+nevertreated", {
   baseline <- load_baseline()
   d <- make_fixture_data()
 
+  ## Pin pre-2.4.3 EM defaults; see PAR-2.
   set.seed(2026)
   out <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = d, index = c("id", "time"),
     method = "ife", time.component.from = "nevertreated",
-    r = 1, se = TRUE, vartype = "bootstrap", nboots = 50, CV = FALSE, parallel = FALSE
+    r = 1, se = TRUE, vartype = "bootstrap", nboots = 50, CV = FALSE, parallel = FALSE,
+    tol = 1e-3, max.iteration = 1000
   )))
 
   expect_true(identical(out$att.avg, baseline$ife_nev_boot$att.avg))
@@ -147,10 +156,12 @@ test_that("PAR-6: jackknife parity — ife+notyettreated", {
   baseline <- load_baseline()
   d <- make_fixture_data()
 
+  ## Pin pre-2.4.3 EM defaults; see PAR-2.
   out <- suppressWarnings(suppressMessages(fect(
     Y ~ D, data = d, index = c("id", "time"),
     method = "ife", r = 1, se = TRUE,
-    vartype = "jackknife", CV = FALSE, parallel = FALSE
+    vartype = "jackknife", CV = FALSE, parallel = FALSE,
+    tol = 1e-3, max.iteration = 1000
   )))
 
   expect_true(identical(out$att.avg, baseline$ife_jk$att.avg))

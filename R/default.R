@@ -64,8 +64,8 @@ fect <- function(
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
-    tol = 1e-3, # tolerance level
-    max.iteration = 1000,
+    tol = 1e-5, # tolerance level (tightened from 1e-3 in v2.4.3)
+    max.iteration = 5000,
     seed = NULL, # set seed
     min.T0 = NULL, # minimum T0
     max.missing = NULL, # maximum missing
@@ -146,8 +146,8 @@ fect.formula <- function(
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
-    tol = 1e-3, # tolerance level
-    max.iteration = 1000,
+    tol = 1e-5, # tolerance level (tightened from 1e-3 in v2.4.3)
+    max.iteration = 5000,
     seed = NULL, # set seed
     min.T0 = NULL,
     max.missing = NULL,
@@ -344,8 +344,8 @@ fect.default <- function(
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
-    tol = 1e-3, # tolerance level
-    max.iteration = 1000,
+    tol = 1e-5, # tolerance level (tightened from 1e-3 in v2.4.3)
+    max.iteration = 5000,
     seed = NULL, # set seed
     min.T0 = NULL,
     max.missing = NULL,
@@ -3150,6 +3150,26 @@ fect.default <- function(
             "att.off.sum.W", "W.off.sum",
             "att.placebo.W", "att.carryover.W"
         )] <- NULL
+    }
+
+    ## v2.4.3+: convergence diagnostic. The EM check is
+    ##   ||fit_new - fit_old||_F / ||fit_old||_F < tol
+    ## When niter >= max.iteration, the EM was halted before satisfying
+    ## the tol gate. The reported att.avg may not reflect a converged
+    ## minimum; users should inspect (and ideally raise max.iteration)
+    ## before publishing.
+    if (!is.null(output$niter) && length(output$niter) == 1 &&
+        is.finite(output$niter) && output$niter >= max.iteration) {
+        warning(sprintf(
+            paste(
+                "EM did not converge within max.iteration = %d (final niter = %d).",
+                "Estimates may be under-converged. Consider raising max.iteration",
+                "and/or tightening tol. If att.avg shifts substantially under",
+                "longer runs, the data may be poorly conditioned for this model",
+                "specification (e.g. very small Ntr, near-collinear factors,",
+                "or a misspecified rank).", sep = "\n  "),
+            as.integer(max.iteration), as.integer(output$niter)
+        ), call. = FALSE)
     }
 
     class(output) <- "fect"

@@ -17,8 +17,8 @@ assumptions.}
             method = "fe",  se = FALSE, vartype = "bootstrap",
             para.error = "auto", cl = NULL,
             quantile.CI = FALSE, nboots = 1000, alpha = 0.05,
-            parallel = TRUE, cores = NULL, tol = 1e-3,
-            max.iteration = 1000, seed = NULL,
+            parallel = TRUE, cores = NULL, tol = 1e-5,
+            max.iteration = 5000, seed = NULL,
             min.T0 = NULL, max.missing = NULL,
             proportion = 0.3, pre.periods = NULL,
             f.threshold = 0.5, tost.threshold = NULL,
@@ -128,8 +128,17 @@ returns). This guarantees numerical identity between serial and parallel
 results but may compute a few extra lambda values compared to the serial
 path. Use \code{parallel = FALSE} to preserve the short-circuit behavior.}
 \item{cores}{an integer indicating the number of cores for parallel computing.}
-\item{tol}{a positive number indicating the tolerance level for EM updates.}
-\item{max.iteration}{the maximal number of iterations for the EM algorithm.}
+\item{tol}{a positive number indicating the relative tolerance for the
+EM update check (\code{||fit_new - fit_old||_F / ||fit_old||_F < tol}).
+Default tightened from \code{1e-3} to \code{1e-5} in v2.4.3 because the
+older default produced under-converged IFE/CFE point estimates that
+shifted up to 40\% relative to the converged value (inference was
+preserved, but the reported numbers were stopping-point-dependent).}
+\item{max.iteration}{the maximal number of EM iterations. Default raised
+from \code{1000} to \code{5000} in v2.4.3 to accommodate the tighter tol;
+canonical IFE/CFE fits converge in 700-2000 iters at \code{tol = 1e-5}.
+A \code{warning()} is emitted when the EM hits this cap without
+satisfying the tol gate (under-convergence diagnostic).}
 \item{seed}{an integer seed for random number generation.}
 \item{min.T0}{an integer specifying the minimum number of pre-treatment periods for each treated unit.}
 \item{max.missing}{an integer specifying the maximum number of missing observations allowed per unit.}
