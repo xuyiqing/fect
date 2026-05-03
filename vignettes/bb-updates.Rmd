@@ -2,7 +2,7 @@
 
 ## v2.4.2
 
-(2026-05-01)
+(2026-05-02)
 
 * New `test = c("none", "placebo", "carryover")` argument on `estimand()`
   closes issue #131. See [Chapter @sec-estimands].
@@ -11,6 +11,12 @@
 * New `para.error` argument for `vartype = "parametric"` selects the
   residual-error model: `"auto"`, `"ar"`, `"empirical"`, `"wild"`. See
   [Chapter @sec-inference].
+* Tighter EM convergence defaults: `tol` from `1e-3` to `1e-5`,
+  `max.iteration` from `1000` to `5000`, plus a `warning()` when EM
+  hits `max.iteration` without converging. IFE/CFE point estimates
+  shift a few percent (up to 40% on factor-heavy CFE) closer to the
+  EM's converged minimum. Pass `tol = 1e-3, max.iteration = 1000`
+  explicitly to reproduce pre-v2.4.2 numerical output.
 * Default `nboots` raised from 200 to 1000.
 * Various bug fixes.
 
