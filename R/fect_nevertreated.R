@@ -60,7 +60,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         gamma.loading = NULL,
                         gamma.loading.grid = NULL,
                         cv.rule = "1se",
-                        W.in.fit = TRUE
+                        W.in.fit = TRUE,
+                        fit.init = NULL ## warm-start aux surface (T x N_boot); v2.4.3+
                         ) {
     ## -------------------------------##
     ## Parsing data
@@ -97,6 +98,15 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     co <- which(D.sum == 0)
     Nco <- length(co)
     r <- min(r, TT, Nco)
+
+    ## Slice warm-start aux surface to control units (the only units fed
+    ## to complex_fe_ub / inter_fe_ub here). NULL preserves cold-start.
+    fit.init.co <- NULL
+    if (!is.null(fit.init)) {
+        if (is.matrix(fit.init) && nrow(fit.init) == TT && ncol(fit.init) >= max(co)) {
+            fit.init.co <- fit.init[, co, drop = FALSE]
+        }
+    }
 
     I.tr <- as.matrix(I[, tr]) ## maybe only 1 treated unit
     I.co <- I[, co]
@@ -236,7 +246,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     ## at each call site.
     .estimate_co <- function(Y, Y0, X, I_obs, W_in, beta0_in, r, force,
                              tol, max.iteration, use_cfe = FALSE,
-                             center = TRUE) {
+                             center = TRUE, fit_init = NULL) {
         ## Center Y to improve convergence conditioning:
         ## removes grand mean from fit so tol applies to variation, not level.
         mu_init <- 0
@@ -245,18 +255,26 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             mu_init <- sum(Y * I_obs) / sum(I_obs)
             Y  <- Y - mu_init * I_obs   ## observed positions centered, zeros stay
             Y0 <- Y0 - mu_init          ## initial fit centered
+            ## Centering the warm-start surface keeps it on the same scale
+            ## as the centered Y; otherwise the EM would unwind centering on
+            ## the very first iteration. Only apply when fit_init is non-null.
+            if (!is.null(fit_init)) fit_init <- fit_init - mu_init
         }
 
         if (use_cfe) {
             out <- complex_fe_ub(Y, Y0, X,
                 X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                 Zgamma.id, kappaQ.id,
-                I_obs, W_in, beta0_in, r, force = force, tol, max.iteration)
+                I_obs, W_in, beta0_in, r, force = force, tol, max.iteration,
+                fit_init = fit_init)
         } else if (!0 %in% I_obs) {
+            ## Balanced inter_fe does not yet expose fit_init (would require
+            ## a separate C++ extension). Cold-start here is the safe default.
             out <- inter_fe(Y, X, r, force = force, beta0_in = beta0_in, tol, max.iteration)
         } else {
             out <- inter_fe_ub(Y, Y0, X, I_obs, W_in, beta0_in, r,
-                        force = force, tol, max.iteration)
+                        force = force, tol, max.iteration,
+                        fit_init = fit_init)
         }
 
         ## Undo centering
@@ -324,7 +342,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         if (r.max == 0) {
             r.cv <- 0
             message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
-            est.co.best <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, 0, force, cv_tol, max.iteration)
+            est.co.best <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, 0, force, cv_tol, max.iteration,
+                                        fit_init = fit.init.co)
         } else {
             r.old <- r ## save the minimal number of factors
 
@@ -1036,7 +1055,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
     est.co.fect <- NULL
 
-    est.co.best <- .estimate_co(YY.co, Y0.co, X.co, II.co, W.use, beta0, r.cv, force, tol, max.iteration)
+    est.co.best <- .estimate_co(YY.co, Y0.co, X.co, II.co, W.use, beta0, r.cv, force, tol, max.iteration,
+                                fit_init = fit.init.co)
 
     if (boot == FALSE) {
         if (r.cv == 0) {
@@ -1418,7 +1438,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             est.co.best <- complex_fe_ub(YY.co, Y0.co, X.co,
                 X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                 Zgamma.id, kappaQ.id,
-                II.co, W.use, beta0, 0, force = force, cv_tol, max.iteration)
+                II.co, W.use, beta0, 0, force = force, cv_tol, max.iteration,
+                fit_init = fit.init.co)
         } else {
             r.old <- r
             message("Cross-validating ...", "\r")
@@ -2113,7 +2134,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     est.co.best <- complex_fe_ub(YY.co, Y0.co, X.co,
         X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
         Zgamma.id, kappaQ.id,
-        II.co, W.use, beta0, r.cv, force = force, tol, max.iteration)
+        II.co, W.use, beta0, r.cv, force = force, tol, max.iteration,
+        fit_init = fit.init.co)
 
     ## Convergence check
     if (!is.null(est.co.best$niter) && est.co.best$niter >= max.iteration) {
