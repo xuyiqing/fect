@@ -211,6 +211,39 @@
 ## Passing jackknife replicates to any of these methods would produce CIs
 ## with undefined (and likely poor) coverage. Hard-error forces the caller
 ## to be explicit about this statistical limitation.
+## Internal: warn (not error) when a tail-quantile-based CI is requested on a
+## bootstrap / parametric fit with fewer than 1000 replicates. The point
+## estimate and SE are unaffected; only basic / percentile / bc / bca CIs read
+## the empirical tail of the bootstrap distribution and need B large enough for
+## the relevant order statistics to be stable. Efron 1987 §3 and DiCiccio &
+## Efron 1996 §4 recommend B >= 1000 as the floor for bca; the same threshold
+## suits basic / percentile (which read 5th / 195th order statistics at B=200
+## vs 25th / 975th at B=1000). Warning rather than error so users can still
+## explore on small B during iteration.
+.check_tail_ci_replicates <- function(fit, ci.method, vartype) {
+    if (vartype == "none") return(invisible(TRUE))
+    if (!isTRUE(fit$vartype %in% c("bootstrap", "parametric"))) {
+        return(invisible(TRUE))
+    }
+    if (!ci.method %in% c("basic", "percentile", "bc", "bca")) {
+        return(invisible(TRUE))
+    }
+    if (is.null(fit$eff.boot)) return(invisible(TRUE))
+    B <- dim(fit$eff.boot)[3]
+    if (is.na(B) || B >= 1000) return(invisible(TRUE))
+    warning(
+        "estimand() with ci.method = \"", ci.method, "\" on a fit with ",
+        "nboots = ", B, " (< 1000): tail-quantile-based CIs may have ",
+        "erratic endpoints at this replicate count (Efron 1987 Section 3; ",
+        "DiCiccio & Efron 1996 Section 4 recommend B >= 1000). The point ",
+        "estimate and SE are unaffected. For publication-grade CIs, refit ",
+        "with `fect(..., nboots = 1000)` and re-call estimand().",
+        call. = FALSE
+    )
+    invisible(TRUE)
+}
+
+
 .check_jackknife_ci_method <- function(ci.method) {
     if (ci.method != "normal") {
         stop(
@@ -651,6 +684,11 @@ estimand <- function(fit,
     if (isTRUE(fit$vartype == "jackknife") && vartype != "none") {
         .check_jackknife_ci_method(ci.method)
     }
+
+    ## Tail-CI under-replication warning: bc / bca / percentile / basic CIs
+    ## need B >= 1000 for stable tail quantiles. Warning, not error, so users
+    ## can still explore on small B during iteration.
+    .check_tail_ci_replicates(fit, ci.method, vartype)
 
     if (type == "att") {
         return(.estimand_att(fit, by, cells, weights, direction,

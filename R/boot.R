@@ -552,6 +552,16 @@ fect_boot <- function(
 
   if (vartype == "jackknife") {
     nboots <- N
+    if (N > 1000) {
+      warning(
+        "vartype = \"jackknife\" with N = ", N, " requires ", N,
+        " leave-one-out refits and will be slow at the v2.4.2 EM ",
+        "convergence defaults (tol = 1e-5, max.iteration = 5000). ",
+        "Consider vartype = \"bootstrap\" (B = 1000 typically faster ",
+        "than full leave-one-out at N > 500) for tractability.",
+        call. = FALSE
+      )
+    }
   }
 
   ## bootstrapped estimates

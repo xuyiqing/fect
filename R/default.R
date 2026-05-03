@@ -60,7 +60,7 @@ fect <- function(
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
     quantile.CI = FALSE,
-    nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
+    nboots = 200, # number of bootstraps (sufficient for SE / normal CI; bump to 1000+ for tail-quantile CIs in estimand())
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
@@ -142,7 +142,7 @@ fect.formula <- function(
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
     quantile.CI = FALSE,
-    nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
+    nboots = 200, # number of bootstraps (sufficient for SE / normal CI; bump to 1000+ for tail-quantile CIs in estimand())
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
@@ -340,7 +340,7 @@ fect.default <- function(
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
     quantile.CI = FALSE,
-    nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
+    nboots = 200, # number of bootstraps (sufficient for SE / normal CI; bump to 1000+ for tail-quantile CIs in estimand())
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores

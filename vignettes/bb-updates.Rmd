@@ -17,7 +17,12 @@
   shift a few percent (up to 40% on factor-heavy CFE) closer to the
   EM's converged minimum. Pass `tol = 1e-3, max.iteration = 1000`
   explicitly to reproduce pre-v2.4.2 numerical output.
-* Default `nboots` raised from 200 to 1000.
+* `estimand()` warns when a tail-quantile CI method (`"basic"`,
+  `"percentile"`, `"bc"`, `"bca"`) is requested on a fit with
+  fewer than 1000 bootstrap replicates, recommending refit at
+  `nboots = 1000`.
+* `vartype = "jackknife"` with `Nco > 1000` emits a fit-time
+  warning recommending `vartype = "bootstrap"` for tractability.
 * Various bug fixes.
 
 ## v2.4.1

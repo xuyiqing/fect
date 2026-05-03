@@ -114,11 +114,17 @@ pre-v2.4.2 numerical output exactly.
 
 ## Other changes
 
-* Default `nboots` raised from 200 to 1000 in `fect()`,
-  `fect.formula()`, and `fect.default()`. Improves percentile-based
-  inference at the tails, matching the literature recommendation for
-  bc/bca methods. Existing scripts that pass `nboots` explicitly are
-  unaffected.
+* `estimand()` warns when `ci.method` `c("basic", "percentile", "bc",
+  "bca")` is requested on a fit with fewer than 1000 bootstrap
+  replicates, recommending refit at `nboots = 1000` for stable tail
+  quantiles (Efron 1987 §3; DiCiccio & Efron 1996 §4). The point
+  estimate and SE are unaffected; the warning fires on every such
+  call so the user can decide whether to suppress, refit, or
+  proceed with caveat.
+* `vartype = "jackknife"` with `Nco > 1000` emits a fit-time warning
+  recommending `vartype = "bootstrap"` for tractability (full
+  leave-one-out scales linearly in N and is slow at the v2.4.2 EM
+  convergence defaults).
 * `complex_fe_ub` and `cfe_iter` C++ entries gain optional `fit_init`
   parameter (NULL default preserves pre-existing cold-start behavior).
   This mirrors the existing warm-start infrastructure on
