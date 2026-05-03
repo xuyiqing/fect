@@ -85,7 +85,7 @@ dgp_a8 <- function(seed) {
 
 ## ------------------------------------------------------------ shared call --
 
-fect_para <- function(df, para.error, nboots = 1000, parallel = TRUE, cores = 4) {
+fect_para <- function(df, para.error, nboots = 1000, parallel = TRUE, cores = 10) {
     suppressMessages(suppressWarnings(
         fect(Y ~ D, data = df, index = c("id", "time"),
              method = "fe", force = "two-way",
@@ -99,7 +99,7 @@ fect_para <- function(df, para.error, nboots = 1000, parallel = TRUE, cores = 4)
 ## ------------------------------------------------------------ T19 / T20 ---
 
 run_coverage_dgp <- function(label, dgp_fn, n_reps = 100, nboots = 1000,
-                              cores = 4, threshold = 0.91, upper = 0.99,
+                              cores = 10, threshold = 0.91, upper = 0.99,
                               true_att = 3.0) {
     ci_methods <- c("basic", "percentile", "bc", "bca", "normal")
     para_modes <- c("ar", "empirical", "wild")
@@ -156,7 +156,7 @@ run_coverage_dgp <- function(label, dgp_fn, n_reps = 100, nboots = 1000,
 
 ## ------------------------------------------------------------ T21 width --
 
-run_width_parity <- function(n_reps = 50, nboots = 500, cores = 4,
+run_width_parity <- function(n_reps = 50, nboots = 500, cores = 10,
                              ratio_lo = 0.70, ratio_hi = 1.30) {
     ci_methods <- c("basic", "percentile", "bc", "bca", "normal")
     modes      <- c("empirical", "wild")
