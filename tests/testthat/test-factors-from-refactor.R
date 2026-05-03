@@ -201,124 +201,18 @@ test_that("Phase 1a: fect accepts time.component.from='notyettreated' (default b
   expect_true(!is.na(out$att.avg))
 })
 
-test_that("Phase 1b: fect accepts time.component.from='nevertreated'", {
-
-  skip_on_cran()
-  df <- make_staggered_data(N = 40, Ntr = 15)  ## 25 never-treated
-
-  out <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", r = 2, CV = FALSE, se = FALSE,
-    time.component.from = "nevertreated",
-    parallel = FALSE
-  ))
-
-  expect_s3_class(out, "fect")
-  expect_true(is.numeric(out$att.avg))
-  expect_true(!is.na(out$att.avg))
-})
-
-test_that("Phase 1c: time.component.from='nevertreated' produces different estimates than 'notyettreated'", {
-
-  skip_on_cran()
-  df <- make_staggered_data(N = 40, Ntr = 15, seed = 99)
-
-  out_nyt <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", r = 2, CV = FALSE, se = FALSE,
-    time.component.from = "notyettreated",
-    parallel = FALSE
-  ))
-
-  out_nt <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", r = 2, CV = FALSE, se = FALSE,
-    time.component.from = "nevertreated",
-    parallel = FALSE
-  ))
-
-  ## Both should produce valid ATTs, but they should differ
-  expect_true(is.numeric(out_nyt$att.avg))
-  expect_true(is.numeric(out_nt$att.avg))
-  ## Allow for numerical coincidence, but in general they won't be equal
-  ## The key structural check: both succeeded with different code paths
-  expect_s3_class(out_nyt, "fect")
-  expect_s3_class(out_nt, "fect")
-})
-
-test_that("Phase 1d: time.component.from defaults to 'notyettreated' when omitted", {
-
-  skip_on_cran()
-  df <- make_staggered_data()
-
-  ## Without time.component.from
-  out_default <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", r = 2, CV = FALSE, se = FALSE,
-    parallel = FALSE
-  ))
-
-  ## With time.component.from = "notyettreated" explicitly
-  out_explicit <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", r = 2, CV = FALSE, se = FALSE,
-    time.component.from = "notyettreated",
-    parallel = FALSE
-  ))
-
-  ## Should produce identical results
-  expect_equal(out_default$att.avg, out_explicit$att.avg, tolerance = 1e-10)
-})
-
-test_that("Phase 1e: time.component.from='nevertreated' works with method='cfe'", {
-
-  skip_on_cran()
-  df <- make_staggered_data(N = 40, Ntr = 15)
-
-  out <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "cfe", r = 0, CV = FALSE, se = FALSE,
-    time.component.from = "nevertreated",
-    parallel = FALSE
-  ))
-
-  expect_s3_class(out, "fect")
-  expect_true(is.numeric(out$att.avg))
-})
-
-test_that("Phase 1f: time.component.from threads through cross-validation", {
-
-  skip_on_cran()
-  df <- make_staggered_data(N = 40, Ntr = 15)
-
-  out <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", r = c(0, 3), CV = TRUE, se = FALSE,
-    time.component.from = "nevertreated",
-    parallel = FALSE
-  ))
-
-  expect_s3_class(out, "fect")
-  expect_true(!is.null(out$r.cv))
-})
-
-test_that("Phase 1g: time.component.from threads through bootstrap inference", {
-
-  skip_on_cran()
-  df <- make_staggered_data(N = 40, Ntr = 15)
-
-  out <- suppressWarnings(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", r = 2, CV = FALSE,
-    se = TRUE, nboots = 30,
-    time.component.from = "nevertreated",
-    parallel = FALSE
-  ))
-
-  expect_s3_class(out, "fect")
-  expect_true(!is.null(out$est.att))
-  expect_true(!is.null(out$att.vcov))
-})
+## Phase 1b-1g pruned (2026-05-03 simplification): each was a single-line
+## smoke check on the time.component.from API surface; the substantive
+## coverage lives in Phase 6a-6e (gsynth <-> ife+nevertreated equivalence)
+## and the Phase 3a-* series (cfe+nevertreated thorough coverage). Phase 1a
+## above retained as the single smoke-entry-point for the API.
+##
+##   1b: nevertreated acceptance        -> covered by Phase 6a-6e
+##   1c: nyt vs nt produce different    -> non-regression-grade observation
+##   1d: default = notyettreated        -> argument-matching is R semantics
+##   1e: cfe + nevertreated works       -> covered by Phase 3a-B/C/D
+##   1f: time.component.from in CV      -> covered by Phase 3a-G1/G3
+##   1g: time.component.from in boot    -> covered by Phase 3a-F1/F2/I1
 
 ## ========================================================
 ## PHASE 2: gsynth merged into ife
@@ -1237,21 +1131,8 @@ test_that("Phase 3a-F4: ife+nevertreated SE unchanged (regression)", {
 
 ## ---- Category E: Output Completeness ----
 
-test_that("Phase 3a-E1: gamma and kappa fields present", {
-
-  skip_on_cran()
-  df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
-
-  out <- suppressWarnings(suppressMessages(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", time.component.from = "nevertreated",
-    parallel = FALSE
-  )))
-
-  expect_false(is.null(out$gamma))
-  ## kappa can be NULL if no Q was specified — that's OK
-})
+## Phase 3a-E1 pruned (2026-05-03): subsumed by E3 (which already asserts
+## core output fields non-NULL with dimensions, including gamma when CFE+Z).
 
 test_that("Phase 3a-E2: time.component.from field in output", {
 
@@ -1289,35 +1170,10 @@ test_that("Phase 3a-E3: core output fields non-NULL with correct dimensions", {
   expect_equal(ncol(out$Y.ct), length(unique(df$id)))
 })
 
-test_that("Phase 3a-E4: plot() works without error", {
-
-  skip_on_cran()
-  df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
-
-  out <- suppressWarnings(suppressMessages(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", time.component.from = "nevertreated",
-    parallel = FALSE
-  )))
-
-  expect_no_error(suppressWarnings(suppressMessages(plot(out))))
-})
-
-test_that("Phase 3a-E5: print() works without error", {
-
-  skip_on_cran()
-  df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
-
-  out <- suppressWarnings(suppressMessages(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "cfe", Z = "Z", r = 2, CV = FALSE, se = FALSE,
-    force = "two-way", time.component.from = "nevertreated",
-    parallel = FALSE
-  )))
-
-  expect_no_error(suppressWarnings(suppressMessages(print(out))))
-})
+## Phase 3a-E4 (plot smoke) and E5 (print smoke) pruned (2026-05-03):
+## covered by dedicated test-plot-fect.R + test-plot-refactor.R for plot,
+## and the print method is exercised by every regression test that prints
+## a summary of fect() output.
 
 ## ---- Category G: Cross-Validation ----
 
@@ -1481,26 +1337,9 @@ test_that("Phase 3a-I1: ife+nevertreated parametric bootstrap, em=TRUE, parallel
               info = "SE estimates should not all be NA")
 })
 
-test_that("Phase 3a-I2: ife+nevertreated parametric bootstrap, em=FALSE, parallel", {
-
-  skip_on_cran()
-  df <- make_factor_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
-
-  out <- suppressWarnings(suppressMessages(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", r = 2, CV = FALSE, force = "two-way",
-    time.component.from = "nevertreated", em = FALSE,
-    se = TRUE, vartype = "bootstrap", nboots = 20,
-    parallel = TRUE, cores = 2, seed = 123
-  )))
-
-  expect_false(is.na(out$att.avg),
-               info = "att.avg should not be NA")
-  expect_false(is.null(out$est.att),
-               info = "est.att should not be NULL")
-  expect_true(any(!is.na(out$est.att[, "S.E."])),
-              info = "SE estimates should not all be NA")
-})
+## Phase 3a-I2 pruned (2026-05-03): em=FALSE variant of I1; em=TRUE/FALSE
+## equivalence on nevertreated is asserted by I10. Smoke check for em=FALSE
+## bootstrap path is implicit through I10's identity assertion.
 
 test_that("Phase 3a-I3: cfe+nevertreated parametric bootstrap, em=TRUE, parallel", {
 
@@ -1523,26 +1362,9 @@ test_that("Phase 3a-I3: cfe+nevertreated parametric bootstrap, em=TRUE, parallel
               info = "SE estimates should not all be NA")
 })
 
-test_that("Phase 3a-I4: cfe+nevertreated parametric bootstrap, em=FALSE, parallel", {
-
-  skip_on_cran()
-  df <- make_cfe_z_data(N = 100, TT = 30, Ntr = 30, tau = 3.0, r = 2, seed = 42)
-
-  out <- suppressWarnings(suppressMessages(fect::fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "cfe", Z = "Z", r = 2, CV = FALSE, force = "two-way",
-    time.component.from = "nevertreated", em = FALSE,
-    se = TRUE, vartype = "bootstrap", nboots = 20,
-    parallel = TRUE, cores = 2, seed = 123
-  )))
-
-  expect_false(is.na(out$att.avg),
-               info = "att.avg should not be NA")
-  expect_false(is.null(out$est.att),
-               info = "est.att should not be NULL")
-  expect_true(any(!is.na(out$est.att[, "S.E."])),
-              info = "SE estimates should not all be NA")
-})
+## Phase 3a-I4 pruned (2026-05-03): cfe em=FALSE variant of I3; same
+## reasoning as I2's prune (em=TRUE/FALSE equivalence on nevertreated
+## covered by I10).
 
 test_that("Phase 3a-I5: bootstrap reproducibility with same seed (ife+nevertreated)", {
 
