@@ -164,55 +164,65 @@ The classic literature gives different recommendations by ci.method, driven by w
 
 The fect default `nboots = 1000` (raised from 200 in v2.4.2) is calibrated for percentile-class reliability. For BCa CIs reported as the primary inferential output of a paper, `nboots = 2000` is the canonical recommendation.
 
-## Empirical coverage on a clean DGP
+## Empirical coverage
 
-We ran a 100-rep simulation on a balanced 40-unit / 20-period TWFE panel with 12 treated units (units 1:12, fixed across replications per the conditional-variance argument above), $T_0 = 12$, true $\mathrm{ATT} = 3.0$. Each rep fit `fect()` once per (vartype, para.error) combination and computed `estimand("att", "overall", window = c(1, 8), ci.method = m)` for each ci.method. Coverage = fraction of 100 CIs containing the true $\mathrm{ATT} = 3.0$.
+The minimal coverage suite (`tests/coverage-study/run_minimal_coverage.R`) exercises the v2.4.2 inference paths on three scenarios at canonical settings, with $K = 200$ replications and outer-loop parallelism over reps:
 
-Two DGPs:
+- **A. Factor model, IID errors, parametric inference.**  Replicates the gsynth-note Xu-2017 setup [`code/sims/coverage/simulate-xu-iid-rfit2.R`]: $N_{tr} = 5$, $N_{co} = 50$, $T = 30$, $T_0 = 20$, $r = 2$ latent factors, no covariates; loadings $\lambda_i \sim U(-\sqrt{3}, \sqrt{3})$, factors $F_t \sim N(0, 1)$, unit FE $\alpha_i \sim U(-\sqrt{3}, \sqrt{3})$, time FE $\xi_t \sim N(0, 1)$, grand mean $\mu = 5$; $\lambda$, $F$, $\alpha$, $\xi$ redrawn each rep.  Treatment effect $\mathrm{ATT}_t = t$ for $t = 1, \dots, 10$ plus $N(0, 1)$ per (unit, post-period).  Errors $\varepsilon \sim N(0, 1)$ IID.  Estimator `method = "ife", r = 2, force = "two-way", time.component.from = "nevertreated", CV = FALSE`.  Inference `vartype = "parametric"`, `para.error = "auto"` (resolves to `"empirical"` on this fully-observed panel).
+- **B. Factor model, AR(1) $\rho = 0.8$ errors, parametric inference.**  Same DGP and estimator as A, but errors are stationary AR(1) with $\rho = 0.8$ and marginal variance 1.  `para.error = "auto"` resolves to `"ar"`.
+- **C. Large-N additive TWFE, AR(1) $\rho = 0.5$.**  $r = 0$ (no factors); $N_{tr} = 20$, $N_{co} = 80$, $T = 30$, $T_0 = 20$; $\alpha_i \sim U(-\sqrt{3}, \sqrt{3})$, $\xi_t \sim N(0, 1)$, $\mu = 5$; constant $\mathrm{ATT} = 3$.  Estimator `method = "fe", force = "two-way", time.component.from = "notyettreated"`.  Two cells: **C1** uses `vartype = "bootstrap"` (cluster bootstrap, 5 ci.methods); **C2** uses `vartype = "jackknife"` with `ci.method = "normal"` only [@efron_tibshirani1993 §11; jackknife produces an SE estimate, not a sampling distribution, so reflection / bias-correction methods lack a defined input].
 
-- **DGP-A (IID Gaussian):** $\varepsilon \sim N(0, 1)$. Tests calibration when residuals are independent.
-- **DGP-A8 (AR(1) $\rho = 0.8$):** stationary AR(1) noise with autocorrelation 0.8. Tests calibration under serial correlation, which is the regime gsynth-note documents as adversarial for cross-validation and bootstrap procedures.
+Coverage target for A and B is the **realized** average treated-post effect within each rep (heterogeneous treatment effect convention, matches gsynth-note); for C, the population $\mathrm{ATT} = 3$.
 
-```{r inference-coverage, eval = FALSE}
-## Coverage simulation script:
-## tests/coverage-study/run_para_error_coverage.R
-##
-## Output saved to /tmp/fect-coverage-study/coverage_para_error_<timestamp>.csv
-## See README in that directory for the full trigger list and acceptance criteria.
-```
+### Coverage at $K = 200$, $\mathrm{nboots} = 200$
 
-### DGP-A (IID Gaussian) coverage --- 100 reps, nboots = 1000
-
-| vartype | para.error | basic | percentile | bc | bca | normal |
+| scenario | ci.method | coverage | MC SE | mean CI width | mean SE | empirical SD |
 |---|---|---:|---:|---:|---:|---:|
-| `"bootstrap"` | --- | 0.92 | 0.91 | 0.91 | 0.92 | 0.91 |
-| `"parametric"` | `"ar"` | 0.91 | 0.91 | 0.91 | 0.91 | 0.91 |
-| `"parametric"` | `"empirical"` | 0.90 | 0.90 | 0.90 | 0.90 | 0.91 |
-| `"parametric"` | `"wild"` | 0.91 | 0.91 | 0.90 | 0.91 | 0.91 |
+| A | basic      | 0.960 | 0.014 | 0.780 | 0.204 | 0.194 |
+| A | percentile | 0.935 | 0.017 | 0.780 | 0.204 | 0.194 |
+| A | bc         | 0.935 | 0.017 | 0.786 | 0.204 | 0.194 |
+| A | bca        | 0.940 | 0.017 | 0.786 | 0.204 | 0.194 |
+| A | normal     | 0.960 | 0.014 | 0.800 | 0.204 | 0.194 |
+| B | basic      | 0.950 | 0.015 | 1.690 | 0.440 | 0.422 |
+| B | percentile | 0.960 | 0.014 | 1.690 | 0.440 | 0.422 |
+| B | bc         | 0.960 | 0.014 | 1.694 | 0.440 | 0.422 |
+| B | bca        | 0.960 | 0.014 | 1.694 | 0.440 | 0.422 |
+| B | normal     | 0.960 | 0.014 | 1.724 | 0.440 | 0.422 |
+| C1 | basic      | 0.935 | 0.017 | 0.571 | 0.149 | 0.147 |
+| C1 | percentile | 0.925 | 0.019 | 0.571 | 0.149 | 0.147 |
+| C1 | bc         | 0.920 | 0.019 | 0.568 | 0.149 | 0.147 |
+| C1 | bca        | 0.920 | 0.019 | 0.568 | 0.149 | 0.147 |
+| C1 | normal     | 0.945 | 0.016 | 0.583 | 0.149 | 0.147 |
+| C2 | normal     | 0.930 | 0.018 | 0.605 | 0.154 | 0.147 |
 
-Mean CI width 0.629 across all parametric cells; bootstrap widths are within 1 % of parametric on this clean DGP. Coverage cells at 0.90 are within 1 MC-SE (≈ 0.022 at n_reps = 100) of the 0.91 strict threshold and are substantively at nominal coverage.
+Total wall time: 1.4 min on 16 cores.  Calibration ratios (mean SE / empirical SD) by scenario: A = 1.05, B = 1.04, C1 = 1.01, C2 = 1.05 --- the bootstrap and jackknife SE estimates match the empirical sampling SD across reps to within 5 %, consistent with well-calibrated inference on top of well-specified estimators.
 
-### DGP-A8 (AR(1) $\rho = 0.8$) coverage --- 100 reps, nboots = 1000
+A, B, and C2 are at nominal coverage across all reported cells.  In **C1**, the tail-CI methods `basic`, `percentile`, `bc`, `bca` come in at 0.92-0.935 --- below the symmetric 0.95 target.  This is exactly the under-replication regime that the `.check_tail_ci_replicates` warning flags: at $B = 200$ the relevant order statistics of the bootstrap distribution (5th / 195th for 95 % `basic` and `percentile`; bias-corrected analogues for `bc` and `bca`) are unstable in expectation [@efron1987; @diciccio_efron1996 §4 recommend $B \geq 1000$].  The `normal` ci.method, which depends only on the bootstrap **standard deviation** (not on tail quantiles), is unaffected and lands at 0.945.
 
-| vartype | para.error | basic | percentile | bc | bca | normal |
-|---|---|---:|---:|---:|---:|---:|
-| `"parametric"` | `"ar"` | 0.97 | 0.96 | 0.96 | 0.96 | 0.97 |
-| `"parametric"` | `"empirical"` | 0.96 | 0.96 | 0.96 | 0.96 | 0.97 |
-| `"parametric"` | `"wild"` | 0.97 | 0.96 | 0.96 | 0.96 | 0.97 |
+### C1 rerun at $\mathrm{nboots} = 1000$
 
-Mean CI width 2.03 (≈ 3.2 × the IID width, reflecting AR-induced uncertainty). Coverage 0.96-0.97 is at or slightly above nominal --- expected behavior of the parametric path on serially correlated data, where the AR-vcov / empirical-residual / wild-Rademacher draws all correctly inflate CIs to absorb the serial-correlation contribution.
+| scenario | ci.method | coverage | MC SE | mean CI width | mean SE |
+|---|---|---:|---:|---:|---:|
+| C1 | basic      | 0.945 | 0.016 | 0.580 | 0.149 |
+| C1 | percentile | 0.945 | 0.016 | 0.580 | 0.149 |
+| C1 | bc         | 0.940 | 0.017 | 0.580 | 0.149 |
+| C1 | bca        | 0.940 | 0.017 | 0.580 | 0.149 |
+| C1 | normal     | 0.940 | 0.017 | 0.583 | 0.149 |
 
-### Width parity across `para.error` modes
+Wall: 2.66 min.  All five ci.methods now within MC noise of nominal 0.95.  This is the operating point the literature recommends for tail-quantile-based CIs.
 
-A separate 50-rep simulation on DGP-A confirms that mean CI widths from `para.error = "wild"` are within 30 % of `para.error = "empirical"` widths across all five ci.methods (ratios 1.02–1.03). The three `para.error` modes produce nearly identical CI widths on a fully-observed panel, with `"ar"` ≈ `"empirical"` ≈ `"wild"` to within 1 %.
+The companion script `run_minimal_coverage_tail_rerun.R` automates exactly this rerun: it parses the K=200 / nboots=200 summary CSV, identifies any (scenario, tail-CI method) cell with coverage below 0.93, and re-runs only those scenarios at nboots=1000.  In production code, follow the v2.4.2 default of `nboots = 200` for `att` (which uses `normal` by default), and explicitly bump to `nboots = 1000` (or `2000` for publication-grade BCa) when calling `estimand()` with a tail-CI method.
 
-**Two patterns are worth noting:**
+### Patterns to note
 
-1. **Case bootstrap and parametric give essentially the same coverage on the IID DGP** (0.91 across all 15 cells). All five ci.methods give nearly identical CI widths, confirming the bootstrap distribution is close to symmetric. The 4-percentage-point gap to nominal 95 % is at the lower end of what's expected from a 100-rep MC simulation; it shrinks faster in `n_reps` than in `nboots`.
+1. **Bootstrap and parametric give nominal coverage on factor-model DGPs.**  At gsynth-note's canonical scale ($N_{tr} = 5$, $N_{co} = 50$, $r = 2$, factor structure absorbs systematic variation), both the IID (A) and AR(1) $\rho = 0.8$ (B) scenarios cover at 0.94-0.96 across all 5 ci.methods.  Coverage is slightly higher under AR(1) than IID, by design --- the AR-vcov draw integrates over serial-correlation noise correctly so CIs widen in lockstep.
+2. **Cluster bootstrap on additive-TWFE serial-correlated data is well-calibrated at sufficient B.**  C1 at nboots=1000 reaches 0.94-0.945 across the tail-CI cells and 0.94 on `normal`; the cluster bootstrap correctly captures $\mathrm{Var}_D$ at $N_{tr} = 20$.
+3. **Jackknife at $N = 100$ recovers nominal Wald-CI coverage.**  C2 at 0.93 is within 1.4 MC SE of 0.95.  At the larger sample size used here, the Tukey-pseudo-value SE estimate is well-approximated.
+4. **Calibration ratios $\approx 1$ across all scenarios.**  The bootstrap / jackknife SE estimate matches the empirical sampling SD to within 5 % in every cell --- the procedures are correctly calibrating *variance*; any coverage slack is finite-sample and resolves at higher $K$ or higher $B$.
 
-2. **Parametric on AR(1) data slightly over-covers (0.96-0.97)** rather than under-covering --- the AR-vcov / empirical / wild draws integrate over the serial-correlation noise correctly, and at $\rho = 0.8$ the CIs are wide enough to absorb the marginal distribution of the ATT estimator. Under-coverage on AR(1) data was a pre-redesign concern (the standalone `vartype = "wild"` shipped in an early v2.4.2 build under-covered by 17–24 percentage points before being rebuilt as a `para.error` sub-option of the parametric path); the redesign at the b9881ed commit eliminated that issue.
+### Older characterization on DGP-A
 
-The literature's recommendation of `nboots ≥ 1000` for percentile-class methods does not bite on this DGP because the bootstrap distribution is approximately Gaussian (a near-symmetric, light-tailed estimand under additive Gaussian noise), so even `nboots = 200` quantiles are stable. The recommendation matters more for `aptt` and `log.att` (ratio and log estimands have heavier tails and tighter sensitivity to the precise tail quantile), and for small `Ntr` or non-Gaussian noise.
+The deep-dive `run_para_error_coverage.R` (T19 / T20 / T21) characterizes the parametric `para.error` dispatch on a small additive-TWFE panel ($N_{tr} = 12$, $N_{co} = 28$, $T = 20$, $T_0 = 12$).  At this scale the parametric pseudo-treated bootstrap targets the conditional variance $V_t$ alone and misses the finite-sample bias variance $\mathrm{Var}_{(\Lambda, F)}[b_t]$ (no factor structure to absorb it).  Empirically: bootstrap SE / empirical SD $\approx 0.91$, yielding $\sim 0.91$ coverage analytically.  T19's strict threshold is 0.90 (not 0.95) for this reason; T20 (AR(1) $\rho = 0.8$) inflates variance and lands at 0.96-0.97.  See the README in `tests/coverage-study/` for the full discussion.
 
 ## Decision tree
 
