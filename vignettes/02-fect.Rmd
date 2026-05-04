@@ -73,52 +73,9 @@ In the gap plot, pre-treatment estimates appear in gray (in-sample) while post-t
 
 ### Inference
 
-The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
+The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. Switch to `vartype = "jackknife"` (leave-one-unit-out) when the number of treated units is small (single digits). The number of bootstrap runs is set by `nboots` and the clustering variable by `cl` (default `"id"`).
 
-::: {.callout-tip appearance="simple"}
-### Inference parameters
-
-The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `para.error` (sub-option of `"parametric"` controlling the residual-error model), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These parameters do not affect point estimates.
-:::
-
-::: {.callout-note appearance="simple"}
-**Variance methods at a glance.** Three `vartype` values are supported. They differ in *what* gets randomized per replicate, *how* the unit composition is preserved, and *what* the relative computational cost is (in multiples of one model refit on the full data). Each replicate refits the model end-to-end; `cost` below is the multiple of `nboots` refits incurred relative to `bootstrap`.
-
-| `vartype` | Per-replicate randomization | Unit composition | Cost vs `bootstrap` | Notes |
-|-----------|-----------------------------|------------------|---------------------|-------|
-| `"bootstrap"` (default) | Resample units with replacement (case bootstrap) | Resampled (units may drop in / out) | 1x | Fully nonparametric; clusters at unit level by default; respects `cl` |
-| `"jackknife"` | Leave-one-unit-out (deterministic) | One unit removed each replicate | `N / nboots`x of refits (overrides `nboots`) | Best when `N` treated is small; ignores `nboots` |
-| `"parametric"` | Draw model errors and re-impute (residual model controlled by `para.error`) | Pseudo-treated drawn from never-treated pool | ≈ 1x | Synth setting only; `time.component.from = "nevertreated"`, no reversal, not MC. See [Section @sec-parametric-regimes] |
-
-The default `"bootstrap"` is robust and the right starting point. Switch to `"jackknife"` when `N` treated is small (single digits). Switch to `"parametric"` only inside the gsynth-style regime where the assumptions in [Section @sec-parametric-regimes] hold.
-
-**`para.error` (sub-option of `"parametric"`).** Selects the residual-error model used to draw bootstrap replicates inside the parametric path. New in v2.4.2.
-
-| `para.error` | Residual draw | Panel shape | Notes |
-|--------------|---------------|-------------|-------|
-| `"auto"` (default) | Resolves at fit time | Any | `"empirical"` on a fully-observed panel, `"ar"` on a panel with missing cells. `fit$para.error` stores the resolved label |
-| `"ar"` | AR(1) process estimated from control residuals; correlated draws | Any | The v2.4.1 behavior; universal fallback |
-| `"empirical"` | i.i.d. resample from main-fit residual pool | Fully observed only | Hard-errors if any cell is missing |
-| `"wild"` | Unit-level Rademacher signs ±1 over the empirical residual pool (Liu 1988; Mammen 1993; Cameron-Gelbach-Miller 2008) | Fully observed only | Preserves marginal residual distribution + within-unit dependence; hard-errors if any cell is missing |
-
-`para.error` is silently ignored when `vartype != "parametric"`.
-:::
-
-::: {.callout-note appearance="simple"}
-**Confidence intervals.** Variance methods generate the bootstrap distribution; `ci.method` (a `estimand()` argument, not `fect()`) decides how that distribution becomes a confidence interval. Five values are supported. None of these add per-replicate cost --- they are post-hoc operations on the already-stored `eff.boot` surface (`bca` adds a cheap cell-level jackknife with no extra refits).
-
-| `ci.method` | Formula | Extra cost | When to prefer |
-|-------------|---------|------------|----------------|
-| `"normal"` | `θ̂ ± z · SE` (Wald) | 0x refits | Symmetric distributions; matches `fit$est.att` |
-| `"basic"` | `(2θ̂ − q_{1−α/2}, 2θ̂ − q_{α/2})` | 0x refits | Reflected percentile; theoretical default |
-| `"percentile"` | `(q_{α/2}, q_{1−α/2})` | 0x refits | Mildly skewed; matches `att.cumu()` |
-| `"bc"` | Bias-corrected percentile (Efron 1987 minus acceleration); cutoffs shifted by `2 z₀` | 0x refits | Skewed distributions where the bootstrap median is biased |
-| `"bca"` (new in v2.4.2) | Bias-corrected accelerated (Efron 1987 in full); adds an acceleration parameter via cell-level jackknife | 0x refits (cell-level jackknife is closed-form arithmetic) | Skewed *and* heavy-tailed; degrades gracefully when `bc` collapses (e.g. point estimate above all bootstrap replicates) |
-
-`ci.method` defaults to `NULL` in `estimand()`, which triggers a per-type default: `att` → `"normal"`, `att.cumu` → `"percentile"`, `aptt` → `"bca"`, `log.att` → `"bca"`. Pass an explicit value to override.
-
-**For most users, the defaults above are what you want.** The deep-dive on bootstrap-distribution semantics, the (vartype × ci.method × `para.error`) interaction, parametric-bootstrap mechanics, and a coverage study is in [Chapter @sec-inference]; that chapter is most useful after [Chapter @sec-gsynth] introduces the regime where parametric bootstrap is the default.
-:::
+A third option, `vartype = "parametric"`, is intended for the synthetic-control regime where the number of treated units is small and the nonparametric bootstrap is unreliable; it has its own assumptions and gates. That setting and the deeper discussion of bootstrap-distribution semantics, confidence-interval methods (`ci.method` in `estimand()`), p-values, and an empirical coverage study live in [Chapter @sec-inference].
 
 ::: {.callout-note appearance="simple"}
 **Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
@@ -143,47 +100,6 @@ When `parallel = TRUE`, CV parallelism auto-engages only on panels above a metho
 -   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level. In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset. This can be particularly useful when the number of treated units is small.
 -   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option.
 :::
-
-### Parametric bootstrap: valid regimes {#sec-parametric-regimes}
-
-The parametric bootstrap (`vartype = "parametric"`) uses a two-stage pseudo-treated resampling procedure to produce uncertainty estimates. It is well-suited for the synthetic control setting, where the number of treated units is small and nonparametric bootstrap is unreliable. However, the procedure rests on two key assumptions: (a) the time components (factors and loadings) are estimated from a **never-treated** control pool that is independent of the treated units' data, and (b) the model residuals on control units accurately reflect the true error distribution. When either assumption is violated, the parametric bootstrap underestimates standard errors and produces confidence intervals that are too narrow.
-
-To prevent users from invoking the parametric bootstrap in settings where these assumptions fail, the package enforces three hard restrictions:
-
-::: {.callout-important appearance="simple"}
-### Three-gate system
-
-| Gate | Condition | What it blocks |
-|---|---|---|
-| A | `method %in% c("mc", "both")` + `vartype = "parametric"` | MC + parametric |
-| B | treatment reversal present + `vartype = "parametric"` | reversal + parametric |
-| C | `time.component.from = "notyettreated"` + `vartype = "parametric"` | notyettreated + parametric |
-
-In all three cases the package raises an informative error pointing to the valid alternatives.
-:::
-
-The motivation for Gate C comes from both theory and evidence. The `notyettreated` path uses EM imputation to estimate factors jointly across all not-yet-treated observations, including the treated units' pre-period data. EM enlarges the effective factor space by imputing masked treated-post cells, which deflates the observed-cell residuals that the parametric bootstrap feeds into its covariance estimator. In a Monte Carlo study (N = 50, T = 20, r = 2 factors, 500 replications), the blocked `ife + notyettreated + parametric` combination produced **80.6% coverage at nominal 95%** (SE ratio ≈ 0.67). In contrast, all tested nevertreated paths produced near-nominal coverage (0.93–0.96, SE ratio ≈ 1.0). The architectural details of all three gates are documented in `ARCHITECTURE.md`.
-
-If your current code uses `vartype = "parametric"` with the default `time.component.from = "notyettreated"`, migrate as follows:
-
-```r
-# Before (now raises an error under Gate C):
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
-     method = "ife", se = TRUE, vartype = "parametric")
-
-# After — option 1: switch to nevertreated imputation
-# (requires that never-treated control units exist in the data)
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
-     method = "ife", time.component.from = "nevertreated",
-     se = TRUE, vartype = "parametric")
-
-# After — option 2: use nonparametric bootstrap (safe default)
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
-     method = "ife",
-     se = TRUE, vartype = "bootstrap")
-```
-
-Option 1 switches to the gsynth-style estimation regime and keeps parametric bootstrap. This is appropriate when never-treated control units exist and the treatment does not reverse. Option 2 leaves the estimator unchanged and uses cluster-bootstrap, which is appropriate when the number of treated units is moderate to large. See [Chapter @sec-gsynth] for guidance.
 
 ```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),

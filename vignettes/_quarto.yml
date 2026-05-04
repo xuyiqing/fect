@@ -8,35 +8,26 @@ book:
     background: light
   chapters:
     - index.qmd
-    - part: "Basics"
-      chapters:
-        - 01-start.Rmd
-        - 02-fect.Rmd
-        - 03-estimands.Rmd
-    - part: "Advanced estimators and inference"
-      chapters:
-        - 04-ife-mc.Rmd
-        - 05-cfe.Rmd
-        - 06-gsynth.Rmd
-        - 07-inference.Rmd
-    - part: "Diagnostics and extensions"
-      chapters:
-        - 08-hte.Rmd
-        - 09-panel.Rmd
-        - 10-sens.Rmd
-    - part: "Reference"
-      chapters:
-        - 11-plots.Rmd
-        - aa-cheatsheet.Rmd
-        - bb-updates.Rmd
-        - cc-references.qmd
+    - 01-start.Rmd
+    - 02-fect.Rmd
+    - 03-estimands.Rmd
+    - 04-ife-mc.Rmd
+    - 05-cfe.Rmd
+    - 06-gsynth.Rmd
+    - 07-inference.Rmd
+    - 08-hte.Rmd
+    - 09-panel.Rmd
+    - 10-sens.Rmd
+    - 11-plots.Rmd
+    - aa-cheatsheet.Rmd
+    - bb-updates.Rmd
+    - cc-references.qmd
 
 bibliography: references.bib
 
-nocite: |
-  @*
-
 suppress-bibliography: true
+link-citations: true
+link-bibliography: true
 
 format:
   html:
@@ -44,6 +35,9 @@ format:
     code-fold: false
     code-tools: true
     code-link: true
+    link-citations: true
+    link-bibliography: true
+    citations-hover: true
     toc-depth: 3
     # Default rendered figure dimensions for HTML output. Tuned so that the
     # PNG width at retina dpi is close to the cosmo theme's content-column

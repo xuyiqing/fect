@@ -125,11 +125,11 @@ esplot(log_att, Period = "event.time",
        ylab = "Mean log(Y) − log(Y0)")
 ```
 
-## Placebo and carryover tests
+## Placebo tests
 
-Issue #131 asked for placebo and carryover versions of every alternative estimand, not just the default `att.placebo` / `att.carryover` scalars. Starting in v2.4.2 the dispatcher takes `test = c("none", "placebo", "carryover")`. The placebo path requires a fit produced with `placeboTest = TRUE` (and a placebo period); the carryover path requires `carryoverTest = TRUE` plus a panel with treatment reversals.
+Issue #131 asked for placebo and carryover versions of every alternative estimand, not just the default `att.placebo` / `att.carryover` scalars. Starting in v2.4.2 the dispatcher takes `test = c("none", "placebo", "carryover")`. The placebo path requires a fit produced with `placeboTest = TRUE` (and a placebo period).
 
-```{r setup-placebo-carryover, eval = TRUE, message = FALSE, results = 'hide'}
+```{r setup-placebo, eval = TRUE, message = FALSE, results = 'hide'}
 ## Re-fit on the same DGP with placeboTest = TRUE so that the dispatcher
 ## can recompute APTT / log-ATT at the placebo cells.
 fit_placebo <- fect(Y ~ D, data = df, index = c("id", "time"),
@@ -137,24 +137,6 @@ fit_placebo <- fect(Y ~ D, data = df, index = c("id", "time"),
                     se = TRUE, nboots = 200, parallel = FALSE,
                     keep.sims = TRUE,
                     placeboTest = TRUE, placebo.period = c(-2, 0))
-
-## Build a panel with treatment reversals for the carryover demo.
-set.seed(2)
-df_rev <- df
-treat_end <- pmin(treat_start[df_rev$id] + sample(5:10, N, replace = TRUE),
-                  TT + 1L)
-df_rev$D <- ifelse(is.na(treat_start[df_rev$id]) |
-                   df_rev$time < treat_start[df_rev$id] |
-                   df_rev$time >= treat_end[df_rev$id],
-                   0, 1)
-df_rev$Y <- exp(2.0 + 0.05 * df_rev$time + 0.3 * df_rev$D +
-                rnorm(nrow(df_rev), sd = 0.1))
-
-fit_carry <- fect(Y ~ D, data = df_rev, index = c("id", "time"),
-                  method = "fe", force = "two-way",
-                  se = TRUE, nboots = 200, parallel = FALSE,
-                  keep.sims = TRUE,
-                  carryoverTest = TRUE, carryover.period = c(1, 2))
 ```
 
 The placebo APTT series should be statistically indistinguishable from zero across the placebo window if the parallel-counterfactual assumption holds; non-zero placebo estimates are evidence against identification.
@@ -181,7 +163,37 @@ esplot(log_att_placebo, Period = "event.time",
        ylab = "Mean log(Y) − log(Y0)")
 ```
 
-The carryover series uses cells in `fit$carryover.period` --- the early post-reversal window where the assumption that the treatment effect dissipates immediately would imply zero estimates. Non-zero carryover estimates suggest the effect persists past treatment removal.
+## Carryover tests
+
+The carryover path requires `carryoverTest = TRUE` plus a panel with treatment reversals. The carryover series uses cells in `fit$carryover.period` --- the early post-reversal window where the assumption that the treatment effect dissipates immediately would imply zero estimates. Non-zero carryover estimates suggest the effect persists past treatment removal. We first build a panel with treatment reversals (each treated unit's spell ends after a uniformly-drawn 5-10 periods) and visualize the resulting on/off pattern with `panelview()` so the structure is concrete:
+
+```{r setup-carryover, eval = TRUE, message = FALSE, results = 'hide'}
+## Build a panel with treatment reversals for the carryover demo.
+set.seed(2)
+df_rev <- df
+treat_end <- pmin(treat_start[df_rev$id] + sample(5:10, N, replace = TRUE),
+                  TT + 1L)
+df_rev$D <- ifelse(is.na(treat_start[df_rev$id]) |
+                   df_rev$time < treat_start[df_rev$id] |
+                   df_rev$time >= treat_end[df_rev$id],
+                   0, 1)
+df_rev$Y <- exp(2.0 + 0.05 * df_rev$time + 0.3 * df_rev$D +
+                rnorm(nrow(df_rev), sd = 0.1))
+```
+
+```{r panelview-carryover, eval = TRUE, fig.width = 7, fig.height = 4.5}
+panelView::panelview(Y ~ D, data = df_rev, index = c("id", "time"),
+                     by.timing = TRUE, axis.lab = "time",
+                     main = "Treatment-reversal panel for carryover demo")
+```
+
+```{r fit-carryover, eval = TRUE, message = FALSE, results = 'hide'}
+fit_carry <- fect(Y ~ D, data = df_rev, index = c("id", "time"),
+                  method = "fe", force = "two-way",
+                  se = TRUE, nboots = 200, parallel = FALSE,
+                  keep.sims = TRUE,
+                  carryoverTest = TRUE, carryover.period = c(1, 2))
+```
 
 ```{r plot-aptt-carryover, eval = TRUE, fig.width = 6, fig.height = 4.5}
 aptt_carry <- estimand(fit_carry, "aptt", "event.time",

@@ -20,7 +20,7 @@
   - `"normal"` --- Wald CI `θ̂ ± z · SE`
 * `ci.method` now defaults to `NULL`, which triggers a per-type default:
   - `"att"` → `"normal"`
-  - `"att.cumu"` → `"percentile"`
+  - `"att.cumu"` → `"basic"` (reflected pivot CI; matches Davison-Hinkley 1997 §5.2.1 and `boot::boot.ci(type = "basic")`)
   - `"aptt"` → `"bca"`
   - `"log.att"` → `"bca"`
   Existing scripts that pass `ci.method` explicitly are unaffected.

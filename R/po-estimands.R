@@ -635,7 +635,7 @@ estimand <- function(fit,
     if (is.null(ci.method)) {
         ci.method <- switch(type,
             "att"      = "normal",      ## matches what fit$est.att uses (Wald: theta +- z*SE)
-            "att.cumu" = "percentile",  ## matches att.cumu() internals
+            "att.cumu" = "basic",       ## reflected pivot CI (Davison-Hinkley 1997 §5.2.1; boot::boot.ci(type = "basic"))
             "aptt"     = "bca",         ## ratio: bootstrap-bias + skew -> BCa (Efron 1987)
             "log.att"  = "bca"          ## log: same rationale
         )
@@ -690,26 +690,31 @@ estimand <- function(fit,
     ## can still explore on small B during iteration.
     .check_tail_ci_replicates(fit, ci.method, vartype)
 
-    if (type == "att") {
-        return(.estimand_att(fit, by, cells, weights, direction,
-                             vartype, conf.level, ci.method, test))
-    }
-    if (type == "att.cumu") {
-        return(.estimand_att_cumu(fit, by, cells, weights, direction,
-                                  vartype, conf.level, ci.method, window))
-    }
-    if (type == "aptt") {
-        return(.estimand_aptt(fit, by, cells, weights, direction,
-                              vartype, conf.level, ci.method, test))
-    }
-    if (type == "log.att") {
-        return(.estimand_log_att(fit, by, cells, weights, direction,
-                                 vartype, conf.level, ci.method, test))
+    result <- if (type == "att") {
+        .estimand_att(fit, by, cells, weights, direction,
+                      vartype, conf.level, ci.method, test)
+    } else if (type == "att.cumu") {
+        .estimand_att_cumu(fit, by, cells, weights, direction,
+                           vartype, conf.level, ci.method, window)
+    } else if (type == "aptt") {
+        .estimand_aptt(fit, by, cells, weights, direction,
+                       vartype, conf.level, ci.method, test)
+    } else if (type == "log.att") {
+        .estimand_log_att(fit, by, cells, weights, direction,
+                          vartype, conf.level, ci.method, test)
+    } else {
+        stop("type = \"", type, "\" is part of the v2.4.0 API surface but ",
+             "is not yet implemented at this commit. Stay tuned.",
+             call. = FALSE)
     }
 
-    stop("type = \"", type, "\" is part of the v2.4.0 API surface but ",
-         "is not yet implemented at this commit. Stay tuned.",
-         call. = FALSE)
+    ## Attach a hidden attribute so esplot() can recognize placebo/carryover
+    ## frames and adapt its visual defaults (e.g., uniform color across all
+    ## event-times since there's no pre-vs-post contrast in those modes).
+    if (!is.null(test) && test != "none") {
+        attr(result, "fect_test") <- test
+    }
+    result
 }
 
 
@@ -1791,7 +1796,20 @@ estimand <- function(fit,
         a_lo    <- stats::pnorm(2 * z0 + z_lo)
         a_hi    <- stats::pnorm(2 * z0 + z_hi)
         bc_qs   <- stats::quantile(boot, probs = c(a_lo, a_hi), na.rm = TRUE)
-        return(list(se = se, ci.lo = unname(bc_qs[1]), ci.hi = unname(bc_qs[2])))
+        ## Same robustness fallback as bca (see comment in the bca block):
+        ## when z0 hits the clamp the bc cutoffs collapse or shift off the
+        ## estimate. Normal CI is the safe replacement.
+        ci_lo_bc <- unname(bc_qs[1])
+        ci_hi_bc <- unname(bc_qs[2])
+        is_degenerate <- abs(ci_hi_bc - ci_lo_bc) < 1e-10
+        is_uncovered  <- (estimate < ci_lo_bc) || (estimate > ci_hi_bc)
+        if (is_degenerate || is_uncovered) {
+            z <- stats::qnorm(1 - alpha / 2)
+            return(list(se    = se,
+                        ci.lo = estimate - z * se,
+                        ci.hi = estimate + z * se))
+        }
+        return(list(se = se, ci.lo = ci_lo_bc, ci.hi = ci_hi_bc))
     }
     if (ci.method == "bca") {
         if (is.null(jack)) {
@@ -1802,8 +1820,21 @@ estimand <- function(fit,
         }
         valid <- !is.na(boot)
         jack_valid <- !is.na(jack)
-        if (sum(valid) == 0L || sum(jack_valid) < 2L) {
+        if (sum(valid) == 0L) {
             return(list(se = NA_real_, ci.lo = NA_real_, ci.hi = NA_real_))
+        }
+        ## Fall back to bc when the cell-level jackknife is degenerate
+        ## (e.g., only one treated cell contributing at this event time:
+        ## leave-one-out yields an empty vector; the .cell_jackknife()
+        ## helper returns rep(NA, n) at n < 2). bc only needs the
+        ## bootstrap distribution, so it stays well-defined wherever
+        ## sum(valid) > 0. This fallback fires on the staggered tails
+        ## of event-time series where event.time t is only reached by
+        ## a single treated unit; without it the user sees missing CI
+        ## bands on the plot at the extreme event-times.
+        if (sum(jack_valid) < 2L) {
+            return(.compute_ci(estimate, boot, "bc", conf.level,
+                               jack = NULL))
         }
         ## z0: bias correction
         p_below <- mean(boot[valid] < estimate)
@@ -1830,7 +1861,26 @@ estimand <- function(fit,
         a_lo  <- adjust(z_lo)
         a_hi  <- adjust(z_hi)
         bca_qs <- stats::quantile(boot, probs = c(a_lo, a_hi), na.rm = TRUE)
-        return(list(se = se, ci.lo = unname(bca_qs[1]), ci.hi = unname(bca_qs[2])))
+        ## Robustness fallback to normal CI when bca produces a pathological
+        ## interval: (a) both cutoffs collapse to the same bootstrap quantile
+        ## (degenerate; happens when z0 hits the clamp at +-qnorm(1e-6)),
+        ## or (b) the interval shifts entirely off the point estimate
+        ## (happens with heavily skewed bootstraps at small B). bca is
+        ## mathematically valid in both cases but the resulting visual is
+        ## misleading on per-event-time plots. Normal CI is centered at
+        ## estimate by construction so it always covers, and it uses the
+        ## already-computed bootstrap SE.
+        ci_lo_bca <- unname(bca_qs[1])
+        ci_hi_bca <- unname(bca_qs[2])
+        is_degenerate <- abs(ci_hi_bca - ci_lo_bca) < 1e-10
+        is_uncovered  <- (estimate < ci_lo_bca) || (estimate > ci_hi_bca)
+        if (is_degenerate || is_uncovered) {
+            z <- stats::qnorm(1 - alpha / 2)
+            return(list(se    = se,
+                        ci.lo = estimate - z * se,
+                        ci.hi = estimate + z * se))
+        }
+        return(list(se = se, ci.lo = ci_lo_bca, ci.hi = ci_hi_bca))
     }
     stop("Unknown ci.method = \"", ci.method, "\".", call. = FALSE)
 }
