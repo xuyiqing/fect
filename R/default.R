@@ -59,7 +59,7 @@ fect <- function(
     vartype = "bootstrap", # bootstrap or jackknife
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
-    ci.method = "normal", # CI method for fect's est.* slots: "normal" (Wald: theta_hat +- z * SE) or "basic" (reflected pivot, Davison-Hinkley 1997 §5.2.1). For percentile / bc / bca on alternative estimands (att.cumu, aptt, log.att), call estimand(fit, type, ci.method) post-fit
+    ci.method = "normal", # CI method for fect's est.* slots: "normal" (Wald: theta_hat +- z * SE) or "basic" (reflected pivot, Davison-Hinkley 1997 Sec. 5.2.1). For percentile / bc / bca on alternative estimands (att.cumu, aptt, log.att), call estimand(fit, type, ci.method) post-fit
     quantile.CI = NULL, # DEPRECATED: use ci.method instead. NULL sentinel = "not supplied"; legacy FALSE -> ci.method = "normal", legacy TRUE -> ci.method = "basic"
     nboots = 200, # number of bootstraps (sufficient for SE / normal CI; bump to 1000+ for tail-quantile CIs in estimand())
     alpha = 0.05, # significance level
@@ -821,7 +821,7 @@ fect.default <- function(
     ## then collapses around 2*theta_hat instead of theta_hat, giving 0%
     ## coverage.  vartype = "jackknife" leave-one-out values are not
     ## exchangeable draws from the sampling distribution either (E&T 1993
-    ## ch11; D&H 1997 §3.2.1).  estimand() applies a location-shift fix for
+    ## ch11; D&H 1997 Sec. 3.2.1).  estimand() applies a location-shift fix for
     ## parametric and a hard-error for jackknife on non-normal ci.methods;
     ## fect's built-in path does neither, so we hard-error here and point
     ## users to estimand().
@@ -851,7 +851,7 @@ fect.default <- function(
     ## Reject ci.method = "basic" on jackknife fits.  Jackknife pseudo-values
     ## are influence-function-flavored leave-one-out quantities, not exchangeable
     ## draws from the sampling distribution of theta-hat (E&T 1993 ch11; D&H
-    ## 1997 §3.2.1).  The reflected pivot interval has no defensible meaning
+    ## 1997 Sec. 3.2.1).  The reflected pivot interval has no defensible meaning
     ## here.  Matches estimand()'s behaviour --- estimand hard-errors on
     ## non-"normal" ci.methods for jackknife fits.
     if (ci.method == "basic" && !is.null(vartype) &&
@@ -888,15 +888,15 @@ fect.default <- function(
     .quantile.CI.bool <- (ci.method == "basic")
     ## Tail-CI replicate warning (mirrors estimand's .check_tail_ci_replicates):
     ## `basic` reads tail quantiles of the bootstrap distribution; the literature
-    ## floor for tail-quantile CIs is B >= 1000 (Efron 1987 §3; DiCiccio & Efron
-    ## 1996 §4). Warn at fit time so users don't need to refit.
+    ## floor for tail-quantile CIs is B >= 1000 (Efron 1987 Sec. 3; DiCiccio & Efron
+    ## 1996 Sec. 4). Warn at fit time so users don't need to refit.
     if (ci.method == "basic" && isTRUE(se) && !is.null(nboots) &&
         is.numeric(nboots) && nboots < 1000) {
         warning(
             "ci.method = \"basic\" reads tail quantiles of the bootstrap ",
             "distribution; with nboots = ", nboots, " (< 1000) the 5th / 195th ",
             "order statistics that the basic interval depends on may be ",
-            "unstable (Efron 1987 §3; DiCiccio & Efron 1996 §4 recommend ",
+            "unstable (Efron 1987 Sec. 3; DiCiccio & Efron 1996 Sec. 4 recommend ",
             "B >= 1000). Refit with `fect(..., nboots = 1000)` for ",
             "publication-grade CIs. The point estimate and SE are unaffected.",
             call. = FALSE
@@ -3149,7 +3149,7 @@ fect.default <- function(
             carryoverTest = carryoverTest,
             carryover.period = carryover.period,
             ## Stored on the fit object so plot logic does not need to
-            ## re-parse `x$call` — robust under do.call(), positional
+            ## re-parse `x$call` --- robust under do.call(), positional
             ## args, and call-rewriting wrappers.
             carryover.rm = carryover.rm,
             ## Reserved slot for the post-hoc estimand API (v2.4.0+).
@@ -3157,7 +3157,7 @@ fect.default <- function(
             ## GSC); future doubly-robust estimators will populate this
             ## with the per-cell debias correction so that
             ## eff = (Y_obs - Y0_hat) + eff_debias is the cell-level
-            ## score. See ref/po-estimands-contract.md §3.
+            ## score. See ref/po-estimands-contract.md Sec. 3.
             eff_debias = NULL,
             unit.type = unit.type,
             obs.missing = obs.missing,
