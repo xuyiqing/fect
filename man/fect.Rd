@@ -16,7 +16,8 @@ assumptions.}
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap",
             para.error = "auto", cl = NULL,
-            quantile.CI = FALSE, nboots = 200, alpha = 0.05,
+            ci.method = "normal", quantile.CI = NULL,
+            nboots = 200, alpha = 0.05,
             parallel = TRUE, cores = NULL, tol = 1e-5,
             max.iteration = 5000, seed = NULL,
             min.T0 = NULL, max.missing = NULL,
@@ -104,7 +105,21 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   observed panel); \code{"wild"} applies unit-level Rademacher sign-flips
   over the empirical residual pool (requires fully-observed panel).}
 \item{cl}{a string specifying the cluster for cluster bootstrapping.}
-\item{quantile.CI}{a logical flag indicating whether to use quantile confidence intervals when bootstrapping.}
+\item{ci.method}{a string controlling how the bootstrap distribution
+becomes the CIs reported in fect's \code{est.*} slots. Two values:
+\code{"normal"} (default; Wald CI: \eqn{\hat\theta \pm z \cdot SE}) or
+\code{"basic"} (reflected pivot:
+\eqn{[2\hat\theta - q_{1-\alpha/2},\, 2\hat\theta - q_{\alpha/2}]}, the
+literature-standard "percentile" CI per Davison & Hinkley (1997, §5.2.1)
+and what \code{boot::boot.ci(type = "basic")} returns). For
+\code{"percentile"}, \code{"bc"}, or \code{"bca"} CIs (typically wanted
+on alternative estimands like \code{aptt} and \code{log.att}), call
+\code{\link{estimand}} after fitting.}
+
+\item{quantile.CI}{deprecated as of v2.4.2. Use \code{ci.method} instead.
+\code{quantile.CI = FALSE} maps to \code{ci.method = "normal"};
+\code{quantile.CI = TRUE} maps to \code{ci.method = "basic"}. Both
+mappings still work but emit a one-time deprecation warning.}
 \item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}. Default \code{200}, sufficient for the standard error and the normal-CI structure that \code{fect} ships in \code{est.att}/\code{att.avg}. For tail-quantile-based CI methods accessed via \code{estimand()} (\code{ci.method} \code{"basic"}, \code{"percentile"}, \code{"bc"}, \code{"bca"}), bump to \code{nboots = 1000} or higher (Efron 1987 Section 3; DiCiccio & Efron 1996 Section 4); \code{estimand()} emits a warning when called on under-replicated fits.}
 \item{alpha}{the significance level for hypothesis tests and confidence intervals. Default \code{0.05}.}
 \item{parallel}{controls which operations run in parallel. Accepted values:

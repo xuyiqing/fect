@@ -6,12 +6,20 @@
 
 * New `test = c("none", "placebo", "carryover")` argument on `estimand()`
   closes issue #131. See [Chapter @sec-estimands].
-* New `ci.method` values `"bc"`, `"bca"`, `"normal"`; per-type defaults
-  updated. `att.cumu` default is `"basic"` (the reflected pivot CI
-  recommended by Davison-Hinkley 1997 §5.2.1 and used by
-  `boot::boot.ci(type = "basic")`); the raw-quantile `"percentile"`
-  option is preserved for replication. See
-  [Chapter @sec-estimands] and [Chapter @sec-inference].
+* New `ci.method = c("normal", "basic")` argument on `fect()`. Default
+  `"normal"` is byte-equivalent to the v2.4.1 default. `"basic"` is the
+  reflected pivot CI (Davison-Hinkley 1997 §5.2.1; `boot::boot.ci(type = "basic")`).
+  All CIs in fect's `est.*` slots use the requested method uniformly.
+  Legacy `quantile.CI` is soft-deprecated --- both legacy values still
+  work (mapped to `ci.method` with a one-time warning). See
+  [Chapter @sec-inference].
+* New `ci.method` values `"bc"`, `"bca"`, `"normal"` on `estimand()`;
+  per-type defaults updated. `att.cumu` default is `"basic"` (the
+  reflected pivot CI recommended by Davison-Hinkley 1997 §5.2.1 and used
+  by `boot::boot.ci(type = "basic")`); the raw-quantile `"percentile"`
+  option is preserved for replication. The full 5-method surface lives
+  on `estimand()`; fect's built-in CI machinery covers normal / basic
+  only. See [Chapter @sec-estimands] and [Chapter @sec-inference].
 * New `para.error` argument for `vartype = "parametric"` selects the
   residual-error model: `"auto"`, `"ar"`, `"empirical"`, `"wild"`. See
   [Chapter @sec-inference].

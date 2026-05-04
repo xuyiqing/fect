@@ -26,6 +26,39 @@ basic_ci_alpha <- function(theta, boots, alpha) {
   ci_mat
 }
 
+## Reflected pivot CI on a (possibly H0-centered) bootstrap distribution.
+## Mirrors the location-shift fix in R/po-estimands.R (commit b4e9fbf):
+## when `shift = TRUE` (i.e., vartype == "parametric"), shift the boot
+## distribution row-wise from mean ~ 0 (H0) to mean ~ theta (H1) before
+## computing the basic interval [2*theta - q_high, 2*theta - q_low]. The
+## shift is variance-preserving, so the SE computed elsewhere on the
+## unshifted boot is unaffected; the H0-based p-value (computed via
+## get.pvalue() on the unshifted boot) is also unchanged.
+##
+## - theta: vector of point estimates (length p)
+## - boots: p x B matrix of bootstrap draws
+## - alpha: significance level (e.g., 0.05 for 95% CI; 0.10 for 90% CI bound)
+## - shift: if TRUE, apply the parametric H0 -> H1 location shift
+.basic_ci_shifted <- function(theta, boots, alpha, shift = FALSE) {
+  if (isTRUE(shift) && is.matrix(boots) && nrow(boots) > 0L) {
+    rm <- rowMeans(boots, na.rm = TRUE)
+    boots <- boots - rm + theta
+  }
+  ci_mat <- basic_ci_alpha(theta, boots, alpha)
+  colnames(ci_mat) <- c("CI.lower", "CI.upper")
+  ci_mat
+}
+
+## Single-CI version: theta scalar, boots vector. Same shift semantics.
+.basic_ci_shifted_one <- function(theta, boots, alpha, shift = FALSE) {
+  if (isTRUE(shift) && length(boots) > 0L) {
+    boots <- boots - mean(boots, na.rm = TRUE) + theta
+  }
+  qs <- quantile(boots, c(1 - alpha / 2, alpha / 2), na.rm = TRUE)
+  c(2 * theta - unname(qs[1]),
+    2 * theta - unname(qs[2]))
+}
+
 # Reduce closure payload before parallel export by keeping only symbols
 # that the function body actually references from its local frame.
 trim_closure_env <- function(fun) {
@@ -3577,6 +3610,15 @@ fect_boot <- function(
       }
     }
   } else {
+    ## Single source of truth for the parametric H0 -> H1 location shift
+    ## downstream.  Used by every `quantile.CI == TRUE` branch in this
+    ## section through the `.basic_ci_shifted()` / `.basic_ci_shifted_one()`
+    ## helpers (defined near the top of this file).  See R/po-estimands.R
+    ## commit b4e9fbf for the original shift fix on the estimand() side ---
+    ## the helpers here apply the same shift to fect's built-in CI
+    ## machinery so fit$est.* slots match estimand() byte-equally.
+    .is_param <- isTRUE(vartype == "parametric")
+
     se.att <- apply(att.boot, 1, function(vec) sd(vec, na.rm = TRUE))
     if (quantile.CI == FALSE) {
       CI.att <- cbind(
@@ -3585,12 +3627,8 @@ fect_boot <- function(
       ) # normal approximation
       pvalue.att <- (1 - pnorm(abs(att / se.att))) * 2
     } else {
-      CI.att <- t(apply(att.boot, 1, function(vec) {
-        2 *
-          att[which.max(!is.na(vec))] -
-          quantile(vec, c(1 - alpha / 2, alpha / 2), na.rm = TRUE)
-      }))
-      pvalue.att <- apply(att.boot, 1, get.pvalue)
+      CI.att <- .basic_ci_shifted(att, att.boot, alpha, .is_param)
+      pvalue.att <- apply(att.boot, 1, get.pvalue)  # original (H0-centered)
     }
 
     #vcov.att <- cov(t(att.boot), use = "pairwise.complete.obs")
@@ -3609,9 +3647,7 @@ fect_boot <- function(
         att + se.att * qnorm(1 - alpha)
       ) # one-sided
     } else {
-      att.bound <- t(apply(att.boot, 1, function(vec) {
-        quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-      }))
+      att.bound <- .basic_ci_shifted(att, att.boot, 2 * alpha, .is_param)
     }
 
     colnames(att.bound) <- c("CI.lower", "CI.upper")
@@ -3646,9 +3682,7 @@ fect_boot <- function(
         )
         pvalue.att.off <- (1 - pnorm(abs(att.off / se.att.off))) * 2
       } else {
-        CI.att.off <- t(apply(att.off.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.att.off <- .basic_ci_shifted(att.off, att.off.boot, alpha, .is_param)
         pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
       }
 
@@ -3687,9 +3721,7 @@ fect_boot <- function(
           att.off + se.att.off * qnorm(1 - alpha)
         )
       } else {
-        att.off.bound <- t(apply(att.off.boot, 1, function(vec) {
-          quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-        }))
+        att.off.bound <- .basic_ci_shifted(att.off, att.off.boot, 2 * alpha, .is_param)
       }
 
       colnames(att.off.bound) <- c("CI.lower", "CI.upper")
@@ -3707,9 +3739,7 @@ fect_boot <- function(
         ) # normal approximation
         pvalue.carry.att <- (1 - pnorm(abs(carry.att / se.carry.att))) * 2
       } else {
-        CI.carry.att <- t(apply(carry.att.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.carry.att <- .basic_ci_shifted(carry.att, carry.att.boot, alpha, .is_param)
         pvalue.carry.att <- apply(carry.att.boot, 1, get.pvalue)
       }
 
@@ -3741,9 +3771,7 @@ fect_boot <- function(
         )
         pvalue.balance.att <- (1 - pnorm(abs(balance.att / se.balance.att))) * 2
       } else {
-        CI.balance.att <- t(apply(balance.att.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.balance.att <- .basic_ci_shifted(balance.att, balance.att.boot, alpha, .is_param)
         pvalue.balance.att <- apply(balance.att.boot, 1, get.pvalue)
       }
 
@@ -3785,11 +3813,9 @@ fect_boot <- function(
           pnorm(abs(balance.avg.att / se.balance.avg.att))) *
           2
       } else {
-        CI.balance.avg.att <- quantile(
-          balance.avg.att.boot,
-          c(alpha / 2, 1 - alpha / 2),
-          na.rm = TRUE
-        )
+        CI.balance.avg.att <- .basic_ci_shifted_one(balance.avg.att,
+                                                    balance.avg.att.boot,
+                                                    alpha, .is_param)
         p.balance.avg.att <- get.pvalue(balance.avg.att.boot)
       }
 
@@ -3812,9 +3838,8 @@ fect_boot <- function(
           balance.att + se.balance.att * qnorm(1 - alpha)
         )
       } else {
-        balance.att.bound <- t(apply(balance.att.boot, 1, function(vec) {
-          quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-        }))
+        balance.att.bound <- .basic_ci_shifted(balance.att, balance.att.boot,
+                                               2 * alpha, .is_param)
       }
 
       colnames(balance.att.bound) <- c("CI.lower", "CI.upper")
@@ -3836,16 +3861,12 @@ fect_boot <- function(
             pnorm(abs(balance.att.placebo / balance.se.placebo))) *
             2
         } else {
-          balance.CI.placebo <- quantile(
-            balance.att.placebo.boot,
-            c(alpha / 2, 1 - alpha / 2),
-            na.rm = TRUE
-          )
-          balance.CI.placebo.bound <- quantile(
-            balance.att.placebo.boot,
-            c(alpha, 1 - alpha),
-            na.rm = TRUE
-          )
+          balance.CI.placebo <- .basic_ci_shifted_one(balance.att.placebo,
+                                                      balance.att.placebo.boot,
+                                                      alpha, .is_param)
+          balance.CI.placebo.bound <- .basic_ci_shifted_one(balance.att.placebo,
+                                                            balance.att.placebo.boot,
+                                                            2 * alpha, .is_param)
           balance.pvalue.placebo <- get.pvalue(balance.att.placebo.boot)
         }
 
@@ -3878,11 +3899,8 @@ fect_boot <- function(
         )
         p.att.avg.W <- (1 - pnorm(abs(att.avg.W / se.att.avg.W))) * 2
       } else {
-        CI.att.avg.W <- quantile(
-          att.avg.W.boot,
-          c(alpha / 2, 1 - alpha / 2),
-          na.rm = TRUE
-        )
+        CI.att.avg.W <- .basic_ci_shifted_one(att.avg.W, att.avg.W.boot,
+                                               alpha, .is_param)
         p.att.avg.W <- get.pvalue(att.avg.W.boot)
       }
 
@@ -3913,12 +3931,8 @@ fect_boot <- function(
         )
         pvalue.att.W <- (1 - pnorm(abs(att.on.W / se.att.W))) * 2
       } else {
-        CI.att.W <- t(apply(att.on.W.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
-        att.W.bound <- t(apply(att.on.W.boot, 1, function(vec) {
-          quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-        }))
+        CI.att.W   <- .basic_ci_shifted(att.on.W, att.on.W.boot, alpha,     .is_param)
+        att.W.bound <- .basic_ci_shifted(att.on.W, att.on.W.boot, 2 * alpha, .is_param)
         pvalue.att.W <- apply(att.on.W.boot, 1, get.pvalue)
       }
 
@@ -3983,18 +3997,8 @@ fect_boot <- function(
           )
           pvalue.placebo.w <- (1 - pnorm(abs(att.placebo.W / se.placebo.W))) * 2
         } else {
-          CI.placebo.W <- quantile(
-            att.placebo.W.boot,
-            c(alpha / 2, 1 - alpha / 2),
-            na.rm = TRUE
-          )
-
-          CI.placebo.bound.W <- quantile(
-            att.placebo.W.boot,
-            c(alpha, 1 - alpha),
-            na.rm = TRUE
-          )
-
+          CI.placebo.W       <- .basic_ci_shifted_one(att.placebo.W, att.placebo.W.boot, alpha,     .is_param)
+          CI.placebo.bound.W <- .basic_ci_shifted_one(att.placebo.W, att.placebo.W.boot, 2 * alpha, .is_param)
           pvalue.placebo.w <- get.pvalue(att.placebo.W.boot)
         }
 
@@ -4031,12 +4035,8 @@ fect_boot <- function(
           )
           pvalue.att.off.W <- (1 - pnorm(abs(att.off.W / se.att.off.W))) * 2
         } else {
-          CI.att.off.W <- t(apply(att.off.W.boot, 1, function(vec) {
-            quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-          }))
-          att.off.W.bound <- t(apply(att.off.W.boot, 1, function(vec) {
-            quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-          }))
+          CI.att.off.W   <- .basic_ci_shifted(att.off.W, att.off.W.boot, alpha,     .is_param)
+          att.off.W.bound <- .basic_ci_shifted(att.off.W, att.off.W.boot, 2 * alpha, .is_param)
           pvalue.att.off.W <- apply(att.off.W.boot, 1, get.pvalue)
         }
 
@@ -4085,16 +4085,8 @@ fect_boot <- function(
               pnorm(abs(att.carryover.W / se.carryover.W))) *
               2
           } else {
-            CI.carryover.W <- quantile(
-              att.carryover.W.boot,
-              c(alpha / 2, 1 - alpha / 2),
-              na.rm = TRUE
-            )
-            CI.carryover.bound.W <- quantile(
-              att.carryover.W.boot,
-              c(alpha, 1 - alpha),
-              na.rm = TRUE
-            )
+            CI.carryover.W       <- .basic_ci_shifted_one(att.carryover.W, att.carryover.W.boot, alpha,     .is_param)
+            CI.carryover.bound.W <- .basic_ci_shifted_one(att.carryover.W, att.carryover.W.boot, 2 * alpha, .is_param)
             pvalue.carryover.w <- get.pvalue(att.carryover.W.boot)
           }
 
@@ -4127,11 +4119,12 @@ fect_boot <- function(
       )
       pvalue.avg <- (1 - pnorm(abs(att.avg / se.avg))) * 2
     } else {
-      CI.avg <- quantile(
-        att.avg.boot,
-        c(alpha / 2, 1 - alpha / 2),
-        na.rm = TRUE
-      )
+      ## ci.method = "basic": reflected pivot interval (with parametric
+      ## location shift via .basic_ci_shifted_one).  NOTE: the legacy
+      ## quantile.CI = TRUE path here previously returned raw percentile
+      ## quantiles (an inconsistency with the per-event-time block, which
+      ## already used basic).  v2.4.2 standardizes on basic at both sites.
+      CI.avg <- .basic_ci_shifted_one(att.avg, att.avg.boot, alpha, .is_param)
       pvalue.avg <- get.pvalue(att.avg.boot)
     }
 
@@ -4146,11 +4139,8 @@ fect_boot <- function(
       )
       pvalue.avg.unit <- (1 - pnorm(abs(att.avg.unit / se.avg.unit))) * 2
     } else {
-      CI.avg.unit <- quantile(
-        att.avg.unit.boot,
-        c(alpha / 2, 1 - alpha / 2),
-        na.rm = TRUE
-      )
+      CI.avg.unit <- .basic_ci_shifted_one(att.avg.unit, att.avg.unit.boot,
+                                            alpha, .is_param)
       pvalue.avg.unit <- get.pvalue(att.avg.unit.boot)
     }
 
@@ -4179,9 +4169,8 @@ fect_boot <- function(
       pvalue.eff.calendar <- (1 - pnorm(abs(calendar.eff / se.eff.calendar))) *
         2
     } else {
-      CI.eff.calendar <- t(apply(calendar.eff.boot, 1, function(vec) {
-        quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-      }))
+      CI.eff.calendar <- .basic_ci_shifted(calendar.eff, calendar.eff.boot,
+                                            alpha, .is_param)
       pvalue.eff.calendar <- apply(calendar.eff.boot, 1, get.pvalue)
     }
     est.eff.calendar <- cbind(
@@ -4212,9 +4201,9 @@ fect_boot <- function(
         pnorm(abs(calendar.eff.fit / se.eff.calendar.fit))) *
         2
     } else {
-      CI.eff.calendar.fit <- t(apply(calendar.eff.fit.boot, 1, function(vec) {
-        quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-      }))
+      CI.eff.calendar.fit <- .basic_ci_shifted(calendar.eff.fit,
+                                                calendar.eff.fit.boot,
+                                                alpha, .is_param)
       pvalue.eff.calendar.fit <- apply(calendar.eff.fit.boot, 1, get.pvalue)
     }
     est.eff.calendar.fit <- cbind(
@@ -4243,9 +4232,7 @@ fect_boot <- function(
         )
         pvalue.beta <- (1 - pnorm(abs(beta / se.beta))) * 2
       } else {
-        CI.beta <- t(apply(beta.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.beta <- .basic_ci_shifted(c(beta), beta.boot, alpha, .is_param)
         pvalue.beta <- apply(beta.boot, 1, get.pvalue)
       }
       est.beta <- cbind(c(beta), se.beta, CI.beta, pvalue.beta)
@@ -4292,16 +4279,8 @@ fect_boot <- function(
         )
         pvalue.placebo <- (1 - pnorm(abs(att.placebo / se.placebo))) * 2
       } else {
-        CI.placebo <- quantile(
-          att.placebo.boot,
-          c(alpha / 2, 1 - alpha / 2),
-          na.rm = TRUE
-        )
-        CI.placebo.bound <- quantile(
-          att.placebo.boot,
-          c(alpha, 1 - alpha),
-          na.rm = TRUE
-        )
+        CI.placebo       <- .basic_ci_shifted_one(att.placebo, att.placebo.boot, alpha,     .is_param)
+        CI.placebo.bound <- .basic_ci_shifted_one(att.placebo, att.placebo.boot, 2 * alpha, .is_param)
         pvalue.placebo <- get.pvalue(att.placebo.boot)
       }
 
@@ -4338,16 +4317,8 @@ fect_boot <- function(
         )
         pvalue.carryover <- (1 - pnorm(abs(att.carryover / se.carryover))) * 2
       } else {
-        CI.carryover <- quantile(
-          att.carryover.boot,
-          c(alpha / 2, 1 - alpha / 2),
-          na.rm = TRUE
-        )
-        CI.carryover.bound <- quantile(
-          att.carryover.boot,
-          c(alpha, 1 - alpha),
-          na.rm = TRUE
-        )
+        CI.carryover       <- .basic_ci_shifted_one(att.carryover, att.carryover.boot, alpha,     .is_param)
+        CI.carryover.bound <- .basic_ci_shifted_one(att.carryover, att.carryover.boot, 2 * alpha, .is_param)
         pvalue.carryover <- get.pvalue(att.carryover.boot)
       }
       est.carryover <- t(as.matrix(c(
@@ -4380,9 +4351,8 @@ fect_boot <- function(
         )
         pvalue.group.att <- (1 - pnorm(abs(out$group.att / se.group.att))) * 2
       } else {
-        CI.group.att <- t(apply(group.att.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.group.att <- .basic_ci_shifted(c(out$group.att), group.att.boot,
+                                           alpha, .is_param)
         pvalue.group.att <- apply(group.att.boot, 1, get.pvalue)
       }
 
@@ -4423,13 +4393,9 @@ fect_boot <- function(
               subgroup.atts + subgroup.se.att * qnorm(1 - alpha)
             )
           } else {
-            subgroup.CI.att <- t(apply(subgroup.atts.boot, 1, function(vec) {
-              quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-            }))
+            subgroup.CI.att   <- .basic_ci_shifted(subgroup.atts, subgroup.atts.boot, alpha,     .is_param)
             subgroup.pvalue.att <- apply(subgroup.atts.boot, 1, get.pvalue)
-            subgroup.att.bound <- t(apply(subgroup.atts.boot, 1, function(vec) {
-              quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-            }))
+            subgroup.att.bound <- .basic_ci_shifted(subgroup.atts, subgroup.atts.boot, 2 * alpha, .is_param)
           }
           subgroup.est.att <- cbind(
             subgroup.atts,
@@ -4482,23 +4448,13 @@ fect_boot <- function(
                 subgroup.atts.off + subgroup.se.att.off * qnorm(1 - alpha)
               )
             } else {
-              subgroup.CI.att.off <- t(apply(
-                subgroup.atts.off.boot,
-                1,
-                function(vec) {
-                  quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-                }
-              ))
-              subgroup.pvalue.att.off <- apply(
-                subgroup.atts.off.boot,
-                1,
-                get.pvalue
-              )
-              subgroup.att.off.bound <- t(apply(
-                subgroup.atts.off.boot,
-                1,
-                function(vec) quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-              ))
+              subgroup.CI.att.off <- .basic_ci_shifted(subgroup.atts.off,
+                                                        subgroup.atts.off.boot,
+                                                        alpha, .is_param)
+              subgroup.pvalue.att.off <- apply(subgroup.atts.off.boot, 1, get.pvalue)
+              subgroup.att.off.bound <- .basic_ci_shifted(subgroup.atts.off,
+                                                           subgroup.atts.off.boot,
+                                                           2 * alpha, .is_param)
             }
             subgroup.est.att.off <- cbind(
               subgroup.atts.off,
@@ -4550,19 +4506,13 @@ fect_boot <- function(
                 pnorm(abs(subgroup.att.placebo / subgroup.se.placebo))) *
                 2
             } else {
-              subgroup.CI.placebo <- quantile(
-                group.att.placebo.boot[[sub.name]],
-                c(alpha / 2, 1 - alpha / 2),
-                na.rm = TRUE
-              )
-              subgroup.CI.placebo.bound <- quantile(
-                group.att.placebo.boot[[sub.name]],
-                c(alpha, 1 - alpha),
-                na.rm = TRUE
-              )
-              subgroup.pvalue.placebo <- get.pvalue(group.att.placebo.boot[[
-                sub.name
-              ]])
+              subgroup.CI.placebo       <- .basic_ci_shifted_one(subgroup.att.placebo,
+                                                                  group.att.placebo.boot[[sub.name]],
+                                                                  alpha, .is_param)
+              subgroup.CI.placebo.bound <- .basic_ci_shifted_one(subgroup.att.placebo,
+                                                                  group.att.placebo.boot[[sub.name]],
+                                                                  2 * alpha, .is_param)
+              subgroup.pvalue.placebo <- get.pvalue(group.att.placebo.boot[[sub.name]])
             }
 
             subgroup.est.placebo <- t(as.matrix(c(
@@ -4612,19 +4562,13 @@ fect_boot <- function(
                 pnorm(abs(subgroup.att.carryover / subgroup.se.carryover))) *
                 2
             } else {
-              subgroup.CI.carryover <- quantile(
-                group.att.carryover.boot[[sub.name]],
-                c(alpha / 2, 1 - alpha / 2),
-                na.rm = TRUE
-              )
-              subgroup.CI.carryover.bound <- quantile(
-                group.att.carryover.boot[[sub.name]],
-                c(alpha, 1 - alpha),
-                na.rm = TRUE
-              )
-              subgroup.pvalue.carryover <- get.pvalue(group.att.carryover.boot[[
-                sub.name
-              ]])
+              subgroup.CI.carryover       <- .basic_ci_shifted_one(subgroup.att.carryover,
+                                                                    group.att.carryover.boot[[sub.name]],
+                                                                    alpha, .is_param)
+              subgroup.CI.carryover.bound <- .basic_ci_shifted_one(subgroup.att.carryover,
+                                                                    group.att.carryover.boot[[sub.name]],
+                                                                    2 * alpha, .is_param)
+              subgroup.pvalue.carryover <- get.pvalue(group.att.carryover.boot[[sub.name]])
             }
 
             subgroup.est.carryover <- t(as.matrix(c(

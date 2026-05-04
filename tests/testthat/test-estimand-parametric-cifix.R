@@ -166,25 +166,29 @@ test_that("P-INV-4: .compute_ci() shifted distribution contains estimate; unshif
   expect_gte(ci_bc_shifted$ci.hi, estimate,
              label = "shifted ci.hi >= estimate")
 
-  ## Unshifted (H0-centered) CI does NOT contain estimate=2.5
-  expect_false(
-    ci_bc_unshifted$ci.lo <= estimate && estimate <= ci_bc_unshifted$ci.hi,
-    label = "H0-centered CI should not contain estimate=2.5"
-  )
-
   ## Shifted CI lower bound is close to estimate - 1.96*sd (Wald-like)
   expected_lo_approx <- estimate - 1.96 * sd(boot_h0)
   expect_equal(ci_bc_shifted$ci.lo, expected_lo_approx,
-               tolerance = 0.15,  ## 15% tolerance — bc differs slightly from Wald
-               label = "shifted ci.lo ≈ estimate - 1.96*sd(boot_h0)")
+               tolerance = 0.15,  ## 15% tolerance: bc differs slightly from Wald
+               label = "shifted ci.lo near estimate - 1.96*sd(boot_h0)")
 
   ## Shifted CI is non-degenerate (width > 1e-6)
   expect_gt(ci_bc_shifted$ci.hi - ci_bc_shifted$ci.lo, 1e-6,
             label = "shifted CI width > 1e-6")
 
-  ## Unshifted CI is degenerate (width << 0.01): confirms the pre-fix pathology
-  expect_lt(ci_bc_unshifted$ci.hi - ci_bc_unshifted$ci.lo, 0.01,
-            label = "H0-centered bc CI is near-degenerate (pre-fix pathology)")
+  ## Unshifted (H0-centered) bc on this input would be near-degenerate
+  ## (pre-fix pathology: tail quantiles all near 0, far from estimate=2.5).
+  ## .compute_ci() bc has an `is_uncovered` safety fallback that detects
+  ## CI not covering the estimate and substitutes the Wald CI around the
+  ## estimate. So the unshifted call now returns a sensible Wald CI even
+  ## though the input was pathological. We assert the fallback fires.
+  width_unshifted <- ci_bc_unshifted$ci.hi - ci_bc_unshifted$ci.lo
+  wald_width      <- 2 * 1.96 * sd(boot_h0)
+  expect_equal(width_unshifted, wald_width, tolerance = 0.05,
+               label = "H0-centered bc falls back to Wald around estimate")
+  expect_true(ci_bc_unshifted$ci.lo <= estimate &&
+              estimate <= ci_bc_unshifted$ci.hi,
+              label = "fallback Wald CI contains the estimate")
 })
 
 ## ---- P-INV-5: bca jackknife path is not broken by the shift -----------------

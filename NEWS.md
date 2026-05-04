@@ -1,6 +1,29 @@
 <!-- markdownlint-disable MD025 -->
 # fect 2.4.2
 
+## New: `ci.method` argument on `fect()`; legacy `quantile.CI` soft-deprecated
+
+* `fect()` gains a `ci.method = c("normal", "basic")` argument. Default
+  `"normal"` (Wald: `θ̂ ± z · SE`) preserves the v2.4.1 default behaviour
+  byte-equivalently. `"basic"` (reflected pivot: `2 · θ̂ − quantile(boot, …)`)
+  is the literature-standard "percentile" CI per @davison_hinkley1997 §5.2.1
+  and what `boot::boot.ci(type = "basic")` returns. All CIs in fect's
+  returned `est.*` slots use the requested method uniformly.
+* The legacy `quantile.CI` argument is soft-deprecated. Both legacy values
+  still work (`quantile.CI = FALSE` → `ci.method = "normal"`; `quantile.CI = TRUE`
+  → `ci.method = "basic"`) but emit a one-time deprecation warning when
+  user-supplied. Removal targeted for v2.5.0+.
+* `ci.method = "basic"` with `nboots < 1000` emits a tail-CI replicate
+  warning at fit time (mirrors the `estimand()` `.check_tail_ci_replicates`
+  gate). The 5th / 195th order statistics that `basic` reads are unstable
+  at small `B` --- @efron1987 §3 and @diciccio_efron1996 §4 recommend
+  `B ≥ 1000` for tail-quantile CIs.
+* `ci.method = "bca"`, `"bc"`, or `"percentile"` on `fect()` is rejected
+  with a clear error pointing the user to `estimand(fit, type, ci.method)`
+  for the full 5-method surface. fect's built-in CI machinery covers the
+  routine `att` workflow; the alternative estimands (`att.cumu`, `aptt`,
+  `log.att`) where bias-corrected CIs matter live on the `estimand()` path.
+
 ## New: alternative-estimand additions in `estimand()`
 
 * New `test = c("none", "placebo", "carryover")` argument evaluates the
