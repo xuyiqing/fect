@@ -2,7 +2,7 @@ Package: fect
 Type: Package
 Title: Fixed Effects Counterfactual Estimators
 Version: 2.4.2
-Date: 2026-05-01
+Date: 2026-05-04
 Authors@R: 
     c(person("Licheng", "Liu", , "lichengl@stanford.edu", role = c("aut")), 
       person("Ziyi", "Liu", , "zyliu2023@berkeley.edu", role = c("aut")),
@@ -46,7 +46,7 @@ Suggests:
     panelView,
     testthat (>= 3.0.0),
     did,
-    DIDmultiplegtDYN,    
+    DIDmultiplegtDYN,
     ggrepel,
     HonestDiDFEct
 Depends: R (>= 4.1.0)

@@ -15,6 +15,7 @@ estimand(
   fit,
   type   = c("att", "att.cumu", "aptt", "log.att"),
   by     = c("event.time", "cohort", "calendar.time", "overall"),
+  test        = c("none", "placebo", "carryover"),
   cells       = NULL,
   weights     = NULL,
   window      = NULL,
@@ -40,6 +41,21 @@ estimand(
     \code{"cohort"}, \code{"calendar.time"}, \code{"overall"}, or any
     column name resolvable in the fit's panel data.}
 
+  \item{test}{Selects which subset of cells to aggregate over.
+    \code{"none"} (default) uses the standard treated post-treatment
+    cells. \code{"placebo"} restricts aggregation to the
+    pre-treatment cells in \code{fit$placebo.period} that were
+    masked-and-imputed during the placebo fit; e.g.\
+    \code{estimand(fit, "aptt", "event.time", test = "placebo")}
+    returns a per-event-time placebo APTT series. Requires
+    \code{placeboTest = TRUE} at fit time and forces
+    \code{direction = "on"}. \code{"carryover"} is the analogous
+    extension for early post-reversal cells in
+    \code{fit$carryover.period}; requires \code{carryoverTest = TRUE}
+    at fit time, a panel with reversals, and forces
+    \code{direction = "off"}. Both are incompatible with
+    \code{type = "att.cumu"}.}
+
   \item{cells}{Optional filter on which treated cells to include.
     Accepts \code{NULL} (default), a logical vector, or a one-sided
     formula. See \code{\link{imputed_outcomes}}.}
@@ -58,22 +74,28 @@ estimand(
     \code{"parametric"}, or \code{"none"}. Selects which variance
     method to source replicates from. The output \code{vartype}
     column reports the method actually used at fit time (read from
-    \code{fit$vartype}), which may differ from this argument value
-    if the fit was produced with a different setting --- the argument
-    is informational and does not re-aggregate replicates.}
+    \code{fit$vartype}); this argument is informational and does not
+    re-aggregate replicates. Wild-bootstrap fits (\code{vartype =
+    "wild"} at fit time) are consumed transparently and reported as
+    \code{"wild"} in the output column.}
 
   \item{conf.level}{Two-sided confidence level. Defaults to 0.95.}
 
   \item{ci.method}{One of \code{"basic"}, \code{"percentile"},
-    \code{"bc"} (bias-corrected percentile), or \code{"normal"}
-    (Wald: \eqn{\hat\theta \pm z \cdot SE}). Default is \code{NULL},
-    which triggers a per-type default: \code{"att"} -> \code{"normal"}
-    (matches what \code{fit$est.att} already uses internally),
-    \code{"att.cumu"} -> \code{"percentile"} (matches what
-    \code{att.cumu()} does internally), \code{"aptt"} -> \code{"bc"}
-    and \code{"log.att"} -> \code{"bc"} (ratio / log estimators
-    benefit from bias correction when the bootstrap distribution is
-    skewed). Pass an explicit value to override.}
+    \code{"bc"} (bias-corrected percentile), \code{"bca"}
+    (bias-corrected accelerated; Efron 1987 in full), or
+    \code{"normal"} (Wald: \eqn{\hat\theta \pm z \cdot SE}). Default
+    is \code{NULL}, which triggers a per-type default:
+    \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
+    already uses internally), \code{"att.cumu"} -> \code{"percentile"}
+    (matches what \code{att.cumu()} does internally),
+    \code{"aptt"} -> \code{"bca"} and \code{"log.att"} ->
+    \code{"bca"} (ratio / log estimators benefit from joint
+    bias and acceleration corrections when the bootstrap distribution
+    is skewed; \code{"bc"} can degenerate at the boundary when the
+    point estimate falls outside the bootstrap support). Pass an
+    explicit value to override. \code{"bca"} requires bootstrap- or
+    wild-bootstrap-sourced replicates.}
 }
 
 \value{

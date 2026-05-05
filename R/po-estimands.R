@@ -119,7 +119,14 @@
     ## not exactly zero). All ATT-style estimands aggregate eff over
     ## treated cells only.
 
-    ## eff.boot, if populated, must match TT x N x nboots.
+    ## eff.boot shape depends on vartype.
+    ##   bootstrap / wild / parametric: TT x N x B
+    ##   jackknife:                     TT x (N-1) x N
+    ##     The third dimension is the dropped-unit index; the second is N-1
+    ##     because each leave-one-out fit runs on a panel with one unit
+    ##     removed. The post-hoc estimand API uses eff.boot only through the
+    ##     dedicated .jackknife_tukey_se_*() helpers, never by treating its
+    ##     second dimension as N.
     if (!is.null(fit$eff.boot)) {
         eb <- fit$eff.boot
         if (!is.array(eb) || length(dim(eb)) != 3) {
@@ -128,13 +135,41 @@
                 call. = FALSE
             )
         }
-        if (!identical(dim(eb)[1:2], c(TT, N))) {
-            stop(
-                "Slot contract: fit$eff.boot first two dimensions (",
-                dim(eb)[1], " x ", dim(eb)[2],
-                ") must match TT x N (", TT, " x ", N, ").",
-                call. = FALSE
-            )
+        is_jack <- isTRUE(fit$vartype == "jackknife")
+        if (is_jack) {
+            if (dim(eb)[1] != TT) {
+                stop(
+                    "Slot contract (jackknife): fit$eff.boot[1] = ",
+                    dim(eb)[1], " must equal TT = ", TT, ".",
+                    call. = FALSE
+                )
+            }
+            if (dim(eb)[3] != N) {
+                stop(
+                    "Slot contract (jackknife): fit$eff.boot[3] = ",
+                    dim(eb)[3], " must equal N = ", N,
+                    " (one leave-one-out replicate per unit).",
+                    call. = FALSE
+                )
+            }
+            ## dim(eb)[2] == N-1 is the normal case; warn if unexpected.
+            if (dim(eb)[2] != N - 1L) {
+                warning(
+                    "Slot contract (jackknife): fit$eff.boot[2] = ",
+                    dim(eb)[2], "; expected N-1 = ", N - 1L,
+                    ". Proceeding, but results may be incorrect.",
+                    call. = FALSE
+                )
+            }
+        } else {
+            if (!identical(dim(eb)[1:2], c(TT, N))) {
+                stop(
+                    "Slot contract: fit$eff.boot first two dimensions (",
+                    dim(eb)[1], " x ", dim(eb)[2],
+                    ") must match TT x N (", TT, " x ", N, ").",
+                    call. = FALSE
+                )
+            }
         }
     }
 
@@ -158,6 +193,80 @@
         )
     }
 
+    invisible(TRUE)
+}
+
+
+## Internal: hard-error if ci.method is not "normal" for a jackknife fit.
+## Jackknife produces an SE estimate via the Tukey pseudo-value formula,
+## not a sampling distribution of θ̂. The accepted CI is Wald-style:
+##   CI = θ̂ ± z_{1-α/2} · SE_jack
+## (ci.method = "normal").
+##
+## Reflection-based methods (basic, percentile) require exchangeable draws
+## from the sampling distribution — jackknife leave-one-out values are not
+## exchangeable draws (Efron & Tibshirani 1993, §11; Davison & Hinkley
+## 1997, §3.2.1). Bias-corrected methods (bc, bca) require a bootstrap
+## distribution to compute z₀ — jackknife has no bootstrap distribution.
+## Passing jackknife replicates to any of these methods would produce CIs
+## with undefined (and likely poor) coverage. Hard-error forces the caller
+## to be explicit about this statistical limitation.
+## Internal: warn (not error) when a tail-quantile-based CI is requested on a
+## bootstrap / parametric fit with fewer than 1000 replicates. The point
+## estimate and SE are unaffected; only basic / percentile / bc / bca CIs read
+## the empirical tail of the bootstrap distribution and need B large enough for
+## the relevant order statistics to be stable. Efron 1987 §3 and DiCiccio &
+## Efron 1996 §4 recommend B >= 1000 as the floor for bca; the same threshold
+## suits basic / percentile (which read 5th / 195th order statistics at B=200
+## vs 25th / 975th at B=1000). Warning rather than error so users can still
+## explore on small B during iteration.
+.check_tail_ci_replicates <- function(fit, ci.method, vartype) {
+    if (vartype == "none") return(invisible(TRUE))
+    if (!isTRUE(fit$vartype %in% c("bootstrap", "parametric"))) {
+        return(invisible(TRUE))
+    }
+    if (!ci.method %in% c("basic", "percentile", "bc", "bca")) {
+        return(invisible(TRUE))
+    }
+    if (is.null(fit$eff.boot)) return(invisible(TRUE))
+    B <- dim(fit$eff.boot)[3]
+    if (is.na(B) || B >= 1000) return(invisible(TRUE))
+    warning(
+        "estimand() with ci.method = \"", ci.method, "\" on a fit with ",
+        "nboots = ", B, " (< 1000): tail-quantile-based CIs may have ",
+        "erratic endpoints at this replicate count (Efron 1987 Section 3; ",
+        "DiCiccio & Efron 1996 Section 4 recommend B >= 1000). The point ",
+        "estimate and SE are unaffected. For publication-grade CIs, refit ",
+        "with `fect(..., nboots = 1000)` and re-call estimand().",
+        call. = FALSE
+    )
+    invisible(TRUE)
+}
+
+
+.check_jackknife_ci_method <- function(ci.method) {
+    if (ci.method != "normal") {
+        stop(
+            "ci.method = \"", ci.method, "\" is not supported for fits ",
+            "produced with vartype = \"jackknife\".\n\n",
+            "Jackknife inference produces a standard error (SE) estimate ",
+            "via the Tukey pseudo-value formula, not a sampling distribution ",
+            "of the estimator. The only statistically valid CI from jackknife ",
+            "is the Wald-style interval: estimate +/- z * SE_jack ",
+            "(ci.method = \"normal\").\n\n",
+            "  Methods basic and percentile require exchangeable draws from ",
+            "the sampling distribution of theta-hat. Jackknife leave-one-out ",
+            "values are influence-function-flavored quantities, not ",
+            "exchangeable draws (Efron & Tibshirani 1993, Chapter 11; ",
+            "Davison & Hinkley 1997, Section 3.2.1).\n\n",
+            "  Methods bc and bca require a bootstrap distribution to compute ",
+            "the bias-correction z0 = Phi^-1(P(boot < estimate)). Jackknife ",
+            "fits have no bootstrap distribution.\n\n",
+            "Use ci.method = \"normal\" (the default for type = \"att\") or ",
+            "refit with vartype = \"bootstrap\" to access all ci.methods.",
+            call. = FALSE
+        )
+    }
     invisible(TRUE)
 }
 
@@ -338,6 +447,25 @@ imputed_outcomes <- function(fit,
     ## Replicate expansion: one row per (cell, b) where b indexes
     ## bootstrap or jackknife replicate. Y_obs and W.agg are constant
     ## across replicates; Y0_hat and eff vary per replicate.
+
+    ## Jackknife guard: eff.boot has shape TT x (N-1) x N for jackknife.
+    ## The second dimension is N-1, not N, so indexing eff.boot[t, i, b]
+    ## with the full panel's column index i (1..N) accesses incorrect slices
+    ## for i > N-1 or returns out-of-bounds values. The replicate expansion
+    ## cannot be aligned to the full panel's cell coordinates under jackknife.
+    if (replicates && isTRUE(fit$vartype == "jackknife")) {
+        stop(
+            "imputed_outcomes(replicates = TRUE) is not supported for ",
+            "fits with vartype = \"jackknife\". Jackknife replicates drop one ",
+            "unit per fit, so each replicate has N-1 columns rather than N; ",
+            "the per-cell replicates cannot be aligned to the full panel's cell ",
+            "coordinates. Use replicates = FALSE for the point-estimate surface, ",
+            "or refit with vartype = \"bootstrap\" to access the replicate ",
+            "expansion.",
+            call. = FALSE
+        )
+    }
+
     eb <- fit$eff.boot
     nboots <- dim(eb)[3]
 
@@ -398,6 +526,17 @@ imputed_outcomes <- function(fit,
 #'   per-event-time series), \code{"cohort"}, \code{"calendar.time"},
 #'   \code{"overall"} (one row), or any column name resolvable in the
 #'   fit's panel data.
+#' @param test Selects which subset of cells to aggregate over (v2.4.3+).
+#'   \code{"none"} (default) uses standard treated post-treatment
+#'   cells. \code{"placebo"} restricts to pre-treatment cells in
+#'   \code{fit$placebo.period} that were masked-and-imputed during the
+#'   placebo fit; produces e.g.\ a per-event-time placebo APTT series
+#'   for credibility checks. Requires \code{placeboTest = TRUE} at fit
+#'   time; forces \code{direction = "on"}. \code{"carryover"} is the
+#'   analogous extension on the reversal side; requires
+#'   \code{carryoverTest = TRUE} + a panel with reversals; forces
+#'   \code{direction = "off"}. Both incompatible with
+#'   \code{type = "att.cumu"}.
 #' @param cells Optional filter on which treated cells to include.
 #'   Accepts \code{NULL} (default; all treated cells), a logical vector,
 #'   or a one-sided formula. See \code{\link{imputed_outcomes}}.
@@ -459,6 +598,7 @@ estimand <- function(fit,
                      type   = c("att", "att.cumu", "aptt", "log.att"),
                      by     = c("event.time", "cohort", "calendar.time",
                                 "overall"),
+                     test        = c("none", "placebo", "carryover"),
                      cells       = NULL,
                      weights     = NULL,
                      window      = NULL,
@@ -468,21 +608,40 @@ estimand <- function(fit,
                      ci.method   = NULL) {
 
     type      <- match.arg(type)
-    direction <- match.arg(direction)
+    test      <- match.arg(test)
     vartype   <- match.arg(vartype)
+
+    ## test = "placebo" / "carryover": auto-set direction to the semantic
+    ## default. Users should not need to remember the pairing.
+    if (test == "placebo") {
+        direction <- "on"
+    } else if (test == "carryover") {
+        direction <- "off"
+    } else {
+        direction <- match.arg(direction)
+    }
+
+    ## Cumulative semantics are undefined for placebo / carryover cells.
+    if (test != "none" && type == "att.cumu") {
+        stop("estimand(type = \"att.cumu\") is incompatible with ",
+             "test = \"", test, "\". Cumulative effects are defined ",
+             "relative to treatment onset; placebo and carryover cells ",
+             "do not have a meaningful cumulative anchor.",
+             call. = FALSE)
+    }
 
     ## ci.method = NULL triggers per-type defaults (v2.4.2+).
     ## See statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md.
     if (is.null(ci.method)) {
         ci.method <- switch(type,
             "att"      = "normal",      ## matches what fit$est.att uses (Wald: theta +- z*SE)
-            "att.cumu" = "percentile",  ## matches att.cumu() internals
-            "aptt"     = "bc",          ## ratio estimator: bias-corrected for skew
-            "log.att"  = "bc"           ## log estimator: bias-corrected for skew
+            "att.cumu" = "basic",       ## reflected pivot CI (Davison-Hinkley 1997 §5.2.1; boot::boot.ci(type = "basic"))
+            "aptt"     = "bca",         ## ratio: bootstrap-bias + skew -> BCa (Efron 1987)
+            "log.att"  = "bca"          ## log: same rationale
         )
     }
     ci.method <- match.arg(ci.method,
-                           c("basic", "percentile", "bc", "normal"))
+                           c("basic", "percentile", "bc", "bca", "normal"))
 
     by_canon <- c("event.time", "cohort", "calendar.time", "overall")
     if (length(by) > 1L) {
@@ -519,32 +678,49 @@ estimand <- function(fit,
 
     .validate_po_contract(fit)
 
-    if (type == "att") {
-        return(.estimand_att(fit, by, cells, weights, direction,
-                             vartype, conf.level, ci.method))
-    }
-    if (type == "att.cumu") {
-        return(.estimand_att_cumu(fit, by, cells, weights, direction,
-                                  vartype, conf.level, ci.method, window))
-    }
-    if (type == "aptt") {
-        return(.estimand_aptt(fit, by, cells, weights, direction,
-                              vartype, conf.level, ci.method))
-    }
-    if (type == "log.att") {
-        return(.estimand_log_att(fit, by, cells, weights, direction,
-                                 vartype, conf.level, ci.method))
+    ## Jackknife ci.method guard: only "normal" is statistically valid.
+    ## See .check_jackknife_ci_method() for the full rationale.
+    ## Placed after .validate_po_contract() so fit is known to be a list.
+    if (isTRUE(fit$vartype == "jackknife") && vartype != "none") {
+        .check_jackknife_ci_method(ci.method)
     }
 
-    stop("type = \"", type, "\" is part of the v2.4.0 API surface but ",
-         "is not yet implemented at this commit. Stay tuned.",
-         call. = FALSE)
+    ## Tail-CI under-replication warning: bc / bca / percentile / basic CIs
+    ## need B >= 1000 for stable tail quantiles. Warning, not error, so users
+    ## can still explore on small B during iteration.
+    .check_tail_ci_replicates(fit, ci.method, vartype)
+
+    result <- if (type == "att") {
+        .estimand_att(fit, by, cells, weights, direction,
+                      vartype, conf.level, ci.method, test)
+    } else if (type == "att.cumu") {
+        .estimand_att_cumu(fit, by, cells, weights, direction,
+                           vartype, conf.level, ci.method, window)
+    } else if (type == "aptt") {
+        .estimand_aptt(fit, by, cells, weights, direction,
+                       vartype, conf.level, ci.method, test)
+    } else if (type == "log.att") {
+        .estimand_log_att(fit, by, cells, weights, direction,
+                          vartype, conf.level, ci.method, test)
+    } else {
+        stop("type = \"", type, "\" is part of the v2.4.0 API surface but ",
+             "is not yet implemented at this commit. Stay tuned.",
+             call. = FALSE)
+    }
+
+    ## Attach a hidden attribute so esplot() can recognize placebo/carryover
+    ## frames and adapt its visual defaults (e.g., uniform color across all
+    ## event-times since there's no pre-vs-post contrast in those modes).
+    if (!is.null(test) && test != "none") {
+        attr(result, "fect_test") <- test
+    }
+    result
 }
 
 
 ## Internal: type = "att" dispatcher.
 .estimand_att <- function(fit, by, cells, weights, direction,
-                          vartype, conf.level, ci.method) {
+                          vartype, conf.level, ci.method, test = "none") {
 
     ## Fast path: by = "event.time" + default args + direction = "on".
     ## Reads directly from fit$est.att for byte-equality with the existing
@@ -561,15 +737,23 @@ estimand <- function(fit,
                     is.null(weights) &&
                     direction == "on" &&
                     abs(conf.level - 0.95) < 1e-12 &&
-                    ci.method == "normal"
+                    ci.method == "normal" &&
+                    test == "none"
 
     if (is_fast_path) {
         return(.estimand_att_fast_event_time(fit))
     }
 
+    if (by == "event.time" && test != "none") {
+        return(.estimand_att_event_time(fit, cells, weights, direction,
+                                        vartype, conf.level, ci.method,
+                                        test))
+    }
+
     if (by == "overall") {
         return(.estimand_att_overall(fit, cells, weights, direction,
-                                     vartype, conf.level, ci.method))
+                                     vartype, conf.level, ci.method,
+                                     test))
     }
 
     stop("estimand(type = \"att\") with by = \"", by, "\" is part of ",
@@ -580,25 +764,193 @@ estimand <- function(fit,
 }
 
 
+## Per-event-time ATT slow path. Used when test = "placebo" /
+## "carryover" forces per-cell aggregation.
+.estimand_att_event_time <- function(fit, cells, weights, direction,
+                                     vartype, conf.level, ci.method,
+                                     test) {
+
+    if (!is.null(weights)) {
+        stop("estimand(\"att\", \"event.time\", test = \"", test, "\") ",
+             "with non-default weights is not yet supported.",
+             call. = FALSE)
+    }
+    if (!is.null(cells)) {
+        stop("estimand(\"att\", \"event.time\", test = \"", test, "\") ",
+             "with `cells` filter is not yet supported.",
+             call. = FALSE)
+    }
+
+    ## Jackknife dispatch: eff.boot has shape TT x (N-1) x N; direct
+    ## cell-masking with a TT x N mask is incompatible. Route through
+    ## the dedicated jackknife helper.
+    if (isTRUE(fit$vartype == "jackknife")) {
+        return(.estimand_att_event_time_jackknife(fit, cells, weights,
+                                                  direction, conf.level,
+                                                  vartype, ci.method, test))
+    }
+
+    mask_info <- .test_cell_mask(fit, test, direction)
+    base_mask <- mask_info$mask
+    Tev       <- mask_info$Tev
+
+    ets <- sort(unique(Tev[base_mask]))
+    if (length(ets) == 0) {
+        stop("No cells satisfy test = \"", test, "\".", call. = FALSE)
+    }
+
+    nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+
+    estimate <- numeric(length(ets))
+    se_vec   <- rep(NA_real_, length(ets))
+    ci_lo    <- rep(NA_real_, length(ets))
+    ci_hi    <- rep(NA_real_, length(ets))
+    n_cells  <- integer(length(ets))
+
+    for (k in seq_along(ets)) {
+        et <- ets[k]
+        cell_mask <- base_mask & Tev == et
+        n_cells[k] <- sum(cell_mask)
+
+        eff_t <- fit$eff[cell_mask]
+        estimate[k] <- mean(eff_t, na.rm = TRUE)
+
+        if (nboots > 0L && vartype != "none") {
+            eff_boot_cells <- apply(fit$eff.boot, 3,
+                                    function(eb) eb[cell_mask])
+            if (!is.matrix(eff_boot_cells)) {
+                eff_boot_cells <- matrix(eff_boot_cells,
+                                         nrow = sum(cell_mask))
+            }
+            att_b <- colMeans(eff_boot_cells, na.rm = TRUE)
+
+            ## PARAMETRIC SHIFT (v2.4.2 fix): center att_b at the point estimate.
+            ## For parametric vartype, eff.boot is H0-centered; only ci.method="normal"
+            ## uses sd() and is unaffected by centering. All other ci.methods require
+            ## the distribution to be centered near estimate. The shift preserves sd().
+            is_parametric <- isTRUE(fit$vartype == "parametric") ||
+                             isTRUE(vartype == "parametric")
+            if (is_parametric) {
+                att_b <- att_b - mean(att_b, na.rm = TRUE) + estimate[k]
+            }
+
+            jack_v <- if (ci.method == "bca") {
+                .cell_jackknife("att", eff = eff_t)
+            } else NULL
+
+            ci <- .compute_ci(estimate[k], att_b, ci.method, conf.level,
+                              jack = jack_v)
+            se_vec[k] <- ci$se
+            ci_lo[k]  <- ci$ci.lo
+            ci_hi[k]  <- ci$ci.hi
+        }
+    }
+
+    used_vartype <- if (vartype == "none") "none"
+                    else if (is.null(fit$vartype)) "bootstrap"
+                    else fit$vartype
+
+    data.frame(
+        event.time = ets,
+        estimate   = estimate,
+        se         = se_vec,
+        ci.lo      = ci_lo,
+        ci.hi      = ci_hi,
+        n_cells    = n_cells,
+        vartype    = used_vartype,
+        stringsAsFactors = FALSE
+    )
+}
+
+
+## Per-event-time ATT slow path for jackknife fits.
+## Called from .estimand_att_event_time() when fit$vartype == "jackknife".
+## Uses the same column-drop masking as .estimand_att_overall_jackknife()
+## to handle the TT x (N-1) x N shape of eff.boot.
+.estimand_att_event_time_jackknife <- function(fit, cells, weights,
+                                                direction, conf.level,
+                                                vartype, ci.method, test) {
+
+    mask_info <- .test_cell_mask(fit, test, direction)
+    base_mask <- mask_info$mask
+    Tev       <- mask_info$Tev
+
+    ets <- sort(unique(Tev[base_mask]))
+    if (length(ets) == 0) {
+        stop("No cells satisfy test = \"", test, "\".", call. = FALSE)
+    }
+
+    nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+
+    estimate <- numeric(length(ets))
+    se_vec   <- rep(NA_real_, length(ets))
+    ci_lo    <- rep(NA_real_, length(ets))
+    ci_hi    <- rep(NA_real_, length(ets))
+    n_cells  <- integer(length(ets))
+
+    for (k in seq_along(ets)) {
+        et <- ets[k]
+        cell_mask <- base_mask & Tev == et
+        n_cells[k] <- sum(cell_mask)
+
+        eff_t <- fit$eff[cell_mask]
+        estimate[k] <- mean(eff_t, na.rm = TRUE)
+
+        ## Jackknife: per-replicate leave-one-out mean over cells.
+        if (nboots > 0L && vartype != "none") {
+            theta_j <- numeric(nboots)
+            for (j in seq_len(nboots)) {
+                cm_j <- cell_mask[, -j, drop = FALSE]
+                eb_j <- fit$eff.boot[, , j]
+                theta_j[j] <- mean(eb_j[cm_j], na.rm = TRUE)
+            }
+            theta_valid <- theta_j[is.finite(theta_j)]
+            N_eff <- length(theta_valid)
+            if (N_eff >= 2L) {
+                pseudo     <- nboots * estimate[k] - (nboots - 1) * theta_valid
+                se_vec[k]  <- sqrt(var(pseudo) / N_eff)
+                z_q        <- stats::qnorm(1 - (1 - conf.level) / 2)
+                ci_lo[k]   <- estimate[k] - z_q * se_vec[k]
+                ci_hi[k]   <- estimate[k] + z_q * se_vec[k]
+            }
+        }
+    }
+
+    data.frame(
+        event.time = ets,
+        estimate   = estimate,
+        se         = se_vec,
+        ci.lo      = ci_lo,
+        ci.hi      = ci_hi,
+        n_cells    = n_cells,
+        vartype    = "jackknife",
+        stringsAsFactors = FALSE
+    )
+}
+
+
 ## Compute overall ATT (single scalar) over treated cells, optionally
 ## filtered. Reads from fit$eff and fit$D.dat directly; bootstrap from
 ## fit$eff.boot if available, else delegates to the pre-aggregated
 ## fit$att.avg.boot when no cells filter is active.
 .estimand_att_overall <- function(fit, cells, weights, direction,
-                                  vartype, conf.level, ci.method) {
+                                  vartype, conf.level, ci.method,
+                                  test = "none") {
 
     if (!is.null(weights)) {
         stop("estimand(\"att\", \"overall\") with non-default weights ",
              "is not yet supported in v2.4.0.", call. = FALSE)
     }
-
-    Tev <- if (direction == "on") fit$T.on else fit$T.off
-    if (is.null(Tev)) {
-        stop("direction = \"off\" requested, but fit$T.off is NULL.",
+    if (test != "none" && !is.null(cells)) {
+        stop("estimand(\"att\", \"overall\") with both test = \"", test,
+             "\" and `cells` is not supported. The test = ... argument ",
+             "already filters cells to the placebo / carryover window.",
              call. = FALSE)
     }
 
-    treated_mask <- !is.na(fit$D.dat) & fit$D.dat == 1 & !is.na(Tev)
+    mask_info <- .test_cell_mask(fit, test, direction)
+    treated_mask <- mask_info$mask
+    Tev          <- mask_info$Tev
 
     ## Apply cells filter at the event-time / id level, not via long-form
     ## conversion (faster). Build a per-cell mask matching shape(eff).
@@ -638,12 +990,35 @@ estimand <- function(fit,
                  "per-cell bootstrap surface is available.",
                  call. = FALSE)
         }
+
+        ## Jackknife: eff.boot has shape TT x (N-1) x N. Each slice eff.boot[,,j]
+        ## is the effect matrix for the fit that excluded unit j; it has N-1 columns
+        ## mapping to the N-1 retained units. We cannot apply cell_mask (TT x N)
+        ## directly to eff.boot[,,j] (TT x (N-1)). Instead, reroute through the
+        ## jackknife-specific helper.
+        if (isTRUE(fit$vartype == "jackknife")) {
+            return(.estimand_att_overall_jackknife(fit, cell_mask, conf.level,
+                                                   vartype))
+        }
+
         nboots <- dim(fit$eff.boot)[3]
         att_b  <- vapply(seq_len(nboots), function(b) {
             mean(fit$eff.boot[, , b][cell_mask], na.rm = TRUE)
         }, numeric(1))
 
-        ci <- .compute_ci(estimate, att_b, ci.method, conf.level)
+        ## PARAMETRIC SHIFT (v2.4.2 fix)
+        is_parametric <- isTRUE(fit$vartype == "parametric") ||
+                         isTRUE(vartype == "parametric")
+        if (is_parametric) {
+            att_b <- att_b - mean(att_b, na.rm = TRUE) + estimate
+        }
+
+        jack_v <- if (ci.method == "bca") {
+            .cell_jackknife("att", eff = fit$eff[cell_mask])
+        } else NULL
+
+        ci <- .compute_ci(estimate, att_b, ci.method, conf.level,
+                          jack = jack_v)
         se_val <- ci$se
         ci_lo  <- ci$ci.lo
         ci_hi  <- ci$ci.hi
@@ -660,6 +1035,132 @@ estimand <- function(fit,
         ci.hi    = ci_hi,
         n_cells  = as.integer(n_cells),
         vartype  = used_vartype,
+        stringsAsFactors = FALSE
+    )
+}
+
+
+## Compute overall ATT under jackknife using the Tukey SE from the
+## per-event-time att.boot matrix.
+##
+## Strategy: eff.boot is TT x (N-1) x N for jackknife. Direct cell-masking
+## is not applicable because each slice drops one unit column. Instead, use
+## the pre-aggregated att.avg.unit.boot (per-unit leave-one-out ATT averages,
+## 1 x N) to compute N scalar overall-ATT leave-one-out estimates, then apply
+## the Tukey SE formula.
+##
+## When a cells filter is active, fall back to per-replicate recomputation
+## from eff.boot by mapping each replicate's reduced column space back to
+## the cell mask of the retained units.
+##
+## Arguments:
+##   fit        - fect object with vartype == "jackknife"
+##   cell_mask  - logical TT x N matrix; TRUE at treated cells to include
+##   conf.level - numeric confidence level (default 0.95)
+##   vartype    - "jackknife" or "none"
+##
+## Returns a one-row data frame with estimate, se, ci.lo, ci.hi, n_cells,
+## vartype (same schema as .estimand_att_overall()).
+.estimand_att_overall_jackknife <- function(fit, cell_mask, conf.level,
+                                             vartype) {
+    if (vartype == "none") {
+        ## No SE requested.
+        estimate <- mean(fit$eff[cell_mask], na.rm = TRUE)
+        return(data.frame(
+            estimate = estimate, se = NA_real_,
+            ci.lo = NA_real_, ci.hi = NA_real_,
+            n_cells = as.integer(sum(cell_mask)),
+            vartype = "none",
+            stringsAsFactors = FALSE
+        ))
+    }
+
+    estimate <- mean(fit$eff[cell_mask], na.rm = TRUE)
+    n_cells  <- sum(cell_mask)
+
+    ## Determine whether the cell_mask is "all treated cells" (no filter
+    ## beyond the standard treated-cell mask). In that case we can use the
+    ## pre-aggregated att.avg.unit.boot slot (1 x N matrix) for the
+    ## Tukey SE rather than recomputing from eff.boot.
+    ## att.avg.unit.boot is a unit-weighted grand average of all post-treatment
+    ## cells, which equals mean(eff[treated_mask]) when there is no
+    ## additional filter.
+    all_treated_mask <- !is.na(fit$D.dat) & fit$D.dat == 1 &
+                        !is.na(fit$T.on)
+    use_precomp <- identical(cell_mask, all_treated_mask) &&
+                   !is.null(fit$att.avg.unit.boot)
+
+    if (use_precomp) {
+        ## att.avg.unit.boot: 1 x N matrix (one row; N columns = jackknife
+        ## replicates). jackknifed() formula:
+        ##   pseudo_j = N * theta_hat - (N-1) * theta_j
+        ##   SE = sqrt(var(pseudo_j) / N)
+        theta_j <- as.vector(fit$att.avg.unit.boot)
+        N_jack  <- length(theta_j)
+        theta_j_valid <- theta_j[!is.na(theta_j)]
+        N_eff   <- length(theta_j_valid)
+        if (N_eff < 2L) {
+            return(data.frame(
+                estimate = estimate, se = NA_real_,
+                ci.lo = NA_real_, ci.hi = NA_real_,
+                n_cells = as.integer(n_cells),
+                vartype = "jackknife",
+                stringsAsFactors = FALSE
+            ))
+        }
+        pseudo  <- N_jack * estimate - (N_jack - 1) * theta_j_valid
+        se_val  <- sqrt(var(pseudo) / N_eff)
+    } else {
+        ## Cells filter is active or att.avg.unit.boot is unavailable.
+        ## Recompute per-replicate overall ATT from eff.boot.
+        ##
+        ## eff.boot[, , j] is TT x (N-1): the effect matrix for the panel
+        ## with unit j removed. The column ordering of eff.boot[,,j] matches
+        ## fit$id[-j] (all units except unit j, in original order).
+        ##
+        ## For each replicate j:
+        ##   1. Build the corresponding cell_mask_j (TT x (N-1)) by dropping
+        ##      column j from cell_mask.
+        ##   2. Compute theta_j = mean(eff.boot[,,j][cell_mask_j]).
+        ##
+        ## This is correct because cell_mask[t, j] is FALSE for unit j at any
+        ## time (unit j is only in the full panel, not in a leave-one-out fit
+        ## that excludes j). Dropping column j from cell_mask gives the mask
+        ## applicable to eff.boot[,,j].
+        N_jack <- dim(fit$eff.boot)[3]
+        theta_j <- numeric(N_jack)
+        for (j in seq_len(N_jack)) {
+            ## Drop column j from cell_mask.
+            cm_j <- cell_mask[, -j, drop = FALSE]
+            eb_j <- fit$eff.boot[, , j]  ## TT x (N-1)
+            theta_j[j] <- mean(eb_j[cm_j], na.rm = TRUE)
+        }
+        theta_j_valid <- theta_j[is.finite(theta_j)]
+        N_eff <- length(theta_j_valid)
+        if (N_eff < 2L) {
+            return(data.frame(
+                estimate = estimate, se = NA_real_,
+                ci.lo = NA_real_, ci.hi = NA_real_,
+                n_cells = as.integer(n_cells),
+                vartype = "jackknife",
+                stringsAsFactors = FALSE
+            ))
+        }
+        pseudo <- N_jack * estimate - (N_jack - 1) * theta_j_valid
+        se_val <- sqrt(var(pseudo) / N_eff)
+    }
+
+    z     <- stats::qnorm(1 - (1 - conf.level) / 2)
+    ci_lo <- estimate - z * se_val
+    ci_hi <- estimate + z * se_val
+
+    data.frame(
+        estimate = estimate,
+        se       = se_val,
+        ci.lo    = ci_lo,
+        ci.hi    = ci_hi,
+        n_cells  = as.integer(n_cells),
+        vartype  = "jackknife",
         stringsAsFactors = FALSE
     )
 }
@@ -836,7 +1337,7 @@ estimand <- function(fit,
 ## replicate, so the bootstrap distribution is the distribution of
 ## ratios, not the ratio of mean distributions.
 .estimand_aptt <- function(fit, by, cells, weights, direction,
-                           vartype, conf.level, ci.method) {
+                           vartype, conf.level, ci.method, test = "none") {
 
     if (!is.null(weights)) {
         stop("estimand(\"aptt\") with non-default weights is not yet ",
@@ -854,7 +1355,7 @@ estimand <- function(fit,
 
     if (by == "event.time") {
         return(.compute_aptt_event_time(fit, conf.level, ci.method,
-                                        vartype, direction))
+                                        vartype, direction, test))
     }
 
     stop("estimand(\"aptt\") with by = \"", by, "\" is not yet ",
@@ -865,20 +1366,15 @@ estimand <- function(fit,
 
 ## Compute per-event-time APTT with bootstrap CI.
 .compute_aptt_event_time <- function(fit, conf.level, ci.method, vartype,
-                                      direction) {
+                                      direction, test = "none") {
 
-    Tev <- if (direction == "on") fit$T.on else fit$T.off
-    if (is.null(Tev)) {
-        stop("direction = \"off\" requested, but fit$T.off is NULL.",
-             call. = FALSE)
-    }
-
-    treated_mask <- !is.na(fit$D.dat) & fit$D.dat == 1 & !is.na(Tev)
+    mask_info <- .test_cell_mask(fit, test, direction)
+    treated_mask <- mask_info$mask
+    Tev          <- mask_info$Tev
 
     ets <- sort(unique(Tev[treated_mask]))
     if (length(ets) == 0) {
-        stop("No treated cells with non-NA event time found.",
-             call. = FALSE)
+        stop("No cells satisfy test = \"", test, "\".", call. = FALSE)
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
@@ -905,40 +1401,87 @@ estimand <- function(fit,
         den   <- mean(Y0_t, na.rm = TRUE)
         estimate[k] <- num / den
 
-        ## Bootstrap distribution per replicate.
+        ## Bootstrap / jackknife distribution per replicate.
         if (nboots > 0L && vartype != "none") {
-            ## eff_boot_cells: rows = cells in this group, cols = replicates.
-            eff_boot_cells <- apply(fit$eff.boot, 3, function(eb) eb[cell_mask])
-            if (!is.matrix(eff_boot_cells)) {
-                eff_boot_cells <- matrix(eff_boot_cells,
-                                         nrow = sum(cell_mask))
+            if (isTRUE(fit$vartype == "jackknife")) {
+                ## Jackknife branch: column-drop masking for TT x (N-1) x N eff.boot.
+                ## For each replicate j (unit j dropped), extract the surviving cells
+                ## and compute per-replicate APTT.
+                keep_cols <- seq_len(ncol(fit$D.dat))
+                theta_j <- numeric(nboots)
+                for (j in seq_len(nboots)) {
+                    ## Build TT x (N-1) masks aligned with eff.boot[,,j].
+                    kcols <- keep_cols[-j]
+                    cm_j_full <- cell_mask[, kcols, drop = FALSE]
+                    eb_j      <- fit$eff.boot[, , j]  ## TT x (N-1)
+                    eff_j_v   <- eb_j[cm_j_full]
+                    Y_j       <- fit$Y.dat[, kcols, drop = FALSE][cm_j_full]
+                    Y0_j_v    <- Y_j - eff_j_v
+                    denom_j   <- mean(Y0_j_v, na.rm = TRUE)
+                    if (is.finite(denom_j) && abs(denom_j) > 1e-10) {
+                        theta_j[j] <- mean(eff_j_v, na.rm = TRUE) / denom_j
+                    } else {
+                        theta_j[j] <- NA_real_
+                    }
+                }
+                theta_valid <- theta_j[is.finite(theta_j)]
+                N_eff <- length(theta_valid)
+                if (N_eff >= 2L) {
+                    pseudo    <- nboots * estimate[k] - (nboots - 1) * theta_valid
+                    se_vec[k] <- sqrt(var(pseudo) / N_eff)
+                    z_q       <- stats::qnorm(1 - (1 - conf.level) / 2)
+                    ci_lo[k]  <- estimate[k] - z_q * se_vec[k]
+                    ci_hi[k]  <- estimate[k] + z_q * se_vec[k]
+                }
+            } else {
+                ## Bootstrap / wild / parametric branch (original code).
+                ## eff_boot_cells: rows = cells in this group, cols = replicates.
+                eff_boot_cells <- apply(fit$eff.boot, 3, function(eb) eb[cell_mask])
+                if (!is.matrix(eff_boot_cells)) {
+                    eff_boot_cells <- matrix(eff_boot_cells,
+                                             nrow = sum(cell_mask))
+                }
+                Y0_boot <- Y_t - eff_boot_cells
+
+                ## Hard-error on cell-drop pathology (v2.4.2+).
+                ## See .compute_log_att_event_time for the full rationale.
+                ## For APTT specifically: when E(Y0_b) crosses zero in any
+                ## replicate, the denominator blows up (or flips sign),
+                ## producing wildly unstable per-replicate APTT values.
+                mean_Y0_per_rep <- colMeans(Y0_boot, na.rm = TRUE)
+                n_bad_reps <- sum(abs(mean_Y0_per_rep) < 1e-10 |
+                                  is.na(mean_Y0_per_rep))
+                if (n_bad_reps > 0L) {
+                    pct_bad <- 100 * n_bad_reps / length(mean_Y0_per_rep)
+                    stop(sprintf(
+                        "APTT bootstrap is unreliable at event time %s\n  (E(Y0_hat) at the point = %.4f, but %d of %d bootstrap replicates\n  (%.1f%%) have E(Y0_b) ~ 0, blowing up the APTT denominator and\n  producing wildly unstable per-replicate ratios).\n\n  Options:\n    1. Filter out cells where E(Y0_hat) is small relative to E(Y):\n         estimand(fit, \"aptt\", \"event.time\",\n                  cells = ~ abs(Y0_hat) > <threshold>)\n    2. Transform the outcome to keep Y0_hat away from zero\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this denominator instability",
+                        as.character(et), den, n_bad_reps,
+                        length(mean_Y0_per_rep), pct_bad
+                    ), call. = FALSE)
+                }
+
+                aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
+                           mean_Y0_per_rep
+
+                ## PARAMETRIC SHIFT (v2.4.2 fix)
+                is_parametric <- isTRUE(fit$vartype == "parametric") ||
+                                 isTRUE(vartype == "parametric")
+                if (is_parametric) {
+                    aptt_b <- aptt_b - mean(aptt_b, na.rm = TRUE) + estimate[k]
+                }
+
+                ## Cell-level jackknife for the BCa acceleration parameter.
+                ## Only computed when bca is requested (cheap; no model refits).
+                jack_v <- if (ci.method == "bca") {
+                    .cell_jackknife("aptt", eff = eff_t, Y0 = Y0_t)
+                } else NULL
+
+                ci <- .compute_ci(estimate[k], aptt_b, ci.method, conf.level,
+                                  jack = jack_v)
+                se_vec[k] <- ci$se
+                ci_lo[k]  <- ci$ci.lo
+                ci_hi[k]  <- ci$ci.hi
             }
-            Y0_boot <- Y_t - eff_boot_cells
-
-            ## Hard-error on cell-drop pathology (v2.4.2+).
-            ## See .compute_log_att_event_time for the full rationale.
-            ## For APTT specifically: when E(Y0_b) crosses zero in any
-            ## replicate, the denominator blows up (or flips sign),
-            ## producing wildly unstable per-replicate APTT values.
-            mean_Y0_per_rep <- colMeans(Y0_boot, na.rm = TRUE)
-            n_bad_reps <- sum(abs(mean_Y0_per_rep) < 1e-10 |
-                              is.na(mean_Y0_per_rep))
-            if (n_bad_reps > 0L) {
-                pct_bad <- 100 * n_bad_reps / length(mean_Y0_per_rep)
-                stop(sprintf(
-                    "APTT bootstrap is unreliable at event time %s\n  (E(Y0_hat) at the point = %.4f, but %d of %d bootstrap replicates\n  (%.1f%%) have E(Y0_b) ~ 0, blowing up the APTT denominator and\n  producing wildly unstable per-replicate ratios).\n\n  Options:\n    1. Filter out cells where E(Y0_hat) is small relative to E(Y):\n         estimand(fit, \"aptt\", \"event.time\",\n                  cells = ~ abs(Y0_hat) > <threshold>)\n    2. Transform the outcome to keep Y0_hat away from zero\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this denominator instability",
-                    as.character(et), den, n_bad_reps,
-                    length(mean_Y0_per_rep), pct_bad
-                ), call. = FALSE)
-            }
-
-            aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
-                       mean_Y0_per_rep
-
-            ci <- .compute_ci(estimate[k], aptt_b, ci.method, conf.level)
-            se_vec[k] <- ci$se
-            ci_lo[k]  <- ci$ci.lo
-            ci_hi[k]  <- ci$ci.hi
         }
     }
 
@@ -962,10 +1505,13 @@ estimand <- function(fit,
 ## Internal: type = "log.att" dispatcher.
 ##
 ## logATT_g = mean_g(log(Y_obs) - log(Y0_hat)) over treated cells.
-## Cells where Y_obs <= 0 or Y0_hat <= 0 are dropped from the
-## aggregation with a one-time warning per call.
+## Hard-stops if any cell included in the aggregation has Y_obs <= 0 or
+## Y0_hat <= 0 (log undefined). Caller must pre-transform the outcome
+## (e.g. log(Y + c) inside fect) so that all imputed and observed
+## outcomes are strictly positive before requesting log.att.
 .estimand_log_att <- function(fit, by, cells, weights, direction,
-                              vartype, conf.level, ci.method) {
+                              vartype, conf.level, ci.method,
+                              test = "none") {
 
     if (!is.null(weights)) {
         stop("estimand(\"log.att\") with non-default weights is not ",
@@ -981,9 +1527,31 @@ estimand <- function(fit,
              call. = FALSE)
     }
 
+    ## Hard-stop on Y <= 0 / Y0_hat <= 0 at the point-estimate level.
+    ## log.att is mathematically undefined for non-positive imputed or
+    ## observed outcomes; silently dropping cells contaminates both the
+    ## point estimate and the bootstrap distribution. Force the caller
+    ## to pre-transform (typical fix: log(Y + c) for some c > 0 chosen
+    ## so all Y0_hat > 0; refit; then re-call estimand).
+    mask_info  <- .test_cell_mask(fit, test, direction)
+    cells_mask <- mask_info$mask
+    Y_chk  <- fit$Y.dat[cells_mask]
+    Y0_chk <- Y_chk - fit$eff[cells_mask]
+    n_bad_Y  <- sum(!is.na(Y_chk)  & Y_chk  <= 0)
+    n_bad_Y0 <- sum(!is.na(Y0_chk) & Y0_chk <= 0)
+    if (n_bad_Y + n_bad_Y0 > 0L) {
+        min_Y  <- if (n_bad_Y  > 0L) min(Y_chk[!is.na(Y_chk)],   na.rm = TRUE) else NA_real_
+        min_Y0 <- if (n_bad_Y0 > 0L) min(Y0_chk[!is.na(Y0_chk)], na.rm = TRUE) else NA_real_
+        stop(sprintf(
+            "log.att requires Y > 0 and Y0_hat > 0 in all treated cells.\n  Found %d cell(s) with Y <= 0 (min Y = %s) and %d cell(s) with Y0_hat <= 0 (min Y0_hat = %s).\n  log(Y) and log(Y0_hat) are undefined; silent dropping would bias the point estimate.\n\n  Fix: refit fect on a strictly-positive outcome, e.g.\n      data$Y_pos <- data$Y + (abs(min(data$Y)) + 1)\n      fit <- fect(Y_pos ~ D, ...)\n      estimand(fit, \"log.att\", \"event.time\")\n  Then back out the original-scale interpretation as needed.",
+            n_bad_Y,  if (is.na(min_Y))  "NA" else sprintf("%.4f", min_Y),
+            n_bad_Y0, if (is.na(min_Y0)) "NA" else sprintf("%.4f", min_Y0)
+        ), call. = FALSE)
+    }
+
     if (by == "event.time") {
         return(.compute_log_att_event_time(fit, conf.level, ci.method,
-                                           vartype, direction))
+                                           vartype, direction, test))
     }
 
     stop("estimand(\"log.att\") with by = \"", by, "\" is not yet ",
@@ -995,20 +1563,16 @@ estimand <- function(fit,
 ## Compute per-event-time log-ATT. Drops cells where either Y_obs or
 ## Y0_hat is non-positive (would give -Inf or NaN under log).
 .compute_log_att_event_time <- function(fit, conf.level, ci.method,
-                                         vartype, direction) {
+                                         vartype, direction,
+                                         test = "none") {
 
-    Tev <- if (direction == "on") fit$T.on else fit$T.off
-    if (is.null(Tev)) {
-        stop("direction = \"off\" requested, but fit$T.off is NULL.",
-             call. = FALSE)
-    }
-
-    treated_mask <- !is.na(fit$D.dat) & fit$D.dat == 1 & !is.na(Tev)
+    mask_info <- .test_cell_mask(fit, test, direction)
+    treated_mask <- mask_info$mask
+    Tev          <- mask_info$Tev
 
     ets <- sort(unique(Tev[treated_mask]))
     if (length(ets) == 0) {
-        stop("No treated cells with non-NA event time found.",
-             call. = FALSE)
+        stop("No cells satisfy test = \"", test, "\".", call. = FALSE)
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
@@ -1022,8 +1586,6 @@ estimand <- function(fit,
     alpha <- 1 - conf.level
     probs <- c(alpha / 2, 1 - alpha / 2)
 
-    n_dropped_total <- 0L
-
     for (k in seq_along(ets)) {
         et <- ets[k]
         cell_mask <- treated_mask & Tev == et
@@ -1032,9 +1594,9 @@ estimand <- function(fit,
         Y_t   <- fit$Y.dat[cell_mask]
         Y0_t  <- Y_t - eff_t
 
-        ## Drop non-positive cells (log undefined).
-        ok <- !is.na(Y_t) & !is.na(Y0_t) & Y_t > 0 & Y0_t > 0
-        n_dropped_total <- n_dropped_total + sum(!ok)
+        ## Caller-level hard-stop in .estimand_log_att already guarantees
+        ## all cells have Y > 0 and Y0_hat > 0; only NA filtering needed.
+        ok <- !is.na(Y_t) & !is.na(Y0_t)
         n_cells[k] <- sum(ok)
 
         if (sum(ok) == 0L) {
@@ -1046,62 +1608,106 @@ estimand <- function(fit,
         estimate[k] <- mean(log_diff, na.rm = TRUE)
 
         if (nboots > 0L && vartype != "none") {
-            eff_boot_cells <- apply(fit$eff.boot, 3,
-                                    function(eb) eb[cell_mask])
-            if (!is.matrix(eff_boot_cells)) {
-                eff_boot_cells <- matrix(eff_boot_cells,
-                                         nrow = sum(cell_mask))
+            if (isTRUE(fit$vartype == "jackknife")) {
+                ## Jackknife branch: column-drop masking for TT x (N-1) x N eff.boot.
+                ## For each replicate j (unit j dropped), extract the surviving cells
+                ## and compute per-replicate log-ATT using log(Y_j) - log(Y0_j).
+                keep_cols <- seq_len(ncol(fit$D.dat))
+                theta_j <- numeric(nboots)
+                for (j in seq_len(nboots)) {
+                    kcols      <- keep_cols[-j]
+                    cm_j_full  <- cell_mask[, kcols, drop = FALSE]
+                    eb_j       <- fit$eff.boot[, , j]  ## TT x (N-1)
+                    eff_j_v    <- eb_j[cm_j_full]
+                    Y_j        <- fit$Y.dat[, kcols, drop = FALSE][cm_j_full]
+                    Y0_j_v     <- Y_j - eff_j_v
+                    ok_j       <- !is.na(Y_j) & !is.na(Y0_j_v) &
+                                  Y_j > 0 & Y0_j_v > 0
+                    if (sum(ok_j) == 0L) {
+                        theta_j[j] <- NA_real_
+                    } else {
+                        theta_j[j] <- mean(log(Y_j[ok_j]) - log(Y0_j_v[ok_j]),
+                                           na.rm = TRUE)
+                    }
+                }
+                theta_valid <- theta_j[is.finite(theta_j)]
+                N_eff <- length(theta_valid)
+                if (N_eff >= 2L) {
+                    pseudo    <- nboots * estimate[k] - (nboots - 1) * theta_valid
+                    se_vec[k] <- sqrt(var(pseudo) / N_eff)
+                    z_q       <- stats::qnorm(1 - (1 - conf.level) / 2)
+                    ci_lo[k]  <- estimate[k] - z_q * se_vec[k]
+                    ci_hi[k]  <- estimate[k] + z_q * se_vec[k]
+                }
+            } else {
+                ## Bootstrap / wild / parametric branch (original code).
+                eff_boot_cells <- apply(fit$eff.boot, 3,
+                                        function(eb) eb[cell_mask])
+                if (!is.matrix(eff_boot_cells)) {
+                    eff_boot_cells <- matrix(eff_boot_cells,
+                                             nrow = sum(cell_mask))
+                }
+                eff_ok    <- eff_boot_cells[ok, , drop = FALSE]
+                Y_ok      <- Y_t[ok]
+                Y0_b_ok   <- Y_ok - eff_ok
+
+                ## Hard-error on cell-drop pathology (v2.4.2+).
+                ##
+                ## When a cell used in the point estimate has Y0_b <= 0 in
+                ## a non-trivial fraction of bootstrap replicates, log(Y0_b)
+                ## returns NaN and colMeans(..., na.rm = TRUE) silently
+                ## averages over fewer cells in that replicate, breaking
+                ## the basic bootstrap principle and contaminating the
+                ## bootstrap distribution.
+                ##
+                ## Threshold: trigger when the WORST cell has Y0_b <= 0 in
+                ## > 5% of replicates. Sub-threshold cells are tolerated
+                ## (small dropping is benign at the bootstrap-distribution
+                ## scale; >5% indicates a genuinely unstable cell that
+                ## needs filtering or a different estimand).
+                n_reps_per_cell <- rowSums(Y0_b_ok <= 0, na.rm = TRUE)
+                n_total_reps    <- ncol(Y0_b_ok)
+                drop_frac       <- n_reps_per_cell / n_total_reps
+                worst_idx       <- which.max(drop_frac)
+                worst_frac      <- drop_frac[worst_idx]
+                if (length(worst_frac) && worst_frac > 0.05) {
+                    worst_Y0 <- Y0_t[ok][worst_idx]
+                    stop(sprintf(
+                        "log-ATT bootstrap is unreliable at event time %s.\n  The worst cell has Y0_hat = %.4f but %d of %d bootstrap replicates\n  (%.1f%%) have Y0_b <= 0 for it, so log(Y0_b) is undefined and the\n  per-replicate average silently drops the cell. This contaminates the\n  bootstrap distribution and yields meaningless inference.\n\n  Options:\n    1. Filter out unstable cells:\n         estimand(fit, \"log.att\", \"event.time\",\n                  cells = ~ Y0_hat > <threshold>)\n    2. Transform the outcome before fect: log(Y + c) for some c > 0\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this pathology",
+                        as.character(et), worst_Y0,
+                        n_reps_per_cell[worst_idx], n_total_reps,
+                        100 * worst_frac
+                    ), call. = FALSE)
+                }
+
+                log_Y0_b  <- log(Y0_b_ok)
+                log_Y     <- log(Y_ok)
+                log_diff_b <- log_Y - log_Y0_b
+                logatt_b  <- colMeans(log_diff_b, na.rm = TRUE)
+
+                ## PARAMETRIC SHIFT (v2.4.2 fix)
+                ## Note: log.att with parametric vartype requires strictly positive Y0_hat,
+                ## which is only reachable when the outcome has been transformed (e.g. log(Y+c)).
+                ## When reachable, eff.boot is H0-centered so logatt_b ≈ 0; the shift
+                ## centers it at estimate[k] (the true log-ATT). The shift preserves sd().
+                is_parametric <- isTRUE(fit$vartype == "parametric") ||
+                                 isTRUE(vartype == "parametric")
+                if (is_parametric) {
+                    logatt_b <- logatt_b - mean(logatt_b, na.rm = TRUE) + estimate[k]
+                }
+
+                ## Cell-level jackknife on the per-cell log-diff vector.
+                jack_v <- if (ci.method == "bca") {
+                    .cell_jackknife("log.att", log_diff = log_diff)
+                } else NULL
+
+                ci <- .compute_ci(estimate[k], logatt_b, ci.method, conf.level,
+                                  jack = jack_v)
+                se_vec[k] <- ci$se
+                ci_lo[k]  <- ci$ci.lo
+                ci_hi[k]  <- ci$ci.hi
             }
-            eff_ok    <- eff_boot_cells[ok, , drop = FALSE]
-            Y_ok      <- Y_t[ok]
-            Y0_b_ok   <- Y_ok - eff_ok
-
-            ## Hard-error on cell-drop pathology (v2.4.2+).
-            ##
-            ## When a cell used in the point estimate has Y0_b <= 0 in
-            ## a non-trivial fraction of bootstrap replicates, log(Y0_b)
-            ## returns NaN and colMeans(..., na.rm = TRUE) silently
-            ## averages over fewer cells in that replicate, breaking
-            ## the basic bootstrap principle and contaminating the
-            ## bootstrap distribution.
-            ##
-            ## Threshold: trigger when the WORST cell has Y0_b <= 0 in
-            ## > 5% of replicates. Sub-threshold cells are tolerated
-            ## (small dropping is benign at the bootstrap-distribution
-            ## scale; >5% indicates a genuinely unstable cell that
-            ## needs filtering or a different estimand).
-            n_reps_per_cell <- rowSums(Y0_b_ok <= 0, na.rm = TRUE)
-            n_total_reps    <- ncol(Y0_b_ok)
-            drop_frac       <- n_reps_per_cell / n_total_reps
-            worst_idx       <- which.max(drop_frac)
-            worst_frac      <- drop_frac[worst_idx]
-            if (length(worst_frac) && worst_frac > 0.05) {
-                worst_Y0 <- Y0_t[ok][worst_idx]
-                stop(sprintf(
-                    "log-ATT bootstrap is unreliable at event time %s.\n  The worst cell has Y0_hat = %.4f but %d of %d bootstrap replicates\n  (%.1f%%) have Y0_b <= 0 for it, so log(Y0_b) is undefined and the\n  per-replicate average silently drops the cell. This contaminates the\n  bootstrap distribution and yields meaningless inference.\n\n  Options:\n    1. Filter out unstable cells:\n         estimand(fit, \"log.att\", \"event.time\",\n                  cells = ~ Y0_hat > <threshold>)\n    2. Transform the outcome before fect: log(Y + c) for some c > 0\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this pathology",
-                    as.character(et), worst_Y0,
-                    n_reps_per_cell[worst_idx], n_total_reps,
-                    100 * worst_frac
-                ), call. = FALSE)
-            }
-
-            log_Y0_b  <- log(Y0_b_ok)
-            log_Y     <- log(Y_ok)
-            log_diff_b <- log_Y - log_Y0_b
-            logatt_b  <- colMeans(log_diff_b, na.rm = TRUE)
-
-            ci <- .compute_ci(estimate[k], logatt_b, ci.method, conf.level)
-            se_vec[k] <- ci$se
-            ci_lo[k]  <- ci$ci.lo
-            ci_hi[k]  <- ci$ci.hi
         }
-    }
-
-    if (n_dropped_total > 0L) {
-        warning(sprintf(
-            "log.att: dropped %d treated cell(s) with Y_obs <= 0 or Y0_hat <= 0.",
-            n_dropped_total
-        ), call. = FALSE)
     }
 
     used_vartype <- if (vartype == "none") "none"
@@ -1129,20 +1735,31 @@ estimand <- function(fit,
 ## distribution `boot` (a numeric vector of replicate-level estimates),
 ## a point `estimate`, and a chosen `ci.method`.
 ##
-## Supports four methods:
+## Supports five methods:
 ##   - "basic":     ci = (2*est - q_hi, 2*est - q_lo) [reflected]
 ##   - "percentile": ci = (q_lo, q_hi)
 ##   - "bc":        bias-corrected percentile (z0 only, no acceleration)
 ##                  ci = (q_{Phi(2*z0 + z_alpha/2)},
 ##                        q_{Phi(2*z0 + z_{1-alpha/2})})
 ##                  where z0 = Phi^-1(mean(boot < est)).
-##   - "normal":    ci = est +/- z_{1-alpha/2} * SE   [Wald]
+##   - "bca":       bias-corrected accelerated (Efron 1987 full BCa).
+##                  Requires `jack` (a numeric vector of leave-one-out
+##                  point estimates over the cells in the aggregation
+##                  group) to compute the acceleration parameter.
+##                  Cutoffs: a_lo = Phi(z0 + (z0+z_alpha/2) /
+##                                          (1 - a*(z0+z_alpha/2)))
+##                  Handles bootstrap-bias + bootstrap-skew jointly;
+##                  default for ratio (aptt) and log (log.att) estimands
+##                  where the bootstrap distribution is inherently
+##                  skewed and bc alone degenerates at the boundary.
+##   - "normal":    ci = est +/- z_{1-alpha/2} * SE   [Wald, symmetric]
+##
+## `jack` is the per-cell leave-one-out vector of within-group point
+## estimates; required for "bca", ignored otherwise. The acceleration
+## is a = sum((mean(jack) - jack)^3) / (6 * (sum(...^2))^1.5).
 ##
 ## Returns a list with elements `se`, `ci.lo`, `ci.hi`.
-##
-## See statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md
-## for the design rationale and per-type defaults.
-.compute_ci <- function(estimate, boot, ci.method, conf.level) {
+.compute_ci <- function(estimate, boot, ci.method, conf.level, jack = NULL) {
     alpha <- 1 - conf.level
     se    <- stats::sd(boot, na.rm = TRUE)
 
@@ -1179,9 +1796,214 @@ estimand <- function(fit,
         a_lo    <- stats::pnorm(2 * z0 + z_lo)
         a_hi    <- stats::pnorm(2 * z0 + z_hi)
         bc_qs   <- stats::quantile(boot, probs = c(a_lo, a_hi), na.rm = TRUE)
-        return(list(se = se, ci.lo = unname(bc_qs[1]), ci.hi = unname(bc_qs[2])))
+        ## Same robustness fallback as bca (see comment in the bca block):
+        ## when z0 hits the clamp the bc cutoffs collapse or shift off the
+        ## estimate. Normal CI is the safe replacement.
+        ci_lo_bc <- unname(bc_qs[1])
+        ci_hi_bc <- unname(bc_qs[2])
+        is_degenerate <- abs(ci_hi_bc - ci_lo_bc) < 1e-10
+        is_uncovered  <- (estimate < ci_lo_bc) || (estimate > ci_hi_bc)
+        if (is_degenerate || is_uncovered) {
+            z <- stats::qnorm(1 - alpha / 2)
+            return(list(se    = se,
+                        ci.lo = estimate - z * se,
+                        ci.hi = estimate + z * se))
+        }
+        return(list(se = se, ci.lo = ci_lo_bc, ci.hi = ci_hi_bc))
+    }
+    if (ci.method == "bca") {
+        if (is.null(jack)) {
+            stop("ci.method = \"bca\" requires the per-cell jackknife ",
+                 "vector via the `jack` argument; the caller must compute ",
+                 "leave-one-out within-group estimates and pass them.",
+                 call. = FALSE)
+        }
+        valid <- !is.na(boot)
+        jack_valid <- !is.na(jack)
+        if (sum(valid) == 0L) {
+            return(list(se = NA_real_, ci.lo = NA_real_, ci.hi = NA_real_))
+        }
+        ## Fall back to bc when the cell-level jackknife is degenerate
+        ## (e.g., only one treated cell contributing at this event time:
+        ## leave-one-out yields an empty vector; the .cell_jackknife()
+        ## helper returns rep(NA, n) at n < 2). bc only needs the
+        ## bootstrap distribution, so it stays well-defined wherever
+        ## sum(valid) > 0. This fallback fires on the staggered tails
+        ## of event-time series where event.time t is only reached by
+        ## a single treated unit; without it the user sees missing CI
+        ## bands on the plot at the extreme event-times.
+        if (sum(jack_valid) < 2L) {
+            return(.compute_ci(estimate, boot, "bc", conf.level,
+                               jack = NULL))
+        }
+        ## z0: bias correction
+        p_below <- mean(boot[valid] < estimate)
+        p_below <- pmin(pmax(p_below, 1e-6), 1 - 1e-6)
+        z0      <- stats::qnorm(p_below)
+        ## a: acceleration via cell-level jackknife
+        jack_v   <- jack[jack_valid]
+        jack_bar <- mean(jack_v)
+        dev      <- jack_bar - jack_v
+        num      <- sum(dev^3)
+        den      <- 6 * (sum(dev^2))^1.5
+        a        <- if (den > 1e-12) num / den else 0
+        ## BCa cutoffs: handles z0 -> +/- inf via the (1 - a*z) denominator
+        z_lo  <- stats::qnorm(alpha / 2)
+        z_hi  <- stats::qnorm(1 - alpha / 2)
+        adjust <- function(z_q) {
+            denom <- 1 - a * (z0 + z_q)
+            ## Guard against a*(z0+z_q) -> 1 (denom -> 0); fall back to bc.
+            if (abs(denom) < 1e-8) {
+                return(stats::pnorm(2 * z0 + z_q))
+            }
+            stats::pnorm(z0 + (z0 + z_q) / denom)
+        }
+        a_lo  <- adjust(z_lo)
+        a_hi  <- adjust(z_hi)
+        bca_qs <- stats::quantile(boot, probs = c(a_lo, a_hi), na.rm = TRUE)
+        ## Robustness fallback to normal CI when bca produces a pathological
+        ## interval: (a) both cutoffs collapse to the same bootstrap quantile
+        ## (degenerate; happens when z0 hits the clamp at +-qnorm(1e-6)),
+        ## or (b) the interval shifts entirely off the point estimate
+        ## (happens with heavily skewed bootstraps at small B). bca is
+        ## mathematically valid in both cases but the resulting visual is
+        ## misleading on per-event-time plots. Normal CI is centered at
+        ## estimate by construction so it always covers, and it uses the
+        ## already-computed bootstrap SE.
+        ci_lo_bca <- unname(bca_qs[1])
+        ci_hi_bca <- unname(bca_qs[2])
+        is_degenerate <- abs(ci_hi_bca - ci_lo_bca) < 1e-10
+        is_uncovered  <- (estimate < ci_lo_bca) || (estimate > ci_hi_bca)
+        if (is_degenerate || is_uncovered) {
+            z <- stats::qnorm(1 - alpha / 2)
+            return(list(se    = se,
+                        ci.lo = estimate - z * se,
+                        ci.hi = estimate + z * se))
+        }
+        return(list(se = se, ci.lo = ci_lo_bca, ci.hi = ci_hi_bca))
     }
     stop("Unknown ci.method = \"", ci.method, "\".", call. = FALSE)
+}
+
+
+## Compute the per-cell jackknife vector for a within-group functional T.
+## For aptt: T(eff, Y0) = mean(eff) / mean(Y0). leave-one-out:
+##   theta_jack[i] = mean(eff[-i]) / mean(Y0[-i])
+## For log.att: T(Y, Y0) = mean(log(Y) - log(Y0)). leave-one-out:
+##   theta_jack[i] = mean(log(Y[-i]) - log(Y0[-i]))
+## For att (level): T = mean(eff). theta_jack[i] = mean(eff[-i]).
+##
+## Used for the BCa acceleration parameter without requiring model refits
+## (the influence is computed at the aggregation step, holding the model
+## fixed). This is the standard practice for BCa when leave-one-unit-out
+## refits are too expensive.
+.cell_jackknife <- function(type, ...) {
+    args <- list(...)
+    if (type == "aptt") {
+        eff <- args$eff; Y0 <- args$Y0
+        n   <- length(eff)
+        if (n < 2L) return(rep(NA_real_, n))
+        sum_eff <- sum(eff, na.rm = TRUE)
+        sum_Y0  <- sum(Y0,  na.rm = TRUE)
+        ## leave-one-out means: (sum - eff_i) / (n - 1)
+        num <- (sum_eff - eff) / (n - 1)
+        den <- (sum_Y0  - Y0)  / (n - 1)
+        return(num / den)
+    }
+    if (type == "log.att") {
+        ld <- args$log_diff
+        n  <- length(ld)
+        if (n < 2L) return(rep(NA_real_, n))
+        ## leave-one-out mean of log_diff
+        sum_ld <- sum(ld, na.rm = TRUE)
+        return((sum_ld - ld) / (n - 1))
+    }
+    if (type == "att") {
+        eff <- args$eff
+        n   <- length(eff)
+        if (n < 2L) return(rep(NA_real_, n))
+        sum_eff <- sum(eff, na.rm = TRUE)
+        return((sum_eff - eff) / (n - 1))
+    }
+    stop("Unknown jackknife type = \"", type, "\".", call. = FALSE)
+}
+
+
+## Build the cell-level base mask for a given test (none / placebo /
+## carryover) and direction. Returns a list with `mask` (logical
+## matrix matching shape(fit$D.dat)) and `Tev` (the relevant event-
+## time matrix from fit$T.on or fit$T.off).
+##
+## test = "none":      treated post-treatment cells (the default ATT
+##                     surface): D.dat == 1 with non-NA Tev.
+## test = "placebo":   pre-treatment cells masked during the placebo
+##                     fit, identified by Tev within fit$placebo.period.
+##                     Requires fit$placeboTest == TRUE.
+## test = "carryover": early post-reversal cells masked during the
+##                     carryover fit, identified by Tev within
+##                     fit$carryover.period (Tev = T.off). Requires
+##                     fit$carryoverTest == TRUE and hasRevs.
+##
+## v2.4.3+ (closes issue #131, ajunquera).
+.test_cell_mask <- function(fit, test, direction) {
+
+    Tev <- if (direction == "on") fit$T.on else fit$T.off
+    if (is.null(Tev)) {
+        stop("direction = \"", direction, "\" requested, but fit$T.",
+             direction, " is NULL.", call. = FALSE)
+    }
+
+    if (test == "none") {
+        return(list(
+            mask = !is.na(fit$D.dat) & fit$D.dat == 1 & !is.na(Tev),
+            Tev  = Tev
+        ))
+    }
+
+    if (test == "placebo") {
+        if (!isTRUE(as.logical(fit$placeboTest)) ||
+            is.null(fit$placebo.period)) {
+            stop("test = \"placebo\" requires the fit to have been run ",
+                 "with placeboTest = TRUE. The placebo estimand is only ",
+                 "meaningful when the placebo cells were masked from the ",
+                 "fit (out-of-sample predictions); a standard fit's ",
+                 "pre-treatment residuals are in-sample and would not be ",
+                 "an honest credibility check. Refit with: ",
+                 "fect(..., placeboTest = TRUE, placebo.period = c(L, R)).",
+                 call. = FALSE)
+        }
+        pp <- fit$placebo.period
+        if (length(pp) == 1L) pp <- c(pp, pp)
+        return(list(
+            mask = !is.na(Tev) & Tev >= pp[1] & Tev <= pp[2],
+            Tev  = Tev
+        ))
+    }
+
+    if (test == "carryover") {
+        if (!isTRUE(as.logical(fit$carryoverTest)) ||
+            is.null(fit$carryover.period)) {
+            stop("test = \"carryover\" requires the fit to have been run ",
+                 "with carryoverTest = TRUE. The carryover estimand is ",
+                 "only meaningful when the early post-reversal cells were ",
+                 "masked from the fit (out-of-sample predictions). Refit ",
+                 "with: fect(..., carryoverTest = TRUE, ",
+                 "carryover.period = c(L, R)).",
+                 call. = FALSE)
+        }
+        if (!isTRUE(fit$hasRevs == 1)) {
+            stop("test = \"carryover\" requires a panel with treatment ",
+                 "reversals (fit$hasRevs == 1).", call. = FALSE)
+        }
+        cp <- fit$carryover.period
+        if (length(cp) == 1L) cp <- c(cp, cp)
+        return(list(
+            mask = !is.na(Tev) & Tev >= cp[1] & Tev <= cp[2],
+            Tev  = Tev
+        ))
+    }
+
+    stop("Unknown test = \"", test, "\".", call. = FALSE)
 }
 
 

@@ -1,85 +1,158 @@
 <!-- markdownlint-disable MD025 -->
 # fect 2.4.2
 
-## New: `ci.method = "bc"` and `"normal"` in `estimand()`; per-type defaults
+## New: `ci.method` argument on `fect()`; legacy `quantile.CI` soft-deprecated
 
-* `estimand()`'s `ci.method` enum is extended from
-  `c("basic", "percentile")` to
-  `c("basic", "percentile", "bc", "normal")`.
-* `"bc"` is the bias-corrected percentile bootstrap (Efron 1987 minus
-  the acceleration). It shifts the percentile cutoffs by `2 z0` where
-  `z0 = Φ⁻¹(P(boot < est))` to compensate when the bootstrap median
-  is biased relative to the point estimate. Free (one extra `Φ⁻¹`
-  call); compatible with all `vartype` values.
-* `"normal"` is the textbook Wald CI: `θ̂ ± z·SE`. This is what
-  `fit$est.att` already uses internally for both bootstrap and
-  jackknife (`R/boot.R` populates `att ± qnorm(1 − α/2) · SE`).
-* **`ci.method` now defaults to `NULL`, which triggers a per-type
-  default:**
-    * `type = "att"` → `"normal"` (corrects v2.4.1's mislabeled
-      "basic" fast-path passthrough; numerically unchanged because
-      `fit$est.att` already uses normal CIs)
-    * `type = "att.cumu"` → `"percentile"` (matches what
-      `att.cumu()` does internally)
-    * `type = "aptt"` → `"bc"` (ratio estimator → skewed bootstrap
-      → bias correction helps)
-    * `type = "log.att"` → `"bc"` (log estimator → same)
-* Existing scripts that pass `ci.method = ...` explicitly are
-  unaffected. Callers that omit `ci.method` will see different CI
-  bounds for `att.cumu` / `aptt` / `log.att` (point estimate and SE
-  unchanged); the change is in the direction of more sensible
-  intervals (basic CI was producing CIs that didn't contain the point
-  estimate when bootstrap was skewed --- discovered while building
-  `test = "placebo"` in v2.4.3 development; see
-  `statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md`).
+* `fect()` gains a `ci.method = c("normal", "basic")` argument. Default
+  `"normal"` (Wald: `θ̂ ± z · SE`) preserves the v2.4.1 default behaviour
+  byte-equivalently. `"basic"` (reflected pivot: `2 · θ̂ − quantile(boot, …)`)
+  is the literature-standard "percentile" CI per @davison_hinkley1997 §5.2.1
+  and what `boot::boot.ci(type = "basic")` returns. All CIs in fect's
+  returned `est.*` slots use the requested method uniformly.
+* The legacy `quantile.CI` argument is soft-deprecated. Both legacy values
+  still work (`quantile.CI = FALSE` → `ci.method = "normal"`; `quantile.CI = TRUE`
+  → `ci.method = "basic"`) but emit a one-time deprecation warning when
+  user-supplied. Removal targeted for v2.5.0+.
+* `ci.method = "basic"` with `nboots < 1000` emits a tail-CI replicate
+  warning at fit time (mirrors the `estimand()` `.check_tail_ci_replicates`
+  gate). The 5th / 195th order statistics that `basic` reads are unstable
+  at small `B` --- @efron1987 §3 and @diciccio_efron1996 §4 recommend
+  `B ≥ 1000` for tail-quantile CIs.
+* `ci.method = "bca"`, `"bc"`, or `"percentile"` on `fect()` is rejected
+  with a clear error pointing the user to `estimand(fit, type, ci.method)`
+  for the full 5-method surface. fect's built-in CI machinery covers the
+  routine `att` workflow; the alternative estimands (`att.cumu`, `aptt`,
+  `log.att`) where bias-corrected CIs matter live on the `estimand()` path.
 
-## New: hard-error on bootstrap cell-drop pathology in `log.att` / `aptt`
+## New: alternative-estimand additions in `estimand()`
 
-* When a cell used in the point estimate has `Y0_b ≤ 0` in a
-  non-trivial fraction of bootstrap replicates (`> 5%` for `log.att`,
-  any replicate where `E(Y0_b) ≈ 0` for `aptt`), the previous v2.4.1
-  behavior silently dropped those replicates' contributions via
-  `colMeans(..., na.rm = TRUE)`, contaminating the bootstrap
-  distribution.
-* v2.4.2 hard-errors on this pathology with actionable guidance:
-  filter near-zero cells, transform the outcome, or use a different
-  estimand. The previous silent-drop behavior produced meaningless
-  inference (the point estimator computed over N cells; bootstrap
-  averages over N, N-1, ..., 0 cells per replicate).
+* New `test = c("none", "placebo", "carryover")` argument evaluates the
+  requested estimand at pre-treatment placebo cells or early
+  post-reversal carryover cells, producing a per-event-time series for
+  credibility checks. Closes issue #131. Auto-pairs `direction = "on"`
+  with placebo and `direction = "off"` with carryover; auto-validates
+  the fit (placebo requires `placeboTest = TRUE` at fit time; carryover
+  requires `carryoverTest = TRUE` + a reversal panel).
+* `type = "att.cumu"` rejected with a clear error when `test != "none"` ---
+  cumulative semantics are defined relative to treatment onset.
+* `ci.method` enum extended from `c("basic", "percentile")` to
+  `c("basic", "percentile", "bc", "bca", "normal")`. New methods:
+  - `"bc"` --- bias-corrected percentile (Efron 1987 minus acceleration)
+  - `"bca"` --- bias-corrected accelerated (Efron 1987 in full); cell-level
+    jackknife computes the acceleration with no extra refits
+  - `"normal"` --- Wald CI `θ̂ ± z · SE`
+* `ci.method` now defaults to `NULL`, which triggers a per-type default:
+  - `"att"` → `"normal"`
+  - `"att.cumu"` → `"basic"` (reflected pivot CI; matches Davison-Hinkley 1997 §5.2.1 and `boot::boot.ci(type = "basic")`)
+  - `"aptt"` → `"bca"`
+  - `"log.att"` → `"bca"`
+  Existing scripts that pass `ci.method` explicitly are unaffected.
 
-## Default `nboots` raised from 200 to 1000
+## New: `para.error` argument for `vartype = "parametric"`
 
-* The default value of `nboots` in `fect()`, `fect.formula()`, and
-  `fect.default()` is now `1000` (was `200`). With the alternative-
-  estimand API increasingly used for percentile-based inference, 200
-  replicates produced noisy quantile estimates at the tails. Existing
-  scripts that explicitly pass `nboots = ...` are unaffected.
+* `fect()` gains a `para.error = c("auto", "ar", "empirical", "wild")`
+  argument selecting the residual-error model the parametric bootstrap
+  draws from. Replaces the implicit panel-shape-driven dispatch.
+* `"auto"` (default) resolves at fit time and stores the resolved label
+  on `fit$para.error`:
+  - `"empirical"` on a fully-observed panel
+  - `"ar"` on a panel with missing cells
+* `"ar"` --- the v2.4.1 behavior: AR(1) error process estimated from
+  control residuals. Works on any panel shape.
+* `"empirical"` --- i.i.d. column-resample from the main-fit residual
+  pool. Requires a fully-observed panel.
+* `"wild"` --- Liu 1988 / Mammen 1993 / Cameron-Gelbach-Miller 2008
+  unit-level Rademacher sign-flips over the empirical residual pool.
+  Requires a fully-observed panel; preserves within-unit dependence.
+* `para.error` is silently ignored when `vartype != "parametric"`.
 
-## Internal: warm-start infrastructure (not user-visible)
+## Changed: tighter EM convergence defaults
 
-* `inter_fe_ub`, `inter_fe_mc`, and the inner `fe_ad_inter_iter` /
-  `fe_ad_inter_covar_iter` C++ helpers gain an optional
-  `Rcpp::Nullable<Rcpp::NumericMatrix> fit_init = R_NilValue`
-  parameter; `fect_fe()` and `fect_mc()` R wrappers gain a matching
-  `fit.init = NULL` argument. NULL preserves pre-2.4.2 cold-start
-  behavior exactly (verified by tests).
-* Bootstrap activation was tested empirically (cold vs warm
-  comparison on simdata + IFE) and produced materially different
-  bootstrap distributions (max abs diff in `eff.boot` of 11.05;
-  S.E. relative diff up to 250%). The non-convex EM converges to
-  different stationary points under different starts. **Activation
-  deferred to v2.5.0** with a properly designed approach (damped
-  warm-start? coverage-based calibration?). The infrastructure is
-  in place but unused; no behavioral change for users.
-* Full investigation: `statsclaw-workspace/fect/ref/warm-start-audit-2026-05-01.md`.
+* `tol`: default flipped from `1e-3` to **`1e-5`**.
+* `max.iteration`: default flipped from `1000` to **`5000`**.
 
-## Bug fix: clearer message for singular-covariance F-test failure
+The pre-v2.4.2 default `tol = 1e-3` halted IFE/CFE EM well before
+convergence: on factor-DGP simdata the EM stopped at iteration 116
+with `att.avg = 2.87`, while running to `tol = 1e-7` (~2000 iters)
+produces `att.avg = 2.43` --- an 18% gap between two valid stopping
+points of the same procedure on the same data. CFE was worse
+(40% gap). The new defaults stop the EM after it has actually
+stabilized.
 
-* `R/diagtest.R` previously reported "F-test Failed. The estimated
-  covariance matrix is singular." This conflated two distinct
-  inferential statements (failed-to-reject vs could-not-be-computed).
-  Updated to "F-test could not be computed: the estimated covariance
-  matrix is singular."
+* **Inference at the old default was already correct.** Coverage
+  simulations (K=80, known-truth DGP, true τ=3) show empirical
+  coverage of 0.96 at both old and new defaults for IFE; bootstrap
+  SE matches empirical SE in both. The fix improves
+  *reproducibility* and *point-estimate stability across
+  versions/machines*, not coverage validity.
+* **What this means for users**: numerical output from prior versions
+  remains valid inferentially (CIs still cover correctly), but the
+  point-estimate values will shift on rerun under v2.4.2 --- typically
+  by a few percent on canonical IFE, up to 40% on factor-heavy CFE.
+  The new numbers are closer to the EM's actual converged minimum.
+* **Speed cost**: ~2-5x slower main fit and bootstrap on
+  factor-DGP IFE/CFE because EM iterates more (994 iters at 1e-5
+  vs 116 at 1e-3 on simdata). GSC and MC paths unaffected
+  (they were already converging within the old defaults).
+* New `warning()` when EM hits `max.iteration` without satisfying
+  the tol gate --- alerts users to under-converged fits on hard
+  cases (e.g., very large N panels, near-collinear factors).
+
+Set `tol = 1e-3, max.iteration = 1000` explicitly to reproduce
+pre-v2.4.2 numerical output exactly.
+
+## Bug fixes
+
+* `vartype = "parametric"` × `ci.method ∈ {"basic", "percentile", "bc",
+  "bca"}` produced 0% coverage CIs through v2.4.1 (the bootstrap
+  distribution is H₀-centered, but reflection-based CIs assume centering
+  at θ̂). `estimand()` now applies a variance-preserving location shift
+  for parametric fits. The `"normal"` ci.method is byte-stable; the
+  other four now produce nominal coverage.
+* `vartype = "jackknife"` was previously rejected by `estimand()` with a
+  slot-contract error. The slot contract is relaxed; only `ci.method =
+  "normal"` is accepted (the Wald-style CI from the Tukey SE), with
+  hard-error guidance pointing at `"bootstrap"` for the full ci.method
+  surface.
+* `log.att` and `aptt` silently dropped bootstrap replicates with
+  `Y0_b ≤ 0` via `colMeans(..., na.rm = TRUE)`, contaminating the
+  bootstrap distribution. Both now hard-error with actionable guidance
+  (pre-transform Y, filter near-zero cells, or use a different
+  estimand). `estimand("log.att", ...)` additionally hard-errors at the
+  point-estimate level when any treated cell has `Y_obs ≤ 0` or
+  `Y0_hat ≤ 0`.
+* `vartype = "parametric"` with default `time.component.from =
+  "notyettreated"` now produces a clearer error that names the user's
+  literal `method` argument (was: "Parametric bootstrap is not valid
+  when ..."; now: "vartype = 'parametric' requires time.component.from
+  = 'nevertreated'. Your call: method = 'fe', time.component.from =
+  'notyettreated'."). The reversal-check gate continues to fire first
+  on reversal panels.
+* `R/diagtest.R` "F-test Failed" message → "F-test could not be
+  computed" --- the test never "failed" in any standard sense; the
+  matrix arithmetic was undefined for the input.
+* Parallel-worker package version warnings (e.g. "package 'mvtnorm'
+  was built under R version X.Y.Z") suppressed via `clusterEvalQ`
+  pre-load + targeted `withCallingHandlers`.
+
+## Other changes
+
+* `estimand()` warns when `ci.method` `c("basic", "percentile", "bc",
+  "bca")` is requested on a fit with fewer than 1000 bootstrap
+  replicates, recommending refit at `nboots = 1000` for stable tail
+  quantiles (Efron 1987 §3; DiCiccio & Efron 1996 §4). The point
+  estimate and SE are unaffected; the warning fires on every such
+  call so the user can decide whether to suppress, refit, or
+  proceed with caveat.
+* `vartype = "jackknife"` with `Nco > 1000` emits a fit-time warning
+  recommending `vartype = "bootstrap"` for tractability (full
+  leave-one-out scales linearly in N and is slow at the v2.4.2 EM
+  convergence defaults).
+* `complex_fe_ub` and `cfe_iter` C++ entries gain optional `fit_init`
+  parameter (NULL default preserves pre-existing cold-start behavior).
+  This mirrors the existing warm-start infrastructure on
+  `inter_fe_ub` / `inter_fe_mc` / inner EM helpers. Not exposed to
+  the public API; reserved for future deferred features.
 
 # fect 2.4.1
 

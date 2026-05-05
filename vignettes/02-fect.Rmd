@@ -73,13 +73,9 @@ In the gap plot, pre-treatment estimates appear in gray (in-sample) while post-t
 
 ### Inference
 
-The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
+The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. Switch to `vartype = "jackknife"` (leave-one-unit-out) when the number of treated units is small (single digits). The number of bootstrap runs is set by `nboots` and the clustering variable by `cl` (default `"id"`).
 
-::: {.callout-tip appearance="simple"}
-### Inference parameters
-
-The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These parameters do not affect point estimates. `"parametric"` is only available in the Synth setting, i.e., when `time.component.from = "nevertreated"`.
-:::
+A third option, `vartype = "parametric"`, is intended for the synthetic-control regime where the number of treated units is small and the nonparametric bootstrap is unreliable; it has its own assumptions and gates. That setting and the deeper discussion of bootstrap-distribution semantics, confidence-interval methods (`ci.method`), p-values, and an empirical coverage study live in [Chapter @sec-inference].
 
 ::: {.callout-note appearance="simple"}
 **Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
@@ -101,50 +97,9 @@ When `parallel = TRUE`, CV parallelism auto-engages only on panels above a metho
 **Clustering.**
 
 -   By default, `fect()` uses cluster-bootstrap at the `unit` level when `se = TRUE`, that is `vartype = "bootstrap"`. The uncertainty estimates thus account for arbitrary serial correlation within a unit over time---commonly understood as being "clustered" at the unit level. In the example above, the unit is `id`, hence, by default, `cl = "id"`.
--   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level. In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset. This can be particularly useful when the number of treated units is small.
 -   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option.
+-   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level (`cl`, if different from `unit`, will be ignored). In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset. This can be particularly useful when the number of treated units is small.
 :::
-
-### Parametric bootstrap: valid regimes {#sec-parametric-regimes}
-
-The parametric bootstrap (`vartype = "parametric"`) uses a two-stage pseudo-treated resampling procedure to produce uncertainty estimates. It is well-suited for the synthetic control setting, where the number of treated units is small and nonparametric bootstrap is unreliable. However, the procedure rests on two key assumptions: (a) the time components (factors and loadings) are estimated from a **never-treated** control pool that is independent of the treated units' data, and (b) the model residuals on control units accurately reflect the true error distribution. When either assumption is violated, the parametric bootstrap underestimates standard errors and produces confidence intervals that are too narrow.
-
-To prevent users from invoking the parametric bootstrap in settings where these assumptions fail, the package enforces three hard restrictions:
-
-::: {.callout-important appearance="simple"}
-### Three-gate system
-
-| Gate | Condition | What it blocks |
-|---|---|---|
-| A | `method %in% c("mc", "both")` + `vartype = "parametric"` | MC + parametric |
-| B | treatment reversal present + `vartype = "parametric"` | reversal + parametric |
-| C | `time.component.from = "notyettreated"` + `vartype = "parametric"` | notyettreated + parametric |
-
-In all three cases the package raises an informative error pointing to the valid alternatives.
-:::
-
-The motivation for Gate C comes from both theory and evidence. The `notyettreated` path uses EM imputation to estimate factors jointly across all not-yet-treated observations, including the treated units' pre-period data. EM enlarges the effective factor space by imputing masked treated-post cells, which deflates the observed-cell residuals that the parametric bootstrap feeds into its covariance estimator. In a Monte Carlo study (N = 50, T = 20, r = 2 factors, 500 replications), the blocked `ife + notyettreated + parametric` combination produced **80.6% coverage at nominal 95%** (SE ratio ≈ 0.67). In contrast, all tested nevertreated paths produced near-nominal coverage (0.93–0.96, SE ratio ≈ 1.0). The architectural details of all three gates are documented in `ARCHITECTURE.md`.
-
-If your current code uses `vartype = "parametric"` with the default `time.component.from = "notyettreated"`, migrate as follows:
-
-```r
-# Before (now raises an error under Gate C):
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
-     method = "ife", se = TRUE, vartype = "parametric")
-
-# After — option 1: switch to nevertreated imputation
-# (requires that never-treated control units exist in the data)
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
-     method = "ife", time.component.from = "nevertreated",
-     se = TRUE, vartype = "parametric")
-
-# After — option 2: use nonparametric bootstrap (safe default)
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
-     method = "ife",
-     se = TRUE, vartype = "bootstrap")
-```
-
-Option 1 switches to the gsynth-style estimation regime and keeps parametric bootstrap. This is appropriate when never-treated control units exist and the treatment does not reverse. Option 2 leaves the estimator unchanged and uses cluster-bootstrap, which is appropriate when the number of treated units is moderate to large. See [Chapter @sec-gsynth] for guidance.
 
 ```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
@@ -283,17 +238,17 @@ The event study plot utilizing leave-one-out for pretreatment estimates is shown
 plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO")
 ```
 
-------------------------------------------------------------------------
-
-## Cumulative effects
-
-Cumulative treatment effects through each event time, and over a specified window, are computed via the unified post-hoc estimand interface introduced in v2.4.0. Both the per-event-time series and the overall window form are one-line calls. See [Chapter @sec-estimands] for the full surface, worked examples, and the migration table from the legacy `effect()` and `att.cumu()` functions.
 
 ------------------------------------------------------------------------
 
 ## Other estimands
 
-Beyond the standard ATT, **fect** supports several estimand variants: the **balanced treated sample** ATT (estimated only on treated units with complete data in a specified window), the **average cohort treatment effect** (estimated separately for each cohort of treatment adoption), and **user-supplied weighted ATTs** (where a user-provided weight column is applied to the across-treated-obs aggregation).
+Beyond the standard ATT, **fect** supports several estimand variants: the **cumulative effects**, the **balanced treated sample** ATT (estimated only on treated units with complete data in a specified window), the **average cohort treatment effect** (estimated separately for each cohort of treatment adoption), and **user-supplied weighted ATTs** (where a user-provided weight column is applied to the across-treated-obs aggregation).
+
+### Cumulative effects
+
+Cumulative treatment effects through each event time, and over a specified window, are computed via the unified post-hoc estimand interface introduced in v2.4.0. Both the per-event-time series and the overall window form are one-line calls. See [Chapter @sec-estimands] for the full surface, worked examples, and the migration table from the legacy `effect()` and `att.cumu()` functions.
+
 
 ### Balanced treated sample
 

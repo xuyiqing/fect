@@ -83,16 +83,20 @@ Choose based on estimand and inference. If the target is unit-specific and condi
 
 ## Organization
 
-The user guide is structured into the following chapters:
+The user guide is structured into four parts. Most users only need the **Basics** part to perform a complete analysis with the fixed effects counterfactual estimator; the remaining parts are referenced as needed.
+
+### Basics
 
 -   [Chapter @sec-start]\
     Installation instructions and datasets.
 
 -   [Chapter @sec-fect]\
-    The fixed effects counterfactual estimator (FEct), including estimation, inference, and diagnostics.
+    The fixed effects counterfactual estimator (FEct), including estimation and basic inference.
 
 -   [Chapter @sec-estimands]\
     Alternative estimands and the unified post-hoc estimand interface: cumulative ATT, APTT, log-scale ATT, window-restricted ATT, and the long-form accessor for custom estimands.
+
+### Advanced estimators and inference
 
 -   [Chapter @sec-ife-mc]\
     Interactive fixed effects (IFE) and matrix completion (MC) methods, cross-validation, and diagnostic tests.
@@ -100,20 +104,27 @@ The user guide is structured into the following chapters:
 -   [Chapter @sec-cfe]\
     The complex fixed effects (CFE) estimator: multi-level fixed effects, time-invariant covariates with time-varying coefficients, unit-specific time trends, in addition to interactive fixed effects.
 
+-   [Chapter @sec-gsynth]\
+    The Gsynth program --- the synthetic control setting using `time.component.from = "nevertreated"` --- originally developed in the **gsynth** package, with CFE extensions.
+
+-   [Chapter @sec-inference]\
+    Bootstrap inference internals: the `vartype` × `ci.method` × `para.error` matrix, parametric bootstrap mechanics, and the decision tree for choosing an inference path. Most relevant after Chapter @sec-gsynth where parametric bootstrap is the default.
+
+### Diagnostics and extensions
+
 -   [Chapter @sec-hte]\
     Effect heterogeneity: box plots, calendar-time trends, and covariate-based HTE. Triple difference-in-differences designs (in development).
-
--   [Chapter @sec-plots]\
-    Details of the plotting options and customization.
-
--   [Chapter @sec-gsynth]\
-    The Gsynth program — the synthetic control setting using `time.component.from = "nevertreated"` — originally developed in the **gsynth** package, with CFE extensions.
 
 -   [Chapter @sec-panel]\
     Application of various "modern" DID estimators.
 
 -   [Chapter @sec-panel-sens]\
     Sensitivity analysis for the counterfactual estimators.
+
+### Reference
+
+-   [Chapter @sec-plots]\
+    Detailed reference for plot options and customization, with examples for factor diagnostics, HTE, and modern-DID visualizations.
 
 -   [Chapter @sec-cheatsheet]\
     Quick reference for methods, parameters, plotting, and diagnostics.

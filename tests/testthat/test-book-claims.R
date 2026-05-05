@@ -539,12 +539,14 @@ test_that("H2: vartype='jackknife' works for FE and IFE", {
     expect_true(!is.null(out_ife$est.att))
 })
 
-test_that("H3: nboots default is 1000 (raised from 200 in v2.4.2)", {
+test_that("H3: nboots default is 200 (tail-CI warning fires at < 1000)", {
 
   skip_on_cran()
-    ## Check default via formals
+    ## v2.4.2: default stays at 200 (sufficient for SE / normal CI).
+    ## A runtime warning fires when ci.method = "basic" and nboots < 1000,
+    ## redirecting users to bump nboots for tail-quantile CIs.
     defs <- formals(fect)
-    expect_equal(defs$nboots, 1000)
+    expect_equal(defs$nboots, 200)
 })
 
 

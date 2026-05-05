@@ -76,7 +76,12 @@ test_that("att.cumu / aptt / att-overall work on parametric fits", {
   skip_on_cran()
   fit <- .make_parametric_fit()
 
-  expect_silent(r1 <- estimand(fit, "att.cumu", "event.time"))
+  ## att.cumu defaults to ci.method = "basic"; aptt defaults to "bca".
+  ## Both are tail-quantile CIs; on this small fit (nboots = 30) they
+  ## emit the v2.4.2 .check_tail_ci_replicates warning by design.
+  ## Suppress it here -- this test asserts the call runs and produces
+  ## non-NA results, not CI quality.
+  suppressWarnings(r1 <- estimand(fit, "att.cumu", "event.time"))
   expect_true(all(r1$vartype == "parametric"))
   expect_true(any(!is.na(r1$estimate)))
 
@@ -84,7 +89,7 @@ test_that("att.cumu / aptt / att-overall work on parametric fits", {
   expect_true(r2$vartype == "parametric")
   expect_true(!is.na(r2$estimate))
 
-  expect_silent(r3 <- estimand(fit, "aptt", "event.time"))
+  suppressWarnings(r3 <- estimand(fit, "aptt", "event.time"))
   expect_true(all(r3$vartype == "parametric"))
   expect_true(any(!is.na(r3$estimate)))
 })
@@ -93,13 +98,12 @@ test_that("log.att hard-errors on parametric fits with negative Y (v2.4.2+)", {
   skip_on_cran()
   fit <- .make_parametric_fit()
   ## sim_linear has many negative Y cells, so log.att now hard-errors
-  ## on the bootstrap cell-drop pathology (v2.4.2+). The previous
-  ## v2.4.1 behavior of silently warning + dropping cells produced
-  ## meaningless inference; the hard-error redirects users to the
-  ## actionable options.
+  ## at point-estimate level (v2.4.2+). The previous v2.4.1 behavior of
+  ## silently warning + dropping cells produced meaningless inference;
+  ## the hard-error redirects users to the actionable options.
   expect_error(
     estimand(fit, "log.att", "event.time"),
-    "log-ATT bootstrap is unreliable"
+    "log\\.att requires Y > 0"
   )
 })
 

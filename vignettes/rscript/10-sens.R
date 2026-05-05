@@ -31,7 +31,7 @@ data <- hh2019
 head(data)
 
 
-## ----hh_honest_placebo, warning=FALSE, message=FALSE, cache=FALSE-------------
+## ----hh_honest_placebo, warning=FALSE, message=FALSE, cache=TRUE--------------
 out.fect.placebo <- fect(nat_rate_ord~indirect, data = hh2019,
                          index = c("bfs","year"),
                          method = 'fe', se = TRUE,

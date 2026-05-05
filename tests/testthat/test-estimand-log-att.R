@@ -94,14 +94,15 @@ test_that("LA.3: log.att without keep.sims errors with the locked wording", {
 
 ## -- LA.4  Negative Y cells trigger the v2.4.2 hard-error -----------
 
-test_that("LA.4: negative Y cells trigger the cell-drop hard-error (v2.4.2+)", {
+test_that("LA.4: negative Y cells trigger point-level hard-error (v2.4.2+)", {
 
   skip_on_cran()
 
-  ## simdata has negative Y values, so log-ATT triggers the hard-error
-  ## on bootstrap cell-drop pathology. (Pre-2.4.2 the same condition
-  ## merely warned and silently dropped cells, producing meaningless
-  ## bootstrap inference.)
+  ## simdata has negative Y values, so log-ATT triggers the v2.4.2
+  ## point-estimate-level hard-error before any bootstrap work. The
+  ## bootstrap-level "log-ATT bootstrap is unreliable" path still
+  ## exists in R/po-estimands.R for strictly-positive panels where
+  ## Y0_b crosses zero only in some bootstrap replicates.
   data("simdata", package = "fect")
   set.seed(42)
   fit_neg <- suppressWarnings(suppressMessages(
@@ -113,6 +114,6 @@ test_that("LA.4: negative Y cells trigger the cell-drop hard-error (v2.4.2+)", {
 
   expect_error(
     fect::estimand(fit_neg, "log.att", "event.time"),
-    "log-ATT bootstrap is unreliable"
+    "log\\.att requires Y > 0"
   )
 })

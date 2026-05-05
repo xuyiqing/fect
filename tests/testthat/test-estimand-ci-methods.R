@@ -178,16 +178,19 @@ test_that("CI.6: vartype column reports the fit-time vartype regardless of ci.me
 
 ## -- CI.7 cell-drop hard-error fires for log.att on negative-Y data --
 
-test_that("CI.7: log.att on simdata triggers cell-drop hard-error (v2.4.2+)", {
+test_that("CI.7: log.att on simdata triggers point-level hard-error (v2.4.2+)", {
 
   skip_on_cran()
 
-  ## simdata has many cells where Y < 0 or where Y0_b can cross zero
-  ## under bootstrap. The v2.4.2 hard-error catches this.
+  ## simdata has cells with Y <= 0 in the treated post-treatment window;
+  ## v2.4.2's point-estimate-level hard-error fires before any bootstrap
+  ## work. The bootstrap-level "log-ATT bootstrap is unreliable" message
+  ## remains in R/po-estimands.R for strictly-positive panels where
+  ## Y0_b crosses zero only in some replicates.
   fit_neg <- .fit_canonical()
   expect_error(
     fect::estimand(fit_neg, "log.att", "event.time"),
-    "log-ATT bootstrap is unreliable"
+    "log\\.att requires Y > 0"
   )
 })
 
@@ -205,14 +208,65 @@ test_that("CI.7b: log.att works on a positive-Y panel (no cell-drop pathology)",
 })
 
 
-## -- CI.8 nboots default is 1000 (v2.4.2+) ---------------------------
+## -- CI.8 nboots default is 200 (v2.4.2) -----------------------------
 
-test_that("CI.8: fect()'s nboots default is 1000", {
+test_that("CI.8: fect()'s nboots default is 200", {
   ## Cheap arg-validation; doesn't need a fit. fect.formula and
   ## fect.default are S3 methods, accessed via getS3method().
-  expect_equal(as.character(formals(fect::fect)$nboots), "1000")
+  ## v2.4.2 keeps nboots = 200 as default (unchanged from v2.4.1).
+  ## Sufficient for SE / normal CI; bump to 1000+ for tail-quantile
+  ## CIs accessed via estimand(). See CI.9-CI.11 for the warning gate.
+  expect_equal(as.character(formals(fect::fect)$nboots), "200")
   expect_equal(as.character(formals(getS3method("fect", "formula"))$nboots),
-               "1000")
+               "200")
   expect_equal(as.character(formals(getS3method("fect", "default"))$nboots),
-               "1000")
+               "200")
+})
+
+
+## -- CI.9 estimand() warns on tail-CI methods at nboots < 1000 -------
+## by = "overall" used because by = "event.time" + non-normal ci.method
+## falls through to a "not yet implemented" path at this commit.
+
+test_that("CI.9: estimand() warns on tail-CI methods with nboots < 1000", {
+  skip_on_cran()
+  fit_small <- .fit_canonical(nboots = 100)
+  for (m in c("basic", "percentile", "bc", "bca")) {
+    expect_warning(
+      fect::estimand(fit_small, "att", "overall", window = c(1, 5),
+                     ci.method = m),
+      "tail-quantile-based CIs may have"
+    )
+  }
+})
+
+
+## -- CI.10 estimand() does NOT warn on normal CI ---------------------
+
+test_that("CI.10: normal CI does not trigger the under-replication warning", {
+  skip_on_cran()
+  fit_small <- .fit_canonical(nboots = 100)
+  expect_warning(
+    fect::estimand(fit_small, "att", "overall", window = c(1, 5),
+                   ci.method = "normal"),
+    NA  ## NA = no warning expected
+  )
+})
+
+
+## -- CI.11 estimand() does NOT warn at nboots >= 1000 ----------------
+
+test_that("CI.11: tail-CI methods at nboots >= 1000 do not warn", {
+  skip_on_cran()
+  fit_big <- .fit_canonical(nboots = 1000)
+  expect_warning(
+    fect::estimand(fit_big, "att", "overall", window = c(1, 5),
+                   ci.method = "bca"),
+    NA
+  )
+  expect_warning(
+    fect::estimand(fit_big, "att", "overall", window = c(1, 5),
+                   ci.method = "percentile"),
+    NA
+  )
 })

@@ -14,10 +14,12 @@ assumptions.}
             CV = NULL, k = 20, cv.prop = 0.1, cv.method = "rolling",
             cv.nobs = 3, cv.donut = 1, cv.buffer = 1, criterion = "mspe",
             binary = FALSE, QR = FALSE,
-            method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
-            quantile.CI = FALSE, nboots = 200, alpha = 0.05,
-            parallel = TRUE, cores = NULL, tol = 1e-3,
-            max.iteration = 1000, seed = NULL,
+            method = "fe",  se = FALSE, vartype = "bootstrap",
+            para.error = "auto", cl = NULL,
+            ci.method = "normal", quantile.CI = NULL,
+            nboots = 200, alpha = 0.05,
+            parallel = TRUE, cores = NULL, tol = 1e-5,
+            max.iteration = 5000, seed = NULL,
             min.T0 = NULL, max.missing = NULL,
             proportion = 0.3, pre.periods = NULL,
             f.threshold = 0.5, tost.threshold = NULL,
@@ -91,9 +93,34 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   These three conditions correspond to Gates A, B, and C in the
   three-gate defense system (see \code{ARCHITECTURE.md}).
   For all other settings, \code{vartype = "bootstrap"} is recommended.}
+\item{para.error}{a string specifying the residual-error model used by
+  the parametric bootstrap path; sub-option of \code{vartype = "parametric"}
+  (silently ignored otherwise). One of \code{"auto"}, \code{"ar"},
+  \code{"empirical"}, or \code{"wild"}. Default \code{"auto"} resolves at
+  fit time to \code{"empirical"} on a fully-observed panel and \code{"ar"}
+  on a panel with missing cells; the resolved label is stored on
+  \code{fit$para.error}. \code{"ar"} estimates an AR(1) error process from
+  control residuals (works on any panel shape); \code{"empirical"}
+  resamples residuals i.i.d. from the main-fit pool (requires fully-
+  observed panel); \code{"wild"} applies unit-level Rademacher sign-flips
+  over the empirical residual pool (requires fully-observed panel).}
 \item{cl}{a string specifying the cluster for cluster bootstrapping.}
-\item{quantile.CI}{a logical flag indicating whether to use quantile confidence intervals when bootstrapping.}
-\item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}.}
+\item{ci.method}{a string controlling how the bootstrap distribution
+becomes the CIs reported in fect's \code{est.*} slots. Two values:
+\code{"normal"} (default; Wald CI: \eqn{\hat\theta \pm z \cdot SE}) or
+\code{"basic"} (reflected pivot:
+\eqn{[2\hat\theta - q_{1-\alpha/2},\, 2\hat\theta - q_{\alpha/2}]}, the
+literature-standard "percentile" CI per Davison & Hinkley (1997, §5.2.1)
+and what \code{boot::boot.ci(type = "basic")} returns). For
+\code{"percentile"}, \code{"bc"}, or \code{"bca"} CIs (typically wanted
+on alternative estimands like \code{aptt} and \code{log.att}), call
+\code{\link{estimand}} after fitting.}
+
+\item{quantile.CI}{deprecated as of v2.4.2. Use \code{ci.method} instead.
+\code{quantile.CI = FALSE} maps to \code{ci.method = "normal"};
+\code{quantile.CI = TRUE} maps to \code{ci.method = "basic"}. Both
+mappings still work but emit a one-time deprecation warning.}
+\item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}. Default \code{200}, sufficient for the standard error and the normal-CI structure that \code{fect} ships in \code{est.att}/\code{att.avg}. For tail-quantile-based CI methods accessed via \code{estimand()} (\code{ci.method} \code{"basic"}, \code{"percentile"}, \code{"bc"}, \code{"bca"}), bump to \code{nboots = 1000} or higher (Efron 1987 Section 3; DiCiccio & Efron 1996 Section 4); \code{estimand()} emits a warning when called on under-replicated fits.}
 \item{alpha}{the significance level for hypothesis tests and confidence intervals. Default \code{0.05}.}
 \item{parallel}{controls which operations run in parallel. Accepted values:
 \describe{
@@ -116,8 +143,17 @@ returns). This guarantees numerical identity between serial and parallel
 results but may compute a few extra lambda values compared to the serial
 path. Use \code{parallel = FALSE} to preserve the short-circuit behavior.}
 \item{cores}{an integer indicating the number of cores for parallel computing.}
-\item{tol}{a positive number indicating the tolerance level for EM updates.}
-\item{max.iteration}{the maximal number of iterations for the EM algorithm.}
+\item{tol}{a positive number indicating the relative tolerance for the
+EM update check (\code{||fit_new - fit_old||_F / ||fit_old||_F < tol}).
+Default tightened from \code{1e-3} to \code{1e-5} in v2.4.3 because the
+older default produced under-converged IFE/CFE point estimates that
+shifted up to 40\% relative to the converged value (inference was
+preserved, but the reported numbers were stopping-point-dependent).}
+\item{max.iteration}{the maximal number of EM iterations. Default raised
+from \code{1000} to \code{5000} in v2.4.3 to accommodate the tighter tol;
+canonical IFE/CFE fits converge in 700-2000 iters at \code{tol = 1e-5}.
+A \code{warning()} is emitted when the EM hits this cap without
+satisfying the tol gate (under-convergence diagnostic).}
 \item{seed}{an integer seed for random number generation.}
 \item{min.T0}{an integer specifying the minimum number of pre-treatment periods for each treated unit.}
 \item{max.missing}{an integer specifying the maximum number of missing observations allowed per unit.}

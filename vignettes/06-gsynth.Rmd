@@ -4,7 +4,7 @@
 source("_common.R")
 ```
 
-This chapter demonstrates the generalized synthetic control method, or Gsynth, proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\].
+This chapter demonstrates the generalized synthetic control method, or Gsynth, proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\]. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/06-gsynth.R).
 
 ::: {.callout-tip appearance="simple"}
 The **gsynth** package as a standalone package still exists, but algorithmically is a wrapper of the **fect** package. Click [here](https://yiqingxu.org/packages/gsynth/) if you want to use the old syntax.
@@ -16,9 +16,9 @@ The **gsynth** package as a standalone package still exists, but algorithmically
 
 Two new defaults are strongly recommended for the Synth setting:
 
-**1. Use rolling-window CV (now the default) for rank selection.** Gsynth applications typically span macro panels with persistent residual shocks. Pre-v2.3.0 block CV suffered from AR leakage across the train/test boundary, systematically over-selecting `r` (often pegging at `r.max`). Rolling CV (`cv.method = "rolling"`) closes the future-side leakage by construction. On a Xu (2017) DGP with $r_{\text{true}} = 2$ and AR(1) $\rho = 0.8$ (K = 200 reps), rolling CV recovers the truth in 56% vs block CV's 15% (mean `r.cv` 1.58 vs 3.34). Use it whenever residuals are temporally correlated (post-fit residual AR(1) above ~0.4); under approximately i.i.d. residuals it agrees closely with block CV (`cv.method = "block"`, also available).
+**1. Use rolling-window CV for rank selection.** This is now the default. Gsynth applications often use macro panels, where residual shocks are persistent over time. Before v2.3.0, block CV could leak information across the train/test boundary and over-select `r`, often choosing `r.max`. Rolling CV (`cv.method = "rolling"`) prevents this future-side leakage by design.
 
-**2. Bound treated loadings via `loading.bound = "simplex"`.** This constrains each treated unit's factor loading to a non-negative convex combination of control loadings, recovering the synthetic-control intuition that the imputed counterfactual should sit *inside* the support of the donor pool. The default `loading.bound = "none"` preserves the original Xu (2017) behavior --- an unconstrained least-squares projection. Activating the simplex bound is opt-in but generally preferable, especially when the donor pool is small or convex-hull overlap is uncertain. See the **Bounded factor loadings** section below and the companion `loading.overlap` diagnostic ([Chapter @sec-loading-overlap]).
+**2. Bound treated loadings with `loading.bound = "simplex"`.** This restricts each treated unit's factor loading to a non-negative weighted average of the control loadings. In other words, the imputed counterfactual is kept inside the support of the donor pool, matching the usual synthetic-control intuition. The default, `loading.bound = "none"`, preserves the original Xu (2017) behavior: an unconstrained least-squares projection. The simplex bound is opt-in, but it is generally preferable, especially when the donor pool is small or overlap with the donor pool is uncertain. See the **Bounded factor loadings** section below and the companion `loading.overlap` diagnostic.
 
 :::
 
@@ -28,7 +28,7 @@ Gsynth was originally implemented in the **gsynth** package but has now been ful
 -   Gsynth is particularly suited for the Synth setting, where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
 -   Compared with IFEct (`method = "ife"`), Gsynth *does not* rely on pre-treatment data from the treated units to estimate time components (e.g., factors). Hence, `time.component.from = "nevertreated"`. This approach speeds up computation, improves stability, and is more suitable for predictive inference based on row exchangeability.
 
-Therefore, we recommend setting `method = "gsynth"` in **fect** for the synthetic control setting, where the treatment does not reverse (or is coded accordingly) and the number of treated units is small. The [R script for this chapter](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/07-gsynth.R) is available for download.
+Therefore, we recommend setting `method = "gsynth"` in **fect** for the synthetic control setting, where the treatment does not reverse (or is coded accordingly) and the number of treated units is small. 
 
 ::: {.callout-important appearance="simple"}
 
@@ -156,7 +156,7 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
 
 The legacy values `"all_units"` (now `"block"`) and `"treated_units"` (block masking restricted to treated pre-treatment cells) are still accepted but emit a deprecation message; both will be replaced by the unified `(cv.method, cv.units)` API in v2.4.0. See the [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv) for the deprecation plan.
 
-### Rolling-window CV via `cv.method = "rolling"`
+### Rolling-window CV 
 
 Set `cv.method = "rolling"` in the main `fect()` CV dispatcher to use rolling-window CV (the recommended default for serially correlated panels --- see the recommended-changes callout at the top of this chapter for the empirical motivation, and [Chapter @sec-ife-mc] for the design and the side-by-side figure).
 
@@ -274,24 +274,6 @@ In the plot below, the points represent the ATTs by calendar time. The blue curv
 
 ```{r calendar, cache = FALSE,fig.height=5, fig.width=7}
 plot(out,type = "calendar")
-```
-
-Lastly, `type = "equiv"` helps visualize the average pre-treatment residuals with equivalence confidence intervals.
-
-```{r sim-equiv, cache = FALSE, fig.height=5, fig.width=7}
-plot(out, type = "equiv", ylim = c(-5, 5))
-```
-
-The floating legend displaying the F-test p-value and Equivalence test p-value can be removed by setting `show.stats = FALSE`.
-
-```{r sim-equiv-no-stats, cache = FALSE, fig.height=5, fig.width=7}
-plot(out, type = "equiv", show.stats =  FALSE)
-```
-
-Alternatively, it can be repositioned by providing coordinates to `stats.pos`.
-
-```{r sim-equiv-reposition, cache = FALSE, fig.height=5, fig.width=7}
-plot(out, type = "equiv", stats.pos = c(-19, 4.5), ylim = c(-5, 5))
 ```
 
 
@@ -634,13 +616,15 @@ ggplot(df.w, aes(x = unbounded, y = bounded)) +
   theme(panel.grid.minor = element_blank())
 ```
 
-Three behavioural patterns to look for:
+Three patterns are worth checking:
 
-1. **Mass concentration near $y = 0$.** Bounded weights are sparse: most (treated, control) pairs get weight zero, with only a handful of donors getting meaningful weight per treated unit. The sparsity comes from the **simplex constraint**, not the regularizer --- non-negative least-squares on a probability simplex has an active-set property: at the optimum, many constraints $w_j = 0$ are active and only a small subset of donors carries positive weight. The entropy regularizer actually pulls weights *toward* uniform $(1/N_{co})$ and so works *against* sparsity; with moderate $\gamma$ the constraint dominates, and as $\gamma \to 0$ weights converge to uniform. Unbounded weights, in contrast, spread non-zero mass across the entire donor pool because the pseudo-inverse has no non-negativity constraint and no preference for sparsity.
-2. **Negative unbounded weights collapse to zero.** Points with $x < 0$ all sit at $y = 0$ (or near it). The simplex projection cannot represent negative weights --- it simply removes those donors from the pool. This is exactly the synthetic-control intuition: a counterfactual cannot be a *negative* combination of donors.
-3. **Bounded weights cap at one.** Points with $x > 1$ collapse to $y \leq 1$. When pseudo-inverse over-extrapolates a single donor, the simplex caps it; the rest of the row redistributes among other donors.
+1. **Many weights near $y = 0$.** Bounded weights are sparse: most (treated, control) pairs receive zero weight, and only a small set of donors receives meaningful weight for each treated unit. This sparsity comes from the *simplex constraint*, not from the regularizer. Non-negative least squares on a probability simplex has an active-set property: at the optimum, many constraints $w_j = 0$ are active, and only a few donors have positive weight. The entropy regularizer pushes weights toward uniform $(1/N_{co})$, so it works against sparsity. With moderate $\gamma$, the constraint dominates; as $\gamma \to 0$, weights converge to uniform. Unbounded weights, by contrast, spread non-zero mass across the donor pool because the pseudo-inverse has no non-negativity constraint and no preference for sparsity.
 
-The result is a fundamentally different counterfactual representation. Pseudo-inverse: dense, possibly extrapolating, sometimes counterintuitive. Simplex: sparse, interpolating-only, every weight has a synthetic-control interpretation.
+2. **Negative unbounded weights become zero.** Points with $x < 0$ sit at $y = 0$, or close to it. The simplex projection cannot use negative weights, so it removes those donors from the counterfactual. This matches the synthetic-control intuition: a counterfactual should not be a negative combination of donors.
+
+3. **Bounded weights cannot exceed one.** Points with $x > 1$ move to $y \leq 1$. When the pseudo-inverse puts too much weight on one donor, the simplex caps that weight and redistributes the rest across other donors.
+
+The result is a different counterfactual representation. The pseudo-inverse is dense and can extrapolate. The simplex is sparse, uses interpolation only, and gives each weight a synthetic-control interpretation.
 
 #### Reading the comparison
 
@@ -684,19 +668,20 @@ Both approaches share the same estimation regime (never-treated controls only), 
 # Model 1: gsynth (pure IFE, r = 2)
 out.gsynth.comp <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "gsynth", force = "two-way",
-                        r = 2, se = FALSE, CV = FALSE)
+                        r = 2, se = FALSE, CV = FALSE, max.iteration = 20000)
 
 # Model 2: CFE + nevertreated with r = 2 only (equivalent to gsynth)
 out.cfe.nt.comp <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "cfe", force = "two-way",
                         time.component.from = "nevertreated",
-                        r = 2, se = FALSE, CV = FALSE)
+                        r = 2, se = FALSE, CV = FALSE, max.iteration = 20000)
 
 # Model 3: CFE + nevertreated with r = 2 and linear trend (overspecified)
 out.cfe.nt.lin <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                        method = "cfe", force = "two-way",
                        time.component.from = "nevertreated",
-                       Q.type = "linear", r = 2, se = FALSE, CV = FALSE)
+                       Q.type = "linear", r = 2, se = FALSE, CV = FALSE,
+                       max.iteration = 20000)
 ```
 
 ```{r cfe_nt_mspe, eval=TRUE, cache=TRUE}
@@ -716,6 +701,11 @@ Since `sim_gsynth` follows a pure IFE data generating process with two factors, 
 2.  **Adding Covariates**: Including covariates in the model will significantly slow down the algorithm, as the IFE/MC model requires more time to converge. Users should be aware of this trade-off when incorporating covariates.
 
 3.  **Setting `min.T0`**: Setting `min.T0` to a positive value helps. The algorithm will automatically exclude treated units with too few pre-treatment periods. A larger $T_0$ reduces bias in causal estimates and minimizes the risk of severe extrapolation. When running cross-validation to select the number of factors, `min.T0` must be equal to or greater than (`r.max` + 2). Errors frequently occur when there are too few pre-treatment periods, so ensuring adequate $T_0$ (e.g. setting `min.T0 = 5`) is crucial.
+
+
+## Inference
+
+The default `vartype` for the gsynth-style regime is `"parametric"` --- a two-stage pseudo-treated bootstrap that targets the conditional variance $V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D)$ on small-$N_{\text{tr}}$ panels where the standard nonparametric bootstrap is unreliable. The `para.error` argument (introduced in v2.4.2) chooses how the residual error process is resampled: `"auto"` (default, resolves to `"empirical"` on a fully-observed panel and `"ar"` on a missing-data panel), `"ar"` (the v2.4.1 behavior), `"empirical"`, or `"wild"`. The (`vartype` × `ci.method` × `para.error`) interaction, parametric-bootstrap mechanics, and an empirical coverage study live in [Chapter @sec-inference], which is the natural next read after this chapter.
 
 
 ## How to Cite

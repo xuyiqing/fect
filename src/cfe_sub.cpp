@@ -262,7 +262,16 @@ List ife_part(arma::mat E, int r) {
   return (result);
 }
 
-/* Obtain cfe; */
+/* Obtain cfe;
+ *
+ * fit_init: optional warm-start matrix (TT x N) to seed the EM loop.
+ *   When non-null and shape matches Y, replaces the default `fit = Y0`
+ *   initialization. Intended for partial warm-start during bootstrap:
+ *   pass the auxiliary-only prediction surface from the cached main fit
+ *   (Y.ct - factor %*% t(lambda)) so the EM can converge faster on
+ *   per-replicate data without anchoring the (factor, lambda) basin.
+ *   See ref/v242-warm-start-investigation/partial-warm-design.md.
+ */
 // [[Rcpp::export]]
 List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
               const arma::cube& X_extra_FE, const arma::cube& X_Z,
@@ -270,7 +279,8 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
               const arma::cube& X_kappa, Rcpp::List Zgamma_id,
               Rcpp::List kappaQ_id, const arma::mat& Y, const arma::mat& Y0,
               const arma::mat& I, const arma::mat& W, const arma::mat& beta0,
-              int force, int r, double tolerate, int max_iter) {
+              int force, int r, double tolerate, int max_iter,
+              Rcpp::Nullable<Rcpp::NumericMatrix> fit_init = R_NilValue) {
   int T = Y.n_rows;
   int N = Y.n_cols;
   int p = XX.n_slices;
@@ -336,7 +346,17 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
 
   arma::mat FE(T, N, arma::fill::zeros);
 
-  fit = Y0;
+  // Warm-start init: if fit_init provided and shape matches, seed the EM
+  // with it; otherwise fall back to fit = Y0 (cold-start, pre-2.4.3).
+  arma::mat warm_init = Y0;
+  if (fit_init.isNotNull()) {
+    arma::mat fi = Rcpp::as<arma::mat>(fit_init);
+    if (fi.n_rows == static_cast<arma::uword>(T) &&
+        fi.n_cols == static_cast<arma::uword>(N)) {
+      warm_init = fi;
+    }
+  }
+  fit = warm_init;
   fit_old = fit;
   for (int i = 0; i < p; i++) {
     fit1 = fit1 + XX.slice(i) * beta0(i);

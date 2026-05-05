@@ -29,6 +29,9 @@ vignettes/*.html
 vignettes/*.pdf
 vignettes/*_cache/
 vignettes/*_files/
+vignettes/*.rmarkdown
+vignettes/site_libs/
+vignettes/.quarto/
 vignettes/_back/**
 vignettes/_book/**
 !vignettes/_book/rscript/

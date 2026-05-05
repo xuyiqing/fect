@@ -57,14 +57,16 @@ fect <- function(
     method = "fe", # method: e for fixed effects; ife for interactive fe; mc for matrix completion
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
+    para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
-    quantile.CI = FALSE,
-    nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
+    ci.method = "normal", # CI method for fect's est.* slots: "normal" (Wald: theta_hat +- z * SE) or "basic" (reflected pivot, Davison-Hinkley 1997 Sec. 5.2.1). For percentile / bc / bca on alternative estimands (att.cumu, aptt, log.att), call estimand(fit, type, ci.method) post-fit
+    quantile.CI = NULL, # DEPRECATED: use ci.method instead. NULL sentinel = "not supplied"; legacy FALSE -> ci.method = "normal", legacy TRUE -> ci.method = "basic"
+    nboots = 200, # number of bootstraps (sufficient for SE / normal CI; bump to 1000+ for tail-quantile CIs in estimand())
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
-    tol = 1e-3, # tolerance level
-    max.iteration = 1000,
+    tol = 1e-5, # tolerance level (tightened from 1e-3 in v2.4.3)
+    max.iteration = 5000,
     seed = NULL, # set seed
     min.T0 = NULL, # minimum T0
     max.missing = NULL, # maximum missing
@@ -138,14 +140,16 @@ fect.formula <- function(
     method = "fe", # method: fe for fixed effects; ife for interactive fe; mc for matrix completion
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
+    para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
-    quantile.CI = FALSE,
-    nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
+    ci.method = "normal", # CI method for fect's est.* slots: "normal" or "basic"
+    quantile.CI = NULL, # DEPRECATED: use ci.method instead
+    nboots = 200, # number of bootstraps (sufficient for SE / normal CI; bump to 1000+ for tail-quantile CIs in estimand())
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
-    tol = 1e-3, # tolerance level
-    max.iteration = 1000,
+    tol = 1e-5, # tolerance level (tightened from 1e-3 in v2.4.3)
+    max.iteration = 5000,
     seed = NULL, # set seed
     min.T0 = NULL,
     max.missing = NULL,
@@ -251,7 +255,9 @@ fect.formula <- function(
         method = method,
         se = se,
         vartype = vartype,
+        para.error = para.error,
         cl = cl,
+        ci.method = ci.method,
         quantile.CI = quantile.CI,
         nboots = nboots,
         alpha = alpha,
@@ -334,14 +340,16 @@ fect.default <- function(
     method = "fe", # method: ife for interactive fe; mc for matrix completion
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
+    para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
     cl = NULL,
-    quantile.CI = FALSE,
-    nboots = 1000, # number of bootstraps (raised from 200 in v2.4.2 for stable percentile / bc CIs)
+    ci.method = "normal", # CI method for fect's est.* slots: "normal" or "basic"
+    quantile.CI = NULL, # DEPRECATED: use ci.method instead
+    nboots = 200, # number of bootstraps (sufficient for SE / normal CI; bump to 1000+ for tail-quantile CIs in estimand())
     alpha = 0.05, # significance level
     parallel = TRUE, # parallel computing
     cores = NULL, # number of cores
-    tol = 1e-3, # tolerance level
-    max.iteration = 1000,
+    tol = 1e-5, # tolerance level (tightened from 1e-3 in v2.4.3)
+    max.iteration = 5000,
     seed = NULL, # set seed
     min.T0 = NULL,
     max.missing = NULL,
@@ -421,13 +429,37 @@ fect.default <- function(
         stop("\"cm\" option is only available for the \"fe\" and \"ife\" methods.")
     }
 
+    ## Save user's literal method argument before any silent coercion (e.g.
+    ## fe -> ife r=0 below). Referenced by the parametric/nevertreated gate
+    ## further down so error messages name the user's actual method = "fe".
+    method_arg <- method
+
     if (se == 1) {
         if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
-            stop("\"vartype\" option misspecified.")
+            stop(
+                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", or \"parametric\".",
+                call. = FALSE
+            )
         }
         if (vartype == "parametric" && method %in% c("mc", "both")) {
             stop(
                 "The \"parametric\" option is not available for the \"mc\" or \"both\" methods."
+            )
+        }
+        if (vartype == "jackknife" && !is.null(cl)) {
+            warning(
+                "vartype = \"jackknife\" with cl = ... : the cl argument is ignored. ",
+                "fect's jackknife is leave-one-unit-out and does not support a ",
+                "cluster (block) jackknife. The resulting SEs do not account for ",
+                "within-cluster correlation. Use vartype = \"bootstrap\" with cl ",
+                "for cluster-aware inference.",
+                call. = FALSE
+            )
+        }
+        if (!para.error %in% c("auto", "ar", "empirical", "wild")) {
+            stop(
+                "\"para.error\" must be one of \"auto\", \"ar\", \"empirical\", or \"wild\".",
+                call. = FALSE
             )
         }
     }
@@ -765,8 +797,120 @@ fect.default <- function(
         stop("\"se\" is not a logical flag.")
     }
 
-    if (is.logical(quantile.CI) == FALSE & !quantile.CI %in% c(0, 1)) {
-        stop("\"quantile.CI\" is not a logical flag.")
+    ## ci.method: "normal" (Wald: theta_hat +- z * SE) or "basic" (reflected
+    ## pivot: 2*theta_hat - quantile(boot, c(1-alpha/2, alpha/2))). Wider 5-method
+    ## surface (basic, percentile, bc, bca, normal) lives on estimand() for
+    ## alternative estimands (att.cumu, aptt, log.att); see ?estimand and
+    ## chapter 7 of the fect User Manual.
+    ##
+    ## quantile.CI is the deprecated legacy arg; map it to ci.method with a
+    ## one-time warning when the user supplied it explicitly. The NULL sentinel
+    ## (default) means "user did not supply it" so the warning stays silent
+    ## under the modern API path.
+    if (!is.null(quantile.CI)) {
+        warning(
+            "Argument `quantile.CI` is deprecated as of fect 2.4.2 and will be ",
+            "removed in a future release. Use `ci.method = \"normal\"` (the ",
+            "default; equivalent to `quantile.CI = FALSE`) or `ci.method = \"basic\"` ",
+            "(equivalent to `quantile.CI = TRUE`) instead.\n\n",
+            "For percentile / bc / bca CIs on alternative estimands ",
+            "(att.cumu, aptt, log.att), call `estimand(fit, type, ci.method)` ",
+            "post-fit; see chapter 7 of the fect User Manual.",
+            call. = FALSE
+        )
+        if (!is.logical(quantile.CI) && !quantile.CI %in% c(0, 1)) {
+            stop("\"quantile.CI\" is not a logical flag.", call. = FALSE)
+        }
+        ci.method <- if (isTRUE(as.logical(quantile.CI))) "basic" else "normal"
+    }
+    ## fect's built-in CI machinery for ci.method = "basic" reads raw
+    ## quantiles of the bootstrap distribution.  This is calibrated for
+    ## vartype = "bootstrap" only --- the case bootstrap is naturally
+    ## centered at theta-hat.  vartype = "parametric" stores eff.boot
+    ## centered at 0 (under H0); the reflected CI 2*theta_hat - quantile(boot)
+    ## then collapses around 2*theta_hat instead of theta_hat, giving 0%
+    ## coverage.  vartype = "jackknife" leave-one-out values are not
+    ## exchangeable draws from the sampling distribution either (E&T 1993
+    ## ch11; D&H 1997 Sec. 3.2.1).  estimand() applies a location-shift fix for
+    ## parametric and a hard-error for jackknife on non-normal ci.methods;
+    ## fect's built-in path does neither, so we hard-error here and point
+    ## users to estimand().
+    .ci.method.allowed <- c("normal", "basic")
+    if (length(ci.method) != 1L || !is.character(ci.method) ||
+        !ci.method %in% .ci.method.allowed) {
+        if (is.character(ci.method) && length(ci.method) == 1L &&
+            ci.method %in% c("percentile", "bc", "bca")) {
+            stop(
+                "ci.method = \"", ci.method, "\" is not supported in fect(); ",
+                "fect()'s built-in CI machinery offers only \"normal\" (Wald) ",
+                "and \"basic\" (reflected pivot).\n\n",
+                "For \"percentile\", \"bc\", and \"bca\" CIs, fit with the ",
+                "default ci.method and call `estimand(fit, type, ci.method = \"",
+                ci.method, "\")` post-fit. The full 5-method surface is the ",
+                "estimand() path; see ?estimand and chapter 7 of the fect ",
+                "User Manual.",
+                call. = FALSE
+            )
+        }
+        stop(
+            "`ci.method` must be one of \"normal\" or \"basic\"; got \"",
+            ci.method, "\".",
+            call. = FALSE
+        )
+    }
+    ## Reject ci.method = "basic" on jackknife fits.  Jackknife pseudo-values
+    ## are influence-function-flavored leave-one-out quantities, not exchangeable
+    ## draws from the sampling distribution of theta-hat (E&T 1993 ch11; D&H
+    ## 1997 Sec. 3.2.1).  The reflected pivot interval has no defensible meaning
+    ## here.  Matches estimand()'s behaviour --- estimand hard-errors on
+    ## non-"normal" ci.methods for jackknife fits.
+    if (ci.method == "basic" && !is.null(vartype) &&
+        identical(vartype, "jackknife")) {
+        stop(
+            "ci.method = \"basic\" is not supported for vartype = \"jackknife\". ",
+            "Jackknife produces an SE estimate via the Tukey pseudo-value ",
+            "formula, not a sampling distribution of theta-hat; reflection-based ",
+            "CIs require exchangeable draws from a sampling distribution ",
+            "(Efron & Tibshirani 1993, Chapter 11; Davison & Hinkley 1997, ",
+            "Section 3.2.1).\n\n",
+            "Use ci.method = \"normal\" (the only valid CI for jackknife: ",
+            "theta-hat +- z * SE_jack) or refit with vartype = \"bootstrap\" ",
+            "for the basic interval.",
+            call. = FALSE
+        )
+    }
+    ## ci.method = "basic" on vartype = "parametric" is supported via a
+    ## location-shift fix in the CI computation downstream (R/boot.R, around
+    ## line 3590): the parametric path stores eff.boot centered at 0 (under
+    ## H0), and the reflected pivot CI 2*theta_hat - quantile(boot) collapses
+    ## around 2*theta_hat without a shift.  fect() applies the same shift
+    ## that R/po-estimands.R applies inside estimand() (commit b4e9fbf), so
+    ## fit$est.avg with ci.method = "basic" on a parametric fit matches
+    ## estimand(fit, "att", ci.method = "basic") byte-equally for the
+    ## avg-level + per-event-time CIs.  The shift is currently applied at
+    ## those two slots only; for other slots (calendar, cohort, subgroup,
+    ## balanced, by-W, placebo, carryover), basic on parametric is not
+    ## yet patched and may produce 0% coverage CIs --- call estimand() for
+    ## those slots.
+    ## Bridge to the existing internal dispatch in fect_boot, which is gated by
+    ## a logical `quantile.CI`. After this resolution, .quantile.CI.bool is the
+    ## single source of truth for the bootstrap-CI branch downstream.
+    .quantile.CI.bool <- (ci.method == "basic")
+    ## Tail-CI replicate warning (mirrors estimand's .check_tail_ci_replicates):
+    ## `basic` reads tail quantiles of the bootstrap distribution; the literature
+    ## floor for tail-quantile CIs is B >= 1000 (Efron 1987 Sec. 3; DiCiccio & Efron
+    ## 1996 Sec. 4). Warn at fit time so users don't need to refit.
+    if (ci.method == "basic" && isTRUE(se) && !is.null(nboots) &&
+        is.numeric(nboots) && nboots < 1000) {
+        warning(
+            "ci.method = \"basic\" reads tail quantiles of the bootstrap ",
+            "distribution; with nboots = ", nboots, " (< 1000) the 5th / 195th ",
+            "order statistics that the basic interval depends on may be ",
+            "unstable (Efron 1987 Sec. 3; DiCiccio & Efron 1996 Sec. 4 recommend ",
+            "B >= 1000). Refit with `fect(..., nboots = 1000)` for ",
+            "publication-grade CIs. The point estimate and SE are unaffected.",
+            call. = FALSE
+        )
     }
 
     ## normalize
@@ -1841,11 +1985,35 @@ fect.default <- function(
             "Use vartype='bootstrap' or 'jackknife'."
         )
     }
-    if (se == 1 && vartype == "parametric" && time.component.from == "notyettreated") {
+    ## Parametric bootstrap requires nevertreated control-pool isolation.
+    ## Placed AFTER the reversal-check gate so reversal users get the more
+    ## actionable reversal message first. Uses method_arg (saved before the
+    ## silent fe -> ife coercion) so the message names the user's literal
+    ## method argument.
+    if (se == 1 && vartype == "parametric" && time.component.from != "nevertreated") {
+        stop(sprintf(
+            paste0(
+                "vartype = \"parametric\" requires time.component.from = \"nevertreated\".\n",
+                "  Your call: method = \"%s\", time.component.from = \"%s\".\n\n",
+                "The parametric pseudo-treated bootstrap requires a control pool ",
+                "isolated from treated-unit pre-treatment cells. Pass ",
+                "time.component.from = \"nevertreated\" (if never-treated controls ",
+                "exist) or use vartype = \"bootstrap\" or \"jackknife\"."
+            ),
+            method_arg, time.component.from
+        ), call. = FALSE)
+    }
+    ## para.error = "empirical" or "wild" requires fully-observed panel.
+    if (se == 1 && vartype == "parametric" &&
+        para.error %in% c("empirical", "wild") &&
+        (0 %in% I)) {
         stop(
-            "Parametric bootstrap is not valid when \"time.component.from\" is ",
-            "\"notyettreated\". Use time.component.from = \"nevertreated\" (if never-treated ",
-            "controls are available) or vartype = \"bootstrap\" or \"jackknife\"."
+            "para.error = \"", para.error, "\" requires a fully-observed panel ",
+            "(no missing cells in the observation matrix I). ",
+            "The current data has unobserved cells. ",
+            "Use para.error = \"ar\" or para.error = \"auto\" (which selects \"ar\" automatically ",
+            "when missing data are present).",
+            call. = FALSE
         )
     }
 
@@ -2456,7 +2624,8 @@ fect.default <- function(
             carryoverTest = carryoverTest,
             carryover.period = carryover.period,
             vartype = vartype,
-            quantile.CI = quantile.CI,
+            para.error = para.error,
+            quantile.CI = .quantile.CI.bool,
             nboots = nboots,
             parallel = parallel,
             cores = cores,
@@ -2715,7 +2884,7 @@ fect.default <- function(
                     vartype = vartype,
                     nboots = nboots,
                     parallel = parallel,
-                    quantile.CI = quantile.CI,
+                    quantile.CI = .quantile.CI.bool,
                     cores = cores,
                     group.level = g.level,
                     group = pG,
@@ -2990,7 +3159,7 @@ fect.default <- function(
             carryoverTest = carryoverTest,
             carryover.period = carryover.period,
             ## Stored on the fit object so plot logic does not need to
-            ## re-parse `x$call` — robust under do.call(), positional
+            ## re-parse `x$call` --- robust under do.call(), positional
             ## args, and call-rewriting wrappers.
             carryover.rm = carryover.rm,
             ## Reserved slot for the post-hoc estimand API (v2.4.0+).
@@ -2998,7 +3167,7 @@ fect.default <- function(
             ## GSC); future doubly-robust estimators will populate this
             ## with the per-cell debias correction so that
             ## eff = (Y_obs - Y0_hat) + eff_debias is the cell-level
-            ## score. See ref/po-estimands-contract.md §3.
+            ## score. See ref/po-estimands-contract.md Sec. 3.
             eff_debias = NULL,
             unit.type = unit.type,
             obs.missing = obs.missing,
@@ -3107,6 +3276,26 @@ fect.default <- function(
             "att.off.sum.W", "W.off.sum",
             "att.placebo.W", "att.carryover.W"
         )] <- NULL
+    }
+
+    ## v2.4.3+: convergence diagnostic. The EM check is
+    ##   ||fit_new - fit_old||_F / ||fit_old||_F < tol
+    ## When niter >= max.iteration, the EM was halted before satisfying
+    ## the tol gate. The reported att.avg may not reflect a converged
+    ## minimum; users should inspect (and ideally raise max.iteration)
+    ## before publishing.
+    if (!is.null(output$niter) && length(output$niter) == 1 &&
+        is.finite(output$niter) && output$niter >= max.iteration) {
+        warning(sprintf(
+            paste(
+                "EM did not converge within max.iteration = %d (final niter = %d).",
+                "Estimates may be under-converged. Consider raising max.iteration",
+                "and/or tightening tol. If att.avg shifts substantially under",
+                "longer runs, the data may be poorly conditioned for this model",
+                "specification (e.g. very small Ntr, near-collinear factors,",
+                "or a misspecified rank).", sep = "\n  "),
+            as.integer(max.iteration), as.integer(output$niter)
+        ), call. = FALSE)
     }
 
     class(output) <- "fect"
