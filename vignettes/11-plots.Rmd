@@ -14,7 +14,7 @@ In this chapter, we explore visualization options available in the **fect** pack
 - special-purpose displays (`status`, `factors`, and `loadings`)
 - standalone `esplot()`
 
-We begin with shared parameter conventions and then work through each plot type in turn. `plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/06-plots.R).
+We begin with shared parameter conventions and then work through each plot type in turn. `plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/11-plots.R).
 
 ------------------------------------------------------------------------
 
@@ -28,6 +28,7 @@ library(ggplot2)
 library(panelView)
 data(gs2020)
 data(hh2019)
+data(simdata)
 ls()
 ```
 
@@ -547,14 +548,14 @@ Note: most styling parameters (`connected`, `plot.ci`, `pre.color`/`post.color`,
 
 ### Factors and loadings plots
 
-These plot types are available when the model is estimated with interactive fixed effects (`method = "ife"` or `method = "gsynth"`). We first fit an IFE model with two factors:
+These plot types are available when the model is estimated with interactive fixed effects (`method = "ife"` or `method = "gsynth"`). We use `simdata` here because its data-generating process has two latent factors ($r = 2$), so the estimated factors and loadings reflect real structure rather than numerical artifacts. We fit an IFE model with two factors:
 
 ```{r est-ife, cache = TRUE}
-out_ife <- fect(nat_rate_ord ~ indirect,
-                data = hh2019,
-                index = c("bfs", "year"),
-                method = "ife", r = 2,
-                se = TRUE, parallel = TRUE, cores = 16, nboots = 1000)
+out_ife <- fect(Y ~ D + X1 + X2, data = simdata,
+                index = c("id", "time"),
+                method = "ife", r = 2, force = "two-way",
+                se = TRUE, parallel = TRUE, cores = 16,
+                nboots = 200)
 ```
 
 The **factors** plot displays the estimated latent time factors. It uses the Okabe-Ito colorblind-safe palette with thinner lines for a clean, publication-ready appearance. Factor 0 (fixed effects, shown when `include.FE = TRUE`) appears in gray; subsequent factors appear in orange, blue, green, and so on. Use `nfactors` to limit the number of displayed factors.
@@ -601,8 +602,9 @@ For $r > 2$ the plot still shows only factors 1 and 2; the hull and overlap meas
 For $r = 1$, the same diagnostic is rendered as a **mirror histogram**: treated counts above the axis, control counts flipped below, with a vertical band marking the range of control loadings. The 1D analog of "outside the hull" is "outside the band."
 
 ```{r loading-overlap-r1-fit, cache = TRUE, message = FALSE, warning = FALSE}
-out_ife_r1 <- fect(nat_rate_ord ~ indirect, data = hh2019,
-                   index = c("bfs", "year"), method = "ife", r = 1,
+out_ife_r1 <- fect(Y ~ D + X1 + X2, data = simdata,
+                   index = c("id", "time"), method = "ife", r = 1,
+                   force = "two-way",
                    se = TRUE, parallel = TRUE, cores = 16, nboots = 500)
 ```
 

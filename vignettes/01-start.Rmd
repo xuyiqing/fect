@@ -42,6 +42,8 @@ For reference, here are the latest **CRAN release** and **`dev` branch** version
 cran_ver <- available.packages(repos = "https://cloud.r-project.org")["fect", "Version"]
 desc <- readLines("https://raw.githubusercontent.com/xuyiqing/fect/dev/DESCRIPTION")
 dev_ver <- sub("^Version: ", "", desc[grep("^Version: ", desc)])
+
+# display versions
 cat(sprintf("CRAN release: %s\n", cran_ver))
 cat(sprintf("Dev branch:   %s\n", dev_ver))
 ```
@@ -111,5 +113,5 @@ The scripts that generate simulated datasets are in `data-raw/`.
 ### Empirical datasets
 
 -   `turnout`: Based on @Xu2017. Used in [Chapter @sec-gsynth] alongside `sim_gsynth`.
--   `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-plots] and [Chapter @sec-panel].
--   `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-plots], [Chapter @sec-panel], and [Chapter @sec-panel-sens].
+-   `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-panel] and  [Chapter @sec-plots].
+-   `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-panel], [Chapter @sec-panel-sens], and  [Chapter @sec-plots].

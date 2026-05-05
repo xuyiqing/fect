@@ -446,6 +446,16 @@ fect.default <- function(
                 "The \"parametric\" option is not available for the \"mc\" or \"both\" methods."
             )
         }
+        if (vartype == "jackknife" && !is.null(cl)) {
+            warning(
+                "vartype = \"jackknife\" with cl = ... : the cl argument is ignored. ",
+                "fect's jackknife is leave-one-unit-out and does not support a ",
+                "cluster (block) jackknife. The resulting SEs do not account for ",
+                "within-cluster correlation. Use vartype = \"bootstrap\" with cl ",
+                "for cluster-aware inference.",
+                call. = FALSE
+            )
+        }
         if (!para.error %in% c("auto", "ar", "empirical", "wild")) {
             stop(
                 "\"para.error\" must be one of \"auto\", \"ar\", \"empirical\", or \"wild\".",

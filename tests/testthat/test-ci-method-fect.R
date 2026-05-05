@@ -196,3 +196,55 @@ test_that("ci.method = 'basic' + parametric matches estimand at avg level", {
     expect_equal(unname(fit$est.avg[1, "CI.lower"]), e$ci.lo, tolerance = 1e-10)
     expect_equal(unname(fit$est.avg[1, "CI.upper"]), e$ci.hi, tolerance = 1e-10)
 })
+
+# ---- 9. vartype = "jackknife" + cl emits an "ignored" warning --------------
+#
+# fect's jackknife is leave-one-unit-out and does not consult cl.  Combining
+# vartype = "jackknife" with a non-NULL cl silently produced unit-level SEs.
+# The user-facing warning routes such callers to vartype = "bootstrap" + cl
+# for cluster-aware inference.
+
+test_that("vartype = 'jackknife' with cl warns that cl is ignored", {
+    d <- simdata
+    d$cl <- (d$id - 1) %/% 2 + 1   # 2 units per cluster
+    expect_warning(
+        suppressMessages(fect(Y ~ D, data = d, index = c("id", "time"),
+                               method = "fe", force = "two-way",
+                               vartype = "jackknife", cl = "cl",
+                               se = TRUE, parallel = FALSE, seed = 42L)),
+        "cl argument is ignored"
+    )
+})
+
+test_that("vartype = 'jackknife' without cl does not emit the cl warning", {
+    seen <- character(0)
+    withCallingHandlers(
+        suppressMessages(fect(Y ~ D, data = simdata, index = c("id", "time"),
+                               method = "fe", force = "two-way",
+                               vartype = "jackknife",
+                               se = TRUE, parallel = FALSE, seed = 42L)),
+        warning = function(w) {
+            seen <<- c(seen, conditionMessage(w))
+            invokeRestart("muffleWarning")
+        }
+    )
+    expect_false(any(grepl("cl argument is ignored", seen, fixed = TRUE)))
+})
+
+test_that("vartype = 'bootstrap' with cl does not emit the jackknife warning", {
+    d <- simdata
+    d$cl <- (d$id - 1) %/% 2 + 1
+    seen <- character(0)
+    withCallingHandlers(
+        suppressMessages(fect(Y ~ D, data = d, index = c("id", "time"),
+                               method = "fe", force = "two-way",
+                               vartype = "bootstrap", cl = "cl",
+                               nboots = 50, se = TRUE,
+                               parallel = FALSE, seed = 42L)),
+        warning = function(w) {
+            seen <<- c(seen, conditionMessage(w))
+            invokeRestart("muffleWarning")
+        }
+    )
+    expect_false(any(grepl("cl argument is ignored", seen, fixed = TRUE)))
+})

@@ -129,9 +129,6 @@ The user guide is structured into four parts. Most users only need the **Basics*
 -   [Chapter @sec-cheatsheet]\
     Quick reference for methods, parameters, plotting, and diagnostics.
 
--   Changelog\
-    Version-by-version changes (back matter; see sidebar).
-
 ## Contributors
 
 The following individuals (and AI) have contributed to **gsynth** and **fect**, listed in the order of their involvement in the project:

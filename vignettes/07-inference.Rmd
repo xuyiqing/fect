@@ -4,24 +4,25 @@
 source("_common.R")
 ```
 
-This chapter is a reference for the inference machinery in fect. Read it when you have to defend a specific (`vartype`, `ci.method`) choice in a paper, or when you want to understand why log-scale and ratio estimands ship `bca` as the default.
+This chapter explains inference in `fect`. Read it when you need to justify a particular (`vartype`, `ci.method`) choice in a paper, or when you want to understand why log-scale and ratio estimands use `bca` by default.
 
-The chapter is organized around three design choices that compose into the inference output:
+The chapter is organized around three choices:
 
-1. `vartype` --- *where the bootstrap distribution comes from* (unit-level cluster bootstrap, jackknife, parametric).
-2. `ci.method` --- *how a CI is constructed from that distribution* (basic, percentile, bc, bca, normal).
-3. `para.error` --- *which residual-error model the parametric path uses* (auto, ar, empirical, wild). Sub-option of `vartype = "parametric"`; silently ignored when `vartype` is `"bootstrap"` or `"jackknife"`.
+1. `vartype` --- where the bootstrap distribution comes from: unit-level cluster bootstrap, jackknife, or parametric bootstrap.
+2. `ci.method` --- how the CI is built from that distribution: basic, percentile, bc, bca, or normal.
+3. `para.error` --- which residual-error model the parametric path uses: auto, ar, empirical, or wild. This option applies only when `vartype = "parametric"` and is ignored when `vartype` is `"bootstrap"` or `"jackknife"`.
 
-For each cell of the resulting matrix there is a corresponding $p$-value via test inversion, and a minimum number of bootstrap replicates `nboots` recommended in the classic literature. We summarize all of this and document the empirical coverage of each cell on a clean DGP. Below, we use $\hat\theta$ to represent a point estimate.  
+For each combination, `fect` also reports a corresponding $p$-value by test inversion and a recommended minimum number of bootstrap replicates, `nboots`, based on the classic literature. We summarize these choices and report the empirical coverage of each combination on a clean DGP. Below, we use $\hat\theta$ to denote a point estimate.
 
 ## The 3 × 5 inference matrix
 
-A `fect()` fit with `se = TRUE` populates a $T \times N \times B$ array `fit$eff.boot` (or, for `vartype = "jackknife"`, a $T \times (N-1) \times N$ array). Two paths consume this array:
+A `fect()` fit with `se = TRUE` stores bootstrap estimates in `fit$eff.boot`, a $T \times N \times B$ array. For `vartype = "jackknife"`, it stores a $T \times (N-1) \times N$ array instead. Two functions use this array:
 
-- **`fect()` itself** populates the `fit$est.att` (per-event-time) and `fit$est.avg` (overall) slots at fit time, using the `ci.method` argument supplied to `fect()`. Two values are accepted there: `"normal"` (default; Wald) and `"basic"` (reflected pivot).
-- **`estimand()`** is the post-hoc path. It aggregates `fit$eff.boot` into a one-dimensional bootstrap distribution of the requested estimand (`att`, `att.cumu`, `aptt`, `log.att`) and passes that distribution to a CI constructor selected by `ci.method`. Five values are accepted there: `"normal"`, `"basic"`, `"percentile"`, `"bc"`, `"bca"`.
+- **`fect()`** fills the `fit$est.att` and `fit$est.avg` slots during the original fit. These give per-event-time and overall estimates. The CI method is set by the `ci.method` argument in `fect()`, which accepts two values: `"normal"` (the default; Wald) and `"basic"`.
 
-The two surfaces agree byte-equally on the overlap (`"normal"` and `"basic"`) at the avg-level and per-event-time CI sites. The richer 3-method surface (`"percentile"`, `"bc"`, `"bca"`) is the `estimand()`-only path, and is where the per-type defaults (`att.cumu → "basic"`, `aptt → "bca"`, `log.att → "bca"`) live.
+- **`estimand()`** is used after fitting. It aggregates `fit$eff.boot` into a one-dimensional bootstrap distribution for the requested estimand: `att`, `att.cumu`, `aptt`, or `log.att`. It then builds a CI using the selected `ci.method`. Five values are accepted: `"normal"`, `"basic"`, `"percentile"`, `"bc"`, and `"bca"`.
+
+The two paths give byte-identical results where they overlap, namely for `"normal"` and `"basic"` CIs at the overall and per-event-time levels. The additional methods, `"percentile"`, `"bc"`, and `"bca"`, are available only through `estimand()`. This is also where the estimand-specific defaults are defined: `att.cumu → "basic"`, `aptt → "bca"`, and `log.att → "bca"`.
 
 **vartype** controls the distribution semantics:
 
@@ -41,50 +42,49 @@ The two surfaces agree byte-equally on the overlap (`"normal"` and `"basic"`) at
 | `"bc"` | bias-shifted percentile, with $z_0 = \Phi^{-1}(P(B < \hat\theta))$ | adapts | ✓ | ✗ |
 | `"bca"` | bias + acceleration $a$ from cell-level jackknife | adapts | ✓ | ✓ |
 
-The default ci.method depends on the estimand: `att` → `"normal"`, `att.cumu` → `"basic"`, `aptt` → `"bca"`, `log.att` → `"bca"`. The defaults are calibrated to estimator semantics, not to coverage performance on any specific DGP --- see the empirical coverage study below for the full grid.
+The default `ci.method` depends on the estimand: `att` → `"normal"`, `att.cumu` → `"basic"`, `aptt` → `"bca"`, and `log.att` → `"bca"`. These defaults follow the meaning of each estimand, not performance on any specific DGP. See the coverage results below for the full comparison.
 
-**On `"basic"` vs `"percentile"`.** The two reflect different theoretical foundations: `"basic"` inverts the pivot $T = \hat\theta - \theta$ and produces $[2\hat\theta - q_{1-\alpha},\ 2\hat\theta - q_\alpha]$, while `"percentile"` reads the bootstrap quantiles directly as $[q_\alpha,\ q_{1-\alpha}]$. The `"basic"` (or "reflected") interval is the form @davison_hinkley1997 §5.2.1 recommend as the default and is what `boot::boot.ci(type = "basic")` returns; the `"percentile"` interval requires an additional symmetry assumption on the bootstrap distribution to be valid [@hesterberg2014]. When the bootstrap distribution is symmetric the two formulas coincide; on skewed distributions, `"basic"` is more defensible. 
+**On `"basic"` vs `"percentile"`.** The two rely on different ideas. The `"basic"` interval inverts the pivot $T = \hat\theta - \theta$ and gives $[2\hat\theta - q_{1-\alpha},\ 2\hat\theta - q_\alpha]$. The `"percentile"` interval uses the bootstrap quantiles directly, $[q_\alpha,\ q_{1-\alpha}]$. Davison and Hinkley (1997, §5.2.1) recommend `"basic"` as the default, and this is what `boot::boot.ci(type = "basic")` returns. The `"percentile"` interval requires an additional symmetry condition on the bootstrap distribution to be valid [@hesterberg2014]. When the distribution is symmetric, the two intervals coincide; when it is skewed, `"basic"` is usually more reliable.
 
-If you want a percentile-based CI as a routine choice, prefer `"basic"` --- it is the literature-standard "percentile" CI in R via the `boot` package. The raw-quantile `"percentile"` option is preserved here mainly for replication of older work and for `boot::boot.ci(type = "perc")` parity.
+If you want a percentile-style CI in routine use, prefer `"basic"`. It is the standard choice in R via the `boot` package. The raw `"percentile"` option is kept mainly for reproducing older results and for parity with `boot::boot.ci(type = "perc")`.
 
 ## Inferential methods in depth
 
 ### Unit-level (block) bootstrap
 
-The default is `"bootstrap"`. Resamples whole units with replacement (treated and control pools separately, with rejection sampling to ensure every period is covered) --- so each replicate is a cluster bootstrap with the unit as the cluster. Refits the full model per replicate. The resulting `fit$eff.boot[, , b]` is the per-cell treatment effect estimate from replicate $b$.
+The default is `"bootstrap"`. It resamples whole units with replacement, drawing treated and control units separately. It uses rejection sampling to make sure every period is covered. Each replicate is therefore a cluster bootstrap, with the unit as the cluster. The full model is refit for each replicate. The array `fit$eff.boot[, , b]` stores the per-cell treatment effect estimate from replicate $b$.
 
-This is the most general option. It captures both *unit-level sampling variability* (different treated units have different treatment effects) and *within-unit residual variability* (the noise on each unit's trajectory). For most applied work, this is what you want.
+This is the most general option. It captures both unit-level variation, since treated units may have different effects, and within-unit residual variation, since each unit's outcome path has noise. For most applied work, this is the recommended choice.
 
-**Caveat.** When treated units are few (say, $N_\mathrm{tr} < 10$), the unit-level bootstrap can degenerate --- some replicates draw a treated pool with a single unit repeated $N_\mathrm{tr}$ times, which gives a near-zero between-unit variance contribution. Switch to `vartype = "jackknife"` in that regime.
+**Caveat.** When there are few treated units, for example $N_\mathrm{tr} < 10$, the unit-level bootstrap can become unstable. Some replicates may draw the same treated unit many times, which leaves little between-unit variation. In this setting, use `vartype = "jackknife"`.
 
 ### Leave-one-unit-out jackknife
 
-For each unit $i \in 1..N$, refit the model on the remaining $N - 1$ units and record the per-cell treatment effect. The standard error is computed via the Tukey jackknife formula $\sqrt{\frac{N-1}{N} \sum_i \left(\widehat{\mathrm{eff}}_i - \overline{\mathrm{eff}}\right)^2}$. The bootstrap-style storage is $T \times (N-1) \times N$ (each leave-one-out fit drops one column).
+For each unit $i \in 1..N$, the model is refit after dropping that unit. The per-cell treatment effect is then recorded. The standard error is computed using the Tukey jackknife formula, $\sqrt{\frac{N-1}{N} \sum_i \left(\widehat{\mathrm{eff}}_i - \overline{\mathrm{eff}}\right)^2}$. The stored array has dimension $T \times (N-1) \times N$, since each leave-one-out fit drops one column.
 
-Use jackknife when (i) $N_\mathrm{tr}$ is small enough that bootstrap is unstable, or (ii) you want a deterministic SE estimate (no sampling noise from the bootstrap draws). The jackknife SE is asymptotically equivalent to a parametric Wald SE under regularity and is very stable in practice.
+Use the jackknife when (i) $N_\mathrm{tr}$ is small enough that the bootstrap is unstable, or (ii) you want a deterministic SE estimate without sampling noise from bootstrap draws. Under regularity conditions, the jackknife SE is asymptotically equivalent to a parametric Wald SE and is often stable in practice.
 
-**Note:** As of v2.4.2, `estimand()` accepts jackknife fits but restricts `ci.method` to `"normal"`. The other four ci.methods hard-error with a clear message. Jackknife produces an SE estimate via the Tukey pseudo-value formula, not a sampling distribution of $\hat\theta$; `"basic"` / `"percentile"` need exchangeable draws from a sampling distribution (jackknife leave-one-out values are not such draws --- @efron_tibshirani1993 §11; @davison_hinkley1997 §3.2.1) and `"bc"` / `"bca"` need a bootstrap distribution to compute the bias-correction $z_0$ (jackknife has none). Use `ci.method = "normal"` for the Wald-style interval $\hat\theta \pm z \cdot \mathrm{SE}_\mathrm{jack}$, or refit with `vartype = "bootstrap"` for the full ci.method surface.
+**Note:** As of v2.4.2, `estimand()` accepts jackknife fits but allows only `ci.method = "normal"`. The other four CI methods return a clear error. The jackknife gives an SE estimate using the Tukey pseudo-value formula. It does not give exchangeable draws from the sampling distribution of $\hat\theta$. Thus, `"basic"` and `"percentile"` are not appropriate, and `"bc"` and `"bca"` require a bootstrap distribution to compute the bias correction $z_0$. Use `ci.method = "normal"` for the Wald-style interval $\hat\theta \pm z \cdot \mathrm{SE}_\mathrm{jack}$, or refit with `vartype = "bootstrap"` if you need the full set of CI methods.
 
 ### Model-based parametric bootstrap
-
-The `"parametric"` path resamples the residual error process and refits the model on each replicate, producing `fit$eff.boot[, , b] = Y.boot - Y0_hat_b` on treated cells. Three residual-error models are supported via the `para.error` argument (sub-option of `vartype = "parametric"`):
+The `"parametric"` path resamples the residual error process and refits the model for each replicate. On treated cells, it stores `fit$eff.boot[, , b] = Y.boot - Y0_hat_b`. Three residual-error models are available through `para.error`, which applies only when `vartype = "parametric"`:
 
 | `para.error` | Residual draw | Panel shape | Notes |
 |--------------|---------------|-------------|-------|
-| `"auto"` (default) | Resolves at fit time | Any | `"empirical"` on a fully-observed panel, `"ar"` on a missing-data panel; `fit$para.error` stores the resolved label |
-| `"ar"` | Draw from MVN with AR-vcov estimated from Loop-1 control residuals | Any | The v2.4.1 behavior; universal fallback |
-| `"empirical"` | i.i.d. column-resample from main-fit control residuals | Fully observed only | Hard-errors if any cell is missing |
-| `"wild"` | Unit-level Rademacher sign-flips over the empirical residual pool [@liu1988; @mammen1993; @cameron_gelbach_miller2008] | Fully observed only | Preserves marginal residual distribution + within-unit dependence; hard-errors if any cell is missing |
+| `"auto"` (default) | Chosen at fit time | Any | Uses `"empirical"` for a fully observed panel and `"ar"` for a panel with missing cells; `fit$para.error` stores the chosen label |
+| `"ar"` | Draws from MVN with AR-vcov estimated from Loop-1 control residuals | Any | The v2.4.1 behavior; works as the fallback |
+| `"empirical"` | i.i.d. column resample from main-fit control residuals | Fully observed only | Returns an error if any cell is missing |
+| `"wild"` | Unit-level Rademacher sign flips over the empirical residual pool [@liu1988; @mammen1993; @cameron_gelbach_miller2008] | Fully observed only | Preserves the marginal residual distribution and within-unit dependence; returns an error if any cell is missing |
 
-The parametric path is the default in the gsynth-style regime (`time.component.from = "nevertreated"`, no treatment reversal, factor-augmented method).
+The parametric path is the default in the gsynth-style setting: `time.component.from = "nevertreated"`, no treatment reversal, and a factor-augmented method.
 
-**Caveat.** The simulation is deliberately under $H_0$ (no treatment effect added back to treated cells), which makes `fit$eff.boot` centered at zero. The legacy `fit$est.avg` output and `get.pvalue()` rely on this $H_0$ centering for the $H_0: \mathrm{ATT} = 0$ hypothesis test. In the current implementation, `estimand()` applies a post-hoc location shift `att_b <- att_b - mean(att_b) + estimate` for parametric fits, which centers the bootstrap distribution at the point estimate while preserving its dispersion (`sd()` is invariant to shift). The `"normal"` ci.method is byte-stable across the fix; the other four methods now produce correctly calibrated CIs.
+**Caveat.** The simulation is run under $H_0$, with no treatment effect added back to treated cells. As a result, `fit$eff.boot` is centered at zero. The legacy `fit$est.avg` output and `get.pvalue()` use this $H_0$ centering to test $H_0: \mathrm{ATT} = 0$. In the current implementation, `estimand()` applies a post-hoc location shift for parametric fits: `att_b <- att_b - mean(att_b) + estimate`. This centers the bootstrap distribution at the point estimate while preserving its spread, since `sd()` is unchanged by a shift. The `"normal"` CI is unchanged by this fix; the other four CI methods now produce correctly centered CIs.
 
-**Conditional-variance target.** The parametric pseudo-treated bootstrap targets the conditional variance $V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D)$, holding the treatment indicator $D$ fixed. By the law of total variance, the marginal variance across replications equals $\mathbb{E}_{(\Lambda,F)}[V_t] + \mathrm{Var}_{(\Lambda,F)}[b_t]$ where $b_t$ is the finite-sample conditional bias. Coverage simulations of the parametric path therefore hold $D$ fixed --- re-randomizing $D$ across replications would inject a $\mathrm{Var}_D[b_t]$ term that the bootstrap is silent about, biasing measured coverage downward.
+**Conditional-variance target.** The parametric pseudo-treated bootstrap targets the conditional variance $V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D)$, holding the treatment indicator $D$ fixed. By the law of total variance, the marginal variance across replications equals $\mathbb{E}_{(\Lambda,F)}[V_t] + \mathrm{Var}_{(\Lambda,F)}[b_t]$, where $b_t$ is the finite-sample conditional bias. Coverage simulations for the parametric path therefore hold $D$ fixed. Re-randomizing $D$ across replications would add a $\mathrm{Var}_D[b_t]$ term that the bootstrap does not estimate, which would make measured coverage too low.
 
 ### Parametric bootstrap: valid regimes {#sec-parametric-regimes}
 
-The parametric bootstrap rests on two key assumptions: (a) the time components (factors and loadings) are estimated from a **never-treated** control pool that is independent of the treated units' data, and (b) the model residuals on control units accurately reflect the true error distribution. When either assumption is violated, the parametric bootstrap underestimates standard errors and produces confidence intervals that are too narrow.
+The parametric bootstrap relies on two assumptions: (a) the time components, including factors and loadings, are estimated from a **never-treated** control pool that is independent of the treated units' data; and (b) the control-unit residuals approximate the true error distribution. If either assumption fails, the parametric bootstrap can understate standard errors and produce confidence intervals that are too narrow.
 
 To prevent users from invoking the parametric bootstrap in settings where these assumptions fail, the package enforces three hard restrictions:
 
@@ -100,7 +100,7 @@ To prevent users from invoking the parametric bootstrap in settings where these 
 In all three cases the package raises an informative error pointing to the valid alternatives.
 :::
 
-The motivation for Gate C comes from both theory and evidence. The `notyettreated` path uses EM imputation to estimate factors jointly across all not-yet-treated observations, including the treated units' pre-period data. EM enlarges the effective factor space by imputing masked treated-post cells, which deflates the observed-cell residuals that the parametric bootstrap feeds into its covariance estimator. In a Monte Carlo study (N = 50, T = 20, r = 2 factors, 500 replications), the blocked `ife + notyettreated + parametric` combination produced **80.6% coverage at nominal 95%** (SE ratio ≈ 0.67). In contrast, all tested nevertreated paths produced near-nominal coverage (0.93–0.96, SE ratio ≈ 1.0). The architectural details of all three gates are documented in `ARCHITECTURE.md`.
+Gate C is motivated by both theory and simulation evidence. The `notyettreated` path uses EM imputation to estimate factors from all not-yet-treated observations, including the treated units' pre-period data. This expands the effective factor space by imputing masked treated-post cells, which reduces the observed-cell residuals used by the parametric bootstrap covariance estimator. In a Monte Carlo study with N = 50, T = 20, r = 2 factors, and 500 replications, the blocked `ife + notyettreated + parametric` combination produced 80.6% coverage at nominal 95% coverage, with an SE ratio of about 0.67. By contrast, all tested `nevertreated` paths produced near-nominal coverage, with coverage between 0.93 and 0.96 and an SE ratio of about 1.0. The details of all three gates are documented in `ARCHITECTURE.md`.
 
 If your current code uses `vartype = "parametric"` with the default `time.component.from = "notyettreated"`, migrate as follows:
 
@@ -124,7 +124,9 @@ Option 1 switches to the gsynth-style estimation regime and keeps parametric boo
 
 ## ci.method choices
 
-`ci.method` decides how the bootstrap distribution becomes a confidence interval. Two layers expose it: `fect()` carries a 2-option `ci.method` for the CIs it ships in `fit$est.att`, `fit$est.avg`, and the placebo / carryover / calendar / cohort / subgroup slots; `estimand()` carries the full 5-option `ci.method` that operates post-hoc on `fit$eff.boot` and `fit$att.avg.unit.boot`. fect's surface is the right entry point for the standard `att` workflow; estimand's surface is the right entry point for the alternative estimands (`att.cumu`, `aptt`, `log.att`).
+`ci.method` controls how the bootstrap distribution is turned into a confidence interval. It is available in two places. `fect()` offers two options for the CIs stored in `fit$est.att`, `fit$est.avg`, and the placebo, carryover, calendar, cohort, and subgroup slots. `estimand()` offers the full five-option set and works after fitting, using `fit$eff.boot` and `fit$att.avg.unit.boot`.
+
+Use `fect()` for the standard `att` workflow. Use `estimand()` for alternative estimands, including `att.cumu`, `aptt`, and `log.att`.
 
 ### `fect()` — `ci.method = c("normal", "basic")`
 
@@ -132,23 +134,21 @@ Option 1 switches to the gsynth-style estimation regime and keeps parametric boo
 fect(..., ci.method = "normal")  # default; Wald: theta_hat +- z * SE
 fect(..., ci.method = "basic")   # reflected pivot: 2 * theta_hat - quantile(boot, ...)
 ```
+The `"basic"` interval is the reflected (pivot) CI of @davison_hinkley1997 §5.2.1. It is the standard "percentile" CI in the literature and is what `boot::boot.ci(type = "basic")` returns in R. The default is `"normal"`. The `est.att` (per-event-time) and `est.avg` (overall) slots returned by `fect()` use the requested method and match `estimand(fit, "att", ci.method)` exactly on the same fit.
 
-The `"basic"` interval is the reflected (pivot) CI of @davison_hinkley1997 §5.2.1 --- the literature-standard "percentile" CI, and what `boot::boot.ci(type = "basic")` returns in R. Default is `"normal"`. fect's returned `est.att` (per-event-time) and `est.avg` (overall) slots use the requested method and match `estimand(fit, "att", ci.method)` byte-equally on the same fit.
+**Parametric fits get a location shift.** When `vartype = "parametric"`, `eff.boot` is centered at $0$ under $H_0$, so the $H_0: \theta = 0$ test is correctly calibrated. For `ci.method = "basic"`, the reflected pivot would otherwise be centered around $2\hat\theta$. To avoid this, `fect()` applies a variance-preserving location shift, `eff.boot.ci <- eff.boot - mean(eff.boot) + theta_hat`, as in `estimand()` (`R/po-estimands.R`). This shift is used only for the CI; the SE and the $H_0$-based $p$-value are unchanged.
 
-**Parametric fits get a location-shift.** The `vartype = "parametric"` path stores `eff.boot` centered at $0$ (under $H_0$, so the $H_0 = 0$ hypothesis test is correctly calibrated). For `ci.method = "basic"`, the reflected pivot would otherwise collapse around $2\hat\theta$; fect applies the same variance-preserving location shift `eff.boot.ci <- eff.boot - mean(eff.boot) + theta_hat` that `estimand()` applies in `R/po-estimands.R`. The shift is local to the CI computation; the SE and the $H_0$-based $p$-value are unaffected.
+**Jackknife rejects basic.** Using `ci.method = "basic"` with `vartype = "jackknife"` returns an error. Use `ci.method = "normal"` instead, which gives $\hat\theta \pm z \cdot \mathrm{SE}_\mathrm{jack}$, or refit with `vartype = "bootstrap"`. Jackknife pseudo-values are leave-one-out quantities, not exchangeable draws from the sampling distribution [@efron_tibshirani1993 ch11; @davison_hinkley1997 §3.2.1].
 
-**Jackknife rejects basic.** `ci.method = "basic"` on `vartype = "jackknife"` hard-errors with a message pointing the user to `ci.method = "normal"` (the only valid CI for jackknife: $\hat\theta \pm z \cdot \mathrm{SE}_\mathrm{jack}$) or to refitting with `vartype = "bootstrap"`. Jackknife pseudo-values are influence-function-flavored leave-one-out quantities, not exchangeable draws from the sampling distribution [@efron_tibshirani1993 ch11; @davison_hinkley1997 §3.2.1].
+**nboots warning.** The `"basic"` interval uses the 2.5th and 97.5th order statistics of the bootstrap distribution. These tail quantiles can be unstable when `nboots` is small. `fect()` issues a warning when `ci.method = "basic"` is used with `nboots < 1000`, and recommends refitting with `nboots = 1000` for publication-quality CIs [@efron1987 §3; @diciccio_efron1996 §4].
 
-**nboots warning.** `ci.method = "basic"` reads the 2.5th / 97.5th order statistics of the bootstrap distribution. These tail quantiles are unstable at small `nboots`; fect emits a warning at fit time when `ci.method = "basic"` is paired with `nboots < 1000`, recommending a refit at `nboots = 1000` for publication-grade CIs [@efron1987 §3; @diciccio_efron1996 §4].
+**Other slots.** The location-shift fix is applied only to `est.att` and `est.avg`. If your workflow uses other `fect()` slots, such as `est.calendar`, `est.cohort.att`, `est.subgroup.att`, balanced-sample, by-W, placebo, or carryover, and you use `vartype = "parametric"` with `ci.method = "basic"`, those slots still use the legacy reflected formula on the raw $H_0$-centered bootstrap. Their CIs may not be correctly centered. Until these slots are updated, use `estimand(fit, type, by, ci.method = "basic")` for the estimand you need.
 
-
-**Other slots.** The location-shift fix is currently applied at the avg-level and per-event-time CI sites only. If your workflow uses `fect()` slots beyond `est.att` and `est.avg` (`est.calendar`, `est.cohort.att`, `est.subgroup.att`, balanced-sample, by-W, placebo, carryover) **and** you fit with `vartype = "parametric"` **and** you request `ci.method = "basic"`, those slots use the legacy reflected formula on the raw $H_0$-centered bootstrap and will produce CIs that don't cover correctly. Until those slots are migrated, call `estimand(fit, type, by, ci.method = "basic")` for the slot you need.
-
-The legacy `quantile.CI` argument is **soft-deprecated** as of v2.4.2: an explicit `quantile.CI = FALSE` is now equivalent to `ci.method = "normal"`, and `quantile.CI = TRUE` is equivalent to `ci.method = "basic"`. Both still work but emit a one-time deprecation warning.
+The legacy `quantile.CI` argument is **soft-deprecated** as of v2.4.2. Setting `quantile.CI = FALSE` is equivalent to `ci.method = "normal"`, and `quantile.CI = TRUE` is equivalent to `ci.method = "basic"`. Both remain available but issue a one-time deprecation warning.
 
 ### `estimand()` — `ci.method = c("normal", "basic", "percentile", "bc", "bca")`
 
-`estimand()` exposes the full 5-method surface for post-hoc CI construction on the same fit. None of the methods add per-replicate cost --- they are post-hoc operations on the already-stored `eff.boot` surface (`bca` adds a cheap cell-level jackknife with no extra refits).
+`estimand()` offers the full five-method set for building CIs after the model is fit. These methods do not add per-replicate cost because they use the already stored `eff.boot` array. The `bca` method adds a low-cost cell-level jackknife, but it does not refit the model.
 
 | `ci.method` | Formula | When to prefer |
 |-------------|---------|----------------|
@@ -158,62 +158,63 @@ The legacy `quantile.CI` argument is **soft-deprecated** as of v2.4.2: an explic
 | `"bc"` | Bias-corrected percentile [@efron1987 minus acceleration]; cutoffs shifted by $2 z_0$ | Skewed distributions where the bootstrap median is biased |
 | `"bca"` (new in v2.4.2) | Bias-corrected accelerated [@efron1987 in full]; adds an acceleration parameter via cell-level jackknife | Skewed *and* heavy-tailed; the per-type default for `aptt` and `log.att` |
 
-`ci.method` defaults to `NULL` in `estimand()`, which triggers a per-type default: `att` → `"normal"`, `att.cumu` → `"basic"`, `aptt` → `"bca"`, `log.att` → `"bca"`. Pass an explicit value to override.
+In `estimand()`, `ci.method = NULL` uses an estimand-specific default: `att` → `"normal"`, `att.cumu` → `"basic"`, `aptt` → `"bca"`, and `log.att` → `"bca"`. Pass an explicit value to override the default.
 
-For tail-quantile-based methods (`"basic"`, `"percentile"`, `"bc"`, `"bca"`), `estimand()` warns when the fit has fewer than 1000 bootstrap replicates and recommends a refit at `nboots = 1000` for stable tail estimation [@efron1987 §3; @diciccio_efron1996 §4].
+For methods based on tail quantiles, `"basic"`, `"percentile"`, `"bc"`, and `"bca"`, `estimand()` warns when the fit has fewer than 1000 bootstrap replicates. It recommends refitting with `nboots = 1000` for more stable tail estimates [@efron1987 §3; @diciccio_efron1996 §4].
 
 ### When the two surfaces overlap
 
-`fect(ci.method = "normal")` and `estimand(fit, type = "att", ci.method = "normal")` produce identical numerics on the avg slot (within RNG noise from independent fits, or byte-identical when the two operate on the same `fit$eff.boot`). Same for `"basic"`. The two-surface design exists because:
+`fect(ci.method = "normal")` and `estimand(fit, type = "att", ci.method = "normal")` give the same estimates for the average effect. They are identical up to RNG noise from independent fits, and byte-identical when they use the same `fit$eff.boot`. The same is true for `"basic"`.
 
-1. fect's `est.*` slots are populated at fit time; users want a CI in the printed output without having to call `estimand()` separately. The simple normal/basic dichotomy covers the routine `att` workflow.
-2. estimand's full 5-method surface is needed for the alternative estimands (`att.cumu`, `aptt`, `log.att`) where the bootstrap distribution is skewed and bias-correction (`bc`, `bca`) materially changes the CI.
+The two interfaces serve different purposes. `fect()` fills the `est.*` slots at fit time, so users get a CI in the printed output without calling `estimand()` separately. The two options, `"normal"` and `"basic"`, cover the routine `att` workflow. `estimand()` provides the full five-method set for alternative estimands, including `att.cumu`, `aptt`, and `log.att`, where the bootstrap distribution can be skewed and bias correction can change the CI.
 
-A user who wants `bca` on the standard `att` slot should fit with the default `ci.method` and call `estimand(fit, type = "att", ci.method = "bca")` post-fit. fect() rejects `ci.method = "bca"` (and `"bc"`, `"percentile"`) with an error pointing to estimand().
+To use `bca` for the standard `att` estimand, fit the model with the default `ci.method` and then call `estimand(fit, type = "att", ci.method = "bca")`. `fect()` rejects `ci.method = "bca"`, `"bc"`, and `"percentile"` with an error that points users to `estimand()`.
 
-## p-values via test inversion
+## $p$-values via test inversion
 
-Each `ci.method` corresponds to a $p$-value formula obtained by inverting the CI procedure: the two-sided $p$-value for testing $H_0: \theta = \theta_0$ is the smallest $\alpha$ at which the $(1 - \alpha)$ CI excludes $\theta_0$.
+Each `ci.method` has a corresponding $p$-value obtained by inverting the CI rule. For a two-sided test of $H_0: \theta = \theta_0$, the $p$-value is the smallest $\alpha$ at which the $(1 - \alpha)$ CI excludes $\theta_0$.
 
-For the standard test of $H_0: \theta = 0$ (the no-effect null):
+For the standard no-effect null, $H_0: \theta = 0$:
 
-| ci.method | $p$-value |
+| `ci.method` | $p$-value |
 |---|---|
 | `"normal"` | $2 (1 - \Phi(|\hat\theta| / \mathrm{SE}))$ |
 | `"percentile"` | $2 \min(P(B \le 0),\ P(B \ge 0))$ |
 | `"basic"` | $2 \min(P(B \ge 2\hat\theta),\ P(B \le 2\hat\theta))$ |
-| `"bc"` | $2 \Phi\!\left(z_0 - |\Phi^{-1}(P(B \le 0)) - z_0|\right)$ where $z_0 = \Phi^{-1}(P(B < \hat\theta))$ |
-| `"bca"` | bca formula with $z_0$ and acceleration $a$ (skewness correction) |
+| `"bc"` | $2 \Phi\!\left(z_0 - |\Phi^{-1}(P(B \le 0)) - z_0|\right)$, where $z_0 = \Phi^{-1}(P(B < \hat\theta))$ |
+| `"bca"` | BCa formula using $z_0$ and acceleration $a$ |
 
-The legacy `fit$est.avg` $p$-value (in the `p.value` column of the `fit$est.att` matrix) uses the `"normal"` formula by default, or the `"percentile"` formula when `quantile.CI = TRUE`. The current `estimand()` API does *not* yet emit a `p.value` column; users who need a non-`"normal"` $p$-value can compute it from `fit$eff.boot` using the formulas above. A `p.value` column is planned for a future release.
+The legacy `fit$est.avg` $p$-value, stored in the `p.value` column of `fit$est.att`, uses the `"normal"` formula by default. When `quantile.CI = TRUE`, it uses the `"percentile"` formula. The current `estimand()` API does not yet return a `p.value` column. Users who need a non-`"normal"` $p$-value can compute it from `fit$eff.boot` using the formulas above. A `p.value` column is planned for a future release.
 
-For parametric vartype, the `get.pvalue()` two-sided $p$-value is computed on the $H_0$-centered bootstrap distribution, not the shifted ($H_1$-centered) distribution --- this is correct, because that $p$-value tests $H_0: \mathrm{ATT} = 0$, which is a hypothesis-test question that the $H_0$ simulation answers directly. The location-shift fix in `estimand()` does not propagate to `get.pvalue()` for this reason.
+For `vartype = "parametric"`, `get.pvalue()` computes the two-sided $p$-value from the $H_0$-centered bootstrap distribution, not from the shifted distribution used for CIs. This is correct because the $p$-value tests $H_0: \mathrm{ATT} = 0$, and the $H_0$ simulation answers that test directly. For this reason, the location-shift fix in `estimand()` does not apply to `get.pvalue()`.
 
 ## How many bootstrap replicates?
 
-The classic literature gives different recommendations by ci.method, driven by what the method needs from the bootstrap distribution:
+The classic literature gives different recommendations by `ci.method`, because each method uses a different part of the bootstrap distribution:
 
-| ci.method | quantity needed | $B$ minimum | $B$ preferred | reference |
+| `ci.method` | Quantity needed | $B$ minimum | $B$ preferred | Reference |
 |---|---|---|---|---|
 | `"normal"` | $\mathrm{sd}(B)$ | 50 | 200 | @efron_tibshirani1993 §12 |
-| `"percentile"` | tail quantiles $q_{2.5}, q_{97.5}$ | 1,000 | 2,000 | @efron_tibshirani1993 §13.3; @davison_hinkley1997 §5.3.1 |
-| `"basic"` | tail quantiles | 1,000 | 2,000 | same |
-| `"bc"` | quantiles + bias correction $z_0$ | 1,000 | 2,000 | @efron1987 |
-| `"bca"` | quantiles + $z_0$ + acceleration $a$ | 1,000 | 2,000+ | @diciccio_efron1996; @hesterberg2014 |
+| `"percentile"` | Tail quantiles $q_{2.5}, q_{97.5}$ | 1,000 | 2,000 | @efron_tibshirani1993 §13.3; @davison_hinkley1997 §5.3.1 |
+| `"basic"` | Tail quantiles | 1,000 | 2,000 | Same |
+| `"bc"` | Quantiles and bias correction $z_0$ | 1,000 | 2,000 | @efron1987 |
+| `"bca"` | Quantiles, $z_0$, and acceleration $a$ | 1,000 | 2,000+ | @diciccio_efron1996; @hesterberg2014 |
 
-The fect default is `nboots = 200`, calibrated for the SE-based normal CI (which is the per-type default for `att`, the most common estimand). The simulation evidence below shows that 200 replicates is enough for nominal coverage on `att` across all four scenarios under `ci.method = "normal"` --- the SE estimate stabilizes well before the tail quantiles do. For tail-quantile CI methods (`basic`, `percentile`, `bc`, `bca`), the literature minimum of 1,000 is more accurate; the simulation evidence shows that on a small-Ntr cluster bootstrap (Scenario C1 below), tail-CI coverage drifts to 0.92-0.93 at `nboots = 200` and recovers to 0.94-0.945 at `nboots = 1000`. For BCa CIs reported as the primary inferential output of a paper, `nboots = 2000` is the canonical recommendation.
+The `fect` default is `nboots = 200`. This is calibrated for the SE-based normal CI, which is the default for `att`, the most common estimand. The simulation results below show that 200 replicates are enough for nominal coverage on `att` across all four scenarios under `ci.method = "normal"`. The SE stabilizes faster than the tail quantiles.
 
-The `estimand()` warning gate `.check_tail_ci_replicates` fires when a tail-CI method is requested on a fit with `nboots < 1000`; the warning text gives the literature citation and points users to refit with `nboots = 1000`.
+For tail-quantile methods, `"basic"`, `"percentile"`, `"bc"`, and `"bca"`, the literature minimum of 1,000 is safer. In the simulation below, the small-$N_\mathrm{tr}$ cluster bootstrap in Scenario C1 gives tail-CI coverage of 0.92--0.93 at `nboots = 200`, improving to 0.94--0.945 at `nboots = 1000`. For BCa CIs used as the main inferential output in a paper, `nboots = 2000` is the standard recommendation.
+
+The `estimand()` warning gate, `.check_tail_ci_replicates`, fires when a tail-CI method is requested from a fit with `nboots < 1000`. The warning cites the literature and recommends refitting with `nboots = 1000`.
 
 ## Empirical coverage
 
-The minimal coverage suite (`tests/coverage-study/`) exercises the v2.4.2 inference paths at $K = 200$ replications on three scenarios:
+We conduct a minimal coverage test using $K = 200$ replications in three scenarios:
 
-- **A** --- factor model $r = 2$, IID errors, `vartype = "parametric"`. $N_{tr} = 5$, $N_{co} = 50$, $T = 30$, $T_0 = 20$.
-- **B** --- same DGP and estimator as A, but errors are AR(1) with $\rho = 0.8$.
-- **C** --- additive TWFE ($r = 0$), AR(1) errors with $\rho = 0.5$, $N_{tr} = 20$, $N_{co} = 80$. **C₁** uses `vartype = "bootstrap"`; **C₂** uses `vartype = "jackknife"`.
+- **A** --- Factor model with $r = 2$, IID errors, and `vartype = "parametric"`. $N_{tr} = 5$, $N_{co} = 50$, $T = 30$, and $T_0 = 20$.
+- **B** --- Same DGP and estimator as A, but with AR(1) errors and $\rho = 0.8$.
+- **C** --- Additive TWFE model with $r = 0$, AR(1) errors with $\rho = 0.5$, $N_{tr} = 20$, and $N_{co} = 80$. **C₁** uses `vartype = "bootstrap"`; **C₂** uses `vartype = "jackknife"`.
 
-Full DGP / estimator settings are in [`tests/coverage-study/results/README.md`](https://github.com/xuyiqing/fect/blob/main/tests/coverage-study/results/README.md). Coverage target for A and B is the realized average treated-post effect within each rep; for C, the population $\mathrm{ATT} = 3$.
+The full DGP and estimator settings are in [`tests/coverage-study/results/README.md`](https://github.com/xuyiqing/fect/blob/main/tests/coverage-study/results/README.md). The coverage target is the realized average treated-post effect within each replication for A and B, and the population $\mathrm{ATT} = 3$ for C.
 
 ### `fect()` ci.method surface
 
@@ -258,11 +259,11 @@ A, B, and C₂ are at nominal across all ci.methods. In C₁, the tail-quantile 
 
 ### Calibration
 
-Calibration ratios (mean SE / empirical SD across reps) by scenario: A = 1.05, B = 1.04, C₁ = 1.01, C₂ = 1.05. The procedures correctly calibrate variance to within 5 % in every cell; any coverage slack is finite-sample and resolves at higher $K$ or $B$.
+Calibration ratios (mean SE divided by empirical SD across replications) are: A = 1.05, B = 1.04, C₁ = 1.01, and C₂ = 1.05. In all cases, variance is calibrated within about 5%. Any remaining coverage gap is a finite-sample issue and shrinks as $K$ or $B$ increases.
 
 ## Decision tree
 
-A practical default when picking a (vartype, ci.method, para.error) combination:
+A practical default when picking a (`vartype`, `ci.method`, `para.error`) combination:
 
 ```text
 Is the design factor-augmented with never-treated controls, no

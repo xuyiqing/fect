@@ -1,6 +1,6 @@
 # Complex Fixed Effects {#sec-cfe}
 
-The **Complex Fixed Effects (CFE)** estimator extends the standard two-way fixed effects counterfactual by incorporating additional model components: extra additive fixed effects, time-invariant covariates with time-varying coefficients, unit-specific loadings on known time trends, and interactive fixed effects (latent factors). Each component helps to relax specific assumptions about the data-generating process, and this chapter introduces them one at a time. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/04-cfe.R).
+The **Complex Fixed Effects (CFE)** estimator extends the standard two-way fixed effects counterfactual by incorporating additional model components: extra additive fixed effects, time-invariant covariates with time-varying coefficients, unit-specific loadings on known time trends, and interactive fixed effects (latent factors). Each component helps to relax specific assumptions about the data-generating process, and this chapter introduces them one at a time. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/05-cfe.R).
 
 In [Chapter @sec-ife-mc], we introduced factor-based methods (IFE and MC) that model latent common factors. CFE generalizes this framework by allowing researchers to incorporate additional observed structure alongside latent factors.
 
@@ -323,23 +323,23 @@ out.cfe.z.only <- fect(Y ~ D + X1 + X2, data = simdata,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
   Z = "L1", gamma = "gamma_t",
-  se = FALSE)
+  se = FALSE, max.iteration = 20000)
 
 # Model 3: CFE with Z = L1 + 1 factor
 out.cfe.z.f1 <- fect(Y ~ D + X1 + X2, data = simdata,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
   Z = "L1", gamma = "gamma_t",
-  r = 1, se = FALSE)
+  r = 1, se = FALSE, max.iteration = 20000)
 
 # Model 4: IFE with 2 factors
 out.ife.r2 <- fect(Y ~ D + X1 + X2, data = simdata,
   index = c("id", "time"),
   method = "ife", force = "two-way",
-  r = 2, se = FALSE)
+  r = 2, se = FALSE, max.iteration = 20000)
 ```
 
-```{r cfe-45-mspe, eval = TRUE, cache = TRUE}
+```{r cfe-45-mspe, eval = TRUE, cache = FALSE}
 mspe.out <- fect_mspe(list(FE = out.fe,
        CFE_Z = out.cfe.z.only,
        CFE_Z_F1 = out.cfe.z.f1,

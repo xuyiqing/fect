@@ -9,7 +9,7 @@ set.seed(1234)
 data(simdata)
 ```
 
-When the parallel trends assumption is violated due to latent common factors with heterogeneous loadings, the FE estimator from [Chapter @sec-fect] is biased. This chapter introduces two methods that account for such latent factors: the **interactive fixed effects** (IFE) method, which explicitly models unit-specific factor loadings, and the **matrix completion** (MC) method, which uses nuclear-norm regularization to recover the low-rank structure of the untreated potential outcomes. The [R script for this chapter](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/03-ife-mc.R) is available for download.
+When the parallel trends assumption is violated due to latent common factors with heterogeneous loadings, the FE estimator from [Chapter @sec-fect] is biased. This chapter introduces two methods that account for such latent factors: the **interactive fixed effects** (IFE) method, which explicitly models unit-specific factor loadings, and the **matrix completion** (MC) method, which uses nuclear-norm regularization to recover the low-rank structure of the untreated potential outcomes. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/04-ife-mc.R).
 
 We use `simdata`, which includes two latent factors ($r = 2$). The FE estimator is biased on this dataset, while IFE and MC recover the correct ATT.
 
@@ -38,7 +38,7 @@ panelview(Y ~ D, data = simdata, index = c("id", "time"),
 
 In addition to FEct, **fect** supports the interactive fixed effects counterfactual (IFEct) method proposed by @Gobillon2016 and @Xu2017 and the matrix completion (MC) method proposed by @Athey2021---`method = "ife"` and `method = "mc"`, respectively. The EM algorithm is used to impute the counterfactuals of treated observations.
 
-For the IFE approach, we need to specify the number of factors using option `r`. By default, the algorithm will select an optimal hyper-parameter via a built-in cross-validation procedure (see the Cross-validation section below).
+For the IFE approach, we need to specify the number of factors using option `r`. By default, the algorithm will select an optimal hyper-parameter via a built-in cross-validation procedure (see the **Cross-validation** section below).
 
 We specify an interval of candidate number of unobserved factors in option `r` like `r=c(0,5)`. When cross-validation is switched off, the first element in `r` will be set as the number of factors. Below we use the MSPE criterion and search the number of factors from 0 to 5.
 
@@ -73,7 +73,7 @@ The companion plot type `type = "loading.overlap"` visualizes whether treated-un
 plot(out.ife, type = "loading.overlap")
 ```
 
-The treated loadings extend well beyond the controls' convex hull, which is **expected for this dataset and consistent with the DGP**. `simdata` is built for the DID/TWFE regime: 200 units total, but only 50 are pure controls --- the remaining 150 receive treatment at some point, with reversals allowed. With three times more treated than control units in the panel, treated factor loadings naturally span a wider range than the controls' joint distribution. For the default `time.component.from = "notyettreated"` regime, this non-overlap is less concerning because factors are estimated from pre-treatment observations of *all* units (treated and control), not from the controls alone. The diagnostic is informative but not actionable here.
+The treated loadings extend well beyond the controls' convex hull, which is expected for this dataset and consistent with the DGP. `simdata` is built for the DID/TWFE regime: 200 units total, but only 50 are pure controls --- the remaining 150 receive treatment at some point, with reversals allowed. With three times more treated than control units in the panel, treated factor loadings naturally span a wider range than the controls' joint distribution. For the default `time.component.from = "notyettreated"` regime, this non-overlap is less concerning because factors are estimated from pre-treatment observations of *all* units (treated and control), not from the controls alone. The diagnostic is informative but not actionable here.
 
 ::: {.callout-note appearance="simple"}
 
@@ -227,15 +227,15 @@ Below these thresholds, the CV runs serially even with `parallel = TRUE`. To for
 
 #### What runs in parallel
 
-The unit of parallel work is the (rank, fold) pair (or (lambda, fold) for MC), dispatched flat across workers via `future_lapply`. This gives near-linear speedup up to the number of total tasks: e.g., with `r=c(0,5)` and `k=20`, there are 120 tasks per CV invocation. The `"loo"` method (and the legacy `"treated_units"` value) are always sequential, because their per-fold computations depend on rank-specific quantities that cannot be batched.
+Parallel work is organized over each (rank, fold) pair, or each (lambda, fold) pair for MC. These tasks are distributed to workers using `future_lapply`. This can lead to large speed gains when there are many tasks. For example, with `r=c(0,5)` and `k=20`, each CV run has 120 tasks. The `"loo"` method, including the older `"treated_units"` option, always runs sequentially because each fold depends on results computed for a given rank.
 
-#### MC-specific note: `break_check` short-circuit
+#### MC-specific note: early stop
 
-For MC cross-validation in serial mode, the lambda search short-circuits via the `break_check` rule once MSPE stops improving. In parallel mode, **all candidate lambdas are computed**: the search is dispatched up-front, so there is no opportunity to terminate early. On well-conditioned problems where the optimal lambda is in the first few values, parallel mode performs slightly more work than serial; the wall-time is still much lower in absolute terms when many CV folds are dispatched together. In pathological cases where the search would have terminated early, serial mode (`parallel = FALSE`) is the better choice.
+For MC cross-validation in serial mode, the lambda search can stop early using the `break_check` rule once MSPE stops improving. In parallel mode, all candidate lambdas are evaluated because tasks are sent out at the start. As a result, when the best lambda is among the first few values, parallel mode may do more total work than serial mode. It can still be faster in wall-clock time because many folds run at once. When early stopping would apply, `parallel = FALSE` may be preferable.
 
 #### CV vs. bootstrap, independent control
 
-The single `parallel` argument controls both CV and bootstrap parallelism. To enable one but not the other — for example, to keep the bootstrap serial during a debugging session while keeping CV parallel — use the string forms `parallel = "cv"` or `parallel = "boot"`. See the parallel-computing callout in [Chapter @sec-fect] for the full table.
+The `parallel` argument controls parallel computing for both CV and the bootstrap. To enable one but not the other, use `parallel = "cv"` or `parallel = "boot"`. For example, during debugging, you may keep the bootstrap serial while running CV in parallel. See the parallel-computing callout in [Chapter @sec-fect] for the full table.
 
 ------------------------------------------------------------------------
 
@@ -247,17 +247,22 @@ We provide three types of diagnostic tests: (1) a placebo test, (2) a joint test
 
 We provide a placebo test for a settled model---hence, cross-validation is not allowed---by setting `placeboTest = TRUE`. We specify a range of pre-treatment periods as "placebo periods" in option `placebo.period` to remove observations in the specified range for model fitting, and then test whether the estimated ATT in this range is significantly different from zero. Below, we set `c(-2, 0)` as the placebo periods.
 
+We set `max.iteration = 20000` to allow full convergence of the IFE model with `tol = 1e-5`. 
+
 ```{r placebo_ife, eval = TRUE, cache = TRUE, message = FALSE, results='hide'}
 out.ife.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife",  r = 2, CV = 0,
   parallel = TRUE, cores = 16, se = TRUE,
-  nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))
+  nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0),
+  max.iteration = 20000)
 
 out.mc.p <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "mc",  lambda = out.mc$lambda.cv,
   CV = 0, parallel = TRUE, cores = 16, se = TRUE,
   nboots = 200, placeboTest = TRUE, placebo.period = c(-2, 0))
 ```
+
+The IFE call sets `max.iteration = 20000`. Placebo and carryover tests drop a window of cells from the IFE estimation, which slows EM convergence below the default cap of 5000 iterations. With the smaller effective sample, EM here converges around iteration 8500. The same argument is used in the carryover and `carryover.rm` calls below. The MC fits do not need it, since matrix completion does not run the same EM loop.
 
 The placebo test conducts two types of tests:
 
@@ -334,7 +339,8 @@ Below, we set `carryover.period = c(1, 3)`. As we deduct the treatment effect fr
 out.ife.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife", r = 2, CV = 0,
   parallel = TRUE, cores = 16, se = TRUE,
-  nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))
+  nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3),
+  max.iteration = 20000)
 
 out.mc.c <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "mc",  lambda = out.mc$lambda.cv,
@@ -363,7 +369,8 @@ Using real-world data, researchers will likely find that carryover effects exist
 out.ife.rm.test <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
   force = "two-way", method = "ife", r = 2, CV = 0,
   parallel = TRUE, cores = 16, se = TRUE,  carryover.rm = 3,
-  nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3))# remove three periods
+  nboots = 200, carryoverTest = TRUE, carryover.period = c(1, 3),
+  max.iteration = 20000)# remove three periods
 ```
 
 ```{r carryover_rm, eval = TRUE, fig.width = 6, fig.height = 4.5}
