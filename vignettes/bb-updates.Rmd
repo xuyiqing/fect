@@ -1,5 +1,13 @@
 # Changelog {.unnumbered}
 
+## v2.4.3
+
+(2026-05-14)
+
+* Fix `future.globals.maxSize` overrun in parallel bootstrap: `quiet_nonpara`
+  wrapper no longer captures `fect_boot()`'s full frame.
+* Raise `future.globals.maxSize` to 2 GiB locally inside the parallel block.
+
 ## v2.4.2
 
 (2026-05-02)
