@@ -1,4 +1,10 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.3
+
+* Fix `future.globals.maxSize` overrun in parallel bootstrap: `quiet_nonpara`
+  wrapper no longer captures `fect_boot()`'s full frame.
+* Raise `future.globals.maxSize` to 2 GiB locally inside the parallel block.
+
 # fect 2.4.2
 
 ## New: `ci.method` argument on `fect()`; legacy `quantile.CI` soft-deprecated

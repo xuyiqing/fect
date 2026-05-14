@@ -1640,9 +1640,23 @@ fect_boot <- function(
     options(doFuture.rng.onMisuse = "ignore")
     on.exit(options(doFuture.rng.onMisuse = old_rng_misuse), add = TRUE)
 
+    ## v2.4.3: bump future.globals.maxSize locally to 2 GiB for the
+    ## parallel block. Belt-and-braces guard for very large panels
+    ## (high N*T, large factor rank, dense covariates) whose per-worker
+    ## export can exceed the 500 MiB default even after the trim below.
+    ## Honour any larger user-set cap via max().
+    old_future_max <- getOption("future.globals.maxSize", 500 * 1024^2)
+    options(future.globals.maxSize = max(old_future_max, 2 * 1024^3))
+    on.exit(options(future.globals.maxSize = old_future_max), add = TRUE)
+
     quiet_nonpara <- function(j) {
       suppressMessages(suppressWarnings(one.nonpara(boot.seq[j])))
     }
+    ## v2.4.3: trim the wrapper's closure env so foreach/future export
+    ## ships only `one.nonpara` (already trimmed at L1600) and `boot.seq`,
+    ## NOT the full fect_boot() frame (Y, D, X, W, out, ...). Prevents the
+    ## quiet_nonpara=728MiB blowup reported on IFE + nboots=1000.
+    quiet_nonpara <- trim_closure_env(quiet_nonpara)
 
     run_dopar_retry <- function(idx, workers) {
       ## Build the PSOCK cluster via the package helper, which bakes
