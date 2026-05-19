@@ -741,12 +741,11 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 
 ## Estimation sample via panelView {#sec-sample}
 
-`fect()` returns a logical `T x N` matrix `$sample` marking which cells of
-the panel entered the estimation (`TRUE` = used in the main fit, placebo
-or carryover test, or balance check; `FALSE` = missing observation,
-dropped unit, or carryover.rm exclusion). The matrix shares row and
-column names with `$Y.dat`, so it composes directly with
-`panelView::panelview(sample = ...)`.
+`fect()` returns a logical `T x N` matrix `$sample` marking which cells
+of the panel entered the estimation (`TRUE` = used in the main fit,
+placebo or carryover test, or balance check; `FALSE` = missing
+observation, dropped unit, or carryover.rm exclusion). It composes
+directly with **panelView** via the `panelview(fit)` entry-point:
 
 ```{r sample-fect, eval=FALSE}
 library(fect); library(panelView)
@@ -754,20 +753,24 @@ data(simdata)
 fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
             method = "ife", r = 1, se = FALSE, CV = FALSE)
 
-panelview(Y ~ D, data = simdata, index = c("id", "time"),
-          type = "treat", by.timing = TRUE,
-          sample = fit)
+# Pass the fit directly --- no data, formula, or index needed.
+panelview(fit, type = "treat", by.timing = TRUE, sample.sort = TRUE)
 ```
 
-Cells with `sample == TRUE` use the normal palette; cells with
-`sample == FALSE` render in a faded "Not used" variant. Pair with
-`sample.sort = TRUE` to put the in-sample units at the top of the
-figure, which is useful when a non-trivial subset of units get dropped
-by `min.T0`, `max.missing`, or carryover-removal. See the **panelView**
-manual (chapter "Treatment Status", section "Overlaying the estimation
-sample") for the full set of options including the alignment-by-name
-rules and the named `color = c(control = ..., unused.control = ..., ...)`
-palette knobs.
+panelview reads the panel and the mask straight from the fit object's
+slots (`$Y.dat`, `$D.dat`, `$id`, `$rawtime`, `$index`, `$Y`, `$D`,
+`$sample`). Cells with `sample == TRUE` use the normal palette; cells
+with `sample == FALSE` render in a faded "Not used" variant. Pair with
+`sample.sort = TRUE` to group the in-sample units at the top, useful
+when a non-trivial subset of units get dropped by `min.T0`,
+`max.missing`, or carryover-removal.
+
+The original signature `panelview(Y ~ D, data, index, sample = fit, ...)`
+still works for explicit-data workflows. See the **panelView** manual
+(chapter "Treatment Status", section "Overlaying the estimation sample")
+for sample-alignment rules, the `sample.sort` x `by.timing` 2x2, and
+the named `color = c(control = ..., unused.control = ..., ...)` palette
+syntax.
 
 ## How to Cite
 
