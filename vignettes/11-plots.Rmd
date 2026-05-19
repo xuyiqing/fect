@@ -759,22 +759,21 @@ fit <- fect(nat_rate_ord ~ indirect, data = hh2019,
             min.T0 = 2)
 
 panelview(fit, type = "treat", by.timing = TRUE,
-          sample.sort = TRUE, axis.lab = "off",
-          display.all = TRUE)
+          axis.lab = "off", display.all = TRUE)
 ```
 
-The figure has three bands. The dark-blue staircase at the top is the
-treated municipalities, ordered by year of treatment onset. The broad
-light-blue middle band is the controls, those municipalities that
-never received the treatment. The dark-grey band at the bottom is the
-roughly 285 municipalities fect could not use: they were already
-treated at the start of the panel, so there is no pre-treatment period
-from which to estimate a counterfactual, and the estimator drops them
+The figure splits into three bands. At the top sits a dark-grey block
+of roughly 285 municipalities that were already treated when the panel
+begins; they have no pre-treatment period and fect drops them
 silently. Without the sample overlay these dropped municipalities
-would be invisible.
+would be invisible. Below that is a dark-blue staircase of the units
+fect actually fits, ordered by treatment onset. The broad light-blue
+band at the bottom is the never-treated controls.
 
-Pairing `sample.sort = TRUE` with `by.timing = TRUE` groups the
-in-sample units at the top and orders them by treatment timing within.
+For a layout that puts the in-sample band on top instead, pair
+`sample.sort = TRUE` with `by.timing = TRUE`: in-sample units rise to
+the top, ordered by treatment timing within, and the dropped band
+falls to the bottom.
 
 The same fit can be passed to `sample =` inside the explicit-data
 signature if you prefer to control the data argument yourself. The
