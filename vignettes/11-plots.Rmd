@@ -753,31 +753,28 @@ the estimation sample takes one call:
 library(fect); library(panelView)
 data(hh2019, package = "fect")
 
-## hh2019 is otherwise complete; we inject a handful of NAs into the
-## outcome to make the resulting "Not used" cells visible in the
-## figure below.
-set.seed(42)
-hh <- hh2019
-hh$nat_rate_ord[hh$bfs %in% sample(unique(hh$bfs), 30) & hh$year <= 1995] <- NA
-
-fit <- fect(nat_rate_ord ~ indirect, data = hh,
+fit <- fect(nat_rate_ord ~ indirect, data = hh2019,
             index = c("bfs", "year"),
             method = "ife", r = 1, se = FALSE, CV = FALSE,
-            min.T0 = 2, na.rm = FALSE)
+            min.T0 = 2)
 
 panelview(fit, type = "treat", by.timing = TRUE,
           sample.sort = TRUE, axis.lab = "off",
           display.all = TRUE)
 ```
 
-In the figure, the cohort window for treated municipalities reads as a
-dark-blue staircase at the top of the in-sample block, control
-municipalities in their natural light blue fill the middle, and the
-band of "Not used" cells at the bottom marks cells fect could not
-use --- typically pre-period missing outcomes or units with too few
-pre-treatment observations for the chosen rank. Pairing
-`sample.sort = TRUE` with `by.timing = TRUE` groups the in-sample
-units at the top and orders them by treatment timing within.
+The figure has three bands. The dark-blue staircase at the top is the
+treated municipalities, ordered by year of treatment onset. The broad
+light-blue middle band is the controls, those municipalities that
+never received the treatment. The dark-grey band at the bottom is the
+roughly 285 municipalities fect could not use: they were already
+treated at the start of the panel, so there is no pre-treatment period
+from which to estimate a counterfactual, and the estimator drops them
+silently. Without the sample overlay these dropped municipalities
+would be invisible.
+
+Pairing `sample.sort = TRUE` with `by.timing = TRUE` groups the
+in-sample units at the top and orders them by treatment timing within.
 
 The same fit can be passed to `sample =` inside the explicit-data
 signature if you prefer to control the data argument yourself. The

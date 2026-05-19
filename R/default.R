@@ -3176,6 +3176,11 @@ fect.default <- function(
             obs.missing = obs.missing,
             obs.missing.balance = obs.missing.balance,
             sample = sample,
+            ## Original input panel (pre-drop), preserved so
+            ## panelView::panelview(fit) can render the full set of
+            ## units --- including those fect dropped (always-treated,
+            ## insufficient pre-period, etc.) --- as "Not used" cells.
+            data.long = data.old[, c(index, Yname, Dname), drop = FALSE],
             time.component.from = time.component.from,
             em = em
         ),
