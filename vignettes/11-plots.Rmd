@@ -755,7 +755,7 @@ data(hh2019, package = "fect")
 
 fit <- fect(nat_rate_ord ~ indirect, data = hh2019,
             index = c("bfs", "year"),
-            method = "ife", r = 1, se = FALSE, CV = FALSE,
+            method = "ife", r = 0, se = FALSE, CV = FALSE,
             min.T0 = 2)
 
 panelview(fit, type = "treat", by.timing = TRUE,
