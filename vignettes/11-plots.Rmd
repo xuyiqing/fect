@@ -739,6 +739,49 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 
 
 
+## Estimation sample via panelView {#sec-sample}
+
+Every fect fit returns a logical matrix `$sample` indicating which
+cells the estimator actually consumed. The matrix is the same shape as
+the panel; a cell is true when it entered the main fit, a placebo or
+carryover test, or a balance check, and false when it was missing,
+dropped, or excluded by `carryover.rm`. **panelView** consumes this
+matrix directly via its `panelview(fit)` entry-point, so visualizing
+the estimation sample takes one call:
+
+```{r sample-fect, fig.height=12}
+library(fect); library(panelView)
+data(hh2019, package = "fect")
+
+fit <- fect(nat_rate_ord ~ indirect, data = hh2019,
+            index = c("bfs", "year"),
+            method = "ife", r = 0, se = FALSE, CV = FALSE,
+            min.T0 = 2)
+
+panelview(fit, type = "treat", by.timing = TRUE,
+          axis.lab = "off", display.all = TRUE)
+```
+
+The figure splits into three bands. At the top sits a dark-grey block
+of roughly 285 municipalities that were already treated when the panel
+begins; they have no pre-treatment period and fect drops them
+silently. Without the sample overlay these dropped municipalities
+would be invisible. Below that is a dark-blue staircase of the units
+fect actually fits, ordered by treatment onset. The broad light-blue
+band at the bottom is the never-treated controls.
+
+For a layout that puts the in-sample band on top instead, pair
+`sample.sort = TRUE` with `by.timing = TRUE`: in-sample units rise to
+the top, ordered by treatment timing within, and the dropped band
+falls to the bottom.
+
+The same fit can be passed to `sample =` inside the explicit-data
+signature if you prefer to control the data argument yourself. The
+**panelView** manual chapter on Treatment Status covers the full
+surface, including the sample-alignment rules, the four
+sample-sort × by-timing combinations, and the named-slot syntax for
+fine-grained palette overrides.
+
 ## How to Cite
 
 If you find these methods and visualization tools helpful, you can cite @LWX2024.
