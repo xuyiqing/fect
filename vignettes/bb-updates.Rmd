@@ -1,5 +1,14 @@
 # Changelog {.unnumbered}
 
+## v2.4.4 (development)
+
+(2026-05-19)
+
+* `fect()` now returns `$sample`, a logical `T x N` matrix (same dims as
+  `$Y.dat`) marking cells the estimator used in any part of the
+  procedure (main fit, placebo / carryover / balance tests). Compatible
+  with `panelView::panelview(sample = ...)`. See @sec-sample.
+
 ## v2.4.3
 
 (2026-05-14)

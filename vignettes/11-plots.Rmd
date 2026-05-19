@@ -739,6 +739,36 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 
 
 
+## Estimation sample via panelView {#sec-sample}
+
+`fect()` returns a logical `T x N` matrix `$sample` marking which cells of
+the panel entered the estimation (`TRUE` = used in the main fit, placebo
+or carryover test, or balance check; `FALSE` = missing observation,
+dropped unit, or carryover.rm exclusion). The matrix shares row and
+column names with `$Y.dat`, so it composes directly with
+`panelView::panelview(sample = ...)`.
+
+```{r sample-fect, eval=FALSE}
+library(fect); library(panelView)
+data(simdata)
+fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
+            method = "ife", r = 1, se = FALSE, CV = FALSE)
+
+panelview(Y ~ D, data = simdata, index = c("id", "time"),
+          type = "treat", by.timing = TRUE,
+          sample = fit)
+```
+
+Cells with `sample == TRUE` use the normal palette; cells with
+`sample == FALSE` render in a faded "Not used" variant. Pair with
+`sample.sort = TRUE` to put the in-sample units at the top of the
+figure, which is useful when a non-trivial subset of units get dropped
+by `min.T0`, `max.missing`, or carryover-removal. See the **panelView**
+manual (chapter "Treatment Status", section "Overlaying the estimation
+sample") for the full set of options including the alignment-by-name
+rules and the named `color = c(control = ..., unused.control = ..., ...)`
+palette knobs.
+
 ## How to Cite
 
 If you find these methods and visualization tools helpful, you can cite @LWX2024.
