@@ -741,36 +741,50 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 
 ## Estimation sample via panelView {#sec-sample}
 
-`fect()` returns a logical `T x N` matrix `$sample` marking which cells
-of the panel entered the estimation (`TRUE` = used in the main fit,
-placebo or carryover test, or balance check; `FALSE` = missing
-observation, dropped unit, or carryover.rm exclusion). It composes
-directly with **panelView** via the `panelview(fit)` entry-point:
+Every fect fit returns a logical matrix `$sample` indicating which
+cells the estimator actually consumed. The matrix is the same shape as
+the panel; a cell is true when it entered the main fit, a placebo or
+carryover test, or a balance check, and false when it was missing,
+dropped, or excluded by `carryover.rm`. **panelView** consumes this
+matrix directly via its `panelview(fit)` entry-point, so visualizing
+the estimation sample takes one call:
 
-```{r sample-fect, eval=FALSE}
+```{r sample-fect, fig.height=12}
 library(fect); library(panelView)
-data(simdata)
-fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
-            method = "ife", r = 1, se = FALSE, CV = FALSE)
+data(hh2019, package = "fect")
 
-# Pass the fit directly --- no data, formula, or index needed.
-panelview(fit, type = "treat", by.timing = TRUE, sample.sort = TRUE)
+## hh2019 is otherwise complete; we inject a handful of NAs into the
+## outcome to make the resulting "Not used" cells visible in the
+## figure below.
+set.seed(42)
+hh <- hh2019
+hh$nat_rate_ord[hh$bfs %in% sample(unique(hh$bfs), 30) & hh$year <= 1995] <- NA
+
+fit <- fect(nat_rate_ord ~ indirect, data = hh,
+            index = c("bfs", "year"),
+            method = "ife", r = 1, se = FALSE, CV = FALSE,
+            min.T0 = 2, na.rm = FALSE)
+
+panelview(fit, type = "treat", by.timing = TRUE,
+          sample.sort = TRUE, axis.lab = "off",
+          display.all = TRUE)
 ```
 
-panelview reads the panel and the mask straight from the fit object's
-slots (`$Y.dat`, `$D.dat`, `$id`, `$rawtime`, `$index`, `$Y`, `$D`,
-`$sample`). Cells with `sample == TRUE` use the normal palette; cells
-with `sample == FALSE` render in a faded "Not used" variant. Pair with
-`sample.sort = TRUE` to group the in-sample units at the top, useful
-when a non-trivial subset of units get dropped by `min.T0`,
-`max.missing`, or carryover-removal.
+In the figure, the cohort window for treated municipalities reads as a
+dark-blue staircase at the top of the in-sample block, control
+municipalities in their natural light blue fill the middle, and the
+band of "Not used" cells at the bottom marks cells fect could not
+use --- typically pre-period missing outcomes or units with too few
+pre-treatment observations for the chosen rank. Pairing
+`sample.sort = TRUE` with `by.timing = TRUE` groups the in-sample
+units at the top and orders them by treatment timing within.
 
-The original signature `panelview(Y ~ D, data, index, sample = fit, ...)`
-still works for explicit-data workflows. See the **panelView** manual
-(chapter "Treatment Status", section "Overlaying the estimation sample")
-for sample-alignment rules, the `sample.sort` x `by.timing` 2x2, and
-the named `color = c(control = ..., unused.control = ..., ...)` palette
-syntax.
+The same fit can be passed to `sample =` inside the explicit-data
+signature if you prefer to control the data argument yourself. The
+**panelView** manual chapter on Treatment Status covers the full
+surface, including the sample-alignment rules, the four
+sample-sort × by-timing combinations, and the named-slot syntax for
+fine-grained palette overrides.
 
 ## How to Cite
 
