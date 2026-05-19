@@ -1,4 +1,8 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.4
+
+- `fect()` now returns `$sample`, a logical matrix (same dims as `$Y.dat`) marking cells used in any part of the estimation procedure (main fit, placebo/carryover/balance tests).
+
 # fect 2.4.3
 
 * Fix `future.globals.maxSize` overrun in parallel bootstrap: `quiet_nonpara`
