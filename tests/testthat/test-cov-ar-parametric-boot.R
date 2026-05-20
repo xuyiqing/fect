@@ -60,12 +60,18 @@
 }
 
 .fit_one <- function(df, nboots, seed) {
-  fect(
-    Y ~ D, data = df, index = c("id", "time"),
-    method = "ife", force = "two-way",
-    CV = FALSE, r = 1, se = TRUE,
-    vartype = "parametric", nboots = nboots, parallel = FALSE, seed = seed,
-    time.component.from = "nevertreated"
+  ## suppressWarnings covers the "EM did not converge within
+  ## max.iteration = 5000" warning. The DGP here is intentionally
+  ## ill-conditioned (small N_co/N_tr + AR(1) rho = 0.8) and these tests
+  ## verify the bootstrap SD ratio, not EM convergence.
+  suppressWarnings(
+    fect(
+      Y ~ D, data = df, index = c("id", "time"),
+      method = "ife", force = "two-way",
+      CV = FALSE, r = 1, se = TRUE,
+      vartype = "parametric", nboots = nboots, parallel = FALSE, seed = seed,
+      time.component.from = "nevertreated"
+    )
   )
 }
 

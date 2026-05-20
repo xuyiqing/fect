@@ -694,6 +694,11 @@ print(mspe.comp$summary[, c("Model", "MSPE", "RMSE", "MAD")])
 Since `sim_gsynth` follows a pure IFE data generating process with two factors, Models 1 and 2 should produce identical MSPE --- confirming that CFE with `time.component.from = "nevertreated"` and no additional structure is numerically equivalent to gsynth. Model 3, which adds unnecessary linear trends, should produce similar or slightly worse MSPE because the extra parameters add noise without benefit when the true DGP has no unit-specific trends.
 
 
+## Inference
+
+The default `vartype` for the gsynth-style regime is `"parametric"` --- a two-stage pseudo-treated bootstrap that targets the conditional variance $V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D)$ on small-$N_{\text{tr}}$ panels where the standard nonparametric bootstrap is unreliable. The `para.error` argument (introduced in v2.4.2) chooses how the residual error process is resampled: `"auto"` (default, resolves to `"empirical"` on a fully-observed panel and `"ar"` on a missing-data panel), `"ar"` (the v2.4.1 behavior), `"empirical"`, or `"wild"`. The (`vartype` × `ci.method` × `para.error`) interaction, parametric-bootstrap mechanics, and an empirical coverage study live in [Chapter @sec-inference], which is the natural next read after this chapter.
+
+
 ## Additional Notes
 
 1.  **Unbalanced Panels**: Running Gsynth within **fect** on unbalanced panels will take significantly more time compared to balanced panels, often by a factor of 100:1 or more. This is because the EM algorithm, which fills in missing values (implemented in C++), requires many more iterations to converge. To reduce run-time, users can remove units or time periods with extensive missing values. Understanding the data structure before running any regressions is always helpful. Note that this approach differs from setting `method = "ife"`, as no pre-treatment data from the treated units is used to impute $\hat{Y}(0)$.
@@ -701,11 +706,6 @@ Since `sim_gsynth` follows a pure IFE data generating process with two factors, 
 2.  **Adding Covariates**: Including covariates in the model will significantly slow down the algorithm, as the IFE/MC model requires more time to converge. Users should be aware of this trade-off when incorporating covariates.
 
 3.  **Setting `min.T0`**: Setting `min.T0` to a positive value helps. The algorithm will automatically exclude treated units with too few pre-treatment periods. A larger $T_0$ reduces bias in causal estimates and minimizes the risk of severe extrapolation. When running cross-validation to select the number of factors, `min.T0` must be equal to or greater than (`r.max` + 2). Errors frequently occur when there are too few pre-treatment periods, so ensuring adequate $T_0$ (e.g. setting `min.T0 = 5`) is crucial.
-
-
-## Inference
-
-The default `vartype` for the gsynth-style regime is `"parametric"` --- a two-stage pseudo-treated bootstrap that targets the conditional variance $V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D)$ on small-$N_{\text{tr}}$ panels where the standard nonparametric bootstrap is unreliable. The `para.error` argument (introduced in v2.4.2) chooses how the residual error process is resampled: `"auto"` (default, resolves to `"empirical"` on a fully-observed panel and `"ar"` on a missing-data panel), `"ar"` (the v2.4.1 behavior), `"empirical"`, or `"wild"`. The (`vartype` × `ci.method` × `para.error`) interaction, parametric-bootstrap mechanics, and an empirical coverage study live in [Chapter @sec-inference], which is the natural next read after this chapter.
 
 
 ## How to Cite

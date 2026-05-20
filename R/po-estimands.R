@@ -231,15 +231,17 @@
     if (is.null(fit$eff.boot)) return(invisible(TRUE))
     B <- dim(fit$eff.boot)[3]
     if (is.na(B) || B >= 1000) return(invisible(TRUE))
-    warning(
-        "estimand() with ci.method = \"", ci.method, "\" on a fit with ",
-        "nboots = ", B, " (< 1000): tail-quantile-based CIs may have ",
-        "erratic endpoints at this replicate count (Efron 1987 Section 3; ",
-        "DiCiccio & Efron 1996 Section 4 recommend B >= 1000). The point ",
-        "estimate and SE are unaffected. For publication-grade CIs, refit ",
-        "with `fect(..., nboots = 1000)` and re-call estimand().",
-        call. = FALSE
-    )
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+        warning(
+            "estimand() with ci.method = \"", ci.method, "\" on a fit with ",
+            "nboots = ", B, " (< 1000): tail-quantile-based CIs may have ",
+            "erratic endpoints at this replicate count (Efron 1987 Section 3; ",
+            "DiCiccio & Efron 1996 Section 4 recommend B >= 1000). The point ",
+            "estimate and SE are unaffected. For publication-grade CIs, refit ",
+            "with `fect(..., nboots = 1000)` and re-call estimand().",
+            call. = FALSE
+        )
+    }
     invisible(TRUE)
 }
 

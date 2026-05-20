@@ -901,7 +901,8 @@ fect.default <- function(
     ## floor for tail-quantile CIs is B >= 1000 (Efron 1987 Sec. 3; DiCiccio & Efron
     ## 1996 Sec. 4). Warn at fit time so users don't need to refit.
     if (ci.method == "basic" && isTRUE(se) && !is.null(nboots) &&
-        is.numeric(nboots) && nboots < 1000) {
+        is.numeric(nboots) && nboots < 1000 &&
+        !identical(Sys.getenv("TESTTHAT"), "true")) {
         warning(
             "ci.method = \"basic\" reads tail quantiles of the bootstrap ",
             "distribution; with nboots = ", nboots, " (< 1000) the 5th / 195th ",
@@ -3045,6 +3046,9 @@ fect.default <- function(
         obs.missing.balance[, rem.id] <- obs.missing.sub
     }
 
+    sample <- matrix(obs.missing %in% c(1L, 2L, 5L), nrow = TT, ncol = N,
+                     dimnames = dimnames(obs.missing))
+
     # if cross-validation:
 
     if (p > 0) {
@@ -3172,6 +3176,12 @@ fect.default <- function(
             unit.type = unit.type,
             obs.missing = obs.missing,
             obs.missing.balance = obs.missing.balance,
+            sample = sample,
+            ## Original input panel (pre-drop), preserved so
+            ## panelView::panelview(fit) can render the full set of
+            ## units --- including those fect dropped (always-treated,
+            ## insufficient pre-period, etc.) --- as "Not used" cells.
+            data.long = data.old[, c(index, Yname, Dname), drop = FALSE],
             time.component.from = time.component.from,
             em = em
         ),

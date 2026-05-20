@@ -231,13 +231,18 @@ test_that("CI.8: fect()'s nboots default is 200", {
 test_that("CI.9: estimand() warns on tail-CI methods with nboots < 1000", {
   skip_on_cran()
   fit_small <- .fit_canonical(nboots = 100)
-  for (m in c("basic", "percentile", "bc", "bca")) {
-    expect_warning(
-      fect::estimand(fit_small, "att", "overall", window = c(1, 5),
-                     ci.method = m),
-      "tail-quantile-based CIs may have"
-    )
-  }
+  ## The warning is gated on Sys.getenv("TESTTHAT") inside estimand() to
+  ## keep the suite-wide summary clean. Temporarily unset the env var here
+  ## so the warning fires and can be asserted.
+  withr::with_envvar(c(TESTTHAT = "false"), {
+    for (m in c("basic", "percentile", "bc", "bca")) {
+      expect_warning(
+        fect::estimand(fit_small, "att", "overall", window = c(1, 5),
+                       ci.method = m),
+        "tail-quantile-based CIs may have"
+      )
+    }
+  })
 })
 
 

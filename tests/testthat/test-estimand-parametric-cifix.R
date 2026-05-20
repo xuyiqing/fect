@@ -88,14 +88,18 @@ make_panel_B_pos <- function(seed) {
     e <- new.env()
     data(sim_linear, package = "fect", envir = e)
     set.seed(42)
-    suppressMessages(
+    ## suppressWarnings here covers the "EM did not converge within
+    ## max.iteration = 5000" warning. The fixture is intentionally small
+    ## (nboots = 30) and convergence is not what these tests verify ---
+    ## they check CI-formula invariants on the parametric path.
+    suppressMessages(suppressWarnings(
       fect(Y ~ D, data = e$sim_linear, index = c("id", "time"),
            method = "ife", force = "two-way", se = TRUE,
            nboots = 30, r = 2, CV = FALSE, keep.sims = TRUE,
            vartype = "parametric",
            time.component.from = "nevertreated",
            parallel = FALSE)
-    )
+    ))
   }
 })
 

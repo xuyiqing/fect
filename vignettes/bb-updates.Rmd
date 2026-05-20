@@ -1,5 +1,14 @@
 # Changelog {.unnumbered}
 
+## v2.4.4
+
+(2026-05-19)
+
+* `fect()` now returns `$sample`, a logical `T x N` matrix (same dims as
+  `$Y.dat`) marking cells the estimator used in any part of the
+  procedure (main fit, placebo / carryover / balance tests). Compatible
+  with `panelView::panelview(sample = ...)`.
+
 ## v2.4.3
 
 (2026-05-14)
@@ -13,24 +22,22 @@
 (2026-05-02)
 
 * New `test = c("none", "placebo", "carryover")` argument on `estimand()`
-  closes issue #131. See [Chapter @sec-estimands].
+  closes issue #131.
 * New `ci.method = c("normal", "basic")` argument on `fect()`. Default
   `"normal"` is byte-equivalent to the v2.4.1 default. `"basic"` is the
   reflected pivot CI (Davison-Hinkley 1997 §5.2.1; `boot::boot.ci(type = "basic")`).
   All CIs in fect's `est.*` slots use the requested method uniformly.
   Legacy `quantile.CI` is soft-deprecated --- both legacy values still
-  work (mapped to `ci.method` with a one-time warning). See
-  [Chapter @sec-inference].
+  work (mapped to `ci.method` with a one-time warning).
 * New `ci.method` values `"bc"`, `"bca"`, `"normal"` on `estimand()`;
   per-type defaults updated. `att.cumu` default is `"basic"` (the
   reflected pivot CI recommended by Davison-Hinkley 1997 §5.2.1 and used
   by `boot::boot.ci(type = "basic")`); the raw-quantile `"percentile"`
   option is preserved for replication. The full 5-method surface lives
   on `estimand()`; fect's built-in CI machinery covers normal / basic
-  only. See [Chapter @sec-estimands] and [Chapter @sec-inference].
+  only.
 * New `para.error` argument for `vartype = "parametric"` selects the
-  residual-error model: `"auto"`, `"ar"`, `"empirical"`, `"wild"`. See
-  [Chapter @sec-inference].
+  residual-error model: `"auto"`, `"ar"`, `"empirical"`, `"wild"`.
 * Tighter EM convergence defaults: `tol` from `1e-3` to `1e-5`,
   `max.iteration` from `1000` to `5000`, plus a `warning()` when EM
   hits `max.iteration` without converging. IFE/CFE point estimates
@@ -52,8 +59,7 @@
 **Enhancement.** `estimand()`'s `vartype` argument now accepts
 `"parametric"` in addition to `"bootstrap"`, `"jackknife"`, and
 `"none"`. Works for all four `type` values when the fit was produced
-with `fect(..., vartype = "parametric", keep.sims = TRUE)`. See
-@sec-estimands for a worked example.
+with `fect(..., vartype = "parametric", keep.sims = TRUE)`.
 
 **Bug fix.** `estimand(fit, "att.cumu", ...)` now populates `n_cells`
 on both event-time and overall paths, so
@@ -84,8 +90,8 @@ dedicated chapter in the user manual.
   event-time-window case.
 * `direction = c("on", "off")` selects the event-time grid for reversal
   panels.
-* New chapter [@sec-estimands] in the user manual walks through all six
-  worked examples plus the migration table.
+* New chapter on post-hoc estimands in the user manual walks through
+  all six worked examples plus the migration table.
 
 **Soft-deprecation.** `effect()` and `att.cumu()` emit a
 one-time-per-session message pointing at `estimand()`. They continue
@@ -128,7 +134,7 @@ breaking the long-form schema.
 
 **Consistent ATT surface when `W` is supplied.** `fit$est.att`, `fit$est.avg`, `plot(fit)`, and `print(fit)` now all report the same W-weighted aggregation. The redundant `*.W` parallel slots are no longer attached to the fit object. To see the unweighted view, refit with `W = NULL`.
 
-**New `W.est` and `W.agg` arguments.** Both default to `NULL` and fall back to `W`. Use `W.est` alone when the weight should enter the outcome-model fit only, or `W.agg` alone when it should enter the aggregation only. See [Chapter @sec-ife-mc] §3.5 for details. A clean fect-internal solution for inverse-probability weights for confounding adjustment is under development for v3.0.
+**New `W.est` and `W.agg` arguments.** Both default to `NULL` and fall back to `W`. Use `W.est` alone when the weight should enter the outcome-model fit only, or `W.agg` alone when it should enter the aggregation only. A clean fect-internal solution for inverse-probability weights for confounding adjustment is under development for v3.0.
 
 **Deprecations.** The `weight` argument to `plot.fect()` is now a no-op (the canonical slots are already W-weighted when `W` is supplied). It emits a one-time warning and is slated for removal in v2.5.0.
 
@@ -136,7 +142,7 @@ breaking the long-form schema.
 
 (2026-04-25)
 
-**Rolling-window cross-validation** ([Chapter @sec-ife-mc], [Chapter @sec-gsynth]):
+**Rolling-window cross-validation**:
 
 * New `cv.method = "rolling"` in the main `fect()` CV dispatcher (also exposed as standalone `r.cv.rolling()`) implements the standard time-series rolling-window CV design adapted to panel data. Recommended default for serially correlated panels; closes the AR-leakage channel that causes block CV to over-select `r` (often pegging at `r.max`). Supports `method` in {`"ife"`, `"gsynth"`, `"cfe"`, `"mc"`, `"both"`}. New parameter `cv.buffer` (default 1, past-side buffer). Empirical validation: on a Xu (2017) DGP with $r_{\text{true}} = 2$ and AR(1) $\rho = 0.8$ (K = 200 reps), rolling CV recovers truth in 56% vs block CV's 15% (mean `r.cv` = 1.58 vs 3.34).
 
@@ -145,11 +151,11 @@ breaking the long-form schema.
 * `cv.rule = "1se"` (default) picks the smallest `r` within one fold-SE of the minimum-CV-error `r`. Legacy `cv.rule = "1pct"` remains available for byte-identical reproducibility of pre-2.3.0 fits.
 * Default flip: existing `CV = TRUE` calls will produce different `r.cv` on the same data. Set `cv.rule = "1pct"` to recover prior behavior.
 
-**Bounded factor loadings for GSC** (see [Chapter @sec-gsynth]):
+**Bounded factor loadings for GSC**:
 
 * New `loading.bound = "simplex"` (default `"none"`) constrains treated-unit loadings to the convex hull of control loadings via an entropy-regularized simplex projection. Companion arguments: `gamma.loading` (regularization strength; `NULL` triggers 5-fold CV) and `gamma.loading.grid`. Diagnostic outputs: `wgt.implied` (row-stochastic simplex weights), `loading.proj.resid` (extrapolation flag per treated unit). Currently `method = "ife"`/`"gsynth"` with `time.component.from = "nevertreated"` only.
 * Caveat: percentile-bootstrap intervals may under-cover when the constraint binds; boundary-corrected inference is deferred.
-* Companion plot: `plot(..., type = "loading.overlap")` shows treated loadings vs the control convex hull ($r \geq 2$) or mirror histogram with control-range band ($r = 1$). See [Chapter @sec-loading-overlap].
+* Companion plot: `plot(..., type = "loading.overlap")` shows treated loadings vs the control convex hull ($r \geq 2$) or mirror histogram with control-range band ($r = 1$).
 
 **Other changes**:
 
