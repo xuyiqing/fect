@@ -20,12 +20,17 @@
     e <- new.env()
     data(sim_linear, package = "fect", envir = e)
     set.seed(42)
-    fit <- fect(Y ~ D, data = e$sim_linear, index = c("id", "time"),
-                method = "ife", force = "two-way", se = TRUE,
-                nboots = 30, r = 2, CV = FALSE, keep.sims = TRUE,
-                vartype = "parametric",
-                time.component.from = "nevertreated",
-                parallel = FALSE)
+    ## suppressWarnings covers the "EM did not converge within
+    ## max.iteration = 5000" warning. The fixture is intentionally small
+    ## (nboots = 30) and convergence is not what these tests verify.
+    fit <- suppressWarnings(
+      fect(Y ~ D, data = e$sim_linear, index = c("id", "time"),
+           method = "ife", force = "two-way", se = TRUE,
+           nboots = 30, r = 2, CV = FALSE, keep.sims = TRUE,
+           vartype = "parametric",
+           time.component.from = "nevertreated",
+           parallel = FALSE)
+    )
     cached <<- fit
     fit
   }
@@ -123,13 +128,18 @@ test_that("keep.sims = FALSE under parametric still errors helpfully on non-fast
   e <- new.env()
   data(sim_linear, package = "fect", envir = e)
   set.seed(42)
-  fit_no_sims <- fect(Y ~ D, data = e$sim_linear, index = c("id", "time"),
-                      method = "ife", force = "two-way", se = TRUE,
-                      nboots = 20, r = 2, CV = FALSE,
-                      keep.sims = FALSE,
-                      vartype = "parametric",
-                      time.component.from = "nevertreated",
-                      parallel = FALSE)
+  ## suppressWarnings covers the "EM did not converge within
+  ## max.iteration = 5000" warning on this small (nboots = 20) fixture;
+  ## the test verifies error messages on non-fast paths, not convergence.
+  fit_no_sims <- suppressWarnings(
+    fect(Y ~ D, data = e$sim_linear, index = c("id", "time"),
+         method = "ife", force = "two-way", se = TRUE,
+         nboots = 20, r = 2, CV = FALSE,
+         keep.sims = FALSE,
+         vartype = "parametric",
+         time.component.from = "nevertreated",
+         parallel = FALSE)
+  )
   expect_null(fit_no_sims$eff.boot)
 
   ## att / event.time fast path reads fit$est.att, so still works.

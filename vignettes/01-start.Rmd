@@ -12,40 +12,34 @@ rm(list = ls())
 
 ## Installation
 
-To install **fect** from CRAN, run the code chunk below:
+| Source | Version | Date | Features |
+|--------|---------|------|----------|
+| CRAN | 2.4.1 | 2026-04-30 | Default release |
+| GitHub (`master`) | 2.4.1 | 2026-04-30 | Same as CRAN |
+| GitHub (`dev`) | 2.4.4 | 2026-05-19 | + `$sample` slot + `panelview(fit)` overlay |
+
+To install **fect** from CRAN:
 
 ```{r install-cran, eval = FALSE, message = FALSE, warning = FALSE}
 install.packages("fect")
 ```
 
-We recommend users to install the most up-to-date, stable version of **fect** from Github using:
+For the most up-to-date stable version on GitHub:
 
-```{r install-github-main, eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
+```{r install-github-main, eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE}
 devtools::install_github("xuyiqing/fect")
 ```
 
-We fix bugs in the `dev` branch before merging into the main branch; therefore, it is often more up to date.
+Bug fixes land on the `dev` branch first, so it is often ahead of `master`:
 
-```{r install-github-dev, eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE,}
+```{r install-github-dev, eval = FALSE, message = FALSE, warning = FALSE, cache = FALSE}
 devtools::install_github("xuyiqing/fect@dev")
 ```
 
-After installation, check **fect** version to make sure the package is up-to-date.
+Check the installed version:
 
 ```{r check-version}
 installed.packages()["fect", "Version"]
-```
-
-For reference, here are the latest **CRAN release** and **`dev` branch** versions (queried live):
-
-```{r check-latest-versions, message = FALSE, warning = FALSE, cache = FALSE}
-cran_ver <- available.packages(repos = "https://cloud.r-project.org")["fect", "Version"]
-desc <- readLines("https://raw.githubusercontent.com/xuyiqing/fect/dev/DESCRIPTION")
-dev_ver <- sub("^Version: ", "", desc[grep("^Version: ", desc)])
-
-# display versions
-cat(sprintf("CRAN release: %s\n", cran_ver))
-cat(sprintf("Dev branch:   %s\n", dev_ver))
 ```
 
 **panelView** for panel data visualization is highly recommended and will be used in the tutorial:

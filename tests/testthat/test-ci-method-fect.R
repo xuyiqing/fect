@@ -92,10 +92,15 @@ test_that("modern API (no quantile.CI supplied) emits no quantile.CI warning", {
 # ---- 6. nboots < 1000 + ci.method = "basic" warns at fit time --------------
 
 test_that("ci.method = 'basic' with nboots < 1000 fires the tail-CI warning", {
-    expect_warning(
-        base_call(ci.method = "basic", nboots = 50),
-        regexp = "tail quantiles.*1000|Efron 1987"
-    )
+    ## The warning is gated on Sys.getenv("TESTTHAT") inside fect() to keep
+    ## the suite-wide summary clean. Temporarily unset the env var here so
+    ## the warning fires and can be asserted.
+    withr::with_envvar(c(TESTTHAT = "false"), {
+        expect_warning(
+            base_call(ci.method = "basic", nboots = 50),
+            regexp = "tail quantiles.*1000|Efron 1987"
+        )
+    })
 })
 
 expect_silent_about <- function(expr, regexp) {
