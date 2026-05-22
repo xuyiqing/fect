@@ -138,8 +138,6 @@ The placebo test now passes (high p-value), confirming that the region×time fix
 In the `index` argument, elements beyond the first two (unit, time) are treated as additional fixed-effect grouping variables. You can include multiple additional groupings: `index = c("id", "time", "region_time", "sector_time")`.
 :::
 
-------------------------------------------------------------------------
-
 ## Time-invariant covariates with time-varying coefficients
 
 When time-invariant unit characteristics $Z_i$ (e.g., baseline GDP, initial population) have effects that change over time, a simple additive control is insufficient. The CFE model allows $Z_i'\gamma_{g(t)}$, where $\gamma$ varies by time group, capturing the time-varying nature of these effects.

@@ -76,7 +76,7 @@ fect <- function(
     tost.threshold = NULL, # equiv
     knots = NULL,
     degree = 2, # wald = FALSE, # fit test
-    sfe = NULL,
+    group.fe = NULL, # additional additive FE columns absorbed via CFE machinery
     cfe = NULL,
     Z = NULL,
     gamma = NULL,
@@ -159,7 +159,7 @@ fect.formula <- function(
     tost.threshold = NULL,
     knots = NULL,
     degree = 2, # wald = FALSE,
-    sfe = NULL,
+    group.fe = NULL,
     cfe = NULL,
     Z = NULL,
     gamma = NULL,
@@ -274,7 +274,7 @@ fect.formula <- function(
         tost.threshold = tost.threshold,
         knots = knots,
         degree = degree,
-        sfe = sfe,
+        group.fe = group.fe,
         cfe = cfe,
         Z = Z,
         gamma = gamma,
@@ -359,7 +359,7 @@ fect.default <- function(
     tost.threshold = NULL,
     knots = NULL,
     degree = 2, # wald = FALSE,
-    sfe = NULL,
+    group.fe = NULL,
     cfe = NULL,
     Z = NULL,
     gamma = NULL,
@@ -399,6 +399,131 @@ fect.default <- function(
         data <- as.data.frame(data)
         ## warning("Not a data frame.")
     }
+
+    ## ----------------------------------------------------------------
+    ## group.fe: validate, auto-route method, normalize into index[3:]
+    ## ----------------------------------------------------------------
+    ## group.fe is a character vector of column names naming additive simple
+    ## FE groupings absorbed via the existing CFE pipeline (X.extra.FE). It
+    ## is a discoverable surface for the legacy index = c(unit, time, extra,
+    ## extra, ...) syntax. See statsclaw-workspace/fect/runs/2026-05-21-
+    ## higher-level-fe.md for the design memo.
+    if (!is.null(group.fe)) {
+        if (!is.character(group.fe)) {
+            stop("\"group.fe\" must be a character vector of column names.",
+                 call. = FALSE)
+        }
+        ## (a) columns exist
+        missing.cols <- setdiff(group.fe, colnames(data))
+        if (length(missing.cols) > 0) {
+            stop("group.fe column(s) not found in data: ",
+                 paste(missing.cols, collapse = ", "), call. = FALSE)
+        }
+        ## (b) conflict with legacy index[3:] form: hard error
+        if (length(index) > 2) {
+            stop("Specify additional FE via group.fe OR extra index slots, ",
+                 "not both. index[3:] is the legacy form; group.fe is preferred.",
+                 call. = FALSE)
+        }
+        ## (c) overlap with index[1:2]: warn and drop the duplicate entries
+        dup.idx <- intersect(group.fe, index[1:2])
+        if (length(dup.idx) > 0) {
+            warning("group.fe entry/entries (",
+                    paste(dup.idx, collapse = ", "),
+                    ") duplicate index[1:2]; dropping from group.fe.",
+                    call. = FALSE)
+            group.fe <- setdiff(group.fe, index[1:2])
+        }
+        ## (d) auto-route method (per D3 in design memo). When routing fe ->
+        ## cfe, also pre-set r = 0 and CV = FALSE so the call behaves like
+        ## the user's intended "FE only" model. (The standard fe -> ife r=0
+        ## coercion at L711-714 of this file uses ife as its backing path;
+        ## the cfe backing requires explicit r/CV to avoid hitting the
+        ## interactive-FE code that expects a populated cfe= list.)
+        if (length(group.fe) > 0) {
+            if (method == "fe") {
+                method <- "cfe"
+                r <- 0
+                if (is.null(CV)) CV <- FALSE
+            } else if (method %in% c("ife", "mc", "both", "gsynth")) {
+                stop("group.fe with method = \"", method, "\" is not supported. ",
+                     "Use method = \"cfe\", r = N explicitly to get free latent ",
+                     "factors with group-level FE.",
+                     call. = FALSE)
+            }
+            ## method == "cfe": keep as-is, no message
+        }
+        ## (e) normalize: append group.fe to index for downstream X.extra.FE pipeline
+        if (length(group.fe) > 0) {
+            index <- c(index, group.fe)
+        }
+        ## (f) default cl from group.fe[1] when cl is NULL (the placeholder
+        ## value) and group.fe is single-column. We use is.null(cl) here
+        ## because missing(cl) doesn't survive the fect.formula -> fect.default
+        ## dispatch (cl is explicitly forwarded). Documented: cl = NULL is
+        ## the default placeholder and does NOT suppress clustering; use
+        ## cl = FALSE to suppress explicitly.
+        if (is.null(cl) && length(group.fe) == 1) {
+            cl <- group.fe[1]
+        } else if (length(group.fe) > 1 && is.null(cl)) {
+            stop("Multi-column group.fe requires explicit cl (e.g., cl = '",
+                 group.fe[1], "', or cl = index[1] for unit-level clustering).",
+                 call. = FALSE)
+        }
+    }
+    ## (g) cl must be a single column name. cl = FALSE is rejected to avoid
+    ## the misleading "no clustering" framing: even without an explicit
+    ## cluster column the case bootstrap still resamples units, which is
+    ## unit-level clustering. Users who want explicit unit-level clustering
+    ## should pass cl = index[1] (e.g., cl = "id").
+    if (isFALSE(cl)) {
+        stop("cl = FALSE is not supported. The case bootstrap always ",
+             "resamples units; to cluster at the unit level explicitly, ",
+             "pass cl = '", index[1], "' (or cl = index[1]).",
+             call. = FALSE)
+    }
+
+    ## Snapshot the cl column name now (before downstream reshape to matrix)
+    ## so print(fit) / summary(fit) can show the user-facing cluster label.
+    cl.label <- if (is.character(cl) && length(cl) == 1) cl else NULL
+
+    ## ----------------------------------------------------------------
+    ## Nesting check: each group.fe column must be constant within index[1].
+    ## This is required because group.fe is documented as "additive simple FE
+    ## on a coarsening of the unit identifier" --- e.g., state on county.
+    ## Without this check, default.R:1672 silently reshapes a non-constant
+    ## column into a TT*N matrix and produces wrong fits.
+    ##
+    ## We do NOT apply this check to the legacy `index = c(unit, time, extra,
+    ## ...)` form because that form has historically supported BOTH (a)
+    ## nested additive FE (the group.fe-style use) AND (b) cell-level
+    ## interactions like region_time (which by design vary within unit). The
+    ## strict modern surface (group.fe) is for case (a) only; the legacy
+    ## surface keeps its full original scope.
+    ## ----------------------------------------------------------------
+    if (length(group.fe) > 0 && all(index[1] %in% colnames(data))) {
+        for (gfe in group.fe) {
+            nest <- tapply(data[[gfe]], data[[index[1]]],
+                           function(x) length(unique(stats::na.omit(x))))
+            bad <- names(nest)[!is.na(nest) & nest > 1]
+            if (length(bad) > 0) {
+                bad.show <- if (length(bad) > 10)
+                    paste0(paste(bad[1:10], collapse = ", "),
+                           ", and ", length(bad) - 10, " more")
+                else paste(bad, collapse = ", ")
+                stop("group.fe column '", gfe,
+                     "' is not constant within index[1] = '", index[1],
+                     "'. Offending units: ", bad.show,
+                     "\n  (group.fe is for additive simple FE on a coarsening ",
+                     "of the unit identifier. For cell-level interactions ",
+                     "that vary within unit, use the legacy `index = c(unit, ",
+                     "time, ...)` form or the `cfe = list(...)` interactive-",
+                     "FE argument instead.)",
+                     call. = FALSE)
+            }
+        }
+    }
+
     ## index
     if (
         (length(index) != 2 | sum(index %in% colnames(data)) != 2) &
@@ -2591,7 +2716,6 @@ fect.default <- function(
             balance.period = balance.period,
             method = method,
             degree = degree,
-            sfe = sfe,
             cfe = cfe,
             X.extra.FE = X.extra.FE,
             X.Z = X.Z,
@@ -3307,6 +3431,13 @@ fect.default <- function(
             as.integer(max.iteration), as.integer(output$niter)
         ), call. = FALSE)
     }
+
+    ## Surface the user's group.fe input on the fit object so print/summary
+    ## can show the absorbed FE composition (per D8 in design memo). Also
+    ## store the user-facing cl column name (cl gets reshaped to a matrix
+    ## internally for the bootstrap; we want the original label here).
+    output$group.fe <- group.fe
+    output$cl.label <- cl.label
 
     class(output) <- "fect"
     return(output)

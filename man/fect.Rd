@@ -24,8 +24,9 @@ assumptions.}
             proportion = 0.3, pre.periods = NULL,
             f.threshold = 0.5, tost.threshold = NULL,
             knots = NULL, degree = 2,
-            sfe = NULL, cfe = NULL,
-            Z = NULL, gamma = NULL, Q = NULL, kappa = NULL, 
+            group.fe = NULL,
+            cfe = NULL,
+            Z = NULL, gamma = NULL, Q = NULL, kappa = NULL,
             Q.type = NULL,
             Q.bspline.degree = NULL,
             Z.param = NULL, Q.param = NULL,
@@ -104,7 +105,16 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   resamples residuals i.i.d. from the main-fit pool (requires fully-
   observed panel); \code{"wild"} applies unit-level Rademacher sign-flips
   over the empirical residual pool (requires fully-observed panel).}
-\item{cl}{a string specifying the cluster for cluster bootstrapping.}
+\item{cl}{a string specifying the cluster column for cluster bootstrapping.
+When \code{group.fe} is set to a single column and \code{cl} is unset,
+\code{cl} auto-defaults to \code{group.fe[1]} --- the natural choice when
+treatment varies at the group level (Bertrand, Duflo & Mullainathan 2004).
+To override --- for example, to cluster at the unit level when group-level
+FE is absorbed --- pass \code{cl = index[1]} (e.g., \code{cl = "id"}).
+Note that \code{cl = NULL} does NOT disable clustering: the case bootstrap
+always resamples units (which is unit-level clustering); the auto-default
+only changes the resample unit to a coarser level. \code{cl = FALSE} is
+rejected with a guiding error.}
 \item{ci.method}{a string controlling how the bootstrap distribution
 becomes the CIs reported in fect's \code{est.*} slots. Two values:
 \code{"normal"} (default; Wald CI: \eqn{\hat\theta \pm z \cdot SE}) or
@@ -163,7 +173,21 @@ satisfying the tol gate (under-convergence diagnostic).}
 \item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
 \item{knots}{a numeric vector specifying knots (currently unused; reserved for future use).}
 \item{degree}{an integer specifying the degree (currently unused; reserved for future use).}
-\item{sfe}{vector specifying other fixed effects for \code{method="cfe"}.}
+\item{group.fe}{a character vector of column names naming additional simple
+additive fixed-effect groupings to absorb (e.g., \code{group.fe = "state"}
+when rows are counties and treatment varies at state level). Each entry must
+be a column in \code{data}. Each entry must be \emph{nested in}
+\code{index[1]} --- i.e., constant within each level of the unit identifier
+--- otherwise an error is raised. When \code{group.fe} is set, \code{method
+= "fe"} is silently routed to \code{method = "cfe"} (FE is a subset of CFE,
+identical result); \code{method = "ife"}, \code{"mc"}, \code{"both"}, and
+\code{"gsynth"} hard-error (use \code{method = "cfe"} with \code{r > 0} for
+free latent factors with group-level FE). When \code{group.fe} has length 1
+and \code{cl} is unset, \code{cl} auto-defaults to \code{group.fe[1]}. To
+cluster at the unit level instead, pass \code{cl = index[1]} (e.g.,
+\code{cl = "id"}); \code{cl = NULL} does NOT change behavior (the case
+bootstrap always resamples units regardless of \code{cl}), and
+\code{cl = FALSE} is rejected with a guiding error.}
 \item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
 \item{Z}{a vector specifying the time-invariant covariates for the Z matrix.}
 \item{gamma}{a vector specifying the time-varying covariates for the gamma matrix.}
