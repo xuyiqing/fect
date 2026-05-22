@@ -91,7 +91,7 @@ The user guide is structured into four parts. Most users only need the **Basics*
     Installation instructions and datasets.
 
 -   [Chapter @sec-fect]\
-    The fixed effects counterfactual estimator (FEct), including estimation and basic inference.
+    The fixed effects counterfactual estimator (FEct), including estimation, basic inference, and the `group.fe` argument for sub-group treatment (e.g., counties nested in states with a state-level policy).
 
 -   [Chapter @sec-estimands]\
     Alternative estimands and the unified post-hoc estimand interface: cumulative ATT, APTT, log-scale ATT, window-restricted ATT, and the long-form accessor for custom estimands.

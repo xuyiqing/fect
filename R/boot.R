@@ -108,7 +108,6 @@ fect_boot <- function(
   balance.period = NULL,
   method = "ife",
   degree = 2,
-  sfe = NULL,
   cfe = NULL,
   X.extra.FE = NULL,
   X.Z = NULL,

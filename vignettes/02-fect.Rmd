@@ -334,6 +334,83 @@ For finer control --- separating the weight that enters the outcome-model fit (`
 
 The fit object exposes the full imputed counterfactual surface, so users can compute estimands beyond the default level-scale ATT directly from the fit. **fect** v2.4.0 ships a typed dispatcher `estimand()` for the common cases — APTT [@chen2024logs], log-scale ATT, cumulative ATT, window-restricted ATT — plus a low-level accessor `imputed_outcomes()` for custom estimands the dispatcher does not ship. See [Chapter @sec-estimands] for the full chapter with worked examples and the migration table from `effect()` / `att.cumu()`.
 
+## Higher-level FE: `group.fe` for sub-group treatment
+
+When units are nested inside groups and treatment varies at the group level --- counties in states with a state policy, students in schools with a school-wide intervention --- the unit FE $\alpha_i$ is often too granular and absorbs the very dynamics the user wants to study. The natural alternative is to absorb FE at the group level instead, while keeping the individual rows for any individual-level covariates and residual degrees of freedom.
+
+::: {.callout-note appearance="simple"}
+`index = c("id", "time")` must still uniquely identify each row. `group.fe` is a *coarsening* of `index[1]` (each unit belongs to one group), not a replacement.
+:::
+
+The `group.fe` argument (v2.4.5+) names this pattern. The implied model is:
+
+$$Y_{it}^{0} = \xi_t + \omega_{g(i)} + e_{it}$$
+
+with $\omega_{g(i)}$ the state FE and `force = "time"` skipping the county FE.
+
+### Worked example
+
+```{r fect-group-fe-data, eval = TRUE, message = FALSE}
+set.seed(42)
+N <- 40; TT <- 10
+df_county <- expand.grid(id = 1:N, time = 1:TT)
+df_county$state <- paste0("S", (df_county$id - 1) %% 4 + 1)
+df_county$D     <- as.integer(df_county$state %in% c("S1", "S2") &
+                              df_county$time >= 6)
+df_county$Y     <- 1 + 0.5 * df_county$D + rnorm(nrow(df_county), sd = 0.5)
+
+fit_gfe <- fect(Y ~ D, data = df_county,
+                index    = c("id", "time"),
+                group.fe = "state",
+                force    = "time",     # no county FE
+                se = TRUE, nboots = 200, parallel = FALSE)
+```
+
+```{r fect-group-fe-print, eval = TRUE}
+print(fit_gfe)
+```
+
+The header surfaces three facts: `Estimator: fe` (no factors), `Fixed effects: time (time) + state` (state, not county), `Cluster SE: state` (auto-defaulted).
+
+### Cluster SE
+
+When `group.fe` is a single column, `cl` auto-defaults to it. This matches the standard recommendation to cluster at the treatment-assignment level (Bertrand, Duflo & Mullainathan 2004): the effective $n$ for the treatment SE is the number of states, not counties. Override by passing `cl` explicitly to any other column --- e.g., `cl = "id"` for unit-level clustering, or `cl = "region"` for a different group level. Note that fect's case bootstrap always resamples units regardless of `cl`; the `cl` argument only sets the *cluster identity* over which resampling happens, never to "no clustering."
+
+### Method auto-routing
+
+`method = "fe"` (default) is silently routed to `method = "cfe"`. Only the CFE solver has the C++ machinery for additive FE that span multiple columns (`extra_FE_index_cache` in `src/cfe_sub.cpp`); the standard FE solver's demean loop is hard-wired to demean by unit and time only. The route is safe because FE is a strict subset of CFE at `r=0`, and all wrapper code paths (CV, plot, bootstrap) branch on the value of `r`, not on `method`. `method = "ife"`/`"mc"`/`"both"`/`"gsynth"` hard-error with `group.fe` --- those wrappers *do* branch on method. For free latent factors with group-level FE, use `method = "cfe"` with the `r` argument set explicitly (e.g., `r=2`).
+
+### Multiple groupings, nesting check
+
+`group.fe = c("state", "region")` absorbs each as an additive simple FE (multi-column requires explicit `cl`). Each grouping column must be constant within `index[1]`; fect hard-errors at fit time with the offending units listed if not. (The legacy `index = c("unit", "time", "extra")` form does *not* enforce this check because it has historically also supported cell-level interactions like `region_time` that vary within unit by design. See [Chapter @sec-cfe] for the legacy CFE syntax.)
+
+### Manual aggregation: when it gives the same answer, when it doesn't
+
+A common workaround is to pre-aggregate to the (group, time) level:
+
+```{r fect-group-fe-aggregate, eval = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
+df_state <- aggregate(cbind(Y, D) ~ state + time, data = df_county, FUN = mean)
+fit_agg <- fect(Y ~ D, data = df_state, index = c("state", "time"),
+                force = "two-way",
+                se = TRUE, nboots = 200, parallel = FALSE)
+```
+
+```{r fect-group-fe-aggregate-print, eval = TRUE}
+c(group.fe = unname(fit_gfe$att.avg),
+  aggregate = unname(fit_agg$att.avg))
+```
+
+On a balanced panel with no individual-level covariates, the two estimates coincide up to EM tolerance. The equivalence **breaks down** when:
+
+- **Groups are unbalanced.** `group.fe` runs OLS on individual rows: a state with 25 counties contributes 25 rows per period and dominates the fit. If treatment effects vary across treated states, `group.fe` returns a *county-weighted* ATT (bigger states dominate); `aggregate` returns a *state-weighted* ATT. Neither is wrong --- they target different estimands. For a *unit-equally-weighted* average on an unbalanced panel, pass explicit weights via the `W` argument.
+- **Individual-level covariates $X_{it}$ vary within group-time.** Aggregation collapses $X$ to the cell mean and loses the variation that identifies $\beta$; `group.fe` keeps it.
+
+`group.fe` is also preferred for residual df from the individual rows, or simply to skip the aggregation step.
+
+::: {.callout-tip appearance="simple"}
+The older syntax `index = c("unit", "time", "extra1", ...)` does the same thing under the hood; `group.fe` is just easier to spot when reading code. New code should prefer `group.fe`.
+:::
+
 ## Additional notes
 
 1.  By default, the program will drop the units that have no larger than 5 observations under control, which is the reason why sometimes there are less available units in the placebo test or carryover test than in the original estimation. We can specify a preferred criterion in the option `min.T0` (default to 5). As a rule of thumb for the IFE estimator, the minimum number of observations under control for a unit should be larger than the specified number of factor `r`.

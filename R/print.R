@@ -23,6 +23,31 @@ print.fect <- function(x,
     cat("Call:\n")
     print(x$call, digits = 4)
 
+    ## Estimator + Fixed effects + Cluster SE lines (D8 in design memo).
+    ## Surfaces the actual FE composition so users can verify their model
+    ## without re-reading the call args. force is stored as integer 0/1/2/3.
+    .fe_label <- function(force_int, index, group.fe) {
+        parts <- character(0)
+        if (length(index) >= 1 && force_int %in% c(1, 3)) {
+            parts <- c(parts, paste0(index[1], " (unit)"))
+        }
+        if (length(index) >= 2 && force_int %in% c(2, 3)) {
+            parts <- c(parts, paste0(index[2], " (time)"))
+        }
+        if (!is.null(group.fe) && length(group.fe) > 0) {
+            parts <- c(parts, paste(group.fe, collapse = " + "))
+        }
+        if (length(parts) == 0) "none" else paste(parts, collapse = " + ")
+    }
+    fe.line <- .fe_label(x$force,
+                         if (!is.null(x$call$index)) eval(x$call$index) else NULL,
+                         x$group.fe)
+    cat("\nEstimator:    ", x$method, "\n", sep = "")
+    cat("Fixed effects: ", fe.line, "\n", sep = "")
+    if (!is.null(x$cl.label)) {
+        cat("Cluster SE:   ", x$cl.label, "\n", sep = "")
+    }
+
     if (switch.on == TRUE) {
         if (!is.null(time.on.lim)) {
 

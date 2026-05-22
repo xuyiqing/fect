@@ -1,4 +1,10 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.5
+
+* Add `group.fe` to `fect()` for absorbing coarser fixed effects, such as state FE with county-level data. Closes #139. Clustered SE defaults to `group.fe[1]`; override with `cl = "<column>"`.
+* Fix `method = "cfe"` with `force = "time"` or `"unit"`, which previously triggered an `Index out of bounds` error. `force = "two-way"` is byte-equivalent.
+* Remove unused `sfe` argument and `R/polynomial.R`.
+
 # fect 2.4.4
 
 - `fect()` now returns `$sample`, a logical matrix (same dims as `$Y.dat`) marking cells used in any part of the estimation procedure (main fit, placebo/carryover/balance tests).
