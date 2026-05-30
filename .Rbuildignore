@@ -19,3 +19,4 @@
 ^cell-D1\.rds$
 ^fect_.*\.tar\.gz$
 ^fect\.Rcheck$
+^tests/coverage-study$

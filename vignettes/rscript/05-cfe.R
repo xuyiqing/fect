@@ -26,10 +26,9 @@ out.fe.only <- fect(Y ~ D, data = sim_region,
 
 
 ## ----cfe-42-fe-only-plot, fig.width = 6, fig.height = 4.5---------------------
-plot(out.fe.only, cex.text = 0.8,
+plot(out.fe.only, 
      stats = c("placebo.p", "equiv.p"),
-     main = "FE Only — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "FE Only — Placebo Test")
 
 
 ## ----cfe-42-with-region, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'----
@@ -41,10 +40,9 @@ out.cfe.region <- fect(Y ~ D, data = sim_region,
 
 
 ## ----cfe-42-with-region-plot, fig.width = 6, fig.height = 4.5-----------------
-plot(out.cfe.region, cex.text = 0.8,
+plot(out.cfe.region, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE with Region×Time FE — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE with Region×Time FE — Placebo Test")
 
 
 ## ----cfe-43-fe-baseline, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'----
@@ -56,10 +54,9 @@ out.fe.base <- fect(Y ~ D + X1 + X2, data = simdata,
 
 
 ## ----cfe-43-fe-baseline-plot, fig.width = 6, fig.height = 4.5-----------------
-plot(out.fe.base, cex.text = 0.8,
+plot(out.fe.base, 
      stats = c("placebo.p", "equiv.p"),
-     main = "FE Only (simdata) — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "FE Only (simdata) — Placebo Test")
 
 
 ## ----cfe-43-gamma-setup, eval = TRUE------------------------------------------
@@ -76,10 +73,9 @@ out.cfe.z <- fect(Y ~ D + X1 + X2, data = simdata,
 
 
 ## ----cfe-43-with-z-plot, fig.width = 6, fig.height = 4.5----------------------
-plot(out.cfe.z, cex.text = 0.8,
+plot(out.cfe.z, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE with Z = L1 — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE with Z = L1 — Placebo Test")
 
 
 ## ----cfe-44-linear-load, eval = TRUE------------------------------------------
@@ -95,10 +91,9 @@ out.fe.lin <- fect(Y ~ D, data = sim_linear,
 
 
 ## ----cfe-44-lin-fe-only-plot, fig.width = 6, fig.height = 4.5-----------------
-plot(out.fe.lin, cex.text = 0.8,
+plot(out.fe.lin, 
      stats = c("placebo.p", "equiv.p"),
-     main = "FE Only (Linear Trend DGP) — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "FE Only (Linear Trend DGP) — Placebo Test")
 
 
 ## ----cfe-44-lin-cfe, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'----
@@ -111,10 +106,9 @@ out.cfe.lin <- fect(Y ~ D, data = sim_linear,
 
 
 ## ----cfe-44-lin-cfe-plot, fig.width = 6, fig.height = 4.5---------------------
-plot(out.cfe.lin, cex.text = 0.8,
+plot(out.cfe.lin, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE with Linear Trend — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE with Linear Trend — Placebo Test")
 
 
 ## ----cfe-44-sin-load, eval = TRUE---------------------------------------------
@@ -130,10 +124,9 @@ out.fe.trend <- fect(Y ~ D, data = sim_trend,
 
 
 ## ----cfe-44-sin-fe-only-plot, fig.width = 6, fig.height = 4.5-----------------
-plot(out.fe.trend, cex.text = 0.8,
+plot(out.fe.trend, 
      stats = c("placebo.p", "equiv.p"),
-     main = "FE Only (Sin Trend DGP) — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "FE Only (Sin Trend DGP) — Placebo Test")
 
 
 ## ----cfe-44-sin-bspline, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'----
@@ -146,10 +139,9 @@ out.cfe.bs <- fect(Y ~ D, data = sim_trend,
 
 
 ## ----cfe-44-sin-bspline-plot, fig.width = 6, fig.height = 4.5-----------------
-plot(out.cfe.bs, cex.text = 0.8,
+plot(out.cfe.bs, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE with B-spline Trend — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE with B-spline Trend — Placebo Test")
 
 
 ## ----cfe-45-gamma-setup, eval = TRUE------------------------------------------
@@ -184,8 +176,7 @@ out.ife.r2 <- fect(Y ~ D + X1 + X2, data = simdata,
 
 
 ## ----cfe-45-mspe, eval = TRUE, cache = TRUE-----------------------------------
-mspe.out <- fect_mspe(
-  list(FE = out.fe,
+mspe.out <- fect_mspe(list(FE = out.fe,
        CFE_Z = out.cfe.z.only,
        CFE_Z_F1 = out.cfe.z.f1,
        IFE_r2 = out.ife.r2),
@@ -204,10 +195,9 @@ out.cfe.best <- fect(Y ~ D + X1 + X2, data = simdata,
 
 
 ## ----cfe-45-best-placebo-plot, fig.width = 6, fig.height = 4.5----------------
-plot(out.cfe.best, cex.text = 0.8,
+plot(out.cfe.best, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE (Z + 1 Factor) — Placebo Test",
-     cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+     main = "CFE (Z + 1 Factor) — Placebo Test")
 
 
 ## ----cfe-46-zparam-example, eval = FALSE--------------------------------------
@@ -219,4 +209,17 @@ plot(out.cfe.best, cex.text = 0.8,
 # #   gamma = c("decade", "political_era"),
 # #   Z.param = list(decade = "baseline_gdp",
 # #                  political_era = "baseline_pop"))
+
+
+## ----cfe-cv-dispatcher, eval = FALSE------------------------------------------
+# fit.cfe <- fect(Y ~ D, data = sim_region,
+#   index   = c("id", "time", "region_time"),
+#   method  = "cfe", force = "two-way",
+#   CV      = TRUE, r = c(0, 3),
+#   cv.method = "rolling",
+#   cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
+#   cv.rule = "1se",
+#   se = TRUE, parallel = TRUE, cores = 16, nboots = 200
+# )
+# fit.cfe$r.cv  # selected r
 

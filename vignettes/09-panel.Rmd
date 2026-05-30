@@ -11,7 +11,7 @@ source("_common.R")
 ```
 
 This chapter, authored by Ziyi Liu and Yiqing Xu, complements @CLLX2026 ([paper](https://yiqingxu.org/papers/english/2023_panel/CLLX.pdf), [slides](https://yiqingxu.org/papers/english/2023_panel/CLLX_slides.pdf)).
-Rivka Lipkovitz also contributes to this tutorial. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/08-panel.R).
+Rivka Lipkovitz also contributes to this tutorial. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/09-panel.R).
 
 ------------------------------------------------------------------------
 

@@ -55,13 +55,20 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
 
 
 
+## ----rcv_dispatcher_gsc, eval = FALSE-----------------------------------------
+# fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+#             method = "gsynth", force = "two-way",
+#             CV = TRUE, r = c(0, 5),
+#             cv.method = "rolling",
+#             cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
+#             cv.rule = "1se",
+#             se = TRUE, vartype = "parametric")
+# fit$r.cv     # selected r --- use this for downstream inference
+
+
 ## ----sim_gap1, fig.height=5, fig.width=7--------------------------------------
 a <- plot(out) # by default, type = "gap"
 print(a)
-
-
-## ----sim_gap1a, fig.height=5, fig.width=7-------------------------------------
-plot(out, theme.bw = FALSE) 
 
 
 ## ----sim-gap-connected, fig.height=5, fig.width=7-----------------------------
@@ -137,8 +144,7 @@ panelview(turnout ~ policy_edr, data = turnout,
 ## ----turnout-panelview-outcome, cache = FALSE, warning =FALSE, fig.height=5, fig.width=7----
 panelview(turnout ~ policy_edr, data = turnout,
           index = c("abb","year"), type = "outcome", 
-          main = "EDR Reform and Turnout", 
-          by.group = TRUE)
+          main = "EDR Reform and Turnout")
 
 
 ## ----turnout_did, cache = TRUE------------------------------------------------
@@ -167,7 +173,7 @@ sort(out_turnout$wgt.implied[,8])
 
 
 ## ----turnout_gap, fig.height=5, fig.width=7-----------------------------------
-plot(out_turnout, xlim = c(-10, 5), ylim=c(-15, 10))
+plot(out_turnout, xlim = c(-10, 5), ylim=c(-10, 10))
 
 
 ## ----turnout-status-plot, fig.height=12, fig.width=7--------------------------
@@ -184,7 +190,7 @@ plot(out_turnout, type = "counterfactual")
 plot(out_turnout, type = "counterfactual", id = "WI", main = "Wisconsin")
 
 
-## ----turnout_box, fig.height=4, fig.width=8-----------------------------------
+## ----turnout_box, fig.height=5, fig.width=7-----------------------------------
 plot(out_turnout, type = "box", 
      xticklabels=c("-20", "-15", "-10", "-5","0","5","10"))
 
@@ -201,6 +207,15 @@ plot(out_turnout, type = "factors", xlab = "Year")
 plot(out_turnout, type = "loadings")
 
 
+## ----turnout-cumulative, fig.height=5, fig.width=7----------------------------
+cumu.turnout <- estimand(out_turnout, "att.cumu", "event.time")
+esplot(cumu.turnout, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       Count = "n_cells",
+       main = "Cumulative Effect of EDR Reform on Turnout",
+       ylab = "Cumulative ATT")
+
+
 ## ----create-unbalanced-data---------------------------------------------------
 set.seed(123456)
 turnout.ub <- turnout[-c(which(turnout$abb=="WY")[1:15], 
@@ -214,12 +229,30 @@ panelview(turnout ~ policy_edr + policy_mail_in + policy_motor,
 
 
 ## ----turnout_ub_est, cache = TRUE, message = FALSE----------------------------
-out_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor, 
-              data = turnout.ub,  index = c("abb","year"), 
-              se = TRUE, method = "gsynth", 
-              r = c(0, 5), CV = TRUE, force = "two-way", 
+out_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
+              data = turnout.ub,  index = c("abb","year"),
+              se = TRUE, method = "gsynth",
+              r = c(0, 5), CV = TRUE, force = "two-way",
               parallel = TRUE, cores = 16, min.T0 = 8,
               nboots = 1000, seed = 02139)
+
+
+## ----turnout_ub_param, cache = TRUE, message = FALSE--------------------------
+out_ub_param <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
+                     data = turnout.ub, index = c("abb","year"),
+                     se = TRUE, method = "gsynth", vartype = "parametric",
+                     r = c(0, 5), CV = TRUE, force = "two-way",
+                     parallel = TRUE, cores = 16, min.T0 = 8,
+                     nboots = 1000, seed = 02139)
+
+
+## ----turnout_ub_ci_compare----------------------------------------------------
+ci_width <- function(out) mean(out$est.att[, "CI.upper"] -
+                                out$est.att[, "CI.lower"], na.rm = TRUE)
+data.frame(
+  vartype  = c("bootstrap", "parametric"),
+  CI_width = c(ci_width(out_ub), ci_width(out_ub_param))
+)
 
 
 ## ----turnout_ub_panelview_miss2, fig.height=12, fig.width=7-------------------
@@ -239,7 +272,72 @@ plot(out_ub, type = "status", xlab = "Year", ylab = "State",
 
 
 ## ----turnout_ub_gap, fig.height=5, fig.width=7--------------------------------
-plot(out_ub, type = "gap", ylim = c(-10, 20))
+plot(out_ub, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
+
+
+## ----turnout_ub_gap_param, fig.height=5, fig.width=7--------------------------
+plot(out_ub_param, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
+
+
+## ----bounded-vs-unbounded-fit, eval = TRUE, cache = TRUE, message = FALSE, results = "hide"----
+# Unbounded gsynth (default v2.2.x behavior --- standard Xu 2017 estimator)
+out.unbounded <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
+                      method = "gsynth", r = 2,
+                      se = TRUE, vartype = "parametric", nboots = 100,
+                      CV = FALSE, parallel = FALSE)
+
+# Bounded gsynth (new in v2.3.0 --- simplex projection)
+out.bounded   <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
+                      method = "gsynth", r = 2,
+                      loading.bound = "simplex",
+                      se = TRUE, vartype = "parametric", nboots = 100,
+                      CV = FALSE, parallel = FALSE)
+
+
+## ----bounded-vs-unbounded-att-------------------------------------------------
+cat("Unbounded ATT =", round(out.unbounded$att.avg, 3), "\n")
+cat("Bounded   ATT =", round(out.bounded$att.avg,   3), "\n")
+cat("\ngamma.loading (CV-selected) =", round(out.bounded$gamma.loading, 4), "\n")
+cat("\nPer-treated projection residuals (loading.proj.resid):\n")
+print(round(out.bounded$loading.proj.resid, 3))
+
+
+## ----bounded-vs-unbounded-gap, fig.width = 9, fig.height = 4, message = FALSE----
+library(gridExtra)
+gap.un  <- plot(out.unbounded, type = "gap", main = "Unbounded gsynth")
+gap.bd  <- plot(out.bounded,   type = "gap", main = "Bounded gsynth (simplex)")
+grid.arrange(gap.un, gap.bd, ncol = 2)
+
+
+## ----bounded-vs-unbounded-overlap, fig.width = 9, fig.height = 4--------------
+ov.un <- plot(out.unbounded, type = "loading.overlap",
+              main = "Unbounded loadings")
+ov.bd <- plot(out.bounded,   type = "loading.overlap",
+              main = "Bounded loadings (projected)")
+grid.arrange(ov.un, ov.bd, ncol = 2)
+
+
+## ----bounded-vs-unbounded-weights, fig.width = 6.5, fig.height = 5, message = FALSE----
+library(ggplot2)
+W.un <- as.matrix(out.unbounded$wgt.implied)
+W.bd <- as.matrix(out.bounded$wgt.implied)
+df.w <- data.frame(
+  unbounded = as.numeric(W.un),
+  bounded   = as.numeric(W.bd)
+)
+
+ggplot(df.w, aes(x = unbounded, y = bounded)) +
+  geom_hline(yintercept = 0, color = "grey80", linewidth = 0.4) +
+  geom_vline(xintercept = 0, color = "grey80", linewidth = 0.4) +
+  geom_abline(slope = 1, intercept = 0,
+              color = "grey60", linetype = "dashed", linewidth = 0.4) +
+  geom_point(alpha = 0.4, size = 1.4, color = "#3F6A99") +
+  labs(x = "Unbounded weight (Moore-Penrose pseudo-inverse)",
+       y = "Bounded weight (simplex-projected)",
+       title = "Implicit donor weights: bounded vs unbounded",
+       subtitle = "One point per (treated, control) pair; dashed line is y = x") +
+  theme_bw(base_size = 11) +
+  theme(panel.grid.minor = element_blank())
 
 
 ## ----cfe_nt_demo, eval=TRUE, cache=TRUE, message=FALSE, results='hide'--------

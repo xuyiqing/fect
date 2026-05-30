@@ -62,7 +62,12 @@ test_that("AC.2: estimand(fit, 'att.cumu', 'event.time') matches effect(fit)", {
   skip_on_cran()
 
   fit <- .fit_no_reversal()
-  est <- fect::estimand(fit, "att.cumu", "event.time")
+  ## ci.method = "percentile" replicates the raw-quantile CI used by the
+  ## legacy effect() function. v2.4.2 changed the default to "basic"
+  ## (reflected pivot CI per Davison-Hinkley 1997 §5.2.1), so byte-equality
+  ## with effect() requires the explicit override.
+  est <- fect::estimand(fit, "att.cumu", "event.time",
+                        ci.method = "percentile")
   out_eff <- suppressWarnings(suppressMessages(
     fect::effect(fit, cumu = TRUE, plot = FALSE)
   ))
@@ -101,7 +106,10 @@ test_that("AC.3: estimand(fit, 'att.cumu', 'overall', window) matches att.cumu()
   fit <- .fit_no_reversal()
   period <- c(1, 5)
 
-  est <- fect::estimand(fit, "att.cumu", "overall", window = period)
+  ## ci.method = "percentile" replicates the raw-quantile CI used by the
+  ## legacy att.cumu() function (see AC.2 comment for context).
+  est <- fect::estimand(fit, "att.cumu", "overall", window = period,
+                        ci.method = "percentile")
   out_acc <- suppressWarnings(suppressMessages(
     fect::att.cumu(fit, period = period, plot = FALSE)
   ))

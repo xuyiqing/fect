@@ -122,11 +122,20 @@ p.twfe
 
 ## ----hh_twfeplot3, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE----
 twfe.output <- as.data.frame(twfe.est$coeftable)
-twfe.output$Time <- c(c(-18:-2),c(0:17)) 
+twfe.output$Time <- c(c(-18:-2),c(0:17))
 p.twfe <- esplot(twfe.output, Period = 'Time',
-                 Estimate = 'Estimate', SE = 'Std. Error', 
+                 Estimate = 'Estimate', SE = 'Std. Error',
                  xlim = c(-12,10),start0 = TRUE)
 p.twfe
+
+
+## ----hh_twfeplot_connected, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 5, cache=TRUE----
+p.twfe.connected <- esplot(twfe.output, Period = 'Time',
+                           Estimate = 'Estimate', SE = 'Std. Error',
+                           xlim = c(-12, 10), start0 = TRUE,
+                           connected = TRUE,
+                           main = "TWFE event study (connected)")
+p.twfe.connected
 
 
 ## ----hh_st, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE----

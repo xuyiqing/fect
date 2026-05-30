@@ -2,7 +2,12 @@
 
 // core cfe model function
 
-/* Complex Fixed Effects: ub */
+/* Complex Fixed Effects: ub
+ *
+ * fit_init: optional warm-start matrix (TT x N). Forwarded to cfe_iter to
+ *   replace the default `fit = Y0` initialization. See cfe_iter docstring
+ *   and ref/v242-warm-start-investigation/partial-warm-design.md.
+ */
 // [[Rcpp::export]]
 List complex_fe_ub(
     const arma::mat& Y, const arma::mat& Y0, const arma::cube& X_covariates, const arma::cube& X_extra_FE,
@@ -10,7 +15,8 @@ List complex_fe_ub(
     Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, const arma::mat& I, const arma::mat& W_in,
     const arma::mat& beta0,
     int r, // r > 0, the outcome has a factor-type fixed effect; r = 0 else
-    int force, double tol = 1e-5, int max_iter = 1000) {
+    int force, double tol = 1e-5, int max_iter = 1000,
+    Rcpp::Nullable<Rcpp::NumericMatrix> fit_init = R_NilValue) {
 
   arma::mat W = W_in;
   /* Dimensions */
@@ -95,7 +101,8 @@ List complex_fe_ub(
   }
   List cfe =
       cfe_iter(XX, invXX, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id,
-                kappaQ_id, YY, Y0, I, W, beta0, force, r, tol, max_iter);
+                kappaQ_id, YY, Y0, I, W, beta0, force, r, tol, max_iter,
+                fit_init);
 
   mu = as<double>(cfe["mu"]);
   beta = as<arma::mat>(cfe["beta"]);

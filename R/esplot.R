@@ -119,8 +119,22 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   ## (pre = "grey50", post = color) so pre-treatment and post-treatment points
   ## are visually distinguishable. fect convention: with start0 = FALSE
   ## (default), period 0 is the LAST pre-treatment period; first post is t=1.
+  ##
+  ## Exception: estimand() with test = "placebo" / "carryover" attaches a
+  ## "fect_test" attribute to the returned data frame; in those modes ALL
+  ## event-times are special (no pre-vs-post contrast to convey), so we
+  ## use a single uniform color (= `color`) across all points and skip the
+  ## gray pre-treatment shade.
+  fect_test <- attr(data, "fect_test")
   if (is.null(post.color)) post.color <- color
-  if (is.null(pre.color))  pre.color  <- "gray50"
+  if (is.null(pre.color)) {
+    pre.color <- if (!is.null(fect_test) &&
+                     fect_test %in% c("placebo", "carryover")) {
+      color
+    } else {
+      "gray50"
+    }
+  }
 
   # Identify time/period column
   if (is.null(Period)) {

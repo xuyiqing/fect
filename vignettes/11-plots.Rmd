@@ -14,7 +14,7 @@ In this chapter, we explore visualization options available in the **fect** pack
 - special-purpose displays (`status`, `factors`, and `loadings`)
 - standalone `esplot()`
 
-We begin with shared parameter conventions and then work through each plot type in turn. `plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/06-plots.R).
+We begin with shared parameter conventions and then work through each plot type in turn. `plot.fect` is an S3 method that accepts a fitted `fect` object and a `type` argument. All customization parameters---axis limits, colors, text sizes, reference lines---are passed as additional arguments. Some parameters apply universally; others are type-specific. A parameter applicability table appears at the end of this chapter. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/11-plots.R).
 
 ------------------------------------------------------------------------
 
@@ -28,6 +28,7 @@ library(ggplot2)
 library(panelView)
 data(gs2020)
 data(hh2019)
+data(simdata)
 ls()
 ```
 
@@ -547,14 +548,14 @@ Note: most styling parameters (`connected`, `plot.ci`, `pre.color`/`post.color`,
 
 ### Factors and loadings plots
 
-These plot types are available when the model is estimated with interactive fixed effects (`method = "ife"` or `method = "gsynth"`). We first fit an IFE model with two factors:
+These plot types are available when the model is estimated with interactive fixed effects (`method = "ife"` or `method = "gsynth"`). We use `simdata` here because its data-generating process has two latent factors ($r = 2$), so the estimated factors and loadings reflect real structure rather than numerical artifacts. We fit an IFE model with two factors:
 
 ```{r est-ife, cache = TRUE}
-out_ife <- fect(nat_rate_ord ~ indirect,
-                data = hh2019,
-                index = c("bfs", "year"),
-                method = "ife", r = 2,
-                se = TRUE, parallel = TRUE, cores = 16, nboots = 1000)
+out_ife <- fect(Y ~ D + X1 + X2, data = simdata,
+                index = c("id", "time"),
+                method = "ife", r = 2, force = "two-way",
+                se = TRUE, parallel = TRUE, cores = 16,
+                nboots = 200)
 ```
 
 The **factors** plot displays the estimated latent time factors. It uses the Okabe-Ito colorblind-safe palette with thinner lines for a clean, publication-ready appearance. Factor 0 (fixed effects, shown when `include.FE = TRUE`) appears in gray; subsequent factors appear in orange, blue, green, and so on. Use `nfactors` to limit the number of displayed factors.
@@ -601,8 +602,9 @@ For $r > 2$ the plot still shows only factors 1 and 2; the hull and overlap meas
 For $r = 1$, the same diagnostic is rendered as a **mirror histogram**: treated counts above the axis, control counts flipped below, with a vertical band marking the range of control loadings. The 1D analog of "outside the hull" is "outside the band."
 
 ```{r loading-overlap-r1-fit, cache = TRUE, message = FALSE, warning = FALSE}
-out_ife_r1 <- fect(nat_rate_ord ~ indirect, data = hh2019,
-                   index = c("bfs", "year"), method = "ife", r = 1,
+out_ife_r1 <- fect(Y ~ D + X1 + X2, data = simdata,
+                   index = c("id", "time"), method = "ife", r = 1,
+                   force = "two-way",
                    se = TRUE, parallel = TRUE, cores = 16, nboots = 500)
 ```
 
@@ -736,6 +738,52 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 | `xlim` / `ylim` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
 
 
+
+## Estimation sample via panelView {#sec-sample}
+
+Every fect fit returns a logical matrix `$sample` indicating which
+cells the estimator actually consumed. The matrix is the same shape as
+the panel; a cell is true when it entered the main fit, a placebo or
+carryover test, or a balance check, and false when it was missing,
+dropped, or excluded by `carryover.rm`. **panelView** consumes this
+matrix directly via its `panelview(fit)` entry-point, so visualizing
+the estimation sample takes one call:
+
+```{r sample-fect-fit, message=FALSE, warning=FALSE}
+library(fect); library(panelView)
+data(hh2019, package = "fect")
+
+fit <- fect(nat_rate_ord ~ indirect, data = hh2019,
+            index = c("bfs", "year"),
+            method = "ife", r = 0, se = FALSE, CV = FALSE,
+            min.T0 = 2)
+```
+
+```{r sample-fect-plot, fig.width=12, fig.height=8, out.width="100%"}
+panelview(fit, type = "treat", by.timing = TRUE,
+          axis.lab = "off", display.all = TRUE,
+          gridOff = TRUE, xlab = "", ylab = "")
+```
+
+The figure splits into three bands. At the top sits a dark-grey block
+of roughly 285 municipalities that were already treated when the panel
+begins; they have no pre-treatment period and fect drops them
+silently. Without the sample overlay these dropped municipalities
+would be invisible. Below that is a dark-blue staircase of the units
+fect actually fits, ordered by treatment onset. The broad light-blue
+band at the bottom is the never-treated controls.
+
+For a layout that puts the in-sample band on top instead, pair
+`sample.sort = TRUE` with `by.timing = TRUE`: in-sample units rise to
+the top, ordered by treatment timing within, and the dropped band
+falls to the bottom.
+
+The same fit can be passed to `sample =` inside the explicit-data
+signature if you prefer to control the data argument yourself. The
+**panelView** manual chapter on Treatment Status covers the full
+surface, including the sample-alignment rules, the four
+sample-sort × by-timing combinations, and the named-slot syntax for
+fine-grained palette overrides.
 
 ## How to Cite
 

@@ -32,8 +32,7 @@ out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
 
 
 ## ----fect_plot_nose, fig.width = 6, fig.height = 4.5--------------------------
-plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
-  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
+plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y")
 
 
 ## ----simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'----
@@ -44,10 +43,10 @@ out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
 
 ## ----fect_plot_nse, fig.width = 6, fig.height = 4.5---------------------------
 plot(out.fect, main = "Estimated ATT (FEct)", ylab = "Effect of D on Y",
-  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8, stats = "F.p")
+  stats = "F.p")
 
 
-## ----exit_fect, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5----
+## ----exit_fect, eval = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5----
 plot(out.fect, type = "exit", main = "Exit Plot (FEct)")
 
 
@@ -65,12 +64,19 @@ print(out.fect)
 # out.fect$eff.boot
 
 
-## ----fect_placebo, eval=TRUE, cache=TRUE, message=FALSE, results='hide', fig.width=6, fig.height=4.5----
+## ----fect_placebo_fit, eval=TRUE, cache=TRUE, message=FALSE, results='hide'----
 out.fect.placebo <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   force = "two-way", method = "fe",
   se = TRUE, nboots = 1000, parallel = TRUE, cores = 16,
   placeboTest = TRUE, placebo.period = c(-2, 0))
-plot(out.fect.placebo, cex.text = 0.8)
+
+
+## ----fect_placebo_plot, eval=TRUE, fig.width=6, fig.height=4.5----------------
+plot(out.fect.placebo)
+
+
+## ----fect_placebo_plot_fill, eval=TRUE, fig.width=6, fig.height=4.5-----------
+plot(out.fect.placebo, highlight.fill = TRUE)
 
 
 ## ----fect_carryover, eval=TRUE, cache=TRUE, message=FALSE, results='hide'-----
@@ -80,8 +86,20 @@ out.fect.carry <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   carryoverTest = TRUE, carryover.period = c(1, 3))
 
 
-## ----fect_carryover_plot, eval=TRUE, cache=TRUE, warning=FALSE, fig.width=6, fig.height=5----
-plot(out.fect.carry, type = "exit", cex.text = 0.8, main = "Carryover Effects (FEct)")
+## ----fect_carryover_plot, eval=TRUE, warning=FALSE, fig.width=6, fig.height=5----
+plot(out.fect.carry, type = "exit", main = "Carryover Effects (FEct)")
+
+
+## ----fect_carryover_plot_fill, eval=TRUE, warning=FALSE, fig.width=6, fig.height=5----
+plot(out.fect.carry, type = "exit",
+     highlight.fill = TRUE,
+     main = "Carryover Effects (FEct), with rectangle")
+
+
+## ----fect_carryover_plot_off, eval=TRUE, warning=FALSE, fig.width=6, fig.height=5----
+plot(out.fect.carry, type = "exit",
+     highlight = FALSE,
+     main = "Carryover Effects (FEct), no highlight")
 
 
 ## ----fect_loo, eval=TRUE, cache = TRUE, message = FALSE-----------------------
@@ -91,46 +109,7 @@ out.fect.loo <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
 
 
 ## ----plot-gap-loo, fig.width = 6, fig.height = 4.5----------------------------
-plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO",
-  cex.main = 0.8, cex.lab = 0.8, cex.axis = 0.8)
-
-
-## ----cumu_effect, cache = TRUE------------------------------------------------
-out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-                        method = "ife", time.component.from = "nevertreated",
-                        force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 1000, vartype = 'bootstrap',
-                        parallel = TRUE, cores = 16, keep.sims=TRUE)
-cumu.out <- effect(out)
-
-
-## ----cumu_effect_plot, cache = TRUE-------------------------------------------
-print(cumu.out)
-plot(cumu.out)
-
-
-## ----cumu_effect_byperiod, cache = TRUE---------------------------------------
-effect(out, cumu=FALSE)
-
-
-## ----cumu_effect_subset, cache = TRUE-----------------------------------------
-effect(out, cumu=TRUE, id=c(101,102,103), period=c(1,5))
-
-
-## ----effect-mc, cache = TRUE--------------------------------------------------
-out_mc <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 1000, vartype = 'bootstrap',
-                        parallel = TRUE, cores = 16, keep.sims=TRUE)
-plot(effect(out_mc))
-
-
-## ----effect-jackknife, cache = TRUE-------------------------------------------
-out_jack <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
-                        method = "mc", force = "two-way", CV = TRUE, r = c(0, 5),
-                        se = TRUE, nboots = 1000, vartype = 'jackknife',
-                        parallel = TRUE, cores = 16, keep.sims=TRUE)
-plot(effect(out_jack))
+plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO")
 
 
 ## ----simdata_bal, eval=TRUE, cache = TRUE-------------------------------------
@@ -171,7 +150,7 @@ out.fe.g <- fect(Y ~ D + X1 + X2, data = sim_base.cohort, index = c("id","time")
           se = TRUE, nboots = 1000, parallel = TRUE, cores = 16, group = 'Cohort')
 
 
-## ----cohort_plot1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5----
+## ----cohort_plot1, eval = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5----
 plot(out.fe.g, show.group = "Cohort:22",
           xlim = c(-15, 10), ylim = c(-10, 10))
 

@@ -48,7 +48,8 @@ fect_cfe <- function(
     group = NULL,
     time.on.seq.group = NULL,
     time.off.seq.group = NULL,
-    W.in.fit = TRUE
+    W.in.fit = TRUE,
+    fit.init = NULL ## warm-start matrix for complex_fe_ub (v2.4.3+)
 ) {
     ## -------------------------------##
     ## Parsing data
@@ -178,7 +179,8 @@ fect_cfe <- function(
         r.cv,
         force = force,
         tol,
-        max.iteration
+        max.iteration,
+        fit_init = fit.init
     )
 
     ## Convergence check for est.best

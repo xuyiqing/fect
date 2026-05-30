@@ -20,12 +20,17 @@
     e <- new.env()
     data(sim_linear, package = "fect", envir = e)
     set.seed(42)
-    fit <- fect(Y ~ D, data = e$sim_linear, index = c("id", "time"),
-                method = "ife", force = "two-way", se = TRUE,
-                nboots = 30, r = 2, CV = FALSE, keep.sims = TRUE,
-                vartype = "parametric",
-                time.component.from = "nevertreated",
-                parallel = FALSE)
+    ## suppressWarnings covers the "EM did not converge within
+    ## max.iteration = 5000" warning. The fixture is intentionally small
+    ## (nboots = 30) and convergence is not what these tests verify.
+    fit <- suppressWarnings(
+      fect(Y ~ D, data = e$sim_linear, index = c("id", "time"),
+           method = "ife", force = "two-way", se = TRUE,
+           nboots = 30, r = 2, CV = FALSE, keep.sims = TRUE,
+           vartype = "parametric",
+           time.component.from = "nevertreated",
+           parallel = FALSE)
+    )
     cached <<- fit
     fit
   }
@@ -76,7 +81,12 @@ test_that("att.cumu / aptt / att-overall work on parametric fits", {
   skip_on_cran()
   fit <- .make_parametric_fit()
 
-  expect_silent(r1 <- estimand(fit, "att.cumu", "event.time"))
+  ## att.cumu defaults to ci.method = "basic"; aptt defaults to "bca".
+  ## Both are tail-quantile CIs; on this small fit (nboots = 30) they
+  ## emit the v2.4.2 .check_tail_ci_replicates warning by design.
+  ## Suppress it here -- this test asserts the call runs and produces
+  ## non-NA results, not CI quality.
+  suppressWarnings(r1 <- estimand(fit, "att.cumu", "event.time"))
   expect_true(all(r1$vartype == "parametric"))
   expect_true(any(!is.na(r1$estimate)))
 
@@ -84,18 +94,22 @@ test_that("att.cumu / aptt / att-overall work on parametric fits", {
   expect_true(r2$vartype == "parametric")
   expect_true(!is.na(r2$estimate))
 
-  expect_silent(r3 <- estimand(fit, "aptt", "event.time"))
+  suppressWarnings(r3 <- estimand(fit, "aptt", "event.time"))
   expect_true(all(r3$vartype == "parametric"))
   expect_true(any(!is.na(r3$estimate)))
 })
 
-test_that("log.att works on parametric fits (negative-Y warning expected)", {
+test_that("log.att hard-errors on parametric fits with negative Y (v2.4.2+)", {
   skip_on_cran()
   fit <- .make_parametric_fit()
-  ## sim_linear has negative Y, so log.att warns about dropped cells.
-  r4 <- suppressWarnings(estimand(fit, "log.att", "event.time"))
-  expect_true(all(r4$vartype == "parametric"))
-  expect_true(any(!is.na(r4$estimate)))
+  ## sim_linear has many negative Y cells, so log.att now hard-errors
+  ## at point-estimate level (v2.4.2+). The previous v2.4.1 behavior of
+  ## silently warning + dropping cells produced meaningless inference;
+  ## the hard-error redirects users to the actionable options.
+  expect_error(
+    estimand(fit, "log.att", "event.time"),
+    "log\\.att requires Y > 0"
+  )
 })
 
 test_that("vartype = 'none' under parametric returns NA SE/CI", {
@@ -114,13 +128,18 @@ test_that("keep.sims = FALSE under parametric still errors helpfully on non-fast
   e <- new.env()
   data(sim_linear, package = "fect", envir = e)
   set.seed(42)
-  fit_no_sims <- fect(Y ~ D, data = e$sim_linear, index = c("id", "time"),
-                      method = "ife", force = "two-way", se = TRUE,
-                      nboots = 20, r = 2, CV = FALSE,
-                      keep.sims = FALSE,
-                      vartype = "parametric",
-                      time.component.from = "nevertreated",
-                      parallel = FALSE)
+  ## suppressWarnings covers the "EM did not converge within
+  ## max.iteration = 5000" warning on this small (nboots = 20) fixture;
+  ## the test verifies error messages on non-fast paths, not convergence.
+  fit_no_sims <- suppressWarnings(
+    fect(Y ~ D, data = e$sim_linear, index = c("id", "time"),
+         method = "ife", force = "two-way", se = TRUE,
+         nboots = 20, r = 2, CV = FALSE,
+         keep.sims = FALSE,
+         vartype = "parametric",
+         time.component.from = "nevertreated",
+         parallel = FALSE)
+  )
   expect_null(fit_no_sims$eff.boot)
 
   ## att / event.time fast path reads fit$est.att, so still works.

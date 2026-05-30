@@ -3890,7 +3890,7 @@ plot.fect <- function(
       } else {
         p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
       }
-      p <- p + geom_pointrange(aes(x = TTT, y = d1[, 1], ymin = d1[, 3], ymax = d1[, 4]), color = "gray50", fill = "gray50", alpha = 1, size = 0.6)
+      p <- p + geom_pointrange(aes(x = TTT, y = d1[, 1], ymin = d1[, 3], ymax = d1[, 4]), color = "gray50", fill = "gray50", alpha = 1, size = 0.6, linewidth = 0.6)
     }
 
     if (isTRUE(show.count) && !type %in% c("gap", "equiv")) {
@@ -4604,7 +4604,7 @@ plot.fect <- function(
       max.count.pos <- data.count[which.max(data.count[, 2]), 1][1] - min(data.count[, 1]) + 1
       p <- p + geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
         data = data.toplot, inherit.aes = FALSE,
-        fill = count.color, size = 0.3, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
+        fill = count.color, alpha = count.alpha, color = count.outline.color, linewidth = 0.2
       )
       p <- p + annotate("text",
         x = max.count.pos - 0.02 * T.gap,

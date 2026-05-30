@@ -281,13 +281,25 @@ List inter_fe(const arma::mat& Y, const arma::cube& X, int r, int force, const a
   return (output);
 }
 
-/* Interactive Fixed Effects: ub */
+/* Interactive Fixed Effects: ub
+ *
+ * fit_init: optional warm-start matrix (TT x N). When non-null and
+ * shape matches Y, the inner EM loop seeds `fit` from it instead of
+ * the default `fit = Y0` (cold-start). Used by R/boot.R::one.nonpara
+ * to pass the main-fit prediction surface into bootstrap replicates,
+ * which collapses EM convergence from ~20-50 iterations to ~1-3 when
+ * the bootstrap perturbs the data only modestly. NULL (default)
+ * preserves the pre-2.4.2 cold-start behavior. See
+ * statsclaw-workspace/fect/ref/warm-start-audit-2026-05-01.md for
+ * the statistical justification.
+ */
 // [[Rcpp::export]]
 List inter_fe_ub(
     const arma::mat& Y, const arma::mat& Y0, const arma::cube& X, const arma::mat& I, const arma::mat& W_in,
     const arma::mat& beta0,
     int r, // r > 0, the outcome has a factor-type fixed effect; r = 0 else
-    int force, double tol = 1e-5, int max_iter = 1000) {
+    int force, double tol = 1e-5, int max_iter = 1000,
+    Rcpp::Nullable<Rcpp::NumericMatrix> fit_init = R_NilValue) {
 
   arma::mat W = W_in;
   /* Dimensions */
@@ -365,7 +377,7 @@ List inter_fe_ub(
     if (r > 0) {
       // add fe ; inter fe ; iteration
       List fe_ad_inter =
-          fe_ad_inter_iter(YY, Y0, I, W, force, 0, r, 0, 0, tol, max_iter);
+          fe_ad_inter_iter(YY, Y0, I, W, force, 0, r, 0, 0, tol, max_iter, fit_init);
       mu = as<double>(fe_ad_inter["mu"]);
       U = as<arma::mat>(fe_ad_inter["e"]);
       fit = as<arma::mat>(fe_ad_inter["fit"]);
@@ -428,7 +440,7 @@ List inter_fe_ub(
     } else if (r > 0) {
       // add, covar, interactive, iteration
       List fe_ad_inter_covar = fe_ad_inter_covar_iter(
-          XX, invXX, YY, Y0, I, W, beta0, force, 0, r, 0, 0, tol, max_iter);
+          XX, invXX, YY, Y0, I, W, beta0, force, 0, r, 0, 0, tol, max_iter, fit_init);
       mu = as<double>(fe_ad_inter_covar["mu"]);
       beta = as<arma::mat>(fe_ad_inter_covar["beta"]);
       U = as<arma::mat>(fe_ad_inter_covar["e"]);

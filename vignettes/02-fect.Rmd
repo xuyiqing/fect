@@ -73,13 +73,9 @@ In the gap plot, pre-treatment estimates appear in gray (in-sample) while post-t
 
 ### Inference
 
-The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. The number of bootstrap runs can be set by `nboots`.
+The package can produce uncertainty estimates when `se = TRUE`. The default is the non-parametric cluster-bootstrap (`vartype = "bootstrap"`), which works well when the number of units is relatively large and many units experience the treatment condition. Switch to `vartype = "jackknife"` (leave-one-unit-out) when the number of treated units is small (single digits). The number of bootstrap runs is set by `nboots` and the clustering variable by `cl` (default `"id"`).
 
-::: {.callout-tip appearance="simple"}
-### Inference parameters
-
-The key parameters that control **uncertainty estimation** are: `se` (enable standard errors), `vartype` (`"bootstrap"`, `"jackknife"`, or `"parametric"`), `nboots` (number of bootstrap replications), and `cl` (clustering variable). These parameters do not affect point estimates. `"parametric"` is only available in the Synth setting, i.e., when `time.component.from = "nevertreated"`.
-:::
+A third option, `vartype = "parametric"`, is intended for the synthetic-control regime where the number of treated units is small and the nonparametric bootstrap is unreliable; it has its own assumptions and gates. That setting and the deeper discussion of bootstrap-distribution semantics, confidence-interval methods (`ci.method`), p-values, and an empirical coverage study live in [Chapter @sec-inference].
 
 ::: {.callout-note appearance="simple"}
 **Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
@@ -101,50 +97,9 @@ When `parallel = TRUE`, CV parallelism auto-engages only on panels above a metho
 **Clustering.**
 
 -   By default, `fect()` uses cluster-bootstrap at the `unit` level when `se = TRUE`, that is `vartype = "bootstrap"`. The uncertainty estimates thus account for arbitrary serial correlation within a unit over time---commonly understood as being "clustered" at the unit level. In the example above, the unit is `id`, hence, by default, `cl = "id"`.
--   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level. In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset. This can be particularly useful when the number of treated units is small.
 -   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option.
+-   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level (`cl`, if different from `unit`, will be ignored). In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset. This can be particularly useful when the number of treated units is small.
 :::
-
-### Parametric bootstrap: valid regimes {#sec-parametric-regimes}
-
-The parametric bootstrap (`vartype = "parametric"`) uses a two-stage pseudo-treated resampling procedure to produce uncertainty estimates. It is well-suited for the synthetic control setting, where the number of treated units is small and nonparametric bootstrap is unreliable. However, the procedure rests on two key assumptions: (a) the time components (factors and loadings) are estimated from a **never-treated** control pool that is independent of the treated units' data, and (b) the model residuals on control units accurately reflect the true error distribution. When either assumption is violated, the parametric bootstrap underestimates standard errors and produces confidence intervals that are too narrow.
-
-To prevent users from invoking the parametric bootstrap in settings where these assumptions fail, the package enforces three hard restrictions:
-
-::: {.callout-important appearance="simple"}
-### Three-gate system
-
-| Gate | Condition | What it blocks |
-|---|---|---|
-| A | `method %in% c("mc", "both")` + `vartype = "parametric"` | MC + parametric |
-| B | treatment reversal present + `vartype = "parametric"` | reversal + parametric |
-| C | `time.component.from = "notyettreated"` + `vartype = "parametric"` | notyettreated + parametric |
-
-In all three cases the package raises an informative error pointing to the valid alternatives.
-:::
-
-The motivation for Gate C comes from both theory and evidence. The `notyettreated` path uses EM imputation to estimate factors jointly across all not-yet-treated observations, including the treated units' pre-period data. EM enlarges the effective factor space by imputing masked treated-post cells, which deflates the observed-cell residuals that the parametric bootstrap feeds into its covariance estimator. In a Monte Carlo study (N = 50, T = 20, r = 2 factors, 500 replications), the blocked `ife + notyettreated + parametric` combination produced **80.6% coverage at nominal 95%** (SE ratio ≈ 0.67). In contrast, all tested nevertreated paths produced near-nominal coverage (0.93–0.96, SE ratio ≈ 1.0). The architectural details of all three gates are documented in `ARCHITECTURE.md`.
-
-If your current code uses `vartype = "parametric"` with the default `time.component.from = "notyettreated"`, migrate as follows:
-
-```r
-# Before (now raises an error under Gate C):
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
-     method = "ife", se = TRUE, vartype = "parametric")
-
-# After — option 1: switch to nevertreated imputation
-# (requires that never-treated control units exist in the data)
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
-     method = "ife", time.component.from = "nevertreated",
-     se = TRUE, vartype = "parametric")
-
-# After — option 2: use nonparametric bootstrap (safe default)
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
-     method = "ife",
-     se = TRUE, vartype = "bootstrap")
-```
-
-Option 1 switches to the gsynth-style estimation regime and keeps parametric bootstrap. This is appropriate when never-treated control units exist and the treatment does not reverse. Option 2 leaves the estimator unchanged and uses cluster-bootstrap, which is appropriate when the number of treated units is moderate to large. See [Chapter @sec-gsynth] for guidance.
 
 ```{r simdata_fect, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
@@ -283,17 +238,17 @@ The event study plot utilizing leave-one-out for pretreatment estimates is shown
 plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO")
 ```
 
-------------------------------------------------------------------------
-
-## Cumulative effects
-
-Cumulative treatment effects through each event time, and over a specified window, are computed via the unified post-hoc estimand interface introduced in v2.4.0. Both the per-event-time series and the overall window form are one-line calls. See [Chapter @sec-estimands] for the full surface, worked examples, and the migration table from the legacy `effect()` and `att.cumu()` functions.
 
 ------------------------------------------------------------------------
 
 ## Other estimands
 
-Beyond the standard ATT, **fect** supports several estimand variants: the **balanced treated sample** ATT (estimated only on treated units with complete data in a specified window), the **average cohort treatment effect** (estimated separately for each cohort of treatment adoption), and **user-supplied weighted ATTs** (where a user-provided weight column is applied to the across-treated-obs aggregation).
+Beyond the standard ATT, **fect** supports several estimand variants: the **cumulative effects**, the **balanced treated sample** ATT (estimated only on treated units with complete data in a specified window), the **average cohort treatment effect** (estimated separately for each cohort of treatment adoption), and **user-supplied weighted ATTs** (where a user-provided weight column is applied to the across-treated-obs aggregation).
+
+### Cumulative effects
+
+Cumulative treatment effects through each event time, and over a specified window, are computed via the unified post-hoc estimand interface introduced in v2.4.0. Both the per-event-time series and the overall window form are one-line calls. See [Chapter @sec-estimands] for the full surface, worked examples, and the migration table from the legacy `effect()` and `att.cumu()` functions.
+
 
 ### Balanced treated sample
 
@@ -378,6 +333,83 @@ For finer control --- separating the weight that enters the outcome-model fit (`
 ### Post-hoc estimands
 
 The fit object exposes the full imputed counterfactual surface, so users can compute estimands beyond the default level-scale ATT directly from the fit. **fect** v2.4.0 ships a typed dispatcher `estimand()` for the common cases — APTT [@chen2024logs], log-scale ATT, cumulative ATT, window-restricted ATT — plus a low-level accessor `imputed_outcomes()` for custom estimands the dispatcher does not ship. See [Chapter @sec-estimands] for the full chapter with worked examples and the migration table from `effect()` / `att.cumu()`.
+
+## Higher-level FE: `group.fe` for sub-group treatment
+
+When units are nested inside groups and treatment varies at the group level --- counties in states with a state policy, students in schools with a school-wide intervention --- the unit FE $\alpha_i$ is often too granular and absorbs the very dynamics the user wants to study. The natural alternative is to absorb FE at the group level instead, while keeping the individual rows for any individual-level covariates and residual degrees of freedom.
+
+::: {.callout-note appearance="simple"}
+`index = c("id", "time")` must still uniquely identify each row. `group.fe` is a *coarsening* of `index[1]` (each unit belongs to one group), not a replacement.
+:::
+
+The `group.fe` argument (v2.4.5+) names this pattern. The implied model is:
+
+$$Y_{it}^{0} = \xi_t + \omega_{g(i)} + e_{it}$$
+
+with $\omega_{g(i)}$ the state FE and `force = "time"` skipping the county FE.
+
+### Worked example
+
+```{r fect-group-fe-data, eval = TRUE, message = FALSE}
+set.seed(42)
+N <- 40; TT <- 10
+df_county <- expand.grid(id = 1:N, time = 1:TT)
+df_county$state <- paste0("S", (df_county$id - 1) %% 4 + 1)
+df_county$D     <- as.integer(df_county$state %in% c("S1", "S2") &
+                              df_county$time >= 6)
+df_county$Y     <- 1 + 0.5 * df_county$D + rnorm(nrow(df_county), sd = 0.5)
+
+fit_gfe <- fect(Y ~ D, data = df_county,
+                index    = c("id", "time"),
+                group.fe = "state",
+                force    = "time",     # no county FE
+                se = TRUE, nboots = 200, parallel = FALSE)
+```
+
+```{r fect-group-fe-print, eval = TRUE}
+print(fit_gfe)
+```
+
+The header surfaces three facts: `Estimator: fe` (no factors), `Fixed effects: time (time) + state` (state, not county), `Cluster SE: state` (auto-defaulted).
+
+### Cluster SE
+
+When `group.fe` is a single column, `cl` auto-defaults to it. This matches the standard recommendation to cluster at the treatment-assignment level (Bertrand, Duflo & Mullainathan 2004): the effective $n$ for the treatment SE is the number of states, not counties. Override by passing `cl` explicitly to any other column --- e.g., `cl = "id"` for unit-level clustering, or `cl = "region"` for a different group level. Note that fect's case bootstrap always resamples units regardless of `cl`; the `cl` argument only sets the *cluster identity* over which resampling happens, never to "no clustering."
+
+### Method auto-routing
+
+`method = "fe"` (default) is silently routed to `method = "cfe"`. Only the CFE solver has the C++ machinery for additive FE that span multiple columns (`extra_FE_index_cache` in `src/cfe_sub.cpp`); the standard FE solver's demean loop is hard-wired to demean by unit and time only. The route is safe because FE is a strict subset of CFE at `r=0`, and all wrapper code paths (CV, plot, bootstrap) branch on the value of `r`, not on `method`. `method = "ife"`/`"mc"`/`"both"`/`"gsynth"` hard-error with `group.fe` --- those wrappers *do* branch on method. For free latent factors with group-level FE, use `method = "cfe"` with the `r` argument set explicitly (e.g., `r=2`).
+
+### Multiple groupings, nesting check
+
+`group.fe = c("state", "region")` absorbs each as an additive simple FE (multi-column requires explicit `cl`). Each grouping column must be constant within `index[1]`; fect hard-errors at fit time with the offending units listed if not. (The legacy `index = c("unit", "time", "extra")` form does *not* enforce this check because it has historically also supported cell-level interactions like `region_time` that vary within unit by design. See [Chapter @sec-cfe] for the legacy CFE syntax.)
+
+### Manual aggregation: when it gives the same answer, when it doesn't
+
+A common workaround is to pre-aggregate to the (group, time) level:
+
+```{r fect-group-fe-aggregate, eval = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
+df_state <- aggregate(cbind(Y, D) ~ state + time, data = df_county, FUN = mean)
+fit_agg <- fect(Y ~ D, data = df_state, index = c("state", "time"),
+                force = "two-way",
+                se = TRUE, nboots = 200, parallel = FALSE)
+```
+
+```{r fect-group-fe-aggregate-print, eval = TRUE}
+c(group.fe = unname(fit_gfe$att.avg),
+  aggregate = unname(fit_agg$att.avg))
+```
+
+On a balanced panel with no individual-level covariates, the two estimates coincide up to EM tolerance. The equivalence **breaks down** when:
+
+- **Groups are unbalanced.** `group.fe` runs OLS on individual rows: a state with 25 counties contributes 25 rows per period and dominates the fit. If treatment effects vary across treated states, `group.fe` returns a *county-weighted* ATT (bigger states dominate); `aggregate` returns a *state-weighted* ATT. Neither is wrong --- they target different estimands. For a *unit-equally-weighted* average on an unbalanced panel, pass explicit weights via the `W` argument.
+- **Individual-level covariates $X_{it}$ vary within group-time.** Aggregation collapses $X$ to the cell mean and loses the variation that identifies $\beta$; `group.fe` keeps it.
+
+`group.fe` is also preferred for residual df from the individual rows, or simply to skip the aggregation step.
+
+::: {.callout-tip appearance="simple"}
+The older syntax `index = c("unit", "time", "extra1", ...)` does the same thing under the hood; `group.fe` is just easier to spot when reading code. New code should prefer `group.fe`.
+:::
 
 ## Additional notes
 

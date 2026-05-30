@@ -116,6 +116,20 @@ plot(out,
      main = "Text and Theme Customization")
 
 
+## ----title-bold-centered------------------------------------------------------
+plot(out, main = "Bold Centered Title") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+
+## ----title-multi--------------------------------------------------------------
+plot(out, main = "Centered, Bold, Larger") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+
+
+## ----legacy-style-default-----------------------------------------------------
+plot(out, legacy.style = TRUE)
+
+
 ## ----line-bound-customization-------------------------------------------------
 plot(out,
      est.lwidth = 1.5,
@@ -169,13 +183,15 @@ plot(out, type = "counterfactual",
      main = "Counterfactual Plot with Custom Colors")
 
 
-## ----placebo, cache = TRUE----------------------------------------------------
+## ----placebo_fit, cache = TRUE------------------------------------------------
 out_fe_placebo <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020,
                        index = c("district_final", "cycle"), force = "two-way",
                        method = "fe", CV = FALSE, parallel = TRUE, cores = 16,
                        se = TRUE, nboots = 1000, placeboTest = TRUE,
                        placebo.period = c(-2, 0))
 
+
+## ----placebo------------------------------------------------------------------
 plot(out_fe_placebo)
 
 
@@ -186,6 +202,11 @@ plot(out_fe_placebo, connected = TRUE, preset = "grayscale",
 
 ## ----plot-placebo-color-------------------------------------------------------
 plot(out_fe_placebo, placebo.color = "green4")
+
+
+## ----plot-placebo-fill--------------------------------------------------------
+plot(out_fe_placebo, highlight.fill = TRUE,
+     main = "Placebo test with background rectangle")
 
 
 ## ----plot-equiv-bound---------------------------------------------------------
@@ -215,18 +236,24 @@ plot(out, type = "equiv",
 plot(out_fe_placebo, type = "exit")
 
 
-## ----carryover, cache = TRUE--------------------------------------------------
+## ----carryover_fit, cache = TRUE----------------------------------------------
 out_fe_carryover <- fect(Y = "general_sharetotal_A_all", D = "cand_A_all", X = c("cand_H_all", "cand_B_all"), data = gs2020,
                        index = c("district_final", "cycle"), force = "two-way",
                          parallel = TRUE, cores = 16, se = TRUE, CV = FALSE,
                          nboots = 1000, carryoverTest = TRUE,
                          carryover.period = c(1, 3))
+
+
+## ----carryover----------------------------------------------------------------
 plot(out_fe_carryover)
 
 
 ## ----plot-cumulative-hh-------------------------------------------------------
-plot(effect(out.hh), main = "Cumulative Effect of Indirect Democracy",
-     ylab = "Cumulative Effect on Naturalization Rate")
+cumu.hh <- estimand(out.hh, "att.cumu", "event.time")
+esplot(cumu.hh, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       main = "Cumulative Effect of Indirect Democracy",
+       ylab = "Cumulative Effect on Naturalization Rate")
 
 
 ## ----subset-no-reversals------------------------------------------------------
@@ -257,7 +284,10 @@ out_no_reversals <- fect(Y = "general_sharetotal_A_all",
 
 
 ## ----cumulative-effects-------------------------------------------------------
-plot(effect(out_no_reversals), xlim = c(1, 2))
+cumu.gs <- estimand(out_no_reversals, "att.cumu", "event.time")
+esplot(cumu.gs, Period = "event.time",
+       Estimate = "estimate", CI.lower = "ci.lo", CI.upper = "ci.hi",
+       xlim = c(1, 2))
 
 
 ## ----plot-box-hte-------------------------------------------------------------
@@ -315,10 +345,23 @@ plot(out_ife, type = "factors", include.FE = FALSE,
 plot(out_ife, type = "loadings", main = "Factor Loadings")
 
 
+## ----plot-loading-overlap, fig.width = 6, fig.height = 5----------------------
+plot(out_ife, type = "loading.overlap")
+
+
+## ----loading-overlap-r1-fit, cache = TRUE, message = FALSE, warning = FALSE----
+out_ife_r1 <- fect(nat_rate_ord ~ indirect, data = hh2019,
+                   index = c("bfs", "year"), method = "ife", r = 1,
+                   se = TRUE, parallel = TRUE, cores = 16, nboots = 500)
+
+
+## ----plot-loading-overlap-r1, fig.width = 6, fig.height = 5, message = FALSE, warning = FALSE----
+plot(out_ife_r1, type = "loading.overlap")
+
+
 ## ----esplot-basic, fig.width = 6, fig.height = 4.5----------------------------
 # Create example data from a fect result
-es_data <- data.frame(
-  Time = as.numeric(rownames(out$est.att)),
+es_data <- data.frame(Time = as.numeric(rownames(out$est.att)),
   ATT = out$est.att[, "ATT"],
   CI.lower = out$est.att[, "CI.lower"],
   CI.upper = out$est.att[, "CI.upper"]
