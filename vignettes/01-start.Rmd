@@ -14,9 +14,9 @@ rm(list = ls())
 
 | Source | Version | Date | Features |
 |--------|---------|------|----------|
-| CRAN | 2.4.1 | 2026-04-30 | Default release |
-| GitHub (`master`) | 2.4.1 | 2026-04-30 | Same as CRAN |
-| GitHub (`dev`) | 2.4.4 | 2026-05-19 | + `$sample` slot + `panelview(fit)` overlay |
+| CRAN | 2.4.5 | 2026-05-30 | Default release |
+| GitHub (`master`) | 2.4.5 | 2026-05-30 | Same as CRAN |
+| GitHub (`dev`) | 2.4.5 | 2026-05-30 | Same as CRAN |
 
 To install **fect** from CRAN:
 

@@ -2,11 +2,10 @@
 
 ## v2.4.5
 
-(2026-05-22)
+(2026-05-30) CRAN release.
 
-* New `group.fe` argument on `fect()`: absorb additive fixed effects at a coarsening of the unit identifier (e.g., state FE on county-level data when treatment varies at the state level). Closes #139. See [Chapter @sec-fect] for the worked example.
-* Cluster SE auto-defaults to `group.fe[1]` (Bertrand-Duflo-Mullainathan 2004). Override via `cl = "<column>"`.
-* Fix: `method = "cfe"` with `force = "time"` / `"unit"` previously errored with `Index out of bounds: [index='alpha']` / `[index='xi']`. Result-list assembly in `complex_fe_ub` now matches the conditional writes in `Demean()`. `force = "two-way"` is byte-equivalent.
+* New `group.fe` argument on `fect()`: absorb additive fixed effects at a coarsening of the unit identifier (e.g., state FE on county-level data when treatment varies at the state level).
+* Fix: `method = "cfe"` with `force = "time"` / `"unit"` previously errored with `Index out of bounds: [index='alpha']` / `[index='xi']`. 
 * Removed the vestigial public `sfe` argument and the orphan internal `R/polynomial.R` (no live code reached either).
 
 ## v2.4.4
