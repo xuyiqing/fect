@@ -61,6 +61,8 @@ fect <- function(
     conformal.scale = "none", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
     conformal.center = "mean", # vartype="conformal": post-period location mean|median
     conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
+    conformal.band = "pointwise", # vartype="conformal": est.att band pointwise|simultaneous
+    conformal.cutoff = "per-period", # vartype="conformal": pointwise cutoff per-period|pooled
     cl = NULL,
     ci.method = "normal", # CI method for fect's est.* slots: "normal" (Wald: theta_hat +- z * SE) or "basic" (reflected pivot, Davison-Hinkley 1997 Sec. 5.2.1). For percentile / bc / bca on alternative estimands (att.cumu, aptt, log.att), call estimand(fit, type, ci.method) post-fit
     quantile.CI = NULL, # DEPRECATED: use ci.method instead. NULL sentinel = "not supplied"; legacy FALSE -> ci.method = "normal", legacy TRUE -> ci.method = "basic"
@@ -147,6 +149,8 @@ fect.formula <- function(
     conformal.scale = "none", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
     conformal.center = "mean", # vartype="conformal": post-period location mean|median
     conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
+    conformal.band = "pointwise", # vartype="conformal": est.att band pointwise|simultaneous
+    conformal.cutoff = "per-period", # vartype="conformal": pointwise cutoff per-period|pooled
     cl = NULL,
     ci.method = "normal", # CI method for fect's est.* slots: "normal" or "basic"
     quantile.CI = NULL, # DEPRECATED: use ci.method instead
@@ -265,6 +269,8 @@ fect.formula <- function(
         conformal.scale = conformal.scale,
         conformal.center = conformal.center,
         conformal.weight = conformal.weight,
+        conformal.band = conformal.band,
+        conformal.cutoff = conformal.cutoff,
         cl = cl,
         ci.method = ci.method,
         quantile.CI = quantile.CI,
@@ -353,6 +359,8 @@ fect.default <- function(
     conformal.scale = "none", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
     conformal.center = "mean", # vartype="conformal": post-period location mean|median
     conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
+    conformal.band = "pointwise", # vartype="conformal": est.att band pointwise|simultaneous
+    conformal.cutoff = "per-period", # vartype="conformal": pointwise cutoff per-period|pooled
     cl = NULL,
     ci.method = "normal", # CI method for fect's est.* slots: "normal" or "basic"
     quantile.CI = NULL, # DEPRECATED: use ci.method instead
@@ -593,6 +601,14 @@ fect.default <- function(
             }
             if (!conformal.weight %in% c("cell", "unit", "precision")) {
                 stop("conformal.weight must be \"cell\", \"unit\", or \"precision\".",
+                     call. = FALSE)
+            }
+            if (!conformal.band %in% c("pointwise", "simultaneous")) {
+                stop("conformal.band must be \"pointwise\" or \"simultaneous\".",
+                     call. = FALSE)
+            }
+            if (!conformal.cutoff %in% c("per-period", "pooled")) {
+                stop("conformal.cutoff must be \"per-period\" or \"pooled\".",
                      call. = FALSE)
             }
         }
@@ -2778,6 +2794,8 @@ fect.default <- function(
             conformal.scale = conformal.scale,
             conformal.center = conformal.center,
             conformal.weight = conformal.weight,
+            conformal.band = conformal.band,
+            conformal.cutoff = conformal.cutoff,
             quantile.CI = .quantile.CI.bool,
             nboots = nboots,
             parallel = parallel,

@@ -120,6 +120,7 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
                                 force = 3L, hasRevs = 0L, tol = 1e-5,
                                 max.iteration = 1000L, norm.para = NULL,
                                 scale = "none", center = "mean", weight = "cell",
+                                band.type = "pointwise", cutoff = "per-period",
                                 alpha = 0.05, conformal.fit = NULL) {
 
   TT <- nrow(Y); N <- ncol(Y)
@@ -256,24 +257,51 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
   s.co.vec <- abs(m.co[keep]) / sc.co[keep]
   p.value  <- .conformal_pval(s.tr, s.co.vec, w.co = w.co)
 
-  ## --- per-period pointwise band (calendar-indexed): at each period the treated
-  ## gap is ranked against the control gaps at the same period. Pre-period rows
-  ## give the placebo / pre-trend band; post-period rows give the effect band.
-  band <- matrix(NA_real_, TT, 4L,
-                 dimnames = list(NULL, c("eff", "CI.lower", "CI.upper", "p.value")))
-  for (t in seq_len(TT)) {
-    gco.t <- G.co[, t]
-    okt   <- is.finite(gco.t) & is.finite(sc.co) & sc.co > 0
-    if (!is.finite(tr.path[t]) || sum(okt) < 2L) next
-    ci.t   <- .conformal_ci_level(tr.path[t], sc.tr, gco.t[okt], sc.co[okt], alpha = alpha)
-    s.tr.t <- if (is.finite(sc.tr) && sc.tr > 0) abs(tr.path[t]) / sc.tr else NA_real_
-    band[t, ] <- c(tr.path[t], ci.t[1], ci.t[2],
-                   .conformal_pval(s.tr.t, abs(gco.t[okt]) / sc.co[okt]))
+  ## --- per-period band(s) (calendar-indexed). Standardized control gaps
+  ## g.tilde[j,t] = |G.co[j,t]| / sc.co[j]; the treated deviation at period t is
+  ## |tr.path[t] - tau| / sc.tr. Three constructions:
+  ##   pointwise + per-period (default): Q_t = conformal quantile of g.tilde[,t].
+  ##   pointwise + pooled: one Q over all post-window g.tilde values.
+  ##   simultaneous: one multiplier c = quantile of the per-control MAX over the
+  ##     post window (sup-t / uniform band over the post path); pre-period rows
+  ##     keep the per-period placebo band.
+  ## The pre-period rows always show the per-period placebo band (for pre-trends).
+  ok.co <- which(is.finite(sc.co) & sc.co > 0)
+  Gv   <- G.co[ok.co, , drop = FALSE]
+  scv  <- sc.co[ok.co]
+  Gtil <- abs(Gv) / scv                      # ncal x TT, row j divided by scv[j]
+
+  Qpool <- NULL
+  if (identical(cutoff, "pooled")) {
+    pv <- as.vector(Gtil[, post.idx, drop = FALSE]); pv <- pv[is.finite(pv)]
+    Qpool <- .conformal_quantile(pv, alpha)
   }
+  Mj    <- apply(Gtil[, post.idx, drop = FALSE], 1L,
+                 function(z) { z <- z[is.finite(z)]; if (length(z)) max(z) else NA_real_ })
+  c.sim <- .conformal_quantile(Mj[is.finite(Mj)], alpha)
+
+  mk_band <- function(mode) {
+    b <- matrix(NA_real_, TT, 4L,
+                dimnames = list(NULL, c("eff", "CI.lower", "CI.upper", "p.value")))
+    for (t in seq_len(TT)) {
+      gt <- Gtil[, t]; okt <- is.finite(gt)
+      if (!is.finite(tr.path[t]) || !is.finite(sc.tr) || sc.tr <= 0 || sum(okt) < 2L) next
+      Qt <- if (mode == "simultaneous" && t %in% post.idx) c.sim
+            else if (identical(cutoff, "pooled")) Qpool
+            else .conformal_quantile(gt[okt], alpha)
+      half <- if (is.finite(Qt)) sc.tr * Qt else Inf
+      b[t, ] <- c(tr.path[t], tr.path[t] - half, tr.path[t] + half,
+                  .conformal_pval(abs(tr.path[t]) / sc.tr, gt[okt]))
+    }
+    b
+  }
+  band     <- mk_band(band.type)                 # populates est.att
+  band.sim <- if (identical(band.type, "simultaneous")) band else mk_band("simultaneous")
 
   list(att = m.tr, ci = c(ci[1], ci[2]), p.value = p.value,
        score.tr = s.tr, score.co = s.co.vec, status = status,
        n.calib = Ncal, n.eff = if (is.null(w.co)) Ncal else .conformal_neff(w.co),
-       scale = scale, center = center, weight = weight, form = "jackknife+",
-       band = band, post.idx = post.idx, pre.idx = pre.idx)
+       scale = scale, center = center, weight = weight,
+       band.type = band.type, cutoff = cutoff, form = "jackknife+",
+       band = band, band.sim = band.sim, post.idx = post.idx, pre.idx = pre.idx)
 }

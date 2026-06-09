@@ -78,7 +78,8 @@ test_that("effective sample size is sensible", {
     dat <- data.frame(id = rep(1:g$N, each = g$T), time = rep(1:g$T, g$N),
                       Y = as.vector(Y), D = as.vector(g$D))
     fit <- suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
-              method = "gsynth", force = 3, CV = FALSE, r = 2, se = FALSE))
+              method = "gsynth", force = 3, CV = FALSE, r = 2, se = FALSE,
+              parallel = FALSE))
     cc <- conformal_calibrate(Y = Y, D = g$D, I = fit$I, II = fit$II, T.on = fit$T.on,
               r.cv = fit$r.cv, eff = fit$eff, method = "gsynth",
               scale = scale, alpha = alpha)
@@ -186,4 +187,59 @@ test_that("precision weight down-weights a noisy treated unit", {
             method = "gsynth", force = 3, CV = FALSE, r = 2, se = TRUE,
             vartype = "conformal", conformal.weight = w))$est.avg[1, "ATT.avg"]
   expect_false(isTRUE(all.equal(att("unit"), att("precision"))))
+})
+
+## ---- bands: pointwise / simultaneous / pooled cutoff ------------------------
+
+test_that("simultaneous band is wider than pointwise; est.att.sim always present", {
+  skip_on_cran()
+  g <- .conf_dgp(1)
+  Y <- g$mu + matrix(rnorm(g$N * g$T), g$T, g$N) + 1.5 * g$D
+  dat <- data.frame(id = rep(1:g$N, each = g$T), time = rep(1:g$T, g$N),
+                    Y = as.vector(Y), D = as.vector(g$D))
+  run <- function(...) suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+            method = "gsynth", force = 3, CV = FALSE, r = 2, se = TRUE,
+            vartype = "conformal", ...))
+  fp <- run(); fs <- run(conformal.band = "simultaneous")
+  post_w <- function(m) {
+    pm <- m[as.numeric(rownames(m)) >= 0, c("CI.lower", "CI.upper"), drop = FALSE]
+    mean(pm[, 2] - pm[, 1])
+  }
+  expect_gte(post_w(fs$est.att), post_w(fp$est.att))      # uniform band is wider
+  expect_false(is.null(fp$est.att.sim))                   # always computed
+  expect_gte(post_w(fp$est.att.sim), post_w(fp$est.att))
+  ## pooled cutoff runs and is finite
+  fpool <- run(conformal.cutoff = "pooled")
+  expect_identical(fpool$conformal$status, "ok")
+  expect_true(all(is.finite(fpool$est.att[as.numeric(rownames(fpool$est.att)) >= 0,
+                                          c("CI.lower", "CI.upper")])))
+})
+
+test_that("simultaneous band gives materially better joint coverage than pointwise", {
+  skip_on_cran()
+  ## Joint (whole-post-path) coverage. Pointwise undercovers jointly (the
+  ## multiple-comparison problem, ~0.44 at 150 reps); the simultaneous band is
+  ## much better (~0.77). NOTE: it undercovers nominal 1 - alpha in this small-N
+  ## regime, sitting near the jackknife+ floor 1 - 2*alpha plus the treated-vs-
+  ## control LOO asymmetry; the precise characterization (and a possible
+  ## symmetric-treated-gap fix) is a Phase 5 item. Here we assert the robust
+  ## qualitative property only.
+  g <- .conf_dgp(909); reps <- 40; alpha <- 0.10
+  joint <- function(band) {
+    post <- band[as.numeric(rownames(band)) >= 0, c("CI.lower", "CI.upper"), drop = FALSE]
+    all(post[, 1] <= 0 & 0 <= post[, 2])
+  }
+  jp <- js <- logical(reps)
+  for (b in seq_len(reps)) {
+    Y <- g$mu + matrix(rnorm(g$N * g$T), g$T, g$N)   # true effect 0 everywhere
+    dat <- data.frame(id = rep(1:g$N, each = g$T), time = rep(1:g$T, g$N),
+                      Y = as.vector(Y), D = as.vector(g$D))
+    f <- suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+              method = "gsynth", force = 3, CV = FALSE, r = 2, se = TRUE,
+              vartype = "conformal", alpha = alpha, parallel = FALSE))
+    jp[b] <- joint(f$est.att)        # pointwise
+    js[b] <- joint(f$est.att.sim)    # simultaneous
+  }
+  expect_gt(mean(js) - mean(jp), 0.15)   # simultaneous materially better jointly
+  expect_gt(mean(js), 0.65)              # and well above pointwise's joint coverage
 })

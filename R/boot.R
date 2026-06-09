@@ -145,6 +145,8 @@ fect_boot <- function(
   conformal.scale = "none",
   conformal.center = "mean",
   conformal.weight = "cell",
+  conformal.band = "pointwise",
+  conformal.cutoff = "per-period",
   quantile.CI = FALSE,
   nboots = 200,
   parallel = TRUE,
@@ -574,7 +576,8 @@ fect_boot <- function(
       force = force, hasRevs = hasRevs, tol = tol, max.iteration = max.iteration,
       norm.para = norm.para,
       scale = conformal.scale, center = conformal.center,
-      weight = conformal.weight, alpha = alpha
+      weight = conformal.weight, band.type = conformal.band,
+      cutoff = conformal.cutoff, alpha = alpha
     )
 
     ## back out a nominal S.E. from the symmetric conformal CI (display only;
@@ -603,23 +606,28 @@ fect_boot <- function(
                                   band[, "CI.lower"], band[, "CI.upper"], band[, "p.value"], calendar.N)
     colnames(est.eff.calendar.fit) <- colnames(est.eff.calendar)
 
-    ## --- map the calendar band to event time (treated unit's relative period)
-    ## for est.att (rownames = out$time). Common-onset: a 1:1 map.
+    ## --- map a calendar band to event time (treated unit's relative period);
+    ## rownames = out$time. Common-onset: a 1:1 map.
     rel <- T.on[, id.tr.conf[1]]
-    est.att <- matrix(NA_real_, length(time.on), 6,
-                      dimnames = list(time.on,
-                        c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value", "count")))
-    for (k in seq_along(time.on)) {
-      rows <- which(rel == time.on[k])
-      if (length(rows) == 0L) next
-      ef <- mean(band[rows, "eff"],      na.rm = TRUE)
-      lo <- mean(band[rows, "CI.lower"], na.rm = TRUE)
-      hi <- mean(band[rows, "CI.upper"], na.rm = TRUE)
-      pv <- mean(band[rows, "p.value"],  na.rm = TRUE)
-      est.att[k, ] <- c(ef, se.from(lo, hi), lo, hi, pv, out$count[k])
+    map_band <- function(bnd) {
+      m <- matrix(NA_real_, length(time.on), 6,
+                  dimnames = list(time.on,
+                    c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value", "count")))
+      for (k in seq_along(time.on)) {
+        rows <- which(rel == time.on[k])
+        if (length(rows) == 0L) next
+        ef <- mean(bnd[rows, "eff"],      na.rm = TRUE)
+        lo <- mean(bnd[rows, "CI.lower"], na.rm = TRUE)
+        hi <- mean(bnd[rows, "CI.upper"], na.rm = TRUE)
+        pv <- mean(bnd[rows, "p.value"],  na.rm = TRUE)
+        m[k, ] <- c(ef, se.from(lo, hi), lo, hi, pv, out$count[k])
+      }
+      m
     }
-    ## Phase 4 builds a true (1 - 2*alpha) inner band and the simultaneous band;
-    ## for now the 90%-slot mirrors the main band so plot paths do not break.
+    est.att     <- map_band(band)            # the selected band (conformal.band)
+    est.att.sim <- map_band(cc$band.sim)     # the uniform / simultaneous band
+    ## Phase 4 note: est.att90 (the inner equivalence band) mirrors the main band
+    ## for now; a true (1 - 2*alpha) conformal inner band is a later refinement.
     est.att90 <- est.att
     att.bound <- est.att[, c("CI.lower", "CI.upper"), drop = FALSE]
     rownames(att.bound) <- time.on
@@ -628,12 +636,14 @@ fect_boot <- function(
       est.avg = est.avg,
       est.avg.unit = est.avg.unit,
       est.att = est.att,
+      est.att.sim = est.att.sim,
       est.att90 = est.att90,
       att.bound = att.bound,
       est.eff.calendar = est.eff.calendar,
       est.eff.calendar.fit = est.eff.calendar.fit,
       vartype = "conformal",
-      conformal = cc[c("scale", "center", "weight", "status", "n.calib", "form")]
+      conformal = cc[c("scale", "center", "weight", "band.type", "cutoff",
+                       "status", "n.calib", "form")]
     )
     return(c(out, result))
   }
