@@ -2,62 +2,79 @@
 ## conformal.R
 ##
 ## Cross-sectional conformal inference for separated, symmetric counterfactual
-## estimators (vartype = "conformal").  The treated counterfactual prediction
-## error is calibrated against the leave-one-control-out prediction errors of the
-## donors and read off as a RANK, rather than resampled and normal-wrapped
-## (parametric bootstrap) or quantile-resampled (nonparametric bootstrap).
+## estimators (vartype = "conformal").  The treated unit's post-treatment
+## prediction error is calibrated against the leave-one-control-out prediction
+## errors of the donors and read off as a RANK, rather than resampled and
+## normal-wrapped (parametric bootstrap) or quantile-resampled (nonparametric
+## bootstrap).
 ##
 ## Design: statsclaw-workspace/fect/runs/REQ-conformal/spec.md
-## Decisions (2026-06-08): jackknife+ default (>= 1 - 2 alpha); scores
-## "studentized" (default), "ratio" (Abadie post/pre RMSPE), "meanabs", "rmse";
-## staggered adoption via valid_controls(predictive = "notyettreated").
+## Decision (2026-06-08): FAMILY A ONLY.  Every interval is a level statistic
 ##
-## This file holds the estimator-AGNOSTIC core: scores, the conformal p-value,
-## and interval inversion.  The calibration loop (leave-one-control-out via
-## impute_Y0) and the vartype dispatch live in boot.R / default.R and feed this
-## core a control-by-period residual matrix plus the treated gap path.
+##     S_i(tau) = | m_i - tau | / scale_i ,   interval  m_tr +/- scale_tr * Q ,
+##
+## where m_i is a location of unit i's post-period gaps (center: mean | median |
+## per-horizon) and scale_i is a per-unit scale from its pre-period gaps
+## (scale: none | sd | rmspe | mad | diff | model-se).  Q is the conformal
+## (1 - alpha) quantile of the control scores |m_j| / scale_j.  This family is
+## never empty (the numerator vanishes at tau = m_tr) and needs no grid inversion.
+## The path / constant-effect scores (rmse / studentized-path / ratio), which
+## could return an empty acceptance set, were removed because the empty case is
+## confusing to report.
+##
+## This file is the estimator-AGNOSTIC core: centers, scales, the conformal
+## quantile / p-value, and the closed-form interval.  The calibration loop
+## (leave-one-control-out via impute_Y0) and the vartype dispatch live in
+## boot.R / default.R and feed this core the per-unit gap paths.
 ## -----------------------------------------------------------------------------
 
-## ---- 1. nonconformity score -------------------------------------------------
-## e.post : numeric, a unit's post-treatment residual (prediction-error) path
-## e.pre  : numeric, the same unit's pre-treatment residual path (for normaliz.)
-## type   : "studentized" | "ratio" | "meanabs" | "rmse"
-## Returns a scalar.  Validity (exchangeability) is identical across types; the
-## choice affects interval width / adaptivity only.
-.conformal_score <- function(e.post, e.pre, type = "studentized") {
-  e.post <- e.post[is.finite(e.post)]
-  if (length(e.post) == 0L) return(NA_real_)
-  rms <- function(x) sqrt(mean(x^2))
-  if (type == "meanabs") {
-    return(abs(mean(e.post)))
-  } else if (type == "rmse") {
-    return(rms(e.post))
-  } else if (type == "ratio") {
-    ## Abadie post/pre RMSPE ratio.
-    ep <- e.pre[is.finite(e.pre)]
-    denom <- if (length(ep) > 0L) rms(ep) else NA_real_
-    if (is.na(denom) || denom <= 0) return(NA_real_)
-    return(rms(e.post) / denom)
-  } else if (type == "studentized") {
-    ep <- e.pre[is.finite(e.pre)]
-    denom <- if (length(ep) > 1L) stats::sd(ep) else NA_real_
-    if (is.na(denom) || denom <= 0) return(NA_real_)
-    return(mean(abs(e.post)) / denom)
-  }
-  stop("conformal: unknown score type '", type, "'.")
+## ---- 1. location (center) of a unit's post-period gap path -------------------
+## "per-horizon" is not a scalar; conformal_calibrate handles it by calling this
+## per post period, so here we cover the scalar centers only.
+.conformal_center <- function(e.post, type = "mean") {
+  e <- e.post[is.finite(e.post)]
+  if (length(e) == 0L) return(NA_real_)
+  if (type == "median") return(stats::median(e))
+  mean(e)
 }
 
-## ---- 2. conformal p-value (weighted-capable) --------------------------------
-## s.tr : scalar treated score; s.co : numeric vector of control scores.
-## w.co : optional non-negative control weights (weighted conformal); NULL = 1.
-## w.tr : treated self-weight (default 1).  Returns p in (0, 1].
+## ---- 2. per-unit scale from a unit's pre-period gap path ---------------------
+## A common (unit-invariant) scale cancels in the ranking, so only per-unit
+## variation matters; that is why "none" (meanabs) and a per-unit scale differ.
+## "model-se" is not computable from e.pre alone -- conformal_calibrate supplies
+## it per unit -- so this returns NA to signal the caller must override.
+.conformal_scale <- function(e.pre, type = "none") {
+  if (type == "none") return(1)
+  if (type == "model-se") return(NA_real_)        # supplied externally
+  e <- e.pre[is.finite(e.pre)]
+  if (type == "sd")    return(if (length(e) > 1L) stats::sd(e)          else NA_real_)
+  if (type == "rmspe") return(if (length(e) > 0L) sqrt(mean(e^2))       else NA_real_)
+  if (type == "mad")   return(if (length(e) > 1L) stats::mad(e)         else NA_real_)
+  if (type == "diff")  return(if (length(e) > 1L) stats::sd(diff(e))    else NA_real_)
+  stop("conformal: unknown scale type '", type, "'.")
+}
+
+## ---- 3. conformal quantile and p-value (weighted-capable) --------------------
+## Weighted (1 - alpha) quantile of the control scores, with the treated unit held
+## as a +Inf atom of weight w.tr (Tibshirani et al. 2019).  Unweighted, this is
+## the ceil((1 - alpha)(n + 1))-th smallest control score.  Returns Inf when the
+## level is unreachable (alpha below the resolution floor 1 / (n + 1)).
+.conformal_quantile <- function(s.co, alpha, w.co = NULL, w.tr = 1) {
+  ok <- is.finite(s.co); s <- s.co[ok]
+  n <- length(s); if (n == 0L) return(Inf)
+  w <- if (is.null(w.co)) rep(1, n) else w.co[ok]
+  ord <- order(s); s <- s[ord]; w <- w[ord]
+  cum <- cumsum(w) / (sum(w) + w.tr)
+  idx <- which(cum >= 1 - alpha)
+  if (length(idx) == 0L) return(Inf)      # mass reached only at the +Inf atom
+  s[idx[1L]]
+}
+
+## p in (0, 1]: rank of the treated score among the controls.
 .conformal_pval <- function(s.tr, s.co, w.co = NULL, w.tr = 1) {
-  ok <- is.finite(s.co)
-  s.co <- s.co[ok]
+  ok <- is.finite(s.co); s.co <- s.co[ok]
   if (is.null(w.co)) w.co <- rep(1, length(s.co)) else w.co <- w.co[ok]
-  num <- w.tr + sum(w.co[s.co >= s.tr])
-  den <- w.tr + sum(w.co)
-  num / den
+  (w.tr + sum(w.co[s.co >= s.tr])) / (w.tr + sum(w.co))
 }
 
 ## effective sample size for weighted conformal
@@ -67,105 +84,43 @@
   (sum(w)^2) / sum(w^2)
 }
 
-## ---- 3. interval inversion --------------------------------------------------
-## Closed form for the average effect under the "meanabs" score.
-## g.tr : scalar treated mean post-period gap; g.co : control mean gaps.
-## Returns c(lower, upper) for att.avg.  Width = +/- the rank-corrected
-## (1 - alpha) quantile of |g.co|.
-.conformal_ci_meanabs <- function(g.tr, g.co, alpha = 0.05, w.co = NULL) {
-  ag <- abs(g.co[is.finite(g.co)])
-  n  <- length(ag)
-  k  <- ceiling((1 - alpha) * (n + 1))      # conformal quantile rank
-  if (k > n) {                              # alpha < 1/(n+1): unbounded
-    return(c(-Inf, Inf))
-  }
-  q <- sort(ag)[k]
-  c(g.tr - q, g.tr + q)
+## ---- 4. closed-form level interval ------------------------------------------
+## m.tr, scale.tr : treated center and per-unit scale.
+## m.co, scale.co : control centers and per-unit scales (vectors).
+## Control score S_j = |m_j| / scale_j (no effect under H0); treated
+## S_tr(tau) = |m.tr - tau| / scale.tr.  Acceptance {tau : S_tr(tau) <= Q} =
+## m.tr +/- scale.tr * Q.  NEVER empty; unbounded c(-Inf, Inf) only when alpha is
+## below the resolution floor (too few controls for the requested level).
+.conformal_ci_level <- function(m.tr, scale.tr, m.co, scale.co, alpha = 0.05, w.co = NULL) {
+  ok <- is.finite(m.co) & is.finite(scale.co) & scale.co > 0
+  s.co <- abs(m.co[ok]) / scale.co[ok]
+  w <- if (is.null(w.co)) NULL else w.co[ok]
+  Q <- .conformal_quantile(s.co, alpha, w.co = w)
+  if (!is.finite(Q) || !is.finite(scale.tr) || scale.tr <= 0) return(c(-Inf, Inf))
+  half <- scale.tr * Q
+  c(m.tr - half, m.tr + half)
 }
 
-## Outcome-scale denominator a given score divides by, used to size the grid in
-## the SAME units as tau (the grid is over outcome-scale constant effects, so the
-## span must be outcome-scaled, not score-scaled).
-.conformal_denom <- function(e.pre, type) {
-  ep <- e.pre[is.finite(e.pre)]
-  if (type == "ratio")       return(if (length(ep) > 0L) sqrt(mean(ep^2)) else NA_real_)
-  if (type == "studentized") return(if (length(ep) > 1L) stats::sd(ep)      else NA_real_)
-  1  # rmse / meanabs: numerator already in outcome units
-}
-
-## Grid inversion for ratio / studentized / rmse (refit-free: control scores are
-## tau-independent; only the treated score is recomputed on the grid).
-## gap.tr.post / gap.tr.pre : treated gap paths.  s.co : control scores.
-## Returns c(lower, upper) = range of accepted constant effects tau.  Two special
-## returns, both carried as attributes so the caller can react:
-##   attr "empty" = "rejected_all_tau" : acceptance set is genuinely empty (no
-##     constant effect is consistent at level alpha; common with per-unit
-##     studentization when the treated pre-period sd is small) -> c(NA, NA).
-##   attr "edge"  = TRUE               : acceptance reached the (expanded) grid
-##     edge; the interval is effectively unbounded on that side.
-.conformal_ci_grid <- function(gap.tr.post, gap.tr.pre, s.co, type, alpha = 0.05,
-                               w.co = NULL, w.tr = 1, n.grid = 401L, span = NULL) {
-  gp <- gap.tr.post[is.finite(gap.tr.post)]
-  center <- mean(gp)
-  ## span in OUTCOME units: beyond |tau - center| ~ (max control score) * denom
-  ## the treated score must exceed every control score, so acceptance is
-  ## impossible -- this bounds where the grid needs to look.
-  denom <- .conformal_denom(gap.tr.pre, type)
-  if (!is.finite(denom) || denom <= 0) denom <- 1
-  s.hi <- suppressWarnings(max(s.co[is.finite(s.co)]))
-  if (!is.finite(s.hi)) s.hi <- 1
-  if (is.null(span)) span <- max(abs(gp)) + (s.hi + 1) * denom
-
-  accept_on <- function(span) {
-    grid <- seq(center - span, center + span, length.out = n.grid)
-    keep <- vapply(grid, function(tau) {
-      s.tr <- .conformal_score(gap.tr.post - tau, gap.tr.pre, type)
-      if (!is.finite(s.tr)) return(FALSE)
-      .conformal_pval(s.tr, s.co, w.co = w.co, w.tr = w.tr) > alpha
-    }, logical(1))
-    list(grid = grid, keep = keep)
-  }
-  a <- accept_on(span)
-  ## adaptive expansion: if acceptance touches an edge the true interval may run
-  ## further (guards the span heuristic against unusual gap/score scales).
-  tries <- 0L
-  while (any(a$keep) && (a$keep[1L] || a$keep[length(a$keep)]) && tries < 3L) {
-    span <- span * 2; a <- accept_on(span); tries <- tries + 1L
-  }
-  if (!any(a$keep)) {
-    out <- c(NA_real_, NA_real_)
-    attr(out, "empty") <- "rejected_all_tau"
-    return(out)
-  }
-  ## an accepted grid endpoint means the interval runs past it -> unbounded side.
-  lo <- min(a$grid[a$keep]); hi <- max(a$grid[a$keep])
-  if (a$keep[1L])               lo <- -Inf
-  if (a$keep[length(a$keep)])   hi <-  Inf
-  rng <- c(lo, hi)
-  if (is.infinite(lo) || is.infinite(hi)) attr(rng, "edge") <- TRUE
-  rng
-}
-
-## ---- 4. calibration: deterministic leave-one-control-out --------------------
+## ---- 5. calibration: deterministic leave-one-control-out --------------------
 ## Mirror of boot.R::draw.error but HELD-OUT (not resampled): each valid control
 ## is predicted once from the other controls, giving its out-of-fold residual
-## path. Estimator-agnostic — built-ins via impute_Y0(method); a custom separated
+## path. Estimator-agnostic -- built-ins via impute_Y0(method); a custom separated
 ## learner via `conformal.fit`. Inputs are the preprocessed matrices available
 ## inside fect_boot(): Y, D, X, I, II, T.on (all TT x N; X is TT x N x p or NULL),
 ## r.cv (selected rank), and eff (TT x N point-fit gap matrix).
 ##
-## Returns: list(att, ci, p.value, score.tr, score.co, n.calib, n.eff, score, form).
+## Returns: list(att, ci, p.value, score.tr, score.co, status, n.calib, n.eff,
+##               scale, center, weight, form).
 ## Scope (verified): block design (common onset), method gsynth/ife, nevertreated
 ## (separated) calibration. Staggered uses the union post-window (per-cohort
-## windows are a TODO); pooled (notyettreated) fits fall back to nevertreated with
-## a warning. MC is not yet routed through impute_Y0 (upstream stop()).
+## windows are a TODO, Phase 4); pooled (notyettreated) fits fall back to
+## nevertreated with a warning. MC is not yet routed through impute_Y0.
 conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
                                 method = "gsynth", predictive = "nevertreated",
                                 force = 3L, hasRevs = 0L, tol = 1e-5,
                                 max.iteration = 1000L, norm.para = NULL,
-                                score = "studentized", alpha = 0.05,
-                                conformal.full = FALSE, conformal.weight = "none",
-                                conformal.fit = NULL) {
+                                scale = "none", center = "mean", weight = "cell",
+                                alpha = 0.05, conformal.fit = NULL) {
 
   TT <- nrow(Y); N <- ncol(Y)
   sum.D <- colSums(D)
@@ -201,12 +156,10 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     }
   }
 
-  ## --- one held-out fit per valid control, reusing the parametric refit path
-  d.pattern <- D[, id.tr[1]]                  # a treated D column (defines onset)
-  sub3 <- function(A, idx) if (is.null(A)) NULL else A[, idx, , drop = FALSE]
-
+  ## --- one held-out fit per valid control, reusing the parametric refit path.
   ## fake-treated column = held-out control j's DATA carrying a treated unit's
   ## TIMING (D, T.on, II must agree with the assigned onset; only Y/I are j's).
+  d.pattern <- D[, id.tr[1]]                  # a treated D column (defines onset)
   loo_gap <- function(j) {
     co.rest <- setdiff(valid.co, j)
     if (!is.null(conformal.fit)) {
@@ -235,60 +188,44 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     g
   }
 
-  ## --- control scores (tau-independent) and mean post gaps
+  ## --- control centers and per-unit scales (tau-independent)
   obs <- (I == 1)
-  S.co <- rep(NA_real_, length(valid.co))
-  g.co <- rep(NA_real_, length(valid.co))
-  for (m in seq_along(valid.co)) {
-    j  <- valid.co[m]
+  m.co  <- rep(NA_real_, length(valid.co))
+  sc.co <- rep(NA_real_, length(valid.co))
+  for (mi in seq_along(valid.co)) {
+    j  <- valid.co[mi]
     gj <- loo_gap(j)
     ep <- gj[post.idx][obs[post.idx, j]]
     eq <- gj[pre.idx ][obs[pre.idx,  j]]
-    S.co[m] <- .conformal_score(ep, eq, score)
-    g.co[m] <- mean(ep, na.rm = TRUE)
+    m.co[mi]  <- .conformal_center(ep, center)
+    sc.co[mi] <- .conformal_scale(eq, scale)
   }
-  keep <- is.finite(S.co)
-  S.co <- S.co[keep]; g.co <- g.co[keep]
-  Ncal <- length(S.co)
+  keep <- is.finite(m.co) & is.finite(sc.co) & sc.co > 0
+  m.co <- m.co[keep]; sc.co <- sc.co[keep]
+  Ncal <- length(m.co)
 
-  ## --- treated statistic (averaged over treated units, post window)
-  eff.tr.mat <- eff[, id.tr, drop = FALSE]
+  ## --- treated aggregate (cell-weighted average over treated units, by default).
+  ## NOTE: unit / precision weighting and the per-period band land in Phase 3/4;
+  ## for the block design rowMeans over treated units is the cell-weighted center.
+  eff.tr.mat   <- eff[, id.tr, drop = FALSE]
   tr.post.path <- rowMeans(eff.tr.mat[post.idx, , drop = FALSE], na.rm = TRUE)
   tr.pre.path  <- rowMeans(eff.tr.mat[pre.idx,  , drop = FALSE], na.rm = TRUE)
-  g.tr <- mean(tr.post.path, na.rm = TRUE)
+  m.tr  <- .conformal_center(tr.post.path, center)
+  sc.tr <- .conformal_scale(tr.pre.path, scale)
 
-  ## --- weights (overlap) — placeholder until loading_bound wiring (Phase 3)
+  ## --- weights (overlap density ratio) deferred to a later phase
   w.co <- NULL
-  if (identical(conformal.weight, "overlap")) {
-    warning("conformal.weight = \"overlap\" not yet wired; using unweighted.")
-  }
 
-  ## --- interval
-  if (score == "meanabs") {
-    ci <- .conformal_ci_meanabs(g.tr, g.co, alpha = alpha, w.co = w.co)
-  } else {
-    ci <- .conformal_ci_grid(tr.post.path, tr.pre.path, S.co, score,
-                             alpha = alpha, w.co = w.co)
-  }
-  ## status: "ok" | "unbounded" (alpha too small for Ncal) | "empty" (a
-  ## constant-effect score that rejects every tau -- correct conformal output,
-  ## not a failure; warn so callers/users know to read it as "no constant effect
-  ## consistent at level alpha", or switch to score = "meanabs").
-  status <- "ok"
-  if (identical(attr(ci, "empty"), "rejected_all_tau")) {
-    status <- "empty"
-    warning("conformal: no constant effect is consistent at level ", alpha,
-            " under score = \"", score, "\" (the treated path is rejected at ",
-            "every tau). Reported interval is empty; score = \"meanabs\" gives ",
-            "a level interval for the average effect that cannot be empty.")
-  } else if (any(is.infinite(ci))) {
-    status <- "unbounded"
-  }
-  S.tr <- .conformal_score(tr.post.path, tr.pre.path, score)
-  p.value <- .conformal_pval(S.tr, S.co, w.co = w.co)
+  ## --- interval (closed form; never empty)
+  ci <- .conformal_ci_level(m.tr, sc.tr, m.co, sc.co, alpha = alpha, w.co = w.co)
+  status <- if (any(is.infinite(ci))) "unbounded" else "ok"
 
-  list(att = g.tr, ci = c(ci[1], ci[2]), p.value = p.value,
-       score.tr = S.tr, score.co = S.co, status = status,
+  s.tr     <- if (is.finite(sc.tr) && sc.tr > 0) abs(m.tr) / sc.tr else NA_real_
+  s.co.vec <- abs(m.co) / sc.co
+  p.value  <- .conformal_pval(s.tr, s.co.vec, w.co = w.co)
+
+  list(att = m.tr, ci = c(ci[1], ci[2]), p.value = p.value,
+       score.tr = s.tr, score.co = s.co.vec, status = status,
        n.calib = Ncal, n.eff = if (is.null(w.co)) Ncal else .conformal_neff(w.co),
-       score = score, form = if (conformal.full) "full" else "jackknife+")
+       scale = scale, center = center, weight = weight, form = "jackknife+")
 }

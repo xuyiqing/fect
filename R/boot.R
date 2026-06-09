@@ -556,23 +556,21 @@ fect_boot <- function(
       method = method, predictive = time.component.from,
       force = force, hasRevs = hasRevs, tol = tol, max.iteration = max.iteration,
       norm.para = norm.para,
-      ## meanabs = closed-form level interval for the average effect: conservative,
-      ## never empty/unbounded (for Ncal above the resolution floor), and matches
-      ## fect's headline att.avg. The dispersion scores (studentized/ratio/rmse)
-      ## are constant-effect interval inversions -- correctly calibrated but can
-      ## return an empty set ~alpha of the time -- exposed later via a score arg.
-      score = "meanabs", alpha = 0.05
+      ## Family A level interval (never empty/unbounded above the resolution
+      ## floor). scale = "none" is meanabs, the safe provisional default; the full
+      ## scale/center/weight knobs are threaded from fect() in Phase 2.
+      scale = "none", alpha = 0.05
     )
-    ## WIP (Phase 1 part 2): the calibration runs on the internal matrices and
-    ## yields the att.avg interval below. Wiring the result through fect()'s
-    ## output slots (eff.calendar, est.att, est.avg) must mirror the parametric
-    ## path's slot assembly (boot.R est.* construction), not an early return,
-    ## which skips the calendar-effect computation that fect.default expects.
+    ## WIP (Phase 1): the calibration runs on the internal matrices and yields the
+    ## att.avg interval below. Wiring the result through fect()'s output slots
+    ## (eff.calendar, est.att, est.avg) mirrors the parametric path's slot
+    ## assembly and replaces this stop() in Phase 2.
     stop(sprintf(paste0(
       "vartype = 'conformal': calibration is implemented but output integration ",
-      "is in progress. Result: att = %.4f, 95%% CI = [%.4f, %.4f], p = %.4f, ",
-      "N_calib = %d, score = %s, form = %s."),
-      cc$att, cc$ci[1], cc$ci[2], cc$p.value, cc$n.calib, cc$score, cc$form),
+      "is in progress. Result: att = %.4f, %.0f%% CI = [%.4f, %.4f], p = %.4f, ",
+      "N_calib = %d, scale = %s, status = %s."),
+      cc$att, 100 * (1 - 0.05), cc$ci[1], cc$ci[2], cc$p.value, cc$n.calib,
+      cc$scale, cc$status),
       call. = FALSE)
   }
 
