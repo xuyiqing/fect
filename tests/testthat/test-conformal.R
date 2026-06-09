@@ -215,6 +215,36 @@ test_that("simultaneous band is wider than pointwise; est.att.sim always present
                                           c("CI.lower", "CI.upper")])))
 })
 
+## ---- plotting ---------------------------------------------------------------
+
+test_that("plot() works on conformal fits (block + staggered, gap + counterfactual)", {
+  skip_on_cran()
+  mkfit <- function(D, seed, ...) {
+    set.seed(seed); N <- ncol(D); T <- nrow(D); r <- 2
+    Fm <- matrix(rnorm(T * r), T, r); L <- matrix(rnorm(N * r), N, r)
+    Y <- Fm %*% t(L) + matrix(rnorm(N * T), T, N) + 1.5 * D
+    dat <- data.frame(id = rep(1:N, each = T), time = rep(1:T, N),
+                      Y = as.vector(Y), D = as.vector(D))
+    suppressWarnings(suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+          method = "gsynth", force = 3, CV = FALSE, r = r, se = TRUE,
+          vartype = "conformal", parallel = FALSE, ...)))
+  }
+  Db <- matrix(0, 20, 25); Db[16:20, 1] <- 1
+  Ds <- matrix(0, 20, 40); Ds[12:20, 1:4] <- 1; Ds[16:20, 5:8] <- 1
+  fb  <- mkfit(Db, 1)
+  fbs <- mkfit(Db, 1, conformal.band = "simultaneous")
+  fs  <- mkfit(Ds, 2)
+  for (f in list(fb, fbs, fs)) {
+    expect_s3_class(plot(f, type = "gap"), "gg")
+    expect_s3_class(plot(f, type = "counterfactual"), "gg")
+  }
+  ## the uniform band is stored and wider than the pointwise band in the post window
+  post <- as.numeric(rownames(fb$est.att)) >= 0
+  w_pt <- mean(fb$est.att[post, "CI.upper"] - fb$est.att[post, "CI.lower"])
+  w_sim <- mean(fb$est.att.sim[post, "CI.upper"] - fb$est.att.sim[post, "CI.lower"])
+  expect_gte(w_sim, w_pt)
+})
+
 ## ---- staggered adoption -----------------------------------------------------
 
 test_that("conformal supports staggered adoption: runs, aligns event time, covers", {
