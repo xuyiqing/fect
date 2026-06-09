@@ -47,6 +47,11 @@ print.fect <- function(x,
     if (!is.null(x$cl.label)) {
         cat("Cluster SE:   ", x$cl.label, "\n", sep = "")
     }
+    if (identical(x$vartype, "conformal") && !is.null(x$conformal)) {
+        cf <- x$conformal
+        cat("Inference:     conformal (scale = ", cf$scale, ", band = ", cf$band.type,
+            ", N.calib = ", cf$n.calib, ")\n", sep = "")
+    }
 
     if (switch.on == TRUE) {
         if (!is.null(time.on.lim)) {

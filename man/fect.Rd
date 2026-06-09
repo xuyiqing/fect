@@ -99,9 +99,9 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   These three conditions correspond to Gates A, B, and C in the
   three-gate defense system (see \code{ARCHITECTURE.md}).
   \code{"conformal"} likewise requires a separated (controls-only)
-  fit and \code{method} not in \code{c("mc", "both")}; it currently
-  supports the core synthetic-control case (no group / reversal / weighted /
-  balanced / placebo / carryover options). See the \code{conformal.*}
+  fit and \code{method} not in \code{c("mc", "both")}; it supports both block
+  (common-onset) and staggered adoption, but not group / reversal / weighted /
+  balanced / placebo / carryover options. See the \code{conformal.*}
   arguments. For all other settings, \code{vartype = "bootstrap"} is recommended.}
 \item{para.error}{a string specifying the residual-error model used by
   the parametric bootstrap path; sub-option of \code{vartype = "parametric"}
