@@ -215,6 +215,31 @@ test_that("simultaneous band is wider than pointwise; est.att.sim always present
                                           c("CI.lower", "CI.upper")])))
 })
 
+## ---- staggered adoption -----------------------------------------------------
+
+test_that("conformal supports staggered adoption: runs, aligns event time, covers", {
+  skip_on_cran()
+  N <- 40; T <- 20; r <- 2
+  D <- matrix(0, T, N); D[12:T, 1:4] <- 1; D[16:T, 5:8] <- 1   # cohorts at 12 and 16
+  set.seed(20260609); reps <- 40; alpha <- 0.10
+  cov <- logical(reps); bad <- 0L; aligned <- TRUE
+  for (b in seq_len(reps)) {
+    Fm <- matrix(rnorm(T * r), T, r); L <- matrix(rnorm(N * r), N, r)
+    Y <- Fm %*% t(L) + matrix(rnorm(N * T), T, N)              # true effect 0
+    dat <- data.frame(id = rep(1:N, each = T), time = rep(1:T, N),
+                      Y = as.vector(Y), D = as.vector(D))
+    f <- suppressWarnings(suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+            method = "gsynth", force = 3, CV = FALSE, r = r, se = TRUE,
+            vartype = "conformal", conformal.scale = "sd", alpha = alpha, parallel = FALSE)))
+    if (f$conformal$status != "ok") bad <- bad + 1L
+    cov[b] <- (f$est.avg[1, "CI.lower"] <= 0) && (0 <= f$est.avg[1, "CI.upper"])
+    if (!identical(rownames(f$est.att), as.character(f$time))) aligned <- FALSE
+  }
+  expect_true(aligned)              # est.att indexed by event time, matched to fit$time
+  expect_equal(bad, 0L)             # never empty/unbounded
+  expect_gt(mean(cov), 0.80)        # scalar coverage near nominal under staggering
+})
+
 test_that("simultaneous band gives materially better joint coverage than pointwise", {
   skip_on_cran()
   ## Joint (whole-post-path) coverage. Pointwise undercovers jointly (the

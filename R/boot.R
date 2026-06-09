@@ -568,7 +568,6 @@ fect_boot <- function(
            "'bootstrap' or 'jackknife' for those.", call. = FALSE)
     }
 
-    id.tr.conf <- which(colSums(D) > 0)
     cc <- conformal_calibrate(
       Y = Y, D = D, X = X, I = I, II = II, T.on = T.on,
       r.cv = out$r.cv, eff = out$eff,
@@ -606,26 +605,25 @@ fect_boot <- function(
                                   band[, "CI.lower"], band[, "CI.upper"], band[, "p.value"], calendar.N)
     colnames(est.eff.calendar.fit) <- colnames(est.eff.calendar)
 
-    ## --- map a calendar band to event time (treated unit's relative period);
-    ## rownames = out$time. Common-onset: a 1:1 map.
-    rel <- T.on[, id.tr.conf[1]]
-    map_band <- function(bnd) {
+    ## --- event-time band -> est.att (rownames = out$time). conformal_calibrate
+    ## returns the band already aggregated by relative period (correct for both
+    ## block and staggered); match its rownames to out$time by value.
+    map_et <- function(etb) {
       m <- matrix(NA_real_, length(time.on), 6,
                   dimnames = list(time.on,
                     c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value", "count")))
+      etrow <- as.numeric(rownames(etb))
       for (k in seq_along(time.on)) {
-        rows <- which(rel == time.on[k])
-        if (length(rows) == 0L) next
-        ef <- mean(bnd[rows, "eff"],      na.rm = TRUE)
-        lo <- mean(bnd[rows, "CI.lower"], na.rm = TRUE)
-        hi <- mean(bnd[rows, "CI.upper"], na.rm = TRUE)
-        pv <- mean(bnd[rows, "p.value"],  na.rm = TRUE)
-        m[k, ] <- c(ef, se.from(lo, hi), lo, hi, pv, out$count[k])
+        r <- which(etrow == time.on[k])
+        if (!length(r)) next
+        v <- etb[r[1L], ]
+        m[k, ] <- c(v["eff"], se.from(v["CI.lower"], v["CI.upper"]),
+                    v["CI.lower"], v["CI.upper"], v["p.value"], out$count[k])
       }
       m
     }
-    est.att     <- map_band(band)            # the selected band (conformal.band)
-    est.att.sim <- map_band(cc$band.sim)     # the uniform / simultaneous band
+    est.att     <- map_et(cc$band.et)        # the selected band (conformal.band)
+    est.att.sim <- map_et(cc$band.et.sim)    # the uniform / simultaneous band
     ## Phase 4 note: est.att90 (the inner equivalence band) mirrors the main band
     ## for now; a true (1 - 2*alpha) conformal inner band is a later refinement.
     est.att90 <- est.att

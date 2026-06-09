@@ -149,19 +149,21 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     stop("conformal: fewer than 2 valid controls after screening.")
   }
 
-  ## --- post / pre period windows (block: common onset; staggered: union)
-  post.idx <- which(rowSums(D[, id.tr, drop = FALSE]) > 0)   # any treated on
-  pre.idx  <- setdiff(seq_len(TT), post.idx)
+  ## --- treatment-incidence structure (handles block AND staggered uniformly).
+  ## post.idx is the UNION post window (any treated unit on); nt[t] is the number
+  ## of treated units in post at calendar t; onsets are per-unit first-treated
+  ## periods. For a control's leave-one-out fit, the union window is masked so its
+  ## gaps are held-out everywhere a treated unit is post (block: a single onset).
+  Dtr        <- D[, id.tr, drop = FALSE]                    # TT x Ntr, 1 = post
+  nt         <- rowSums(Dtr)                                 # treated post count / period
+  union.post <- nt > 0
+  post.idx   <- which(union.post)
+  pre.idx    <- setdiff(seq_len(TT), post.idx)
   if (length(post.idx) == 0L || length(pre.idx) == 0L) {
     stop("conformal: could not identify pre/post windows from D.")
   }
-  if (Ntr > 1L) {
-    onsets <- vapply(id.tr, function(i) min(which(D[, i] == 1)), integer(1))
-    if (length(unique(onsets)) > 1L) {
-      warning("conformal: staggered onsets detected; using the union post-window. ",
-              "Per-cohort windows are not yet implemented.")
-    }
-  }
+  onsets    <- apply(Dtr, 2L, function(d) { w <- which(d == 1); if (length(w)) min(w) else NA_integer_ })
+  staggered <- length(unique(onsets[is.finite(onsets)])) > 1L
 
   ## --- one held-out fit per valid control, reusing the parametric refit path.
   ## fake-treated column = held-out control j's DATA carrying a treated unit's
@@ -178,7 +180,9 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     D.ps   <- cbind(d.pattern,        D[, co.rest, drop = FALSE])
     Ton.ps <- cbind(T.on[, id.tr[1]], T.on[, co.rest, drop = FALSE])
     I.ps   <- cbind(I[, j],           I[, co.rest, drop = FALSE])
-    II.ps  <- cbind(I[, j] * (d.pattern == 0), II[, co.rest, drop = FALSE])
+    ## mask the UNION post window so the control's gaps are held-out wherever any
+    ## treated unit is post (block: a single onset; staggered: the union).
+    II.ps  <- cbind(I[, j] * as.numeric(!union.post), II[, co.rest, drop = FALSE])
     X.ps   <- if (is.null(X)) NULL else
               array(c(X[, j, , drop = FALSE], X[, co.rest, , drop = FALSE]),
                     dim = c(TT, 1L + length(co.rest), dim(X)[3]))
@@ -209,85 +213,75 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     sc.co[mi]  <- .conformal_scale(gj[pre.idx], scale)
   }
 
-  ## --- treated aggregate across treated units, combined per `weight`:
-  ##   cell      = weight each unit by its post-obs count (per-treated-cell ATT),
-  ##   unit      = each treated unit counts equally,
-  ##   precision = inverse pre-period variance (down-weights noisy units).
-  ## The scalar center is the weighted mean of the per-unit post centers; the
-  ## per-period band uses the matching weighted treated trajectory. They coincide
-  ## for a single treated unit and (mean center) for a balanced panel.
-  ## Multi-treated NOTE: the aggregate is ranked against single-control gaps; a
-  ## placebo-AVERAGE calibration (ranking against averages of Ntr controls) is a
-  ## refinement deferred to the simulation phase.
-  trc  <- eff[, id.tr, drop = FALSE]                              # TT x Ntr
-  m.i  <- apply(trc[post.idx, , drop = FALSE], 2L, function(z) .conformal_center(z, center))
-  n.i  <- colSums(!is.na(trc[post.idx, , drop = FALSE]))
-  ## precision weight uses each unit's pre-period VARIANCE directly (decoupled
-  ## from the `scale` knob, which only normalizes the score), so it down-weights
-  ## noisy units even under the default scale = "none".
-  var.i <- apply(trc[pre.idx, , drop = FALSE], 2L, function(z) {
-    z <- z[is.finite(z)]; if (length(z) > 1L) stats::var(z) else NA_real_
-  })
-  wi   <- switch(weight,
-                 cell      = n.i,
-                 unit      = rep(1, Ntr),
+  ## --- per-treated-unit summaries, each over the unit's OWN post / pre window
+  ## (block: every unit shares the union window; staggered: per-unit windows).
+  ## `weight`: cell = per-treated-cell ATT (n_i); unit = equal per unit;
+  ## precision = inverse pre-period variance (decoupled from the score `scale`).
+  trc        <- eff[, id.tr, drop = FALSE]                       # TT x Ntr
+  obstr      <- (I[, id.tr, drop = FALSE] == 1)
+  postmask.i <- (Dtr == 1)                                       # own post cells
+  premask.i  <- (Dtr == 0) & obstr                              # own observed pre cells
+  m.i  <- vapply(seq_len(Ntr), function(i)
+            .conformal_center(trc[postmask.i[, i], i], center), numeric(1))
+  n.i  <- colSums(postmask.i)
+  var.i <- vapply(seq_len(Ntr), function(i) {
+            z <- trc[premask.i[, i], i]; z <- z[is.finite(z)]
+            if (length(z) > 1L) stats::var(z) else NA_real_ }, numeric(1))
+  wi   <- switch(weight, cell = n.i, unit = rep(1, Ntr),
                  precision = ifelse(is.finite(var.i) & var.i > 0, 1 / var.i, 0))
   wi[!is.finite(wi)] <- 0
   if (!any(wi > 0)) wi <- rep(1, Ntr)
-  Wt    <- matrix(wi, TT, Ntr, byrow = TRUE); Wt[is.na(trc)] <- 0
-  denom <- rowSums(Wt)
-  tr.path <- ifelse(denom > 0, rowSums(trc * Wt, na.rm = TRUE) / denom, NA_real_)  # calendar
+
+  ## treated trajectory (calendar): weighted mean over the units that are POST at
+  ## t (effect window) or, where none are, over the units that are PRE at t
+  ## (placebo window). For block this is the per-period weighted mean throughout.
+  wsum  <- function(e, w) { ok <- is.finite(e) & is.finite(w) & w > 0
+                            if (any(ok)) sum(e[ok] * w[ok]) / sum(w[ok]) else NA_real_ }
+  Wt    <- matrix(wi, TT, Ntr, byrow = TRUE)
+  postW <- Wt * postmask.i; preW <- Wt * premask.i
+  tr.path <- vapply(seq_len(TT), function(t)
+               wsum(trc[t, ], if (nt[t] > 0) postW[t, ] else preW[t, ]), numeric(1))
   sc.tr   <- .conformal_scale(tr.path[pre.idx], scale)
 
   w.co <- NULL   # overlap density-ratio weighting deferred to a later phase
 
-  ## --- scalar average effect: weighted mean of per-unit post centers, ranked vs
-  ## the per-control post centers.
-  m.co  <- apply(G.co[, post.idx, drop = FALSE], 1L,
-                 function(z) .conformal_center(z, center))
-  keep  <- is.finite(m.co) & is.finite(sc.co) & sc.co > 0
-  okm   <- is.finite(m.i) & wi > 0
-  m.tr  <- if (any(okm)) sum(wi[okm] * m.i[okm]) / sum(wi[okm]) else
-           .conformal_center(tr.path[post.idx], center)
-  ci    <- .conformal_ci_level(m.tr, sc.tr, m.co[keep], sc.co[keep],
-                               alpha = alpha, w.co = w.co)
-  Ncal  <- sum(keep)
+  ## --- scalar average effect: weighted mean of per-unit post centers, ranked
+  ## against per-control placebo centers (each control's gap aggregated over the
+  ## union post window the SAME way the treated ATT is, i.e. nt-weighted = the
+  ## per-treated-cell ATT; for block nt is constant so this is a plain mean).
+  ntp  <- nt[post.idx]
+  m.co <- apply(G.co, 1L, function(g) wsum(g[post.idx], ntp))
+  keep <- is.finite(m.co) & is.finite(sc.co) & sc.co > 0
+  okm  <- is.finite(m.i) & wi > 0
+  m.tr <- if (any(okm)) sum(wi[okm] * m.i[okm]) / sum(wi[okm]) else
+          .conformal_center(tr.path[post.idx], center)
+  ci   <- .conformal_ci_level(m.tr, sc.tr, m.co[keep], sc.co[keep], alpha = alpha, w.co = w.co)
+  Ncal <- sum(keep)
   status <- if (any(is.infinite(ci))) "unbounded" else "ok"
   s.tr     <- if (is.finite(sc.tr) && sc.tr > 0) abs(m.tr) / sc.tr else NA_real_
   s.co.vec <- abs(m.co[keep]) / sc.co[keep]
   p.value  <- .conformal_pval(s.tr, s.co.vec, w.co = w.co)
 
-  ## --- per-period band(s) (calendar-indexed). Standardized control gaps
-  ## g.tilde[j,t] = |G.co[j,t]| / sc.co[j]; the treated deviation at period t is
-  ## |tr.path[t] - tau| / sc.tr. Three constructions:
-  ##   pointwise + per-period (default): Q_t = conformal quantile of g.tilde[,t].
-  ##   pointwise + pooled: one Q over all post-window g.tilde values.
-  ##   simultaneous: one multiplier c = quantile of the per-control MAX over the
-  ##     post window (sup-t / uniform band over the post path); pre-period rows
-  ##     keep the per-period placebo band.
-  ## The pre-period rows always show the per-period placebo band (for pre-trends).
+  ## --- standardized control gaps g.tilde[j,t] = |G.co[j,t]| / sc.co[j], and the
+  ## simultaneous (sup-t) multiplier from the per-control MAX over the post window.
   ok.co <- which(is.finite(sc.co) & sc.co > 0)
-  Gv   <- G.co[ok.co, , drop = FALSE]
-  scv  <- sc.co[ok.co]
-  Gtil <- abs(Gv) / scv                      # ncal x TT, row j divided by scv[j]
-
-  Qpool <- NULL
-  if (identical(cutoff, "pooled")) {
-    pv <- as.vector(Gtil[, post.idx, drop = FALSE]); pv <- pv[is.finite(pv)]
-    Qpool <- .conformal_quantile(pv, alpha)
-  }
+  Gv    <- G.co[ok.co, , drop = FALSE]; scv <- sc.co[ok.co]
+  Gtil  <- abs(Gv) / scv                       # ncal x TT
   Mj    <- apply(Gtil[, post.idx, drop = FALSE], 1L,
                  function(z) { z <- z[is.finite(z)]; if (length(z)) max(z) else NA_real_ })
   c.sim <- .conformal_quantile(Mj[is.finite(Mj)], alpha)
+  Qpool <- if (identical(cutoff, "pooled")) {
+             pv <- as.vector(Gtil[, post.idx, drop = FALSE]); .conformal_quantile(pv[is.finite(pv)], alpha)
+           } else NULL
 
-  mk_band <- function(mode) {
-    b <- matrix(NA_real_, TT, 4L,
-                dimnames = list(NULL, c("eff", "CI.lower", "CI.upper", "p.value")))
+  ## --- CALENDAR band (per calendar period) -> est.eff.calendar.
+  mk_cal <- function(mode) {
+    b <- matrix(NA_real_, TT, 4L, dimnames = list(NULL, c("eff", "CI.lower", "CI.upper", "p.value")))
     for (t in seq_len(TT)) {
       gt <- Gtil[, t]; okt <- is.finite(gt)
       if (!is.finite(tr.path[t]) || !is.finite(sc.tr) || sc.tr <= 0 || sum(okt) < 2L) next
-      Qt <- if (mode == "simultaneous" && t %in% post.idx) c.sim
-            else if (identical(cutoff, "pooled")) Qpool
+      Qt <- if (mode == "simultaneous" && union.post[t]) c.sim
+            else if (!is.null(Qpool) && union.post[t]) Qpool
             else .conformal_quantile(gt[okt], alpha)
       half <- if (is.finite(Qt)) sc.tr * Qt else Inf
       b[t, ] <- c(tr.path[t], tr.path[t] - half, tr.path[t] + half,
@@ -295,13 +289,42 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     }
     b
   }
-  band     <- mk_band(band.type)                 # populates est.att
-  band.sim <- if (identical(band.type, "simultaneous")) band else mk_band("simultaneous")
+  band     <- mk_cal(band.type)
+  band.sim <- if (identical(band.type, "simultaneous")) band else mk_cal("simultaneous")
+
+  ## --- EVENT-TIME band (per relative period) -> est.att. For block this is the
+  ## calendar band re-indexed; for staggered it aggregates cohorts at each relative
+  ## time, pooling the control gaps at the matching calendar cells (cross-sectional
+  ## exchangeability across units, with stationarity across cohort onsets).
+  rel.mat <- T.on[, id.tr, drop = FALSE]
+  etimes  <- sort(unique(rel.mat[obstr]))
+  mk_et <- function(mode) {
+    b <- matrix(NA_real_, length(etimes), 4L,
+                dimnames = list(as.character(etimes), c("eff", "CI.lower", "CI.upper", "p.value")))
+    for (k in seq_along(etimes)) {
+      cells <- which(rel.mat == etimes[k] & obstr, arr.ind = TRUE)   # (t, unit) pairs
+      if (!nrow(cells)) next
+      tg  <- wsum(trc[cells], wi[cells[, 2L]])
+      ts  <- unique(cells[, 1L])                                     # calendar periods at this rel time
+      ispost <- any(union.post[ts])
+      gp  <- as.vector(Gtil[, ts, drop = FALSE]); gp <- gp[is.finite(gp)]
+      if (!is.finite(tg) || !is.finite(sc.tr) || sc.tr <= 0 || length(gp) < 2L) next
+      Qk <- if (mode == "simultaneous" && ispost) c.sim
+            else if (!is.null(Qpool) && ispost) Qpool
+            else .conformal_quantile(gp, alpha)
+      half <- if (is.finite(Qk)) sc.tr * Qk else Inf
+      b[k, ] <- c(tg, tg - half, tg + half, .conformal_pval(abs(tg) / sc.tr, gp))
+    }
+    b
+  }
+  band.et     <- mk_et(band.type)
+  band.et.sim <- if (identical(band.type, "simultaneous")) band.et else mk_et("simultaneous")
 
   list(att = m.tr, ci = c(ci[1], ci[2]), p.value = p.value,
        score.tr = s.tr, score.co = s.co.vec, status = status,
        n.calib = Ncal, n.eff = if (is.null(w.co)) Ncal else .conformal_neff(w.co),
        scale = scale, center = center, weight = weight,
-       band.type = band.type, cutoff = cutoff, form = "jackknife+",
-       band = band, band.sim = band.sim, post.idx = post.idx, pre.idx = pre.idx)
+       band.type = band.type, cutoff = cutoff, staggered = staggered, form = "jackknife+",
+       band = band, band.sim = band.sim, band.et = band.et, band.et.sim = band.et.sim,
+       post.idx = post.idx, pre.idx = pre.idx)
 }
