@@ -243,6 +243,9 @@ test_that("plot() works on conformal fits (block + staggered, gap + counterfactu
   w_pt <- mean(fb$est.att[post, "CI.upper"] - fb$est.att[post, "CI.lower"])
   w_sim <- mean(fb$est.att.sim[post, "CI.upper"] - fb$est.att.sim[post, "CI.lower"])
   expect_gte(w_sim, w_pt)
+  ## the inner (1 - 2*alpha) band (est.att90) is narrower than the main band
+  w_in <- mean(fb$est.att90[post, "CI.upper"] - fb$est.att90[post, "CI.lower"])
+  expect_lt(w_in, w_pt)
 })
 
 ## ---- staggered adoption -----------------------------------------------------

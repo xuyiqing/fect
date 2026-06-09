@@ -262,35 +262,41 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
   s.co.vec <- abs(m.co[keep]) / sc.co[keep]
   p.value  <- .conformal_pval(s.tr, s.co.vec, w.co = w.co)
 
-  ## --- standardized control gaps g.tilde[j,t] = |G.co[j,t]| / sc.co[j], and the
-  ## simultaneous (sup-t) multiplier from the per-control MAX over the post window.
-  ok.co <- which(is.finite(sc.co) & sc.co > 0)
-  Gv    <- G.co[ok.co, , drop = FALSE]; scv <- sc.co[ok.co]
-  Gtil  <- abs(Gv) / scv                       # ncal x TT
-  Mj    <- apply(Gtil[, post.idx, drop = FALSE], 1L,
-                 function(z) { z <- z[is.finite(z)]; if (length(z)) max(z) else NA_real_ })
-  c.sim <- .conformal_quantile(Mj[is.finite(Mj)], alpha)
-  Qpool <- if (identical(cutoff, "pooled")) {
-             pv <- as.vector(Gtil[, post.idx, drop = FALSE]); .conformal_quantile(pv[is.finite(pv)], alpha)
-           } else NULL
+  ## --- standardized control gaps g.tilde[j,t] = |G.co[j,t]| / sc.co[j], the
+  ## per-control MAX over the post window (for the sup-t multiplier), and the
+  ## pooled post-window values (for cutoff = "pooled"). The band builders take a
+  ## level `a` so the outer (alpha) and inner (2*alpha) bands reuse one pass.
+  ok.co  <- which(is.finite(sc.co) & sc.co > 0)
+  Gv     <- G.co[ok.co, , drop = FALSE]; scv <- sc.co[ok.co]
+  Gtil   <- abs(Gv) / scv                      # ncal x TT
+  Mj     <- apply(Gtil[, post.idx, drop = FALSE], 1L,
+                  function(z) { z <- z[is.finite(z)]; if (length(z)) max(z) else NA_real_ })
+  Mj     <- Mj[is.finite(Mj)]
+  pvpool <- if (identical(cutoff, "pooled")) {
+              v <- as.vector(Gtil[, post.idx, drop = FALSE]); v[is.finite(v)]
+            } else NULL
+  qt_post <- function(gp, a) {                 # post-window cutoff at level a
+    if (!is.null(pvpool)) .conformal_quantile(pvpool, a) else .conformal_quantile(gp, a)
+  }
 
   ## --- CALENDAR band (per calendar period) -> est.eff.calendar.
-  mk_cal <- function(mode) {
+  mk_cal <- function(mode, a) {
+    c.sim <- .conformal_quantile(Mj, a)
     b <- matrix(NA_real_, TT, 4L, dimnames = list(NULL, c("eff", "CI.lower", "CI.upper", "p.value")))
     for (t in seq_len(TT)) {
       gt <- Gtil[, t]; okt <- is.finite(gt)
       if (!is.finite(tr.path[t]) || !is.finite(sc.tr) || sc.tr <= 0 || sum(okt) < 2L) next
       Qt <- if (mode == "simultaneous" && union.post[t]) c.sim
-            else if (!is.null(Qpool) && union.post[t]) Qpool
-            else .conformal_quantile(gt[okt], alpha)
+            else if (union.post[t]) qt_post(gt[okt], a)
+            else .conformal_quantile(gt[okt], a)
       half <- if (is.finite(Qt)) sc.tr * Qt else Inf
       b[t, ] <- c(tr.path[t], tr.path[t] - half, tr.path[t] + half,
                   .conformal_pval(abs(tr.path[t]) / sc.tr, gt[okt]))
     }
     b
   }
-  band     <- mk_cal(band.type)
-  band.sim <- if (identical(band.type, "simultaneous")) band else mk_cal("simultaneous")
+  band     <- mk_cal(band.type, alpha)
+  band.sim <- if (identical(band.type, "simultaneous")) band else mk_cal("simultaneous", alpha)
 
   ## --- EVENT-TIME band (per relative period) -> est.att. For block this is the
   ## calendar band re-indexed; for staggered it aggregates cohorts at each relative
@@ -298,7 +304,8 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
   ## exchangeability across units, with stationarity across cohort onsets).
   rel.mat <- T.on[, id.tr, drop = FALSE]
   etimes  <- sort(unique(rel.mat[obstr]))
-  mk_et <- function(mode) {
+  mk_et <- function(mode, a) {
+    c.sim <- .conformal_quantile(Mj, a)
     b <- matrix(NA_real_, length(etimes), 4L,
                 dimnames = list(as.character(etimes), c("eff", "CI.lower", "CI.upper", "p.value")))
     for (k in seq_along(etimes)) {
@@ -310,21 +317,24 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
       gp  <- as.vector(Gtil[, ts, drop = FALSE]); gp <- gp[is.finite(gp)]
       if (!is.finite(tg) || !is.finite(sc.tr) || sc.tr <= 0 || length(gp) < 2L) next
       Qk <- if (mode == "simultaneous" && ispost) c.sim
-            else if (!is.null(Qpool) && ispost) Qpool
-            else .conformal_quantile(gp, alpha)
+            else if (ispost) qt_post(gp, a)
+            else .conformal_quantile(gp, a)
       half <- if (is.finite(Qk)) sc.tr * Qk else Inf
       b[k, ] <- c(tg, tg - half, tg + half, .conformal_pval(abs(tg) / sc.tr, gp))
     }
     b
   }
-  band.et     <- mk_et(band.type)
-  band.et.sim <- if (identical(band.type, "simultaneous")) band.et else mk_et("simultaneous")
+  a.inner       <- min(2 * alpha, 0.5)                 # inner (1 - 2*alpha) band
+  band.et       <- mk_et(band.type, alpha)
+  band.et.inner <- mk_et(band.type, a.inner)
+  band.et.sim   <- if (identical(band.type, "simultaneous")) band.et else mk_et("simultaneous", alpha)
 
   list(att = m.tr, ci = c(ci[1], ci[2]), p.value = p.value,
        score.tr = s.tr, score.co = s.co.vec, status = status,
        n.calib = Ncal, n.eff = if (is.null(w.co)) Ncal else .conformal_neff(w.co),
        scale = scale, center = center, weight = weight,
        band.type = band.type, cutoff = cutoff, staggered = staggered, form = "jackknife+",
-       band = band, band.sim = band.sim, band.et = band.et, band.et.sim = band.et.sim,
+       band = band, band.sim = band.sim, band.et = band.et,
+       band.et.inner = band.et.inner, band.et.sim = band.et.sim,
        post.idx = post.idx, pre.idx = pre.idx)
 }

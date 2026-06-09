@@ -622,12 +622,10 @@ fect_boot <- function(
       }
       m
     }
-    est.att     <- map_et(cc$band.et)        # the selected band (conformal.band)
-    est.att.sim <- map_et(cc$band.et.sim)    # the uniform / simultaneous band
-    ## Phase 4 note: est.att90 (the inner equivalence band) mirrors the main band
-    ## for now; a true (1 - 2*alpha) conformal inner band is a later refinement.
-    est.att90 <- est.att
-    att.bound <- est.att[, c("CI.lower", "CI.upper"), drop = FALSE]
+    est.att     <- map_et(cc$band.et)         # the (1 - alpha) band (conformal.band)
+    est.att.sim <- map_et(cc$band.et.sim)     # the uniform / simultaneous band
+    est.att90   <- map_et(cc$band.et.inner)   # the inner (1 - 2*alpha) conformal band
+    att.bound   <- est.att90[, c("CI.lower", "CI.upper"), drop = FALSE]
     rownames(att.bound) <- time.on
 
     result <- list(
