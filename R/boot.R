@@ -543,6 +543,34 @@ fect_boot <- function(
   fit.out <- out$Y.ct
   N_unit <- dim(out$res)[2]
 
+  ## ---- vartype = "conformal": cross-sectional conformal interval -----------
+  ## Rank the treated gap against the leave-one-control-out donor scores
+  ## (see conformal.R), bypassing the resampling / jackknife SE machinery.
+  ## Uses fect_boot's internal preprocessed matrices (Y, D, I, II, T.on).
+  ## NOTE Phase 1: score / alpha hardcoded; est.att per-period bands + arg
+  ## threading from fect() come next.
+  if (vartype == "conformal") {
+    cc <- conformal_calibrate(
+      Y = Y, D = D, X = X, I = I, II = II, T.on = T.on,
+      r.cv = out$r.cv, eff = out$eff,
+      method = method, predictive = time.component.from,
+      force = force, hasRevs = hasRevs, tol = tol, max.iteration = max.iteration,
+      norm.para = norm.para,
+      score = "studentized", alpha = 0.05
+    )
+    ## WIP (Phase 1 part 2): the calibration runs on the internal matrices and
+    ## yields the att.avg interval below. Wiring the result through fect()'s
+    ## output slots (eff.calendar, est.att, est.avg) must mirror the parametric
+    ## path's slot assembly (boot.R est.* construction), not an early return,
+    ## which skips the calendar-effect computation that fect.default expects.
+    stop(sprintf(paste0(
+      "vartype = 'conformal': calibration is implemented but output integration ",
+      "is in progress. Result: att = %.4f, 95%% CI = [%.4f, %.4f], p = %.4f, ",
+      "N_calib = %d, score = %s, form = %s."),
+      cc$att, cc$ci[1], cc$ci[2], cc$p.value, cc$n.calib, cc$score, cc$form),
+      call. = FALSE)
+  }
+
   if (!is.null(group)) {
     group.output.origin <- out$group.output
     group.output.name <- names(out$group.output)

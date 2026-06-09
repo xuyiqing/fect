@@ -560,15 +560,15 @@ fect.default <- function(
     method_arg <- method
 
     if (se == 1) {
-        if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
+        if (!vartype %in% c("bootstrap", "jackknife", "parametric", "conformal")) {
             stop(
-                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", or \"parametric\".",
+                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", \"parametric\", or \"conformal\".",
                 call. = FALSE
             )
         }
-        if (vartype == "parametric" && method %in% c("mc", "both")) {
+        if (vartype %in% c("parametric", "conformal") && method %in% c("mc", "both")) {
             stop(
-                "The \"parametric\" option is not available for the \"mc\" or \"both\" methods."
+                "The \"", vartype, "\" option is not available for the \"mc\" or \"both\" methods."
             )
         }
         if (vartype == "jackknife" && !is.null(cl)) {

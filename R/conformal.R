@@ -108,3 +108,136 @@
   }
   rng
 }
+
+## ---- 4. calibration: deterministic leave-one-control-out --------------------
+## Mirror of boot.R::draw.error but HELD-OUT (not resampled): each valid control
+## is predicted once from the other controls, giving its out-of-fold residual
+## path. Estimator-agnostic — built-ins via impute_Y0(method); a custom separated
+## learner via `conformal.fit`. Inputs are the preprocessed matrices available
+## inside fect_boot(): Y, D, X, I, II, T.on (all TT x N; X is TT x N x p or NULL),
+## r.cv (selected rank), and eff (TT x N point-fit gap matrix).
+##
+## Returns: list(att, ci, p.value, score.tr, score.co, n.calib, n.eff, score, form).
+## Scope (verified): block design (common onset), method gsynth/ife, nevertreated
+## (separated) calibration. Staggered uses the union post-window (per-cohort
+## windows are a TODO); pooled (notyettreated) fits fall back to nevertreated with
+## a warning. MC is not yet routed through impute_Y0 (upstream stop()).
+conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
+                                method = "gsynth", predictive = "nevertreated",
+                                force = 3L, hasRevs = 0L, tol = 1e-5,
+                                max.iteration = 1000L, norm.para = NULL,
+                                score = "studentized", alpha = 0.05,
+                                conformal.full = FALSE, conformal.weight = "none",
+                                conformal.fit = NULL) {
+
+  TT <- nrow(Y); N <- ncol(Y)
+  sum.D <- colSums(D)
+  id.tr <- which(sum.D > 0); id.co <- which(sum.D == 0)
+  Ntr <- length(id.tr); Nco <- length(id.co)
+  if (Nco < 2L) stop("conformal: need at least 2 controls.")
+
+  ## --- separation guard: conformal calibration is controls-only (nevertreated)
+  if (!identical(predictive, "nevertreated")) {
+    warning("vartype = \"conformal\" requires a separated fit; ",
+            "calibrating on controls only (predictive = \"nevertreated\").")
+    predictive <- "nevertreated"
+  }
+
+  ## --- valid controls (enough pre/post obs); reuse fect's screen
+  valid.co <- valid_controls(list(D = D, I = I, r.cv = r.cv), method, predictive, force)
+  valid.co <- intersect(valid.co, id.co)
+  if (length(valid.co) < 2L) {
+    stop("conformal: fewer than 2 valid controls after screening.")
+  }
+
+  ## --- post / pre period windows (block: common onset; staggered: union)
+  post.idx <- which(rowSums(D[, id.tr, drop = FALSE]) > 0)   # any treated on
+  pre.idx  <- setdiff(seq_len(TT), post.idx)
+  if (length(post.idx) == 0L || length(pre.idx) == 0L) {
+    stop("conformal: could not identify pre/post windows from D.")
+  }
+  if (Ntr > 1L) {
+    onsets <- vapply(id.tr, function(i) min(which(D[, i] == 1)), integer(1))
+    if (length(unique(onsets)) > 1L) {
+      warning("conformal: staggered onsets detected; using the union post-window. ",
+              "Per-cohort windows are not yet implemented.")
+    }
+  }
+
+  ## --- one held-out fit per valid control, reusing the parametric refit path
+  d.pattern <- D[, id.tr[1]]                  # a treated D column (defines onset)
+  sub3 <- function(A, idx) if (is.null(A)) NULL else A[, idx, , drop = FALSE]
+
+  ## fake-treated column = held-out control j's DATA carrying a treated unit's
+  ## TIMING (D, T.on, II must agree with the assigned onset; only Y/I are j's).
+  loo_gap <- function(j) {
+    co.rest <- setdiff(valid.co, j)
+    if (!is.null(conformal.fit)) {
+      y0 <- conformal.fit(Y = Y, X = X, time = seq_len(TT),
+                          control.ids = co.rest, target.id = j, T0 = max(pre.idx))
+      return(Y[, j] - y0)
+    }
+    Y.ps   <- cbind(Y[, j],           Y[, co.rest, drop = FALSE])
+    D.ps   <- cbind(d.pattern,        D[, co.rest, drop = FALSE])
+    Ton.ps <- cbind(T.on[, id.tr[1]], T.on[, co.rest, drop = FALSE])
+    I.ps   <- cbind(I[, j],           I[, co.rest, drop = FALSE])
+    II.ps  <- cbind(I[, j] * (d.pattern == 0), II[, co.rest, drop = FALSE])
+    X.ps   <- if (is.null(X)) NULL else
+              array(c(X[, j, , drop = FALSE], X[, co.rest, , drop = FALSE]),
+                    dim = c(TT, 1L + length(co.rest), dim(X)[3]))
+    synth <- try(impute_Y0(
+      method = method, predictive = predictive,
+      Y = Y.ps, X = X.ps, D = D.ps, W = NULL, I = I.ps, II = II.ps,
+      T.on = Ton.ps, tuning = r.cv, boot = 1,
+      force = force, hasRevs = hasRevs, tol = tol,
+      max.iteration = max.iteration, norm.para = norm.para
+    ), silent = TRUE)
+    if (inherits(synth, "try-error") || !("eff" %in% names(synth))) return(rep(NA_real_, TT))
+    g <- as.matrix(synth$eff.tr)[, 1]
+    if (!is.null(norm.para)) g <- g / norm.para[1]
+    g
+  }
+
+  ## --- control scores (tau-independent) and mean post gaps
+  obs <- (I == 1)
+  S.co <- rep(NA_real_, length(valid.co))
+  g.co <- rep(NA_real_, length(valid.co))
+  for (m in seq_along(valid.co)) {
+    j  <- valid.co[m]
+    gj <- loo_gap(j)
+    ep <- gj[post.idx][obs[post.idx, j]]
+    eq <- gj[pre.idx ][obs[pre.idx,  j]]
+    S.co[m] <- .conformal_score(ep, eq, score)
+    g.co[m] <- mean(ep, na.rm = TRUE)
+  }
+  keep <- is.finite(S.co)
+  S.co <- S.co[keep]; g.co <- g.co[keep]
+  Ncal <- length(S.co)
+
+  ## --- treated statistic (averaged over treated units, post window)
+  eff.tr.mat <- eff[, id.tr, drop = FALSE]
+  tr.post.path <- rowMeans(eff.tr.mat[post.idx, , drop = FALSE], na.rm = TRUE)
+  tr.pre.path  <- rowMeans(eff.tr.mat[pre.idx,  , drop = FALSE], na.rm = TRUE)
+  g.tr <- mean(tr.post.path, na.rm = TRUE)
+
+  ## --- weights (overlap) — placeholder until loading_bound wiring (Phase 3)
+  w.co <- NULL
+  if (identical(conformal.weight, "overlap")) {
+    warning("conformal.weight = \"overlap\" not yet wired; using unweighted.")
+  }
+
+  ## --- interval
+  if (score == "meanabs") {
+    ci <- .conformal_ci_meanabs(g.tr, g.co, alpha = alpha, w.co = w.co)
+  } else {
+    ci <- .conformal_ci_grid(tr.post.path, tr.pre.path, S.co, score,
+                             alpha = alpha, w.co = w.co)
+  }
+  S.tr <- .conformal_score(tr.post.path, tr.pre.path, score)
+  p.value <- .conformal_pval(S.tr, S.co, w.co = w.co)
+
+  list(att = g.tr, ci = ci, p.value = p.value,
+       score.tr = S.tr, score.co = S.co,
+       n.calib = Ncal, n.eff = if (is.null(w.co)) Ncal else .conformal_neff(w.co),
+       score = score, form = if (conformal.full) "full" else "jackknife+")
+}
