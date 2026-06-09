@@ -83,29 +83,66 @@
   c(g.tr - q, g.tr + q)
 }
 
+## Outcome-scale denominator a given score divides by, used to size the grid in
+## the SAME units as tau (the grid is over outcome-scale constant effects, so the
+## span must be outcome-scaled, not score-scaled).
+.conformal_denom <- function(e.pre, type) {
+  ep <- e.pre[is.finite(e.pre)]
+  if (type == "ratio")       return(if (length(ep) > 0L) sqrt(mean(ep^2)) else NA_real_)
+  if (type == "studentized") return(if (length(ep) > 1L) stats::sd(ep)      else NA_real_)
+  1  # rmse / meanabs: numerator already in outcome units
+}
+
 ## Grid inversion for ratio / studentized / rmse (refit-free: control scores are
 ## tau-independent; only the treated score is recomputed on the grid).
 ## gap.tr.post / gap.tr.pre : treated gap paths.  s.co : control scores.
-## Returns c(lower, upper) = range of accepted constant effects tau.
+## Returns c(lower, upper) = range of accepted constant effects tau.  Two special
+## returns, both carried as attributes so the caller can react:
+##   attr "empty" = "rejected_all_tau" : acceptance set is genuinely empty (no
+##     constant effect is consistent at level alpha; common with per-unit
+##     studentization when the treated pre-period sd is small) -> c(NA, NA).
+##   attr "edge"  = TRUE               : acceptance reached the (expanded) grid
+##     edge; the interval is effectively unbounded on that side.
 .conformal_ci_grid <- function(gap.tr.post, gap.tr.pre, s.co, type, alpha = 0.05,
                                w.co = NULL, w.tr = 1, n.grid = 401L, span = NULL) {
-  center <- mean(gap.tr.post[is.finite(gap.tr.post)])
-  if (is.null(span)) {
-    sd.co <- stats::sd(s.co[is.finite(s.co)])
-    span  <- max(abs(gap.tr.post), na.rm = TRUE) + 6 * (if (is.finite(sd.co)) sd.co else 1)
+  gp <- gap.tr.post[is.finite(gap.tr.post)]
+  center <- mean(gp)
+  ## span in OUTCOME units: beyond |tau - center| ~ (max control score) * denom
+  ## the treated score must exceed every control score, so acceptance is
+  ## impossible -- this bounds where the grid needs to look.
+  denom <- .conformal_denom(gap.tr.pre, type)
+  if (!is.finite(denom) || denom <= 0) denom <- 1
+  s.hi <- suppressWarnings(max(s.co[is.finite(s.co)]))
+  if (!is.finite(s.hi)) s.hi <- 1
+  if (is.null(span)) span <- max(abs(gp)) + (s.hi + 1) * denom
+
+  accept_on <- function(span) {
+    grid <- seq(center - span, center + span, length.out = n.grid)
+    keep <- vapply(grid, function(tau) {
+      s.tr <- .conformal_score(gap.tr.post - tau, gap.tr.pre, type)
+      if (!is.finite(s.tr)) return(FALSE)
+      .conformal_pval(s.tr, s.co, w.co = w.co, w.tr = w.tr) > alpha
+    }, logical(1))
+    list(grid = grid, keep = keep)
   }
-  grid <- seq(center - span, center + span, length.out = n.grid)
-  accept <- vapply(grid, function(tau) {
-    s.tr <- .conformal_score(gap.tr.post - tau, gap.tr.pre, type)
-    if (!is.finite(s.tr)) return(FALSE)
-    .conformal_pval(s.tr, s.co, w.co = w.co, w.tr = w.tr) > alpha
-  }, logical(1))
-  if (!any(accept)) return(c(NA_real_, NA_real_))
-  rng <- range(grid[accept])
-  ## flag if the acceptance set hit a grid edge (interval may be unbounded)
-  if (accept[1] || accept[n.grid]) {
-    attr(rng, "edge") <- TRUE
+  a <- accept_on(span)
+  ## adaptive expansion: if acceptance touches an edge the true interval may run
+  ## further (guards the span heuristic against unusual gap/score scales).
+  tries <- 0L
+  while (any(a$keep) && (a$keep[1L] || a$keep[length(a$keep)]) && tries < 3L) {
+    span <- span * 2; a <- accept_on(span); tries <- tries + 1L
   }
+  if (!any(a$keep)) {
+    out <- c(NA_real_, NA_real_)
+    attr(out, "empty") <- "rejected_all_tau"
+    return(out)
+  }
+  ## an accepted grid endpoint means the interval runs past it -> unbounded side.
+  lo <- min(a$grid[a$keep]); hi <- max(a$grid[a$keep])
+  if (a$keep[1L])               lo <- -Inf
+  if (a$keep[length(a$keep)])   hi <-  Inf
+  rng <- c(lo, hi)
+  if (is.infinite(lo) || is.infinite(hi)) attr(rng, "edge") <- TRUE
   rng
 }
 
@@ -233,11 +270,25 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     ci <- .conformal_ci_grid(tr.post.path, tr.pre.path, S.co, score,
                              alpha = alpha, w.co = w.co)
   }
+  ## status: "ok" | "unbounded" (alpha too small for Ncal) | "empty" (a
+  ## constant-effect score that rejects every tau -- correct conformal output,
+  ## not a failure; warn so callers/users know to read it as "no constant effect
+  ## consistent at level alpha", or switch to score = "meanabs").
+  status <- "ok"
+  if (identical(attr(ci, "empty"), "rejected_all_tau")) {
+    status <- "empty"
+    warning("conformal: no constant effect is consistent at level ", alpha,
+            " under score = \"", score, "\" (the treated path is rejected at ",
+            "every tau). Reported interval is empty; score = \"meanabs\" gives ",
+            "a level interval for the average effect that cannot be empty.")
+  } else if (any(is.infinite(ci))) {
+    status <- "unbounded"
+  }
   S.tr <- .conformal_score(tr.post.path, tr.pre.path, score)
   p.value <- .conformal_pval(S.tr, S.co, w.co = w.co)
 
-  list(att = g.tr, ci = ci, p.value = p.value,
-       score.tr = S.tr, score.co = S.co,
+  list(att = g.tr, ci = c(ci[1], ci[2]), p.value = p.value,
+       score.tr = S.tr, score.co = S.co, status = status,
        n.calib = Ncal, n.eff = if (is.null(w.co)) Ncal else .conformal_neff(w.co),
        score = score, form = if (conformal.full) "full" else "jackknife+")
 }

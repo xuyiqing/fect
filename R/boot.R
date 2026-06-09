@@ -556,7 +556,12 @@ fect_boot <- function(
       method = method, predictive = time.component.from,
       force = force, hasRevs = hasRevs, tol = tol, max.iteration = max.iteration,
       norm.para = norm.para,
-      score = "studentized", alpha = 0.05
+      ## meanabs = closed-form level interval for the average effect: conservative,
+      ## never empty/unbounded (for Ncal above the resolution floor), and matches
+      ## fect's headline att.avg. The dispersion scores (studentized/ratio/rmse)
+      ## are constant-effect interval inversions -- correctly calibrated but can
+      ## return an empty set ~alpha of the time -- exposed later via a score arg.
+      score = "meanabs", alpha = 0.05
     )
     ## WIP (Phase 1 part 2): the calibration runs on the internal matrices and
     ## yields the att.avg interval below. Wiring the result through fect()'s
