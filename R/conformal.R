@@ -128,14 +128,10 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
   Ntr <- length(id.tr); Nco <- length(id.co)
   if (Nco < 2L) stop("conformal: need at least 2 controls.")
 
-  ## not-yet-implemented knobs (land in a later phase): fail loudly, not silently.
+  ## model-se needs the estimator's per-unit prediction SE (not wired yet).
   if (identical(scale, "model-se")) {
     stop("conformal: scale = \"model-se\" is not yet implemented; use one of ",
          "\"none\", \"sd\", \"rmspe\", \"mad\", \"diff\".", call. = FALSE)
-  }
-  if (!identical(weight, "cell")) {
-    stop("conformal: weight = \"", weight, "\" is not yet implemented; ",
-         "use weight = \"cell\" (the per-treated-cell ATT).", call. = FALSE)
   }
 
   ## --- separation guard: conformal calibration is controls-only (nevertreated)
@@ -212,20 +208,46 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     sc.co[mi]  <- .conformal_scale(gj[pre.idx], scale)
   }
 
-  ## --- treated aggregate path (cell-weighted average over treated units).
-  ## NOTE: unit / precision weighting land in Phase 3; for the block design
-  ## rowMeans over treated units is the cell-weighted (per-treated-cell) center.
-  eff.tr.mat <- eff[, id.tr, drop = FALSE]
-  tr.path    <- rowMeans(eff.tr.mat, na.rm = TRUE)   # calendar
-  sc.tr      <- .conformal_scale(tr.path[pre.idx], scale)
+  ## --- treated aggregate across treated units, combined per `weight`:
+  ##   cell      = weight each unit by its post-obs count (per-treated-cell ATT),
+  ##   unit      = each treated unit counts equally,
+  ##   precision = inverse pre-period variance (down-weights noisy units).
+  ## The scalar center is the weighted mean of the per-unit post centers; the
+  ## per-period band uses the matching weighted treated trajectory. They coincide
+  ## for a single treated unit and (mean center) for a balanced panel.
+  ## Multi-treated NOTE: the aggregate is ranked against single-control gaps; a
+  ## placebo-AVERAGE calibration (ranking against averages of Ntr controls) is a
+  ## refinement deferred to the simulation phase.
+  trc  <- eff[, id.tr, drop = FALSE]                              # TT x Ntr
+  m.i  <- apply(trc[post.idx, , drop = FALSE], 2L, function(z) .conformal_center(z, center))
+  n.i  <- colSums(!is.na(trc[post.idx, , drop = FALSE]))
+  ## precision weight uses each unit's pre-period VARIANCE directly (decoupled
+  ## from the `scale` knob, which only normalizes the score), so it down-weights
+  ## noisy units even under the default scale = "none".
+  var.i <- apply(trc[pre.idx, , drop = FALSE], 2L, function(z) {
+    z <- z[is.finite(z)]; if (length(z) > 1L) stats::var(z) else NA_real_
+  })
+  wi   <- switch(weight,
+                 cell      = n.i,
+                 unit      = rep(1, Ntr),
+                 precision = ifelse(is.finite(var.i) & var.i > 0, 1 / var.i, 0))
+  wi[!is.finite(wi)] <- 0
+  if (!any(wi > 0)) wi <- rep(1, Ntr)
+  Wt    <- matrix(wi, TT, Ntr, byrow = TRUE); Wt[is.na(trc)] <- 0
+  denom <- rowSums(Wt)
+  tr.path <- ifelse(denom > 0, rowSums(trc * Wt, na.rm = TRUE) / denom, NA_real_)  # calendar
+  sc.tr   <- .conformal_scale(tr.path[pre.idx], scale)
 
   w.co <- NULL   # overlap density-ratio weighting deferred to a later phase
 
-  ## --- scalar average effect: center over the post window, rank vs controls
+  ## --- scalar average effect: weighted mean of per-unit post centers, ranked vs
+  ## the per-control post centers.
   m.co  <- apply(G.co[, post.idx, drop = FALSE], 1L,
                  function(z) .conformal_center(z, center))
   keep  <- is.finite(m.co) & is.finite(sc.co) & sc.co > 0
-  m.tr  <- .conformal_center(tr.path[post.idx], center)
+  okm   <- is.finite(m.i) & wi > 0
+  m.tr  <- if (any(okm)) sum(wi[okm] * m.i[okm]) / sum(wi[okm]) else
+           .conformal_center(tr.path[post.idx], center)
   ci    <- .conformal_ci_level(m.tr, sc.tr, m.co[keep], sc.co[keep],
                                alpha = alpha, w.co = w.co)
   Ncal  <- sum(keep)

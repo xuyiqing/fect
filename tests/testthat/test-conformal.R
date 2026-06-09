@@ -148,3 +148,42 @@ test_that("conformal.scale threads through fect() and changes the interval", {
   ## not-yet-implemented knobs error clearly
   expect_error(run("model-se"), "not yet implemented")
 })
+
+## ---- multi-treated weighting (cell / unit / precision) ----------------------
+
+test_that("conformal weights run for multiple treated units; cell matches att.avg", {
+  skip_on_cran()
+  set.seed(3); N <- 30; T <- 20; T0 <- 15; r <- 2
+  Fm <- matrix(rnorm(T * r), T, r); L <- matrix(rnorm(N * r), N, r)
+  D <- matrix(0, T, N); D[(T0 + 1):T, 1:4] <- 1
+  Y <- Fm %*% t(L) + matrix(rnorm(N * T), T, N) + 1.5 * D
+  dat <- data.frame(id = rep(1:N, each = T), time = rep(1:T, N),
+                    Y = as.vector(Y), D = as.vector(D))
+  pf <- suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+            method = "gsynth", force = 3, CV = FALSE, r = 2, se = FALSE))
+  for (w in c("cell", "unit", "precision")) {
+    f <- suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+              method = "gsynth", force = 3, CV = FALSE, r = 2, se = TRUE,
+              vartype = "conformal", conformal.weight = w))
+    expect_identical(f$conformal$status, "ok")
+    expect_true(all(is.finite(f$est.avg[1, c("CI.lower", "CI.upper")])))
+    if (w == "cell") {
+      expect_equal(unname(f$est.avg[1, "ATT.avg"]), pf$att.avg, tolerance = 1e-6)
+    }
+  }
+})
+
+test_that("precision weight down-weights a noisy treated unit", {
+  skip_on_cran()
+  set.seed(5); N <- 30; T <- 20; T0 <- 15; r <- 2
+  Fm <- matrix(rnorm(T * r), T, r); L <- matrix(rnorm(N * r), N, r)
+  D <- matrix(0, T, N); D[(T0 + 1):T, 1:4] <- 1
+  E <- matrix(rnorm(N * T), T, N); E[, 1] <- E[, 1] * 4   # treated unit 1 noisy
+  Y <- Fm %*% t(L) + E + 1.5 * D
+  dat <- data.frame(id = rep(1:N, each = T), time = rep(1:T, N),
+                    Y = as.vector(Y), D = as.vector(D))
+  att <- function(w) suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+            method = "gsynth", force = 3, CV = FALSE, r = 2, se = TRUE,
+            vartype = "conformal", conformal.weight = w))$est.avg[1, "ATT.avg"]
+  expect_false(isTRUE(all.equal(att("unit"), att("precision"))))
+})

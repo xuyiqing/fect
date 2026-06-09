@@ -582,18 +582,21 @@ fect_boot <- function(
     z <- stats::qnorm(1 - alpha / 2)
     se.from <- function(lo, hi) ifelse(is.finite(hi - lo), (hi - lo) / (2 * z), NA_real_)
 
-    ## --- average effect -> est.avg / est.avg.unit
+    ## --- average effect -> est.avg / est.avg.unit. Point = the conformal
+    ## weighted center cc$att (so the symmetric CI is centered on the reported
+    ## estimate); for the default weight = "cell" this equals fect's att.avg.
+    ## conformal reports a single weighting, so both print rows show it.
     se.avg  <- se.from(cc$ci[1], cc$ci[2])
-    est.avg <- t(as.matrix(c(att.avg, se.avg, cc$ci[1], cc$ci[2], cc$p.value)))
+    est.avg <- t(as.matrix(c(cc$att, se.avg, cc$ci[1], cc$ci[2], cc$p.value)))
     colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
-    att.avg.unit.val <- if (length(att.avg.unit)) att.avg.unit else att.avg
-    est.avg.unit <- t(as.matrix(c(att.avg.unit.val, se.avg, cc$ci[1], cc$ci[2], cc$p.value)))
+    est.avg.unit <- t(as.matrix(c(cc$att, se.avg, cc$ci[1], cc$ci[2], cc$p.value)))
     colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper", "p.value")
 
-    ## --- per-period band (calendar-indexed) -> est.eff.calendar(.fit) directly
+    ## --- per-period band (calendar-indexed) -> est.eff.calendar(.fit). The
+    ## ATT-calendar point is the conformal weighted per-period effect (band eff).
     band   <- cc$band
     se.cal <- se.from(band[, "CI.lower"], band[, "CI.upper"])
-    est.eff.calendar <- cbind(calendar.eff, se.cal,
+    est.eff.calendar <- cbind(band[, "eff"], se.cal,
                               band[, "CI.lower"], band[, "CI.upper"], band[, "p.value"], calendar.N)
     colnames(est.eff.calendar) <- c("ATT-calendar", "S.E.", "CI.lower", "CI.upper", "p.value", "count")
     est.eff.calendar.fit <- cbind(calendar.eff.fit, se.cal,
@@ -609,10 +612,11 @@ fect_boot <- function(
     for (k in seq_along(time.on)) {
       rows <- which(rel == time.on[k])
       if (length(rows) == 0L) next
+      ef <- mean(band[rows, "eff"],      na.rm = TRUE)
       lo <- mean(band[rows, "CI.lower"], na.rm = TRUE)
       hi <- mean(band[rows, "CI.upper"], na.rm = TRUE)
       pv <- mean(band[rows, "p.value"],  na.rm = TRUE)
-      est.att[k, ] <- c(att[k], se.from(lo, hi), lo, hi, pv, out$count[k])
+      est.att[k, ] <- c(ef, se.from(lo, hi), lo, hi, pv, out$count[k])
     }
     ## Phase 4 builds a true (1 - 2*alpha) inner band and the simultaneous band;
     ## for now the 90%-slot mirrors the main band so plot paths do not break.
