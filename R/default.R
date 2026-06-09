@@ -58,7 +58,7 @@ fect <- function(
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
-    conformal.scale = "none", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
+    conformal.scale = "sd", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
     conformal.center = "mean", # vartype="conformal": post-period location mean|median
     conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
     conformal.band = "pointwise", # vartype="conformal": est.att band pointwise|simultaneous
@@ -146,7 +146,7 @@ fect.formula <- function(
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
-    conformal.scale = "none", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
+    conformal.scale = "sd", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
     conformal.center = "mean", # vartype="conformal": post-period location mean|median
     conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
     conformal.band = "pointwise", # vartype="conformal": est.att band pointwise|simultaneous
@@ -356,7 +356,7 @@ fect.default <- function(
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
-    conformal.scale = "none", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
+    conformal.scale = "sd", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
     conformal.center = "mean", # vartype="conformal": post-period location mean|median
     conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
     conformal.band = "pointwise", # vartype="conformal": est.att band pointwise|simultaneous

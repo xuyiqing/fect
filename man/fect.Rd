@@ -15,7 +15,10 @@ assumptions.}
             cv.nobs = 3, cv.donut = 1, cv.buffer = 1, criterion = "mspe",
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap",
-            para.error = "auto", cl = NULL,
+            para.error = "auto",
+            conformal.scale = "sd", conformal.center = "mean",
+            conformal.weight = "cell", conformal.band = "pointwise",
+            conformal.cutoff = "per-period", cl = NULL,
             ci.method = "normal", quantile.CI = NULL,
             nboots = 200, alpha = 0.05,
             parallel = TRUE, cores = NULL, tol = 1e-5,
@@ -83,17 +86,23 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
 \item{vartype}{a string specifying the type of variance estimator, e.g.
-  \code{"bootstrap"}. Three values are supported:
+  \code{"bootstrap"}. Four values are supported:
   \code{"bootstrap"} (nonparametric cluster-bootstrap; the safe default),
-  \code{"jackknife"} (leave-one-unit-out), and
-  \code{"parametric"} (two-stage pseudo-treated parametric bootstrap).
+  \code{"jackknife"} (leave-one-unit-out),
+  \code{"parametric"} (two-stage pseudo-treated parametric bootstrap), and
+  \code{"conformal"} (cross-sectional conformal prediction interval; rank-based
+  and distribution-free, with no bootstrap draws).
   The \code{"parametric"} option is restricted to the
   gsynth-style regime: it requires
   \code{time.component.from = "nevertreated"}, no treatment reversal,
   and \code{method} not in \code{c("mc", "both")}.
   These three conditions correspond to Gates A, B, and C in the
   three-gate defense system (see \code{ARCHITECTURE.md}).
-  For all other settings, \code{vartype = "bootstrap"} is recommended.}
+  \code{"conformal"} likewise requires a separated (controls-only)
+  fit and \code{method} not in \code{c("mc", "both")}; it currently
+  supports the core synthetic-control case (no group / reversal / weighted /
+  balanced / placebo / carryover options). See the \code{conformal.*}
+  arguments. For all other settings, \code{vartype = "bootstrap"} is recommended.}
 \item{para.error}{a string specifying the residual-error model used by
   the parametric bootstrap path; sub-option of \code{vartype = "parametric"}
   (silently ignored otherwise). One of \code{"auto"}, \code{"ar"},
@@ -105,6 +114,31 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   resamples residuals i.i.d. from the main-fit pool (requires fully-
   observed panel); \code{"wild"} applies unit-level Rademacher sign-flips
   over the empirical residual pool (requires fully-observed panel).}
+\item{conformal.scale}{for \code{vartype = "conformal"}: the per-unit scale that
+  normalizes each unit's prediction error before ranking. One of \code{"none"}
+  (the unscaled mean-absolute statistic), \code{"sd"} (studentize by the unit's
+  pre-period residual standard deviation), \code{"rmspe"} (Abadie pre-period
+  root-mean-square error), \code{"mad"} (robust median-absolute-deviation), or
+  \code{"diff"} (standard deviation of first-differenced pre-period residuals,
+  robust to nonstationary trends). \code{"model-se"} is reserved and not yet
+  implemented.}
+\item{conformal.center}{for \code{vartype = "conformal"}: the post-period
+  location summarized into the average effect, \code{"mean"} or \code{"median"}
+  (the latter is robust to a single aberrant post period). The per-period band
+  is always reported alongside.}
+\item{conformal.weight}{for \code{vartype = "conformal"} with multiple treated
+  units: how unit effects are aggregated into the average. \code{"cell"} weights
+  each treated unit-period equally (the conventional ATT; equals
+  \code{fect}'s \code{att.avg}), \code{"unit"} weights each treated unit equally,
+  and \code{"precision"} weights by inverse pre-period variance (down-weighting
+  noisy units).}
+\item{conformal.band}{for \code{vartype = "conformal"}: the band reported in
+  \code{est.att}. \code{"pointwise"} (each period covers on its own) or
+  \code{"simultaneous"} (a uniform sup-t band over the post window for whole-path
+  statements). The uniform band is also always stored in \code{fit$est.att.sim}.}
+\item{conformal.cutoff}{for \code{vartype = "conformal"} pointwise bands: whether
+  the rank cutoff is computed \code{"per-period"} (separately at each period) or
+  \code{"pooled"} (one cutoff over all post-period control gaps).}
 \item{cl}{a string specifying the cluster column for cluster bootstrapping.
 When \code{group.fe} is set to a single column and \code{cl} is unset,
 \code{cl} auto-defaults to \code{group.fe[1]} --- the natural choice when

@@ -142,7 +142,7 @@ fect_boot <- function(
   carryover.period = NULL,
   vartype = "bootstrap",
   para.error = "auto",
-  conformal.scale = "none",
+  conformal.scale = "sd",
   conformal.center = "mean",
   conformal.weight = "cell",
   conformal.band = "pointwise",

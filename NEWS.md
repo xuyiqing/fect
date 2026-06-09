@@ -1,4 +1,10 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.6
+
+* New `vartype = "conformal"`: a cross-sectional conformal prediction interval for the average treatment effect on the treated. It ranks the treated unit's average post-treatment prediction error against the leave-one-control-out errors of the donors, giving a distribution-free interval with no bootstrap draws. The interval is closed-form and never empty.
+* Conformal options: `conformal.scale` (`"sd"` default, the studentized statistic; also `"none"`, `"rmspe"`, `"mad"`, `"diff"`), `conformal.center` (`"mean"`/`"median"`), `conformal.weight` (`"cell"`/`"unit"`/`"precision"` for multiple treated units), `conformal.band` (`"pointwise"`/`"simultaneous"`), and `conformal.cutoff` (`"per-period"`/`"pooled"`). The simultaneous (uniform) band is also stored in `fit$est.att.sim`.
+* `vartype = "conformal"` requires a separated (controls-only) fit and `method` not in `c("mc", "both")`. It currently covers the core synthetic-control case; group, reversal, weighted (`W`), balanced-panel, placebo, and carryover options still use `bootstrap`/`jackknife`.
+
 # fect 2.4.5
 
 * Add `group.fe` to `fect()` for absorbing coarser fixed effects, such as state FE with county-level data. Closes #139. Clustered SE defaults to `group.fe[1]`; override with `cl = "<column>"`.
