@@ -58,6 +58,9 @@ fect <- function(
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
+    conformal.scale = "none", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
+    conformal.center = "mean", # vartype="conformal": post-period location mean|median
+    conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
     cl = NULL,
     ci.method = "normal", # CI method for fect's est.* slots: "normal" (Wald: theta_hat +- z * SE) or "basic" (reflected pivot, Davison-Hinkley 1997 Sec. 5.2.1). For percentile / bc / bca on alternative estimands (att.cumu, aptt, log.att), call estimand(fit, type, ci.method) post-fit
     quantile.CI = NULL, # DEPRECATED: use ci.method instead. NULL sentinel = "not supplied"; legacy FALSE -> ci.method = "normal", legacy TRUE -> ci.method = "basic"
@@ -141,6 +144,9 @@ fect.formula <- function(
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
+    conformal.scale = "none", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
+    conformal.center = "mean", # vartype="conformal": post-period location mean|median
+    conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
     cl = NULL,
     ci.method = "normal", # CI method for fect's est.* slots: "normal" or "basic"
     quantile.CI = NULL, # DEPRECATED: use ci.method instead
@@ -256,6 +262,9 @@ fect.formula <- function(
         se = se,
         vartype = vartype,
         para.error = para.error,
+        conformal.scale = conformal.scale,
+        conformal.center = conformal.center,
+        conformal.weight = conformal.weight,
         cl = cl,
         ci.method = ci.method,
         quantile.CI = quantile.CI,
@@ -341,6 +350,9 @@ fect.default <- function(
     se = FALSE, # report uncertainties
     vartype = "bootstrap", # bootstrap or jackknife
     para.error = "auto", # parametric bootstrap error strategy: "auto", "ar", "empirical", "wild"
+    conformal.scale = "none", # vartype="conformal": per-unit scale none|sd|rmspe|mad|diff|model-se
+    conformal.center = "mean", # vartype="conformal": post-period location mean|median
+    conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
     cl = NULL,
     ci.method = "normal", # CI method for fect's est.* slots: "normal" or "basic"
     quantile.CI = NULL, # DEPRECATED: use ci.method instead
@@ -570,6 +582,19 @@ fect.default <- function(
             stop(
                 "The \"", vartype, "\" option is not available for the \"mc\" or \"both\" methods."
             )
+        }
+        if (vartype == "conformal") {
+            if (!conformal.scale %in% c("none", "sd", "rmspe", "mad", "diff", "model-se")) {
+                stop("conformal.scale must be one of \"none\", \"sd\", \"rmspe\", ",
+                     "\"mad\", \"diff\", \"model-se\".", call. = FALSE)
+            }
+            if (!conformal.center %in% c("mean", "median")) {
+                stop("conformal.center must be \"mean\" or \"median\".", call. = FALSE)
+            }
+            if (!conformal.weight %in% c("cell", "unit", "precision")) {
+                stop("conformal.weight must be \"cell\", \"unit\", or \"precision\".",
+                     call. = FALSE)
+            }
         }
         if (vartype == "jackknife" && !is.null(cl)) {
             warning(
@@ -2750,6 +2775,9 @@ fect.default <- function(
             carryover.period = carryover.period,
             vartype = vartype,
             para.error = para.error,
+            conformal.scale = conformal.scale,
+            conformal.center = conformal.center,
+            conformal.weight = conformal.weight,
             quantile.CI = .quantile.CI.bool,
             nboots = nboots,
             parallel = parallel,
@@ -3349,7 +3377,10 @@ fect.default <- function(
         output$loo <- FALSE
     }
 
-    if (se == 1) {
+    ## conformal inference is rank-based with no bootstrap draws, so the
+    ## bootstrap F / equivalence diagnostics (diagtest) do not apply; skip them
+    ## (as with se = FALSE). The pre-period conformal band still shows pre-trends.
+    if (se == 1 && vartype != "conformal") {
         suppressWarnings(
             test.out <- diagtest(
                 output,
@@ -3366,7 +3397,7 @@ fect.default <- function(
     if (loo == TRUE) {
         output$loo <- TRUE
     }
-    if (loo == TRUE && se == 1) {
+    if (loo == TRUE && se == 1 && vartype != "conformal") {
         suppressWarnings(
             test.out <- diagtest(
                 output,

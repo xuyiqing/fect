@@ -128,6 +128,16 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
   Ntr <- length(id.tr); Nco <- length(id.co)
   if (Nco < 2L) stop("conformal: need at least 2 controls.")
 
+  ## not-yet-implemented knobs (land in a later phase): fail loudly, not silently.
+  if (identical(scale, "model-se")) {
+    stop("conformal: scale = \"model-se\" is not yet implemented; use one of ",
+         "\"none\", \"sd\", \"rmspe\", \"mad\", \"diff\".", call. = FALSE)
+  }
+  if (!identical(weight, "cell")) {
+    stop("conformal: weight = \"", weight, "\" is not yet implemented; ",
+         "use weight = \"cell\" (the per-treated-cell ATT).", call. = FALSE)
+  }
+
   ## --- separation guard: conformal calibration is controls-only (nevertreated)
   if (!identical(predictive, "nevertreated")) {
     warning("vartype = \"conformal\" requires a separated fit; ",
@@ -188,44 +198,60 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     g
   }
 
-  ## --- control centers and per-unit scales (tau-independent)
+  ## --- full per-control LOO gap paths (calendar-indexed), and a per-unit scale
+  ## from each control's pre-period gaps. Keeping the whole path lets us serve
+  ## both the scalar average interval AND the per-period band from one pass.
   obs <- (I == 1)
-  m.co  <- rep(NA_real_, length(valid.co))
+  G.co  <- matrix(NA_real_, length(valid.co), TT)   # control x calendar gap
   sc.co <- rep(NA_real_, length(valid.co))
   for (mi in seq_along(valid.co)) {
     j  <- valid.co[mi]
     gj <- loo_gap(j)
-    ep <- gj[post.idx][obs[post.idx, j]]
-    eq <- gj[pre.idx ][obs[pre.idx,  j]]
-    m.co[mi]  <- .conformal_center(ep, center)
-    sc.co[mi] <- .conformal_scale(eq, scale)
+    gj[!obs[, j]] <- NA_real_
+    G.co[mi, ] <- gj
+    sc.co[mi]  <- .conformal_scale(gj[pre.idx], scale)
   }
-  keep <- is.finite(m.co) & is.finite(sc.co) & sc.co > 0
-  m.co <- m.co[keep]; sc.co <- sc.co[keep]
-  Ncal <- length(m.co)
 
-  ## --- treated aggregate (cell-weighted average over treated units, by default).
-  ## NOTE: unit / precision weighting and the per-period band land in Phase 3/4;
-  ## for the block design rowMeans over treated units is the cell-weighted center.
-  eff.tr.mat   <- eff[, id.tr, drop = FALSE]
-  tr.post.path <- rowMeans(eff.tr.mat[post.idx, , drop = FALSE], na.rm = TRUE)
-  tr.pre.path  <- rowMeans(eff.tr.mat[pre.idx,  , drop = FALSE], na.rm = TRUE)
-  m.tr  <- .conformal_center(tr.post.path, center)
-  sc.tr <- .conformal_scale(tr.pre.path, scale)
+  ## --- treated aggregate path (cell-weighted average over treated units).
+  ## NOTE: unit / precision weighting land in Phase 3; for the block design
+  ## rowMeans over treated units is the cell-weighted (per-treated-cell) center.
+  eff.tr.mat <- eff[, id.tr, drop = FALSE]
+  tr.path    <- rowMeans(eff.tr.mat, na.rm = TRUE)   # calendar
+  sc.tr      <- .conformal_scale(tr.path[pre.idx], scale)
 
-  ## --- weights (overlap density ratio) deferred to a later phase
-  w.co <- NULL
+  w.co <- NULL   # overlap density-ratio weighting deferred to a later phase
 
-  ## --- interval (closed form; never empty)
-  ci <- .conformal_ci_level(m.tr, sc.tr, m.co, sc.co, alpha = alpha, w.co = w.co)
+  ## --- scalar average effect: center over the post window, rank vs controls
+  m.co  <- apply(G.co[, post.idx, drop = FALSE], 1L,
+                 function(z) .conformal_center(z, center))
+  keep  <- is.finite(m.co) & is.finite(sc.co) & sc.co > 0
+  m.tr  <- .conformal_center(tr.path[post.idx], center)
+  ci    <- .conformal_ci_level(m.tr, sc.tr, m.co[keep], sc.co[keep],
+                               alpha = alpha, w.co = w.co)
+  Ncal  <- sum(keep)
   status <- if (any(is.infinite(ci))) "unbounded" else "ok"
-
   s.tr     <- if (is.finite(sc.tr) && sc.tr > 0) abs(m.tr) / sc.tr else NA_real_
-  s.co.vec <- abs(m.co) / sc.co
+  s.co.vec <- abs(m.co[keep]) / sc.co[keep]
   p.value  <- .conformal_pval(s.tr, s.co.vec, w.co = w.co)
+
+  ## --- per-period pointwise band (calendar-indexed): at each period the treated
+  ## gap is ranked against the control gaps at the same period. Pre-period rows
+  ## give the placebo / pre-trend band; post-period rows give the effect band.
+  band <- matrix(NA_real_, TT, 4L,
+                 dimnames = list(NULL, c("eff", "CI.lower", "CI.upper", "p.value")))
+  for (t in seq_len(TT)) {
+    gco.t <- G.co[, t]
+    okt   <- is.finite(gco.t) & is.finite(sc.co) & sc.co > 0
+    if (!is.finite(tr.path[t]) || sum(okt) < 2L) next
+    ci.t   <- .conformal_ci_level(tr.path[t], sc.tr, gco.t[okt], sc.co[okt], alpha = alpha)
+    s.tr.t <- if (is.finite(sc.tr) && sc.tr > 0) abs(tr.path[t]) / sc.tr else NA_real_
+    band[t, ] <- c(tr.path[t], ci.t[1], ci.t[2],
+                   .conformal_pval(s.tr.t, abs(gco.t[okt]) / sc.co[okt]))
+  }
 
   list(att = m.tr, ci = c(ci[1], ci[2]), p.value = p.value,
        score.tr = s.tr, score.co = s.co.vec, status = status,
        n.calib = Ncal, n.eff = if (is.null(w.co)) Ncal else .conformal_neff(w.co),
-       scale = scale, center = center, weight = weight, form = "jackknife+")
+       scale = scale, center = center, weight = weight, form = "jackknife+",
+       band = band, post.idx = post.idx, pre.idx = pre.idx)
 }

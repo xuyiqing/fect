@@ -142,6 +142,9 @@ fect_boot <- function(
   carryover.period = NULL,
   vartype = "bootstrap",
   para.error = "auto",
+  conformal.scale = "none",
+  conformal.center = "mean",
+  conformal.weight = "cell",
   quantile.CI = FALSE,
   nboots = 200,
   parallel = TRUE,
@@ -544,34 +547,91 @@ fect_boot <- function(
   N_unit <- dim(out$res)[2]
 
   ## ---- vartype = "conformal": cross-sectional conformal interval -----------
-  ## Rank the treated gap against the leave-one-control-out donor scores
-  ## (see conformal.R), bypassing the resampling / jackknife SE machinery.
-  ## Uses fect_boot's internal preprocessed matrices (Y, D, I, II, T.on).
-  ## NOTE Phase 1: score / alpha hardcoded; est.att per-period bands + arg
-  ## threading from fect() come next.
+  ## Rank the treated gaps against the leave-one-control-out donor gaps (Family A
+  ## level statistic, see conformal.R), bypassing the resampling / jackknife SE
+  ## machinery. Populate the est.* slots so print / plot / esplot work unchanged,
+  ## then return early (no bootstrap draws).
   if (vartype == "conformal") {
+    ## Phase 2 scope is the core SC case; unsupported options error clearly (they
+    ## are added in later phases). Reversals, weights, balance, placebo, carryover
+    ## and group estimates still go through bootstrap / jackknife.
+    if (!is.null(group)) {
+      stop("vartype = 'conformal' does not yet support group-level estimates; ",
+           "use vartype = 'bootstrap' or 'jackknife'.", call. = FALSE)
+    }
+    if (!is.null(balance.period) || !is.null(W) || hasRevs == 1 ||
+        isTRUE(placeboTest) || isTRUE(carryoverTest)) {
+      stop("vartype = 'conformal' does not yet support reversals, weights, ",
+           "balanced-panel, placebo or carryover tests; use vartype = ",
+           "'bootstrap' or 'jackknife' for those.", call. = FALSE)
+    }
+
+    id.tr.conf <- which(colSums(D) > 0)
     cc <- conformal_calibrate(
       Y = Y, D = D, X = X, I = I, II = II, T.on = T.on,
       r.cv = out$r.cv, eff = out$eff,
       method = method, predictive = time.component.from,
       force = force, hasRevs = hasRevs, tol = tol, max.iteration = max.iteration,
       norm.para = norm.para,
-      ## Family A level interval (never empty/unbounded above the resolution
-      ## floor). scale = "none" is meanabs, the safe provisional default; the full
-      ## scale/center/weight knobs are threaded from fect() in Phase 2.
-      scale = "none", alpha = 0.05
+      scale = conformal.scale, center = conformal.center,
+      weight = conformal.weight, alpha = alpha
     )
-    ## WIP (Phase 1): the calibration runs on the internal matrices and yields the
-    ## att.avg interval below. Wiring the result through fect()'s output slots
-    ## (eff.calendar, est.att, est.avg) mirrors the parametric path's slot
-    ## assembly and replaces this stop() in Phase 2.
-    stop(sprintf(paste0(
-      "vartype = 'conformal': calibration is implemented but output integration ",
-      "is in progress. Result: att = %.4f, %.0f%% CI = [%.4f, %.4f], p = %.4f, ",
-      "N_calib = %d, scale = %s, status = %s."),
-      cc$att, 100 * (1 - 0.05), cc$ci[1], cc$ci[2], cc$p.value, cc$n.calib,
-      cc$scale, cc$status),
-      call. = FALSE)
+
+    ## back out a nominal S.E. from the symmetric conformal CI (display only;
+    ## conformal inference is rank-based, the S.E. column is informational).
+    z <- stats::qnorm(1 - alpha / 2)
+    se.from <- function(lo, hi) ifelse(is.finite(hi - lo), (hi - lo) / (2 * z), NA_real_)
+
+    ## --- average effect -> est.avg / est.avg.unit
+    se.avg  <- se.from(cc$ci[1], cc$ci[2])
+    est.avg <- t(as.matrix(c(att.avg, se.avg, cc$ci[1], cc$ci[2], cc$p.value)))
+    colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
+    att.avg.unit.val <- if (length(att.avg.unit)) att.avg.unit else att.avg
+    est.avg.unit <- t(as.matrix(c(att.avg.unit.val, se.avg, cc$ci[1], cc$ci[2], cc$p.value)))
+    colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper", "p.value")
+
+    ## --- per-period band (calendar-indexed) -> est.eff.calendar(.fit) directly
+    band   <- cc$band
+    se.cal <- se.from(band[, "CI.lower"], band[, "CI.upper"])
+    est.eff.calendar <- cbind(calendar.eff, se.cal,
+                              band[, "CI.lower"], band[, "CI.upper"], band[, "p.value"], calendar.N)
+    colnames(est.eff.calendar) <- c("ATT-calendar", "S.E.", "CI.lower", "CI.upper", "p.value", "count")
+    est.eff.calendar.fit <- cbind(calendar.eff.fit, se.cal,
+                                  band[, "CI.lower"], band[, "CI.upper"], band[, "p.value"], calendar.N)
+    colnames(est.eff.calendar.fit) <- colnames(est.eff.calendar)
+
+    ## --- map the calendar band to event time (treated unit's relative period)
+    ## for est.att (rownames = out$time). Common-onset: a 1:1 map.
+    rel <- T.on[, id.tr.conf[1]]
+    est.att <- matrix(NA_real_, length(time.on), 6,
+                      dimnames = list(time.on,
+                        c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value", "count")))
+    for (k in seq_along(time.on)) {
+      rows <- which(rel == time.on[k])
+      if (length(rows) == 0L) next
+      lo <- mean(band[rows, "CI.lower"], na.rm = TRUE)
+      hi <- mean(band[rows, "CI.upper"], na.rm = TRUE)
+      pv <- mean(band[rows, "p.value"],  na.rm = TRUE)
+      est.att[k, ] <- c(att[k], se.from(lo, hi), lo, hi, pv, out$count[k])
+    }
+    ## Phase 4 builds a true (1 - 2*alpha) inner band and the simultaneous band;
+    ## for now the 90%-slot mirrors the main band so plot paths do not break.
+    est.att90 <- est.att
+    att.bound <- est.att[, c("CI.lower", "CI.upper"), drop = FALSE]
+    rownames(att.bound) <- time.on
+
+    result <- list(
+      est.avg = est.avg,
+      est.avg.unit = est.avg.unit,
+      est.att = est.att,
+      est.att90 = est.att90,
+      att.bound = att.bound,
+      est.eff.calendar = est.eff.calendar,
+      est.eff.calendar.fit = est.eff.calendar.fit,
+      vartype = "conformal",
+      conformal = cc[c("scale", "center", "weight", "status", "n.calib", "form")]
+    )
+    return(c(out, result))
   }
 
   if (!is.null(group)) {

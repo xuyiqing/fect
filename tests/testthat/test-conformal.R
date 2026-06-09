@@ -108,3 +108,43 @@ test_that("studentized-mean (scale = sd) runs, never empty/unbounded, ballpark c
   expect_equal(r$bad, 0L)
   expect_gt(r$cov, 0.75); expect_lte(r$cov, 1.0)
 })
+
+## ---- fect(vartype = "conformal") end-to-end integration ---------------------
+
+test_that("fect(vartype = 'conformal') returns a complete, printable object", {
+  skip_on_cran()
+  g <- .conf_dgp(1)
+  Y <- g$mu + matrix(rnorm(g$N * g$T), g$T, g$N) + 1.5 * g$D   # true ATT = 1.5
+  dat <- data.frame(id = rep(1:g$N, each = g$T), time = rep(1:g$T, g$N),
+                    Y = as.vector(Y), D = as.vector(g$D))
+  f <- suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+            method = "gsynth", force = 3, CV = FALSE, r = 2, se = TRUE,
+            vartype = "conformal"))
+  expect_equal(f$vartype, "conformal")
+  expect_identical(f$conformal$status, "ok")
+  ## est.avg: finite, ordered CI with the right columns
+  expect_true(all(c("ATT.avg", "CI.lower", "CI.upper", "p.value") %in% colnames(f$est.avg)))
+  expect_lt(f$est.avg[1, "CI.lower"], f$est.avg[1, "CI.upper"])
+  ## est.att: event-time rownames, post-period CIs finite
+  expect_equal(rownames(f$est.att), as.character(f$time))
+  post <- f$est.att[as.numeric(rownames(f$est.att)) >= 0, , drop = FALSE]
+  expect_true(all(is.finite(post[, c("CI.lower", "CI.upper")])))
+  expect_silent(invisible(capture.output(print(f))))
+})
+
+test_that("conformal.scale threads through fect() and changes the interval", {
+  skip_on_cran()
+  g <- .conf_dgp(7)
+  Y <- g$mu + matrix(rnorm(g$N * g$T), g$T, g$N) + 1.5 * g$D
+  dat <- data.frame(id = rep(1:g$N, each = g$T), time = rep(1:g$T, g$N),
+                    Y = as.vector(Y), D = as.vector(g$D))
+  run <- function(scale) suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+            method = "gsynth", force = 3, CV = FALSE, r = 2, se = TRUE,
+            vartype = "conformal", conformal.scale = scale))
+  w_none <- diff(run("none")$est.avg[1, c("CI.lower", "CI.upper")])
+  w_diff <- diff(run("diff")$est.avg[1, c("CI.lower", "CI.upper")])
+  expect_true(is.finite(w_none) && is.finite(w_diff))
+  expect_false(isTRUE(all.equal(w_none, w_diff)))   # the scale actually does something
+  ## not-yet-implemented knobs error clearly
+  expect_error(run("model-se"), "not yet implemented")
+})
