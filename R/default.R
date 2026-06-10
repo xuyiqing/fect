@@ -3228,7 +3228,9 @@ fect.default <- function(
         if (binary == TRUE) {
             rownames(out$marginal) <- Xname.tmp
         }
-        if (se == TRUE) {
+        if (se == TRUE && !is.null(out$est.beta)) {
+            ## vartype = "conformal" returns no coefficient draws, hence no
+            ## est.beta/est.marginal; skip the labelling rather than crash.
             rownames(out$est.beta) <- Xname.tmp
             colnames(out$est.beta) <- c(
                 "Coef",
@@ -3237,7 +3239,7 @@ fect.default <- function(
                 "CI.upper",
                 "p.value"
             )
-            if (binary == TRUE) {
+            if (binary == TRUE && !is.null(out$est.marginal)) {
                 rownames(out$est.marginal) <- Xname.tmp
             }
             if (placeboTest == TRUE) {

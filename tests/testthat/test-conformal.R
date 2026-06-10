@@ -80,7 +80,7 @@ test_that("effective sample size is sensible", {
     fit <- suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
               method = "gsynth", force = 3, CV = FALSE, r = 2, se = FALSE,
               parallel = FALSE))
-    cc <- conformal_calibrate(Y = Y, D = g$D, I = fit$I, II = fit$II, T.on = fit$T.on,
+    cc <- fect:::conformal_calibrate(Y = Y, D = g$D, I = fit$I, II = fit$II, T.on = fit$T.on,
               r.cv = fit$r.cv, eff = fit$eff, method = "gsynth",
               scale = scale, alpha = alpha)
     if (cc$status != "ok") bad <- bad + 1L
@@ -300,4 +300,29 @@ test_that("simultaneous band gives materially better joint coverage than pointwi
   }
   expect_gt(mean(js) - mean(jp), 0.15)   # simultaneous materially better jointly
   expect_gt(mean(js), 0.65)              # and well above pointwise's joint coverage
+})
+
+test_that("conformal runs with covariates under staggered adoption (est.beta absent, no crash)", {
+  ## Regression guard: with p > 0 and vartype = "conformal", fect returns no
+  ## est.beta (no coefficient draws); the Xname labelling in default.R must
+  ## skip rather than crash ("attempt to set 'rownames' on an object with no
+  ## dimensions", caught 2026-06-10).
+  set.seed(424)
+  N <- 20; TT <- 16
+  Fm <- matrix(rnorm(TT * 2), TT, 2)
+  L  <- matrix(rnorm(N * 2), N, 2)
+  X1 <- matrix(rnorm(TT * N), TT, N)
+  Y  <- Fm %*% t(L) + 1.5 * X1 + matrix(rnorm(TT * N), TT, N)
+  dat <- data.frame(id = rep(1:N, each = TT), time = rep(1:TT, N),
+                    Y = as.vector(Y), X1 = as.vector(X1))
+  dat$D <- as.integer((dat$id == 1 & dat$time >= 9) |
+                      (dat$id == 2 & dat$time >= 13))
+  f <- suppressMessages(suppressWarnings(
+    fect::fect(Y ~ D + X1, data = dat, index = c("id", "time"), method = "gsynth",
+         force = 3, CV = FALSE, r = 2, se = TRUE, vartype = "conformal",
+         parallel = FALSE)))
+  expect_true(is.finite(f$est.avg[1]))
+  expect_true(f$est.avg[3] < f$est.avg[4])     # CI ordered
+  expect_true(!is.null(f$beta))                # point coefficient still reported
+  expect_true(is.null(f$est.beta))             # and no inference object invented
 })
