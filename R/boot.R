@@ -142,6 +142,12 @@ fect_boot <- function(
   carryover.period = NULL,
   vartype = "bootstrap",
   para.error = "auto",
+  conformal.scale = "sd",
+  conformal.center = "mean",
+  conformal.weight = "cell",
+  conformal.band = "pointwise",
+  conformal.cutoff = "per-period",
+  conformal.fit = NULL,
   quantile.CI = FALSE,
   nboots = 200,
   parallel = TRUE,
@@ -542,6 +548,103 @@ fect_boot <- function(
   eff.out <- out$eff
   fit.out <- out$Y.ct
   N_unit <- dim(out$res)[2]
+
+  ## ---- vartype = "conformal": cross-sectional conformal interval -----------
+  ## Rank the treated gaps against the leave-one-control-out donor gaps (Family A
+  ## level statistic, see conformal.R), bypassing the resampling / jackknife SE
+  ## machinery. Populate the est.* slots so print / plot / esplot work unchanged,
+  ## then return early (no bootstrap draws).
+  if (vartype == "conformal") {
+    ## Phase 2 scope is the core SC case; unsupported options error clearly (they
+    ## are added in later phases). Reversals, weights, balance, placebo, carryover
+    ## and group estimates still go through bootstrap / jackknife.
+    if (!is.null(group)) {
+      stop("vartype = 'conformal' does not yet support group-level estimates; ",
+           "use vartype = 'bootstrap' or 'jackknife'.", call. = FALSE)
+    }
+    if (!is.null(balance.period) || !is.null(W) || hasRevs == 1 ||
+        isTRUE(placeboTest) || isTRUE(carryoverTest)) {
+      stop("vartype = 'conformal' does not yet support reversals, weights, ",
+           "balanced-panel, placebo or carryover tests; use vartype = ",
+           "'bootstrap' or 'jackknife' for those.", call. = FALSE)
+    }
+
+    cc <- conformal_calibrate(
+      Y = Y, D = D, X = X, I = I, II = II, T.on = T.on,
+      r.cv = out$r.cv, eff = out$eff,
+      method = method, predictive = time.component.from,
+      force = force, hasRevs = hasRevs, tol = tol, max.iteration = max.iteration,
+      norm.para = norm.para,
+      scale = conformal.scale, center = conformal.center,
+      weight = conformal.weight, band.type = conformal.band,
+      cutoff = conformal.cutoff, alpha = alpha,
+      conformal.fit = conformal.fit
+    )
+
+    ## back out a nominal S.E. from the symmetric conformal CI (display only;
+    ## conformal inference is rank-based, the S.E. column is informational).
+    z <- stats::qnorm(1 - alpha / 2)
+    se.from <- function(lo, hi) ifelse(is.finite(hi - lo), (hi - lo) / (2 * z), NA_real_)
+
+    ## --- average effect -> est.avg / est.avg.unit. Point = the conformal
+    ## weighted center cc$att (so the symmetric CI is centered on the reported
+    ## estimate); for the default weight = "cell" this equals fect's att.avg.
+    ## conformal reports a single weighting, so both print rows show it.
+    se.avg  <- se.from(cc$ci[1], cc$ci[2])
+    est.avg <- t(as.matrix(c(cc$att, se.avg, cc$ci[1], cc$ci[2], cc$p.value)))
+    colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
+    est.avg.unit <- t(as.matrix(c(cc$att, se.avg, cc$ci[1], cc$ci[2], cc$p.value)))
+    colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper", "p.value")
+
+    ## --- per-period band (calendar-indexed) -> est.eff.calendar(.fit). The
+    ## ATT-calendar point is the conformal weighted per-period effect (band eff).
+    band   <- cc$band
+    se.cal <- se.from(band[, "CI.lower"], band[, "CI.upper"])
+    est.eff.calendar <- cbind(band[, "eff"], se.cal,
+                              band[, "CI.lower"], band[, "CI.upper"], band[, "p.value"], calendar.N)
+    colnames(est.eff.calendar) <- c("ATT-calendar", "S.E.", "CI.lower", "CI.upper", "p.value", "count")
+    est.eff.calendar.fit <- cbind(calendar.eff.fit, se.cal,
+                                  band[, "CI.lower"], band[, "CI.upper"], band[, "p.value"], calendar.N)
+    colnames(est.eff.calendar.fit) <- colnames(est.eff.calendar)
+
+    ## --- event-time band -> est.att (rownames = out$time). conformal_calibrate
+    ## returns the band already aggregated by relative period (correct for both
+    ## block and staggered); match its rownames to out$time by value.
+    map_et <- function(etb) {
+      m <- matrix(NA_real_, length(time.on), 6,
+                  dimnames = list(time.on,
+                    c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value", "count")))
+      etrow <- as.numeric(rownames(etb))
+      for (k in seq_along(time.on)) {
+        r <- which(etrow == time.on[k])
+        if (!length(r)) next
+        v <- etb[r[1L], ]
+        m[k, ] <- c(v["eff"], se.from(v["CI.lower"], v["CI.upper"]),
+                    v["CI.lower"], v["CI.upper"], v["p.value"], out$count[k])
+      }
+      m
+    }
+    est.att     <- map_et(cc$band.et)         # the (1 - alpha) band (conformal.band)
+    est.att.sim <- map_et(cc$band.et.sim)     # the uniform / simultaneous band
+    est.att90   <- map_et(cc$band.et.inner)   # the inner (1 - 2*alpha) conformal band
+    att.bound   <- est.att90[, c("CI.lower", "CI.upper"), drop = FALSE]
+    rownames(att.bound) <- time.on
+
+    result <- list(
+      est.avg = est.avg,
+      est.avg.unit = est.avg.unit,
+      est.att = est.att,
+      est.att.sim = est.att.sim,
+      est.att90 = est.att90,
+      att.bound = att.bound,
+      est.eff.calendar = est.eff.calendar,
+      est.eff.calendar.fit = est.eff.calendar.fit,
+      vartype = "conformal",
+      conformal = cc[c("scale", "center", "weight", "band.type", "cutoff",
+                       "status", "n.calib", "form")]
+    )
+    return(c(out, result))
+  }
 
   if (!is.null(group)) {
     group.output.origin <- out$group.output

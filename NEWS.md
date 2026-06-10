@@ -1,4 +1,14 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.6
+
+* New `vartype = "conformal"`: a cross-sectional conformal prediction interval for the average treatment effect on the treated. It ranks the treated unit's average post-treatment prediction error against the leave-one-control-out errors of the donors, giving a distribution-free interval with no bootstrap draws. The interval is closed-form and never empty.
+* Conformal options: `conformal.scale` (`"sd"` default, the studentized statistic; also `"none"`, `"rmspe"`, `"mad"`, `"diff"`), `conformal.center` (`"mean"`/`"median"`), `conformal.weight` (`"cell"`/`"unit"`/`"precision"` for multiple treated units), `conformal.band` (`"pointwise"`/`"simultaneous"`), and `conformal.cutoff` (`"per-period"`/`"pooled"`). The simultaneous (uniform) band is also stored in `fit$est.att.sim`.
+* Conformal supports both block (common-onset) and **staggered adoption** (per-cohort donor pools, union-window calibration, and event-time-aggregated bands). `plot()` renders the event-study and counterfactual for conformal fits, and `est.att90` is a true inner `1 - 2*alpha` band.
+* `vartype = "conformal"` requires a separated (controls-only) fit and `method` not in `c("mc", "both")`. It currently covers the core synthetic-control case (block or staggered); group, reversal, weighted (`W`), balanced-panel, placebo, and carryover options still use `bootstrap`/`jackknife`.
+* `conformal.fit`: a user-facing hook for custom separated learners under `vartype = "conformal"`. Supply `f(Y, X, time, control.ids, target.id, T0)` returning the imputed untreated path; both sides of the calibration --- every held-out control and each treated unit (fitted on its own pre-window) --- run through the same learner. With a simplex synthetic-control learner this reproduces the hand-rolled Proposition 99 conformal interval exactly.
+* `time.component.from` now defaults to `NULL` (auto): under `vartype = "conformal"` with `method` `"fe"`/`"ife"`/`"cfe"` it resolves to `"nevertreated"` so the main fit is strictly separated like the calibration (a message is emitted); otherwise the legacy `"notyettreated"`. Explicit `"notyettreated"` with conformal is honored with a weak-separation warning.
+* Fix: `vartype = "conformal"` with covariates crashed during output labelling (`est.beta` does not exist for conformal --- no coefficient draws); the labelling is now null-guarded. Staggered + covariate conformal fits are covered by a regression test.
+
 # fect 2.4.5
 
 * Add `group.fe` to `fect()` for absorbing coarser fixed effects, such as state FE with county-level data. Closes #139. Clustered SE defaults to `group.fe[1]`; override with `cl = "<column>"`.

@@ -9,13 +9,17 @@ assumptions.}
             group = NULL,
             na.rm = FALSE,
             index, force = "two-way",
-            time.component.from = "notyettreated", em = TRUE,
+            time.component.from = NULL, em = TRUE,
             r = 0, lambda = NULL, nlambda = 10,
             CV = NULL, k = 20, cv.prop = 0.1, cv.method = "rolling",
             cv.nobs = 3, cv.donut = 1, cv.buffer = 1, criterion = "mspe",
             binary = FALSE, QR = FALSE,
             method = "fe",  se = FALSE, vartype = "bootstrap",
-            para.error = "auto", cl = NULL,
+            para.error = "auto",
+            conformal.scale = "sd", conformal.center = "mean",
+            conformal.weight = "cell", conformal.band = "pointwise",
+            conformal.cutoff = "per-period",
+            conformal.fit = NULL, cl = NULL,
             ci.method = "normal", quantile.CI = NULL,
             nboots = 200, alpha = 0.05,
             parallel = TRUE, cores = NULL, tol = 1e-5,
@@ -59,7 +63,7 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
 \item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Every observation should be uniquely defined by the pair of the unit and time indicator.}
 \item{force}{a string indicating whether unit or time or both fixed effects will be imposed. Must be one of the following, "none", "unit", "time", or "two-way". The default is "two-way".}
-\item{time.component.from}{Controls which units provide the time-varying model components (time fixed effects, factor structure, temporal dynamics). Options are \code{"notyettreated"} (default) --- all units contribute during their pre-treatment periods, or \code{"nevertreated"} --- only never-treated units estimate the time components, which are then projected onto treated units.}
+\item{time.component.from}{Controls which units provide the time-varying model components (time fixed effects, factor structure, temporal dynamics). Options are \code{"notyettreated"} --- all units contribute during their pre-treatment periods, or \code{"nevertreated"} --- only never-treated units estimate the time components, which are then projected onto treated units. The default \code{NULL} resolves automatically: \code{"nevertreated"} under \code{vartype = "conformal"} with \code{method} \code{"fe"}, \code{"ife"}, or \code{"cfe"} (strict separation, matching the conformal calibration; a message is emitted), and \code{"notyettreated"} otherwise. Passing \code{"notyettreated"} explicitly together with \code{vartype = "conformal"} is honored with a warning (the main fit then pools treated pre-treatment cells).}
 \item{em}{a logical flag indicating whether to use the EM algorithm for missing data in the estimation sample. Default is \code{TRUE}. Setting \code{em = FALSE} requires a complete estimation sample and is only compatible with \code{time.component.from = "nevertreated"}.}
 \item{r}{an integer specifying the number of factors. If \code{CV = TRUE}, the cross validation procedure will select the optimal number of factors from \code{r} to 5.}
 \item{lambda}{a single or sequence of positive numbers specifying the hyper-parameter sequence for matrix completion method. If \code{lambda} is a sequence and \code{CV = 1}, cross-validation will be performed.}
@@ -83,17 +87,23 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
 \item{vartype}{a string specifying the type of variance estimator, e.g.
-  \code{"bootstrap"}. Three values are supported:
+  \code{"bootstrap"}. Four values are supported:
   \code{"bootstrap"} (nonparametric cluster-bootstrap; the safe default),
-  \code{"jackknife"} (leave-one-unit-out), and
-  \code{"parametric"} (two-stage pseudo-treated parametric bootstrap).
+  \code{"jackknife"} (leave-one-unit-out),
+  \code{"parametric"} (two-stage pseudo-treated parametric bootstrap), and
+  \code{"conformal"} (cross-sectional conformal prediction interval; rank-based
+  and distribution-free, with no bootstrap draws).
   The \code{"parametric"} option is restricted to the
   gsynth-style regime: it requires
   \code{time.component.from = "nevertreated"}, no treatment reversal,
   and \code{method} not in \code{c("mc", "both")}.
   These three conditions correspond to Gates A, B, and C in the
   three-gate defense system (see \code{ARCHITECTURE.md}).
-  For all other settings, \code{vartype = "bootstrap"} is recommended.}
+  \code{"conformal"} likewise requires a separated (controls-only)
+  fit and \code{method} not in \code{c("mc", "both")}; it supports both block
+  (common-onset) and staggered adoption, but not group / reversal / weighted /
+  balanced / placebo / carryover options. See the \code{conformal.*}
+  arguments. For all other settings, \code{vartype = "bootstrap"} is recommended.}
 \item{para.error}{a string specifying the residual-error model used by
   the parametric bootstrap path; sub-option of \code{vartype = "parametric"}
   (silently ignored otherwise). One of \code{"auto"}, \code{"ar"},
@@ -105,6 +115,33 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   resamples residuals i.i.d. from the main-fit pool (requires fully-
   observed panel); \code{"wild"} applies unit-level Rademacher sign-flips
   over the empirical residual pool (requires fully-observed panel).}
+\item{conformal.scale}{for \code{vartype = "conformal"}: the per-unit scale that
+  normalizes each unit's prediction error before ranking. One of \code{"none"}
+  (the unscaled mean-absolute statistic), \code{"sd"} (studentize by the unit's
+  pre-period residual standard deviation), \code{"rmspe"} (Abadie pre-period
+  root-mean-square error), \code{"mad"} (robust median-absolute-deviation), or
+  \code{"diff"} (standard deviation of first-differenced pre-period residuals,
+  robust to nonstationary trends). \code{"model-se"} is reserved and not yet
+  implemented.}
+\item{conformal.center}{for \code{vartype = "conformal"}: the post-period
+  location summarized into the average effect, \code{"mean"} or \code{"median"}
+  (the latter is robust to a single aberrant post period). The per-period band
+  is always reported alongside.}
+\item{conformal.weight}{for \code{vartype = "conformal"} with multiple treated
+  units: how unit effects are aggregated into the average. \code{"cell"} weights
+  each treated unit-period equally (the conventional ATT; equals
+  \code{fect}'s \code{att.avg}), \code{"unit"} weights each treated unit equally,
+  and \code{"precision"} weights by inverse pre-period variance (down-weighting
+  noisy units).}
+\item{conformal.band}{for \code{vartype = "conformal"}: the band reported in
+  \code{est.att}. \code{"pointwise"} (each period covers on its own) or
+  \code{"simultaneous"} (a uniform sup-t band over the post window for whole-path
+  statements). The uniform band is also always stored in \code{fit$est.att.sim}.}
+\item{conformal.cutoff}{for \code{vartype = "conformal"} pointwise bands: whether
+  the rank cutoff is computed \code{"per-period"} (separately at each period) or
+  \code{"pooled"} (one cutoff over all post-period control gaps).}
+
+\item{conformal.fit}{for \code{vartype = "conformal"}: an optional custom separated learner, a function \code{f(Y, X, time, control.ids, target.id, T0)} returning the imputed untreated path for \code{target.id}, fitted on \code{control.ids} (and the target's own cells up to \code{T0} only). When supplied, both sides of the calibration run through it: every held-out control and each treated unit (the latter on its own pre-treatment window). The learner must be separated in the sense of the accompanying paper; built-in methods are used when \code{NULL} (default).}
 \item{cl}{a string specifying the cluster column for cluster bootstrapping.
 When \code{group.fe} is set to a single column and \code{cl} is unset,
 \code{cl} auto-defaults to \code{group.fe[1]} --- the natural choice when
