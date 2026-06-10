@@ -199,6 +199,22 @@ conformal_calibrate <- function(Y, D, X = NULL, I, II, T.on, r.cv, eff,
     g
   }
 
+  ## --- custom separated learner: score the TREATED units through the same
+  ## hook the donors use, so both sides of the calibration come from one
+  ## estimator. (Previously the treated gap came from the main fect fit while
+  ## donors went through conformal.fit -- mismatched arms.) Each treated unit
+  ## is fitted on its OWN pre-window (onset - 1); donors keep the union
+  ## pseudo-window in loo_gap, mirroring the built-in impute_Y0 path.
+  if (!is.null(conformal.fit)) {
+    for (i in seq_len(Ntr)) {
+      id  <- id.tr[i]
+      T0i <- if (is.finite(onsets[i])) onsets[i] - 1L else max(pre.idx)
+      y0  <- conformal.fit(Y = Y, X = X, time = seq_len(TT),
+                           control.ids = valid.co, target.id = id, T0 = T0i)
+      eff[, id] <- Y[, id] - y0
+    }
+  }
+
   ## --- full per-control LOO gap paths (calendar-indexed), and a per-unit scale
   ## from each control's pre-period gaps. Keeping the whole path lets us serve
   ## both the scalar average interval AND the per-period band from one pass.

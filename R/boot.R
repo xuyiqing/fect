@@ -147,6 +147,7 @@ fect_boot <- function(
   conformal.weight = "cell",
   conformal.band = "pointwise",
   conformal.cutoff = "per-period",
+  conformal.fit = NULL,
   quantile.CI = FALSE,
   nboots = 200,
   parallel = TRUE,
@@ -576,7 +577,8 @@ fect_boot <- function(
       norm.para = norm.para,
       scale = conformal.scale, center = conformal.center,
       weight = conformal.weight, band.type = conformal.band,
-      cutoff = conformal.cutoff, alpha = alpha
+      cutoff = conformal.cutoff, alpha = alpha,
+      conformal.fit = conformal.fit
     )
 
     ## back out a nominal S.E. from the symmetric conformal CI (display only;

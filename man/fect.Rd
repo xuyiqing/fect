@@ -9,7 +9,7 @@ assumptions.}
             group = NULL,
             na.rm = FALSE,
             index, force = "two-way",
-            time.component.from = "notyettreated", em = TRUE,
+            time.component.from = NULL, em = TRUE,
             r = 0, lambda = NULL, nlambda = 10,
             CV = NULL, k = 20, cv.prop = 0.1, cv.method = "rolling",
             cv.nobs = 3, cv.donut = 1, cv.buffer = 1, criterion = "mspe",
@@ -18,7 +18,8 @@ assumptions.}
             para.error = "auto",
             conformal.scale = "sd", conformal.center = "mean",
             conformal.weight = "cell", conformal.band = "pointwise",
-            conformal.cutoff = "per-period", cl = NULL,
+            conformal.cutoff = "per-period",
+            conformal.fit = NULL, cl = NULL,
             ci.method = "normal", quantile.CI = NULL,
             nboots = 200, alpha = 0.05,
             parallel = TRUE, cores = NULL, tol = 1e-5,
@@ -62,7 +63,7 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
 \item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Every observation should be uniquely defined by the pair of the unit and time indicator.}
 \item{force}{a string indicating whether unit or time or both fixed effects will be imposed. Must be one of the following, "none", "unit", "time", or "two-way". The default is "two-way".}
-\item{time.component.from}{Controls which units provide the time-varying model components (time fixed effects, factor structure, temporal dynamics). Options are \code{"notyettreated"} (default) --- all units contribute during their pre-treatment periods, or \code{"nevertreated"} --- only never-treated units estimate the time components, which are then projected onto treated units.}
+\item{time.component.from}{Controls which units provide the time-varying model components (time fixed effects, factor structure, temporal dynamics). Options are \code{"notyettreated"} --- all units contribute during their pre-treatment periods, or \code{"nevertreated"} --- only never-treated units estimate the time components, which are then projected onto treated units. The default \code{NULL} resolves automatically: \code{"nevertreated"} under \code{vartype = "conformal"} with \code{method} \code{"fe"}, \code{"ife"}, or \code{"cfe"} (strict separation, matching the conformal calibration; a message is emitted), and \code{"notyettreated"} otherwise. Passing \code{"notyettreated"} explicitly together with \code{vartype = "conformal"} is honored with a warning (the main fit then pools treated pre-treatment cells).}
 \item{em}{a logical flag indicating whether to use the EM algorithm for missing data in the estimation sample. Default is \code{TRUE}. Setting \code{em = FALSE} requires a complete estimation sample and is only compatible with \code{time.component.from = "nevertreated"}.}
 \item{r}{an integer specifying the number of factors. If \code{CV = TRUE}, the cross validation procedure will select the optimal number of factors from \code{r} to 5.}
 \item{lambda}{a single or sequence of positive numbers specifying the hyper-parameter sequence for matrix completion method. If \code{lambda} is a sequence and \code{CV = 1}, cross-validation will be performed.}
@@ -139,6 +140,8 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
 \item{conformal.cutoff}{for \code{vartype = "conformal"} pointwise bands: whether
   the rank cutoff is computed \code{"per-period"} (separately at each period) or
   \code{"pooled"} (one cutoff over all post-period control gaps).}
+
+\item{conformal.fit}{for \code{vartype = "conformal"}: an optional custom separated learner, a function \code{f(Y, X, time, control.ids, target.id, T0)} returning the imputed untreated path for \code{target.id}, fitted on \code{control.ids} (and the target's own cells up to \code{T0} only). When supplied, both sides of the calibration run through it: every held-out control and each treated unit (the latter on its own pre-treatment window). The learner must be separated in the sense of the accompanying paper; built-in methods are used when \code{NULL} (default).}
 \item{cl}{a string specifying the cluster column for cluster bootstrapping.
 When \code{group.fe} is set to a single column and \code{cl} is unset,
 \code{cl} auto-defaults to \code{group.fe[1]} --- the natural choice when

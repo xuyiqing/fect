@@ -326,3 +326,54 @@ test_that("conformal runs with covariates under staggered adoption (est.beta abs
   expect_true(!is.null(f$beta))                # point coefficient still reported
   expect_true(is.null(f$est.beta))             # and no inference object invented
 })
+
+test_that("conformal.fit scores the treated unit too (custom two-step DiD learner)", {
+  ## Regression guard (2026-06-10): previously the hook scored donors only and
+  ## the treated gap came from the main fect fit -- mismatched arms. Now both
+  ## sides run through the hook: with a deterministic two-step DiD learner the
+  ## ATT the interval is built on must equal the hand-computed DiD gap.
+  set.seed(77)
+  N <- 18; TT <- 14
+  Y <- outer(rnorm(TT), rep(1, N)) + outer(rep(1, TT), rnorm(N)) +
+       matrix(rnorm(TT * N), TT, N)
+  dat <- data.frame(id = rep(1:N, each = TT), time = rep(1:TT, N),
+                    Y = as.vector(Y))
+  dat$D <- as.integer(dat$id == 1 & dat$time >= 10)
+  did_fit <- function(Y, X, time, control.ids, target.id, T0) {
+    trend <- rowMeans(Y[, control.ids, drop = FALSE])
+    trend - mean(trend[seq_len(T0)]) + mean(Y[seq_len(T0), target.id])
+  }
+  f <- suppressMessages(fect::fect(Y ~ D, data = dat, index = c("id", "time"),
+        method = "gsynth", force = 3, CV = FALSE, r = 0, se = TRUE,
+        vartype = "conformal", conformal.fit = did_fit, parallel = FALSE))
+  y0   <- did_fit(Y, NULL, 1:TT, 2:N, 1, 9)
+  att  <- mean((Y[, 1] - y0)[10:14])
+  expect_equal(unname(f$est.avg[1]), att, tolerance = 1e-8)
+  expect_true(f$est.avg[3] < f$est.avg[4])
+})
+
+test_that("time.component.from auto-resolves under vartype = 'conformal' (ife)", {
+  set.seed(88)
+  N <- 16; TT <- 14
+  Fm <- matrix(rnorm(TT), TT, 1); L <- matrix(rnorm(N), N, 1)
+  Y  <- Fm %*% t(L) + matrix(rnorm(TT * N), TT, N)
+  dat <- data.frame(id = rep(1:N, each = TT), time = rep(1:TT, N),
+                    Y = as.vector(Y))
+  dat$D <- as.integer(dat$id == 1 & dat$time >= 10)
+  run <- function(...) fect::fect(Y ~ D, data = dat, index = c("id", "time"),
+        method = "ife", force = 3, CV = FALSE, r = 1, se = TRUE,
+        vartype = "conformal", parallel = FALSE, ...)
+  expect_message(f1 <- suppressWarnings(run()), "nevertreated")
+  f2 <- suppressMessages(run(time.component.from = "nevertreated"))
+  expect_equal(f1$est.avg, f2$est.avg)
+  w <- testthat::capture_warnings(
+    f3 <- suppressMessages(run(time.component.from = "notyettreated")))
+  expect_true(any(grepl("weak separation", w)))
+  ## non-conformal callers keep the legacy default
+  g1 <- suppressMessages(fect::fect(Y ~ D, data = dat, index = c("id", "time"),
+        method = "ife", force = 3, CV = FALSE, r = 1, se = FALSE, parallel = FALSE))
+  g2 <- suppressMessages(fect::fect(Y ~ D, data = dat, index = c("id", "time"),
+        method = "ife", force = 3, CV = FALSE, r = 1, se = FALSE, parallel = FALSE,
+        time.component.from = "notyettreated"))
+  expect_equal(g1$att.avg, g2$att.avg)
+})

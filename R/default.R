@@ -39,7 +39,7 @@ fect <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
-    time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    time.component.from = NULL, # factor estimation sample: NULL = auto ("nevertreated" under vartype="conformal" for fe/ife/cfe, else "notyettreated")
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # number of factors
     lambda = NULL, # mc method: regularization parameter
@@ -63,6 +63,7 @@ fect <- function(
     conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
     conformal.band = "pointwise", # vartype="conformal": est.att band pointwise|simultaneous
     conformal.cutoff = "per-period", # vartype="conformal": pointwise cutoff per-period|pooled
+    conformal.fit = NULL, # vartype="conformal": custom separated learner f(Y, X, time, control.ids, target.id, T0) -> y0 path
     cl = NULL,
     ci.method = "normal", # CI method for fect's est.* slots: "normal" (Wald: theta_hat +- z * SE) or "basic" (reflected pivot, Davison-Hinkley 1997 Sec. 5.2.1). For percentile / bc / bca on alternative estimands (att.cumu, aptt, log.att), call estimand(fit, type, ci.method) post-fit
     quantile.CI = NULL, # DEPRECATED: use ci.method instead. NULL sentinel = "not supplied"; legacy FALSE -> ci.method = "normal", legacy TRUE -> ci.method = "basic"
@@ -127,7 +128,7 @@ fect.formula <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
-    time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    time.component.from = NULL, # factor estimation sample: NULL = auto ("nevertreated" under vartype="conformal" for fe/ife/cfe, else "notyettreated")
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # nubmer of factors
     lambda = NULL, # mc method: regularization parameter
@@ -151,6 +152,7 @@ fect.formula <- function(
     conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
     conformal.band = "pointwise", # vartype="conformal": est.att band pointwise|simultaneous
     conformal.cutoff = "per-period", # vartype="conformal": pointwise cutoff per-period|pooled
+    conformal.fit = NULL, # vartype="conformal": custom separated learner f(Y, X, time, control.ids, target.id, T0) -> y0 path
     cl = NULL,
     ci.method = "normal", # CI method for fect's est.* slots: "normal" or "basic"
     quantile.CI = NULL, # DEPRECATED: use ci.method instead
@@ -271,6 +273,7 @@ fect.formula <- function(
         conformal.weight = conformal.weight,
         conformal.band = conformal.band,
         conformal.cutoff = conformal.cutoff,
+        conformal.fit = conformal.fit,
         cl = cl,
         ci.method = ci.method,
         quantile.CI = quantile.CI,
@@ -337,7 +340,7 @@ fect.default <- function(
     na.rm = FALSE, # remove missing values
     index, # c(unit, time) indicators
     force = "two-way", # fixed effects demeaning
-    time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
+    time.component.from = NULL, # factor estimation sample: NULL = auto ("nevertreated" under vartype="conformal" for fe/ife/cfe, else "notyettreated")
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = 0, # nubmer of factors
     lambda = NULL, ## mc method: regularization parameter
@@ -361,6 +364,7 @@ fect.default <- function(
     conformal.weight = "cell", # vartype="conformal": multi-treated aggregation cell|unit|precision
     conformal.band = "pointwise", # vartype="conformal": est.att band pointwise|simultaneous
     conformal.cutoff = "per-period", # vartype="conformal": pointwise cutoff per-period|pooled
+    conformal.fit = NULL, # vartype="conformal": custom separated learner f(Y, X, time, control.ids, target.id, T0) -> y0 path
     cl = NULL,
     ci.method = "normal", # CI method for fect's est.* slots: "normal" or "basic"
     quantile.CI = NULL, # DEPRECATED: use ci.method instead
@@ -738,6 +742,24 @@ fect.default <- function(
         stop(
             "\"method\" option misspecified; choose from c(\"fe\",\"gsynth\", \"ife\", \"mc\", \"both\", \"cfe\")."
         )
+    }
+
+    ## resolve time.component.from (NULL = auto). Under vartype = "conformal"
+    ## the calibration is strictly separated (controls-only); resolving the
+    ## MAIN fit to "nevertreated" as well makes the treated unit's gap obey
+    ## strict separation too, matching the paper's Algorithm 1 exactly.
+    if (is.null(time.component.from)) {
+        if (vartype == "conformal" && method %in% c("fe", "ife", "cfe")) {
+            time.component.from <- "nevertreated"
+            message("vartype = \"conformal\": time.component.from set to \"nevertreated\" (strict separation; pass \"notyettreated\" explicitly to override).")
+        } else {
+            time.component.from <- "notyettreated"
+        }
+    } else if (vartype == "conformal" && identical(time.component.from, "notyettreated") &&
+               method %in% c("fe", "ife", "cfe")) {
+        warning("vartype = \"conformal\" with time.component.from = \"notyettreated\": ",
+                "the main fit pools treated pre-treatment cells (weak separation only); ",
+                "\"nevertreated\" gives the exact finite-sample guarantee.", call. = FALSE)
     }
 
     ## validate time.component.from
@@ -2796,6 +2818,7 @@ fect.default <- function(
             conformal.weight = conformal.weight,
             conformal.band = conformal.band,
             conformal.cutoff = conformal.cutoff,
+        conformal.fit = conformal.fit,
             quantile.CI = .quantile.CI.bool,
             nboots = nboots,
             parallel = parallel,
