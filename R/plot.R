@@ -11,6 +11,7 @@ plot.fect <- function(
     type = NULL, # gap, equiv, status, exit, factors, loadings, calendar, counterfactual, heterogeneous
     restrict = "rm",
     loo = FALSE,
+    dloo = FALSE, ## view the double leave-one-out (dloo) pre-trend placebos; reuses loo's slots with a distinct label
     highlight = NULL, ## TRUE / FALSE / NULL (auto) / character subset of c("placebo", "carryover", "carryover.rm")
     highlight.fill = FALSE, ## TRUE: draw a lightened background rectangle behind each highlighted period; default FALSE keeps the glyph-only minimal look.
     plot.ci = NULL, ## "0.9", "0.95", "none"
@@ -404,6 +405,37 @@ plot.fect <- function(
     loo <- 1
   } else {
     loo <- 0
+  }
+
+  ## Double leave-one-out (dloo) view. dloo fills the SAME pre.* slots as loo,
+  ## so we drive the identical machinery (set the local loo state on) but flag
+  ## the view so the estimate label reads "Double-LOO" instead of "LOO".
+  dloo.view <- FALSE
+  if (isTRUE(dloo)) {
+    if (pequiv == FALSE) {
+      stop("No double leave-one-out (dloo) results for pre-treatment periods.")
+    }
+    if (!isTRUE(x$dloo)) {
+      warning("plot(dloo = TRUE) but the fit was not produced with dloo = TRUE.",
+              call. = FALSE)
+    }
+    loo <- 1           # dloo reuses loo's slots; dloo takes precedence over loo
+    x$loo <- TRUE      # mirror loo state so the loo == 1 & x$loo branches fire
+    dloo.view <- TRUE
+  }
+
+  ## A fit produced with dloo = TRUE fills the loo slots with double-LOO
+  ## estimates, so plot(loo = TRUE) plots those (under the plain "LOO" label).
+  ## Warn so the user knows the pre-treatment ATTs are actually double-LOO.
+  if (loo == 1 && !dloo.view && isTRUE(x$dloo)) {
+    warning(
+      if (isTRUE(x$dloo_adjust)) {
+        "Double-leave-one-out (adjusted by (g-2)/(g-1)) used for pre-treatment ATTs"
+      } else {
+        "Double-leave-one-out used for pre-treatment ATTs"
+      },
+      call. = FALSE
+    )
   }
 
   ## y=0 line type
@@ -2697,7 +2729,9 @@ plot.fect <- function(
       ## add legend for 95\% CI
       set.limits <- "ci"
       if (is.null(legend.labs) == TRUE) {
-        est_label <- if (loo == 1 && type %in% c("gap", "equiv")) "LOO Estimates" else "ATT"
+        est_label <- if (loo == 1 && type %in% c("gap", "equiv")) {
+          if (isTRUE(dloo.view)) "Double-LOO Estimates" else "LOO Estimates"
+        } else "ATT"
         if (plot.ci == "90") {
           set.labels <- paste0(est_label, " (w/ 90% CI)")
         } else if (plot.ci == "95") {

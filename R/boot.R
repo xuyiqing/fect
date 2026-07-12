@@ -156,9 +156,23 @@ fect_boot <- function(
   gamma.loading = NULL,
   gamma.loading.grid = NULL,
   W.in.fit = TRUE,
-  W.in.agg = TRUE
+  W.in.agg = TRUE,
+  dloo = FALSE,            # apply the dloo pre-trend overlay to each replicate
+  dloo_adjust = FALSE,     # dloo: use Liu's pre-treatment-average baseline
+  dloo.controls = "not-yet-treated",
+  dloo.rawtime = NULL,     # calendar time per row (for cohort/event alignment)
+  dloo.group.map = NULL    # rawgroup<->newgroup map for the per-group breakdown
 ) {
   do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
+  ## dloo overlay bookkeeping: the pre-trend draws are collected per replicate
+  ## (like att.boot) so inference reuses the native resampling with no retained
+  ## per-replicate panels. `dloo.pre.term` / `dloo.npre` / `dloo.ng` are filled
+  ## once the point fit `out` is available (just before the collectors are
+  ## allocated), so each replicate's draw aligns to the fit's pre-trend axis.
+  dloo <- isTRUE(dloo)
+  dloo.pre.term <- NULL
+  dloo.npre <- 0L
+  dloo.ng   <- 0L
   na.pos <- NULL
   TT <- dim(Y)[1]
   N <- dim(Y)[2]
@@ -614,6 +628,23 @@ fect_boot <- function(
   att.avg.unit.boot <- matrix(0, 1, nboots)
   att.boot <- matrix(0, length(time.on), nboots)
   att.count.boot <- matrix(0, length(time.on), nboots)
+  ## dloo pre-trend draws, one column per replicate (pooled) / one slice per
+  ## replicate (per group). The pre-trend axis is taken from the point fit `out`
+  ## (its non-positive event times), so each replicate's draw aligns to exactly
+  ## the rows the point estimate uses. `dloo.rawtime.use` labels the TT rows for
+  ## the cohort/event mapping; row order is what matters, so 1:TT is a valid
+  ## fallback when the caller does not pass the calendar times.
+  dloo.rawtime.use <- NULL
+  if (dloo) {
+    dloo.rawtime.use <- if (!is.null(dloo.rawtime)) dloo.rawtime else seq_len(TT)
+    dloo.pre.term <- sort(out$time[out$time <= 0])
+    dloo.npre <- length(dloo.pre.term)
+    dloo.ng   <- if (!is.null(dloo.group.map))
+                     length(unique(dloo.group.map$newgroup)) else 0L
+  }
+  pre.att.boot <- if (dloo) matrix(NA_real_, dloo.npre, nboots) else NULL
+  pre.att.group.boot <- if (dloo && dloo.ng > 0)
+      array(NA_real_, dim = c(dloo.ng, dloo.npre, nboots)) else NULL
   beta.boot <- marginal.boot <- att.off.boot <- att.off.count.boot <- NULL
   calendar.eff.boot <- matrix(0, TT, nboots)
   calendar.eff.fit.boot <- matrix(0, TT, nboots)
@@ -1343,6 +1374,11 @@ fect_boot <- function(
           I = matrix(NA_real_, TT, length(boot.id)),
           boot.id = boot.id
         )
+        if (dloo) {
+          boot0$dloo.pre <- rep(NA_real_, dloo.npre)
+          if (dloo.ng > 0)
+            boot0$dloo.pre.group <- matrix(NA_real_, dloo.ng, dloo.npre)
+        }
         return(boot0)
       } else {
         T.off.boot <- NULL
@@ -1578,9 +1614,27 @@ fect_boot <- function(
             I = matrix(NA_real_, TT, length(boot.id)),
             boot.id = boot.id
           )
+          if (dloo) {
+            boot0$dloo.pre <- rep(NA_real_, dloo.npre)
+            if (dloo.ng > 0)
+              boot0$dloo.pre.group <- matrix(NA_real_, dloo.ng, dloo.npre)
+          }
           return(boot0)
         } else {
           boot$boot.id <- boot.id
+          ## dloo overlay on THIS replicate's resampled panel (no refit, no
+          ## retained panels): apply the same linear overlay fect_boot's caller
+          ## uses for the point estimate. Keeps only the small pre-trend draw.
+          if (dloo) {
+            dd <- .dloo_boot_draw(
+              eff = boot$eff, D = D.boot, I = I.boot,
+              rawtime = dloo.rawtime.use, group.map = dloo.group.map,
+              G = if (dloo.ng > 0) boot.group else NULL,
+              controls = dloo.controls, correct = dloo_adjust,
+              pre.term = dloo.pre.term)
+            boot$dloo.pre <- dd$att
+            if (dloo.ng > 0) boot$dloo.pre.group <- dd$group_att
+          }
           return(boot)
         }
       }
@@ -1631,7 +1685,10 @@ fect_boot <- function(
       eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
       D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
       I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
-      boot.id = NULL
+      boot.id = NULL,
+      dloo.pre = if (dloo) rep(NA_real_, dloo.npre) else NULL,
+      dloo.pre.group = if (dloo && dloo.ng > 0)
+          matrix(NA_real_, dloo.ng, dloo.npre) else NULL
     )
   }
   if (do_parallel_boot) {
@@ -1847,6 +1904,11 @@ fect_boot <- function(
       att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
       att.boot[, j] <- boot.out[[j]]$att
       att.count.boot[, j] <- boot.out[[j]]$count
+      if (dloo) {
+        pre.att.boot[, j] <- boot.out[[j]]$dloo.pre
+        if (dloo.ng > 0)
+          pre.att.group.boot[, , j] <- boot.out[[j]]$dloo.pre.group
+      }
       if (keep.sims) {
         colnames(boot.out[[j]]$eff) <- boot.out[[j]]$boot.id
         eff.boot[,, j] <- boot.out[[j]]$eff
@@ -1962,6 +2024,11 @@ fect_boot <- function(
       att.avg.unit.boot[, j] <- boot$att.avg.unit
       att.boot[, j] <- boot$att
       att.count.boot[, j] <- boot$count
+      if (dloo) {
+        pre.att.boot[, j] <- boot$dloo.pre
+        if (dloo.ng > 0)
+          pre.att.group.boot[, , j] <- boot$dloo.pre.group
+      }
       if (keep.sims) {
         colnames(boot$eff) <- boot$boot.id
         # assign("boot", boot, .GlobalEnv)
@@ -2075,6 +2142,11 @@ fect_boot <- function(
     att.avg.unit.boot <- t(as.matrix(att.avg.unit.boot[, -boot.rm]))
     att.boot <- as.matrix(att.boot[, -boot.rm])
     att.count.boot <- as.matrix(att.count.boot[, -boot.rm])
+    if (dloo) {
+      pre.att.boot <- matrix(pre.att.boot[, -boot.rm], nrow = dloo.npre)
+      if (dloo.ng > 0)
+        pre.att.group.boot <- pre.att.group.boot[, , -boot.rm, drop = FALSE]
+    }
     calendar.eff.boot <- as.matrix(calendar.eff.boot[, -boot.rm])
     calendar.eff.fit.boot <- as.matrix(calendar.eff.fit.boot[, -boot.rm])
     if (p > 0) {
@@ -4660,6 +4732,12 @@ fect_boot <- function(
         colnames.boot = colnames.boot
       )
     )
+  }
+  if (dloo) {
+    ## Distinct keys so these raw per-replicate draws don't collide with the
+    ## final `pre.att.boot` slot that default.R fills from them via .dloo_fill.
+    result <- c(result, list(dloo.pre.att.boot = pre.att.boot,
+                             dloo.pre.att.group.boot = pre.att.group.boot))
   }
 
   if (p > 0) {

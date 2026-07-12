@@ -94,6 +94,8 @@ fect <- function(
     carryover.period = NULL, # carry-over period
     carryover.rm = NULL,
     loo = FALSE, # leave one period out placebo
+    dloo = FALSE, # double (cohort-wise) leave-one-out pre-trend placebo (closed-form overlay; no refit)
+    dloo_adjust = FALSE, # with dloo: use Liu's pre-treatment-average baseline instead of the leave-one-out baseline
     permute = FALSE, ## permutation test
     m = 2, ## block length
     normalize = FALSE, # accelerate option
@@ -177,6 +179,8 @@ fect.formula <- function(
     carryover.period = NULL, # carry-over period
     carryover.rm = NULL,
     loo = FALSE, # leave one period out placebo
+    dloo = FALSE, # double (cohort-wise) leave-one-out pre-trend placebo (closed-form overlay; no refit)
+    dloo_adjust = FALSE, # with dloo: use Liu's pre-treatment-average baseline instead of the leave-one-out baseline
     permute = FALSE, ## permutation test
     m = 2, ## block length
     normalize = FALSE,
@@ -290,6 +294,8 @@ fect.formula <- function(
         carryover.period = carryover.period,
         carryover.rm = carryover.rm,
         loo = loo,
+        dloo = dloo,
+        dloo_adjust = dloo_adjust,
         permute = permute,
         m = m,
         normalize = normalize,
@@ -377,6 +383,8 @@ fect.default <- function(
     carryover.period = NULL, # carry-over period
     carryover.rm = NULL,
     loo = FALSE, # leave one period out placebo
+    dloo = FALSE, # double (cohort-wise) leave-one-out pre-trend placebo (closed-form overlay; no refit)
+    dloo_adjust = FALSE, # with dloo: use Liu's pre-treatment-average baseline instead of the leave-one-out baseline
     permute = FALSE, ## permutation test
     m = 2, ## block length
     normalize = FALSE,
@@ -393,6 +401,50 @@ fect.default <- function(
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     placeboEquiv <- loo
     permu.dimension <- "time"
+
+    ## ------------------------------------------------------------------ ##
+    ## double leave-one-out (dloo) pre-trend placebo: argument-level checks.
+    ## dloo is a closed-form overlay on the in-sample fit (see R/dloo.R); it
+    ## fills the same pre.est.att / pre.att.bound / pre.att.boot slots as `loo`
+    ## but without re-fitting. The structural requirements (staggered adoption,
+    ## balanced pre-treatment panel) are validated below, once D / I / hasRevs
+    ## are available. Here we validate the flag combinations.
+    ## ------------------------------------------------------------------ ##
+    if (isTRUE(dloo_adjust) && !isTRUE(dloo)) {
+        stop("\"dloo_adjust\" requires \"dloo = TRUE\".")
+    }
+    if (isTRUE(dloo)) {
+        if (isTRUE(loo)) {
+            stop("\"dloo\" and \"loo\" can't be used simultaneously.")
+        }
+        if (isTRUE(placeboTest) || isTRUE(carryoverTest)) {
+            stop("\"dloo\" can't be combined with \"placeboTest\" or \"carryoverTest\".")
+        }
+        if (isTRUE(binary)) {
+            stop("\"dloo\" does not support binary (probit) models.")
+        }
+        if (isTRUE(permute)) {
+            stop("\"permute\" can't be used with \"dloo\".")
+        }
+        ## dloo is exact ONLY for additive two-way fixed effects; fail fast on
+        ## latent-factor / matrix-completion models before the fit. (group.fe
+        ## keeps method = "fe" here and is coerced to the cfe backend later, so
+        ## it is unaffected.) The default method is already "fe".
+        if (!is.null(method) && !method %in% c("fe")) {
+            stop("\"dloo\" is only supported for additive two-way fixed-effects ",
+                 "imputation (method = \"fe\"). It is not yet validated for ",
+                 "latent-factor / matrix-completion models (ife, mc, gsynth, ",
+                 "both, cfe).")
+        }
+        ## Like `loo`, dloo reports pre-trend SEs; ensure the native bootstrap
+        ## runs even if the user left se = FALSE. The overlay is applied to each
+        ## replicate INSIDE fect_boot, so no separate resampler and no retention
+        ## of per-replicate panels (keep.sims stays whatever the user set).
+        if (se == FALSE) {
+            message("For the double leave-one-out placebo test, automatically set \"se\" to TRUE.")
+            se <- TRUE
+        }
+    }
 
     ## read data
     if (is.data.frame(data) == FALSE || length(class(data)) > 1) {
@@ -2314,6 +2366,36 @@ fect.default <- function(
         }
     }
 
+    ## double leave-one-out (dloo): structural requirements. Checked here on the
+    ## FINAL estimation panel (after all unit/period removals) so we fail before
+    ## the fit and never falsely reject a unit that fect drops anyway. The
+    ## closed-form overlay is exact only for a staggered-adoption design (no
+    ## treatment reversal) and a balanced pre-treatment panel (no missing
+    ## pre-treatment cells; post-treatment missingness is irrelevant to a
+    ## pre-trend placebo). Violations return no estimates.
+    if (isTRUE(dloo)) {
+        if (hasRevs == TRUE) {
+            stop("\"dloo\" requires a staggered adoption design (no treatment reversal).")
+        }
+        dloo.prebal <- .dloo_check_prebalance(D, I)
+        if (is.character(dloo.prebal)) {
+            stop("\"dloo\" requires a balanced panel: ", dloo.prebal, ".")
+        }
+        ## A dloo placebo needs a leave-one-out baseline, so a cohort must have
+        ## at least two pre-treatment periods; a single-pre-period cohort yields
+        ## no estimable cell. If no cohort clears this, stop with a clear message
+        ## rather than erroring deep in the (post-fit) overlay assembly.
+        dloo.first <- apply(D, 2, function(d) {
+            d[is.na(d)] <- 0
+            w <- which(d == 1)
+            if (length(w) == 0) NA_integer_ else min(w)
+        })
+        dloo.maxpre <- suppressWarnings(max(dloo.first - 1L, na.rm = TRUE))
+        if (!is.finite(dloo.maxpre) || dloo.maxpre < 2) {
+            stop("\"dloo\" requires at least one cohort with >= 2 pre-treatment periods; none found.")
+        }
+    }
+
     ## 8. Finally, check enough observations
     if (min(apply(II, 1, sum)) == 0) {
         if (placeboTest == 1) {
@@ -2761,7 +2843,12 @@ fect.default <- function(
             time.component.from = time.component.from,
             loading.bound      = loading.bound,
             gamma.loading      = gamma.loading,
-            gamma.loading.grid = gamma.loading.grid
+            gamma.loading.grid = gamma.loading.grid,
+            ## dloo: apply the pre-trend overlay to each bootstrap replicate
+            ## inside fect_boot (no separate resampler, no retained sims).
+            dloo               = dloo,
+            dloo_adjust        = dloo_adjust,
+            dloo.group.map     = if (!is.null(group)) rawgroup else NULL
         )
 
     }
@@ -3340,6 +3427,45 @@ fect.default <- function(
         )
     }
 
+    ## double leave-one-out (dloo): fill the SAME pre-treatment placebo slots as
+    ## `loo`, but from the closed-form overlay on the assembled in-sample object
+    ## (no refit). The overlay reads output$eff / D.dat / I.dat / time, which are
+    ## the aligned slots at this point. Exact ONLY for additive two-way FE
+    ## (method = "fe"); with latent factors / matrix completion the fixed effects
+    ## do not cleanly cancel in the DiD, so we hard-stop (backstop to the
+    ## argument-level check; also catches any r.cv > 0 path).
+    if (isTRUE(dloo)) {
+        if (!is.null(output$method) && !output$method %in% c("fe") ||
+            (!is.null(output$r.cv) && isTRUE(output$r.cv > 0))) {
+            stop("\"dloo\" is only supported for additive two-way fixed-effects ",
+                 "imputation (method = \"fe\"). It is not yet validated for ",
+                 "latent-factor / matrix-completion models.", call. = FALSE)
+        }
+        dloo.out <- .dloo_fill(
+            output,
+            dloo_adjust    = dloo_adjust,
+            alpha          = alpha,
+            quantile.CI    = .quantile.CI.bool,
+            vartype        = vartype,
+            boot.pre       = output$dloo.pre.att.boot,
+            boot.pre.group = output$dloo.pre.att.group.boot
+        )
+        ## drop the raw per-replicate draws now that SEs are assembled
+        output$dloo.pre.att.boot <- NULL
+        output$dloo.pre.att.group.boot <- NULL
+        output <- c(
+            output,
+            list(
+                pre.est.att          = dloo.out$pre.est.att,
+                pre.att.bound        = dloo.out$pre.att.bound,
+                pre.att.boot         = dloo.out$pre.att.boot,
+                pre.est.group.output = dloo.out$pre.est.group.output
+            )
+        )
+        output$dloo         <- TRUE
+        output$dloo_adjust <- isTRUE(dloo_adjust)
+    }
+
     # if (placeboEquiv || placeboTest || carryoverTest) {
     # classic equivalence test, placeboTest, and carryoverTest
     # this can also be used in placeboTest
@@ -3377,6 +3503,25 @@ fect.default <- function(
             )
         )
         output <- c(output, list(loo.test.out = test.out))
+    }
+
+    ## double leave-one-out equivalence test. dloo populated the same
+    ## pre.est.att / pre.att.boot slots as loo, so we reuse diagtest's loo path
+    ## by toggling loo TRUE for this call (then restore FALSE: the user did not
+    ## request the single-loo test).
+    if (isTRUE(dloo) && se == 1) {
+        output$loo <- TRUE
+        suppressWarnings(
+            test.out <- diagtest(
+                output,
+                pre.periods = pre.periods,
+                f.threshold = f.threshold,
+                tost.threshold = tost.threshold,
+                N_bar = N_bar
+            )
+        )
+        output$loo <- FALSE
+        output <- c(output, list(dloo.test.out = test.out))
     }
 
     output <- c(output, list(call = match.call()))
