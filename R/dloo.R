@@ -131,14 +131,29 @@
     eff     <- fit$eff
     D       <- fit$D.dat
     I       <- fit$I.dat
-    rawtime <- fit$rawtime
     TT      <- nrow(eff)
     N       <- ncol(eff)
+
+    ## Work in ROW-INDEX time, not calendar time. fect's time axis is unique and
+    ## sorted (default.R builds tname via unique(sort(.))), so ranks are an
+    ## order-preserving relabelling: every use below is a comparison (which(t < g)),
+    ## a lookup (match(g, .)) or a difference (tcol - gcol + 1), all invariant to
+    ## it. Two reasons to normalise rather than carry fit$rawtime:
+    ##   * fect accepts Date and character time indices. vapply(., numeric(1))
+    ##     below strips a Date's class, after which match(<numeric>, <Date>)
+    ##     compares "12782" to "2000-12-31" and returns NA for every cell --- the
+    ##     point estimates come back silently all-NA while the bootstrap path
+    ##     (which already ranks) still fills the S.E. column.
+    ##   * it makes this path byte-identical to .dloo_boot_draw's, which passes
+    ##     seq_len(TT). The two must never disagree.
+    ## The original calendar labels are kept for cell_cohort_label only.
+    rawtime_orig <- fit$rawtime
+    rawtime      <- seq_len(TT)
 
     ## Control (= not-treated, observed) cell mask.
     ctrl_mask <- (!is.na(I) & I == 1) & (!is.na(D) & D == 0)
 
-    ## First-treated calendar time per unit; Inf for never-treated.
+    ## First-treated row per unit; Inf for never-treated.
     first_treat <- vapply(seq_len(N), function(i) {
         d <- D[, i]
         w <- which(!is.na(d) & d == 1)
@@ -198,7 +213,8 @@
          controls = controls,
          cell_cohort = cohort_v, cell_tcol = tcol_v,
          cell_event = et_v,
-         cell_cohort_label = cohorts[cohort_v],
+         cell_cohort_label = ifelse(is.finite(cohorts[cohort_v]),
+                                    rawtime_orig[cohorts[cohort_v]], NA),
          unit_group = unit_group, group_labels = group_labels)
 }
 
