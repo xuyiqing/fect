@@ -33,7 +33,8 @@ assumptions.}
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,
             carryoverTest = FALSE, carryover.period = NULL, carryover.rm = NULL,
-            loo = FALSE, permute = FALSE, m = 2,
+            loo = FALSE, dloo = FALSE, dloo_adjust = FALSE,
+            permute = FALSE, m = 2,
             normalize = FALSE, keep.sims = FALSE,
             cm = FALSE,
             loading.bound = "none", gamma.loading = NULL,
@@ -205,6 +206,14 @@ bootstrap always resamples units regardless of \code{cl}), and
 \item{carryover.period}{an integer or 2-element numeric vector specifying pseudo-carryover periods.}
 \item{carryover.rm}{an integer specifying the range of post-treatment periods to treat as carryover.}
 \item{loo}{a logical flag for leave-one-period-out goodness-of-fit tests.}
+\item{dloo}{a logical flag for the double (cohort-wise) leave-one-out pre-trend
+placebos. When \code{TRUE}, \code{fect} estimates these directly from the in-sample fit -- without re-fitting
+the imputation model.}
+\item{dloo_adjust}{a logical flag, used only with \code{dloo = TRUE}. When
+\code{TRUE}, the pre-trend estimates use the pre-treatment-average baseline of
+Liu (2025) instead of the leave-one-out baseline -- equivalently, the
+double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
+\eqn{g}.}
 \item{permute}{a logical flag indicating whether to run a permutation test.}
 \item{m}{an integer specifying the block length for permutation tests. Default \code{2}.}
 \item{normalize}{a logical flag indicating whether to scale outcome and covariates.}
@@ -319,6 +328,11 @@ Ignored when \code{CV = FALSE}.}
   \item{beta.boot}{bootstrap draws for \code{beta}.}
   \item{test.out}{F-test and equivalence test results for pre-treatment fit.}
   \item{loo.test.out}{leave-one-period-out test results.}
+  \item{dloo.test.out}{double leave-one-out (\code{dloo}) pre-trend test results.}
+  \item{pre.est.att}{when \code{loo} or \code{dloo} is \code{TRUE}, the
+  pre-treatment placebo estimates (ATT, S.E., CI, p-value, count) by event
+  time; for \code{dloo} these are the double-LOO (or, with
+  \code{dloo_adjust}, pre-treatment-average) estimates.}
   \item{permute}{permutation test results.}
 }
 \author{

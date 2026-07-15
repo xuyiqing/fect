@@ -1,4 +1,34 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.6
+
+* Add `dloo` and `dloo_adjust` flags to `fect()`: double (cohort-wise)
+  leave-one-out pre-trend placebos, computed as a closed-form overlay on the
+  in-sample fit -- **no re-fitting of the imputation model**. Like `loo`,
+  `dloo = TRUE` fills the object's `pre.est.att` / `pre.att.bound` /
+  `pre.att.boot` slots (and adds `dloo.test.out`), viewed with
+  `plot(fit, dloo = TRUE)` and tested through the existing pre-trend machinery.
+  The
+  double-LOO removes both the attenuation and the staggered-adoption
+  contamination bias of the in-sample placebo, and is algebraically identical
+  (fixed effects cancel in the DiD) to re-fitting the imputation model on the
+  restricted later-adopter control pool for every (cohort, period) -- see the
+  Proposition in Li & Strezhnev. `dloo_adjust = TRUE` selects Liu (2025)'s
+  pre-treatment-average baseline (equivalently, the double-LOO rescaled by
+  `(g-2)/(g-1)` per cohort), which is preferable for benchmarking
+  period-to-period *changes* in the parallel-trends violation. The flags
+  require a staggered-adoption design (no reversal) and a balanced
+  pre-treatment panel (post-treatment missingness is allowed); they error
+  otherwise. Standard errors reuse `fect`'s own bootstrap: the linear overlay
+  is applied to each case-resampled replicate inside the existing bootstrap
+  loop (no separate resampler, and no per-replicate panels are retained), and
+  the confidence intervals follow `ci.method` exactly as elsewhere in the
+  package, so dloo inference matches the rest of `fect`. Only supported for
+  `method = "fe"` (additive two-way fixed effects); other methods error. When
+  combined with `group`, subgroup-wise placebo series are filled into
+  `pre.est.group.output` (viewable via `plot(fit, dloo = TRUE, show.group = ...)`):
+  each subgroup averages the same per-unit placebo over its own treated units
+  with shared controls, so the subgroups aggregate back to the pooled series.
+
 # fect 2.4.5
 
 * Add `group.fe` to `fect()` for absorbing coarser fixed effects, such as state FE with county-level data. Closes #139. Clustered SE defaults to `group.fe[1]`; override with `cl = "<column>"`.
