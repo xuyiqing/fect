@@ -95,7 +95,7 @@ fect <- function(
     carryover.rm = NULL,
     loo = FALSE, # leave one period out placebo
     dloo = FALSE, # double (cohort-wise) leave-one-out pre-trend placebo (closed-form overlay; no refit)
-    dloo_adjust = FALSE, # with dloo: use Liu's pre-treatment-average baseline instead of the leave-one-out baseline
+    dloo.adjust = FALSE, # with dloo: use Liu's pre-treatment-average baseline instead of the leave-one-out baseline
     permute = FALSE, ## permutation test
     m = 2, ## block length
     normalize = FALSE, # accelerate option
@@ -180,7 +180,7 @@ fect.formula <- function(
     carryover.rm = NULL,
     loo = FALSE, # leave one period out placebo
     dloo = FALSE, # double (cohort-wise) leave-one-out pre-trend placebo (closed-form overlay; no refit)
-    dloo_adjust = FALSE, # with dloo: use Liu's pre-treatment-average baseline instead of the leave-one-out baseline
+    dloo.adjust = FALSE, # with dloo: use Liu's pre-treatment-average baseline instead of the leave-one-out baseline
     permute = FALSE, ## permutation test
     m = 2, ## block length
     normalize = FALSE,
@@ -295,7 +295,7 @@ fect.formula <- function(
         carryover.rm = carryover.rm,
         loo = loo,
         dloo = dloo,
-        dloo_adjust = dloo_adjust,
+        dloo.adjust = dloo.adjust,
         permute = permute,
         m = m,
         normalize = normalize,
@@ -384,7 +384,7 @@ fect.default <- function(
     carryover.rm = NULL,
     loo = FALSE, # leave one period out placebo
     dloo = FALSE, # double (cohort-wise) leave-one-out pre-trend placebo (closed-form overlay; no refit)
-    dloo_adjust = FALSE, # with dloo: use Liu's pre-treatment-average baseline instead of the leave-one-out baseline
+    dloo.adjust = FALSE, # with dloo: use Liu's pre-treatment-average baseline instead of the leave-one-out baseline
     permute = FALSE, ## permutation test
     m = 2, ## block length
     normalize = FALSE,
@@ -410,8 +410,8 @@ fect.default <- function(
     ## balanced pre-treatment panel) are validated below, once D / I / hasRevs
     ## are available. Here we validate the flag combinations.
     ## ------------------------------------------------------------------ ##
-    if (isTRUE(dloo_adjust) && !isTRUE(dloo)) {
-        stop("\"dloo_adjust\" requires \"dloo = TRUE\".")
+    if (isTRUE(dloo.adjust) && !isTRUE(dloo)) {
+        stop("\"dloo.adjust\" requires \"dloo = TRUE\".")
     }
     if (isTRUE(dloo)) {
         if (isTRUE(loo)) {
@@ -2860,7 +2860,7 @@ fect.default <- function(
             ## dloo: apply the pre-trend overlay to each bootstrap replicate
             ## inside fect_boot (no separate resampler, no retained sims).
             dloo               = dloo,
-            dloo_adjust        = dloo_adjust,
+            dloo.adjust        = dloo.adjust,
             dloo.group.map     = if (!is.null(group)) rawgroup else NULL
         )
 
@@ -3456,7 +3456,7 @@ fect.default <- function(
         }
         dloo.out <- .dloo_fill(
             output,
-            dloo_adjust    = dloo_adjust,
+            dloo.adjust    = dloo.adjust,
             alpha          = alpha,
             quantile.CI    = .quantile.CI.bool,
             vartype        = vartype,
@@ -3476,7 +3476,7 @@ fect.default <- function(
             )
         )
         output$dloo         <- TRUE
-        output$dloo_adjust <- isTRUE(dloo_adjust)
+        output$dloo.adjust <- isTRUE(dloo.adjust)
     }
 
     # if (placeboEquiv || placeboTest || carryoverTest) {

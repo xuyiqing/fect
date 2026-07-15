@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD025 -->
 # fect 2.4.6
 
-* Add `dloo` and `dloo_adjust` flags to `fect()`: double (cohort-wise)
+* Add `dloo` and `dloo.adjust` flags to `fect()`: double (cohort-wise)
   leave-one-out pre-trend placebos, computed as a closed-form overlay on the
   in-sample fit -- **no re-fitting of the imputation model**. Like `loo`,
   `dloo = TRUE` fills the object's `pre.est.att` / `pre.att.bound` /
@@ -12,7 +12,7 @@
   contamination bias of the in-sample placebo, and is algebraically identical
   (fixed effects cancel in the DiD) to re-fitting the imputation model on the
   restricted later-adopter control pool for every (cohort, period) -- see the
-  Proposition in Li & Strezhnev. `dloo_adjust = TRUE` selects Liu (2025)'s
+  Proposition in Li & Strezhnev. `dloo.adjust = TRUE` selects Liu (2025)'s
   pre-treatment-average baseline (equivalently, the double-LOO rescaled by
   `(g-2)/(g-1)` per cohort), which is preferable for benchmarking
   period-to-period *changes* in the parallel-trends violation. The flags

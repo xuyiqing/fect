@@ -429,7 +429,7 @@ plot.fect <- function(
   ## Warn so the user knows the pre-treatment ATTs are actually double-LOO.
   if (loo == 1 && !dloo.view && isTRUE(x$dloo)) {
     warning(
-      if (isTRUE(x$dloo_adjust)) {
+      if (isTRUE(x$dloo.adjust)) {
         "Double-leave-one-out (adjusted by (g-2)/(g-1)) used for pre-treatment ATTs"
       } else {
         "Double-leave-one-out used for pre-treatment ATTs"

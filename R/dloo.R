@@ -3,7 +3,7 @@
 ## the default in-sample (fect-default) imputation fit.
 ##
 ## These are INTERNAL helpers used by fect() when it is called with
-## `dloo = TRUE` (and, optionally, `dloo_adjust = TRUE`). They are not
+## `dloo = TRUE` (and, optionally, `dloo.adjust = TRUE`). They are not
 ## exported. The user-facing surface is the pair of fect() flags, which mirror
 ## the existing `loo` flag: like `loo`, `dloo` fills the object's
 ## `pre.est.att` / `pre.att.bound` / `pre.att.boot` slots with corrected
@@ -50,19 +50,19 @@
 ##       - mean_{t' in B} [ ATT^is_g(t') - (1/N^(g)) sum_{g' > g} N_g' ATT^is_g'(t') ],
 ##
 ##   where B is the set of retained pre-treatment baseline periods of g (t' < g):
-##   for dloo, B excludes the tested period t; for dloo_adjust, B keeps it (see
+##   for dloo, B excludes the tested period t; for dloo.adjust, B keeps it (see
 ##   below).
 ##
 ##   Two reasons we average this way rather than applying the (g-1)/(g-2) closed
 ##   form directly: (i) no rescaling constant is ever formed, so it degrades
 ##   gracefully when a cohort has few baselines (a short B) instead of dividing
-##   by g-2; and (ii) switching between dloo and dloo_adjust is just a change to
+##   by g-2; and (ii) switching between dloo and dloo.adjust is just a change to
 ##   which periods are in B. This reproduces (D) exactly: because the in-sample
 ##   pre-period placebos sum to zero over t' < g, subtracting the leave-one-out
 ##   baseline mean rescales the tested-period term by (g-1)/(g-2), recovering the
 ##   closed form above.
 ##
-## The dloo_adjust correction (Liu's "pre-treatment average" baseline).
+## The dloo.adjust correction (Liu's "pre-treatment average" baseline).
 ## (Liu, "Cohort-Anchored Robust Inference for Event-Study with Staggered Adoption")
 ##   The *difference* of two dloo estimates over-states the period-to-period
 ##   change in the parallel-trends violation by the factor (g-1)/(g-2) (no
@@ -73,7 +73,7 @@
 ##     ATT^avg_g(t) = ((g-2)/(g-1)) * ATT^dloo_g(t),
 ##
 ##   i.e. dloo with the tested period KEPT in the baseline set B. That is what
-##   `dloo_adjust = TRUE` selects here --- a minimal change to which in-sample
+##   `dloo.adjust = TRUE` selects here --- a minimal change to which in-sample
 ##   estimates enter the aggregation (no rescaling constant is ever formed).
 ##   See the paper for the equality ATT^avg_g(t) - ATT^avg_g(t*) = the 2x2 DiD.
 ##
@@ -168,9 +168,9 @@
     ## Enumerate (cohort, period) cells for treated cohorts with at least two
     ## pre-periods (the minimum for a dloo baseline). Cohorts with no
     ## later-adopting control pool are kept but evaluate to NA.
-    ## NB: this >= 2 requirement is enforced here, so it applies to dloo_adjust
+    ## NB: this >= 2 requirement is enforced here, so it applies to dloo.adjust
     ## too --- a single-pre-period cohort is excluded outright, NOT entered as
-    ## the mechanically-zero placebo the dloo_adjust note below might suggest.
+    ## the mechanically-zero placebo the dloo.adjust note below might suggest.
     ## fect() fails fast upstream if NO cohort clears this.
     treated_pos <- which(is.finite(cohorts))
     cohort_v <- integer(0); tcol_v <- integer(0)
@@ -223,7 +223,7 @@
 ## Evaluate the overlay for a vector of per-unit weights `w`. Returns the
 ## per-cell placebos and the size-weighted event-study series. `correct = TRUE`
 ## keeps the tested period in the baseline set B (Liu's pre-treatment-average /
-## dloo_adjust); `correct = FALSE` drops it (the conventional dloo). Used both
+## dloo.adjust); `correct = FALSE` drops it (the conventional dloo). Used both
 ## for the point estimate (w == 1) and for each bootstrap draw.
 ## ---------------------------------------------------------------------------
 .dloo_eval <- function(prep, w, correct) {
@@ -392,7 +392,7 @@
 ##                  used by the equivalence test)
 ##   pre.att.boot : matrix, rows = pre.term, cols = surviving replicates
 ##
-## `dloo_adjust = TRUE` selects Liu's pre-treatment-average baseline. SEs are
+## `dloo.adjust = TRUE` selects Liu's pre-treatment-average baseline. SEs are
 ## normal-approximation (matching fect's default ci.method = "normal").
 ##
 ##   boot.pre       : matrix, rows = pre.term, cols = surviving replicates
@@ -400,7 +400,7 @@
 ##                    group rows aligned to `pt$group_labels`.
 ## ---------------------------------------------------------------------------
 .dloo_fill <- function(fit,
-                       dloo_adjust    = FALSE,
+                       dloo.adjust    = FALSE,
                        alpha          = 0.05,
                        controls       = "not-yet-treated",
                        quantile.CI    = FALSE,
@@ -411,7 +411,7 @@
     prep <- .dloo_prepare(fit, controls)
 
     ## Point estimate (unit weights all 1), aligned to the object's pre.term.
-    pt <- .dloo_eval(prep, rep(1, prep$N), dloo_adjust)
+    pt <- .dloo_eval(prep, rep(1, prep$N), dloo.adjust)
 
     pre.term <- fit$time[fit$time <= 0]
     pre.term <- sort(pre.term)

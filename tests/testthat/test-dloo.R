@@ -4,7 +4,7 @@
 ## same pre.est.att / pre.att.bound / pre.att.boot slots as `loo`, but without
 ## re-fitting. These tests verify the overlay reproduces the DEFINITION of the
 ## estimator (2x2 DiDs of cohort means) to machine precision, that
-## `dloo_adjust = TRUE` yields Liu's pre-treatment-average baseline
+## `dloo.adjust = TRUE` yields Liu's pre-treatment-average baseline
 ## ((g-2)/(g-1) rescaling), and that the balanced/staggered guards fire.
 
 skip_on_cran()
@@ -68,7 +68,7 @@ fit_dloo <- function(dat, correct = FALSE, ...) {
     suppressMessages(fect(
         Y ~ D, data = dat, index = c("id", "time"),
         method = "fe", force = "two-way",
-        dloo = TRUE, dloo_adjust = correct,
+        dloo = TRUE, dloo.adjust = correct,
         parallel = FALSE, nboots = 50, seed = 1, ...))
 }
 
@@ -139,7 +139,7 @@ test_that("dloo overlay reproduces the definition (2x2 DiDs) to machine precisio
     expect_equal(m$ATT.overlay, m$ATT.ref, tolerance = 1e-10)
 })
 
-test_that("dloo_adjust reproduces the pre-treatment-average baseline", {
+test_that("dloo.adjust reproduces the pre-treatment-average baseline", {
     dat  <- make_panel()
     fitc <- fit_dloo(dat, correct = TRUE)
     refc <- bruteforce_agg(dat, correct = TRUE)
@@ -149,7 +149,7 @@ test_that("dloo_adjust reproduces the pre-treatment-average baseline", {
     expect_equal(m$ATT.overlay, m$ATT.ref, tolerance = 1e-10)
 })
 
-test_that("dloo_adjust == (g-2)/(g-1) rescaling of dloo, cohort by cohort", {
+test_that("dloo.adjust == (g-2)/(g-1) rescaling of dloo, cohort by cohort", {
     ## Single-cohort-of-interest panel so the event-time aggregate is one cohort
     ## and the (g-2)/(g-1) factor is unambiguous.
     dat <- make_panel(TT = 8, cohorts = c(5, Inf), n_per = 30)
@@ -165,7 +165,7 @@ test_that("dloo fills the loo-compatible pre.* slots and inference", {
     dat <- make_panel()
     fit <- fit_dloo(dat)
     expect_true(isTRUE(fit$dloo))
-    expect_false(isTRUE(fit$dloo_adjust))
+    expect_false(isTRUE(fit$dloo.adjust))
     expect_true(all(c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value",
                       "count.on") %in% colnames(fit$pre.est.att)))
     expect_equal(ncol(fit$pre.att.boot), 50)
@@ -226,7 +226,7 @@ test_that("dloo with group reproduces the per-subgroup definition", {
     }
 })
 
-test_that("dloo_adjust with group reproduces the per-subgroup definition", {
+test_that("dloo.adjust with group reproduces the per-subgroup definition", {
     dat <- make_panel_grp()
     fit <- fit_dloo(dat, correct = TRUE, group = "grp")
     ref <- bruteforce_group(dat, correct = TRUE)
@@ -304,12 +304,12 @@ test_that("post-treatment missingness is allowed under dloo", {
         NA)
 })
 
-test_that("dloo_adjust requires dloo, and incompatible options error", {
+test_that("dloo.adjust requires dloo, and incompatible options error", {
     dat <- make_panel()
     expect_error(
         suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
-                              method = "fe", dloo_adjust = TRUE, parallel = FALSE)),
-        "dloo_adjust")
+                              method = "fe", dloo.adjust = TRUE, parallel = FALSE)),
+        "dloo.adjust")
     expect_error(
         suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
                               method = "fe", dloo = TRUE, loo = TRUE, parallel = FALSE)),

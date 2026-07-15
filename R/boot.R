@@ -158,7 +158,7 @@ fect_boot <- function(
   W.in.fit = TRUE,
   W.in.agg = TRUE,
   dloo = FALSE,            # apply the dloo pre-trend overlay to each replicate
-  dloo_adjust = FALSE,     # dloo: use Liu's pre-treatment-average baseline
+  dloo.adjust = FALSE,     # dloo: use Liu's pre-treatment-average baseline
   dloo.controls = "not-yet-treated",
   dloo.rawtime = NULL,     # calendar time per row (for cohort/event alignment)
   dloo.group.map = NULL    # rawgroup<->newgroup map for the per-group breakdown
@@ -1630,7 +1630,7 @@ fect_boot <- function(
               eff = boot$eff, D = D.boot, I = I.boot,
               rawtime = dloo.rawtime.use, group.map = dloo.group.map,
               G = if (dloo.ng > 0) boot.group else NULL,
-              controls = dloo.controls, correct = dloo_adjust,
+              controls = dloo.controls, correct = dloo.adjust,
               pre.term = dloo.pre.term)
             boot$dloo.pre <- dd$att
             if (dloo.ng > 0) boot$dloo.pre.group <- dd$group_att

@@ -33,7 +33,7 @@ assumptions.}
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,
             carryoverTest = FALSE, carryover.period = NULL, carryover.rm = NULL,
-            loo = FALSE, dloo = FALSE, dloo_adjust = FALSE,
+            loo = FALSE, dloo = FALSE, dloo.adjust = FALSE,
             permute = FALSE, m = 2,
             normalize = FALSE, keep.sims = FALSE,
             cm = FALSE,
@@ -209,7 +209,7 @@ bootstrap always resamples units regardless of \code{cl}), and
 \item{dloo}{a logical flag for the double (cohort-wise) leave-one-out pre-trend
 placebos. When \code{TRUE}, \code{fect} estimates these directly from the in-sample fit -- without re-fitting
 the imputation model.}
-\item{dloo_adjust}{a logical flag, used only with \code{dloo = TRUE}. When
+\item{dloo.adjust}{a logical flag, used only with \code{dloo = TRUE}. When
 \code{TRUE}, the pre-trend estimates use the pre-treatment-average baseline of
 Liu (2025) instead of the leave-one-out baseline -- equivalently, the
 double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
@@ -332,7 +332,7 @@ Ignored when \code{CV = FALSE}.}
   \item{pre.est.att}{when \code{loo} or \code{dloo} is \code{TRUE}, the
   pre-treatment placebo estimates (ATT, S.E., CI, p-value, count) by event
   time; for \code{dloo} these are the double-LOO (or, with
-  \code{dloo_adjust}, pre-treatment-average) estimates.}
+  \code{dloo.adjust}, pre-treatment-average) estimates.}
   \item{permute}{permutation test results.}
 }
 \author{
