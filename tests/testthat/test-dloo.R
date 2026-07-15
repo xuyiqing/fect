@@ -350,3 +350,47 @@ test_that("plot(fit, dloo = TRUE) renders (distinct dloo view)", {
     fit <- fit_dloo(dat)
     expect_error(plot(fit, dloo = TRUE), NA)
 })
+
+test_that("dloo rejects vartype it has no overlay hook for", {
+    ## Only the case-resampling / jackknife worker carries the .dloo_boot_draw
+    ## hook. method = "fe" is rewritten to "ife" internally, which used to route
+    ## vartype = "parametric" into a worker returning no dloo.pre -- failing with
+    ## "number of items to replace..." only after the whole bootstrap had run.
+    dat <- make_panel()
+    expect_error(
+        suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+                              method = "fe", force = "two-way", dloo = TRUE,
+                              se = TRUE, vartype = "parametric",
+                              time.component.from = "nevertreated",
+                              nboots = 10, parallel = FALSE)),
+        "vartype")
+    ## jackknife IS supported and must keep working
+    expect_error(
+        suppressMessages(fect(Y ~ D, data = dat, index = c("id", "time"),
+                              method = "fe", force = "two-way", dloo = TRUE,
+                              se = TRUE, vartype = "jackknife",
+                              parallel = FALSE)),
+        NA)
+})
+
+test_that("dloo is invariant to how the time index is typed", {
+    ## .dloo_prepare ranks the time axis rather than reading calendar values.
+    ## Before that, a Date index silently produced all-NA point estimates with a
+    ## fully populated S.E. column (the bootstrap path already ranked).
+    dat <- make_panel()
+    ref <- fit_dloo(dat)$pre.est.att[, "ATT"]
+    expect_true(all(is.finite(ref)))
+
+    ## Date index
+    dd <- dat; dd$time <- as.Date("2000-01-01") + (dd$time - 1L) * 365L
+    got <- fit_dloo(dd)$pre.est.att[, "ATT"]
+    expect_true(all(is.finite(got)))
+    expect_equal(unname(got), unname(ref), tolerance = 1e-10)
+
+    ## irregular (gappy) numeric calendar -- event time is a row-index difference,
+    ## so the estimates must not move
+    dg <- dat; map <- c(1, 2, 3, 4, 9, 10, 25, 26)
+    dg$time <- map[dg$time]
+    got2 <- fit_dloo(dg)$pre.est.att[, "ATT"]
+    expect_equal(unname(got2), unname(ref), tolerance = 1e-10)
+})

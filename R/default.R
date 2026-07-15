@@ -426,6 +426,19 @@ fect.default <- function(
         if (isTRUE(permute)) {
             stop("\"permute\" can't be used with \"dloo\".")
         }
+        ## The overlay is applied per replicate inside fect_boot, and only the
+        ## case-resampling / jackknife worker carries the hook. Stated as an
+        ## ALLOWLIST, not a denylist: `method = "fe"` is rewritten to "ife" with
+        ## r = 0 further down, which routes vartype = "parametric" into a
+        ## different worker whose return value has no dloo.pre --- the run then
+        ## dies with "number of items to replace is not a multiple of
+        ## replacement length" only AFTER the full bootstrap has been paid for.
+        ## An allowlist also fails closed on vartypes added later rather than
+        ## silently taking the untested path.
+        if (!vartype %in% c("bootstrap", "jackknife")) {
+            stop("\"dloo\" supports vartype = \"bootstrap\" or \"jackknife\" only; ",
+                 "got \"", vartype, "\".")
+        }
         ## dloo is exact ONLY for additive two-way fixed effects; fail fast on
         ## latent-factor / matrix-completion models before the fit. (group.fe
         ## keeps method = "fe" here and is coerced to the cfe backend later, so
