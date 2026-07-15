@@ -451,7 +451,7 @@
         b <- sum(vec[ok] <= 0) / n * 2
         min(min(a, b), 1)
     }
-    .assemble <- function(att, boot, count) {
+    .assemble <- function(att, boot, count, terms = pre.term) {
         if (identical(vartype, "jackknife")) {
             j  <- jackknifed(att, boot, alpha, quantile.CI = quantile.CI)
             se <- j$se; ci.lower <- j$CI.l; ci.upper <- j$CI.u; p.value <- j$P
@@ -477,11 +477,11 @@
         pre.est.att <- cbind(att, se, ci.lower, ci.upper, p.value, count)
         colnames(pre.est.att) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
                                    "p.value", "count.on")
-        rownames(pre.est.att) <- pre.term
+        rownames(pre.est.att) <- terms
         pre.att.bound <- cbind(bd.lower, bd.upper)
         colnames(pre.att.bound) <- c("CI.lower", "CI.upper")
-        rownames(pre.att.bound) <- pre.term
-        rownames(boot) <- pre.term
+        rownames(pre.att.bound) <- terms
+        rownames(boot) <- terms
         list(pre.est.att = pre.est.att, pre.att.bound = pre.att.bound,
              pre.att.boot = boot)
     }
@@ -491,14 +491,31 @@
     ## Per-subgroup slots, keyed by raw group label, mirroring the `loo`
     ## contract (list of pre.est.att / pre.att.bound / pre.att.boot per group)
     ## so they view through plot(fit, loo = TRUE, show.group = ...).
+    ##
+    ## Each subgroup is built on ITS OWN event-time axis, not the pooled one --
+    ## exactly as `loo` does. A subgroup only spans event times its own cohorts
+    ## reach: a subgroup made of cohort 6 has no cell at event time -6, so
+    ## carrying the pooled axis would advertise rows that cannot exist, and
+    ## plot()'s `which(t1 == t0[1])` (against the subgroup's own att.on axis)
+    ## would return integer(0) and error with "argument of length 0". Note this
+    ## only bites when the group correlates with adoption timing -- region,
+    ## sector, state -- which is the usual reason to group at all.
+    ##
+    ## `keep` is always contiguous and ends at 0: each cohort contributes the
+    ## run {1-g+1, ..., 0}, so a union over a subgroup's cohorts is the run of
+    ## its latest-adopting cohort.
     pre.est.group.output <- NULL
     if (has_group && !is.null(boot.pre.group)) {
         pre.est.group.output <- stats::setNames(
-            lapply(seq_along(grp_labels), function(gi)
-                .assemble(att.group[gi, ],
-                          matrix(boot.pre.group[gi, , ],
-                                 nrow = length(pre.term)),
-                          count.group[gi, ])),
+            lapply(seq_along(grp_labels), function(gi) {
+                keep <- which(count.group[gi, ] > 0 & !is.na(att.group[gi, ]))
+                if (length(keep) == 0) return(NULL)
+                .assemble(att.group[gi, keep],
+                          matrix(boot.pre.group[gi, keep, ],
+                                 nrow = length(keep)),
+                          count.group[gi, keep],
+                          terms = pre.term[keep])
+            }),
             grp_labels)
     }
 

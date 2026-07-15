@@ -351,6 +351,55 @@ test_that("plot(fit, dloo = TRUE) renders (distinct dloo view)", {
     expect_error(plot(fit, dloo = TRUE), NA)
 })
 
+## balanced staggered panel where the subgroup PREDICTS adoption timing, so the
+## subgroups span DIFFERENT pre-windows (A reaches -6, B only -4). This is the
+## normal case whenever the group is a region / sector / state; make_panel_grp
+## deliberately mixes the label within cohort, so it never exercises this.
+make_panel_grp_staggered <- function(TT = 10, n_per = 15, sd = 0.4, seed = 11) {
+    set.seed(seed); rows <- list(); id <- 0
+    spec <- list(list(grp = "A", g = 8), list(grp = "A", g = Inf),
+                 list(grp = "B", g = 6), list(grp = "B", g = Inf))
+    for (s in spec) for (u in seq_len(n_per)) {
+        id <- id + 1
+        y <- rnorm(1) + 0.1 * (1:TT) + rnorm(TT, 0, sd)
+        d <- as.integer(!is.infinite(s$g) & (1:TT) >= s$g)
+        if (!is.infinite(s$g)) y <- y + d * 2
+        rows[[length(rows) + 1]] <-
+            data.frame(id = id, time = 1:TT, Y = y, D = d, grp = s$grp)
+    }
+    do.call(rbind, rows)
+}
+
+test_that("each dloo subgroup is built on its own event-time axis, like loo", {
+    dat <- make_panel_grp_staggered()
+    fit <- fit_dloo(dat, group = "grp")
+
+    ## pooled reaches back to the earliest cohort (6 -> -6 via cohort 8's window)
+    pooled.et <- as.numeric(rownames(fit$pre.est.att))
+
+    for (g in c("A", "B")) {
+        pre <- as.numeric(rownames(fit$pre.est.group.output[[g]]$pre.est.att))
+        on  <- as.numeric(rownames(fit$est.group.output[[g]]$att.on))
+        ## the subgroup's pre-window must start where its own att.on window does
+        expect_equal(min(pre), min(on))
+        ## contiguous and ending at 0
+        expect_equal(pre, seq(min(pre), 0))
+        ## no all-NA padding rows survive
+        expect_true(all(is.finite(fit$pre.est.group.output[[g]]$pre.est.att[, "ATT"])))
+        ## boot rows track the same axis
+        expect_equal(nrow(fit$pre.est.group.output[[g]]$pre.att.boot), length(pre))
+    }
+
+    ## B adopts at 6 and so spans a strictly shorter pre-window than the pool
+    etB <- as.numeric(rownames(fit$pre.est.group.output[["B"]]$pre.est.att))
+    expect_true(min(etB) > min(pooled.et))
+
+    ## the failure this guards: plot errored with "argument of length 0"
+    for (g in c("A", "B")) {
+        expect_error(plot(fit, dloo = TRUE, show.group = g), NA)
+    }
+})
+
 test_that("dloo rejects vartype it has no overlay hook for", {
     ## Only the case-resampling / jackknife worker carries the .dloo_boot_draw
     ## hook. method = "fe" is rewritten to "ife" internally, which used to route
