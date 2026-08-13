@@ -5,7 +5,7 @@
 > ci.method extensions) and 2026-05-02 (CFE `fit_init` plumbing on
 > `complex_fe_ub` + `cfe_iter`, dormant). Full regen via scriber
 > deferred until next material module change.
-> Manual merge patch 2026-08-12: `research-para-boot-v3` merged master
+> Manual merge patch 2026-08-12: `research-para-boot-v2` merged master
 > (v2.4.5) into the `split_residuals` research branch. This document is
 > master's regen with the `split_residuals` sections hand-grafted back in
 > (not a fresh scriber run) — see the "Notes" section for what changed.
