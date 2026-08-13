@@ -1,4 +1,9 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.6.9000
+
+* Research branch merge (`research-para-boot-v3`): merges master (v2.4.5, CRAN 2.4.6) into the `split_residuals` debiased-parametric-bootstrap POC branch. `split_residuals` (experimental, default `FALSE`) now ships alongside every v2.3.1-2.4.5 feature (`W.est`/`W.agg`, modern plot theme, rolling-window CV, `carryover.rm`, `estimand()`/`imputed_outcomes()`, `para.error`, PSOCK retry-with-backoff).
+* `split_residuals = TRUE` relaxes Gate C: `vartype = "parametric"` on `notyettreated` designs is now allowed via K=2 cross-fitting (half-A estimates the treated-error distribution, half-B supplies the control-arm draws) instead of erroring. Coverage properties still under active research.
+
 # fect 2.4.5
 
 * Add `group.fe` to `fect()` for absorbing coarser fixed effects, such as state FE with county-level data. Closes #139. Clustered SE defaults to `group.fe[1]`; override with `cl = "<column>"`.
