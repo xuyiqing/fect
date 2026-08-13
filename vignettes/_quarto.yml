@@ -10,23 +10,24 @@ book:
     - index.qmd
     - 01-start.Rmd
     - 02-fect.Rmd
-    - 03-ife-mc.Rmd
-    - 04-cfe.Rmd
-    - 05-hte.Rmd
-    - 06-plots.Rmd
-    - 07-gsynth.Rmd
-    - 08-panel.Rmd
-    - 09-sens.Rmd
+    - 03-estimands.Rmd
+    - 04-ife-mc.Rmd
+    - 05-cfe.Rmd
+    - 06-gsynth.Rmd
+    - 07-inference.Rmd
+    - 08-hte.Rmd
+    - 09-panel.Rmd
+    - 10-sens.Rmd
+    - 11-plots.Rmd
     - aa-cheatsheet.Rmd
-    - references.qmd
     - bb-updates.Rmd
+    - cc-references.qmd
 
 bibliography: references.bib
 
-nocite: |
-  @*
-
 suppress-bibliography: true
+link-citations: true
+link-bibliography: true
 
 format:
   html:
@@ -34,7 +35,18 @@ format:
     code-fold: false
     code-tools: true
     code-link: true
+    link-citations: true
+    link-bibliography: true
+    citations-hover: true
     toc-depth: 3
+    # Default rendered figure dimensions for HTML output. Tuned so that the
+    # PNG width at retina dpi is close to the cosmo theme's content-column
+    # width (~700-800 px), minimizing browser downscaling that would shrink
+    # axis / title / stats text below the readable threshold. Per-chunk
+    # `fig.width` / `fig.height` overrides still win.
+    fig-width: 5.5
+    fig-height: 4
+    fig-format: svg
 
 knitr:
   opts_chunk:

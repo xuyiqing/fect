@@ -34,7 +34,9 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
                     group.level = NULL,
                     group = NULL,
                     time.on.seq.group = NULL,
-                    time.off.seq.group = NULL) {
+                    time.off.seq.group = NULL,
+                    W.in.fit = TRUE,
+                    fit.init = NULL) { ## warm-start matrix for inter_fe_mc (v2.4.2+)
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -65,7 +67,9 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
 
-    if (is.null(W)) {
+    if (is.null(W) || !W.in.fit) {
+        ## When W.in.fit = FALSE (W.agg supplied alone), the outcome model
+        ## is fit unweighted; W is still used at the aggregation step below.
         W.use <- as.matrix(0)
     } else {
         W.use <- W
@@ -99,7 +103,8 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
 
     validX <- 1 ## no multi-colinearity
     ## matrix completion
-    est.best <- inter_fe_mc(YY, Y0, X, II, W.use, beta0, hasF, lambda.cv, force, tol, max.iteration)
+    est.best <- inter_fe_mc(YY, Y0, X, II, W.use, beta0, hasF, lambda.cv, force, tol, max.iteration,
+                            fit_init = fit.init)
     validX <- est.best$validX
     validF <- est.best$validF
     est.fect <- NULL

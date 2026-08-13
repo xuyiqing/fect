@@ -943,6 +943,49 @@ test_that("E.6: bootstrap + CV interaction (se=TRUE, nboots=5, parallel=TRUE) ru
   })
 })
 
+## -- E.7  Boot under stale future plan: simulate the CV→boot plan-leak
+##         that produced the E.6 PSOCK race. Set up a cluster plan,
+##         stop its workers behind future's back, then run boot. The
+##         cluster-init retry loop in run_dopar_retry should recover.
+test_that("E.7: bootstrap survives a stale future::plan() with dead workers", {
+
+  skip_on_cran()
+
+  ## Save / restore plan around the test.
+  old_plan <- future::plan()
+  on.exit(suppressWarnings(future::plan(old_plan)), add = TRUE)
+
+  ## Install a fresh PSOCK cluster, then forcibly kill its workers
+  ## while the plan still points at it. Mirrors the post-CV state the
+  ## bootstrap path inherits when CV's on.exit restores a plan whose
+  ## underlying cluster was stopped.
+  cl <- parallelly::makeClusterPSOCK(
+    workers      = 2L,
+    rscript_libs = .libPaths(),
+    autoStop     = TRUE
+  )
+  suppressWarnings(future::plan(future::cluster, workers = cl))
+  try(parallel::stopCluster(cl), silent = TRUE)
+
+  expect_no_error({
+    set.seed(42)
+    suppressWarnings(suppressMessages(
+      fect::fect(
+        Y ~ D,
+        data      = simdata,
+        index     = c("id", "time"),
+        method    = "ife",
+        r         = 0:1,
+        CV        = FALSE,
+        force     = "two-way",
+        se        = TRUE,
+        nboots    = 5,
+        parallel  = TRUE
+      )
+    ))
+  })
+})
+
 ## =================================================================
 ## Section G: Regression guard — nevertreated parallel paths
 ## =================================================================
@@ -1718,3 +1761,103 @@ test_that("N.6: plan restored after sequential IFE and CFE nevertreated parallel
   expect_equal(plan_before, plan_after,
     info = "plan should be restored to sequential after CFE nevertreated parallel CV")
 })
+
+
+## =================================================================
+## Section B: v2.4.3 — quiet_nonpara closure-leak regression
+## =================================================================
+
+## -- B.1  Parallel bootstrap on simdata under a tight future.globals.maxSize
+##         cap. With the v2.4.3 trim of quiet_nonpara and the local 2 GiB
+##         bump, no "future.globals.maxSize" warning should fire even when
+##         the caller's pre-block cap is small.
+
+test_that("B.1: parallel bootstrap on simdata does not trip future.globals.maxSize", {
+
+  skip_on_cran()
+
+  ## Force a tight pre-block cap to simulate the failure environment.
+  ## The v2.4.3 local bump inside do_parallel_boot raises this to 2 GiB
+  ## for the duration of the parallel block (with on.exit restore).
+  old_max <- getOption("future.globals.maxSize", 500 * 1024^2)
+  options(future.globals.maxSize = 50 * 1024^2)  # 50 MiB pre-block
+  on.exit(options(future.globals.maxSize = old_max), add = TRUE)
+
+  ## Clear leaked plan state (defensive, mirrors E.6 / E.7).
+  suppressWarnings({
+    try(future::plan(future::sequential), silent = TRUE)
+    try(foreach::registerDoSEQ(),         silent = TRUE)
+  })
+
+  warns <- character(0)
+
+  expect_no_error(
+    withCallingHandlers(
+      {
+        set.seed(42)
+        suppressMessages(
+          fect::fect(
+            Y ~ D,
+            data      = simdata,
+            index     = c("id", "time"),
+            method    = "ife",
+            r         = 1,
+            CV        = FALSE,
+            se        = TRUE,
+            vartype   = "bootstrap",
+            nboots    = 20,
+            parallel  = TRUE
+          )
+        )
+      },
+      warning = function(w) {
+        warns <<- c(warns, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    )
+  )
+
+  expect_false(any(grepl("future\\.globals\\.maxSize", warns)),
+               info = paste("warns:", paste(warns, collapse = " | ")))
+  expect_false(any(grepl("Future backend failed", warns)),
+               info = paste("warns:", paste(warns, collapse = " | ")))
+})
+
+## -- B.2  Structural contract: trim_closure_env(), when applied to a
+##         quiet_nonpara-shaped wrapper defined inside a heavy outer
+##         frame, keeps ONLY the two referenced locals (one.nonpara,
+##         boot.seq) and drops the rest. Locks in the invariant the
+##         v2.4.3 fix depends on.
+
+test_that("B.2: trim_closure_env strips fect_boot frame from quiet_nonpara-shape closure", {
+
+  ## Reproduce the shape of fect_boot()'s local frame: heavy locals
+  ## around a wrapper that only references `one.nonpara` and `boot.seq`.
+  outer_fn <- function() {
+    Y           <- matrix(rnorm(1e4), 100, 100)
+    D           <- matrix(rnorm(1e4), 100, 100)
+    big_out     <- as.list(seq_len(1e4))
+    boot.seq    <- 1:20
+    one.nonpara <- function(j) j
+    quiet_nonpara <- function(j) {
+      suppressMessages(suppressWarnings(one.nonpara(boot.seq[j])))
+    }
+    quiet_nonpara <- fect:::trim_closure_env(quiet_nonpara)
+    quiet_nonpara
+  }
+
+  qn <- outer_fn()
+  env_names <- ls(environment(qn), all.names = TRUE)
+
+  ## The trimmed env should hold ONLY the two referenced locals.
+  expect_setequal(env_names, c("one.nonpara", "boot.seq"))
+
+  ## And it should NOT carry the heavy frame objects.
+  expect_false("Y"       %in% env_names)
+  expect_false("D"       %in% env_names)
+  expect_false("big_out" %in% env_names)
+
+  ## Size sanity: trimmed closure stays small (< 1 MiB).
+  expect_lt(as.numeric(object.size(qn)), 1 * 1024^2)
+})
+

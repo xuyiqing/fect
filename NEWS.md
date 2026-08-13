@@ -1,4 +1,404 @@
-# fect 2.3.0 (development)
+<!-- markdownlint-disable MD025 -->
+# fect 2.4.5
+
+* Add `group.fe` to `fect()` for absorbing coarser fixed effects, such as state FE with county-level data. Closes #139. Clustered SE defaults to `group.fe[1]`; override with `cl = "<column>"`.
+* Fix `method = "cfe"` with `force = "time"` or `"unit"`, which previously triggered an `Index out of bounds` error. `force = "two-way"` is byte-equivalent.
+* Remove unused `sfe` argument and `R/polynomial.R`.
+
+# fect 2.4.4
+
+- `fect()` now returns `$sample`, a logical matrix (same dims as `$Y.dat`) marking cells used in any part of the estimation procedure (main fit, placebo/carryover/balance tests).
+
+# fect 2.4.3
+
+* Fix `future.globals.maxSize` overrun in parallel bootstrap: `quiet_nonpara`
+  wrapper no longer captures `fect_boot()`'s full frame.
+* Raise `future.globals.maxSize` to 2 GiB locally inside the parallel block.
+
+# fect 2.4.2
+
+## New: `ci.method` argument on `fect()`; legacy `quantile.CI` soft-deprecated
+
+* `fect()` gains a `ci.method = c("normal", "basic")` argument. Default
+  `"normal"` (Wald: `θ̂ ± z · SE`) preserves the v2.4.1 default behaviour
+  byte-equivalently. `"basic"` (reflected pivot: `2 · θ̂ − quantile(boot, …)`)
+  is the literature-standard "percentile" CI per @davison_hinkley1997 §5.2.1
+  and what `boot::boot.ci(type = "basic")` returns. All CIs in fect's
+  returned `est.*` slots use the requested method uniformly.
+* The legacy `quantile.CI` argument is soft-deprecated. Both legacy values
+  still work (`quantile.CI = FALSE` → `ci.method = "normal"`; `quantile.CI = TRUE`
+  → `ci.method = "basic"`) but emit a one-time deprecation warning when
+  user-supplied. Removal targeted for v2.5.0+.
+* `ci.method = "basic"` with `nboots < 1000` emits a tail-CI replicate
+  warning at fit time (mirrors the `estimand()` `.check_tail_ci_replicates`
+  gate). The 5th / 195th order statistics that `basic` reads are unstable
+  at small `B` --- @efron1987 §3 and @diciccio_efron1996 §4 recommend
+  `B ≥ 1000` for tail-quantile CIs.
+* `ci.method = "bca"`, `"bc"`, or `"percentile"` on `fect()` is rejected
+  with a clear error pointing the user to `estimand(fit, type, ci.method)`
+  for the full 5-method surface. fect's built-in CI machinery covers the
+  routine `att` workflow; the alternative estimands (`att.cumu`, `aptt`,
+  `log.att`) where bias-corrected CIs matter live on the `estimand()` path.
+
+## New: alternative-estimand additions in `estimand()`
+
+* New `test = c("none", "placebo", "carryover")` argument evaluates the
+  requested estimand at pre-treatment placebo cells or early
+  post-reversal carryover cells, producing a per-event-time series for
+  credibility checks. Closes issue #131. Auto-pairs `direction = "on"`
+  with placebo and `direction = "off"` with carryover; auto-validates
+  the fit (placebo requires `placeboTest = TRUE` at fit time; carryover
+  requires `carryoverTest = TRUE` + a reversal panel).
+* `type = "att.cumu"` rejected with a clear error when `test != "none"` ---
+  cumulative semantics are defined relative to treatment onset.
+* `ci.method` enum extended from `c("basic", "percentile")` to
+  `c("basic", "percentile", "bc", "bca", "normal")`. New methods:
+  - `"bc"` --- bias-corrected percentile (Efron 1987 minus acceleration)
+  - `"bca"` --- bias-corrected accelerated (Efron 1987 in full); cell-level
+    jackknife computes the acceleration with no extra refits
+  - `"normal"` --- Wald CI `θ̂ ± z · SE`
+* `ci.method` now defaults to `NULL`, which triggers a per-type default:
+  - `"att"` → `"normal"`
+  - `"att.cumu"` → `"basic"` (reflected pivot CI; matches Davison-Hinkley 1997 §5.2.1 and `boot::boot.ci(type = "basic")`)
+  - `"aptt"` → `"bca"`
+  - `"log.att"` → `"bca"`
+  Existing scripts that pass `ci.method` explicitly are unaffected.
+
+## New: `para.error` argument for `vartype = "parametric"`
+
+* `fect()` gains a `para.error = c("auto", "ar", "empirical", "wild")`
+  argument selecting the residual-error model the parametric bootstrap
+  draws from. Replaces the implicit panel-shape-driven dispatch.
+* `"auto"` (default) resolves at fit time and stores the resolved label
+  on `fit$para.error`:
+  - `"empirical"` on a fully-observed panel
+  - `"ar"` on a panel with missing cells
+* `"ar"` --- the v2.4.1 behavior: AR(1) error process estimated from
+  control residuals. Works on any panel shape.
+* `"empirical"` --- i.i.d. column-resample from the main-fit residual
+  pool. Requires a fully-observed panel.
+* `"wild"` --- Liu 1988 / Mammen 1993 / Cameron-Gelbach-Miller 2008
+  unit-level Rademacher sign-flips over the empirical residual pool.
+  Requires a fully-observed panel; preserves within-unit dependence.
+* `para.error` is silently ignored when `vartype != "parametric"`.
+
+## Changed: tighter EM convergence defaults
+
+* `tol`: default flipped from `1e-3` to **`1e-5`**.
+* `max.iteration`: default flipped from `1000` to **`5000`**.
+
+The pre-v2.4.2 default `tol = 1e-3` halted IFE/CFE EM well before
+convergence: on factor-DGP simdata the EM stopped at iteration 116
+with `att.avg = 2.87`, while running to `tol = 1e-7` (~2000 iters)
+produces `att.avg = 2.43` --- an 18% gap between two valid stopping
+points of the same procedure on the same data. CFE was worse
+(40% gap). The new defaults stop the EM after it has actually
+stabilized.
+
+* **Inference at the old default was already correct.** Coverage
+  simulations (K=80, known-truth DGP, true τ=3) show empirical
+  coverage of 0.96 at both old and new defaults for IFE; bootstrap
+  SE matches empirical SE in both. The fix improves
+  *reproducibility* and *point-estimate stability across
+  versions/machines*, not coverage validity.
+* **What this means for users**: numerical output from prior versions
+  remains valid inferentially (CIs still cover correctly), but the
+  point-estimate values will shift on rerun under v2.4.2 --- typically
+  by a few percent on canonical IFE, up to 40% on factor-heavy CFE.
+  The new numbers are closer to the EM's actual converged minimum.
+* **Speed cost**: ~2-5x slower main fit and bootstrap on
+  factor-DGP IFE/CFE because EM iterates more (994 iters at 1e-5
+  vs 116 at 1e-3 on simdata). GSC and MC paths unaffected
+  (they were already converging within the old defaults).
+* New `warning()` when EM hits `max.iteration` without satisfying
+  the tol gate --- alerts users to under-converged fits on hard
+  cases (e.g., very large N panels, near-collinear factors).
+
+Set `tol = 1e-3, max.iteration = 1000` explicitly to reproduce
+pre-v2.4.2 numerical output exactly.
+
+## Bug fixes
+
+* `vartype = "parametric"` × `ci.method ∈ {"basic", "percentile", "bc",
+  "bca"}` produced 0% coverage CIs through v2.4.1 (the bootstrap
+  distribution is H₀-centered, but reflection-based CIs assume centering
+  at θ̂). `estimand()` now applies a variance-preserving location shift
+  for parametric fits. The `"normal"` ci.method is byte-stable; the
+  other four now produce nominal coverage.
+* `vartype = "jackknife"` was previously rejected by `estimand()` with a
+  slot-contract error. The slot contract is relaxed; only `ci.method =
+  "normal"` is accepted (the Wald-style CI from the Tukey SE), with
+  hard-error guidance pointing at `"bootstrap"` for the full ci.method
+  surface.
+* `log.att` and `aptt` silently dropped bootstrap replicates with
+  `Y0_b ≤ 0` via `colMeans(..., na.rm = TRUE)`, contaminating the
+  bootstrap distribution. Both now hard-error with actionable guidance
+  (pre-transform Y, filter near-zero cells, or use a different
+  estimand). `estimand("log.att", ...)` additionally hard-errors at the
+  point-estimate level when any treated cell has `Y_obs ≤ 0` or
+  `Y0_hat ≤ 0`.
+* `vartype = "parametric"` with default `time.component.from =
+  "notyettreated"` now produces a clearer error that names the user's
+  literal `method` argument (was: "Parametric bootstrap is not valid
+  when ..."; now: "vartype = 'parametric' requires time.component.from
+  = 'nevertreated'. Your call: method = 'fe', time.component.from =
+  'notyettreated'."). The reversal-check gate continues to fire first
+  on reversal panels.
+* `R/diagtest.R` "F-test Failed" message → "F-test could not be
+  computed" --- the test never "failed" in any standard sense; the
+  matrix arithmetic was undefined for the input.
+* Parallel-worker package version warnings (e.g. "package 'mvtnorm'
+  was built under R version X.Y.Z") suppressed via `clusterEvalQ`
+  pre-load + targeted `withCallingHandlers`.
+
+## Other changes
+
+* `estimand()` warns when `ci.method` `c("basic", "percentile", "bc",
+  "bca")` is requested on a fit with fewer than 1000 bootstrap
+  replicates, recommending refit at `nboots = 1000` for stable tail
+  quantiles (Efron 1987 §3; DiCiccio & Efron 1996 §4). The point
+  estimate and SE are unaffected; the warning fires on every such
+  call so the user can decide whether to suppress, refit, or
+  proceed with caveat.
+* `vartype = "jackknife"` with `Nco > 1000` emits a fit-time warning
+  recommending `vartype = "bootstrap"` for tractability (full
+  leave-one-out scales linearly in N and is slow at the v2.4.2 EM
+  convergence defaults).
+* `complex_fe_ub` and `cfe_iter` C++ entries gain optional `fit_init`
+  parameter (NULL default preserves pre-existing cold-start behavior).
+  This mirrors the existing warm-start infrastructure on
+  `inter_fe_ub` / `inter_fe_mc` / inner EM helpers. Not exposed to
+  the public API; reserved for future deferred features.
+
+# fect 2.4.1
+
+## New: parametric variance support in `estimand()`
+
+* `estimand()`'s `vartype` argument now accepts `"parametric"` in
+  addition to `"bootstrap"`, `"jackknife"`, and `"none"`. When the
+  fit was produced with `fect(..., vartype = "parametric",
+  keep.sims = TRUE)`, all four `type` values (`"att"`, `"att.cumu"`,
+  `"aptt"`, `"log.att"`) work without modification, sourcing
+  replicates from the parametric `fit$eff.boot` surface populated
+  by the existing fit-time machinery.
+* Byte-equality between `estimand(fit, "att", "event.time")` and
+  `fit$est.att` is preserved under parametric (asserted by tests).
+* The output `vartype` column reports the variance method actually
+  used at fit time (read from `fit$vartype`), which may differ from
+  the user-supplied `vartype` argument; the argument is informational
+  and does not re-aggregate replicates.
+* No changes to fit-time machinery, slot semantics, or the v2.4.0
+  contract documented in `statsclaw-workspace/fect/ref/po-estimands-contract.md`.
+
+# fect 2.4.0
+
+## New: post-hoc estimands API
+
+* New `estimand(fit, type, by, ...)` typed dispatcher computes
+  alternative estimands directly from any fect imputation fit. Shipped
+  types: `"att"` (default per-event-time ATT, byte-identical to
+  `fit$est.att`), `"att.cumu"` (cumulative ATT, replaces `effect()`),
+  `"aptt"` (average proportional treatment effect on the treated;
+  Chen & Roth 2024), `"log.att"` (mean log-scale treatment effect).
+  Shipped `by` axes: `"event.time"`, `"overall"`, plus reserved
+  canonical values `"cohort"` / `"calendar.time"` for future commits.
+  Returns a tidy data frame with consistent columns
+  `(<by_key>, estimate, se, ci.lo, ci.hi, n_cells, vartype)` regardless
+  of `type`. See `?estimand` and the new "Alternative estimands"
+  vignette chapter for worked examples and the design rationale.
+* New `imputed_outcomes(fit, cells, replicates, direction)` low-level
+  accessor returns the cell-level imputed potential-outcome surface as
+  a long-form data frame with documented columns
+  `(id, time, event.time, cohort, treated, Y_obs, Y0_hat, eff,
+  eff_debias, W.agg, [replicate])`. Use this for custom estimands the
+  dispatcher does not ship; pipe to dplyr / data.table for arbitrary
+  aggregation.
+* `cells = ` filter argument on both `imputed_outcomes()` and
+  `estimand()` accepts NULL (default), a logical vector, or a one-sided
+  formula evaluated against the long-form data
+  (e.g. `~ event.time %in% 1:5 & !id %in% bad_ids`). The
+  `window = c(L, R)` argument on `estimand()` is sugar over
+  `cells = ~ event.time >= L & event.time <= R`.
+* `direction = c("on", "off")` on both functions selects the event-time
+  grid for reversal panels.
+* New `eff_debias` reserved slot on the fit object (NULL for plain
+  imputation estimators; populated by future doubly-robust estimators)
+  so DR scores can be added to the surface without breaking the
+  long-form schema.
+
+## Soft-deprecation: `effect()` and `att.cumu()`
+
+* `effect()` and `att.cumu()` continue to work byte-identically to
+  v2.3.x and emit a one-time-per-session message pointing at the
+  unified `estimand()` API. Removal not before v3.0.0. Migration:
+  - `effect(fit, cumu = TRUE)` → `estimand(fit, "att.cumu", "event.time")`
+  - `effect(fit, cumu = FALSE)` → `estimand(fit, "att", "event.time")`
+  - `att.cumu(fit, period = c(L, R))` →
+    `estimand(fit, "att.cumu", "overall", window = c(L, R))`
+  Numerical equality is asserted by package tests.
+
+# fect 2.3.3
+
+## Bug fixes
+
+* Fix `"incorrect number of dimensions"` crash in `diagtest()` that
+  surfaced intermittently with `parallel = TRUE` + small `nboots`.
+  Two layers: (a) `R/diagtest.R` now uses `drop = FALSE` when filtering
+  bootstrap columns by all-non-NA, so a single surviving column stays
+  a matrix; (b) the bootstrap parallel path in `R/boot.R` now builds
+  the PSOCK cluster via `parallelly::makeClusterPSOCK(rscript_libs =
+  .libPaths())` (the same robust pattern used by the CV path),
+  wrapped in a 3-attempt retry-with-backoff. If `doParallel` cluster
+  init exhausts retries the bootstrap now degrades to sequential
+  rather than crashing.
+* `carryover.rm` is now stored on the fit object. `plot.fect()` no
+  longer reads it from `as.list(x$call)$carryover.rm` (which silently
+  gave the wrong K under `do.call()`, programmatic wrappers, or any
+  call-rewriting code path). Behaviorally a no-op for fits built via
+  named-argument `fect(...)`; correct under any other construction.
+
+## Documentation
+
+* Chapter 2 §Other estimands gains a worked example for post-hoc
+  estimands derived from the imputed potential-outcome surface,
+  showing APTT (Chen & Roth 2024) with bootstrap CIs from the
+  existing fit slots. Issue #126 (ajunquera).
+
+# fect 2.3.2
+
+## Modern visual defaults for `plot.fect()` (visual breaking change)
+
+* Default visual overhaul across all 14 plot types under
+  `theme.bw = TRUE`: white panel, plain left-aligned title, thin grey
+  reference lines, dashed treatment-onset vline, pre/post lightness
+  contrast (`grey50` / `grey20`), publication-sized axis text
+  (`cex.main = 11`, `cex.lab = 9`, `cex.axis = 8`, `cex.text = 3.0`),
+  and compact legends.
+* Placebo / carryover plots render highlighted periods as a single
+  accent glyph (orange triangle for placebo, blue diamond for
+  carryover, orange triangle for `carryover.rm`) instead of a stacked
+  pair of circle + accent. Background rectangle behind each highlight
+  period is opt-in via `highlight.fill = TRUE` --- default is glyph
+  only, which keeps figures clean for print and grayscale.
+* `highlight` argument extended to accept a character subset of
+  `c("placebo", "carryover", "carryover.rm")` for selective
+  per-test-type highlighting (e.g., `highlight = "placebo"` to
+  render carryover periods as plain circles when both tests ran at
+  fit time). Backward-compatible: `NULL` / `TRUE` / `FALSE` still
+  behave as before.
+* Stats annotation block (placebo / carryover / F / equivalence
+  p-values) sits at the top-left panel corner with symmetric 2.5%
+  inset and `2 × num_stat_lines` top padding so it never grazes the
+  leftmost CI. Sized at `cex.text * 1.0` so it does not overpower
+  the title. User-supplied `stats.pos` still wins.
+* `loadings` (ggpairs) plot: correlation panel reformatted with
+  overall + per-group entries; per-group label colors match the
+  density-plot fills.
+* Migrated off ggplot2 4.0's deprecated `fatten` / `lwd` arguments
+  to the `size` / `linewidth` aesthetics. Clears the per-plot
+  deprecation warnings.
+
+## `legacy.style = TRUE` escape hatch
+
+New `legacy.style` argument (default `FALSE`). Pass
+`legacy.style = TRUE` for byte-identical reproduction of pre-2.3.1
+figures (bold centered title, larger axis sizes, solid vline, blue
+placebo triangles, no peach rectangle), regardless of `theme.bw`.
+
+## `theme.bw = FALSE` soft-deprecated
+
+Setting `theme.bw = FALSE` now emits a one-time per-session message
+flagging removal in v2.5.0. Users who want the gray-panel look
+should pass `legacy.style = TRUE` (which honors `theme.bw = FALSE`
+exactly), or apply `+ ggplot2::theme_gray()` to the returned plot.
+
+# fect 2.3.1
+
+## New: `W.est` and `W.agg` arguments distinguish survey weights from IPW / balancing weights
+
+`fect()` and `fect.formula()` gain two new arguments that control where
+the weight column enters the estimator:
+
+* `W.est` --- weight column for the outcome-model fit (the weighted least
+  squares applied inside the IFE / MC / CFE solver).
+* `W.agg` --- weight column for the across-treated-obs aggregation
+  (`att.on`, `est.avg`, `est.att`).
+
+Both default to `NULL` and fall back to the existing `W` argument when
+left unset, so callers who pass only `W = "col"` get the same behavior as
+v2.3.0 + the consistency fix below (W enters both fit and aggregation).
+Pass the per-role arguments to specify finer behavior:
+
+* Survey / sample weights: `W = "ws"` (or equivalently
+  `W.est = W.agg = "ws"`). W enters both fit and aggregation.
+* Robust-regression / heteroskedasticity / GLS weights: `W.est = "wr"`
+  alone. The fit is weighted, the aggregation is unweighted.
+* Inverse-probability / balancing / post-stratification weights:
+  `W.agg = "ipw"` alone. The outcome model is fit unweighted (preserving
+  doubly-robust properties), and the aggregation is weighted by IPW.
+
+In v2.3.1, `W.est` and `W.agg` (when both supplied) must point to the
+same column. Truly distinct columns for fit vs. aggregation (e.g. a
+combined survey x IPW design where the outcome model uses survey weights
+and the aggregation uses survey x IPW) are scheduled for v2.4.0; the
+v2.3.1 design errors with an instructive message if requested.
+
+**Caveat for IPW users.** `W.agg = "ipw"` fits the outcome model
+unweighted and applies IPW only at the across-treated-obs aggregation.
+This is closer to a doubly-robust estimator than v2.3.0's silent
+everywhere-weighting --- but it is not a fully cross-fit doubly-robust
+estimator. Residuals on never-treated controls used in any de-bias term
+inherit in-sample shrinkage from the outcome fit, which DR theory
+requires cross-fitting to eliminate. A fully cross-fit DR path is
+scheduled for v3.0.
+
+## Breaking change: weighted fits now have a single, consistent ATT surface
+
+When `W = "<column>"` is supplied to `fect()`, every reported quantity on
+the returned fit object now reflects those weights. Prior versions
+maintained two parallel ATT pipelines on weighted fits: an unweighted one
+(populated into `est.att`, `est.avg`, `att.boot`, `att.vcov`, etc.) and a
+W-weighted one (populated into the parallel `est.att.W`, `est.avg.W`,
+`att.W.boot`, `att.W.vcov` slots). `plot(fit)` silently substituted the
+W-weighted pipeline for rendering while `print(fit)` and `fit$est.att`
+returned the unweighted pipeline --- so the same fit object reported
+different per-period ATTs and aggregate CIs depending on which surface
+the user looked at.
+
+As of 2.3.1, when `W` is non-NULL:
+
+* `fit$est.att`, `fit$est.avg`, `fit$est.att90`, `fit$att.bound`,
+  `fit$att.boot`, `fit$att.vcov`, `fit$est.placebo`, `fit$est.carryover`,
+  and the `*.off` reverse-treatment counterparts all carry the
+  W-weighted aggregations.
+* `fit$att`, `fit$time`, `fit$count`, `fit$att.avg`, `fit$att.off`,
+  `fit$time.off`, `fit$count.off`, `fit$att.placebo`, `fit$att.carryover`
+  similarly carry the W-weighted aggregations from the per-method
+  estimator.
+* `print(fit)` now labels the obs-level row as `Tr obs sample-weighted (W)`
+  (instead of `Tr obs equally weighted`) when W was supplied.
+* The redundant `*.W` slots (`est.att.W`, `est.avg.W`, `att.W.boot`,
+  `att.W.vcov`, `att.W.bound`, `att.on.W`, `time.on.W`, `count.on.W`,
+  `att.avg.W`, `att.on.sum.W`, `W.on.sum`, `att.off.W`, `time.off.W`,
+  `count.off.W`, `att.off.sum.W`, `W.off.sum`, `att.placebo.W`,
+  `att.carryover.W`, `est.placebo.W`, `est.carryover.W`, `est.att.off.W`,
+  `att.off.W.bound`, `att.off.W.vcov`) are no longer present on the
+  returned fit object.
+
+If you want the unweighted view of the same fit, refit with `W = NULL`.
+
+The `weight` argument to `plot.fect()` is now a no-op (deprecated),
+slated for removal in v2.5.0; passing it emits a deprecation warning.
+Internally `plot.fect()` no longer auto-flips between two pipelines ---
+it reads the canonical slots, which are already W-weighted when W was
+supplied at fit time.
+
+The C++ matrix-completion / IFE / CFE solvers (`inter_fe_mc`,
+`inter_fe_ub`, `inter_fe_cfe`) already used W as a fit-time
+weighted-least-squares weight in 2.3.0; this release does not change the
+fit, only the result-object surface.
+
+# fect 2.3.0
 
 ## Rolling-window cross-validation (standard ML design)
 

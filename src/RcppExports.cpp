@@ -308,8 +308,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // complex_fe_ub
-List complex_fe_ub(const arma::mat& Y, const arma::mat& Y0, const arma::cube& X_covariates, const arma::cube& X_extra_FE, const arma::cube& X_Z, const arma::cube& X_Q, const arma::cube& X_gamma, const arma::cube& X_kappa, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, const arma::mat& I, const arma::mat& W_in, const arma::mat& beta0, int r, int force, double tol, int max_iter);
-RcppExport SEXP _fect_complex_fe_ub(SEXP YSEXP, SEXP Y0SEXP, SEXP X_covariatesSEXP, SEXP X_extra_FESEXP, SEXP X_ZSEXP, SEXP X_QSEXP, SEXP X_gammaSEXP, SEXP X_kappaSEXP, SEXP Zgamma_idSEXP, SEXP kappaQ_idSEXP, SEXP ISEXP, SEXP W_inSEXP, SEXP beta0SEXP, SEXP rSEXP, SEXP forceSEXP, SEXP tolSEXP, SEXP max_iterSEXP) {
+List complex_fe_ub(const arma::mat& Y, const arma::mat& Y0, const arma::cube& X_covariates, const arma::cube& X_extra_FE, const arma::cube& X_Z, const arma::cube& X_Q, const arma::cube& X_gamma, const arma::cube& X_kappa, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, const arma::mat& I, const arma::mat& W_in, const arma::mat& beta0, int r, int force, double tol, int max_iter, Rcpp::Nullable<Rcpp::NumericMatrix> fit_init);
+RcppExport SEXP _fect_complex_fe_ub(SEXP YSEXP, SEXP Y0SEXP, SEXP X_covariatesSEXP, SEXP X_extra_FESEXP, SEXP X_ZSEXP, SEXP X_QSEXP, SEXP X_gammaSEXP, SEXP X_kappaSEXP, SEXP Zgamma_idSEXP, SEXP kappaQ_idSEXP, SEXP ISEXP, SEXP W_inSEXP, SEXP beta0SEXP, SEXP rSEXP, SEXP forceSEXP, SEXP tolSEXP, SEXP max_iterSEXP, SEXP fit_initSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -330,7 +330,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type force(forceSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
-    rcpp_result_gen = Rcpp::wrap(complex_fe_ub(Y, Y0, X_covariates, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, I, W_in, beta0, r, force, tol, max_iter));
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericMatrix> >::type fit_init(fit_initSEXP);
+    rcpp_result_gen = Rcpp::wrap(complex_fe_ub(Y, Y0, X_covariates, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, I, W_in, beta0, r, force, tol, max_iter, fit_init));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -488,8 +489,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // cfe_iter
-List cfe_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::cube& X_extra_FE, const arma::cube& X_Z, const arma::cube& X_Q, const arma::cube& X_gamma, const arma::cube& X_kappa, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, const arma::mat& beta0, int force, int r, double tolerate, int max_iter);
-RcppExport SEXP _fect_cfe_iter(SEXP XXSEXP, SEXP xxinvSEXP, SEXP X_extra_FESEXP, SEXP X_ZSEXP, SEXP X_QSEXP, SEXP X_gammaSEXP, SEXP X_kappaSEXP, SEXP Zgamma_idSEXP, SEXP kappaQ_idSEXP, SEXP YSEXP, SEXP Y0SEXP, SEXP ISEXP, SEXP WSEXP, SEXP beta0SEXP, SEXP forceSEXP, SEXP rSEXP, SEXP tolerateSEXP, SEXP max_iterSEXP) {
+List cfe_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::cube& X_extra_FE, const arma::cube& X_Z, const arma::cube& X_Q, const arma::cube& X_gamma, const arma::cube& X_kappa, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, const arma::mat& beta0, int force, int r, double tolerate, int max_iter, Rcpp::Nullable<Rcpp::NumericMatrix> fit_init);
+RcppExport SEXP _fect_cfe_iter(SEXP XXSEXP, SEXP xxinvSEXP, SEXP X_extra_FESEXP, SEXP X_ZSEXP, SEXP X_QSEXP, SEXP X_gammaSEXP, SEXP X_kappaSEXP, SEXP Zgamma_idSEXP, SEXP kappaQ_idSEXP, SEXP YSEXP, SEXP Y0SEXP, SEXP ISEXP, SEXP WSEXP, SEXP beta0SEXP, SEXP forceSEXP, SEXP rSEXP, SEXP tolerateSEXP, SEXP max_iterSEXP, SEXP fit_initSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -511,7 +512,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type r(rSEXP);
     Rcpp::traits::input_parameter< double >::type tolerate(tolerateSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
-    rcpp_result_gen = Rcpp::wrap(cfe_iter(XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter));
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericMatrix> >::type fit_init(fit_initSEXP);
+    rcpp_result_gen = Rcpp::wrap(cfe_iter(XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter, fit_init));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -615,8 +617,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // inter_fe_ub
-List inter_fe_ub(const arma::mat& Y, const arma::mat& Y0, const arma::cube& X, const arma::mat& I, const arma::mat& W_in, const arma::mat& beta0, int r, int force, double tol, int max_iter);
-RcppExport SEXP _fect_inter_fe_ub(SEXP YSEXP, SEXP Y0SEXP, SEXP XSEXP, SEXP ISEXP, SEXP W_inSEXP, SEXP beta0SEXP, SEXP rSEXP, SEXP forceSEXP, SEXP tolSEXP, SEXP max_iterSEXP) {
+List inter_fe_ub(const arma::mat& Y, const arma::mat& Y0, const arma::cube& X, const arma::mat& I, const arma::mat& W_in, const arma::mat& beta0, int r, int force, double tol, int max_iter, Rcpp::Nullable<Rcpp::NumericMatrix> fit_init);
+RcppExport SEXP _fect_inter_fe_ub(SEXP YSEXP, SEXP Y0SEXP, SEXP XSEXP, SEXP ISEXP, SEXP W_inSEXP, SEXP beta0SEXP, SEXP rSEXP, SEXP forceSEXP, SEXP tolSEXP, SEXP max_iterSEXP, SEXP fit_initSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -630,7 +632,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type force(forceSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
-    rcpp_result_gen = Rcpp::wrap(inter_fe_ub(Y, Y0, X, I, W_in, beta0, r, force, tol, max_iter));
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericMatrix> >::type fit_init(fit_initSEXP);
+    rcpp_result_gen = Rcpp::wrap(inter_fe_ub(Y, Y0, X, I, W_in, beta0, r, force, tol, max_iter, fit_init));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -672,8 +675,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // fe_ad_inter_iter
-List fe_ad_inter_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, int force, int mc, int r, int hard, double lambda, double tolerate, int max_iter);
-RcppExport SEXP _fect_fe_ad_inter_iter(SEXP YSEXP, SEXP Y0SEXP, SEXP ISEXP, SEXP WSEXP, SEXP forceSEXP, SEXP mcSEXP, SEXP rSEXP, SEXP hardSEXP, SEXP lambdaSEXP, SEXP tolerateSEXP, SEXP max_iterSEXP) {
+List fe_ad_inter_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, int force, int mc, int r, int hard, double lambda, double tolerate, int max_iter, Rcpp::Nullable<Rcpp::NumericMatrix> fit_init);
+RcppExport SEXP _fect_fe_ad_inter_iter(SEXP YSEXP, SEXP Y0SEXP, SEXP ISEXP, SEXP WSEXP, SEXP forceSEXP, SEXP mcSEXP, SEXP rSEXP, SEXP hardSEXP, SEXP lambdaSEXP, SEXP tolerateSEXP, SEXP max_iterSEXP, SEXP fit_initSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -688,13 +691,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
     Rcpp::traits::input_parameter< double >::type tolerate(tolerateSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
-    rcpp_result_gen = Rcpp::wrap(fe_ad_inter_iter(Y, Y0, I, W, force, mc, r, hard, lambda, tolerate, max_iter));
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericMatrix> >::type fit_init(fit_initSEXP);
+    rcpp_result_gen = Rcpp::wrap(fe_ad_inter_iter(Y, Y0, I, W, force, mc, r, hard, lambda, tolerate, max_iter, fit_init));
     return rcpp_result_gen;
 END_RCPP
 }
 // fe_ad_inter_covar_iter
-List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, const arma::mat& beta0, int force, int mc, int r, int hard, double lambda, double tolerate, int max_iter);
-RcppExport SEXP _fect_fe_ad_inter_covar_iter(SEXP XXSEXP, SEXP xxinvSEXP, SEXP YSEXP, SEXP Y0SEXP, SEXP ISEXP, SEXP WSEXP, SEXP beta0SEXP, SEXP forceSEXP, SEXP mcSEXP, SEXP rSEXP, SEXP hardSEXP, SEXP lambdaSEXP, SEXP tolerateSEXP, SEXP max_iterSEXP) {
+List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, const arma::mat& beta0, int force, int mc, int r, int hard, double lambda, double tolerate, int max_iter, Rcpp::Nullable<Rcpp::NumericMatrix> fit_init);
+RcppExport SEXP _fect_fe_ad_inter_covar_iter(SEXP XXSEXP, SEXP xxinvSEXP, SEXP YSEXP, SEXP Y0SEXP, SEXP ISEXP, SEXP WSEXP, SEXP beta0SEXP, SEXP forceSEXP, SEXP mcSEXP, SEXP rSEXP, SEXP hardSEXP, SEXP lambdaSEXP, SEXP tolerateSEXP, SEXP max_iterSEXP, SEXP fit_initSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -712,7 +716,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
     Rcpp::traits::input_parameter< double >::type tolerate(tolerateSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
-    rcpp_result_gen = Rcpp::wrap(fe_ad_inter_covar_iter(XX, xxinv, Y, Y0, I, W, beta0, force, mc, r, hard, lambda, tolerate, max_iter));
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericMatrix> >::type fit_init(fit_initSEXP);
+    rcpp_result_gen = Rcpp::wrap(fe_ad_inter_covar_iter(XX, xxinv, Y, Y0, I, W, beta0, force, mc, r, hard, lambda, tolerate, max_iter, fit_init));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -734,8 +739,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // inter_fe_mc
-List inter_fe_mc(const arma::mat& Y, const arma::mat& Y0, const arma::cube& X, const arma::mat& I, const arma::mat& W_in, const arma::mat& beta0, int r, double lambda, int force, double tol, int max_iter);
-RcppExport SEXP _fect_inter_fe_mc(SEXP YSEXP, SEXP Y0SEXP, SEXP XSEXP, SEXP ISEXP, SEXP W_inSEXP, SEXP beta0SEXP, SEXP rSEXP, SEXP lambdaSEXP, SEXP forceSEXP, SEXP tolSEXP, SEXP max_iterSEXP) {
+List inter_fe_mc(const arma::mat& Y, const arma::mat& Y0, const arma::cube& X, const arma::mat& I, const arma::mat& W_in, const arma::mat& beta0, int r, double lambda, int force, double tol, int max_iter, Rcpp::Nullable<Rcpp::NumericMatrix> fit_init);
+RcppExport SEXP _fect_inter_fe_mc(SEXP YSEXP, SEXP Y0SEXP, SEXP XSEXP, SEXP ISEXP, SEXP W_inSEXP, SEXP beta0SEXP, SEXP rSEXP, SEXP lambdaSEXP, SEXP forceSEXP, SEXP tolSEXP, SEXP max_iterSEXP, SEXP fit_initSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -750,7 +755,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type force(forceSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
-    rcpp_result_gen = Rcpp::wrap(inter_fe_mc(Y, Y0, X, I, W_in, beta0, r, lambda, force, tol, max_iter));
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericMatrix> >::type fit_init(fit_initSEXP);
+    rcpp_result_gen = Rcpp::wrap(inter_fe_mc(Y, Y0, X, I, W_in, beta0, r, lambda, force, tol, max_iter, fit_init));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -776,7 +782,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fect_fe_ub", (DL_FUNC) &_fect_fe_ub, 6},
     {"_fect_inter_fe_d", (DL_FUNC) &_fect_inter_fe_d, 9},
     {"_fect_inter_fe_d_ub", (DL_FUNC) &_fect_inter_fe_d_ub, 10},
-    {"_fect_complex_fe_ub", (DL_FUNC) &_fect_complex_fe_ub, 17},
+    {"_fect_complex_fe_ub", (DL_FUNC) &_fect_complex_fe_ub, 18},
     {"_fect_YY_adj", (DL_FUNC) &_fect_YY_adj, 5},
     {"_fect_Demean", (DL_FUNC) &_fect_Demean, 4},
     {"_fect_fixed_effects_part", (DL_FUNC) &_fect_fixed_effects_part, 4},
@@ -788,7 +794,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fect_WBeta", (DL_FUNC) &_fect_WBeta, 4},
     {"_fect_beta_part", (DL_FUNC) &_fect_beta_part, 5},
     {"_fect_ife_part", (DL_FUNC) &_fect_ife_part, 2},
-    {"_fect_cfe_iter", (DL_FUNC) &_fect_cfe_iter, 18},
+    {"_fect_cfe_iter", (DL_FUNC) &_fect_cfe_iter, 19},
     {"_fect_Y_demean", (DL_FUNC) &_fect_Y_demean, 2},
     {"_fect_Y_wdemean", (DL_FUNC) &_fect_Y_wdemean, 3},
     {"_fect_fe_add", (DL_FUNC) &_fect_fe_add, 6},
@@ -796,13 +802,13 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fect_panel_FE", (DL_FUNC) &_fect_panel_FE, 3},
     {"_fect_ife", (DL_FUNC) &_fect_ife, 6},
     {"_fect_inter_fe", (DL_FUNC) &_fect_inter_fe, 7},
-    {"_fect_inter_fe_ub", (DL_FUNC) &_fect_inter_fe_ub, 10},
+    {"_fect_inter_fe_ub", (DL_FUNC) &_fect_inter_fe_ub, 11},
     {"_fect_fe_ad_iter", (DL_FUNC) &_fect_fe_ad_iter, 7},
     {"_fect_fe_ad_covar_iter", (DL_FUNC) &_fect_fe_ad_covar_iter, 10},
-    {"_fect_fe_ad_inter_iter", (DL_FUNC) &_fect_fe_ad_inter_iter, 11},
-    {"_fect_fe_ad_inter_covar_iter", (DL_FUNC) &_fect_fe_ad_inter_covar_iter, 14},
+    {"_fect_fe_ad_inter_iter", (DL_FUNC) &_fect_fe_ad_inter_iter, 12},
+    {"_fect_fe_ad_inter_covar_iter", (DL_FUNC) &_fect_fe_ad_inter_covar_iter, 15},
     {"_fect_beta_iter", (DL_FUNC) &_fect_beta_iter, 7},
-    {"_fect_inter_fe_mc", (DL_FUNC) &_fect_inter_fe_mc, 11},
+    {"_fect_inter_fe_mc", (DL_FUNC) &_fect_inter_fe_mc, 12},
     {NULL, NULL, 0}
 };
 

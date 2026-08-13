@@ -16,4 +16,11 @@ if (!interactive() &&
   )))
 }
 
-test_check("fect")
+## On CRAN (NOT_CRAN unset and not on GitHub Actions) run ONLY the minimal
+## smoke tests in test-cran.R to keep the check budget small. Locally and in CI
+## (NOT_CRAN=true or GITHUB_ACTIONS set) run the full regression suite.
+if (!identical(Sys.getenv("NOT_CRAN"), "true") && !nzchar(Sys.getenv("GITHUB_ACTIONS"))) {
+  test_check("fect", filter = "^cran$")
+} else {
+  test_check("fect")
+}

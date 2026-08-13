@@ -15,6 +15,12 @@
 # prefer r = 0 over r >= 1, so this test exercises the r.cv == 0 code path.
 
 test_that("gsynth + CV + se survives when r.cv == 0 (regression for dispatcher crash)", {
+
+  ## Bootstrap regression test: heavy for CRAN's test budget. Runs in
+  ## the standard test environment (devtools::test() / R CMD check
+  ## without --as-cran sandboxing).
+  skip_on_cran()
+
   set.seed(20260421)
   N <- 20
   TT <- 15

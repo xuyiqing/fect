@@ -83,13 +83,20 @@ Choose based on estimand and inference. If the target is unit-specific and condi
 
 ## Organization
 
-The user guide is structured into the following chapters:
+The user guide is structured into four parts. Most users only need the **Basics** part to perform a complete analysis with the fixed effects counterfactual estimator; the remaining parts are referenced as needed.
+
+### Basics
 
 -   [Chapter @sec-start]\
     Installation instructions and datasets.
 
 -   [Chapter @sec-fect]\
-    Also known as the fixed effects counterfactual estimator (FEct), including estimation, inference, alternative estimands.
+    The fixed effects counterfactual estimator (FEct), including estimation, basic inference, and the `group.fe` argument for sub-group treatment (e.g., counties nested in states with a state-level policy).
+
+-   [Chapter @sec-estimands]\
+    Alternative estimands and the unified post-hoc estimand interface: cumulative ATT, APTT, log-scale ATT, window-restricted ATT, and the long-form accessor for custom estimands.
+
+### Advanced estimators and inference
 
 -   [Chapter @sec-ife-mc]\
     Interactive fixed effects (IFE) and matrix completion (MC) methods, cross-validation, and diagnostic tests.
@@ -97,20 +104,27 @@ The user guide is structured into the following chapters:
 -   [Chapter @sec-cfe]\
     The complex fixed effects (CFE) estimator: multi-level fixed effects, time-invariant covariates with time-varying coefficients, unit-specific time trends, in addition to interactive fixed effects.
 
+-   [Chapter @sec-gsynth]\
+    The Gsynth program --- the synthetic control setting using `time.component.from = "nevertreated"` --- originally developed in the **gsynth** package, with CFE extensions.
+
+-   [Chapter @sec-inference]\
+    Bootstrap inference internals: the `vartype` × `ci.method` × `para.error` matrix, parametric bootstrap mechanics, and the decision tree for choosing an inference path. Most relevant after Chapter @sec-gsynth where parametric bootstrap is the default.
+
+### Diagnostics and extensions
+
 -   [Chapter @sec-hte]\
     Effect heterogeneity: box plots, calendar-time trends, and covariate-based HTE. Triple difference-in-differences designs (in development).
-
--   [Chapter @sec-plots]\
-    Details of the plotting options and customization.
-
--   [Chapter @sec-gsynth]\
-    The Gsynth program — the synthetic control setting using `time.component.from = "nevertreated"` — originally developed in the **gsynth** package, with CFE extensions.
 
 -   [Chapter @sec-panel]\
     Application of various "modern" DID estimators.
 
 -   [Chapter @sec-panel-sens]\
     Sensitivity analysis for the counterfactual estimators.
+
+### Reference
+
+-   [Chapter @sec-plots]\
+    Detailed reference for plot options and customization, with examples for factor diagnostics, HTE, and modern-DID visualizations.
 
 -   [Chapter @sec-cheatsheet]\
     Quick reference for methods, parameters, plotting, and diagnostics.
@@ -127,20 +141,20 @@ The following individuals (and AI) have contributed to **gsynth** and **fect**, 
 -   [Tianzhu Qin](https://tianzhuqin.github.io/) (PhD Student at Cambridge University)
 -   Jinwen Wu (Predoc at Stanford PoliSci)
 -   [Rivka Lipkovitz](https://rivka.me/) (Undergraduate at MIT)
--   [StatsClaw](https://github.com/xuyiqing/StatsClaw) (Agentic System for Statistical Software Development)
+-   [StatsClaw](https://statsclaw.ai/) (Agentic System for Statistical Software Development)
 
 ## How to Cite
 
 To cite the **fect** package or this user manual, please use:
 
-> Xu, Yiqing, Licheng Liu, Ye Wang, Ziyi Liu, Shijian Liu, Tianzhu Qin, Jinwen Wu, and Rivka Lipkovitz. 2026. *fect: Fixed Effects Counterfactual Estimators --- User Manual (v2.3.0).* <https://yiqingxu.org/packages/fect/>
+> Xu, Yiqing, Licheng Liu, Ye Wang, Ziyi Liu, Shijian Liu, Tianzhu Qin, Jinwen Wu, and Rivka Lipkovitz. 2026. *fect: Fixed Effects Counterfactual Estimators --- User Manual (v2.4.5).* <https://yiqingxu.org/packages/fect/>
 
 ``` bibtex
 @manual{fect2026,
   title = {fect: Fixed Effects Counterfactual Estimators --- User Manual},
   author = {Xu, Yiqing and Liu, Licheng and Wang, Ye and Liu, Ziyi and Liu, Shijian and Qin, Tianzhu and Wu, Jinwen and Lipkovitz, Rivka},
   year = {2026},
-  note = {R package version 2.3.0},
+  note = {R package version 2.4.5},
   url = {https://yiqingxu.org/packages/fect/}
 }
 ```

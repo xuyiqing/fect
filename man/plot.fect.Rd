@@ -12,6 +12,7 @@
     restrict = "rm",
     loo = FALSE,
     highlight = NULL,
+    highlight.fill = FALSE,
     plot.ci = NULL,
     show.points = TRUE,
     loess.fit = TRUE,
@@ -117,6 +118,7 @@
     pretreatment = FALSE,
     num.pretreatment = 3,
     cm = FALSE,
+    legacy.style = FALSE,
     ...
 )
 }
@@ -128,7 +130,15 @@
     or \code{"cumul"} (cumulative effect plot). Default is context-dependent (e.g., "gap", or "equiv" if \code{loo=TRUE}).}
   \item{restrict}{For sensitivity plots (\code{type = "sens"} or \code{type = "sens_es"}). Specifies the type of restriction: \code{"rm"} (restriction on M, for relative magnitude bounds) or \code{"sm"} (smoothness restriction, for bounds based on second differences). Default is \code{"rm"}.}
   \item{loo}{Logical; if \code{TRUE} (default is \code{FALSE}), use leave-one-out estimates for pre-treatment periods in equivalence tests or gap plots.}
-  \item{highlight}{Logical or \code{NULL} (default). If \code{TRUE}, highlights specific periods such as placebo or carryover periods in relevant tests. If \code{NULL}, defaults to \code{TRUE} if a placebo or carryover test is being plotted, and \code{FALSE} otherwise.}
+  \item{highlight}{Controls which test-period types receive the colored-glyph treatment in placebo / carryover plots. Accepts:
+    \itemize{
+      \item \code{NULL} (default): auto --- highlight every test type that ran at fit time (placebo, carryover, carryover.rm).
+      \item \code{TRUE}: same as \code{NULL} but explicit.
+      \item \code{FALSE}: no highlighting; all periods render as plain pre/post circles.
+      \item A character subset of \code{c("placebo", "carryover", "carryover.rm")}: highlight only the named test types; other test periods render as plain circles. For example, \code{highlight = "placebo"} on a fit with both \code{placeboTest = TRUE} and \code{carryoverTest = TRUE} draws orange triangles at placebo periods but renders carryover periods as ordinary post-treatment circles.
+    }
+  }
+  \item{highlight.fill}{Logical. If \code{TRUE}, draws a lightened-tone background rectangle behind each highlighted period (in the same hue as the period's accent glyph). If \code{FALSE} (the default), only the colored glyph is drawn. The glyph alone is usually sufficient signal that a period belongs to a test window, and the glyph-only look survives grayscale printing without surprise. Set \code{TRUE} for slide / talk figures where the rectangle helps locate the window for a remote audience.}
   \item{plot.ci}{Specifies the confidence interval to be plotted. Options include:
     \code{"0.9"}, \code{"0.95"}, or \code{"none"}. Default is \code{NULL}, which is context-dependent (e.g., "0.95" for gap plots, "0.9" for equivalence plots, "none" if no CIs are available in the \code{fect} object).}
   \item{show.points}{Logical; if \code{TRUE} (default), shows point estimates on event study style plots (e.g., gap, equiv, exit plots).}
@@ -235,6 +245,7 @@
   \item{pretreatment}{Logical; if \code{TRUE}, restricts HTE analysis to pre-treatment periods only. Default is \code{FALSE}.}
   \item{num.pretreatment}{Integer; number of pre-treatment periods to include when \code{pretreatment = TRUE}. Default is \code{3}.}
   \item{cm}{Logical; if \code{TRUE}, plots causal moderation estimates instead of effect modification estimates for HTE plots. Requires the \code{fect} object to have been estimated with \code{cm = TRUE}. Default is \code{FALSE}.}
+  \item{legacy.style}{Logical; if \code{TRUE}, reproduces the pre-2.3.1 visual defaults (bold centered title, larger axis text, solid treatment-onset line, blue placebo triangles, no peach highlight rectangle) regardless of the value of \code{theme.bw}. If \code{FALSE} (the default) and \code{theme.bw = TRUE}, the modern v2.3.1 visual recipe is used. Pass \code{legacy.style = TRUE} for byte-identical reproduction of figures rendered under earlier fect versions.}
   \item{loess.fit}{Logical; if \code{TRUE} (default), overlays a LOESS smoothing curve on HTE scatter plots.}
   \item{...}{Additional graphical parameters passed to internal plotting routines, primarily those accepted by \code{esplot} for event study style plots (gap, equiv, exit, sens_es, cumul).}
 }

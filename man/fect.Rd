@@ -5,7 +5,8 @@
 \description{Implements counterfactual estimators in TSCS data analysis and statistical tools to test their identification
 assumptions.}
 \usage{fect(formula = NULL, data, Y, D, X = NULL,
-            W = NULL, group = NULL,
+            W = NULL, W.est = NULL, W.agg = NULL,
+            group = NULL,
             na.rm = FALSE,
             index, force = "two-way",
             time.component.from = "notyettreated", em = TRUE,
@@ -13,16 +14,19 @@ assumptions.}
             CV = NULL, k = 20, cv.prop = 0.1, cv.method = "rolling",
             cv.nobs = 3, cv.donut = 1, cv.buffer = 1, criterion = "mspe",
             binary = FALSE, QR = FALSE,
-            method = "fe",  se = FALSE, vartype = "bootstrap", cl = NULL,
-            quantile.CI = FALSE, nboots = 200, alpha = 0.05,
-            parallel = TRUE, cores = NULL, tol = 1e-3,
-            max.iteration = 1000, seed = NULL,
+            method = "fe",  se = FALSE, vartype = "bootstrap",
+            para.error = "auto", cl = NULL,
+            ci.method = "normal", quantile.CI = NULL,
+            nboots = 200, alpha = 0.05,
+            parallel = TRUE, cores = NULL, tol = 1e-5,
+            max.iteration = 5000, seed = NULL,
             min.T0 = NULL, max.missing = NULL,
             proportion = 0.3, pre.periods = NULL,
             f.threshold = 0.5, tost.threshold = NULL,
             knots = NULL, degree = 2,
-            sfe = NULL, cfe = NULL,
-            Z = NULL, gamma = NULL, Q = NULL, kappa = NULL, 
+            group.fe = NULL,
+            cfe = NULL,
+            Z = NULL, gamma = NULL, Q = NULL, kappa = NULL,
             Q.type = NULL,
             Q.bspline.degree = NULL,
             Z.param = NULL, Q.param = NULL,
@@ -41,7 +45,16 @@ assumptions.}
 \item{Y}{the outcome indicator.}
 \item{D}{the treatment indicator. The treatment should be binary (0 and 1).}
 \item{X}{time-varying covariates. Covariates that have perfect collinearity with specified fixed effects are dropped automatically.}
-\item{W}{the weight indicator. If specified, the program will fit the data with a weighted outcome model and calculate weighted average and dynamic treatment effect.}
+\item{W}{a string giving the column name of a weight variable. Convenience default that populates both \code{W.est} and \code{W.agg} when those are left \code{NULL}. Suitable for survey or sample weights, where the same column applies to both the outcome-model fit and the across-treated-obs aggregation.}
+
+\item{W.est}{a string giving the column name of a weight variable that enters the outcome-model fit (the weighted least squares applied inside the IFE / MC / CFE solver). When \code{NULL}, falls back to \code{W}. Use this (with \code{W.agg = NULL}) when the weight reflects fit-side considerations and the estimand is the unweighted average ATT across treated cells.}
+
+\item{W.agg}{a string giving the column name of a weight variable that enters the across-treated-obs aggregation (\code{att.on}, \code{est.avg}, \code{est.att}). When \code{NULL}, falls back to \code{W}. Use this (with \code{W.est = NULL}) when the user's estimand differs from "ATT for the treated units in the analysis sample" --- common cases include calibration weights to a target population or post-stratification weights that should adjust the summary but not the model fit.
+
+A clean in-package solution for inverse-probability weights for confounding adjustment is under development for fect 3.0 (a cross-fit doubly-robust path); \code{W.agg} is not a substitute for that work and does not deliver the doubly-robust properties an IPW user expects.
+
+In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the same column; truly distinct columns for fit vs. aggregation (e.g. combined survey x IPW designs) are scheduled for v2.4.0.}
+
 \item{group}{the group indicator. If specified, the group-wise ATT will be estimated.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
 \item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Every observation should be uniquely defined by the pair of the unit and time indicator.}
@@ -81,9 +94,43 @@ assumptions.}
   These three conditions correspond to Gates A, B, and C in the
   three-gate defense system (see \code{ARCHITECTURE.md}).
   For all other settings, \code{vartype = "bootstrap"} is recommended.}
-\item{cl}{a string specifying the cluster for cluster bootstrapping.}
-\item{quantile.CI}{a logical flag indicating whether to use quantile confidence intervals when bootstrapping.}
-\item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}.}
+\item{para.error}{a string specifying the residual-error model used by
+  the parametric bootstrap path; sub-option of \code{vartype = "parametric"}
+  (silently ignored otherwise). One of \code{"auto"}, \code{"ar"},
+  \code{"empirical"}, or \code{"wild"}. Default \code{"auto"} resolves at
+  fit time to \code{"empirical"} on a fully-observed panel and \code{"ar"}
+  on a panel with missing cells; the resolved label is stored on
+  \code{fit$para.error}. \code{"ar"} estimates an AR(1) error process from
+  control residuals (works on any panel shape); \code{"empirical"}
+  resamples residuals i.i.d. from the main-fit pool (requires fully-
+  observed panel); \code{"wild"} applies unit-level Rademacher sign-flips
+  over the empirical residual pool (requires fully-observed panel).}
+\item{cl}{a string specifying the cluster column for cluster bootstrapping.
+When \code{group.fe} is set to a single column and \code{cl} is unset,
+\code{cl} auto-defaults to \code{group.fe[1]} --- the natural choice when
+treatment varies at the group level (Bertrand, Duflo & Mullainathan 2004).
+To override --- for example, to cluster at the unit level when group-level
+FE is absorbed --- pass \code{cl = index[1]} (e.g., \code{cl = "id"}).
+Note that \code{cl = NULL} does NOT disable clustering: the case bootstrap
+always resamples units (which is unit-level clustering); the auto-default
+only changes the resample unit to a coarser level. \code{cl = FALSE} is
+rejected with a guiding error.}
+\item{ci.method}{a string controlling how the bootstrap distribution
+becomes the CIs reported in fect's \code{est.*} slots. Two values:
+\code{"normal"} (default; Wald CI: \eqn{\hat\theta \pm z \cdot SE}) or
+\code{"basic"} (reflected pivot:
+\eqn{[2\hat\theta - q_{1-\alpha/2},\, 2\hat\theta - q_{\alpha/2}]}, the
+literature-standard "percentile" CI per Davison & Hinkley (1997, §5.2.1)
+and what \code{boot::boot.ci(type = "basic")} returns). For
+\code{"percentile"}, \code{"bc"}, or \code{"bca"} CIs (typically wanted
+on alternative estimands like \code{aptt} and \code{log.att}), call
+\code{\link{estimand}} after fitting.}
+
+\item{quantile.CI}{deprecated as of v2.4.2. Use \code{ci.method} instead.
+\code{quantile.CI = FALSE} maps to \code{ci.method = "normal"};
+\code{quantile.CI = TRUE} maps to \code{ci.method = "basic"}. Both
+mappings still work but emit a one-time deprecation warning.}
+\item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}. Default \code{200}, sufficient for the standard error and the normal-CI structure that \code{fect} ships in \code{est.att}/\code{att.avg}. For tail-quantile-based CI methods accessed via \code{estimand()} (\code{ci.method} \code{"basic"}, \code{"percentile"}, \code{"bc"}, \code{"bca"}), bump to \code{nboots = 1000} or higher (Efron 1987 Section 3; DiCiccio & Efron 1996 Section 4); \code{estimand()} emits a warning when called on under-replicated fits.}
 \item{alpha}{the significance level for hypothesis tests and confidence intervals. Default \code{0.05}.}
 \item{parallel}{controls which operations run in parallel. Accepted values:
 \describe{
@@ -106,8 +153,17 @@ returns). This guarantees numerical identity between serial and parallel
 results but may compute a few extra lambda values compared to the serial
 path. Use \code{parallel = FALSE} to preserve the short-circuit behavior.}
 \item{cores}{an integer indicating the number of cores for parallel computing.}
-\item{tol}{a positive number indicating the tolerance level for EM updates.}
-\item{max.iteration}{the maximal number of iterations for the EM algorithm.}
+\item{tol}{a positive number indicating the relative tolerance for the
+EM update check (\code{||fit_new - fit_old||_F / ||fit_old||_F < tol}).
+Default tightened from \code{1e-3} to \code{1e-5} in v2.4.3 because the
+older default produced under-converged IFE/CFE point estimates that
+shifted up to 40\% relative to the converged value (inference was
+preserved, but the reported numbers were stopping-point-dependent).}
+\item{max.iteration}{the maximal number of EM iterations. Default raised
+from \code{1000} to \code{5000} in v2.4.3 to accommodate the tighter tol;
+canonical IFE/CFE fits converge in 700-2000 iters at \code{tol = 1e-5}.
+A \code{warning()} is emitted when the EM hits this cap without
+satisfying the tol gate (under-convergence diagnostic).}
 \item{seed}{an integer seed for random number generation.}
 \item{min.T0}{an integer specifying the minimum number of pre-treatment periods for each treated unit.}
 \item{max.missing}{an integer specifying the maximum number of missing observations allowed per unit.}
@@ -117,7 +173,21 @@ path. Use \code{parallel = FALSE} to preserve the short-circuit behavior.}
 \item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
 \item{knots}{a numeric vector specifying knots (currently unused; reserved for future use).}
 \item{degree}{an integer specifying the degree (currently unused; reserved for future use).}
-\item{sfe}{vector specifying other fixed effects for \code{method="cfe"}.}
+\item{group.fe}{a character vector of column names naming additional simple
+additive fixed-effect groupings to absorb (e.g., \code{group.fe = "state"}
+when rows are counties and treatment varies at state level). Each entry must
+be a column in \code{data}. Each entry must be \emph{nested in}
+\code{index[1]} --- i.e., constant within each level of the unit identifier
+--- otherwise an error is raised. When \code{group.fe} is set, \code{method
+= "fe"} is silently routed to \code{method = "cfe"} (FE is a subset of CFE,
+identical result); \code{method = "ife"}, \code{"mc"}, \code{"both"}, and
+\code{"gsynth"} hard-error (use \code{method = "cfe"} with \code{r > 0} for
+free latent factors with group-level FE). When \code{group.fe} has length 1
+and \code{cl} is unset, \code{cl} auto-defaults to \code{group.fe[1]}. To
+cluster at the unit level instead, pass \code{cl = index[1]} (e.g.,
+\code{cl = "id"}); \code{cl = NULL} does NOT change behavior (the case
+bootstrap always resamples units regardless of \code{cl}), and
+\code{cl = FALSE} is rejected with a guiding error.}
 \item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
 \item{Z}{a vector specifying the time-invariant covariates for the Z matrix.}
 \item{gamma}{a vector specifying the time-varying covariates for the gamma matrix.}

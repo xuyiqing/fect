@@ -45,7 +45,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     cores = NULL,
                     do_parallel_cv   = FALSE,   ## pre-computed flag from default.R
                     do_parallel_boot = FALSE,    ## threaded through; not used in cv.R
-                    cv.rule = "1se"              ## "1se" (default), "min", or "1pct" (legacy)
+                    cv.rule = "1se",             ## "1se" (default), "min", or "1pct" (legacy)
+                    W.in.fit = TRUE              ## whether W enters the outcome-model fit
                     ) {
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     ## -------------------------------##
@@ -67,7 +68,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         X <- array(0, dim = c(1, 1, 0))
     }
 
-    if (is.null(W)) {
+    if (is.null(W) || !W.in.fit) {
         W.use <- as.matrix(0)
         use_weight <- 0
     } else {

@@ -1,0 +1,10 @@
+---
+suppress-bibliography: false
+nocite: |
+  @*
+---
+
+# Bibliography {.unnumbered}
+
+::: {#refs}
+:::

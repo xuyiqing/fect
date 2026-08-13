@@ -9,8 +9,8 @@
 stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)](https://www.tidyverse.org/lifecycle/#stable)
 [![License:
 MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[<img src="https://www.r-pkg.org/badges/version/fect" alt="CRAN status"/>](https://CRAN.R-project.org/package=fect)
-[<img src="https://cranlogs.r-pkg.org/badges/grand-total/fect" alt="CRAN downloads"/>](https://cran.r-project.org/web/packages/fect/index.html)
+[![CRAN status](https://www.r-pkg.org/badges/version/fect)](https://CRAN.R-project.org/package=fect)
+[![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/fect)](https://cran.r-project.org/web/packages/fect/index.html)
 <!-- badges: end -->
 
 **R** package for implementing counterfactual estimators, also known as
@@ -40,10 +40,10 @@ Cross-Sectional
 Data](https://yiqingxu.org/papers/english/2022_fect/LWX2022.pdf).
 *American Journal of Political Science*, 68 (1): 160–76.
 
-Chiu, Albert, Xingchen Lan, Ziyi Liu, and Yiqing Xu. (2025). [Causal
+Chiu, Albert, Xingchen Lan, Ziyi Liu, and Yiqing Xu. (2026). [Causal
 Panel Analysis Under Parallel Trends: Lessons from a Large Reanalysis
 Study](https://www.cambridge.org/core/journals/american-political-science-review/article/causal-panel-analysis-under-parallel-trends-lessons-from-a-large-reanalysis-study/219275E0CE901F099F2CFFBA07079243).
-*American Political Science Review*, First View.
+*American Political Science Review*, 120(1): 245–266.
 
 **Report bugs:** Please report any bugs by submitting an issue on
 [GitHub](https://github.com/xuyiqing/fect/issues) or emailing me

@@ -26,6 +26,39 @@ basic_ci_alpha <- function(theta, boots, alpha) {
   ci_mat
 }
 
+## Reflected pivot CI on a (possibly H0-centered) bootstrap distribution.
+## Mirrors the location-shift fix in R/po-estimands.R (commit b4e9fbf):
+## when `shift = TRUE` (i.e., vartype == "parametric"), shift the boot
+## distribution row-wise from mean ~ 0 (H0) to mean ~ theta (H1) before
+## computing the basic interval [2*theta - q_high, 2*theta - q_low]. The
+## shift is variance-preserving, so the SE computed elsewhere on the
+## unshifted boot is unaffected; the H0-based p-value (computed via
+## get.pvalue() on the unshifted boot) is also unchanged.
+##
+## - theta: vector of point estimates (length p)
+## - boots: p x B matrix of bootstrap draws
+## - alpha: significance level (e.g., 0.05 for 95% CI; 0.10 for 90% CI bound)
+## - shift: if TRUE, apply the parametric H0 -> H1 location shift
+.basic_ci_shifted <- function(theta, boots, alpha, shift = FALSE) {
+  if (isTRUE(shift) && is.matrix(boots) && nrow(boots) > 0L) {
+    rm <- rowMeans(boots, na.rm = TRUE)
+    boots <- boots - rm + theta
+  }
+  ci_mat <- basic_ci_alpha(theta, boots, alpha)
+  colnames(ci_mat) <- c("CI.lower", "CI.upper")
+  ci_mat
+}
+
+## Single-CI version: theta scalar, boots vector. Same shift semantics.
+.basic_ci_shifted_one <- function(theta, boots, alpha, shift = FALSE) {
+  if (isTRUE(shift) && length(boots) > 0L) {
+    boots <- boots - mean(boots, na.rm = TRUE) + theta
+  }
+  qs <- quantile(boots, c(1 - alpha / 2, alpha / 2), na.rm = TRUE)
+  c(2 * theta - unname(qs[1]),
+    2 * theta - unname(qs[2]))
+}
+
 # Reduce closure payload before parallel export by keeping only symbols
 # that the function body actually references from its local frame.
 trim_closure_env <- function(fun) {
@@ -75,7 +108,6 @@ fect_boot <- function(
   balance.period = NULL,
   method = "ife",
   degree = 2,
-  sfe = NULL,
   cfe = NULL,
   X.extra.FE = NULL,
   X.Z = NULL,
@@ -109,6 +141,7 @@ fect_boot <- function(
   carryoverTest = 0,
   carryover.period = NULL,
   vartype = "bootstrap",
+  para.error = "auto",
   quantile.CI = FALSE,
   nboots = 200,
   parallel = TRUE,
@@ -122,7 +155,9 @@ fect_boot <- function(
   split_residuals = FALSE,
   loading.bound = "none",
   gamma.loading = NULL,
-  gamma.loading.grid = NULL
+  gamma.loading.grid = NULL,
+  W.in.fit = TRUE,
+  W.in.agg = TRUE
 ) {
   do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
   na.pos <- NULL
@@ -186,6 +221,7 @@ fect_boot <- function(
         X = X,
         D = D,
         W = W,
+        W.in.fit = W.in.fit,
         I = I,
         II = II,
         T.on = T.on,
@@ -218,6 +254,7 @@ fect_boot <- function(
         X = X,
         D = D,
         W = W,
+        W.in.fit = W.in.fit,
         I = I,
         II = II,
         cm = cm,
@@ -250,6 +287,7 @@ fect_boot <- function(
           X = X,
           D = D,
           W = W,
+          W.in.fit = W.in.fit,
           I = I,
           II = II,
           T.on = T.on,
@@ -283,6 +321,7 @@ fect_boot <- function(
           X = X,
           D = D,
           W = W,
+          W.in.fit = W.in.fit,
           I = I,
           II = II,
           T.on = T.on,
@@ -327,6 +366,7 @@ fect_boot <- function(
           X = X,
           D = D,
           W = W,
+          W.in.fit = W.in.fit,
           X.extra.FE = X.extra.FE,
           X.Z = X.Z,
           X.Q = X.Q,
@@ -376,6 +416,7 @@ fect_boot <- function(
         X = X,
         D = D,
         W = W,
+        W.in.fit = W.in.fit,
         I = I,
         II = II,
         T.on = T.on,
@@ -544,6 +585,16 @@ fect_boot <- function(
 
   if (vartype == "jackknife") {
     nboots <- N
+    if (N > 1000) {
+      warning(
+        "vartype = \"jackknife\" with N = ", N, " requires ", N,
+        " leave-one-out refits and will be slow at the v2.4.2 EM ",
+        "convergence defaults (tol = 1e-5, max.iteration = 5000). ",
+        "Consider vartype = \"bootstrap\" (B = 1000 typically faster ",
+        "than full leave-one-out at N > 500) for tractability.",
+        call. = FALSE
+      )
+    }
   }
 
   ## bootstrapped estimates
@@ -685,6 +736,7 @@ fect_boot <- function(
           X = X,
           D = D,
           W = W,
+          W.in.fit = W.in.fit,
           I = I,
           II = II,
           cm = cm,
@@ -764,7 +816,13 @@ fect_boot <- function(
   } else if (
     binary == FALSE & method %in% c("gsynth", "ife", "cfe") & vartype == "parametric"
   ) {
-    message("Parametric Bootstrap \n")
+    ## Resolve para.error = "auto" to the concrete mode for this dataset.
+    para.error.resolved <- if (identical(para.error, "auto")) {
+        if (0 %in% I) "ar" else "empirical"
+    } else {
+        para.error
+    }
+    message("Parametric Bootstrap (para.error = \"", para.error.resolved, "\") \n")
     sum.D <- colSums(out$D)
     id.tr <- which(sum.D > 0)
     I.tr <- as.matrix(out$I[, id.tr])
@@ -939,11 +997,13 @@ fect_boot <- function(
     if (do_parallel_boot) {
       ## Phase A: future_lapply (was foreach %dopar%, which inherited whatever
       ## backend the global foreach registry held — see notes/ stage-1).
-      error.list <- future.apply::future_lapply(
-        seq_len(nboots),
-        FUN = function(j) draw.error(),
-        future.seed = TRUE,
-        future.packages = c("fect", "mvtnorm", "fixest")
+      error.list <- .fect_with_quiet_pkg_warnings(
+        future.apply::future_lapply(
+          seq_len(nboots),
+          FUN = function(j) draw.error(),
+          future.seed = TRUE,
+          future.packages = c("fect", "mvtnorm", "fixest")
+        )
       )
       error.tr <- abind(error.list, along = 3)
     } else {
@@ -956,7 +1016,7 @@ fect_boot <- function(
       }
     }
 
-    if (0 %in% I) {
+    if (para.error.resolved == "ar") {
       ## calculate vcov of ep_tr
       na.sum <- sapply(1:nboots, function(vec) {
         sum(is.na(c(error.tr[,, vec])))
@@ -1014,7 +1074,9 @@ fect_boot <- function(
 
       ## get the error for the treated and control
       error.tr.boot <- matrix(NA, TT, Ntr)
-      if (0 %in% I) {
+      if (para.error.resolved == "ar") {
+        ## Path AR: draw from MVN with AR-vcov estimated from Loop 1 pool.
+        ## Works for fully-observed and missing-data panels.
         for (w in 1:Ntr) {
           error.tr.boot[, w] <- t(rmvnorm(
             n = 1,
@@ -1042,7 +1104,9 @@ fect_boot <- function(
           ))
           error.co.boot[which(as.matrix(I[, fake.co]) == 0)] <- 0
         }
-      } else {
+      } else if (para.error.resolved == "empirical") {
+        ## Path empirical: column-resample from the Loop 1 pool.
+        ## Requires fully-observed panel (validated at fit time).
         for (w in 1:Ntr) {
           error.tr.boot[, w] <- error.tr[,
             w,
@@ -1055,6 +1119,30 @@ fect_boot <- function(
         } else {
           error.co.boot <- error.co[, sample(1:Nco, Nco, replace = TRUE)]
         }
+      } else {
+        ## Path wild: unit-level Rademacher sign-flip on Loop 1 pool draws.
+        ## Preserves within-unit AR structure (sign applied to entire time series).
+        ## Requires fully-observed panel (validated at fit time).
+        ## This is variant-(i): treated cells receive error.tr.boot (from Loop 1 pool),
+        ## NOT the observed treatment effect. The bootstrap distribution is H0-centered.
+        ## The po-estimands.R location-shift (commit b4e9fbf) re-centers at theta-hat.
+        ## NOTE (merge 2026-08-12): split_residuals has no branch here -- "wild" did not
+        ## exist when split_residuals was designed, so this path always uses the full
+        ## control pool (error.co / Nco) regardless of split_residuals. Flagged for the
+        ## user; not resolved as part of this merge (see report).
+        signs    <- sample(c(-1, 1), Ntr, replace = TRUE)
+        co_signs <- sample(c(-1, 1), Nco, replace = TRUE)
+
+        for (w in 1:Ntr) {
+          j <- sample(1:dim(error.tr)[3], 1, replace = TRUE)
+          error.tr.boot[, w] <- signs[w] * error.tr[, w, j]
+        }
+
+        co_picks      <- sample(1:Nco, Nco, replace = TRUE)
+        error.co.boot <- error.co[, co_picks, drop = FALSE]
+        ## Apply per-unit sign to entire column (unit's full time series).
+        ## t(t(M) * v) multiplies column k of M by v[k].
+        error.co.boot <- t(t(error.co.boot) * co_signs)
       }
 
       Y.boot <- fit.out[, id.boot]
@@ -1200,8 +1288,11 @@ fect_boot <- function(
     }
   } else {
     one.nonpara <- function(num = NULL) {
-      ## bootstrap
+      ## Y.input is what gets passed to the per-method bootstrap refit.
+      ## For case bootstrap and jackknife it is just the original Y.
+      Y.input <- Y
       if (is.null(num)) {
+        ## case bootstrap (resample units with replacement)
         if (is.null(cl)) {
           if (hasRevs == 0) {
             if (Nco > 0) {
@@ -1355,10 +1446,11 @@ fect_boot <- function(
         if (method == "gsynth") {
           boot <- try(
             fect_nevertreated(
-              Y = Y[, boot.id],
+              Y = Y.input[, boot.id],
               X = X.boot,
               D = D.boot,
               W = W.boot,
+              W.in.fit = W.in.fit,
               I = I.boot,
               II = II[, boot.id],
               T.on = T.on[, boot.id],
@@ -1398,10 +1490,11 @@ fect_boot <- function(
         } else if (method == "ife") {
           boot <- try(
             fect_fe(
-              Y = Y[, boot.id],
+              Y = Y.input[, boot.id],
               X = X.boot,
               D = D.boot,
               W = W.boot,
+              W.in.fit = W.in.fit,
               I = I.boot,
               II = II[, boot.id],
               cm = cm,
@@ -1441,10 +1534,11 @@ fect_boot <- function(
         } else if (method == "mc") {
           boot <- try(
             fect_mc(
-              Y = Y[, boot.id],
+              Y = Y.input[, boot.id],
               X = X.boot,
               D = D[, boot.id],
               W = W.boot,
+              W.in.fit = W.in.fit,
               I = I[, boot.id],
               II = II[, boot.id],
               T.on = T.on[, boot.id],
@@ -1486,10 +1580,11 @@ fect_boot <- function(
           X.kappa.boot <- X.kappa[, boot.id, , drop = FALSE]
           boot <- try(
             fect_cfe(
-              Y = Y[, boot.id],
+              Y = Y.input[, boot.id],
               X = X.boot,
               D = D.boot,
               W = W.boot,
+              W.in.fit = W.in.fit,
               X.extra.FE = X.extra.FE.boot,
               X.Z = X.Z.boot,
               X.Q = X.Q.boot,
@@ -1628,21 +1723,53 @@ fect_boot <- function(
     options(doFuture.rng.onMisuse = "ignore")
     on.exit(options(doFuture.rng.onMisuse = old_rng_misuse), add = TRUE)
 
+    ## v2.4.3: bump future.globals.maxSize locally to 2 GiB for the
+    ## parallel block. Belt-and-braces guard for very large panels
+    ## (high N*T, large factor rank, dense covariates) whose per-worker
+    ## export can exceed the 500 MiB default even after the trim below.
+    ## Honour any larger user-set cap via max().
+    old_future_max <- getOption("future.globals.maxSize", 500 * 1024^2)
+    options(future.globals.maxSize = max(old_future_max, 2 * 1024^3))
+    on.exit(options(future.globals.maxSize = old_future_max), add = TRUE)
+
     quiet_nonpara <- function(j) {
       suppressMessages(suppressWarnings(one.nonpara(boot.seq[j])))
     }
+    ## v2.4.3: trim the wrapper's closure env so foreach/future export
+    ## ships only `one.nonpara` (already trimmed at L1600) and `boot.seq`,
+    ## NOT the full fect_boot() frame (Y, D, X, W, out, ...). Prevents the
+    ## quiet_nonpara=728MiB blowup reported on IFE + nboots=1000.
+    quiet_nonpara <- trim_closure_env(quiet_nonpara)
 
     run_dopar_retry <- function(idx, workers) {
-      cl <- parallel::makePSOCKcluster(workers)
+      ## Build the PSOCK cluster via the package helper, which bakes
+      ## .libPaths() into worker startup (rscript_libs) — eliminating
+      ## the post-construction `clusterCall(.libPaths)` race that
+      ## occasionally killed a worker before iter 1 in mixed CV+boot
+      ## test runs (E.6 in test-cv-parallel.R). Retry-with-backoff on
+      ## socket-init failure; shrink workers between attempts.
+      cl <- NULL
+      init_err <- NULL
+      try_workers <- max(1L, as.integer(workers))
+      for (attempt in seq_len(3L)) {
+        cl <- tryCatch(
+          .fect_make_future_cluster(try_workers),
+          error = function(e) {
+            init_err <<- e
+            NULL
+          }
+        )
+        if (!is.null(cl)) break
+        Sys.sleep(0.5 * attempt)
+        try_workers <- max(1L, try_workers - 1L)
+      }
+      if (is.null(cl)) {
+        stop("PSOCK cluster initialization failed: ",
+             conditionMessage(init_err))
+      }
       on.exit({
         try(parallel::stopCluster(cl), silent = TRUE)
       }, add = TRUE)
-      ## Propagate parent .libPaths() so PSOCK workers can find fect
-      ## (and other user-installed packages) regardless of how the
-      ## parent R session was launched (e.g. Quarto render).
-      parent_libs <- .libPaths()
-      try(parallel::clusterCall(cl, function(p) .libPaths(p),
-                                p = parent_libs), silent = TRUE)
       doParallel::registerDoParallel(cl)
       suppressWarnings(foreach(
         j = idx,
@@ -1707,7 +1834,23 @@ fect_boot <- function(
           workers <- max(1L, min(raw_cores, 8L))
         }
         workers <- max(1L, as.integer(workers))
-        run_dopar_retry(1:nboots, workers)
+        ## If doParallel ALSO can't bring up a cluster (cluster-init
+        ## storm after CV plan teardown, etc.), degrade to sequential
+        ## rather than letting fect() die. Bootstrap completes with
+        ## reduced throughput; downstream aggregation is unaffected.
+        tryCatch(
+          run_dopar_retry(1:nboots, workers),
+          error = function(e2) {
+            warning(
+              paste0(
+                "doParallel backend also failed (",
+                conditionMessage(e2),
+                "). Falling back to sequential bootstrap."
+              )
+            )
+            lapply(seq_len(nboots), quiet_nonpara)
+          }
+        )
       }
     )
 
@@ -3139,6 +3282,23 @@ fect_boot <- function(
       colnames(att.W.bound) <- c("CI.lower", "CI.upper")
       rownames(att.W.bound) <- time.on.W
 
+      est.att90.W <- cbind(
+        att.on.W,
+        att.on.W.j$se,
+        att.W.bound,
+        att.on.W.j$P,
+        count.on.W
+      )
+      colnames(est.att90.W) <- c(
+        "ATT",
+        "S.E.",
+        "CI.lower",
+        "CI.upper",
+        "p.value",
+        "count"
+      )
+      rownames(est.att90.W) <- time.on.W
+
       if (!is.null(placebo.period) & placeboTest == TRUE) {
         att.placebo.W.j <- jackknifed(
           att.placebo.W,
@@ -3547,6 +3707,15 @@ fect_boot <- function(
       }
     }
   } else {
+    ## Single source of truth for the parametric H0 -> H1 location shift
+    ## downstream.  Used by every `quantile.CI == TRUE` branch in this
+    ## section through the `.basic_ci_shifted()` / `.basic_ci_shifted_one()`
+    ## helpers (defined near the top of this file).  See R/po-estimands.R
+    ## commit b4e9fbf for the original shift fix on the estimand() side ---
+    ## the helpers here apply the same shift to fect's built-in CI
+    ## machinery so fit$est.* slots match estimand() byte-equally.
+    .is_param <- isTRUE(vartype == "parametric")
+
     se.att <- apply(att.boot, 1, function(vec) sd(vec, na.rm = TRUE))
     if (quantile.CI == FALSE) {
       CI.att <- cbind(
@@ -3555,12 +3724,8 @@ fect_boot <- function(
       ) # normal approximation
       pvalue.att <- (1 - pnorm(abs(att / se.att))) * 2
     } else {
-      CI.att <- t(apply(att.boot, 1, function(vec) {
-        2 *
-          att[which.max(!is.na(vec))] -
-          quantile(vec, c(1 - alpha / 2, alpha / 2), na.rm = TRUE)
-      }))
-      pvalue.att <- apply(att.boot, 1, get.pvalue)
+      CI.att <- .basic_ci_shifted(att, att.boot, alpha, .is_param)
+      pvalue.att <- apply(att.boot, 1, get.pvalue)  # original (H0-centered)
     }
 
     #vcov.att <- cov(t(att.boot), use = "pairwise.complete.obs")
@@ -3579,9 +3744,7 @@ fect_boot <- function(
         att + se.att * qnorm(1 - alpha)
       ) # one-sided
     } else {
-      att.bound <- t(apply(att.boot, 1, function(vec) {
-        quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-      }))
+      att.bound <- .basic_ci_shifted(att, att.boot, 2 * alpha, .is_param)
     }
 
     colnames(att.bound) <- c("CI.lower", "CI.upper")
@@ -3616,9 +3779,7 @@ fect_boot <- function(
         )
         pvalue.att.off <- (1 - pnorm(abs(att.off / se.att.off))) * 2
       } else {
-        CI.att.off <- t(apply(att.off.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.att.off <- .basic_ci_shifted(att.off, att.off.boot, alpha, .is_param)
         pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
       }
 
@@ -3657,9 +3818,7 @@ fect_boot <- function(
           att.off + se.att.off * qnorm(1 - alpha)
         )
       } else {
-        att.off.bound <- t(apply(att.off.boot, 1, function(vec) {
-          quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-        }))
+        att.off.bound <- .basic_ci_shifted(att.off, att.off.boot, 2 * alpha, .is_param)
       }
 
       colnames(att.off.bound) <- c("CI.lower", "CI.upper")
@@ -3677,9 +3836,7 @@ fect_boot <- function(
         ) # normal approximation
         pvalue.carry.att <- (1 - pnorm(abs(carry.att / se.carry.att))) * 2
       } else {
-        CI.carry.att <- t(apply(carry.att.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.carry.att <- .basic_ci_shifted(carry.att, carry.att.boot, alpha, .is_param)
         pvalue.carry.att <- apply(carry.att.boot, 1, get.pvalue)
       }
 
@@ -3711,9 +3868,7 @@ fect_boot <- function(
         )
         pvalue.balance.att <- (1 - pnorm(abs(balance.att / se.balance.att))) * 2
       } else {
-        CI.balance.att <- t(apply(balance.att.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.balance.att <- .basic_ci_shifted(balance.att, balance.att.boot, alpha, .is_param)
         pvalue.balance.att <- apply(balance.att.boot, 1, get.pvalue)
       }
 
@@ -3755,11 +3910,9 @@ fect_boot <- function(
           pnorm(abs(balance.avg.att / se.balance.avg.att))) *
           2
       } else {
-        CI.balance.avg.att <- quantile(
-          balance.avg.att.boot,
-          c(alpha / 2, 1 - alpha / 2),
-          na.rm = TRUE
-        )
+        CI.balance.avg.att <- .basic_ci_shifted_one(balance.avg.att,
+                                                    balance.avg.att.boot,
+                                                    alpha, .is_param)
         p.balance.avg.att <- get.pvalue(balance.avg.att.boot)
       }
 
@@ -3782,9 +3935,8 @@ fect_boot <- function(
           balance.att + se.balance.att * qnorm(1 - alpha)
         )
       } else {
-        balance.att.bound <- t(apply(balance.att.boot, 1, function(vec) {
-          quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-        }))
+        balance.att.bound <- .basic_ci_shifted(balance.att, balance.att.boot,
+                                               2 * alpha, .is_param)
       }
 
       colnames(balance.att.bound) <- c("CI.lower", "CI.upper")
@@ -3806,16 +3958,12 @@ fect_boot <- function(
             pnorm(abs(balance.att.placebo / balance.se.placebo))) *
             2
         } else {
-          balance.CI.placebo <- quantile(
-            balance.att.placebo.boot,
-            c(alpha / 2, 1 - alpha / 2),
-            na.rm = TRUE
-          )
-          balance.CI.placebo.bound <- quantile(
-            balance.att.placebo.boot,
-            c(alpha, 1 - alpha),
-            na.rm = TRUE
-          )
+          balance.CI.placebo <- .basic_ci_shifted_one(balance.att.placebo,
+                                                      balance.att.placebo.boot,
+                                                      alpha, .is_param)
+          balance.CI.placebo.bound <- .basic_ci_shifted_one(balance.att.placebo,
+                                                            balance.att.placebo.boot,
+                                                            2 * alpha, .is_param)
           balance.pvalue.placebo <- get.pvalue(balance.att.placebo.boot)
         }
 
@@ -3848,11 +3996,8 @@ fect_boot <- function(
         )
         p.att.avg.W <- (1 - pnorm(abs(att.avg.W / se.att.avg.W))) * 2
       } else {
-        CI.att.avg.W <- quantile(
-          att.avg.W.boot,
-          c(alpha / 2, 1 - alpha / 2),
-          na.rm = TRUE
-        )
+        CI.att.avg.W <- .basic_ci_shifted_one(att.avg.W, att.avg.W.boot,
+                                               alpha, .is_param)
         p.att.avg.W <- get.pvalue(att.avg.W.boot)
       }
 
@@ -3883,12 +4028,8 @@ fect_boot <- function(
         )
         pvalue.att.W <- (1 - pnorm(abs(att.on.W / se.att.W))) * 2
       } else {
-        CI.att.W <- t(apply(att.on.W.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
-        att.W.bound <- t(apply(att.on.W.boot, 1, function(vec) {
-          quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-        }))
+        CI.att.W   <- .basic_ci_shifted(att.on.W, att.on.W.boot, alpha,     .is_param)
+        att.W.bound <- .basic_ci_shifted(att.on.W, att.on.W.boot, 2 * alpha, .is_param)
         pvalue.att.W <- apply(att.on.W.boot, 1, get.pvalue)
       }
 
@@ -3922,6 +4063,23 @@ fect_boot <- function(
       colnames(att.W.bound) <- c("CI.lower", "CI.upper")
       rownames(att.W.bound) <- time.on.W
 
+      est.att90.W <- cbind(
+        att.on.W,
+        se.att.W,
+        att.W.bound,
+        pvalue.att.W,
+        count.on.W
+      )
+      colnames(est.att90.W) <- c(
+        "ATT",
+        "S.E.",
+        "CI.lower",
+        "CI.upper",
+        "p.value",
+        "count"
+      )
+      rownames(est.att90.W) <- time.on.W
+
       if (!is.null(placebo.period) & placeboTest == TRUE) {
         # att.placebo.W.boot
         se.placebo.W <- sd(att.placebo.W.boot, na.rm = TRUE)
@@ -3936,18 +4094,8 @@ fect_boot <- function(
           )
           pvalue.placebo.w <- (1 - pnorm(abs(att.placebo.W / se.placebo.W))) * 2
         } else {
-          CI.placebo.W <- quantile(
-            att.placebo.W.boot,
-            c(alpha / 2, 1 - alpha / 2),
-            na.rm = TRUE
-          )
-
-          CI.placebo.bound.W <- quantile(
-            att.placebo.W.boot,
-            c(alpha, 1 - alpha),
-            na.rm = TRUE
-          )
-
+          CI.placebo.W       <- .basic_ci_shifted_one(att.placebo.W, att.placebo.W.boot, alpha,     .is_param)
+          CI.placebo.bound.W <- .basic_ci_shifted_one(att.placebo.W, att.placebo.W.boot, 2 * alpha, .is_param)
           pvalue.placebo.w <- get.pvalue(att.placebo.W.boot)
         }
 
@@ -3984,12 +4132,8 @@ fect_boot <- function(
           )
           pvalue.att.off.W <- (1 - pnorm(abs(att.off.W / se.att.off.W))) * 2
         } else {
-          CI.att.off.W <- t(apply(att.off.W.boot, 1, function(vec) {
-            quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-          }))
-          att.off.W.bound <- t(apply(att.off.W.boot, 1, function(vec) {
-            quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-          }))
+          CI.att.off.W   <- .basic_ci_shifted(att.off.W, att.off.W.boot, alpha,     .is_param)
+          att.off.W.bound <- .basic_ci_shifted(att.off.W, att.off.W.boot, 2 * alpha, .is_param)
           pvalue.att.off.W <- apply(att.off.W.boot, 1, get.pvalue)
         }
 
@@ -4038,16 +4182,8 @@ fect_boot <- function(
               pnorm(abs(att.carryover.W / se.carryover.W))) *
               2
           } else {
-            CI.carryover.W <- quantile(
-              att.carryover.W.boot,
-              c(alpha / 2, 1 - alpha / 2),
-              na.rm = TRUE
-            )
-            CI.carryover.bound.W <- quantile(
-              att.carryover.W.boot,
-              c(alpha, 1 - alpha),
-              na.rm = TRUE
-            )
+            CI.carryover.W       <- .basic_ci_shifted_one(att.carryover.W, att.carryover.W.boot, alpha,     .is_param)
+            CI.carryover.bound.W <- .basic_ci_shifted_one(att.carryover.W, att.carryover.W.boot, 2 * alpha, .is_param)
             pvalue.carryover.w <- get.pvalue(att.carryover.W.boot)
           }
 
@@ -4080,11 +4216,12 @@ fect_boot <- function(
       )
       pvalue.avg <- (1 - pnorm(abs(att.avg / se.avg))) * 2
     } else {
-      CI.avg <- quantile(
-        att.avg.boot,
-        c(alpha / 2, 1 - alpha / 2),
-        na.rm = TRUE
-      )
+      ## ci.method = "basic": reflected pivot interval (with parametric
+      ## location shift via .basic_ci_shifted_one).  NOTE: the legacy
+      ## quantile.CI = TRUE path here previously returned raw percentile
+      ## quantiles (an inconsistency with the per-event-time block, which
+      ## already used basic).  v2.4.2 standardizes on basic at both sites.
+      CI.avg <- .basic_ci_shifted_one(att.avg, att.avg.boot, alpha, .is_param)
       pvalue.avg <- get.pvalue(att.avg.boot)
     }
 
@@ -4099,11 +4236,8 @@ fect_boot <- function(
       )
       pvalue.avg.unit <- (1 - pnorm(abs(att.avg.unit / se.avg.unit))) * 2
     } else {
-      CI.avg.unit <- quantile(
-        att.avg.unit.boot,
-        c(alpha / 2, 1 - alpha / 2),
-        na.rm = TRUE
-      )
+      CI.avg.unit <- .basic_ci_shifted_one(att.avg.unit, att.avg.unit.boot,
+                                            alpha, .is_param)
       pvalue.avg.unit <- get.pvalue(att.avg.unit.boot)
     }
 
@@ -4132,9 +4266,8 @@ fect_boot <- function(
       pvalue.eff.calendar <- (1 - pnorm(abs(calendar.eff / se.eff.calendar))) *
         2
     } else {
-      CI.eff.calendar <- t(apply(calendar.eff.boot, 1, function(vec) {
-        quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-      }))
+      CI.eff.calendar <- .basic_ci_shifted(calendar.eff, calendar.eff.boot,
+                                            alpha, .is_param)
       pvalue.eff.calendar <- apply(calendar.eff.boot, 1, get.pvalue)
     }
     est.eff.calendar <- cbind(
@@ -4165,9 +4298,9 @@ fect_boot <- function(
         pnorm(abs(calendar.eff.fit / se.eff.calendar.fit))) *
         2
     } else {
-      CI.eff.calendar.fit <- t(apply(calendar.eff.fit.boot, 1, function(vec) {
-        quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-      }))
+      CI.eff.calendar.fit <- .basic_ci_shifted(calendar.eff.fit,
+                                                calendar.eff.fit.boot,
+                                                alpha, .is_param)
       pvalue.eff.calendar.fit <- apply(calendar.eff.fit.boot, 1, get.pvalue)
     }
     est.eff.calendar.fit <- cbind(
@@ -4196,9 +4329,7 @@ fect_boot <- function(
         )
         pvalue.beta <- (1 - pnorm(abs(beta / se.beta))) * 2
       } else {
-        CI.beta <- t(apply(beta.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.beta <- .basic_ci_shifted(c(beta), beta.boot, alpha, .is_param)
         pvalue.beta <- apply(beta.boot, 1, get.pvalue)
       }
       est.beta <- cbind(c(beta), se.beta, CI.beta, pvalue.beta)
@@ -4245,16 +4376,8 @@ fect_boot <- function(
         )
         pvalue.placebo <- (1 - pnorm(abs(att.placebo / se.placebo))) * 2
       } else {
-        CI.placebo <- quantile(
-          att.placebo.boot,
-          c(alpha / 2, 1 - alpha / 2),
-          na.rm = TRUE
-        )
-        CI.placebo.bound <- quantile(
-          att.placebo.boot,
-          c(alpha, 1 - alpha),
-          na.rm = TRUE
-        )
+        CI.placebo       <- .basic_ci_shifted_one(att.placebo, att.placebo.boot, alpha,     .is_param)
+        CI.placebo.bound <- .basic_ci_shifted_one(att.placebo, att.placebo.boot, 2 * alpha, .is_param)
         pvalue.placebo <- get.pvalue(att.placebo.boot)
       }
 
@@ -4291,16 +4414,8 @@ fect_boot <- function(
         )
         pvalue.carryover <- (1 - pnorm(abs(att.carryover / se.carryover))) * 2
       } else {
-        CI.carryover <- quantile(
-          att.carryover.boot,
-          c(alpha / 2, 1 - alpha / 2),
-          na.rm = TRUE
-        )
-        CI.carryover.bound <- quantile(
-          att.carryover.boot,
-          c(alpha, 1 - alpha),
-          na.rm = TRUE
-        )
+        CI.carryover       <- .basic_ci_shifted_one(att.carryover, att.carryover.boot, alpha,     .is_param)
+        CI.carryover.bound <- .basic_ci_shifted_one(att.carryover, att.carryover.boot, 2 * alpha, .is_param)
         pvalue.carryover <- get.pvalue(att.carryover.boot)
       }
       est.carryover <- t(as.matrix(c(
@@ -4333,9 +4448,8 @@ fect_boot <- function(
         )
         pvalue.group.att <- (1 - pnorm(abs(out$group.att / se.group.att))) * 2
       } else {
-        CI.group.att <- t(apply(group.att.boot, 1, function(vec) {
-          quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-        }))
+        CI.group.att <- .basic_ci_shifted(c(out$group.att), group.att.boot,
+                                           alpha, .is_param)
         pvalue.group.att <- apply(group.att.boot, 1, get.pvalue)
       }
 
@@ -4376,13 +4490,9 @@ fect_boot <- function(
               subgroup.atts + subgroup.se.att * qnorm(1 - alpha)
             )
           } else {
-            subgroup.CI.att <- t(apply(subgroup.atts.boot, 1, function(vec) {
-              quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-            }))
+            subgroup.CI.att   <- .basic_ci_shifted(subgroup.atts, subgroup.atts.boot, alpha,     .is_param)
             subgroup.pvalue.att <- apply(subgroup.atts.boot, 1, get.pvalue)
-            subgroup.att.bound <- t(apply(subgroup.atts.boot, 1, function(vec) {
-              quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-            }))
+            subgroup.att.bound <- .basic_ci_shifted(subgroup.atts, subgroup.atts.boot, 2 * alpha, .is_param)
           }
           subgroup.est.att <- cbind(
             subgroup.atts,
@@ -4435,23 +4545,13 @@ fect_boot <- function(
                 subgroup.atts.off + subgroup.se.att.off * qnorm(1 - alpha)
               )
             } else {
-              subgroup.CI.att.off <- t(apply(
-                subgroup.atts.off.boot,
-                1,
-                function(vec) {
-                  quantile(vec, c(alpha / 2, 1 - alpha / 2), na.rm = TRUE)
-                }
-              ))
-              subgroup.pvalue.att.off <- apply(
-                subgroup.atts.off.boot,
-                1,
-                get.pvalue
-              )
-              subgroup.att.off.bound <- t(apply(
-                subgroup.atts.off.boot,
-                1,
-                function(vec) quantile(vec, c(alpha, 1 - alpha), na.rm = TRUE)
-              ))
+              subgroup.CI.att.off <- .basic_ci_shifted(subgroup.atts.off,
+                                                        subgroup.atts.off.boot,
+                                                        alpha, .is_param)
+              subgroup.pvalue.att.off <- apply(subgroup.atts.off.boot, 1, get.pvalue)
+              subgroup.att.off.bound <- .basic_ci_shifted(subgroup.atts.off,
+                                                           subgroup.atts.off.boot,
+                                                           2 * alpha, .is_param)
             }
             subgroup.est.att.off <- cbind(
               subgroup.atts.off,
@@ -4503,19 +4603,13 @@ fect_boot <- function(
                 pnorm(abs(subgroup.att.placebo / subgroup.se.placebo))) *
                 2
             } else {
-              subgroup.CI.placebo <- quantile(
-                group.att.placebo.boot[[sub.name]],
-                c(alpha / 2, 1 - alpha / 2),
-                na.rm = TRUE
-              )
-              subgroup.CI.placebo.bound <- quantile(
-                group.att.placebo.boot[[sub.name]],
-                c(alpha, 1 - alpha),
-                na.rm = TRUE
-              )
-              subgroup.pvalue.placebo <- get.pvalue(group.att.placebo.boot[[
-                sub.name
-              ]])
+              subgroup.CI.placebo       <- .basic_ci_shifted_one(subgroup.att.placebo,
+                                                                  group.att.placebo.boot[[sub.name]],
+                                                                  alpha, .is_param)
+              subgroup.CI.placebo.bound <- .basic_ci_shifted_one(subgroup.att.placebo,
+                                                                  group.att.placebo.boot[[sub.name]],
+                                                                  2 * alpha, .is_param)
+              subgroup.pvalue.placebo <- get.pvalue(group.att.placebo.boot[[sub.name]])
             }
 
             subgroup.est.placebo <- t(as.matrix(c(
@@ -4565,19 +4659,13 @@ fect_boot <- function(
                 pnorm(abs(subgroup.att.carryover / subgroup.se.carryover))) *
                 2
             } else {
-              subgroup.CI.carryover <- quantile(
-                group.att.carryover.boot[[sub.name]],
-                c(alpha / 2, 1 - alpha / 2),
-                na.rm = TRUE
-              )
-              subgroup.CI.carryover.bound <- quantile(
-                group.att.carryover.boot[[sub.name]],
-                c(alpha, 1 - alpha),
-                na.rm = TRUE
-              )
-              subgroup.pvalue.carryover <- get.pvalue(group.att.carryover.boot[[
-                sub.name
-              ]])
+              subgroup.CI.carryover       <- .basic_ci_shifted_one(subgroup.att.carryover,
+                                                                    group.att.carryover.boot[[sub.name]],
+                                                                    alpha, .is_param)
+              subgroup.CI.carryover.bound <- .basic_ci_shifted_one(subgroup.att.carryover,
+                                                                    group.att.carryover.boot[[sub.name]],
+                                                                    2 * alpha, .is_param)
+              subgroup.pvalue.carryover <- get.pvalue(group.att.carryover.boot[[sub.name]])
             }
 
             subgroup.est.carryover <- t(as.matrix(c(
@@ -4614,6 +4702,21 @@ fect_boot <- function(
   }
 
   ## storage
+  ## When W is supplied AND aggregation should reflect those weights
+  ## (W or W.agg supplied), route the W-weighted aggregations into the
+  ## canonical slot names. When only W.est is supplied (W in fit only),
+  ## the canonical aggregation stays unweighted. The fect.default() tail
+  ## does the same role-gated routing for the per-method on/off/avg
+  ## vectors.
+  if (!is.null(W) && isTRUE(W.in.agg)) {
+    est.avg      <- est.avg.W
+    att.bound    <- att.W.bound
+    att.avg.boot <- att.avg.W.boot
+    est.att      <- est.att.W
+    est.att90    <- est.att90.W
+    att.boot     <- att.on.W.boot
+    vcov.att     <- vcov.att.W
+  }
   result <- list(
     est.avg = est.avg,
     att.bound = att.bound,
@@ -4628,7 +4731,8 @@ fect_boot <- function(
     att.boot.original = att.boot.original,
     att.vcov = vcov.att,
     att.count.boot = att.count.boot,
-    vartype = vartype
+    vartype = vartype,
+    para.error = if (vartype == "parametric" && exists("para.error.resolved")) para.error.resolved else NULL
   )
   if (keep.sims) {
     result = c(
@@ -4650,6 +4754,12 @@ fect_boot <- function(
     }
   }
   if (hasRevs == 1) {
+    if (!is.null(W) && isTRUE(W.in.agg)) {
+      est.att.off  <- est.att.off.W
+      att.off.boot <- att.off.W.boot
+      vcov.att.off <- vcov.att.off.W
+      att.off.bound <- att.off.W.bound
+    }
     result <- c(
       result,
       list(
@@ -4690,34 +4800,11 @@ fect_boot <- function(
       )
     }
   }
-  if (!is.null(W)) {
-    # att.avg.W.boot
-    result <- c(result, list(est.avg.W = est.avg.W))
-    result <- c(result, list(est.att.W = est.att.W))
-    result <- c(result, list(att.W.bound = att.W.bound))
-    result <- c(
-      result,
-      list(att.W.boot = att.on.W.boot, att.W.vcov = vcov.att.W)
-    )
-    if (!is.null(placebo.period) & placeboTest == TRUE) {
-      result <- c(result, list(est.placebo.W = est.placebo.W))
-    }
-    if (hasRevs == 1) {
-      result <- c(
-        result,
-        list(
-          est.att.off.W = est.att.off.W,
-          att.off.W.bound = att.off.W.bound,
-          att.off.W.vcov = vcov.att.off.W
-        )
-      )
-      if (!is.null(carryover.period) & carryoverTest == TRUE) {
-        result <- c(result, list(est.carryover.W = est.carryover.W))
-      }
-    }
-  }
-
   if (!is.null(placebo.period) & placeboTest == TRUE) {
+    if (!is.null(W) && isTRUE(W.in.agg)) {
+      est.placebo       <- est.placebo.W
+      att.placebo.boot  <- att.placebo.W.boot
+    }
     result <- c(
       result,
       list(est.placebo = est.placebo, att.placebo.boot = att.placebo.boot)
@@ -4725,6 +4812,10 @@ fect_boot <- function(
   }
 
   if (!is.null(carryover.period) & carryoverTest == TRUE) {
+    if (!is.null(W) && isTRUE(W.in.agg)) {
+      est.carryover       <- est.carryover.W
+      att.carryover.boot  <- att.carryover.W.boot
+    }
     result <- c(
       result,
       list(

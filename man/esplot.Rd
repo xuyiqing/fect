@@ -16,10 +16,12 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
        only.pre = FALSE, only.post = FALSE, show.count = TRUE,
        stats = NULL, stats.labs = NULL, highlight.periods = NULL,
        highlight.colors = NULL, highlight.shapes = NULL,
+       highlight.fill = FALSE,
        lcolor = NULL, lwidth = NULL,
-       ltype = c("solid", "solid"), connected = FALSE, ci.outline = FALSE,
+       ltype = NULL, connected = FALSE, ci.outline = FALSE,
        main = NULL, xlim = NULL, ylim = NULL, xlab = NULL, ylab = NULL,
        gridOff = FALSE, stats.pos = NULL, theme.bw = TRUE,
+       legacy.style = FALSE,
        cex.main = NULL, cex.axis = NULL, cex.lab = NULL,
        cex.text = NULL, axis.adjust = FALSE, color = "#000000",
        pre.color = NULL, post.color = NULL,
@@ -52,9 +54,10 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
   \item{highlight.periods}{Optional. A numeric vector of time periods to highlight with different colors. For \code{connected = TRUE}, these define intervals from \code{period - 0.5} to \code{period + 0.5}. For \code{connected = FALSE}, individual points at these periods are highlighted.}
   \item{highlight.colors}{Optional. A character vector of colors corresponding to \code{highlight.periods}. If \code{NULL} and \code{highlight.periods} is provided, default rainbow colors are used. Must be the same length as \code{highlight.periods}.}
   \item{highlight.shapes}{Optional. An integer vector of point shapes corresponding to \code{highlight.periods} (e.g., 17 = triangle, 18 = diamond). Must be the same length as \code{highlight.periods}. Default is \code{NULL}.}
+  \item{highlight.fill}{Logical. If \code{TRUE}, draws a lightened-tone background rectangle behind each highlighted period (auto-derived from \code{highlight.colors}). If \code{FALSE} (the default), only the colored glyph at each highlight period is drawn. The colored glyph alone is usually sufficient signal that a period belongs to a test window, and the glyph-only look survives grayscale printing without surprise. Set \code{TRUE} for slide / talk figures where the rectangle helps a remote audience locate the window.}
   \item{lcolor}{Optional. Color(s) for the reference lines. Can be a single color (applied to both horizontal y=0 line and vertical pre/post separator line) or a vector of two colors (first for horizontal, second for vertical). If \code{NULL}, defaults to \code{"#aaaaaa"} if \code{theme.bw = TRUE}, otherwise \code{"white"}. Default is \code{NULL}.}
   \item{lwidth}{Optional. Line width(s) for the reference lines. Can be a single width or a vector of two widths (similar to \code{lcolor}). If \code{NULL}, defaults to \code{1.5} if \code{theme.bw = TRUE}, otherwise \code{2}. Default is \code{NULL}.}
-  \item{ltype}{Optional. Linetype(s) for the reference lines. Can be a single linetype (applied to both horizontal y=0 line and vertical pre/post separator line) or a vector of two linetypes (first for horizontal, second for vertical). Default is \code{c("solid", "solid")}.}
+  \item{ltype}{Optional. Linetype(s) for the reference lines. Can be a single linetype (applied to both horizontal y=0 line and vertical pre/post separator line) or a vector of two linetypes (first for horizontal, second for vertical). Default is \code{NULL}, which resolves to \code{c("solid", "dashed")} under the modern recipe (\code{theme.bw = TRUE} with \code{legacy.style = FALSE}) and to \code{c("solid", "solid")} otherwise.}
   \item{connected}{Logical. If \code{TRUE}, estimates and confidence intervals are plotted as a connected line with a ribbon. This involves interpolating values between observed time points (at 0.5 steps by default) to create a smoother appearance. If \code{FALSE} (default), \code{geom_pointrange} is used, showing individual estimates and their CIs as points with ranges for each observed time period.}
   \item{ci.outline}{Logical. If \code{connected = TRUE}, whether to draw an outline around the confidence interval ribbon. The outline color is a slightly darker version of the fill color. Default is \code{FALSE}.}
   \item{main}{Optional. The main title for the plot. If \code{NULL} (default), a default title "Estimated Dynamic Treatment Effects" is used. If an empty string \code{""} is provided, no title is displayed.}
@@ -65,6 +68,7 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
   \item{gridOff}{Logical. Whether to turn off major and minor grid lines. Default is \code{TRUE}.}
   \item{stats.pos}{Optional. A numeric vector of length 2 (\code{c(x, y)}) specifying the coordinates for the top-left position of the \code{stats} text block. If \code{NULL} (default), the position is automatically determined.}
   \item{theme.bw}{Logical. Whether to use \code{ggplot2::theme_bw()}. Default is \code{TRUE}.}
+  \item{legacy.style}{Logical. If \code{TRUE}, reproduces the pre-2.3.1 visual defaults (bold centered title, larger axis text, solid vline, blue placebo triangles, no peach highlight rectangle) regardless of the value of \code{theme.bw}. If \code{FALSE} (the default) and \code{theme.bw = TRUE}, the modern v2.3.1 visual recipe is used. Pass \code{legacy.style = TRUE} to byte-identical-reproduce figures rendered under earlier fect versions.}
   \item{cex.main}{Optional. Numeric scaling factor for the plot title font size. The base size used by ggplot is 16. Default is \code{NULL} (uses base size 16).}
   \item{cex.axis}{Optional. Numeric scaling factor for the axis tick mark labels font size. The base size used by ggplot is 15. Default is \code{NULL} (uses base size 15).}
   \item{cex.lab}{Optional. Numeric scaling factor for the axis title (x and y labels) font size. The base size used by ggplot is 15. Default is \code{NULL} (uses base size 15).}
