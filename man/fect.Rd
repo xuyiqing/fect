@@ -35,6 +35,7 @@ assumptions.}
             carryoverTest = FALSE, carryover.period = NULL, carryover.rm = NULL,
             loo = FALSE, permute = FALSE, m = 2,
             normalize = FALSE, keep.sims = FALSE,
+            split_residuals = FALSE,
             cm = FALSE,
             loading.bound = "none", gamma.loading = NULL,
             gamma.loading.grid = NULL,
@@ -209,6 +210,7 @@ bootstrap always resamples units regardless of \code{cl}), and
 \item{m}{an integer specifying the block length for permutation tests. Default \code{2}.}
 \item{normalize}{a logical flag indicating whether to scale outcome and covariates.}
 \item{keep.sims}{a logical flag indicating whether to save unit-time level bootstrap effects. Default \code{keep.sims = FALSE}. If \code{se = FALSE}, this argument is ignored.}
+\item{split_residuals}{a logical flag enabling an experimental, proof-of-concept debiased parametric bootstrap. Default \code{FALSE}. Has an effect only when \code{vartype = "parametric"} (otherwise ignored, with a warning). When \code{TRUE}, the control pool is partitioned via K=2 cross-fitting into two disjoint halves: one half estimates the treated-unit error distribution and the other half supplies the out-of-sample control-arm draws, so no control unit's residual informs both stages. Also relaxes the \code{vartype = "parametric"} restriction (see \code{vartype}) to permit \code{time.component.from = "notyettreated"} designs, which otherwise require \code{"nevertreated"}. Requires at least 4 control units. Coverage properties are still under active research; this option is \emph{experimental and not recommended for applied use}.}
 \item{cm}{a logical flag indicating whether to enable causal moderation analysis. When \code{TRUE}, the estimator decomposes the treatment effect into effect modification and causal moderation components. Currently available for \code{method = "fe"} and \code{method = "ife"}. Default is \code{FALSE}.}
 \item{loading.bound}{a string controlling whether treated-unit factor loadings are bounded inside the convex hull of control loadings. \code{"none"} (default) reproduces standard GSC behavior. \code{"simplex"} constrains each treated unit's loading to be a non-negative convex combination of control loadings via an entropy-regularized simplex projection, ensuring the imputed counterfactual lies pointwise in the convex hull of factor-implied control outcomes. Currently applies only to \code{method = "ife"} or \code{method = "gsynth"} (equivalent forms), and requires \code{time.component.from = "nevertreated"}.}
 \item{gamma.loading}{scalar regularization strength for the \code{"simplex"} projection. \code{NULL} (default) triggers 5-fold cross-validation over \code{gamma.loading.grid}. A numeric value is used directly. Ignored when \code{loading.bound = "none"}.}
