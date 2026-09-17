@@ -1,5 +1,6 @@
 ^src/.*\.(o|so|dll)$
 ^\.github$
+^\.git$
 ^pkgdown/.*$
 ^.*\.Rproj$
 ^\.Rproj\.user$
