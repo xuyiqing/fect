@@ -244,28 +244,27 @@ BiInitialFit <- function(data, ## long form data
                          r,
                          oci) { ## indicator
 
-    N <- length(unique(data[, 2]))
-    T <- length(unique(data[, 3]))
-    r <- min(r, T, N)
+    N <- length(unique(data[,2]))
+    T <- length(unique(data[,3]))
     p <- dim(data)[2] - 3
 
     x <- x.sub <- NULL
     if (p > 0) {
-        x <- as.matrix(data[, 4:(dim(data)[2])])
+        x <- as.matrix(data[,4:(dim(data)[2])])
         ## regard as missing
-        x[setdiff(1:(N * T), oci), ] <- 0
-        x.sub <- as.matrix(x[oci, ])
+        x[setdiff(1:(N*T), oci),] <- 0
+        x.sub <- as.matrix(x[oci,])
     }
-    y <- as.matrix(data[, 1])
+    y <- as.matrix(data[,1])
     beta0 <- matrix(0, 1, 1)
 
     ind <- NULL
     if (force == 1) {
-        ind <- as.matrix(data[, 2])
+        ind <- as.matrix(data[,2])
     } else if (force == 2) {
-        ind <- as.matrix(data[, 3])
+        ind <- as.matrix(data[,3])
     } else if (force == 3) {
-        ind <- as.matrix(data[, c(2, 3)])
+        ind <- as.matrix(data[,c(2,3)])
     }
 
     xi <- matrix(0, T, 1)
@@ -277,10 +276,10 @@ BiInitialFit <- function(data, ## long form data
     if (force == 0) { ## no additive fixed effects
         if (p == 0) {
             mu <- mean(c(y)[oci])
-            y0 <- as.matrix(rep(mu, T * N))
+            y0 <- as.matrix(rep(mu, T*N))
             Y0 <- matrix(mu, T, N)
         } else {
-            lm.fit <- lm(as.matrix(c(y)[oci]) ~ x.sub)
+            lm.fit <- lm(as.matrix(c(y)[oci])~x.sub)
             coef <- lm.fit$coefficients
             mu <- coef[1]
             beta0 <- as.matrix(coef[2:length(coef)])
@@ -290,27 +289,64 @@ BiInitialFit <- function(data, ## long form data
             y0 <- mu + x %*% beta0
             Y0 <- matrix(y0, T, N)
         }
-        if (QR == 0) {
-            FE <- mu
-        }
-    } else { ## with additive fixed effects
-        # plm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub,
-        #                   ind = as.matrix(ind[oci,]),drop.singletons = FALSE)))
-        plm.fit <- NULL # to delete
-        y0 <- suppressWarnings(predict(plm.fit, x = x, ind = ind))
-        Y0 <- matrix(y0, T, N)
-        mu <- plm.fit$intercept
+        #if (QR == 0) {
+        #    FE <- mu
+        #}
+
+    } else {
+        mu <- 0
+        ## with additive fixed effects
+        colnames(y) <- y.name <- 'y'
+        colnames(ind) <- ind.name <- paste0("id.",c(1:dim(ind)[2]))
+
         if (p > 0) {
-            beta0 <- plm.fit$coefficients
+            colnames(x) <- x.name <- paste0("x.",c(1:dim(x)[2]))
+            data.reg <- cbind.data.frame(y,x,ind)
+            formula.reg <- paste0("y ~ ",paste(x.name,collapse=" + "), "|", paste(ind.name, collapse = "+"))
+        } else {
+            data.reg <- cbind.data.frame(y,ind)
+            formula.reg <- paste0("y~1|",paste(ind.name,collapse="+"))
         }
+
+        formula.reg <- as.formula(formula.reg)
+        lm.fit <- suppressWarnings(invisible(feols(fml = formula.reg,
+                                                   data = data.reg[oci,],
+                                                   fixef.rm = "none")))
+        y0 <- suppressWarnings(predict(lm.fit, newdata = data.reg))
+
+        #lm.fit <- suppressWarnings(invisible(fastplm(y = as.matrix(c(y)[oci]), x = x.sub,
+        #                   ind = as.matrix(ind[oci,]),drop.singletons = FALSE)))
+        #y0 <- suppressWarnings(predict(lm.fit, x = x, ind = ind))
+
+        Y0 <- matrix(y0, T, N)
+        if (p > 0) {
+            beta0 <- lm.fit$coefficients
+            names(beta0) <- NULL
+            beta0 <- as.matrix(beta0)
+        }
+
+        fe_est <- fixest::fixef(lm.fit)
+
         if (force == 1) {
-            alpha <- plm.fit$sfe.coefs[[1]]
+            alpha <- as.numeric(fe_est$id.1)
+            mu <- mu + mean(alpha)
+            alpha <- as.matrix(alpha - mu) ## demeaning
         }
-        if (force == 2) {
-            xi <- plm.fit$sfe.coefs[[1]]
-        } else if (force == 3) {
-            alpha <- plm.fit$sfe.coefs[[1]]
-            xi <- plm.fit$sfe.coefs[[2]]
+        else if (force == 2) {
+            xi <- as.numeric(fe_est$id.1)
+            mu <- mu + mean(xi)
+            xi <- as.matrix(xi - mu) ## demeaning
+        }
+        else if (force == 3) {
+            alpha <- as.numeric(fe_est$id.1)
+            mu <- mu + mean(alpha)
+            alpha <- as.matrix(alpha - mu) ## demeaning
+
+            xi <- as.numeric(fe_est$id.2)
+            mxi <- mean(xi)
+            xi <- as.matrix(xi - mxi) ## demeaning
+
+            mu <- mu + mxi
         }
     }
 
@@ -318,77 +354,105 @@ BiInitialFit <- function(data, ## long form data
     if (r > 0) { ## factor analysis of residuals
 
         res <- y - y0
-        res[setdiff(1:(N * T), oci), ] <- 0
+        res[setdiff(1:(N*T), oci),] <- 0
         res <- matrix(res, T, N)
+
         ife_pca <- panel_factor(res, r)
         ife <- ife_pca$FE
         factor <- ife_pca$factor
         loadings <- ife_pca$lambda
+
         Y0 <- Y0 + ife
 
         if (QR == 1) {
+
             ## initial value: need time fixed effects xi and factor f
             if (force == 0) {
+
                 ## factor <- qr_factor(factor, loadings)$factor
-                FE <- ife_pca$FE
+                FE <- mu + ife
+
             } else if (force == 1) {
-                ## modify initial Y0
-                Y0[setdiff(1:(N * T), oci)] <- Y0[setdiff(1:(N * T), oci)] - (sum(factor[1, ] * loadings[1, ]) + alpha[1])
+
+                FE <- mu + ife + matrix(rep(alpha, each = T), T, N)
+
                 ## restrctions: alpha_1 = 0, f_1 = 0
                 alpha <- alpha - alpha[1] + (loadings - matrix(rep(loadings[1, ], N), N, r, byrow = TRUE)) %*% as.matrix(factor[1, ])
                 factor <- factor - matrix(rep(factor[1, ], T), T, r, byrow = TRUE)
                 ife_qr <- qr_factor(factor, loadings)
                 factor <- ife_qr$factor
-                FE <- ife_qr$FE + matrix(rep(alpha, each = T), T, N)
+
+
             } else if (force == 2) {
+
+                FE <- mu + ife + matrix(rep(xi, N), T, N)
+
                 ## modify initial Y0
-                Y0[setdiff(1:(N * T), oci)] <- Y0[setdiff(1:(N * T), oci)] - (sum(factor[1, ] * loadings[1, ]) + xi[1])
-                ## restrctions: xi_1 = 0
+
+                ## restrctions: xi_1 = 0, l_1 = 0
                 xi <- xi - xi[1] + (factor - matrix(rep(factor[1, ], T), T, r, byrow = TRUE)) %*% as.matrix(loadings[1, ])
                 loadings <- loadings - matrix(rep(loadings[1, ], N), N, r, byrow = TRUE)
                 ife_qr <- qr_factor(factor, loadings)
                 factor <- ife_qr$factor
-                FE <- ife_qr$FE + matrix(rep(xi, N), T, N)
+
+
             } else if (force == 3) {
-                ## modify initial Y0
-                Y0[setdiff(1:(N * T), oci)] <- Y0[setdiff(1:(N * T), oci)] - (sum(factor[1, ] * loadings[1, ]) + xi[1] + alpha[1])
+
+                FE <- mu + ife + matrix(rep(alpha, each = T), T, N) + matrix(rep(xi, N), T, N)
+
+
                 ## restrctions: xi_1 = 0 , f_1 = 0
                 alpha <- alpha - alpha[1] + (loadings - matrix(rep(loadings[1, ], N), N, r, byrow = TRUE)) %*% as.matrix(factor[1, ])
                 xi <- xi - xi[1] + (factor - matrix(rep(factor[1, ], T), T, r, byrow = TRUE)) %*% as.matrix(loadings[1, ])
+
                 factor <- factor - matrix(rep(factor[1, ], T), T, r, byrow = TRUE)
                 loadings <- loadings - matrix(rep(loadings[1, ], N), N, r, byrow = TRUE)
+
                 ife_qr <- qr_factor(factor, loadings)
                 factor <- ife_qr$factor
-                FE <- ife_qr$FE + matrix(rep(alpha, each = T), T, N) + matrix(rep(xi, N), T, N)
+
             }
         } else {
             FE <- mu + matrix(rep(alpha, each = T), T, N) + matrix(rep(xi, N), T, N) + ife
         }
+
     } else { ## only adjust additive fixed effects
         if (QR == 1) {
             if (force == 1) {
-                ## modify initial Y0
-                Y0[setdiff(1:(N * T), oci)] <- Y0[setdiff(1:(N * T), oci)] - alpha[1]
+
+                FE <- mu + matrix(rep(alpha, each = T), T, N)
+
                 ## restrctions: alpha_1 = 0
-                FE <- matrix(rep(alpha, each = T), T, N)
-            } else if (force == 2) {
-                ## modify initial Y0
-                Y0[setdiff(1:(N * T), oci)] <- Y0[setdiff(1:(N * T), oci)] - xi[1]
+                alpha <- alpha - alpha[1]
+
+            }
+            else if (force == 2) {
+
+                FE <- mu + matrix(rep(xi, N), T, N)
+
                 ## restrctions: xi_1 = 0
                 xi <- xi - xi[1]
-                FE <- matrix(rep(xi, N), T, N)
-            } else if (force == 3) {
-                ## modify initial Y0
-                Y0[setdiff(1:(N * T), oci)] <- Y0[setdiff(1:(N * T), oci)] - (xi[1] + alpha[1])
+
+            }
+            else if (force == 3) {
+
+                FE <- mu + matrix(rep(alpha, each = T), T, N) + matrix(rep(xi, N), T, N)
+
                 ## restrctions: xi_1 = 0 , alpha_1 = 0
+                alpha <- alpha - alpha[1]
                 xi <- xi - xi[1]
-                FE <- matrix(rep(alpha, each = T), T, N) + matrix(rep(xi, N), T, N)
+
             }
         } else {
             FE <- mu + matrix(rep(alpha, each = T), T, N) + matrix(rep(xi, N), T, N)
         }
+
     }
 
+    if (r == 0 && force == 0) FE <- matrix(mu, T, N)
+    if (any(!is.finite(Y0)) || any(!is.finite(FE))) {
+        stop("Binary initialization requires observed training data for every fixed-effect level.")
+    }
     result <- list(Y0 = Y0, FE0 = FE, xi0 = xi, factor0 = factor, loadings = loadings)
     return(result)
 }

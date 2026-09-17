@@ -156,7 +156,12 @@ fect_boot <- function(
   gamma.loading = NULL,
   gamma.loading.grid = NULL,
   W.in.fit = TRUE,
-  W.in.agg = TRUE
+  W.in.agg = TRUE,
+  cv.buffer = 1,
+  cv.donut = 1,
+  min.T0 = 5,
+  cv.rule = "1se",
+  cv.seed = NULL
 ) {
   do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
   na.pos <- NULL
@@ -440,6 +445,10 @@ fect_boot <- function(
         cv.prop = cv.prop,
         cv.method = cv.method,
         cv.nobs = cv.nobs,
+        cv.buffer = cv.buffer,
+        cv.donut = cv.donut,
+        min.T0 = min.T0,
+        cv.rule = cv.rule,
         time.component.from = time.component.from,
         X.extra.FE = X.extra.FE,
         X.Z = X.Z,
@@ -466,6 +475,15 @@ fect_boot <- function(
         T.on = T.on,
         T.off = T.off,
         k = k,
+        seed = cv.seed,
+        cv.prop = cv.prop,
+        cv.method = cv.method,
+        cv.nobs = cv.nobs,
+        cv.buffer = cv.buffer,
+        cv.donut = cv.donut,
+        min.T0 = min.T0,
+        cv.rule = cv.rule,
+        max.iteration = max.iteration,
         r = r,
         r.end = r.end,
         QR = QR,
@@ -480,6 +498,9 @@ fect_boot <- function(
       }
     }
   }
+
+  # Rank-zero Probit remains on the binary IFE resampling path.
+  if (binary) method <- "ife"
 
   ## output
   validX <- out$validX

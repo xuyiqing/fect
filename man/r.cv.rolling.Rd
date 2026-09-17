@@ -19,6 +19,7 @@ r.cv.rolling(
   force = "unit",
   seed = NULL,
   verbose = TRUE,
+  binary = FALSE,
   ...
 )
 }
@@ -76,8 +77,7 @@ with `cv.prop * n_eligible * cv.nobs`.}
 \item{cv.rule}{Rule for picking `r` from the MSPE curve: `"1se"`
 (default), `"min"`, or `"1pct"`.}
 
-\item{min.T0}{Minimum observations required strictly before the
-anchor. Sets the lower bound on valid anchor positions. Default 5.}
+\item{min.T0}{Minimum training observations remaining before the anchor after removing the buffer. Default 5.}
 
 \item{force}{One of `"none"`, `"unit"`, `"time"`, `"two-way"`. Default
 `"unit"`.}
@@ -87,6 +87,8 @@ anchor. Sets the lower bound on valid anchor positions. Default 5.}
 ambient RNG).}
 
 \item{verbose}{If TRUE (default), print per-fold per-r MSPE.}
+
+\item{binary}{Fit a Probit IFE model and score probability MSPE. Requires \code{method = "ife"} and staggered adoption. Default FALSE.}
 
 \item{...}{Additional arguments forwarded to `fect()`. For
 `method = "cfe"`, the user holds CFE structural arguments (`Z`,

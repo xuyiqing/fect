@@ -98,15 +98,6 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
             }
 
             ## ini.res <- initialOut$res
-        } else {
-            initialOut <- BiInitialFit(data = data.ini, QR = QR, r = r.cv, force = force, oci = oci)
-            Y0 <- initialOut$Y0
-            beta0 <- initialOut$beta0
-            FE0 <- initialOut$FE0
-            if (QR == 1) {
-                xi0 <- initialOut$xi0
-                factor0 <- initialOut$factor0
-            }
         }
         
         ## -------------------------------##
@@ -138,10 +129,9 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
                 }
             }
         } else {
-            if (QR == FALSE) {
-                est.best <- inter_fe_d_ub(YY, Y0, FE0, X, II, r.cv, force, tol = tol)
-            } else {
-                est.best <- inter_fe_d_qr_ub(YY, Y0, FE0, factor0, xi0, X, II, r.cv, force, tol = tol)
+            est.best <- .fect_binary_estimate(Y, X, II, r.cv, force, QR, tol, max.iteration)
+            if (est.best$niter >= max.iteration) {
+                warning("Binary fit reached max.iteration; inspect convergence before interpreting estimates.", call. = FALSE)
             }
         }
     

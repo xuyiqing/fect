@@ -678,6 +678,13 @@ fect.default <- function(
 
     ## binary
     if (binary == 1) {
+        if (!vartype %in% c("bootstrap", "jackknife"))
+            stop("Binary IFE supports only nonparametric bootstrap or jackknife inference.")
+        if (time.component.from != "notyettreated")
+            stop("Binary IFE requires time.component.from = 'notyettreated'.")
+        if (!is.null(W)) stop("Binary IFE currently requires unweighted observations.")
+        if (cm) stop("Binary IFE does not support cm = TRUE.")
+        if (criterion != "mspe") stop("Binary CV uses probability MSPE; set criterion = 'mspe'.")
         method <- "ife"
         normalize <- FALSE
     }
@@ -2102,6 +2109,9 @@ fect.default <- function(
             "Treatment status have no reversals. Cannot perform \"carryoverTest\" in this case."
         )
     }
+    if (hasRevs == TRUE && binary) {
+        stop("Binary IFE supports staggered adoption only; treatment reversals are not supported.")
+    }
     if (hasRevs == TRUE & method == "gsynth") {
         stop("Gsynth can't be used when treatments have reversals.")
     }
@@ -2464,6 +2474,7 @@ fect.default <- function(
                     T.on = T.on,
                     T.off = T.off,
                     k = k,
+                    seed = seed,
                     cv.prop = cv.prop,
                     cv.method = cv.method,
                     cv.nobs = cv.nobs,
@@ -2475,6 +2486,9 @@ fect.default <- function(
                     force = force,
                     hasRevs = hasRevs,
                     tol = tol,
+                    cv.donut = cv.donut,
+                    cv.rule = cv.rule,
+                    max.iteration = max.iteration,
                     group.level = g.level,
                     group = G
                 )
@@ -2732,6 +2746,11 @@ fect.default <- function(
             cv.prop = cv.prop,
             cv.method = cv.method,
             cv.nobs = cv.nobs,
+            cv.buffer = cv.buffer,
+            cv.seed = seed,
+            cv.donut = cv.donut,
+            min.T0 = min.T0,
+            cv.rule = cv.rule,
             r = r,
             r.end = r.end,
             nlambda = nlambda,
@@ -3251,7 +3270,7 @@ fect.default <- function(
         out$g.level <- g.level
     }
 
-    if (is.null(tost.threshold) == TRUE) {
+    if (is.null(tost.threshold) && !binary) {
         tost.threshold <- 0.36 * sqrt(out$sigma2.fect)
     }
 
@@ -3349,7 +3368,7 @@ fect.default <- function(
         output$loo <- FALSE
     }
 
-    if (se == 1) {
+    if (se == 1 && !binary) {
         suppressWarnings(
             test.out <- diagtest(
                 output,
@@ -3366,7 +3385,7 @@ fect.default <- function(
     if (loo == TRUE) {
         output$loo <- TRUE
     }
-    if (loo == TRUE && se == 1) {
+    if (loo == TRUE && se == 1 && !binary) {
         suppressWarnings(
             test.out <- diagtest(
                 output,

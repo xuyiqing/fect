@@ -1,4 +1,11 @@
 <!-- markdownlint-disable MD025 -->
+# fect development — binary IFE
+
+* Restore binary Probit IFE fitting using the fixest initializer from Licheng Liu's supplied fect 1.1.10 revision; fix time-only initialization and route fixed-rank/CV fits through a common result builder.
+* Add binary probability scoring to rolling CV and `r.cv.rolling(binary = TRUE, method = "ife")`. Score only the validation block, excluding its past buffer and future tail. Preserve masks, per-fold probability/classification losses, scoring counts, failed fits, and selection settings in the output.
+* Use probability MSPE (Brier score) for binary rank selection. Legacy internal binary CV scored thresholded classifications; ranks can therefore change. Support `cv.rule` and reproducible seeds consistently with and without inference. Candidates must succeed on all common folds.
+* Enforce `min.T0` after buffer removal for shared and standalone rolling masks. Binary inference supports nonparametric bootstrap and jackknife with fixed selected rank. Binary fitting requires staggered adoption, unweighted observations, and the not-yet-treated factor path; unsupported requests error explicitly.
+
 # fect 2.4.5
 
 * Add `group.fe` to `fect()` for absorbing coarser fixed effects, such as state FE with county-level data. Closes #139. Clustered SE defaults to `group.fe[1]`; override with `cl = "<column>"`.

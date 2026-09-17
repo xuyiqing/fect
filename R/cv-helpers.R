@@ -415,10 +415,10 @@
 ##      1. Sample max(1L, round(cv.prop * n_eligible)) units from the
 ##         eligible pool. Eligible = controls (all observed times) +
 ##         treated (observed times strictly before treatment onset).
-##         A unit is eligible only if it has at least min.T0 + cv.nobs
+##         A unit is eligible only if it has at least min.T0 + cv.buffer + cv.nobs
 ##         observations in its eligible window.
 ##      2. For each sampled unit, draw a random anchor index a_idx in
-##         seq.int(min.T0 + 1L, n_obs - cv.nobs + 1L). The mask
+##         seq.int(min.T0 + cv.buffer + 1L, n_obs - cv.nobs + 1L). The mask
 ##         partitions cells into:
 ##           - holdout: obs_t[a_idx:(a_idx + cv.nobs - 1L)]
 ##                      -> added to BOTH cv.id (masked) and est.id (scored)
@@ -469,13 +469,13 @@
 
     ## Filter to units with enough eligible observations.
     elig_lengths <- vapply(elig_times, length, integer(1))
-    eligible_units <- which(elig_lengths >= (min.T0 + cv.nobs))
+    eligible_units <- which(elig_lengths >= (min.T0 + cv.buffer + cv.nobs))
     n_eligible <- length(eligible_units)
 
     if (n_eligible == 0L) {
         stop(".build_cv_mask_rolling: no eligible units have enough ",
-             "observations (need >= min.T0 + cv.nobs = ",
-             min.T0 + cv.nobs, ").")
+             "observations (need >= min.T0 + cv.buffer + cv.nobs = ",
+             min.T0 + cv.buffer + cv.nobs, ").")
     }
 
     n_sample_per_fold <- max(1L, as.integer(round(cv.prop * n_eligible)))
@@ -496,7 +496,7 @@
         for (j in sampled) {
             obs_t <- elig_times[[j]]
             n_obs <- length(obs_t)
-            valid <- seq.int(min.T0 + 1L, n_obs - cv.nobs + 1L)
+            valid <- seq.int(min.T0 + cv.buffer + 1L, n_obs - cv.nobs + 1L)
             if (length(valid) == 0L) next
             a_idx <- valid[sample.int(length(valid), 1L)]
 

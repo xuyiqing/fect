@@ -76,8 +76,8 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   \code{"gmspe"} for the geometric-mean squared prediction errors,
   \code{"moment"} for period-weighted residuals in test sets,
   \code{"pc"} for an information criterion method.}
-\item{binary}{This version doesn't support this option.}
-\item{QR}{This version doesn't support this option.}
+\item{binary}{Logical; fit a Probit interactive fixed-effects model for a 0/1 outcome. Supports staggered adoption (including common adoption), unweighted fitting, and \code{time.component.from = "notyettreated"}. Treatment reversals and \code{cm = TRUE} are not supported. Inference is limited to nonparametric \code{bootstrap} and \code{jackknife}; the selected rank is held fixed in resamples. Binary CV uses probability MSPE (Brier score); classification error is returned as a separate diagnostic.}
+\item{QR}{Logical; use alternating QR updates for binary Probit estimation when TRUE, or the SVD-based update when FALSE. Ignored for continuous outcomes.}
 \item{method}{a string specifying which imputation algorithm will be used.
   \code{"fe"}, \code{"ife"}, \code{"mc"},
   \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}

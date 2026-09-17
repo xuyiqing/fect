@@ -102,14 +102,16 @@
 #'   with `cv.prop * n_eligible * cv.nobs`.
 #' @param cv.rule Rule for picking `r` from the MSPE curve: `"1se"`
 #'   (default), `"min"`, or `"1pct"`.
-#' @param min.T0 Minimum observations required strictly before the
-#'   anchor. Sets the lower bound on valid anchor positions. Default 5.
+#' @param min.T0 Minimum training observations remaining before the anchor
+#'   after removing the buffer. Default 5.
 #' @param force One of `"none"`, `"unit"`, `"time"`, `"two-way"`. Default
 #'   `"unit"`.
 #' @param seed Optional integer base seed; per-fold seeds derive from
 #'   `seed + fold_id` for reproducibility. Default `NULL` (use the
 #'   ambient RNG).
 #' @param verbose If TRUE (default), print per-fold per-r MSPE.
+#' @param binary Fit a Probit IFE model and score probability MSPE. Requires
+#'   `method = "ife"` and staggered adoption. Default FALSE.
 #' @param ... Additional arguments forwarded to `fect()`. For
 #'   `method = "cfe"`, the user holds CFE structural arguments (`Z`,
 #'   `gamma`, `Q`, `Q.type`, `Q.bspline.degree`, `kappa`, etc.) fixed
@@ -154,9 +156,32 @@ r.cv.rolling <- function(formula,
                           force = "unit",
                           seed = NULL,
                           verbose = TRUE,
+                          binary = FALSE,
                           ...) {
     cv.rule <- match.arg(cv.rule)
     method  <- match.arg(method)
+    if (isTRUE(binary)) {
+        if (method != "ife") stop("Binary rolling CV requires method = 'ife'.")
+        dots <- list(...)
+        reserved <- intersect(names(dots), c("CV", "se", "r", "cv.method", "binary"))
+        if (length(reserved)) stop("Binary rolling CV controls these arguments: ", paste(reserved, collapse=", "))
+        fit <- do.call(fect, c(list(formula=formula, data=data, index=index,
+            method="ife", binary=TRUE, CV=TRUE, se=FALSE, r=c(0,r.max),
+            cv.method="rolling", cv.rule=cv.rule, k=k, cv.nobs=cv.nobs,
+            cv.buffer=cv.buffer, cv.prop=cv.prop, min.T0=min.T0,
+            force=force, seed=seed), dots))
+        losses <- fit$cv.loss.per.fold
+        return(list(r.cv=fit$r.cv, cv.rule=fit$cv.rule,
+            mspe=data.frame(r=fit$CV.out[,"r"], mspe=fit$CV.out[,"MSPE"],
+                se=fit$CV.out[,"MSPE.SE"], n_holdout=sum(fit$cv.counts),
+                n_folds_used=rowSums(is.finite(losses))),
+            mspe.per.fold=losses, pooled.mspe=fit$cv.pooled.mspe,
+            classification.per.fold=fit$cv.classification.per.fold,
+            folds=fit$cv.folds, failures=fit$cv.failures,
+            k=k, cv.nobs=cv.nobs, cv.buffer=cv.buffer, cv.prop=cv.prop,
+            n.units.masked=length(unique(unlist(lapply(fit$cv.folds,
+                function(f) (f$est.id-1L) %/% nrow(fit$Y.dat)+1L))))))
+    }
     fect_method <- method
     ## CFE on the notyettreated path also populates Y.ct.full at masked
     ## cells, so MSPE scoring works uniformly. Only "gsynth" uses
@@ -217,14 +242,14 @@ r.cv.rolling <- function(formula,
         if (!is.null(treat_onset[[u]])) t_all[t_all < treat_onset[[u]]]
         else                            t_all
     })
-    ## Eligible: at least min.T0 + cv.nobs observations.
+    ## Eligible: at least min.T0 + cv.buffer + cv.nobs observations.
     eligible <- vapply(elig_obs_times, length,
-                       integer(1)) >= (min.T0 + cv.nobs)
+                       integer(1)) >= (min.T0 + cv.buffer + cv.nobs)
     elig_obs_times <- elig_obs_times[eligible]
     if (length(elig_obs_times) == 0L) {
         stop("r.cv.rolling: no eligible units have enough pre-treatment ",
-             "observations (need >= min.T0 + cv.nobs = ",
-             min.T0 + cv.nobs, ").")
+             "observations (need >= min.T0 + cv.buffer + cv.nobs = ",
+             min.T0 + cv.buffer + cv.nobs, ").")
     }
 
     n_eligible_units <- length(elig_obs_times)
@@ -263,12 +288,12 @@ r.cv.rolling <- function(formula,
             obs_t <- elig_obs_times[[u]]
             n_obs <- length(obs_t)
             ## Anchor index in obs_t such that:
-            ##   - >= min.T0 obs before  -> a_idx >= min.T0 + 1
+            ##   - >= min.T0 training obs after buffering -> a_idx >= min.T0 + cv.buffer + 1
             ##   - >= cv.nobs obs from a -> a_idx <= n_obs - cv.nobs + 1
             ## For treated units, obs_t already excludes post-treatment
             ## cells, so the holdout block is guaranteed to stay in the
             ## pre-treatment window.
-            valid <- seq.int(min.T0 + 1L, n_obs - cv.nobs + 1L)
+            valid <- seq.int(min.T0 + cv.buffer + 1L, n_obs - cv.nobs + 1L)
             if (length(valid) == 0L) return(NULL)
             a_idx <- valid[sample.int(length(valid), 1L)]
             holdout_t <- obs_t[a_idx:(a_idx + cv.nobs - 1L)]
