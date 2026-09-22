@@ -90,11 +90,12 @@ imputed_outcomes(
 }
 
 \examples{
-\dontrun{
+\donttest{
 library(fect)
+data(simdata)
 fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
             method = "fe", force = "two-way",
-            se = TRUE, nboots = 200, parallel = FALSE,
+            se = TRUE, nboots = 50, parallel = FALSE,
             keep.sims = TRUE)
 
 ## Point-estimate long form: one row per treated cell.
@@ -106,6 +107,6 @@ po5 <- imputed_outcomes(fit, cells = ~ event.time \%in\% 1:5)
 
 ## Bootstrap replicate expansion (requires keep.sims = TRUE).
 po_b <- imputed_outcomes(fit, replicates = TRUE)
-nrow(po_b) == nrow(po) * 200    # one row per (cell, replicate)
+nrow(po_b) == nrow(po) * 50    # one row per (cell, replicate)
 }
 }

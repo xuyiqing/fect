@@ -196,12 +196,12 @@ plot.fect <- function(
 
   ## Soft-deprecate theme.bw = FALSE: emit once per session. The gray-panel
   ## look is preserved for now but slated for removal in v2.5.0.
-  if (!isTRUE(theme.bw) && !isTRUE(getOption("fect.theme.bw.deprecated.notified", FALSE))) {
+  if (!isTRUE(theme.bw) && !isTRUE(.fect_state$theme.bw.deprecation.notified)) {
     message("Note: `theme.bw = FALSE` is soft-deprecated. The modern style ",
             "is now the default; pass `legacy.style = TRUE` for byte-",
             "identical pre-2.3.1 reproduction. `theme.bw` is slated for ",
             "removal in v2.5.0.")
-    options(fect.theme.bw.deprecated.notified = TRUE)
+    .fect_state$theme.bw.deprecation.notified <- TRUE
   }
   if (is.null(preset)) {
     if (is.null(connected)) connected <- FALSE

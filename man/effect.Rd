@@ -79,21 +79,21 @@ effect(
 }
 
 \examples{
-\dontrun{
-# Fit fect model with bootstrap
-fit <- fect(Y ~ D + X, data = panel_data, keep.sims = TRUE)
+\donttest{
+library(fect)
+data(simdata)
+fit <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+            method = "fe", force = "two-way", se = TRUE, nboots = 50,
+            parallel = FALSE, keep.sims = TRUE)
 
-# Calculate cumulative effects for all treated units
+# Cumulative effects for all treated units
 results <- effect(fit)
+head(results$est.catt)
 
-# Calculate period-specific effects for specific units
-results_specific <- effect(fit,
-                          cumu = FALSE,
-                          id = c("unit1", "unit2"),
-                          period = c(1, 4))
-
-# View results
-print(results$est.catt)
+# Period-specific effects for two treated units over event times 1 to 4
+ids <- head(unique(simdata$id[simdata$D == 1]), 2)
+results_specific <- effect(fit, cumu = FALSE, id = ids, period = c(1, 4))
+head(results_specific$est.catt)
 }
 }
 

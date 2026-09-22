@@ -70,7 +70,7 @@ test_that("legacy.style = TRUE produces bold centered title (theme.bw = TRUE)", 
 test_that("legacy.style = TRUE produces bold centered title even with theme.bw = FALSE", {
   fit <- local_fect_fit()
   ## Reset deprecation flag so any messages from theme.bw=FALSE don't leak
-  options(fect.theme.bw.deprecated.notified = TRUE)
+  assign("theme.bw.deprecation.notified", TRUE, envir = fect:::.fect_state)
   p <- plot(fit, type = "gap", main = "gray-classic test",
             legacy.style = TRUE, theme.bw = FALSE)
   expect_equal(extract_title_face(p), "bold")
@@ -80,7 +80,7 @@ test_that("legacy.style = TRUE produces bold centered title even with theme.bw =
 test_that("theme.bw = FALSE emits soft-deprecation message exactly once per session", {
   fit <- local_fect_fit()
   ## Force re-arming
-  options(fect.theme.bw.deprecated.notified = FALSE)
+  assign("theme.bw.deprecation.notified", FALSE, envir = fect:::.fect_state)
   expect_message(
     plot(fit, type = "gap", theme.bw = FALSE),
     "soft-deprecated"
@@ -93,7 +93,7 @@ test_that("theme.bw = FALSE emits soft-deprecation message exactly once per sess
 
 test_that("all three modes run without error", {
   fit <- local_fect_fit()
-  options(fect.theme.bw.deprecated.notified = TRUE)
+  assign("theme.bw.deprecation.notified", TRUE, envir = fect:::.fect_state)
   expect_no_error(plot(fit, type = "gap"))                                           # modern
   expect_no_error(plot(fit, type = "gap", legacy.style = TRUE))                      # classic
   expect_no_error(plot(fit, type = "gap", theme.bw = FALSE))                         # gray

@@ -118,11 +118,12 @@ estimand(
 }
 
 \examples{
-\dontrun{
+\donttest{
 library(fect)
+data(simdata)
 fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
             method = "fe", force = "two-way",
-            se = TRUE, nboots = 200, parallel = FALSE)
+            se = TRUE, nboots = 50, parallel = FALSE)
 
 ## Default: per-event-time ATT (matches fit$est.att numerically).
 est <- estimand(fit, "att", "event.time")

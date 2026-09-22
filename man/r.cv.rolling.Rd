@@ -129,17 +129,17 @@ panel data: each sampled unit gets its own anchor per fold, drawn
 uniformly from valid positions.
 }
 \examples{
-\dontrun{
-  library(fect)
-  data(simdata)
-  res <- r.cv.rolling(Y ~ D, data = simdata, index = c("id", "time"),
-                      method = "ife", r.max = 5,
-                      cv.nobs = 3, cv.buffer = 1, k = 20)
-  res$r.cv
-  ## then use the chosen r in a CV-disabled fit:
-  fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
-              method = "ife", time.component.from = "notyettreated",
-              CV = FALSE, r = res$r.cv, se = TRUE)
+\donttest{
+library(fect)
+data(simdata)
+res <- r.cv.rolling(Y ~ D, data = simdata, index = c("id", "time"),
+                    method = "ife", r.max = 5,
+                    cv.nobs = 3, cv.buffer = 1, k = 5)
+res$r.cv
+## then use the chosen r in a CV-disabled fit:
+fit <- fect(Y ~ D, data = simdata, index = c("id", "time"),
+            method = "ife", time.component.from = "notyettreated",
+            CV = FALSE, r = res$r.cv, se = TRUE, nboots = 50,
+            parallel = FALSE)
 }
-
 }
