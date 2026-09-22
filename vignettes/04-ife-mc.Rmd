@@ -292,10 +292,14 @@ Instead of using estimated ATTs for periods prior to the treatment to test for p
 
 ```{r simdata_ife_loo, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.ife.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "ife", force = "two-way", se = TRUE, parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
+  method = "ife", r = 2, CV = 0, force = "two-way", se = TRUE, parallel = TRUE,
+  cores = 16, nboots = 200, loo = TRUE, max.iteration = 20000)
 out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "mc", force = "two-way", se = TRUE, parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
+  method = "mc", lambda = out.mc$lambda.cv, CV = 0, force = "two-way", se = TRUE,
+  parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
 ```
+
+As with the placebo test, the LOO test is run on a settled model, so we fix the tuning parameters at the values selected earlier (`r` set to 2 for IFEct, `lambda` set to `out.mc$lambda.cv` for MC) and turn cross-validation off. Note that `method = "ife"` without `r` (and without `CV = TRUE`) runs with the default `r` of 0, which is the FEct model with no factors.
 
 After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the `plot` function. Since all pre-treatment estimates are now out-of-sample, the plot uses a uniform black color for all points (no gray/black distinction). The equivalence plots below use the LOO estimates directly.
 
@@ -327,7 +331,7 @@ plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
      main = "Testing Pre-Trend (MC)")
 ```
 
-From the above plots, we see that IFEct passes both tests using a conventional test size (5%); and MC fails the F tests, but passes the TOST (equivalence) test. Hence, we may conclude that IFEct is a more suitable model.
+In the IFEct panel, the $F$ test does not reject the null of no pre-trend (p = 0.82), and the TOST rejects the null that some pre-treatment average lies outside the equivalence range (p < 0.001). In the MC panel, the $F$ test rejects (p < 0.001): the LOO estimates are small but drift upward in the last few periods before the treatment starts. The TOST also rejects non-equivalence (p < 0.001), so all of the MC pre-treatment averages stay inside the equivalence range. IFEct is the more suitable model for these data.
 
 ### Carryover effects
 

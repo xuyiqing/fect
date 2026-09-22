@@ -135,9 +135,11 @@ plot(out.mc.p, stats = c("placebo.p","equiv.p"),
 
 ## ----simdata_ife_loo, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'----
 out.ife.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "ife", force = "two-way", se = TRUE, parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
+  method = "ife", r = 2, CV = 0, force = "two-way", se = TRUE, parallel = TRUE,
+  cores = 16, nboots = 200, loo = TRUE, max.iteration = 20000)
 out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "mc", force = "two-way", se = TRUE, parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
+  method = "mc", lambda = out.mc$lambda.cv, CV = 0, force = "two-way", se = TRUE,
+  parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
 
 
 ## ----pretrend_ife, eval = TRUE, fig.width = 6, fig.height = 4.5, warning = FALSE----
