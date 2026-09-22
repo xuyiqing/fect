@@ -415,6 +415,7 @@ See [Chapter @sec-plots] for the full table of `highlight` / `highlight.fill` pa
 | :--- | :--- | :--- | :--- | :--- |
 | Placebo test | Tests whether the model produces zero ATT in withheld pre-treatment periods | `placeboTest = TRUE`, `placebo.period = c(a, b)` | `"gap"` (default) | `placebo.p`, `equiv.p` |
 | LOO pre-trend test | Out-of-sample check for pre-trends by leaving out one pre-treatment period at a time | `loo = TRUE` (in `fect()`), `loo = TRUE` (in `plot()`) | `"gap"` or `"equiv"` | `F.p`, `equiv.p` |
+| Double LOO pre-trend test | Cohort-wise leave-one-out placebos from the in-sample fit, no re-fitting; `method = "fe"` with staggered adoption only (see [Chapter @sec-fect]) | `dloo = TRUE` (in `fect()`), `dloo = TRUE` (in `plot()`) | `"gap"` or `"equiv"` | `F.p`, `equiv.p` |
 | Joint pre-trend test (F + TOST) | Joint assessment: F test for zero residual averages; TOST for equivalence within a threshold | `type = "equiv"` in `plot()`, `tost.threshold` | `"equiv"` | `F.p`, `F.equiv.p`, `equiv.p` |
 | Carryover test | Tests whether treatment effects persist after treatment ends | `carryoverTest = TRUE`, `carryover.period = c(a, b)` | `"exit"` | `carryover.p`, `equiv.p` |
 
@@ -423,6 +424,7 @@ See [Chapter @sec-plots] for the full table of `highlight` / `highlight.fill` pa
 - A **larger** F-test / placebo / carryover p-value suggests the model passes the test.
 - A **smaller** TOST / equivalence p-value suggests the pre-trends or carryover effects are within an acceptable range.
 - We recommend using `loo = TRUE` for pre-trend tests to avoid the false reassurance of in-sample fit.
+- Under staggered adoption with `method = "fe"`, `dloo = TRUE` gives the corrected placebos at no re-fitting cost; see [Chapter @sec-fect].
 - The `proportion` option controls which pre-treatment periods are included in the tests (default: periods where the number of treated units exceeds `proportion` $\times$ total treated units).
 - The `tost.threshold` option sets the equivalence range for the TOST test (default: $0.36\hat{\sigma}_\epsilon$). Finding the "right" threshold is often a challenge in empirical research.
 

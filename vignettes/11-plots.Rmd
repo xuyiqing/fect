@@ -123,7 +123,7 @@ plot(out,
 
 The `color` parameter sets the master color for estimate lines, points, and CI bands. In gap plots, `color` controls the **post-treatment** color; pre-treatment defaults to gray. To control each phase independently, use `pre.color` and `post.color`.
 
-Default color conventions for gap plots: pre-treatment = gray (in-sample), post-treatment = black (out-of-sample). When `loo = TRUE`, all points are black (all out-of-sample).
+Default color conventions for gap plots: pre-treatment = gray (in-sample), post-treatment = black (out-of-sample). When `loo = TRUE` or `dloo = TRUE`, all points are black (all out-of-sample); the legend reads "LOO Estimates" or "Double-LOO Estimates" accordingly.
 
 ```{r preset-vibrant2}
 plot(out.hh,

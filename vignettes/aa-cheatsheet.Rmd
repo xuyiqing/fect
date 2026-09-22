@@ -41,6 +41,8 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 | Input | **Description** | **Applicable Methods** |
 |------------------------|------------------------|------------------------|
 | `loo` | Leave-one-period-out goodness-of-fit test (`TRUE/FALSE`). | fe, ife, mc, gsynth |
+| `dloo` | Double (cohort-wise) leave-one-out pre-trend placebos, computed from the in-sample fit without re-fitting (`TRUE/FALSE`). Staggered adoption and a balanced pre-treatment panel only. | fe |
+| `dloo.adjust` | With `dloo = TRUE`: use the pre-treatment-average baseline of @liu2025cohort (`TRUE/FALSE`). | fe |
 | `carryoverTest` | Tests for carryover effects in post-treatment periods (`TRUE/FALSE`). | fe, ife, mc, cfe |
 | `carryover.period` | Range of post-treatment periods for the carryover test (vector). | fe, ife, mc, cfe |
 | `permute` | Permutation test (`TRUE/FALSE`). | fe, ife, mc, gsynth |
@@ -203,7 +205,7 @@ In addition to the main `fect()` function, the package provides several utility 
 
 -   Factor-based methods (`ife`, `gsynth`) can use `r` and `k` for factor selection and cross-validation. We can implement a similar process using `mc` or `gsynth` with `lambda` and `nlambda`.
 
--   `carryoverTest` is available in `fe`, `ife`, `mc`, and `cfe` but not in `gsynth`. `loo` is available in `fe`, `ife`, `mc`, and `gsynth`.
+-   `carryoverTest` is available in `fe`, `ife`, `mc`, and `cfe` but not in `gsynth`. `loo` is available in `fe`, `ife`, `mc`, and `gsynth`. `dloo` is available in `fe` only, and only for staggered adoption without reversal.
 
 -   The **cfe** method supports additional parameters: `Z`/`gamma` for time-invariant covariates with time-varying coefficients, `Q`/`kappa` (or `Q.type`) for unit-specific time trends, extra additive fixed effects via `index[3:]`, and interactive fixed effects via `r`. See [Chapter @sec-cfe] for details.
 

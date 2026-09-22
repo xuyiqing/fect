@@ -216,7 +216,7 @@ For more detail on carryover tests with IFE and MC, see [Chapter @sec-ife-mc].
 
 ### Leave-one-out approach
 
-@li2025benchmarking show that in some applications, pre-trend estimates based on in-sample model fit can lead to the mistaken belief that no pre-trend exists, even when a non-parallel pre-trend is present. A simple fix is to use a leave-one-out method by setting `loo = TRUE` to obtain these estimates, although it is significantly more time-consuming.
+@li2025benchmarking show that in some applications, pre-trend estimates based on in-sample model fit can lead to the mistaken belief that no pre-trend exists, even when a non-parallel pre-trend is present. A simple fix is to use a leave-one-out method by setting `loo = TRUE` to obtain these estimates, although it re-fits the model once per pre-treatment period and is therefore much more time-consuming. Under staggered adoption, the double leave-one-out placebos of the next section (`dloo = TRUE`) give the corrected estimates without any re-fitting.
 
 ::: {.callout-note appearance="simple"}
 We recommend setting `loo = TRUE` when (i) the event-study plot is intended as a critical piece of evidence to support the parallel trends assumption, which is often the case, or (ii) when implementing an equivalence test for the pre-trend estimates. For more discussion on the LOO pre-trend test, see [Chapter @sec-ife-mc].
@@ -232,10 +232,71 @@ out.fect.loo <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
   parallel = TRUE, cores = 16, nboots = 1000)
 ```
 
-The event study plot utilizing leave-one-out for pretreatment estimates is shown below. This graph is fairly similar to the graphics we presented earlier without using leave-one-out. However, this is not always true.
+The event study plot with leave-one-out pre-treatment estimates is shown below; pass `loo = TRUE` to `plot()` as well, otherwise the in-sample estimates are drawn. All points are now black, since every estimate is out of sample. Without a `type`, a fit with leave-one-out placebos plots the equivalence view, so `type = "gap"` is set explicitly. This graph is fairly similar to the one presented earlier without leave-one-out. However, this is not always true.
 
 ```{r plot-gap-loo, fig.width = 6, fig.height = 4.5}
-plot(out.fect.loo,main = "Estimated ATT (FEct) -- LOO")
+plot(out.fect.loo, loo = TRUE, type = "gap", main = "Estimated ATT (FEct) -- LOO")
+```
+
+### Double leave-one-out placebos
+
+Under staggered adoption, @li2025benchmarking show that the in-sample placebo has two problems. First, it is attenuated: the tested period helps estimate the unit's own fixed effect, so the residual at that period is pulled toward zero. Second, it is contaminated: cohorts that adopted earlier serve as controls for a later cohort's pre-treatment periods while they are already treated. The leave-one-out approach above removes the first problem by re-fitting the model once per pre-treatment period. Their proposed fix, the double leave-one-out placebo, removes both. For a cohort adopting at period $g$ and a pre-treatment period $t$, it drops period $t$ and compares that cohort only with units that adopt strictly later or never, as a two-by-two difference in means. Because unit and time fixed effects cancel in that difference, the estimator is a fixed linear function of the in-sample placebos that **fect** already computes. It therefore costs nothing beyond the original fit. Anton Strezhnev contributed the implementation; set `dloo = TRUE` in `fect()` to use it.
+
+::: {.callout-note appearance="simple"}
+### When `dloo` applies
+
+`dloo` requires additive two-way fixed effects (`method = "fe"`), staggered adoption with no treatment reversal, and a balanced pre-treatment panel (post-treatment cells may be missing). Standard errors come from the package's own bootstrap or jackknife (`vartype = "bootstrap"` or `"jackknife"`). It cannot be combined with `loo`, `placeboTest`, `carryoverTest`, `permute`, or `binary`. The datasets shipped with the package either allow reversal or have a single cohort, so the example below simulates a small staggered panel.
+:::
+
+We simulate three adoption cohorts (periods 8, 12, and 16) plus a never-treated group, with unit and time fixed effects, a constant treatment effect of 1.5, and no violation of parallel trends.
+
+```{r fect_dloo_sim, eval = TRUE}
+set.seed(2026)
+TT <- 20; cohorts <- c(8, 12, 16, Inf); n_per <- 40
+xi <- rnorm(TT)
+sim_stag <- do.call(rbind, lapply(seq_along(cohorts), function(k) {
+  g <- cohorts[k]
+  do.call(rbind, lapply(seq_len(n_per), function(u) {
+    d <- as.integer(is.finite(g) & seq_len(TT) >= g)
+    data.frame(id = (k - 1) * n_per + u, time = seq_len(TT),
+               Y = rnorm(1) + xi + 1.5 * d + rnorm(TT, 0, 0.8), D = d)
+  }))
+}))
+```
+
+The call mirrors the leave-one-out fit above, with `dloo = TRUE` in place of `loo = TRUE`. The double leave-one-out placebos fill the same slots (`pre.est.att`, `pre.att.bound`, `pre.att.boot`), and the joint tests on them are stored in `dloo.test.out`.
+
+```{r fect_dloo, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.fect.dloo <- fect(Y ~ D, data = sim_stag, index = c("id", "time"),
+  method = "fe", force = "two-way", se = TRUE, nboots = 200,
+  parallel = TRUE, cores = 16, dloo = TRUE)
+```
+
+Set `dloo = TRUE` in `plot()` to display them. The legend reads "Double-LOO Estimates", and all points are black because every pre-treatment estimate is now out of sample. As with `loo`, the default view is the equivalence plot, so `type = "gap"` is set explicitly for the event-study plot.
+
+```{r plot-gap-dloo, fig.width = 6, fig.height = 4.5}
+plot(out.fect.dloo, dloo = TRUE, type = "gap",
+     main = "Estimated ATT (FEct) -- Double LOO")
+```
+
+The equivalence plot and the joint pre-trend tests of [Chapter @sec-ife-mc] work on these placebos in the same way. Here the $F$ test does not reject the null of no pre-trend (p = 0.98). The equivalence test does not reject non-equivalence either (p = 0.40): the four earliest periods rest on the last cohort alone (40 units, see the count bars), and their intervals are too wide for the default equivalence range. Both readings are consistent with the data-generating process, which has no violation.
+
+```{r plot-equiv-dloo, fig.width = 6, fig.height = 4.5}
+plot(out.fect.dloo, dloo = TRUE, type = "equiv", ylim = c(-2, 2),
+     main = "Testing Pre-Trend (FEct) -- Double LOO")
+```
+
+The difference between two double leave-one-out placebos overstates the period-to-period change in a parallel-trends violation by the factor $(g-1)/(g-2)$, because each placebo has its own leave-one-out baseline. @liu2025cohort instead uses the average over all pre-treatment periods, including the tested one, as the baseline. Setting `dloo.adjust = TRUE` selects that version, which equals the double leave-one-out placebo rescaled by $(g-2)/(g-1)$ for a cohort adopting at period $g$. Use it when the question is how a violation changes from one period to the next rather than its level in a given period.
+
+```{r fect_dloo_adjust, eval = TRUE, cache = TRUE, message = FALSE, results = 'hide'}
+out.fect.dloo.adj <- fect(Y ~ D, data = sim_stag, index = c("id", "time"),
+  method = "fe", force = "two-way", se = TRUE, nboots = 200,
+  parallel = TRUE, cores = 16, dloo = TRUE, dloo.adjust = TRUE)
+```
+
+```{r plot-gap-dloo-adjust, fig.width = 6, fig.height = 4.5}
+plot(out.fect.dloo.adj, dloo = TRUE, type = "gap",
+     main = "Estimated ATT (FEct) -- Double LOO, adjusted baseline")
 ```
 
 
