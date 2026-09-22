@@ -217,7 +217,7 @@ In addition to the main `fect()` function, the package provides several utility 
 |:--:|:---|:--:|
 | `nboots` | Number of bootstrap runs (int) | 200 |
 | `k` | Sets the number of cross-validation rounds(int) | 10 |
-| `r` | Sets the number of factors | 0; c(0,3) when CV |
+| `r` | Sets the number of factors | NULL: cross-validated over 0 to 5 for ife/gsynth, 0 for fe/cfe; a range such as c(0,3) sets the CV search |
 | `m` | Specifies the block length for the permutation test | 2 |
 | `nlambda` | Length of hyper-parameter sequence | 10 |
 

@@ -299,7 +299,7 @@ out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
   parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
 ```
 
-As with the placebo test, the LOO test is run on a settled model, so we fix the tuning parameters at the values selected earlier (`r` set to 2 for IFEct, `lambda` set to `out.mc$lambda.cv` for MC) and turn cross-validation off. Note that `method = "ife"` without `r` (and without `CV = TRUE`) runs with the default `r` of 0, which is the FEct model with no factors.
+As with the placebo test, the LOO test is run on a settled model, so we fix the tuning parameters at the values selected earlier (`r` set to 2 for IFEct, `lambda` set to `out.mc$lambda.cv` for MC) and turn cross-validation off. Since v2.4.6, `method = "ife"` without `r` selects the number of factors by cross-validation (0 to 5); with `CV = FALSE` and no `r`, it falls back to zero factors, the FEct model, with a message.
 
 After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the `plot` function. Since all pre-treatment estimates are now out-of-sample, the plot uses a uniform black color for all points (no gray/black distinction). The equivalence plots below use the LOO estimates directly.
 

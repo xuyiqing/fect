@@ -30,10 +30,13 @@ Development version, not yet on CRAN.
   `pre.est.group.output` (viewable via `plot(fit, dloo = TRUE, show.group = ...)`):
   each subgroup averages the same per-unit placebo over its own treated units
   with shared controls, so the subgroups aggregate back to the pooled series.
-* `method = "ife"` (or `"gsynth"`) called without `r` and without `CV = TRUE`
-  now prints a message that no factors are estimated, so the fit is the FEct
-  model. This mirrors the existing message for `method = "mc"` without
-  `lambda`. The default `r = 0` is unchanged.
+* `r` now defaults to `NULL`. For `method = "ife"` (or `"gsynth"`) a missing
+  `r` means the number of factors is selected by cross-validation over 0 to 5,
+  as `method = "mc"` already does for a missing `lambda`. Previously the
+  default was `r = 0`, so `method = "ife"` without `r` silently fit the
+  two-way fixed-effects model with no factors. With `CV = FALSE` and no `r`,
+  the fit falls back to `r = 0` with a message, mirroring MC. An explicit
+  `r = 0` is honoured silently. `fe` and `cfe` are unchanged.
 * Fix the equivalence (TOST) test for the leave-one-out pre-trend estimates
   (`loo = TRUE`): the reported p-value now uses the same pre-treatment window
   as the F test, the periods that pass the `proportion` cutoff. It previously

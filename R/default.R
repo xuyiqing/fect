@@ -41,7 +41,7 @@ fect <- function(
     force = "two-way", # fixed effects demeaning
     time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
-    r = 0, # number of factors
+    r = NULL, # number of factors; NULL = cross-validate 0:5 (ife/gsynth) or 0 (fe/cfe)
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
@@ -126,7 +126,7 @@ fect.formula <- function(
     force = "two-way", # fixed effects demeaning
     time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
-    r = 0, # nubmer of factors
+    r = NULL, # number of factors; NULL = cross-validate 0:5 (ife/gsynth) or 0 (fe/cfe)
     lambda = NULL, # mc method: regularization parameter
     nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
@@ -330,7 +330,7 @@ fect.default <- function(
     force = "two-way", # fixed effects demeaning
     time.component.from = "notyettreated", # factor estimation sample: "notyettreated" or "nevertreated"
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
-    r = 0, # nubmer of factors
+    r = NULL, # number of factors; NULL = cross-validate 0:5 (ife/gsynth) or 0 (fe/cfe)
     lambda = NULL, ## mc method: regularization parameter
     nlambda = 0,
     CV = NULL, # cross-validation
@@ -802,9 +802,32 @@ fect.default <- function(
         }
     }
 
-    ## remember what the user asked for: `fe` is rewritten to `ife` with r = 0
-    ## just below, and that rewrite must not trigger the r = 0 message.
-    method.user <- method
+    ## `r = NULL` (the default since 2.4.6) means "not supplied". For the factor
+    ## methods that is a request to cross-validate the number of factors over
+    ## 0:5, mirroring `method = "mc"` with lambda = NULL. With CV switched off
+    ## and no r, fall back to r = 0 (the FEct model) and say so, again as MC
+    ## does. For fe / cfe / binary models, no r means no factors. (Before
+    ## 2.4.6 the default was r = 0 and `method = "ife"` without r silently ran
+    ## the two-way FE model; the manual's own LOO example did exactly that.)
+    if (is.null(r)) {
+        if (method == "both") {
+            r <- 0:5
+        } else if (method %in% c("ife", "gsynth") && binary == 0) {
+            if (!is.null(CV) && CV == FALSE) {
+                message(
+                    "No r is supplied and CV = FALSE. FEct (r = 0, no factors) ",
+                    "is applied. Set r > 0, or CV = TRUE to select the number ",
+                    "of factors."
+                )
+                r <- 0
+            } else {
+                r <- c(0, 5)
+                CV <- TRUE
+            }
+        } else {
+            r <- 0
+        }
+    }
 
     ## the default setting of CV
     if (is.null(CV)) {
@@ -889,20 +912,6 @@ fect.default <- function(
             method <- "ife"
             r <- 0
         }
-    }
-
-    ## `method = "ife"` / `"gsynth"` with r = 0 and no cross-validation (the
-    ## signature default is r = 0, and with CV = FALSE the smallest element of
-    ## a vector r is used) estimates no factors: it is the FEct model. Say so,
-    ## mirroring the MC message above, so a missing `r` cannot pass silently
-    ## as an IFE fit. (The manual's own LOO example did exactly that, 2026-09.)
-    if (method.user %in% c("ife", "gsynth") && CV == FALSE && min(r) == 0 &&
-        binary == 0) {
-        message(
-            "method = \"", method.user, "\" with r = 0: no factors are estimated, ",
-            "so this is the FEct (two-way fixed effects) model. Set r > 0, or ",
-            "CV = TRUE to select the number of factors."
-        )
     }
 
     ## leave one period out placebo
