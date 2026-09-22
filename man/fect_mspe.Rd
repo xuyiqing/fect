@@ -30,11 +30,9 @@ fect_mspe(
   \item{cv.buffer}{Integer; number of past-side cells masked from training (but not scored) before each rolling-window holdout. Used only by \code{cv.method = "rolling"}. Default is 1.}
   \item{cv.prop}{Numeric; for block CV, proportion of observations to mask per round; for rolling CV, fraction of eligible units sampled per fold. Default is 0.2.}
   \item{min.T0}{Integer; minimum number of pre-treatment periods required. Default is 5.}
-  \item{min.T0}{Integer; a treated unit must keep at least this many unmasked pre-treatment periods in every fold to be scored; units with fewer are dropped from that fold. Default is 5.}
   \item{k}{Integer; number of cross-validation folds. Default is 5.}
   \item{criterion}{Character; scoring criterion. One of \code{"mspe"}, \code{"wmspe"}, \code{"gmspe"}, \code{"wgmspe"}, \code{"mad"}, \code{"moment"}, \code{"gmoment"}. Default is \code{"mspe"}.}
   \item{W}{Optional TT x N observation weight matrix. Default is \code{NULL}.}
-  \item{W}{Optional \code{TT x N} matrix of observation weights used by the weighted criteria (\code{"wmspe"}, \code{"wgmspe"}); \code{NULL} for unweighted scoring.}
   \item{norm.para}{Optional normalization vector. Default is \code{NULL}.}
   \item{proportion}{Numeric; proportion cutoff for count.T.cv (same as fect_cv). Default is 0.}
 }

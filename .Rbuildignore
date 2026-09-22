@@ -20,3 +20,4 @@
 ^fect_.*\.tar\.gz$
 ^fect\.Rcheck$
 ^tests/coverage-study$
+^Rplots\.pdf$
