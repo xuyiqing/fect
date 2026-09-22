@@ -11,6 +11,7 @@
     type = NULL,
     restrict = "rm",
     loo = FALSE,
+    dloo = FALSE,
     highlight = NULL,
     highlight.fill = FALSE,
     plot.ci = NULL,
@@ -130,6 +131,7 @@
     or \code{"cumul"} (cumulative effect plot). Default is context-dependent (e.g., "gap", or "equiv" if \code{loo=TRUE}).}
   \item{restrict}{For sensitivity plots (\code{type = "sens"} or \code{type = "sens_es"}). Specifies the type of restriction: \code{"rm"} (restriction on M, for relative magnitude bounds) or \code{"sm"} (smoothness restriction, for bounds based on second differences). Default is \code{"rm"}.}
   \item{loo}{Logical; if \code{TRUE} (default is \code{FALSE}), use leave-one-out estimates for pre-treatment periods in equivalence tests or gap plots.}
+  \item{dloo}{Logical; if \code{TRUE} (default is \code{FALSE}), display the double (cohort-wise) leave-one-out pre-trend placebos of a fit produced with \code{dloo = TRUE}. Uses the same slots and machinery as \code{loo} but labels the series \dQuote{Double-LOO Estimates}.}
   \item{highlight}{Controls which test-period types receive the colored-glyph treatment in placebo / carryover plots. Accepts:
     \itemize{
       \item \code{NULL} (default): auto --- highlight every test type that ran at fit time (placebo, carryover, carryover.rm).
