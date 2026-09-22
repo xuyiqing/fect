@@ -1,4 +1,24 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.6
+
+Development version, not yet on CRAN.
+
+* `method = "ife"` (or `"gsynth"`) called without `r` and without `CV = TRUE`
+  now prints a message that no factors are estimated, so the fit is the FEct
+  model. This mirrors the existing message for `method = "mc"` without
+  `lambda`. The default `r = 0` is unchanged.
+* Fix the equivalence (TOST) test for the leave-one-out pre-trend estimates
+  (`loo = TRUE`): the reported p-value now uses the same pre-treatment window
+  as the F test, the periods that pass the `proportion` cutoff. It previously
+  ranged over every pre-treatment period, so an early period with a handful
+  of treated units and a wide standard error could set the reported maximum.
+  The in-sample test was not affected.
+* User manual, Factor-Based Methods chapter: the LOO pre-trend example now
+  fits the IFE model with `r = 2`. The previous call omitted `r` and ran with
+  zero factors, so the figure captioned "IFEct" showed the two-way
+  fixed-effects pre-trend. The text under the joint-test figures was
+  rewritten to match. Thanks to Siyang Zhu (UPF) for the report.
+
 # fect 2.4.5
 
 * Add `group.fe` to `fect()` for absorbing coarser fixed effects, such as state FE with county-level data. Closes #139. Clustered SE defaults to `group.fe[1]`; override with `cl = "<column>"`.

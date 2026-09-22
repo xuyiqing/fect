@@ -737,6 +737,10 @@ fect.default <- function(
         }
     }
 
+    ## remember what the user asked for: `fe` is rewritten to `ife` with r = 0
+    ## just below, and that rewrite must not trigger the r = 0 message.
+    method.user <- method
+
     ## the default setting of CV
     if (is.null(CV)) {
         if (method == "fe") {
@@ -820,6 +824,20 @@ fect.default <- function(
             method <- "ife"
             r <- 0
         }
+    }
+
+    ## `method = "ife"` / `"gsynth"` with r = 0 and no cross-validation (the
+    ## signature default is r = 0, and with CV = FALSE the smallest element of
+    ## a vector r is used) estimates no factors: it is the FEct model. Say so,
+    ## mirroring the MC message above, so a missing `r` cannot pass silently
+    ## as an IFE fit. (The manual's own LOO example did exactly that, 2026-09.)
+    if (method.user %in% c("ife", "gsynth") && CV == FALSE && min(r) == 0 &&
+        binary == 0) {
+        message(
+            "method = \"", method.user, "\" with r = 0: no factors are estimated, ",
+            "so this is the FEct (two-way fixed effects) model. Set r > 0, or ",
+            "CV = TRUE to select the number of factors."
+        )
     }
 
     ## leave one period out placebo
