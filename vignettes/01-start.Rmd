@@ -16,7 +16,7 @@ rm(list = ls())
 |--------|---------|------|----------|
 | CRAN | 2.4.5 | 2026-05-30 | Default release |
 | GitHub (`master`) | 2.4.5 | 2026-05-30 | Same as CRAN |
-| GitHub (`dev`) | 2.4.5 | 2026-05-30 | Same as CRAN |
+| GitHub (`dev`) | 2.4.6 | in development | Adds `dloo` placebos, the LOO equivalence-test window fix, and a message when `method = "ife"` runs with zero factors |
 
 To install **fect** from CRAN:
 
