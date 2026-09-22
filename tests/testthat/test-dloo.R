@@ -176,10 +176,13 @@ test_that("dloo fills the loo-compatible pre.* slots and inference", {
                  sort(fit$time[fit$time <= 0]))
 })
 
-test_that("dloo results plot through the loo view without error", {
+test_that("dloo results plot through the loo view, with the by-design notice", {
     dat <- make_panel()
     fit <- fit_dloo(dat)
-    expect_error(plot(fit, loo = TRUE), NA)
+    ## a dloo fit has no plain-LOO results: plot(loo = TRUE) draws the double-LOO
+    ## values and warns so the user knows. Assert the warning rather than let it
+    ## leak into the suite; expect_warning also fails on an error.
+    expect_warning(plot(fit, loo = TRUE), "Double-leave-one-out")
 })
 
 test_that("dloo inference is the overlay applied inside fect's own bootstrap", {
@@ -267,8 +270,8 @@ test_that("group leaves the pooled dloo unchanged and partitions it exactly", {
 test_that("dloo group slots plot through the loo view per subgroup", {
     dat <- make_panel_grp()
     fit <- fit_dloo(dat, group = "grp")
-    expect_error(plot(fit, loo = TRUE, show.group = "A"), NA)
-    expect_error(plot(fit, loo = TRUE, show.group = "B"), NA)
+    expect_warning(plot(fit, loo = TRUE, show.group = "A"), "Double-leave-one-out")
+    expect_warning(plot(fit, loo = TRUE, show.group = "B"), "Double-leave-one-out")
 })
 
 test_that("dloo requires staggered adoption (no reversal)", {
