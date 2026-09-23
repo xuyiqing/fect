@@ -10,7 +10,7 @@ assumptions.}
             na.rm = FALSE,
             index, force = "two-way",
             time.component.from = "notyettreated", em = TRUE,
-            r = 0, lambda = NULL, nlambda = 10,
+            r = NULL, lambda = NULL, nlambda = 10,
             CV = NULL, k = 20, cv.prop = 0.1, cv.method = "rolling",
             cv.nobs = 3, cv.donut = 1, cv.buffer = 1, criterion = "mspe",
             binary = FALSE, QR = FALSE,
@@ -33,7 +33,8 @@ assumptions.}
             balance.period = NULL, fill.missing = FALSE,
             placeboTest = FALSE, placebo.period = NULL,
             carryoverTest = FALSE, carryover.period = NULL, carryover.rm = NULL,
-            loo = FALSE, permute = FALSE, m = 2,
+            loo = FALSE, dloo = FALSE, dloo.adjust = FALSE,
+            permute = FALSE, m = 2,
             normalize = FALSE, keep.sims = FALSE,
             cm = FALSE,
             loading.bound = "none", gamma.loading = NULL,
@@ -61,10 +62,10 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
 \item{force}{a string indicating whether unit or time or both fixed effects will be imposed. Must be one of the following, "none", "unit", "time", or "two-way". The default is "two-way".}
 \item{time.component.from}{Controls which units provide the time-varying model components (time fixed effects, factor structure, temporal dynamics). Options are \code{"notyettreated"} (default) --- all units contribute during their pre-treatment periods, or \code{"nevertreated"} --- only never-treated units estimate the time components, which are then projected onto treated units.}
 \item{em}{a logical flag indicating whether to use the EM algorithm for missing data in the estimation sample. Default is \code{TRUE}. Setting \code{em = FALSE} requires a complete estimation sample and is only compatible with \code{time.component.from = "nevertreated"}.}
-\item{r}{an integer specifying the number of factors. If \code{CV = TRUE}, the cross validation procedure will select the optimal number of factors from \code{r} to 5.}
+\item{r}{an integer specifying the number of factors, or a range such as \code{c(0, 5)}. Default \code{NULL}: for \code{method = "ife"} or \code{"gsynth"} the number of factors is then selected by cross-validation over 0 to 5, as \code{method = "mc"} does for \code{lambda}; for \code{method = "fe"} or \code{"cfe"} it means no factors. With \code{CV = FALSE} and no \code{r}, the fit falls back to \code{r = 0} (the FEct model) with a message. A single number with \code{CV = FALSE} (the default when \code{r} is a single number) fixes the number of factors; \code{r = 0} then estimates no factors. If \code{CV = TRUE}, the cross validation procedure will select the optimal number of factors from \code{r} to 5.}
 \item{lambda}{a single or sequence of positive numbers specifying the hyper-parameter sequence for matrix completion method. If \code{lambda} is a sequence and \code{CV = 1}, cross-validation will be performed.}
 \item{nlambda}{an integer specifying the length of hyper-parameter sequence for matrix completion method. Default is \code{nlambda = 10}.}
-\item{CV}{a logical flag indicating whether cross-validation will be performed to select the optimal number of factors or hyper-parameter in matrix completion algorithm. If \code{r} is not specified, the procedure will search through \code{r = 0} to \code{5}.}
+\item{CV}{a logical flag indicating whether cross-validation will be performed to select the optimal number of factors or hyper-parameter in matrix completion algorithm. If \code{r} is not specified, the procedure searches through \code{r = 0} to \code{5}; for \code{method = "ife"} and \code{"gsynth"} this is the default behaviour.}
 \item{k}{an integer specifying number of cross-validation rounds. Default is \code{k = 20}.}
 \item{cv.prop}{a numerical value specifying the proportion of testing set compared to sample size during the cross-validation procedure.}
 \item{cv.method}{a string specifying the cross-validation masking strategy. One of \code{"rolling"} (default; standard time-series rolling-window CV), \code{"block"} (random scattered anchors with contiguous-block masking), or \code{"loo"} (leave-one-out, available for \code{fect_nevertreated}). The legacy aliases \code{"all_units"} (= \code{"block"}) and \code{"treated_units"} (block masking restricted to treated pre-treatment cells) are still accepted but emit a deprecation message; both will be replaced by the unified \code{(cv.method, cv.units)} API in v2.4.0.}
@@ -205,6 +206,14 @@ bootstrap always resamples units regardless of \code{cl}), and
 \item{carryover.period}{an integer or 2-element numeric vector specifying pseudo-carryover periods.}
 \item{carryover.rm}{an integer specifying the range of post-treatment periods to treat as carryover.}
 \item{loo}{a logical flag for leave-one-period-out goodness-of-fit tests.}
+\item{dloo}{a logical flag for the double (cohort-wise) leave-one-out pre-trend
+placebos. When \code{TRUE}, \code{fect} estimates these directly from the in-sample fit -- without re-fitting
+the imputation model.}
+\item{dloo.adjust}{a logical flag, used only with \code{dloo = TRUE}. When
+\code{TRUE}, the pre-trend estimates use the pre-treatment-average baseline of
+Liu (2025) instead of the leave-one-out baseline -- equivalently, the
+double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
+\eqn{g}.}
 \item{permute}{a logical flag indicating whether to run a permutation test.}
 \item{m}{an integer specifying the block length for permutation tests. Default \code{2}.}
 \item{normalize}{a logical flag indicating whether to scale outcome and covariates.}
@@ -319,6 +328,11 @@ Ignored when \code{CV = FALSE}.}
   \item{beta.boot}{bootstrap draws for \code{beta}.}
   \item{test.out}{F-test and equivalence test results for pre-treatment fit.}
   \item{loo.test.out}{leave-one-period-out test results.}
+  \item{dloo.test.out}{double leave-one-out (\code{dloo}) pre-trend test results.}
+  \item{pre.est.att}{when \code{loo} or \code{dloo} is \code{TRUE}, the
+  pre-treatment placebo estimates (ATT, S.E., CI, p-value, count) by event
+  time; for \code{dloo} these are the double-LOO (or, with
+  \code{dloo.adjust}, pre-treatment-average) estimates.}
   \item{permute}{permutation test results.}
 }
 \author{

@@ -144,7 +144,7 @@ test_that("hasRevs+parametric gate fires in fect()", {
 
   expect_error(
     fect(Y ~ D, data = df, index = c("id", "time"),
-         method = "ife", vartype = "parametric", se = TRUE, nboots = 5),
+         method = "ife", r = 0, vartype = "parametric", se = TRUE, nboots = 5),
     regexp = "parametric.*reversal|reversal.*parametric",
     ignore.case = TRUE
   )

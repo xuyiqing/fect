@@ -16,6 +16,16 @@ att.cumu(x, period = NULL, weighted = TRUE, alpha = 0.05, type = "on", plot = FA
   \item{type}{A string that specifies the type of effect to calculate. Must be one of the following: \code{"on"} (switch-on treatment effect) or \code{"off"} (switch-off treatment effect). Default is \code{"on"}.}
   \item{plot}{A logical flag indicating whether to plot cumulative effects. Default is \code{FALSE}.}
 }
+\value{
+  A numeric matrix with one row per accumulation window, from \code{period[1]}
+  to each subsequent period up to \code{period[2]}, with columns \code{start},
+  \code{end}, and \code{catt} (the cumulative average treatment effect on the
+  treated over that window). When the \code{fect} object carries uncertainty
+  estimates, four further columns give the bootstrap standard error
+  (\code{S.E.}), the confidence interval at level \code{alpha}
+  (\code{CI.lower}, \code{CI.upper}), and the \code{p.value}. With
+  \code{plot = TRUE} the cumulative effects are also plotted.
+}
 \author{
   Licheng Liu, Ye Wang, and Yiqing Xu
 }

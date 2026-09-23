@@ -114,13 +114,21 @@ diagtest <- function(
             }
         }
 
-        # TOST
-        est.att <- x$pre.est.att[, c(1:2)]
-        tost.equiv.p <- sapply(1:nrow(est.att), function(i) {
-            return(tost(est.att[i, 1], est.att[i, 2], c(-tost.threshold, tost.threshold)))
-        }) # keep the maximum p value
-
-        tost.equiv.p <- max(tost.equiv.p)
+        # TOST --- restricted to the same pre-treatment window as the F test
+        # (`pre.pos`: periods that pass the `proportion` cutoff), matching the
+        # in-sample branch below. Previously every row of pre.est.att entered,
+        # so a sparse early period (a handful of treated units, wide S.E.)
+        # could set the reported maximum even though it is neither plotted
+        # nor part of the F test.
+        est.att <- x$pre.est.att[pre.pos, c(1:2), drop = FALSE]
+        if (nrow(est.att) > 0) {
+            tost.equiv.p <- sapply(1:nrow(est.att), function(i) {
+                return(tost(est.att[i, 1], est.att[i, 2], c(-tost.threshold, tost.threshold)))
+            }) # keep the maximum p value
+            tost.equiv.p <- max(tost.equiv.p)
+        } else {
+            tost.equiv.p <- NA
+        }
         out <- list(
             f.stat = f.stat,
             f.p = f.p,

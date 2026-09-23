@@ -60,15 +60,14 @@ A list of class \code{"did_wrapper"}:
 Rivka Lipkovitz
 }
 \examples{
-\dontrun{
-result_twfe <- did_wrapper(
-  data   = df,
-  Y      = "outcome",
-  D      = "treat",
-  index  = c("id", "time"),
-  method = "twfe"
-)
-result_twfe$est.avg
-result_twfe$est.att
+\donttest{
+if (requireNamespace("fixest", quietly = TRUE)) {
+  library(fect)
+  data(simdata)
+  result_twfe <- did_wrapper(data = simdata, Y = "Y", D = "D",
+                             index = c("id", "time"), method = "twfe")
+  result_twfe$est.avg
+  head(result_twfe$est.att)
+}
 }
 }

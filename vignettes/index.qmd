@@ -139,8 +139,9 @@ The following individuals (and AI) have contributed to **gsynth** and **fect**, 
 -   Ziyi Liu (PhD Student at Berkeley Haas)
 -   Shijian Liu (PhD Student at NYU Stern)
 -   [Tianzhu Qin](https://tianzhuqin.github.io/) (PhD Student at Cambridge University)
--   Jinwen Wu (Predoc at Stanford PoliSci)
+-   Jinwen Wu (PhD Student at Yale University)
 -   [Rivka Lipkovitz](https://rivka.me/) (Undergraduate at MIT)
+-   [Anton Strezhnev](https://www.antonstrezhnev.com/) (Assistant Professor at the University of Wisconsin--Madison; contributed the double leave-one-out pre-trend placebos, `dloo`)
 -   [StatsClaw](https://statsclaw.ai/) (Agentic System for Statistical Software Development)
 
 ## How to Cite

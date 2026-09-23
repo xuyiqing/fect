@@ -47,17 +47,29 @@ An updated \code{fect} object including:
 Rivka Lipkovitz
 }
 \examples{
-\dontrun{
-out <- fect(Y ~ D, data = df, index = c("unit", "time"), method = "fe", se = TRUE)
-out_sens <- fect_sens(
-  fect.out = out,
-  post.periods = c(1, 2, 3, 4),
-  Mbarvec = seq(0, 1, by = 0.2),
-  Mvec = c(0, 0.05, 0.1),
-  periodMbarvec = c(0, 0.5),
-  periodMvec = c(0, 0.1)
-)
-names(out_sens$sensitivity.rm)
-names(out_sens$sensitivity.smooth)
+\donttest{
+## HonestDiDFEct is not on CRAN: remotes::install_github("lzy318/HonestDiDFEct")
+if (requireNamespace("HonestDiDFEct", quietly = TRUE)) {
+  library(fect)
+  data(simdata)
+  ## The sensitivity analysis uses pre-treatment placebo estimates, so fit
+  ## with placeboTest = TRUE (three placebo periods here).
+  out <- fect(Y ~ D, data = simdata, index = c("id", "time"), method = "fe",
+              se = TRUE, nboots = 50, parallel = FALSE,
+              placeboTest = TRUE, placebo.period = c(-2, 0))
+  if (!is.matrix(out$att.vcov) && is.matrix(out$att.boot)) {
+    out$att.vcov <- cov(t(out$att.boot), use = "pairwise.complete.obs")
+  }
+  out_sens <- fect_sens(
+    fect.out = out,
+    post.periods = 1:4,
+    Mbarvec = seq(0, 1, by = 0.2),
+    Mvec = c(0, 0.05, 0.1),
+    periodMbarvec = c(0, 0.5),
+    periodMvec = c(0, 0.1)
+  )
+  names(out_sens$sensitivity.rm)
+  names(out_sens$sensitivity.smooth)
+}
 }
 }

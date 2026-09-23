@@ -292,10 +292,14 @@ Instead of using estimated ATTs for periods prior to the treatment to test for p
 
 ```{r simdata_ife_loo, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.ife.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "ife", force = "two-way", se = TRUE, parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
+  method = "ife", r = 2, CV = 0, force = "two-way", se = TRUE, parallel = TRUE,
+  cores = 16, nboots = 200, loo = TRUE, max.iteration = 20000)
 out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
-  method = "mc", force = "two-way", se = TRUE, parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
+  method = "mc", lambda = out.mc$lambda.cv, CV = 0, force = "two-way", se = TRUE,
+  parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
 ```
+
+As with the placebo test, the LOO test is run on a settled model, so we fix the tuning parameters at the values selected earlier (`r` set to 2 for IFEct, `lambda` set to `out.mc$lambda.cv` for MC) and turn cross-validation off. Since v2.4.6, `method = "ife"` without `r` selects the number of factors by cross-validation (0 to 5); with `CV = FALSE` and no `r`, it falls back to zero factors, the FEct model, with a message.
 
 After the LOO estimation, one can plot these LOO pre-trends in the gap plot or the equivalence plot by setting `loo = TRUE` in the `plot` function. Since all pre-treatment estimates are now out-of-sample, the plot uses a uniform black color for all points (no gray/black distinction). The equivalence plots below use the LOO estimates directly.
 
@@ -327,7 +331,7 @@ plot(out.mc.loo, type = "equiv", ylim = c(-4,4), loo = TRUE,
      main = "Testing Pre-Trend (MC)")
 ```
 
-From the above plots, we see that IFEct passes both tests using a conventional test size (5%); and MC fails the F tests, but passes the TOST (equivalence) test. Hence, we may conclude that IFEct is a more suitable model.
+In the IFEct panel, the $F$ test does not reject the null of no pre-trend (p = 0.82), and the TOST rejects the null that some pre-treatment average lies outside the equivalence range (p < 0.001). In the MC panel, the $F$ test rejects (p < 0.001): the LOO estimates are small but drift upward in the last few periods before the treatment starts. The TOST also rejects non-equivalence (p < 0.001), so all of the MC pre-treatment averages stay inside the equivalence range. IFEct is the more suitable model for these data.
 
 ### Carryover effects
 
@@ -411,6 +415,7 @@ See [Chapter @sec-plots] for the full table of `highlight` / `highlight.fill` pa
 | :--- | :--- | :--- | :--- | :--- |
 | Placebo test | Tests whether the model produces zero ATT in withheld pre-treatment periods | `placeboTest = TRUE`, `placebo.period = c(a, b)` | `"gap"` (default) | `placebo.p`, `equiv.p` |
 | LOO pre-trend test | Out-of-sample check for pre-trends by leaving out one pre-treatment period at a time | `loo = TRUE` (in `fect()`), `loo = TRUE` (in `plot()`) | `"gap"` or `"equiv"` | `F.p`, `equiv.p` |
+| Double LOO pre-trend test | Cohort-wise leave-one-out placebos from the in-sample fit, no re-fitting; `method = "fe"` with staggered adoption only (see [Chapter @sec-fect]) | `dloo = TRUE` (in `fect()`), `dloo = TRUE` (in `plot()`) | `"gap"` or `"equiv"` | `F.p`, `equiv.p` |
 | Joint pre-trend test (F + TOST) | Joint assessment: F test for zero residual averages; TOST for equivalence within a threshold | `type = "equiv"` in `plot()`, `tost.threshold` | `"equiv"` | `F.p`, `F.equiv.p`, `equiv.p` |
 | Carryover test | Tests whether treatment effects persist after treatment ends | `carryoverTest = TRUE`, `carryover.period = c(a, b)` | `"exit"` | `carryover.p`, `equiv.p` |
 
@@ -419,6 +424,7 @@ See [Chapter @sec-plots] for the full table of `highlight` / `highlight.fill` pa
 - A **larger** F-test / placebo / carryover p-value suggests the model passes the test.
 - A **smaller** TOST / equivalence p-value suggests the pre-trends or carryover effects are within an acceptable range.
 - We recommend using `loo = TRUE` for pre-trend tests to avoid the false reassurance of in-sample fit.
+- Under staggered adoption with `method = "fe"`, `dloo = TRUE` gives the corrected placebos at no re-fitting cost; see [Chapter @sec-fect].
 - The `proportion` option controls which pre-treatment periods are included in the tests (default: periods where the number of treated units exceeds `proportion` $\times$ total treated units).
 - The `tost.threshold` option sets the equivalence range for the TOST test (default: $0.36\hat{\sigma}_\epsilon$). Finding the "right" threshold is often a challenge in empirical research.
 

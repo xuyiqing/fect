@@ -45,9 +45,12 @@ A list containing:
 \item{scores}{The scores from the last replication.}
 }
 \examples{
-\dontrun{
-out <- fect(Y ~ D, data = df, index = c("unit", "time"), method = "ife", r = 2)
-mspe <- fect_mspe(out.fect = out, hide_n = 10, seed = 42, n_rep = 5)
+\donttest{
+library(fect)
+data(simdata)
+out <- fect(Y ~ D, data = simdata, index = c("id", "time"), method = "ife",
+            r = 2, CV = FALSE, se = FALSE, parallel = FALSE)
+mspe <- fect_mspe(out.fect = out, seed = 42, k = 5)
 mspe$summary
 }
 }
