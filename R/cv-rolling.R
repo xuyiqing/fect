@@ -111,7 +111,7 @@
 #'   ambient RNG).
 #' @param verbose If TRUE (default), print per-fold per-r MSPE.
 #' @param binary Fit a Probit IFE model and score probability MSPE. Requires
-#'   `method = "ife"` and staggered adoption. Default FALSE.
+#'   `method = "ife"`; treatment reversals are allowed. Default FALSE.
 #' @param ... Additional arguments forwarded to `fect()`. For
 #'   `method = "cfe"`, the user holds CFE structural arguments (`Z`,
 #'   `gamma`, `Q`, `Q.type`, `Q.bspline.degree`, `kappa`, etc.) fixed
@@ -173,7 +173,8 @@ r.cv.rolling <- function(formula,
         losses <- fit$cv.loss.per.fold
         return(list(r.cv=fit$r.cv, cv.rule=fit$cv.rule,
             mspe=data.frame(r=fit$CV.out[,"r"], mspe=fit$CV.out[,"MSPE"],
-                se=fit$CV.out[,"MSPE.SE"], n_holdout=sum(fit$cv.counts),
+                se=fit$CV.out[,"MSPE.SE"], pc=fit$CV.out[,"PC"],
+                loglik=fit$CV.out[,"Log-likelihood"], n_holdout=sum(fit$cv.counts),
                 n_folds_used=rowSums(is.finite(losses))),
             mspe.per.fold=losses, pooled.mspe=fit$cv.pooled.mspe,
             classification.per.fold=fit$cv.classification.per.fold,

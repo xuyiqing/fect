@@ -77,8 +77,11 @@ test_that("binary inference restrictions are enforced", {
     d<-make_binary_panel()
     expect_error(binary_test_fit(d,CV=FALSE,r=0,se=TRUE,vartype="parametric"),
                  "only nonparametric bootstrap or jackknife")
+    ## treatment reversals are supported (fect 1.1.x behaviour)
     d$D[d$id==20 & d$time==22]<-0
-    expect_error(binary_test_fit(d,CV=FALSE,r=0,se=FALSE),"staggered adoption only")
+    fit <- binary_test_fit(d,CV=FALSE,r=0,se=FALSE)
+    expect_true(is.numeric(fit$att.avg))
+    expect_true(length(fit$att.off) >= 1)
 })
 
 test_that("binary CV settings survive jackknife and standalone dispatch", {

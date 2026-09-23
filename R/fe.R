@@ -204,6 +204,8 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         PC <- est.best$PC
     } else {
         loglikelihood <- est.best$loglikelihood
+        ## Bai-Ng style criterion (fect 1.1.x "IC"); see .fect_binary_pc()
+        PC <- .fect_binary_pc(loglikelihood, r.cv, ncol(Y), nrow(Y))
     }
 
     if (p > 0) {
@@ -849,7 +851,7 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         #    out <- c(out, list(equiv.att.avg = equiv.att.avg))
         # }
     } else {
-        out <- c(out, list(loglikelihood = loglikelihood, marginal = marginal))
+        out <- c(out, list(loglikelihood = loglikelihood, PC = PC, marginal = marginal))
     }
 
     if (!is.null(T.on.carry)) {

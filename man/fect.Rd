@@ -55,7 +55,7 @@ A clean in-package solution for inverse-probability weights for confounding adju
 
 In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the same column; truly distinct columns for fit vs. aggregation (e.g. combined survey x IPW designs) are scheduled for v2.4.0.}
 
-\item{group}{the group indicator. If specified, the group-wise ATT will be estimated.}
+\item{group}{the group (cohort) indicator. If specified, the group-wise ATT will be estimated. The indicator may be constant within units (e.g., adoption cohort), in which case cohort-specific dynamic effects are also reported and can be plotted with \code{show.group}; or it may vary over time within units (e.g., regime type by year), in which case only the cohort ATT, i.e. the average effect over treated observations whose group index equals each level, is reported.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
 \item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Every observation should be uniquely defined by the pair of the unit and time indicator.}
 \item{force}{a string indicating whether unit or time or both fixed effects will be imposed. Must be one of the following, "none", "unit", "time", or "two-way". The default is "two-way".}
@@ -76,7 +76,7 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
   \code{"gmspe"} for the geometric-mean squared prediction errors,
   \code{"moment"} for period-weighted residuals in test sets,
   \code{"pc"} for an information criterion method.}
-\item{binary}{Logical; fit a Probit interactive fixed-effects model for a 0/1 outcome. Supports staggered adoption (including common adoption), unweighted fitting, and \code{time.component.from = "notyettreated"}. Treatment reversals and \code{cm = TRUE} are not supported. Inference is limited to nonparametric \code{bootstrap} and \code{jackknife}; the selected rank is held fixed in resamples. Binary CV uses probability MSPE (Brier score); classification error is returned as a separate diagnostic.}
+\item{binary}{Logical; fit a Probit interactive fixed-effects model for a 0/1 outcome. Supports staggered adoption (including common adoption) as well as treatment reversals (switch-on and switch-off effects are reported as in the linear case), unweighted fitting, and \code{time.component.from = "notyettreated"}. \code{cm = TRUE} is not supported. Inference is limited to nonparametric \code{bootstrap} and \code{jackknife}; the selected rank is held fixed in resamples. Binary CV uses probability MSPE (Brier score); classification error is returned as a separate diagnostic.}
 \item{QR}{Logical; use alternating QR updates for binary Probit estimation when TRUE, or the SVD-based update when FALSE. Ignored for continuous outcomes.}
 \item{method}{a string specifying which imputation algorithm will be used.
   \code{"fe"}, \code{"ife"}, \code{"mc"},
@@ -244,7 +244,7 @@ Ignored when \code{CV = FALSE}.}
   \item{IC}{information criterion.}
   \item{est}{results of the fitted model.}
   \item{MSPE}{mean squared prediction error from cross-validation.}
-  \item{CV.out}{results of the cross-validation procedure.}
+  \item{CV.out}{results of the cross-validation procedure. For \code{binary = TRUE} the table has one row per candidate rank with the BIC-type \code{IC}, the Bai-Ng style criterion \code{PC} (the "IC" of fect 1.1.x, computed from the full-sample fit and hence independent of the CV split), the mean log-likelihood, the probability MSPE and its standard error across folds, and the classification error.}
   \item{niter}{number of iterations.}
   \item{factor}{estimated time-varying factors.}
   \item{lambda}{estimated loadings.}

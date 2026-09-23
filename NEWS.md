@@ -1,10 +1,14 @@
 <!-- markdownlint-disable MD025 -->
 # fect development — binary IFE
 
+* Binary Probit IFE reports the Bai-Ng style information criterion of fect 1.1.x as `PC` (`r (N+T)/(NT) log(NT/(N+T)) - 2 * mean log-likelihood`), both on the fixed-rank fit (`$PC`) and as a `PC` column in `CV.out` next to the BIC-type `IC`. `PC` is computed from the full-sample fit at each rank, so it does not depend on the CV split. Binary CV now prints one line per rank with PC, log-likelihood and MSPE. `r.cv.rolling(binary = TRUE)` returns `pc` and `loglik` columns in `$mspe`.
+* Binary Probit IFE (`binary = TRUE`) now supports treatment reversals, as in fect 1.1.x: the Probit model is fitted on all untreated cells (the same mask as the linear estimators), switch-off effects (`att.off`, `est.att.off`) are reported, and jackknife / nonparametric bootstrap inference works. Rolling CV drops every later observed cell of a held-out unit (including untreated cells after a reversal) from the training window.
+* `group` may now vary over time within units (e.g., regime type by country-year), as in fect 1.1.x. In that case the cohort (group) ATT is the average effect over treated observations whose group index equals each level (`group.att` / `est.group.att`), cohort-specific dynamic effects are not reported (`group.output` is `NULL`, `plot(show.group = )` errors), and `print()` displays the cohort ATT table. Time-invariant `group` behaves as before.
+
 * Restore binary Probit IFE fitting using the fixest initializer from Licheng Liu's supplied fect 1.1.10 revision; fix time-only initialization and route fixed-rank/CV fits through a common result builder.
 * Add binary probability scoring to rolling CV and `r.cv.rolling(binary = TRUE, method = "ife")`. Score only the validation block, excluding its past buffer and future tail. Preserve masks, per-fold probability/classification losses, scoring counts, failed fits, and selection settings in the output.
 * Use probability MSPE (Brier score) for binary rank selection. Legacy internal binary CV scored thresholded classifications; ranks can therefore change. Support `cv.rule` and reproducible seeds consistently with and without inference. Candidates must succeed on all common folds.
-* Enforce `min.T0` after buffer removal for shared and standalone rolling masks. Binary inference supports nonparametric bootstrap and jackknife with fixed selected rank. Binary fitting requires staggered adoption, unweighted observations, and the not-yet-treated factor path; unsupported requests error explicitly.
+* Enforce `min.T0` after buffer removal for shared and standalone rolling masks. Binary inference supports nonparametric bootstrap and jackknife with fixed selected rank. Binary fitting requires unweighted observations and the not-yet-treated factor path; unsupported requests error explicitly.
 
 # fect 2.4.5
 

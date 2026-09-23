@@ -1,4 +1,15 @@
 ## Binary IFE: explicit training masks and probability scoring.
+
+## Bai-Ng style information criterion for the Probit IFE model, as reported
+## by fect 1.1.x ("IC" in its binary CV table):
+##   PC(r) = r * (N + T) / (N T) * log(N T / (N + T)) - 2 * mean log-likelihood,
+## where the mean log-likelihood is averaged over the cells used in the fit.
+## It is a function of the full-sample fit only, so it does not depend on
+## how the data are split for cross-validation. The C++ `IC` slot is the
+## BIC-type penalty and is kept separately.
+.fect_binary_pc <- function(loglikelihood, r, N, TT) {
+    r * (N + TT) / (N * TT) * log(N * TT / (N + TT)) - 2 * loglikelihood
+}
 .fect_binary_estimate <- function(Y, X, II, r, force, QR, tol,
                                   max.iteration = 1000) {
     TT <- nrow(Y); N <- ncol(Y)
@@ -50,7 +61,6 @@ fect_binary_cv <- function(Y, X, D, I, II, T.on, T.off=NULL,
     k=20, cv.prop=0.1, cv.method="rolling", cv.nobs=3, cv.buffer=1,
     min.T0=5, r=0, r.end, QR=FALSE, force, hasRevs=0, tol,
     group.level=NULL, group=NULL, cv.donut=1, cv.rule="1se", max.iteration=1000, seed=NULL) {
-    if (hasRevs) stop("Binary IFE supports staggered adoption only; treatment reversals are not supported.")
     cv.method <- .fect_normalize_cv_method(cv.method,
         allowed=c("rolling","block","all_units","treated_units"))
     cv.rule <- .fect_validate_cv_rule(cv.rule)
@@ -115,9 +125,16 @@ fect_binary_cv <- function(Y, X, D, I, II, T.on, T.off=NULL,
     get_full <- function(name) vapply(full,function(z) {
         if (inherits(z,"error")) NA_real_ else as.numeric(z[[name]])
     },numeric(1))
-    out$CV.out <- cbind(r=ranks,IC=get_full("IC"),
-        `Log-likelihood`=get_full("loglikelihood"),MSPE=means,
+    loglik.full <- get_full("loglikelihood")
+    PC <- .fect_binary_pc(loglik.full, ranks, ncol(Y), nrow(Y))
+    out$CV.out <- cbind(r=ranks,IC=get_full("IC"),PC=PC,
+        `Log-likelihood`=loglik.full,MSPE=means,
         MSPE.SE=ses,Classification.error=rowMeans(classification))
+    for (a in seq_along(ranks)) {
+        message(sprintf(" r = %d; PC = %.5f; Log-likelihood = %.5f; MSPE = %.5f%s",
+            ranks[a], PC[a], loglik.full[a], means[a],
+            if (a == chosen) " *" else ""))
+    }
     out$cv.rule <- cv.rule
     out$cv.method <- if (cv.method == "all_units") "block" else cv.method
     out$cv.loss <- "probability_mspe"

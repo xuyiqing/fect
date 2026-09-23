@@ -505,9 +505,14 @@
                 bs <- max(1L, a_idx - cv.buffer)
                 obs_t[bs:(a_idx - 1L)]
             } else integer(0)
-            drop_t <- if ((a_idx + cv.nobs) <= n_obs) {
-                obs_t[(a_idx + cv.nobs):n_obs]
-            } else integer(0)
+            ## Future tail: every observed (II == 1) cell of this unit after
+            ## the hold-out block. Under staggered adoption this equals the
+            ## remaining pre-onset cells; with treatment reversals it also
+            ## removes untreated cells observed after the unit switched
+            ## treatment off, so the training window never sees the future.
+            last_hold <- holdout_t[length(holdout_t)]
+            all_obs_t <- which(II[, j] == 1L)
+            drop_t <- all_obs_t[all_obs_t > last_hold]
 
             base <- (j - 1L) * TT
             holdout_idx <- base + as.integer(holdout_t)

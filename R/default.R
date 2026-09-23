@@ -1682,30 +1682,38 @@ fect.default <- function(
     }
 
     ## group indicator
+    ## G is a TT x N matrix of (recoded, 1..K) group indices. A 0 marks a
+    ## cell that is missing in the (unbalanced) panel. Two regimes:
+    ##   * time-invariant: every unit carries a single group index. Missing
+    ##     cells are filled with that index, and both the cohort ATT and the
+    ##     cohort-specific dynamic effects (group.output) are reported.
+    ##   * time-varying: at least one unit switches group over time (e.g.
+    ##     regime type of a country by year). Following fect 1.1.x, the
+    ##     cohort ATT is then the average of the treated-cell effects whose
+    ##     group index equals g (cell-level definition). Cohort-specific
+    ##     dynamic effects are not defined in that regime and are dropped.
     G.old <- G <- NULL
+    group.time.varying <- FALSE
     if (!is.null(group)) {
         G <- matrix(data[, group], TT, N)
-        ## replace group index 0(missing) for each unit
-        if (!0 %in% G) {
-            if (sum(apply(G, 2, var)) > 0) {
-                stop(
-                    "A unit in different periods should have the same group index.\n"
-                )
+        n.group.per.unit <- apply(G, 2, function(vec) {
+            length(unique(vec[vec != 0]))
+        })
+        group.time.varying <- any(n.group.per.unit > 1)
+        if (!group.time.varying) {
+            ## replace group index 0 (missing cell) with the unit's group index
+            if (0 %in% G) {
+                G <- apply(G, 2, function(vec) {
+                    return(rep(max(vec), length(vec)))
+                })
             }
         } else {
-            if (
-                max(apply(G, 2, function(vec) {
-                    return(length(table(vec)))
-                })) >
-                    2
-            ) {
-                stop(
-                    "A unit in different periods should have the same group index.\n"
-                )
-            }
-            G <- apply(G, 2, function(vec) {
-                return(rep(max(vec), length(vec)))
-            })
+            message(
+                "The \"group\" indicator varies over time within units. ",
+                "Cohort (group) ATTs are computed as averages over treated ",
+                "observations by group; cohort-specific dynamic effects are ",
+                "not reported.\n"
+            )
         }
         G.old <- G
     }
@@ -2109,9 +2117,6 @@ fect.default <- function(
             "Treatment status have no reversals. Cannot perform \"carryoverTest\" in this case."
         )
     }
-    if (hasRevs == TRUE && binary) {
-        stop("Binary IFE supports staggered adoption only; treatment reversals are not supported.")
-    }
     if (hasRevs == TRUE & method == "gsynth") {
         stop("Gsynth can't be used when treatments have reversals.")
     }
@@ -2356,7 +2361,8 @@ fect.default <- function(
     g.level <- NULL
     if (!is.null(group)) {
         g.level <- unique(c(G))
-        g.level <- g.level[!is.na(g.level)]
+        ## 0 marks a missing cell (only present when group is time-varying)
+        g.level <- g.level[!is.na(g.level) & g.level != 0]
         rownames(rawgroup) <- rawgroup[, "newgroup"]
         names(g.level) <- rawgroup[as.character(g.level), "rawgroup"]
         g.level <- sort(g.level)
@@ -3264,10 +3270,21 @@ fect.default <- function(
         out$group <- rawgroup
         # out$G <- group
         # out$group2 <- rawgroup2
+        if (!is.null(out$group.att)) {
+            names(out$group.att) <- names(g.level)
+        }
         if (se == 1) {
             rownames(out$est.group.att) <- names(g.level)
         }
         out$g.level <- g.level
+        out$group.time.varying <- group.time.varying
+        if (group.time.varying) {
+            ## cohort-specific dynamic effects are only defined for a
+            ## time-invariant group indicator; keep the cohort ATT only.
+            out$group.output <- NULL
+            out$est.group.output <- NULL
+            pre.est.group.output <- NULL
+        }
     }
 
     if (is.null(tost.threshold) && !binary) {

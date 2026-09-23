@@ -434,6 +434,13 @@ plot.fect <- function(
     if (length(show.group) > 1) {
       stop("\"show.group\" should contain only one group.\n")
     }
+    if (isTRUE(x$group.time.varying)) {
+      stop(
+        "\"show.group\" is not available: the \"group\" indicator varies over ",
+        "time within units, so cohort-specific dynamic effects are not ",
+        "defined. Use the cohort ATTs in \"group.att\" / \"est.group.att\" instead.\n"
+      )
+    }
     all.group.name <- names(x$g.level)
     if (!show.group %in% all.group.name) {
       message("The specified group does not exist or its treatment effects cannot be estimated.\n")

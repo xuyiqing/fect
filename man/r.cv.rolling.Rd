@@ -88,7 +88,7 @@ ambient RNG).}
 
 \item{verbose}{If TRUE (default), print per-fold per-r MSPE.}
 
-\item{binary}{Fit a Probit IFE model and score probability MSPE. Requires \code{method = "ife"} and staggered adoption. Default FALSE.}
+\item{binary}{Fit a Probit IFE model and score probability MSPE. Requires \code{method = "ife"}; treatment reversals are allowed. Default FALSE.}
 
 \item{...}{Additional arguments forwarded to `fect()`. For
 `method = "cfe"`, the user holds CFE structural arguments (`Z`,

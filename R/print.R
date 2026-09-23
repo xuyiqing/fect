@@ -137,6 +137,24 @@ print.fect <- function(x,
         }
     }
 
+    ## cohort (group) ATT
+    if (!is.null(x$group.att)) {
+        if (isTRUE(x$group.time.varying)) {
+            cat("\nCohort (group) ATT (group indicator is time-varying; ",
+                "averaged over treated observations by group):\n", sep = "")
+        } else {
+            cat("\nCohort (group) ATT:\n")
+        }
+        if (!is.null(x$est.group.att)) {
+            print(x$est.group.att, digits = 4)
+        } else {
+            group.out <- as.matrix(x$group.att)
+            colnames(group.out) <- "ATT"
+            rownames(group.out) <- names(x$g.level)
+            print(group.out, digits = 4)
+        }
+    }
+
     if (!is.null(x$est.placebo)) {
         cat("\nPlacebo effect for pre-treatment periods:\n")
         print(x$est.placebo, digits = 4)
