@@ -15,11 +15,11 @@
 * Calls that name the variables as strings, such as
   `fect(Y = "y", D = "d", X = "x", data = df, index = c("id", "time"))`, now
   use the same defaults as formula calls such as `fect(y ~ d + x, ...)`. Two
-  defaults were different. First, `cv.method` was `"all_units"` (block
-  cross-validation) instead of `"rolling"`, the documented default since
-  v2.3.0, and these calls printed a deprecation note for `"all_units"`. They
-  now use rolling cross-validation, which can select a different number of
-  factors `r`, or a different `lambda` for `method = "mc"`, than before. Set
+  defaults were different. First, `cv.method` was `"all_units"` instead of
+  `"rolling"`, the documented default since v2.3.0. So when these calls
+  cross-validated, they used block cross-validation and printed a deprecation
+  note for `"all_units"`. They now use rolling cross-validation, which can
+  select a different number of factors `r` (or `lambda`) than before. Set
   `cv.method = "block"` to reproduce earlier results. Second, `nlambda` was 0
   instead of 10, so any of these calls that cross-validated `lambda`, such as
   `method = "mc"` with no `lambda` given, stopped with
