@@ -1637,12 +1637,17 @@ fect_boot <- function(
           ## retained panels): apply the same linear overlay fect_boot's caller
           ## uses for the point estimate. Keeps only the small pre-trend draw.
           if (dloo) {
+            ## with covariates the overlay re-estimates beta on this
+            ## replicate's pre-treatment pools, from its Y and X
             dd <- .dloo_boot_draw(
               eff = boot$eff, D = D.boot, I = I.boot,
               rawtime = dloo.rawtime.use, group.map = dloo.group.map,
               G = if (dloo.ng > 0) boot.group else NULL,
               controls = dloo.controls, correct = dloo.adjust,
-              pre.term = dloo.pre.term)
+              pre.term = dloo.pre.term,
+              Y = if (p > 0) Y.input[, boot.id, drop = FALSE] else NULL,
+              X = if (p > 0) X.boot else NULL,
+              scale = if (is.null(norm.para)) 1 else norm.para[1])
             boot$dloo.pre <- dd$att
             if (dloo.ng > 0) boot$dloo.pre.group <- dd$group_att
           }

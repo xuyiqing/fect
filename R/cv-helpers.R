@@ -85,6 +85,32 @@
 ##
 ## Returns the canonical (internal) cv.method string. `loo` and
 ## `rolling` pass through unchanged.
+
+## Check `cv.donut` against `cv.nobs` for block cross-validation. Block folds
+## (cv.sample() in R/support.R) hold out runs of cv.nobs consecutive periods
+## and, when cv.nobs >= 3, score only positions cv.donut .. cv.nobs -
+## cv.donut - 1 of each run. With 2 * cv.donut >= cv.nobs nothing is left to
+## score, and the CV used to stop with the internal "No residuals to score."
+## Rolling and loo folds do not use cv.donut. Takes the normalized cv.method
+## ("all_units" = block).
+.fect_check_cv_donut <- function(cv.donut, cv.nobs, cv.method) {
+    if (!is.numeric(cv.donut) || length(cv.donut) != 1 || is.na(cv.donut) ||
+        cv.donut < 0 || cv.donut != round(cv.donut)) {
+        stop("\"cv.donut\" must be a non-negative whole number.", call. = FALSE)
+    }
+    if (cv.method %in% c("all_units", "treated_units") &&
+        cv.nobs >= 3 && 2 * cv.donut >= cv.nobs) {
+        stop(sprintf(paste0(
+            "\"cv.donut\" = %d leaves no held-out period to score when ",
+            "\"cv.nobs\" = %d. Block cross-validation holds out cv.nobs ",
+            "consecutive periods and scores only the middle ",
+            "cv.nobs - 2 * cv.donut of them. Use cv.donut <= %d, or a larger ",
+            "cv.nobs."), as.integer(cv.donut), as.integer(cv.nobs),
+            as.integer((cv.nobs - 1) %/% 2)), call. = FALSE)
+    }
+    invisible(TRUE)
+}
+
 .fect_normalize_cv_method <- function(cv.method,
                                       allowed = c("rolling", "block",
                                                   "all_units",

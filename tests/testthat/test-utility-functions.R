@@ -240,3 +240,22 @@ test_that("att.cumu and effect produce valid cumulative ATT", {
     expect_true(!is.null(e3$effect.est.avg))
   }
 })
+
+test_that("effect(plot = TRUE) draws without warnings", {
+  ## ggplot2 3.4.0 deprecated `size` for lines; effect() used it for the
+  ## interval lines and the count bars' borders until 2.4.6 (seen as a
+  ## warning in gsynth's test suite).
+  ## (The deprecation reaches testthat as a warning but does not fail
+  ## expect_no_warning(), so warnings are collected by hand.)
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  w <- character()
+  withCallingHandlers(
+    suppressMessages(effect(out_norev, cumu = TRUE, period = c(1, 3), plot = TRUE)),
+    warning = function(cond) {
+      w <<- c(w, conditionMessage(cond))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_equal(w, character())
+})

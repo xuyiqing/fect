@@ -70,7 +70,7 @@ In v2.3.1, \code{W.est} and \code{W.agg} (when both supplied) must point to the 
 \item{cv.prop}{a numerical value specifying the proportion of testing set compared to sample size during the cross-validation procedure.}
 \item{cv.method}{a string specifying the cross-validation masking strategy. One of \code{"rolling"} (default; standard time-series rolling-window CV), \code{"block"} (random scattered anchors with contiguous-block masking), or \code{"loo"} (leave-one-out, available for \code{fect_nevertreated}). The legacy aliases \code{"all_units"} (= \code{"block"}) and \code{"treated_units"} (block masking restricted to treated pre-treatment cells) are still accepted but emit a deprecation message; both will be replaced by the unified \code{(cv.method, cv.units)} API in v2.4.0.}
 \item{cv.nobs}{an integer specifying the length of continuous observations within a unit in the testing set. Default is \code{cv.nobs = 3}.}
-\item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}. Used by block CV (\code{cv.method = "block"}, or the legacy aliases \code{"all_units"}/\code{"treated_units"}). Default is 1 (matches \code{cv.buffer} for rolling CV).}
+\item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}. Used by block CV (\code{cv.method = "block"}, or the legacy aliases \code{"all_units"}/\code{"treated_units"}). Default is 1 (matches \code{cv.buffer} for rolling CV). When \code{cv.nobs >= 3}, \code{2 * cv.donut} must be smaller than \code{cv.nobs}, so that each held-out run keeps at least one scored period.}
 \item{cv.buffer}{an integer specifying the length of past-side buffer cells masked from training (but not scored) immediately before each rolling-window holdout. Used only by \code{cv.method = "rolling"}; the future side is dropped from training by construction. Analogous to \code{cv.donut} for block CV but applied only on the past side. Default is 1.}
 \item{criterion}{criterion used for model selection. Default is "mspe".
   \code{"mspe"} for the mean squared prediction error,
@@ -208,7 +208,9 @@ bootstrap always resamples units regardless of \code{cl}), and
 \item{loo}{a logical flag for leave-one-period-out goodness-of-fit tests.}
 \item{dloo}{a logical flag for the double (cohort-wise) leave-one-out pre-trend
 placebos. When \code{TRUE}, \code{fect} estimates these directly from the in-sample fit -- without re-fitting
-the imputation model.}
+the imputation model. With covariates, the covariate coefficients are re-estimated for each cohort and tested
+period on that cohort's comparison sample (its other pre-treatment periods, and the units that adopt later or
+never, before the cohort adopts), so data from later periods do not affect the placebos.}
 \item{dloo.adjust}{a logical flag, used only with \code{dloo = TRUE}. When
 \code{TRUE}, the pre-trend estimates use the pre-treatment-average baseline of
 Liu (2025) instead of the leave-one-out baseline -- equivalently, the
@@ -228,7 +230,7 @@ double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
   \item{\code{"min"}}{Pick the \code{r} that minimizes the mean CV criterion (no tolerance).}
   \item{\code{"1pct"}}{Legacy pre-2.3.0 heuristic: pick the smallest \code{r} within 1\% relative tolerance of the best mean CV criterion. Use this for byte-identical reproducibility of pre-2.3.0 fits.}
 }
-Ignored when \code{CV = FALSE}. Not yet applied for \code{method = "cfe"} with \code{time.component.from = "nevertreated"}, which keeps a larger \code{r} only if it lowers the CV criterion by more than 1\%.}
+Ignored when \code{CV = FALSE}.}
 }
 \details{
   \code{fect} implements counterfactual estimators for TSCS data. It first imputes counterfactuals by fitting an outcome model using untreated observations, then estimates the individual treatment effect as the difference between observed and predicted outcomes. Finally, it computes average treatment effects on the treated (ATT) and period-specific ATTs. Placebo and equivalence tests help evaluate identification assumptions.

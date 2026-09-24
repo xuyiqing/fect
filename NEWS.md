@@ -14,7 +14,15 @@ Development version, not yet on CRAN.
   contamination bias of the in-sample placebo, and is algebraically identical
   (fixed effects cancel in the DiD) to re-fitting the imputation model on the
   restricted later-adopter control pool for every (cohort, period) -- see the
-  Proposition in Li & Strezhnev. `dloo.adjust = TRUE` selects Liu (2025)'s
+  Proposition in Li & Strezhnev. With covariates, `X beta` does not cancel in
+  that DiD, so the covariate coefficients are re-estimated for each (cohort,
+  period) on the same restricted pool (a closed-form two-way fixed-effects
+  regression), and the identity with re-fitting holds with covariates too.
+  An earlier development build used the full-sample coefficients, which are
+  estimated from all untreated observations, including control units'
+  observations after a cohort adopts; there, changing one never-treated
+  unit's outcome in the last period moved the pre-treatment placebos.
+  `dloo.adjust = TRUE` selects Liu (2025)'s
   pre-treatment-average baseline (equivalently, the double-LOO rescaled by
   `(g-2)/(g-1)` per cohort), which is preferable for benchmarking
   period-to-period *changes* in the parallel-trends violation. The flags
@@ -78,8 +86,25 @@ Development version, not yet on CRAN.
   Moment and GMoment columns of the cross-validation table now leave out
   pre-treatment periods with few treated units, as set by the default
   `proportion = 0.3`, as calls without `se` already did. So with
-  `criterion = "moment"` the selected `r` can change. `method = "cfe"` with
-  `time.component.from = "nevertreated"` still ignores `cv.rule`.
+  `criterion = "moment"` the selected `r` can change.
+* `method = "cfe"` with `time.component.from = "nevertreated"` now applies
+  `cv.rule`. Its cross-validation kept its own rule whatever `cv.rule` was:
+  it moved to a larger `r` only when that lowered the error by more than 1%
+  relative to the best smaller `r`. With the default `cv.rule = "1se"` it can
+  now select a smaller `r`, as the other methods do. `cv.rule = "1pct"`
+  (the smallest `r` within 1% of the lowest error) usually gives the old
+  selection. The cross-validation table itself is unchanged.
+* `cv.donut` is now checked against `cv.nobs` for block cross-validation
+  (`cv.method = "block"`). Block folds hold out `cv.nobs` consecutive periods
+  and score only the middle `cv.nobs - 2 * cv.donut` of them, so a setting
+  such as `cv.nobs = 3, cv.donut = 2` left nothing to score, and the
+  cross-validation stopped with the internal message
+  `No residuals to score.` It now stops before cross-validating and says
+  which values work. `cv.donut` must also be a non-negative whole number.
+  Rolling cross-validation, the default, does not use `cv.donut`.
+* `effect(plot = TRUE)` now sets line widths with `linewidth`, so it no
+  longer triggers ggplot2's warning that `size` for lines is deprecated
+  (since ggplot2 3.4.0).
 * Fix the equivalence (TOST) test for the leave-one-out pre-trend estimates
   (`loo = TRUE`): the reported p-value now uses the same pre-treatment window
   as the F test, the periods that pass the `proportion` cutoff. It previously

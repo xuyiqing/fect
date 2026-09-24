@@ -281,7 +281,7 @@ effect <- function(x, ## a fect object
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
       geom_linerange(data = plot_data,
                      aes(x = .data$time, ymin = .data$ci_lower, ymax = .data$ci_upper),
-                     size = 0.5) +
+                     linewidth = 0.5) +
       labs(x = xlab, y = ylab, title = main) +
       theme_bw() +
       theme(
@@ -299,7 +299,7 @@ effect <- function(x, ## a fect object
     if (count == TRUE) {
       p <- p + geom_rect(data = data.toplot,
                          aes(xmin = .data$xmin, xmax = .data$xmax, ymin = .data$ymin, ymax = .data$ymax),
-                         fill = "gray50", alpha = 0.3, size = 0.3, color = "black") +
+                         fill = "gray50", alpha = 0.3, linewidth = 0.3, color = "black") +
         annotate("text",
                  x = time_range[which.max(count_data$count)],
                  y = max(data.toplot$ymax) + 0.05 * y_range,

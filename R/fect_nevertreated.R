@@ -202,6 +202,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         cv.method,
         allowed = c("rolling", "block", "all_units", "treated_units", "loo")
     )
+    if (isTRUE(CV == TRUE)) .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
     ## ---- W for treated units (scoring) ---- ##
     if (!is.null(W)) {
@@ -1452,6 +1453,29 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             CV.out[, "PC"] <- 1e10
             r.pc <- est.co.pc.best <- NULL
 
+            ## Per-fold SEs parallel to CV.out, for applying `cv.rule` after the
+            ## loop, as in the IFE block above. Before 2.4.6 this block kept its
+            ## in-loop 1% rule whatever `cv.rule` was.
+            CV.out.se <- matrix(NA_real_, nrow(CV.out), ncol(CV.out))
+            colnames(CV.out.se) <- colnames(CV.out)
+            CV.out.se[, "r"] <- CV.out[, "r"]
+            ## Pooled scores (as before) plus per-fold SEs for one r. Folds
+            ## without residuals add nothing to the pooled score and are left
+            ## out of the SEs.
+            .cfe_fold_scores <- function(fold_list, use_weight, np) {
+                fold_list <- Filter(function(fl) length(fl$resid) > 0, fold_list)
+                if (length(fold_list) == 0L) {
+                    return(list(pooled = c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf,
+                                           WGMSPE = Inf, MAD = Inf, Moment = Inf,
+                                           GMoment = Inf, RMSE = Inf, Bias = Inf),
+                                se = NULL))
+                }
+                .fect_cv_aggregate_folds(fold_list = fold_list,
+                                         count.T.cv = count.T.cv,
+                                         use_weight = as.integer(use_weight),
+                                         norm.para = np)
+            }
+
             crit_col <- switch(criterion,
                 mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE", wgmspe = "WGMSPE",
                 mad = "MAD", moment = "Moment", gmoment = "GMoment", "MSPE")
@@ -1723,22 +1747,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
                     ## Aggregate fold scores for this rank
                     task_idx <- which(vapply(tasks_cfe, function(t) t$ri == i, logical(1)))
-                    all_resid    <- unlist(lapply(fold_scores_cfe[task_idx], `[[`, "resid"))
-                    all_time_idx <- unlist(lapply(fold_scores_cfe[task_idx], `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_scores_cfe[task_idx], `[[`, "obs_w")) else c()
-
-                    if (length(all_resid) == 0) {
-                        scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
-                                    MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
-                    } else {
-                        scores <- .score_residuals(
-                            all_resid,
-                            obs_weights   = if (!is.null(W)) all_obs_w else NULL,
-                            time_index    = all_time_idx,
-                            count_weights = count.T.cv,
-                            norm.para     = NULL
-                        )
-                    }
+                    agg    <- .cfe_fold_scores(fold_scores_cfe[task_idx], !is.null(W), NULL)
+                    scores <- agg$pooled
+                    se_v   <- agg$se
 
                     ## 1% rule — identical logic to serial path
                     if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
@@ -1753,6 +1764,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     }
                     CV.out[i, 2:4] <- c(sigma2, IC, PC)
                     CV.out[i, score_names] <- scores[score_names]
+                    if (!is.null(se_v)) {
+                        for (cn in score_names) {
+                            if (cn %in% names(se_v)) CV.out.se[i, cn] <- se_v[cn]
+                        }
+                    }
                     message("r = ", r, "; sigma2 = ",
                         sprintf("%.5f", sigma2), "; IC = ",
                         sprintf("%.5f", IC), "; PC = ",
@@ -1765,6 +1781,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
+                se_v <- NULL  # per-fold SEs; the LOO branch has no folds
                 est.co <- complex_fe_ub(YY.co, Y0.co, X.co,
                     X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                     Zgamma.id, kappaQ.id,
@@ -1997,21 +2014,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         max.iteration   = max.iteration
                     )
                 })
-                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                if (length(all_resid) == 0) {
-                    scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
-                                MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
-                } else {
-                    scores <- .score_residuals(
-                        all_resid,
-                        obs_weights = if (!is.null(W)) all_obs_w else NULL,
-                        time_index = all_time_idx,
-                        count_weights = count.T.cv,
-                        norm.para = NULL
-                    )
-                }
+                agg    <- .cfe_fold_scores(fold_results, !is.null(W), NULL)
+                scores <- agg$pooled
+                se_v   <- agg$se
 
               } else {
                 ## ---- cv.sample "treated_units" CFE CV (serial path — lapply only) ---- ##
@@ -2076,21 +2081,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         Ntr      = Ntr
                     )
                 })
-                all_resid    <- unlist(lapply(fold_results, `[[`, "resid"))
-                all_time_idx <- unlist(lapply(fold_results, `[[`, "time_idx"))
-                all_obs_w    <- if (!is.null(W.tr)) unlist(lapply(fold_results, `[[`, "obs_w")) else c()
-                if (length(all_resid) == 0) {
-                    scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
-                                MAD = Inf, Moment = Inf, GMoment = Inf, RMSE = Inf, Bias = Inf)
-                } else {
-                    scores <- .score_residuals(
-                        all_resid,
-                        obs_weights = if (!is.null(W.tr)) all_obs_w else NULL,
-                        time_index = if (length(all_time_idx) > 0) all_time_idx else NULL,
-                        count_weights = count.T.cv,
-                        norm.para = norm.para
-                    )
-                }
+                agg    <- .cfe_fold_scores(fold_results, !is.null(W.tr), norm.para)
+                scores <- agg$pooled
+                se_v   <- agg$se
 
               } ## end cv.method branching
 
@@ -2107,6 +2100,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
                 CV.out[i, 2:4] <- c(sigma2, IC, PC)
                 CV.out[i, score_names] <- scores[score_names]
+                if (!is.null(se_v)) {
+                    for (cn in score_names) {
+                        if (cn %in% names(se_v)) CV.out.se[i, cn] <- se_v[cn]
+                    }
+                }
                 message("r = ", r, "; sigma2 = ",
                     sprintf("%.5f", sigma2), "; IC = ",
                     sprintf("%.5f", IC), "; PC = ",
@@ -2117,6 +2115,35 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             } ## end of CV loop
 
             } ## end SERIAL BRANCH (CFE)
+
+            ## --- Apply cv.rule ----------------------------------------------
+            ## As in the IFE block above: the in-loop assignments use the legacy
+            ## 1% rule; override r.cv with the user's rule (default "1se"). The
+            ## final fit below re-estimates the model at r.cv.
+            if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
+                means <- CV.out[, crit_col]
+                ses   <- CV.out.se[, crit_col]
+                ## Treat sentinels (1e10, Inf, NA) as missing for selection.
+                means[!is.finite(means) | means >= 1e9] <- NA_real_
+                i_pick <- .fect_apply_cv_rule(means, ses, rule = cv.rule)
+                if (!is.na(i_pick) && i_pick >= 1L && i_pick <= nrow(CV.out)) {
+                    new_r_cv <- unname(CV.out[i_pick, "r"])
+                    if (!is.null(new_r_cv) && is.finite(new_r_cv)) {
+                        if (new_r_cv != as.integer(unname(r.cv))) {
+                            message(sprintf(
+                                "  [cv.rule = %s] r.cv adjusted from %d to %d",
+                                cv.rule,
+                                as.integer(unname(r.cv)),
+                                as.integer(new_r_cv)
+                            ))
+                        }
+                        had_name <- !is.null(names(r.cv))
+                        r.cv <- new_r_cv
+                        if (had_name) names(r.cv) <- "r"
+                    }
+                }
+            }
+            ## -----------------------------------------------------------------
 
             MSPE.best <- min(CV.out[, "MSPE"])
             if (r > (T0.min - 1)) {

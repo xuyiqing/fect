@@ -272,6 +272,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         )
         cv.treat <- (cv.method == "treated_units")
         use_rolling <- (cv.method == "rolling")
+        .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
         ## ----- ##
         ## ------------- initialize ------------ ##
