@@ -61,6 +61,11 @@ Development version, not yet on CRAN.
   zero factors, so the figure captioned "IFEct" showed the two-way
   fixed-effects pre-trend. The text under the joint-test figures was
   rewritten to match. Thanks to Siyang Zhu (UPF) for the report.
+* User manual, Inference chapter: the migration example under "Parametric
+  bootstrap: valid regimes" now passes the data by name,
+  `fect(data = data, Y = "Y", ...)`. Its three calls passed the data frame
+  first without a name, so `fect()` took it as the formula and each call
+  stopped with `argument "data" is missing, with no default`.
 
 # fect 2.4.5
 
