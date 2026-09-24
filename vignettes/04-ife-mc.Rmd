@@ -205,7 +205,7 @@ cat("criterion = 'gmspe': r.cv =", out.pc$r.cv, "\n")
 
 ### Selection rule
 
-A candidate `r` is selected over a smaller value only if its criterion score improves by more than 1%. This prevents overfitting to marginal improvements.
+By default (`cv.rule = "1se"`), **fect** picks the smallest `r` whose cross-validation error is within one standard error of the lowest error, with the standard error taken across the `k` folds. This keeps factors out when they improve the fit by less than the fold-to-fold noise. `cv.rule = "min"` picks the `r` with the lowest error, and `cv.rule = "1pct"` picks the smallest `r` within 1% of the lowest error, the rule used before v2.3.0.
 
 :::
 
@@ -423,7 +423,7 @@ See [Chapter @sec-plots] for the full table of `highlight` / `highlight.fill` pa
 
 ::: {.callout-tip appearance="simple"}
 
-- A **larger** F-test / placebo / carryover p-value suggests the model passes the test.
+- A **larger** F-test, placebo, or carryover p-value means the test does not reject the null of no pre-trend (or no carryover effect). Not rejecting is weaker than showing that there is none; the equivalence tests address that.
 - A **smaller** TOST / equivalence p-value suggests the pre-trends or carryover effects are within an acceptable range.
 - We recommend using `loo = TRUE` for pre-trend tests to avoid the false reassurance of in-sample fit.
 - Under staggered adoption with `method = "fe"`, `dloo = TRUE` gives the corrected placebos at no re-fitting cost; see [Chapter @sec-fect].
