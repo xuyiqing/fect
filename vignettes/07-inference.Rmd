@@ -106,17 +106,17 @@ If your current code uses `vartype = "parametric"` with the default `time.compon
 
 ```r
 # Before (now raises an error under Gate C):
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
+fect(data = data, Y = "Y", D = "D", index = c("id", "time"),
      method = "ife", se = TRUE, vartype = "parametric")
 
 # After --- option 1: switch to nevertreated imputation
 # (requires that never-treated control units exist in the data)
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
+fect(data = data, Y = "Y", D = "D", index = c("id", "time"),
      method = "ife", time.component.from = "nevertreated",
      se = TRUE, vartype = "parametric")
 
 # After --- option 2: use nonparametric bootstrap (safe default)
-fect(data, Y = "Y", D = "D", index = c("id", "time"),
+fect(data = data, Y = "Y", D = "D", index = c("id", "time"),
      method = "ife", se = TRUE, vartype = "bootstrap")
 ```
 
