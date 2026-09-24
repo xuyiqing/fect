@@ -42,8 +42,9 @@ test_that("fect(), fect.formula() and fect.default() declare the same defaults",
 
 test_that("formula and non-formula calls use the same CV method and select the same r", {
     d <- .parity_panel()
-    ## fect's `seed` argument does not reach the CV fold draws when se = FALSE,
-    ## so seed the session right before each call.
+    ## Seed the session right before each call so both calls draw the same CV
+    ## folds. (Passing seed = 1 does the same since 2.4.6; set.seed() keeps
+    ## this test about calling styles only.)
     set.seed(1)
     out_formula <- suppressMessages(fect(
         Y ~ D + X, data = d, index = c("id", "time"),
