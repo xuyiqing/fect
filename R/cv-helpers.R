@@ -529,5 +529,9 @@
         )
     }
 
+    ## Record the pool the folds were drawn from, so callers can report it
+    ## without re-deriving the eligibility rule (fect_binary_cv's
+    ## cv.eligible.units).
+    attr(folds, "eligible.units") <- eligible_units
     folds
 }

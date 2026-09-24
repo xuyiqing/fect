@@ -82,6 +82,7 @@ script (democratisation and autocratisation episodes) needs this.
 | `NEWS.md` | Entry added; the "requires staggered adoption" sentence removed. |
 | `tests/testthat/test-binary-rolling.R` | The test that asserted the old error now asserts a successful fit with switch-off output. |
 | `tests/testthat/test-binary-reversal.R` | New: fixed-rank fits (r = 0, 1), rolling CV fold integrity with reversals, jackknife inference. |
+| `R/cv-helpers.R`, `R/cv_binary.R` | Follow-up (2026-09-23): `cv.eligible.units` now comes from the fold builder, which counts only untreated cells before the first treated period. It used to count all untreated cells, so with reversals it could list units no fold can draw. Regression test in `test-binary-reversal.R`. |
 
 ### Verification
 * All models of `binary_empirical.R` run: CV over r = 0..3 and the three
@@ -135,7 +136,7 @@ C++ `IC` is left unchanged and still reported.
 | File | Result |
 |---|---|
 | `test-group-time-varying.R` | 20 pass |
-| `test-binary-reversal.R` | 24 pass |
+| `test-binary-reversal.R` | 28 pass (24 before the 2026-09-23 `cv.eligible.units` test) |
 | `test-binary-pc.R` | 10 pass |
 | `test-binary-rolling.R` | 151 pass |
 | `test-fect-basic.R` | pass |

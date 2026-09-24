@@ -17,9 +17,11 @@ fit <- fect(Y ~ D + X, data = panel, index = c("id", "time"),
             se = TRUE, vartype = "jackknife")
 ```
 
-The outcome must be 0/1, and treatment must follow staggered adoption (common
-adoption is included). Reversals, observation weights, `cm = TRUE`, and a
-never-treated-only fitting route are unsupported. Inference supports
+The outcome must be 0/1. Treatment may follow staggered adoption (common
+adoption is included) or switch off again: reversals are supported, and
+switch-off effects are reported in `att.off` and `est.att.off`. Observation
+weights, `cm = TRUE`, and a never-treated-only fitting route are
+unsupported. Inference supports
 nonparametric unit/cluster bootstrap and jackknife. Rank is selected once on
 the original sample and held fixed in resampling. The bootstrap implementation
 can fail when resampled units do not provide enough support; inspect its usual
@@ -32,9 +34,12 @@ Each fold samples eligible units. Within each sampled unit, it retains earlier
 untreated training observations, removes a past buffer, scores an untreated
 block, and excludes the remaining future observations from training. Other
 units supply contemporaneous untreated observations. The buffer and block
-lengths count observed untreated observations, including on unbalanced panels.
-With the defaults, a unit needs at least 5 + 1 + 3 = 9 such observations to be
-eligible. CV eligibility does not redefine the final ATT population.
+lengths count observed untreated observations before the unit's first treated
+period, including on unbalanced panels. With the defaults, a unit needs at
+least 5 + 1 + 3 = 9 such observations to be eligible. Untreated observations
+after a reversal are never held out and do not count toward eligibility; when
+their unit is sampled, they are dropped from training with the rest of its
+future. CV eligibility does not redefine the final ATT population.
 
 Every rank uses the same folds. Excluded outcomes are removed before both
 initialization and fitting. The primary score is the mean squared error of

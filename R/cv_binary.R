@@ -146,8 +146,10 @@ fect_binary_cv <- function(Y, X, D, I, II, T.on, T.off=NULL,
     out$cv.failures <- list(folds=failures,full=full.failures)
     out$cv.settings <- list(k=k,cv.prop=cv.prop,cv.nobs=cv.nobs,
         cv.buffer=cv.buffer,min.T0=min.T0,cv.donut=cv.donut)
-    if (cv.method == "rolling") out$cv.eligible.units <-
-        which(colSums(II) >= min.T0 + cv.buffer + cv.nobs)
+    # Units the folds could draw from, as the fold builder counted them: only
+    # untreated cells before the first treated period count, so cells after
+    # a reversal do not make a unit eligible.
+    if (cv.method == "rolling") out$cv.eligible.units <- attr(folds, "eligible.units")
     message("Selected r = ",out$r.cv," (",cv.rule,", probability MSPE).")
     out
 }

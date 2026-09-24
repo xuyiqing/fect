@@ -59,6 +59,33 @@ test_that("binary rolling CV runs with reversals", {
     }
 })
 
+test_that("binary rolling CV lists only units its folds can draw", {
+    skip_on_cran()
+    ## Unit 24 is treated at t = 4..6 and untreated again from t = 7: 3
+    ## untreated cells before its first treated period, 18 after the reversal.
+    ## Only the first 3 count toward eligibility (min.T0 + cv.buffer + cv.nobs
+    ## = 8), so no fold can draw it and it must not be listed.
+    d <- make_binary_reversal_panel()
+    d$D[d$id == 24] <- as.integer(d$time[d$id == 24] %in% 4:6)
+    fit <- suppressWarnings(rev_fit(d, CV = TRUE, r = c(0, 1), se = FALSE,
+        cv.method = "rolling", k = 10, cv.prop = 0.5, cv.nobs = 2,
+        cv.buffer = 1, min.T0 = 5, seed = 3))
+    TT <- 24L
+    II <- fit$I.dat; II[fit$D.dat == 1] <- 0L
+    n.pre <- vapply(seq_len(ncol(II)), function(j) {
+        on <- which(fit$D.dat[, j] >= 1)
+        pre <- if (length(on)) seq_len(on[1] - 1L) else seq_len(TT)
+        sum(II[pre, j] == 1L)
+    }, numeric(1))
+    ## counting every untreated cell, as before, would list unit 24
+    expect_gte(sum(II[, 24]), 8)
+    expect_identical(fit$cv.eligible.units, which(n.pre >= 8))
+    expect_false(24L %in% fit$cv.eligible.units)
+    drawn <- unique(unlist(lapply(fit$cv.folds,
+        function(f) (f$est.id - 1L) %/% TT + 1L)))
+    expect_true(all(drawn %in% fit$cv.eligible.units))
+})
+
 test_that("binary jackknife inference runs with reversals", {
     skip_on_cran()
     d <- make_binary_reversal_panel()
