@@ -46,6 +46,21 @@
   ranged over every pre-treatment period, so an early period with a handful
   of treated units and a wide standard error could set the reported maximum.
   The in-sample test was not affected.
+* Cross-validation now uses the settings passed to `fect()` in two cases
+  where it silently used defaults. With `se = TRUE`, it ignored `cv.rule`,
+  `cv.buffer`, `cv.donut`, `min.T0` and `proportion` and ran with `"1se"`,
+  1, 1, 5 and 0, so it could select a different number of factors `r` (or a
+  different `lambda`) than the same call with `se = FALSE`. And
+  `method = "gsynth"`, like `method = "ife"` with
+  `time.component.from = "nevertreated"`, always used `cv.rule = "1se"`,
+  with or without `se`. Calls that set any of these arguments can now select
+  a different `r`. Calls that leave them at their defaults select the same
+  `r` as before, with one exception. With `se = TRUE`, the WMSPE, WGMSPE,
+  Moment and GMoment columns of the cross-validation table now leave out
+  pre-treatment periods with few treated units, as set by the default
+  `proportion = 0.3`, as calls without `se` already did. So with
+  `criterion = "moment"` the selected `r` can change. `method = "cfe"` with
+  `time.component.from = "nevertreated"` still ignores `cv.rule`.
 * User manual, Factor-Based Methods chapter: the LOO pre-trend example now
   fits the IFE model with `r` set to 2. The previous call omitted `r` and ran with
   zero factors, so the figure captioned "IFEct" showed the two-way

@@ -157,6 +157,12 @@ fect_boot <- function(
   gamma.loading.grid = NULL,
   W.in.fit = TRUE,
   W.in.agg = TRUE,
+  cv.buffer = 1,
+  cv.donut = 1,
+  min.T0 = 5,
+  cv.rule = "1se",
+  proportion = 0,          # CV settings for the fect_cv() call below; before 2.4.6
+                           # they were not passed, so se = TRUE ran CV on defaults
   dloo = FALSE,            # apply the dloo pre-trend overlay to each replicate
   dloo.adjust = FALSE,     # dloo: use Liu's pre-treatment-average baseline
   dloo.controls = "not-yet-treated",
@@ -442,6 +448,7 @@ fect_boot <- function(
         k = k,
         r = r,
         r.end = r.end,
+        proportion = proportion,
         nlambda = nlambda,
         lambda = lambda,
         force = force,
@@ -454,6 +461,10 @@ fect_boot <- function(
         cv.prop = cv.prop,
         cv.method = cv.method,
         cv.nobs = cv.nobs,
+        cv.buffer = cv.buffer,
+        cv.donut = cv.donut,
+        min.T0 = min.T0,
+        cv.rule = cv.rule,
         time.component.from = time.component.from,
         X.extra.FE = X.extra.FE,
         X.Z = X.Z,
