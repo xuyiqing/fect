@@ -2526,6 +2526,17 @@ fect.default <- function(
             " +----------------------------------------------------------+\n")
     }
 
+    if (se == FALSE & permute == FALSE & CV == TRUE) {
+        ## set seed for the cross-validation folds. Before 2.4.6 nothing
+        ## seeded this case, so the folds came from the session RNG and
+        ## ignored `seed`. set.seed(seed) is also what the parallel bootstrap
+        ## (the default) uses, so with default settings a run with se = TRUE
+        ## draws the same folds, and picks the same r, as one without.
+        if (is.null(seed) == FALSE) {
+            set.seed(seed)
+        }
+    }
+
     ## -------------------------------##
     ## run main program
     ## -------------------------------##

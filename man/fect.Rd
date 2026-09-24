@@ -165,7 +165,7 @@ from \code{1000} to \code{5000} in v2.4.3 to accommodate the tighter tol;
 canonical IFE/CFE fits converge in 700-2000 iters at \code{tol = 1e-5}.
 A \code{warning()} is emitted when the EM hits this cap without
 satisfying the tol gate (under-convergence diagnostic).}
-\item{seed}{an integer seed for random number generation.}
+\item{seed}{an integer seed for random number generation. When supplied, it fixes the cross-validation folds and the bootstrap and permutation draws, so repeating a call gives the same results. Default \code{NULL}: these draws follow the current state of R's random number generator (see \code{\link{set.seed}}).}
 \item{min.T0}{an integer specifying the minimum number of pre-treatment periods for each treated unit.}
 \item{max.missing}{an integer specifying the maximum number of missing observations allowed per unit.}
 \item{proportion}{a numeric value specifying which pre-treatment periods are used for goodness-of-fit tests.}

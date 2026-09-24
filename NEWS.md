@@ -56,6 +56,21 @@ Development version, not yet on CRAN.
   ranged over every pre-treatment period, so an early period with a handful
   of treated units and a wide standard error could set the reported maximum.
   The in-sample test was not affected.
+* `seed` now fixes the cross-validation folds when `se = FALSE`. Before,
+  `fect()` applied `seed` only to standard errors (`se = TRUE`) and
+  permutation tests (`permute = TRUE`). Otherwise the folds were drawn from
+  whatever state R's random number generator was in, and `seed` had no
+  effect. So two identical calls, such as
+  `fect(Y ~ D + X, data = df, index = c("id", "time"), method = "ife", CV = TRUE, r = c(0, 3), seed = 1)`,
+  could report different cross-validation results and select a different
+  number of factors `r` (or a different `lambda`). Now `seed = s` draws the
+  same folds as calling `set.seed(s)` first. This is also what a call with
+  `se = TRUE` does by default, so the same `seed` selects the same `r` with
+  and without standard errors. Cross-validation results change for calls
+  that set `seed` with `se = FALSE`. To reproduce an earlier result that
+  relied on a `set.seed()` call before `fect()`, keep that call and drop
+  `seed`. Calls without `seed`, and calls with `se = TRUE` or
+  `permute = TRUE`, give the same results as before.
 * User manual, Factor-Based Methods chapter: the LOO pre-trend example now
   fits the IFE model with `r = 2`. The previous call omitted `r` and ran with
   zero factors, so the figure captioned "IFEct" showed the two-way
