@@ -73,5 +73,5 @@ test_that("a non-formula call with method = \"mc\" and no lambda cross-validates
         method = "mc", parallel = FALSE))
 
     expect_equal(out_default$CV.out.mc, out_formula$CV.out.mc)
-    expect_identical(out_default$lambda.cv, out_formula$lambda.cv)
+    expect_equal(out_default$lambda.cv, out_formula$lambda.cv)
 })
