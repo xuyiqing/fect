@@ -102,6 +102,9 @@ Development version, not yet on CRAN.
   `No residuals to score.` It now stops before cross-validating and says
   which values work. `cv.donut` must also be a non-negative whole number.
   Rolling cross-validation, the default, does not use `cv.donut`.
+* `effect(plot = TRUE)` now sets line widths with `linewidth`, so it no
+  longer triggers ggplot2's warning that `size` for lines is deprecated
+  (since ggplot2 3.4.0).
 * Fix the equivalence (TOST) test for the leave-one-out pre-trend estimates
   (`loo = TRUE`): the reported p-value now uses the same pre-treatment window
   as the F test, the periods that pass the `proportion` cutoff. It previously
