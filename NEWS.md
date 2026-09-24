@@ -37,6 +37,19 @@ Development version, not yet on CRAN.
   two-way fixed-effects model with no factors. With `CV = FALSE` and no `r`,
   the fit falls back to `r = 0` with a message, mirroring MC. An explicit
   `r = 0` is honoured silently. `fe` and `cfe` are unchanged.
+* Calls that name the variables as strings, such as
+  `fect(Y = "y", D = "d", X = "x", data = df, index = c("id", "time"))`, now
+  use the same defaults as formula calls such as `fect(y ~ d + x, ...)`. Two
+  defaults were different. First, `cv.method` was `"all_units"` (block
+  cross-validation) instead of `"rolling"`, the documented default since
+  v2.3.0, and these calls printed a deprecation note for `"all_units"`. They
+  now use rolling cross-validation, which can select a different number of
+  factors `r`, or a different `lambda` for `method = "mc"`, than before. Set
+  `cv.method = "block"` to reproduce earlier results. Second, `nlambda` was 0
+  instead of 10, so any of these calls that cross-validated `lambda`, such as
+  `method = "mc"` with no `lambda` given, stopped with
+  `"nlambda" option misspecified.` They now run; with no `lambda` given they
+  try 10 values, as formula calls do. Formula calls are unchanged.
 * Fix the equivalence (TOST) test for the leave-one-out pre-trend estimates
   (`loo = TRUE`): the reported p-value now uses the same pre-treatment window
   as the F test, the periods that pass the `proportion` cutoff. It previously
