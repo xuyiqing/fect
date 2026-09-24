@@ -4,7 +4,7 @@
 
 [Development version, not yet on CRAN.]{.text-muted}
 
-* New `dloo` and `dloo.adjust` flags on `fect()`, contributed by Anton Strezhnev: double leave-one-out pre-trend placebos, computed without re-fitting. They require staggered adoption, a balanced pre-treatment panel, and `method = "fe"`. `dloo.adjust = TRUE` applies Ziyi Liu's correction.
+* New `dloo` and `dloo.adjust` flags on `fect()`, contributed by Anton Strezhnev: double leave-one-out pre-trend placebos, computed without re-fitting. With covariates, the covariate coefficients are re-estimated on each cohort's pre-treatment comparison sample. They require staggered adoption, a balanced pre-treatment panel, and `method = "fe"`. `dloo.adjust = TRUE` applies Ziyi Liu's correction.
 * `r` now defaults to `NULL`. For `method = "ife"` or `"gsynth"`, leaving out `r` now selects the number of factors by cross-validation over 0 to 5, instead of fitting zero factors.
 * Cross-validation fixes. Each can change the selected `r` or `lambda` for some existing calls:
   * Calls that name variables as strings, such as `fect(Y = "y", D = "d", ...)`, now use the same defaults as formula calls (rolling cross-validation, `nlambda = 10`). Set `cv.method = "block"` to get the old folds.

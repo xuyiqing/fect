@@ -14,7 +14,15 @@ Development version, not yet on CRAN.
   contamination bias of the in-sample placebo, and is algebraically identical
   (fixed effects cancel in the DiD) to re-fitting the imputation model on the
   restricted later-adopter control pool for every (cohort, period) -- see the
-  Proposition in Li & Strezhnev. `dloo.adjust = TRUE` selects Liu (2025)'s
+  Proposition in Li & Strezhnev. With covariates, `X beta` does not cancel in
+  that DiD, so the covariate coefficients are re-estimated for each (cohort,
+  period) on the same restricted pool (a closed-form two-way fixed-effects
+  regression), and the identity with re-fitting holds with covariates too.
+  An earlier development build used the full-sample coefficients, which are
+  estimated from all untreated observations, including control units'
+  observations after a cohort adopts; there, changing one never-treated
+  unit's outcome in the last period moved the pre-treatment placebos.
+  `dloo.adjust = TRUE` selects Liu (2025)'s
   pre-treatment-average baseline (equivalently, the double-LOO rescaled by
   `(g-2)/(g-1)` per cohort), which is preferable for benchmarking
   period-to-period *changes* in the parallel-trends violation. The flags

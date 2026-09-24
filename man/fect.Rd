@@ -208,7 +208,9 @@ bootstrap always resamples units regardless of \code{cl}), and
 \item{loo}{a logical flag for leave-one-period-out goodness-of-fit tests.}
 \item{dloo}{a logical flag for the double (cohort-wise) leave-one-out pre-trend
 placebos. When \code{TRUE}, \code{fect} estimates these directly from the in-sample fit -- without re-fitting
-the imputation model.}
+the imputation model. With covariates, the covariate coefficients are re-estimated for each cohort and tested
+period on that cohort's comparison sample (its other pre-treatment periods, and the units that adopt later or
+never, before the cohort adopts), so data from later periods do not affect the placebos.}
 \item{dloo.adjust}{a logical flag, used only with \code{dloo = TRUE}. When
 \code{TRUE}, the pre-trend estimates use the pre-treatment-average baseline of
 Liu (2025) instead of the leave-one-out baseline -- equivalently, the

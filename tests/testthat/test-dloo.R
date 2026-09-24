@@ -446,3 +446,142 @@ test_that("dloo is invariant to how the time index is typed", {
     got2 <- fit_dloo(dg)$pre.est.att[, "ATT"]
     expect_equal(unname(got2), unname(ref), tolerance = 1e-10)
 })
+
+## ---- covariates -------------------------------------------------------------
+## With covariates the unit and time effects still cancel in the DiD, but
+## X beta does not. The overlay re-estimates beta for each (cohort, tested
+## period) on the pool the re-fit uses (R/dloo.R). Before 2.4.6 it used the
+## full-sample beta, so a control cell in a late period (outside every pool)
+## moved the pre-treatment placebos.
+
+## balanced staggered panel with two time-varying covariates whose paths
+## differ by cohort, so X beta does not cancel in the DiD
+make_panel_x <- function(TT = 8, cohorts = c(4, 6, Inf), n_per = 25, sd = 0.4,
+                         seed = 42) {
+    set.seed(seed)
+    rows <- list(); id <- 0
+    for (g in cohorts) for (u in seq_len(n_per)) {
+        id <- id + 1
+        tr <- !is.infinite(g)
+        x1 <- rnorm(TT) + (if (tr) 0.9 / g else 0.05) * (1:TT) * 3
+        x2 <- rnorm(TT, sd = 0.5) + (if (tr) 0.2 else 0) * (1:TT)
+        y  <- rnorm(1) + 0.1 * (1:TT) + 0.8 * x1 - 0.5 * x2 + rnorm(TT, 0, sd)
+        d  <- as.integer(tr & (1:TT) >= g)
+        if (tr) y <- y + d * 2.0
+        rows[[length(rows) + 1]] <- data.frame(id = id, time = 1:TT, Y = y,
+                                               D = d, X1 = x1, X2 = x2)
+    }
+    do.call(rbind, rows)
+}
+
+fit_dloo_x <- function(dat, correct = FALSE, ...) {
+    suppressMessages(fect(
+        Y ~ D + X1 + X2, data = dat, index = c("id", "time"),
+        method = "fe", force = "two-way",
+        dloo = TRUE, dloo.adjust = correct,
+        parallel = FALSE, nboots = 50, seed = 1, ...))
+}
+
+## The literal definition: for each cohort g and tested period t, fit Y on X
+## with unit and time dummies (lm) over cohort g's pre-periods other than t and
+## the later-adopting / never-treated units' periods before g; the placebo is
+## cohort g's mean residual at t. dloo.adjust is (g-2)/(g-1) times it.
+bruteforce_refit_x <- function(dat, correct = FALSE, xvars = c("X1", "X2")) {
+    ft <- tapply(seq_len(nrow(dat)), dat$id, function(ix) {
+        w <- which(dat$D[ix] == 1); if (length(w) == 0) Inf else min(dat$time[ix][w])
+    })
+    dat$g <- as.numeric(ft[as.character(dat$id)])
+    gs    <- sort(unique(dat$g[is.finite(dat$g)]))
+    allg  <- sort(unique(dat$g))
+    Nsize <- tapply(dat$id, dat$g, function(x) length(unique(x)))
+    f     <- stats::reformulate(c(xvars, "factor(id)", "factor(time)"), "Y")
+    cell  <- list()
+    for (g in gs) {
+        pre   <- seq_len(g - 1)
+        later <- allg[allg > g]
+        if (length(pre) < 2 || length(later) == 0) next
+        for (t in pre) {
+            pool <- dat[(dat$g == g & dat$time %in% setdiff(pre, t)) |
+                        (dat$g %in% later & dat$time %in% pre), ]
+            m    <- stats::lm(f, data = pool)
+            test <- dat[dat$g == g & dat$time == t, ]
+            val  <- mean(test$Y - stats::predict(m, newdata = test))
+            if (correct) val <- val * (g - 2) / (g - 1)
+            cell[[length(cell) + 1]] <- data.frame(
+                event.time = t - g + 1, val = val,
+                Nsize_g = as.numeric(Nsize[as.character(g)]))
+        }
+    }
+    cell <- do.call(rbind, cell)
+    ag <- tapply(seq_len(nrow(cell)), cell$event.time, function(ix)
+        sum(cell$val[ix] * cell$Nsize_g[ix]) / sum(cell$Nsize_g[ix]))
+    data.frame(event.time = as.numeric(names(ag)), ATT = as.numeric(ag))
+}
+
+test_that("with covariates, dloo equals the literal re-fit on each restricted pool", {
+    dat <- make_panel_x()
+    for (correct in c(FALSE, TRUE)) {
+        fit <- fit_dloo_x(dat, correct = correct)
+        ref <- bruteforce_refit_x(dat, correct = correct)
+        got <- data.frame(event.time = as.numeric(rownames(fit$pre.est.att)),
+                          ATT = fit$pre.est.att[, "ATT"])
+        m <- merge(got, ref, by = "event.time", suffixes = c(".overlay", ".ref"))
+        expect_equal(nrow(m), nrow(ref))
+        expect_equal(m$ATT.overlay, m$ATT.ref, tolerance = 1e-8,
+                     info = paste("correct =", correct))
+    }
+})
+
+test_that("with covariates, a late control cell does not move the dloo placebos", {
+    dat  <- make_panel_x()
+    ## one never-treated unit's last period: after every cohort has adopted,
+    ## so it is in no cohort's pool
+    nt   <- min(dat$id[ave(dat$D, dat$id, FUN = max) == 0])
+    last <- dat$id == nt & dat$time == max(dat$time)
+    dat2 <- dat
+    dat2$Y[last] <- dat2$Y[last] + 50
+    f1 <- fit_dloo_x(dat)
+    f2 <- fit_dloo_x(dat2)
+    expect_equal(f2$pre.est.att[, "ATT"], f1$pre.est.att[, "ATT"], tolerance = 1e-8)
+    expect_equal(f2$pre.att.boot, f1$pre.att.boot, tolerance = 1e-8)
+    ## the imputation fit itself does use that cell
+    expect_false(isTRUE(all.equal(f2$att.avg, f1$att.avg)))
+})
+
+test_that("with covariates, dloo.adjust is (g-2)/(g-1) times dloo", {
+    dat <- make_panel_x(TT = 8, cohorts = c(5, Inf), n_per = 30)
+    a   <- fit_dloo_x(dat)$pre.est.att[, "ATT"]
+    ac  <- fit_dloo_x(dat, correct = TRUE)$pre.est.att[, "ATT"]
+    expect_equal(ac, a * (5 - 2) / (5 - 1), tolerance = 1e-10)
+})
+
+test_that("with covariates, dloo does not depend on normalize", {
+    dat <- make_panel_x()
+    f1  <- fit_dloo_x(dat)
+    f2  <- fit_dloo_x(dat, normalize = TRUE)
+    expect_equal(f2$pre.est.att[, "ATT"], f1$pre.est.att[, "ATT"], tolerance = 1e-8)
+    expect_equal(f2$pre.att.boot, f1$pre.att.boot, tolerance = 1e-8)
+})
+
+test_that("with covariates, group partitions the pooled dloo exactly", {
+    dat <- make_panel_x(n_per = 30)
+    dat$grp <- ifelse(dat$id %% 2 == 0, "A", "B")
+    fitg <- fit_dloo_x(dat, group = "grp")
+    fit0 <- fit_dloo_x(dat)
+    expect_equal(fitg$pre.est.att[, "ATT"], fit0$pre.est.att[, "ATT"],
+                 tolerance = 1e-12)
+    et <- as.numeric(rownames(fitg$pre.est.att))
+    recon <- vapply(et, function(e) {
+        num <- 0; den <- 0
+        for (gname in names(fitg$pre.est.group.output)) {
+            go <- fitg$pre.est.group.output[[gname]]$pre.est.att
+            r  <- match(e, as.numeric(rownames(go)))
+            if (!is.na(r) && !is.na(go[r, "ATT"])) {
+                num <- num + go[r, "count.on"] * go[r, "ATT"]
+                den <- den + go[r, "count.on"]
+            }
+        }
+        num / den
+    }, numeric(1))
+    expect_equal(recon, unname(fitg$pre.est.att[, "ATT"]), tolerance = 1e-10)
+})

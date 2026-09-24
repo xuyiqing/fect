@@ -3501,6 +3501,9 @@ fect.default <- function(
                  "imputation (method = \"fe\"). It is not yet validated for ",
                  "latent-factor / matrix-completion models.", call. = FALSE)
         }
+        ## With covariates the overlay re-estimates beta on each cohort's
+        ## pre-treatment pool (R/dloo.R), so it needs the fitted Y and X;
+        ## norm.para returns them to the units of output$eff.
         dloo.out <- .dloo_fill(
             output,
             dloo.adjust    = dloo.adjust,
@@ -3508,7 +3511,10 @@ fect.default <- function(
             quantile.CI    = .quantile.CI.bool,
             vartype        = vartype,
             boot.pre       = output$dloo.pre.att.boot,
-            boot.pre.group = output$dloo.pre.att.group.boot
+            boot.pre.group = output$dloo.pre.att.group.boot,
+            Y              = if (p > 0) Y else NULL,
+            X              = if (p > 0) X else NULL,
+            scale          = if (is.null(norm.para)) 1 else norm.para[1]
         )
         ## drop the raw per-replicate draws now that SEs are assembled
         output$dloo.pre.att.boot <- NULL
