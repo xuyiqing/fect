@@ -88,6 +88,14 @@ Development version, not yet on CRAN.
   `proportion = 0.3`, as calls without `se` already did. So with
   `criterion = "moment"` the selected `r` can change. `method = "cfe"` with
   `time.component.from = "nevertreated"` still ignores `cv.rule`.
+* `cv.donut` is now checked against `cv.nobs` for block cross-validation
+  (`cv.method = "block"`). Block folds hold out `cv.nobs` consecutive periods
+  and score only the middle `cv.nobs - 2 * cv.donut` of them, so a setting
+  such as `cv.nobs = 3, cv.donut = 2` left nothing to score, and the
+  cross-validation stopped with the internal message
+  `No residuals to score.` It now stops before cross-validating and says
+  which values work. `cv.donut` must also be a non-negative whole number.
+  Rolling cross-validation, the default, does not use `cv.donut`.
 * Fix the equivalence (TOST) test for the leave-one-out pre-trend estimates
   (`loo = TRUE`): the reported p-value now uses the same pre-treatment window
   as the F test, the periods that pass the `proportion` cutoff. It previously

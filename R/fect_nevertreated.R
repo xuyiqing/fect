@@ -202,6 +202,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         cv.method,
         allowed = c("rolling", "block", "all_units", "treated_units", "loo")
     )
+    if (isTRUE(CV == TRUE)) .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
     ## ---- W for treated units (scoring) ---- ##
     if (!is.null(W)) {

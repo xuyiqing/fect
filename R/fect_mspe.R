@@ -29,6 +29,7 @@ fect_mspe <- function(
     )
     cv.treat <- (cv.method == "treated_units")
     use_rolling <- (cv.method == "rolling")
+    .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
     ## ---- helper functions (unchanged) ---- ##
     .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj, caller_env) {
