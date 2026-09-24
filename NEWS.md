@@ -86,8 +86,14 @@ Development version, not yet on CRAN.
   Moment and GMoment columns of the cross-validation table now leave out
   pre-treatment periods with few treated units, as set by the default
   `proportion = 0.3`, as calls without `se` already did. So with
-  `criterion = "moment"` the selected `r` can change. `method = "cfe"` with
-  `time.component.from = "nevertreated"` still ignores `cv.rule`.
+  `criterion = "moment"` the selected `r` can change.
+* `method = "cfe"` with `time.component.from = "nevertreated"` now applies
+  `cv.rule`. Its cross-validation kept its own rule whatever `cv.rule` was:
+  it moved to a larger `r` only when that lowered the error by more than 1%
+  relative to the best smaller `r`. With the default `cv.rule = "1se"` it can
+  now select a smaller `r`, as the other methods do. `cv.rule = "1pct"`
+  (the smallest `r` within 1% of the lowest error) usually gives the old
+  selection. The cross-validation table itself is unchanged.
 * `cv.donut` is now checked against `cv.nobs` for block cross-validation
   (`cv.method = "block"`). Block folds hold out `cv.nobs` consecutive periods
   and score only the middle `cv.nobs - 2 * cv.donut` of them, so a setting

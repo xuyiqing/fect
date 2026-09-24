@@ -230,7 +230,7 @@ double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
   \item{\code{"min"}}{Pick the \code{r} that minimizes the mean CV criterion (no tolerance).}
   \item{\code{"1pct"}}{Legacy pre-2.3.0 heuristic: pick the smallest \code{r} within 1\% relative tolerance of the best mean CV criterion. Use this for byte-identical reproducibility of pre-2.3.0 fits.}
 }
-Ignored when \code{CV = FALSE}. Not yet applied for \code{method = "cfe"} with \code{time.component.from = "nevertreated"}, which keeps a larger \code{r} only if it lowers the CV criterion by more than 1\%.}
+Ignored when \code{CV = FALSE}.}
 }
 \details{
   \code{fect} implements counterfactual estimators for TSCS data. It first imputes counterfactuals by fitting an outcome model using untreated observations, then estimates the individual treatment effect as the difference between observed and predicted outcomes. Finally, it computes average treatment effects on the treated (ATT) and period-specific ATTs. Placebo and equivalence tests help evaluate identification assumptions.

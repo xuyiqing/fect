@@ -10,6 +10,7 @@
   * Calls that name variables as strings, such as `fect(Y = "y", D = "d", ...)`, now use the same defaults as formula calls (rolling cross-validation, `nlambda = 10`). Set `cv.method = "block"` to get the old folds.
   * `seed` now fixes the folds when `se = FALSE`. Before, it had no effect there.
   * With `se = TRUE`, cross-validation now uses `cv.rule`, `cv.buffer`, `cv.donut`, `min.T0` and `proportion` as given. `method = "gsynth"` now respects `cv.rule` ([#146](https://github.com/xuyiqing/fect/issues/146)).
+  * `method = "cfe"` with `time.component.from = "nevertreated"` now respects `cv.rule`. With the default `"1se"` it can select a smaller `r`; `cv.rule = "1pct"` usually gives the old selection.
 * Fix: the leave-one-out equivalence (TOST) test now uses the same pre-treatment window as the F test.
 * `cv.donut` is now checked against `cv.nobs` for block cross-validation. A value that left no held-out period to score now stops with a clear message instead of an internal error.
 * User manual: the IFE leave-one-out example now sets `r` to 2 (thanks to Siyang Zhu, UPF, for the report). The Inference chapter's migration example now passes `data = data`.

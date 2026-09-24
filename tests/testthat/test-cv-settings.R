@@ -95,3 +95,24 @@ test_that("gsynth applies cv.rule, with and without se", {
   expect_equal(g_boot$CV.out, g_nose$CV.out, tolerance = 1e-10)
   expect_equal(g_boot$r.cv, g_nose$r.cv)
 })
+
+## CFE with never-treated factors kept its own in-loop 1% rule whatever
+## cv.rule was (fixed in 2.4.6). On panel 2 the lowest CV MSPE is at r = 2 and
+## the 1-SE rule picks r = 1; before the fix every rule returned r = 2.
+test_that("cfe with never-treated factors applies cv.rule, with and without se", {
+  d <- .rule_panel(2)
+  c_1se <- .fit_cv(d, session = 1, method = "cfe", time.component.from = "nevertreated")
+  c_min <- .fit_cv(d, session = 1, method = "cfe", time.component.from = "nevertreated",
+                   cv.rule = "min")
+  r_argmin <- unname(c_min$CV.out[which.min(c_min$CV.out[, "MSPE"]), "r"])
+  skip_if(r_argmin == 0, "this panel no longer has a positive lowest-MSPE r")
+  ## same folds, same table; "min" picks the lowest MSPE, "1se" a smaller r
+  expect_equal(c_1se$CV.out, c_min$CV.out, tolerance = 1e-10)
+  expect_equal(c_min$r.cv, r_argmin)
+  expect_lt(c_1se$r.cv, c_min$r.cv)
+  ## with se = TRUE: same folds, same table, same rule
+  c_boot <- .fit_boot(d, seed = 1, method = "cfe", time.component.from = "nevertreated",
+                      cv.rule = "min")
+  expect_equal(c_boot$CV.out, c_min$CV.out, tolerance = 1e-10)
+  expect_equal(c_boot$r.cv, c_min$r.cv)
+})
