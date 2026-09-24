@@ -9,9 +9,14 @@
 ## Originally lived at the top of test-score-unify.R; extracted on
 ## 2026-05-03 when that file was split for readability + progress
 ## visibility under reporter = "summary".
+##
+## Call non-base functions with their namespace (utils::data,
+## stats::rnorm). Under TESTTHAT_PARALLEL=true, each worker sources
+## the helpers while R is still starting up, before utils and stats
+## are attached, so a bare data() or rnorm() stops the worker.
 ## ---------------------------------------------------------------
 
-suppressWarnings(data("simdata", package = "fect"))
+suppressWarnings(utils::data("simdata", package = "fect"))
 
 ## DGP with factor structure and sufficient never-treated units for CV.
 ## N=50, TT=20, Ntr=15 => 35 never-treated units with 20 pre-treatment
@@ -19,10 +24,10 @@ suppressWarnings(data("simdata", package = "fect"))
 make_factor_data <- function(N = 50, TT = 20, Ntr = 15, tau = 3.0,
                               r = 2, seed = 42) {
   set.seed(seed)
-  F_mat <- matrix(rnorm(TT * r), TT, r)
-  L_mat <- matrix(rnorm(N * r), N, r)
-  alpha_i <- rnorm(N, 0, 1)
-  xi_t <- rnorm(TT, 0, 0.5)
+  F_mat <- matrix(stats::rnorm(TT * r), TT, r)
+  L_mat <- matrix(stats::rnorm(N * r), N, r)
+  alpha_i <- stats::rnorm(N, 0, 1)
+  xi_t <- stats::rnorm(TT, 0, 0.5)
 
   T0_vec <- rep(Inf, N)
   if (Ntr > 0) {
@@ -39,7 +44,7 @@ make_factor_data <- function(N = 50, TT = 20, Ntr = 15, tau = 3.0,
       D_vec[idx] <- as.integer(treated)
       Y_vec[idx] <- alpha_i[i] + xi_t[t] +
         sum(F_mat[t, ] * L_mat[i, ]) +
-        tau * D_vec[idx] + rnorm(1, 0, 0.5)
+        tau * D_vec[idx] + stats::rnorm(1, 0, 0.5)
       id_vec[idx] <- i
       time_vec[idx] <- t
       idx <- idx + 1

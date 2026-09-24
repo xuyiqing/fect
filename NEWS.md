@@ -37,6 +37,49 @@ Development version, not yet on CRAN.
   two-way fixed-effects model with no factors. With `CV = FALSE` and no `r`,
   the fit falls back to `r = 0` with a message, mirroring MC. An explicit
   `r = 0` is honoured silently. `fe` and `cfe` are unchanged.
+* Calls that name the variables as strings, such as
+  `fect(Y = "y", D = "d", X = "x", data = df, index = c("id", "time"))`, now
+  use the same defaults as formula calls such as `fect(y ~ d + x, ...)`. Two
+  defaults were different. First, `cv.method` was `"all_units"` instead of
+  `"rolling"`, the documented default since v2.3.0. So when these calls
+  cross-validated, they used block cross-validation and printed a deprecation
+  note for `"all_units"`. They now use rolling cross-validation, which can
+  select a different number of factors `r` (or `lambda`) than before. Set
+  `cv.method = "block"` to reproduce earlier results. Second, `nlambda` was 0
+  instead of 10, so any of these calls that cross-validated `lambda`, such as
+  `method = "mc"` with no `lambda` given, stopped with
+  `"nlambda" option misspecified.` They now run; with no `lambda` given they
+  try 10 values, as formula calls do. Formula calls are unchanged.
+* `seed` now fixes the cross-validation folds when `se = FALSE`. Before,
+  `fect()` applied `seed` only to standard errors (`se = TRUE`) and
+  permutation tests (`permute = TRUE`). Otherwise the folds were drawn from
+  whatever state R's random number generator was in, and `seed` had no
+  effect. So two identical calls, such as
+  `fect(Y ~ D + X, data = df, index = c("id", "time"), method = "ife", CV = TRUE, r = c(0, 3), seed = 1)`,
+  could report different cross-validation results and select a different
+  number of factors `r` (or a different `lambda`). Now `seed = s` draws the
+  same folds as calling `set.seed(s)` first. This is also what a call with
+  `se = TRUE` does by default, so the same `seed` selects the same `r` with
+  and without standard errors. Cross-validation results change for calls
+  that set `seed` with `se = FALSE`. To reproduce an earlier result that
+  relied on a `set.seed()` call before `fect()`, keep that call and drop
+  `seed`. Calls without `seed`, and calls with `se = TRUE` or
+  `permute = TRUE`, give the same results as before.
+* Cross-validation now uses the settings passed to `fect()` in two cases
+  where it silently used defaults. With `se = TRUE`, it ignored `cv.rule`,
+  `cv.buffer`, `cv.donut`, `min.T0` and `proportion` and ran with `"1se"`,
+  1, 1, 5 and 0, so it could select a different number of factors `r` (or a
+  different `lambda`) than the same call with `se = FALSE`. And
+  `method = "gsynth"`, like `method = "ife"` with
+  `time.component.from = "nevertreated"`, always used `cv.rule = "1se"`,
+  with or without `se`. Calls that set any of these arguments can now select
+  a different `r`. Calls that leave them at their defaults select the same
+  `r` as before, with one exception. With `se = TRUE`, the WMSPE, WGMSPE,
+  Moment and GMoment columns of the cross-validation table now leave out
+  pre-treatment periods with few treated units, as set by the default
+  `proportion = 0.3`, as calls without `se` already did. So with
+  `criterion = "moment"` the selected `r` can change. `method = "cfe"` with
+  `time.component.from = "nevertreated"` still ignores `cv.rule`.
 * Fix the equivalence (TOST) test for the leave-one-out pre-trend estimates
   (`loo = TRUE`): the reported p-value now uses the same pre-treatment window
   as the F test, the periods that pass the `proportion` cutoff. It previously
@@ -48,6 +91,11 @@ Development version, not yet on CRAN.
   zero factors, so the figure captioned "IFEct" showed the two-way
   fixed-effects pre-trend. The text under the joint-test figures was
   rewritten to match. Thanks to Siyang Zhu (UPF) for the report.
+* User manual, Inference chapter: the migration example under "Parametric
+  bootstrap: valid regimes" now passes the data by name,
+  `fect(data = data, Y = "Y", ...)`. Its three calls passed the data frame
+  first without a name, so `fect()` took it as the formula and each call
+  stopped with `argument "data" is missing, with no default`.
 
 # fect 2.4.5
 

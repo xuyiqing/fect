@@ -314,6 +314,10 @@ fect.formula <- function(
 
 
 ## default function
+## A call without a formula (Y = "y", D = "d", ...) comes straight here:
+## UseMethod() passes on only the arguments the user supplied, not the
+## generic's defaults. Every default below must therefore match fect() and
+## fect.formula(); tests/testthat/test-default-args-parity.R checks this.
 
 fect.default <- function(
     formula = NULL,
@@ -332,11 +336,11 @@ fect.default <- function(
     em = TRUE, # EM algorithm for missing data; FALSE uses direct SVD (requires complete estimation sample)
     r = NULL, # number of factors; NULL = cross-validate 0:5 (ife/gsynth) or 0 (fe/cfe)
     lambda = NULL, ## mc method: regularization parameter
-    nlambda = 0,
+    nlambda = 10, ## mc method: regularization parameter
     CV = NULL, # cross-validation
     k = 20, # times of CV
     cv.prop = 0.1,
-    cv.method = "all_units",
+    cv.method = "rolling", ## CV masking strategy (default flipped from "all_units" in v2.3.0)
     cv.nobs = 3,
     cv.donut = 1, ## cv mspe
     cv.buffer = 1, ## past-side buffer for cv.method = "rolling"
@@ -2522,6 +2526,17 @@ fect.default <- function(
             " +----------------------------------------------------------+\n")
     }
 
+    if (se == FALSE & permute == FALSE & CV == TRUE) {
+        ## set seed for the cross-validation folds. Before 2.4.6 nothing
+        ## seeded this case, so the folds came from the session RNG and
+        ## ignored `seed`. set.seed(seed) is also what the parallel bootstrap
+        ## (the default) uses, so with default settings a run with se = TRUE
+        ## draws the same folds, and picks the same r, as one without.
+        if (is.null(seed) == FALSE) {
+            set.seed(seed)
+        }
+    }
+
     ## -------------------------------##
     ## run main program
     ## -------------------------------##
@@ -2854,8 +2869,13 @@ fect.default <- function(
             cv.prop = cv.prop,
             cv.method = cv.method,
             cv.nobs = cv.nobs,
+            cv.buffer = cv.buffer,
+            cv.donut = cv.donut,
+            min.T0 = min.T0,
+            cv.rule = cv.rule,
             r = r,
             r.end = r.end,
+            proportion = proportion,
             nlambda = nlambda,
             lambda = lambda,
             alpha = alpha,

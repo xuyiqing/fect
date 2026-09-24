@@ -165,10 +165,10 @@ from \code{1000} to \code{5000} in v2.4.3 to accommodate the tighter tol;
 canonical IFE/CFE fits converge in 700-2000 iters at \code{tol = 1e-5}.
 A \code{warning()} is emitted when the EM hits this cap without
 satisfying the tol gate (under-convergence diagnostic).}
-\item{seed}{an integer seed for random number generation.}
+\item{seed}{an integer seed for random number generation. When supplied, it fixes the cross-validation folds and the bootstrap and permutation draws, so repeating a call gives the same results. Default \code{NULL}: these draws follow the current state of R's random number generator (see \code{\link{set.seed}}).}
 \item{min.T0}{an integer specifying the minimum number of pre-treatment periods for each treated unit.}
 \item{max.missing}{an integer specifying the maximum number of missing observations allowed per unit.}
-\item{proportion}{a numeric value specifying which pre-treatment periods are used for goodness-of-fit tests.}
+\item{proportion}{a numeric value specifying which pre-treatment periods are used for goodness-of-fit tests. In cross-validation, the same periods count in the weighted scores (WMSPE, WGMSPE, Moment and GMoment); periods with at most \code{proportion} times the largest number of treated units get zero weight.}
 \item{pre.periods}{a vector specifying the range of pre-treatment periods used for the goodness-of-fit test.}
 \item{f.threshold}{a numeric threshold for an F-test in equivalence testing. Default \code{0.5}.}
 \item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
@@ -228,7 +228,7 @@ double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
   \item{\code{"min"}}{Pick the \code{r} that minimizes the mean CV criterion (no tolerance).}
   \item{\code{"1pct"}}{Legacy pre-2.3.0 heuristic: pick the smallest \code{r} within 1\% relative tolerance of the best mean CV criterion. Use this for byte-identical reproducibility of pre-2.3.0 fits.}
 }
-Ignored when \code{CV = FALSE}.}
+Ignored when \code{CV = FALSE}. Not yet applied for \code{method = "cfe"} with \code{time.component.from = "nevertreated"}, which keeps a larger \code{r} only if it lowers the CV criterion by more than 1\%.}
 }
 \details{
   \code{fect} implements counterfactual estimators for TSCS data. It first imputes counterfactuals by fitting an outcome model using untreated observations, then estimates the individual treatment effect as the difference between observed and predicted outcomes. Finally, it computes average treatment effects on the treated (ATT) and period-specific ATTs. Placebo and equivalence tests help evaluate identification assumptions.
