@@ -173,8 +173,16 @@ att.cumu.sub <- function(x, ## a fect object
         }
 
         catt.se <- sd(catt.boot, na.rm = TRUE)
-        catt.ci <- quantile(catt.boot, c(alpha/2, 1 - alpha/2), na.rm = TRUE)
-        catt.p <- get.pvalue(catt.boot)
+        if (isTRUE(x$vartype == "parametric")) {
+            ## Parametric draws are centred at zero (simulated under H0), so
+            ## their quantiles are not a CI for catt: use the normal
+            ## interval and p-value built on their SD.
+            catt.ci <- catt + c(-1, 1) * stats::qnorm(1 - alpha / 2) * catt.se
+            catt.p <- 2 * stats::pnorm(-abs(catt / catt.se))
+        } else {
+            catt.ci <- quantile(catt.boot, c(alpha/2, 1 - alpha/2), na.rm = TRUE)
+            catt.p <- get.pvalue(catt.boot)
+        }
     }
   
     if (se == 0) {

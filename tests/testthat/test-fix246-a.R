@@ -144,3 +144,96 @@ test_that("A1: a cells formula can use variables of the calling function", {
   expect_equal(out$est$se, ref$se)
   expect_true(all(out$po$event.time <= 3))
 })
+
+
+## -- A2  effect() / att.cumu() use the fit's stored vartype ------------------
+
+.fx_simgsynth <- function() {
+  e <- new.env()
+  utils::data("simgsynth", package = "fect", envir = e)
+  e$simgsynth
+}
+
+## Parametric gsynth fit with vartype passed as a variable, so fit$call$vartype
+## is a symbol (as with any wrapper that forwards its own argument).
+.fx_param_fit <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    vt <- "parametric"
+    cached <<- .fx_quiet(fect::fect(
+      Y ~ D + X1 + X2, data = .fx_simgsynth(), index = c("id", "time"),
+      method = "gsynth", force = "two-way", r = 2, CV = FALSE, se = TRUE,
+      vartype = vt, nboots = 50, parallel = FALSE, keep.sims = TRUE, seed = 3))
+    cached
+  }
+})
+
+.fx_covers <- function(tab, est_col = "ATT") {
+  ok <- !is.na(tab[, est_col])
+  all(tab[ok, "CI.lower"] <= tab[ok, est_col] & tab[ok, est_col] <= tab[ok, "CI.upper"])
+}
+
+test_that("A2: effect() CIs are centred on the estimate for parametric fits", {
+  skip_on_cran()
+  fit <- .fx_param_fit()
+  expect_false(is.character(fit$call$vartype))   # vartype passed as a variable
+  expect_identical(fit$vartype, "parametric")
+  withr::local_options(fect.suppress_estimand_deprecation = TRUE)
+  ef <- fect::effect(fit)$effect.est.att
+  expect_true(.fx_covers(ef))
+  ## the same when the call carries no vartype at all (gsynth's default)
+  fit2 <- fit
+  fit2$call$vartype <- NULL
+  ef2 <- fect::effect(fit2)$effect.est.att
+  expect_equal(ef2, ef)
+  ## the stored vartype wins over a different literal in the call
+  fit3 <- fit
+  fit3$call$vartype <- "bootstrap"
+  expect_equal(fect::effect(fit3)$effect.est.att, ef)
+})
+
+test_that("A2: effect() works for one selected unit and for a one-treated-unit fit", {
+  skip_on_cran()
+  withr::local_options(fect.suppress_estimand_deprecation = TRUE)
+  fit <- .fx_param_fit()
+  tr_ids <- colnames(fit$eff)[colSums(fit$D.dat) > 0]
+  one <- fect::effect(fit, id = tr_ids[1])$effect.est.att
+  expect_true(is.matrix(one))
+  expect_true(all(is.finite(one[, "S.E."])))
+  expect_true(.fx_covers(one))
+
+  d <- .fx_simgsynth()
+  tr_all <- unique(d$id[d$D == 1])
+  d1 <- d[!(d$id %in% tr_all[-1]), ]           # one treated unit + controls
+  fit1 <- .fx_quiet(fect::fect(
+    Y ~ D + X1 + X2, data = d1, index = c("id", "time"), method = "gsynth",
+    force = "two-way", r = 2, CV = FALSE, se = TRUE, vartype = "parametric",
+    nboots = 30, parallel = FALSE, keep.sims = TRUE, seed = 3))
+  ef1 <- fect::effect(fit1)$effect.est.att
+  expect_true(all(is.finite(ef1[, "S.E."])))
+})
+
+test_that("A2: att.cumu() and estimand('att.cumu') use normal CIs for parametric draws", {
+  skip_on_cran()
+  withr::local_options(fect.suppress_estimand_deprecation = TRUE)
+  fit <- .fx_param_fit()
+  ac <- fect::att.cumu(fit, period = c(1, 5), plot = FALSE)
+  z <- stats::qnorm(0.975)
+  for (i in 2:nrow(ac)) {
+    expect_equal(unname(ac[i, "CI.lower"]), unname(ac[i, "catt"] - z * ac[i, "S.E."]))
+    expect_equal(unname(ac[i, "CI.upper"]), unname(ac[i, "catt"] + z * ac[i, "S.E."]))
+  }
+  es <- fect::estimand(fit, "att.cumu", "overall", window = c(1, 5))
+  expect_true(es$ci.lo <= es$estimate && es$estimate <= es$ci.hi)
+  expect_equal(es$estimate, unname(ac[nrow(ac), "catt"]))
+})
+
+test_that("A2: every se = TRUE fit stores its vartype; se = FALSE fits do not", {
+  skip_on_cran()
+  d <- .fx_simgsynth()
+  f0 <- .fx_quiet(fect::fect(Y ~ D, data = d, index = c("id", "time"),
+                             method = "fe", se = FALSE, parallel = FALSE))
+  expect_null(f0$vartype)
+  expect_identical(.fx_param_fit()$vartype, "parametric")
+})

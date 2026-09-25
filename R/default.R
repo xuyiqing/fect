@@ -3592,6 +3592,15 @@ fect.default <- function(
 
     output <- c(output, list(call = match.call()))
 
+    ## effect(), att.cumu() and estimand() read the variance type actually
+    ## used from the fit, not from the call (the call holds NULL when
+    ## vartype was not typed, or a symbol when it was passed as a variable).
+    ## fect_boot() stores it; make sure every se = TRUE fit carries it.
+    ## se = FALSE fits keep it NULL.
+    if (se == 1 && is.null(output$vartype)) {
+        output$vartype <- vartype
+    }
+
     ## When W is supplied AND the aggregation surface should be weighted
     ## (W or W.agg supplied), route the W-weighted aggregations into the
     ## canonical slot names so fit$att, fit$time, fit$count, fit$att.avg,
