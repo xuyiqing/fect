@@ -102,3 +102,22 @@ test_that("B8c: loo refits of a never-treated cfe fit use the never-treated esti
                  pl$att[which(pl$time == kk)], tolerance = 1e-10, info = paste("kk =", kk))
   }
 })
+
+
+## -- B8d  loo refits keep para.error -----------------------------------------
+
+test_that("B8d: parametric loo refits use the fit's para.error", {
+  skip_on_cran()
+  d <- .fix246c_panel()
+  res <- .fix246c_messages(fect::fect(
+    Y ~ D + X1, data = d, index = c("id", "time"), method = "gsynth",
+    r = 2, CV = FALSE, loo = TRUE, se = TRUE, vartype = "parametric",
+    para.error = "wild", nboots = 5, parallel = FALSE, seed = 1
+  ))
+  used <- regmatches(res$messages,
+                     regexpr("para.error = \"[a-z]+\"", res$messages))
+  ## one message for the main fit and one per refit (8 pre-periods);
+  ## before 2.4.6 the refits reported "empirical" (the "auto" choice)
+  expect_length(used, 9L)
+  expect_true(all(used == "para.error = \"wild\""))
+})

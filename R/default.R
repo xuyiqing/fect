@@ -3244,7 +3244,10 @@ fect.default <- function(
                     ## Without it fect_boot() assumed "notyettreated", so the
                     ## refits of a never-treated cfe fit ran the not-yet-
                     ## treated cfe estimator (before 2.4.6).
-                    time.component.from = time.component.from
+                    time.component.from = time.component.from,
+                    ## the user's error strategy for parametric refits
+                    ## (before 2.4.6 they always used "auto")
+                    para.error = para.error
                 )
 
                 p.est.att <- p.out$est.att
