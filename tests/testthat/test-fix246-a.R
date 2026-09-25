@@ -452,3 +452,114 @@ test_that("A6: cl under the parametric bootstrap warns and is not printed as clu
   out <- utils::capture.output(print(run$value))
   expect_false(any(grepl("^Cluster SE", out)))
 })
+
+
+## -- A7  degenerate replicates are dropped and counted, never crash ----------
+
+## The small-control-pool panel of the issue sweep (work/batchA/diag032c.R):
+## 3 treated units, Nco never-treated units, 30 periods, 2 factors.
+.fx_small_pool <- function(Nco, Ntr = 3, TT = 30, T0 = 20, seed = 32) {
+  set.seed(seed)
+  N <- Ntr + Nco
+  d <- expand.grid(time = 1:TT, id = 1:N)[, c("id", "time")]
+  F <- matrix(stats::rnorm(TT * 2), TT, 2)
+  L <- matrix(stats::rnorm(N * 2), N, 2)
+  d$X1 <- stats::rnorm(nrow(d))
+  d$X2 <- stats::rnorm(nrow(d))
+  d$D <- as.numeric(d$id <= Ntr & d$time > T0)
+  d$Y <- 1 + stats::rnorm(N)[d$id] + stats::rnorm(TT)[d$time] +
+    rowSums(F[d$time, ] * L[d$id, ]) + 0.5 * d$X1 + 0.3 * d$X2 + 2 * d$D +
+    stats::rnorm(nrow(d), sd = 0.3)
+  d
+}
+
+.fx_drop_count <- function(msgs, nboots) {
+  pat <- sprintf("^([0-9]+) of %d (bootstrap|jackknife) replicates failed and were dropped", nboots)
+  hit <- grep(pat, msgs, value = TRUE)
+  if (length(hit) == 0) return(0L)
+  as.integer(sub(paste0(pat, ".*$"), "\\1", hit[1]))
+}
+
+test_that("A7: runs with four never-treated units finish; failed replicates are counted", {
+  skip_on_cran()
+  d <- .fx_small_pool(Nco = 4)
+  for (vt in c("bootstrap", "parametric")) {
+    for (ks in c(FALSE, TRUE)) {
+      run <- .fx_messages(fect::fect(
+        Y ~ D, data = d, index = c("id", "time"), method = "gsynth",
+        force = "two-way", r = 2, CV = FALSE, se = TRUE, vartype = vt,
+        nboots = 50, parallel = FALSE, seed = 1, keep.sims = ks))
+      fit <- run$value
+      k <- .fx_drop_count(run$messages, 50)
+      expect_gt(k, 0)
+      expect_equal(length(fit$att.avg.boot), 50L - k)
+      expect_true(is.finite(fit$est.avg[1, "S.E."]))
+      if (ks) expect_equal(dim(fit$eff.boot)[3], 50L - k)
+    }
+  }
+})
+
+test_that("A7: collinear factors in the main fit stop with a plain message", {
+  skip_on_cran()
+  ## treated units with 2 pre-treatment periods cannot identify 2 loadings
+  ## plus the unit intercept
+  d <- .fx_small_pool(Nco = 10, T0 = 2)
+  for (m in c("gsynth", "cfe")) {
+    expect_error(
+      .fx_quiet(fect::fect(
+        Y ~ D, data = d, index = c("id", "time"), method = m,
+        force = "two-way", r = 2, CV = FALSE, se = FALSE, min.T0 = 2,
+        time.component.from = "nevertreated", parallel = FALSE)),
+      "factor loadings cannot be estimated", fixed = TRUE, info = m)
+  }
+})
+
+## Replicate refits that return (instead of failing) with the 3-field list the
+## pre-fix early returns gave: every 5th bootstrap refit.
+.fx_degenerate_refits <- function() {
+  real_fn <- fect:::fect_nevertreated
+  calls <- 0L
+  function(..., boot = 0) {
+    if (isTRUE(boot == 1)) {
+      calls <<- calls + 1L
+      if (calls %% 5L == 0L) {
+        return(list(att = rep(NA, 30), att.avg = NA, beta = matrix(NA, 0, 1)))
+      }
+    }
+    real_fn(..., boot = boot)
+  }
+}
+
+.fx_boot_simgsynth <- function(keep.sims) {
+  .fx_messages(fect::fect(
+    Y ~ D, data = .fx_simgsynth(), index = c("id", "time"),
+    method = "gsynth", force = "two-way", r = 2, CV = FALSE, se = TRUE,
+    vartype = "bootstrap", nboots = 20, parallel = FALSE, seed = 2,
+    keep.sims = keep.sims))
+}
+
+test_that("A7: a refit that returns a degenerate result counts as a failed replicate", {
+  skip_on_cran()
+  testthat::local_mocked_bindings(fect_nevertreated = .fx_degenerate_refits(),
+                                  .package = "fect")
+  for (ks in c(FALSE, TRUE)) {
+    run <- .fx_boot_simgsynth(keep.sims = ks)
+    expect_equal(.fx_drop_count(run$messages, 20), 4L)
+    expect_equal(length(run$value$att.avg.boot), 16L)
+  }
+})
+
+test_that("A7: the collectors drop a replicate whose fields do not fit, instead of aborting", {
+  skip_on_cran()
+  ## switch the shape check off, so the degenerate refits reach the collectors
+  testthat::local_mocked_bindings(
+    fect_nevertreated = .fx_degenerate_refits(),
+    .fect_boot_result_ok = function(...) TRUE,
+    .package = "fect")
+  for (ks in c(FALSE, TRUE)) {
+    run <- .fx_boot_simgsynth(keep.sims = ks)
+    expect_equal(.fx_drop_count(run$messages, 20), 4L)
+    expect_equal(length(run$value$att.avg.boot), 16L)
+    expect_true(is.finite(run$value$est.avg[1, "S.E."]))
+  }
+})

@@ -1230,7 +1230,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     silent = TRUE
                 )
                 if ("try-error" %in% class(lambda.tr)) {
-                    return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1)))
+                    stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
                 }
             } else {
                 ## Bounded: solve simplex QP per treated unit on the r-col F block only
@@ -1269,8 +1269,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         return(l.tr) ## a vector of each individual lambdas
                     })), silent = TRUE)
                     if ("try-error" %in% class(lambda.tr)) {
-                        return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1)))
-                        ## stop("Error occurs. Please set a smaller value of factor number.")
+                        stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
                     }
                     if ((r.cv == 1) & (force %in% c(0, 2))) {
                         lambda.tr <- t(lambda.tr)
@@ -1317,8 +1316,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         silent = TRUE
                     )
                     if ("try-error" %in% class(test)) {
-                        return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1), eff = matrix(NA, TT, Ntr)))
-                        ## stop("Error occurs. Please set a smaller value of factor number.")
+                        stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
                     }
                 } else {
                     lambda.tr.r <- matrix(NA_real_, nrow = r.cv, ncol = Ntr)
@@ -2463,8 +2461,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 resid <- U.tr.L1 - kappa_fit - typeA_fit
                 result <- .estimate_lambda_fit(resid, F.hat.aug)
                 if (!result$ok) {
-                    return(list(att = rep(NA, TT), att.avg = NA,
-                                beta = matrix(NA, p, 1)))
+                    stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
                 }
                 lambda_fit <- result$fit
                 lambda.tr <- result$lambda
@@ -2496,8 +2493,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             resid <- U.tr.L1 - kappa_fit - typeA_fit
             result <- .estimate_lambda_fit(resid, F.hat.aug)
             if (!result$ok) {
-                return(list(att = rep(NA, TT), att.avg = NA,
-                            beta = matrix(NA, p, 1)))
+                stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
             }
             lambda_fit <- result$fit
             lambda.tr <- result$lambda
