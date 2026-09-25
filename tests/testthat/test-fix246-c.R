@@ -167,6 +167,23 @@ test_that("C2: duplicated covariate names, or X naming Y or D, stop", {
 })
 
 
+test_that("C2 guard: fect_mspe() refits a fit made with Y/D/X strings", {
+  skip_on_cran()
+  ## fect_mspe() re-evaluates the call's `data` from its own frame for a fit
+  ## without a formula, so the data must be reachable from anywhere
+  fs <- .fc_quiet(fect::fect(data = fect::simgsynth, Y = "Y", D = "D",
+                             X = c("X1", "X2"), index = c("id", "time"),
+                             method = "ife", r = 2, CV = FALSE, se = FALSE,
+                             parallel = FALSE))
+  ff <- .fc_quiet(fect::fect(Y ~ D + X1 + X2, data = fect::simgsynth,
+                             index = c("id", "time"), method = "ife", r = 2,
+                             CV = FALSE, se = FALSE, parallel = FALSE))
+  ## the refit passes a formula; forwarding the call's X as well would stop
+  ms <- .fc_quiet(fect::fect_mspe(fs, seed = 1, k = 3))
+  mf <- .fc_quiet(fect::fect_mspe(ff, seed = 1, k = 3))
+  expect_identical(ms$summary$MSPE, mf$summary$MSPE)
+})
+
 ## -- C3  non-numeric covariates -------------------------------------------
 
 test_that("C3: factor, character and Date covariates stop with a clear message", {

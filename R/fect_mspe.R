@@ -41,7 +41,12 @@ fect_mspe <- function(
             data = data_obj,
             index = index_obj
         )
-        arg_names <- setdiff(names(call_args), c("", "formula", "data", "index"))
+        ## The refit always passes a formula, which carries Y, D and the
+        ## covariates, so the call's own Y/D/X are not forwarded: fect()
+        ## stops when X is given together with a formula (a fit made with
+        ## Y = , D = , X = strings has all three in its call).
+        arg_names <- setdiff(names(call_args),
+                             c("", "formula", "data", "index", "Y", "D", "X"))
         for (nm in arg_names) {
             rerun_args[[nm]] <- eval(call_args[[nm]], envir = formula_env, enclos = caller_env)
         }
