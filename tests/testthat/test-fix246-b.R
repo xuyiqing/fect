@@ -298,3 +298,46 @@ test_that("B6: the factors plot works with a Date time index", {
   labs <- ggplot2::ggplot_build(p)$layout$panel_params[[1]]$x$get_labels()
   expect_true("2020-01-01" %in% labs)
 })
+
+
+## -- B7  dropping periods without controls must leave treated cells --------
+
+## 50 units, 62 months; 10 units treated from 2020-01. `all_post = TRUE`: the
+## controls are unobserved in every post-treatment month; otherwise in two.
+.fb_panel_057 <- function(all_post) {
+  months <- as.integer(format(seq(as.Date("2015-08-01"), as.Date("2020-09-01"),
+                                  by = "month"), "%Y%m"))
+  TT <- length(months)
+  set.seed(57)
+  N <- 50; Ntr <- 10; start <- which(months == 202001)
+  d <- expand.grid(t = 1:TT, u = 1:N)
+  d$ID <- sprintf("u%02d", d$u)
+  d$time <- months[d$t]
+  d$D <- as.numeric(d$u <= Ntr & d$t >= start)
+  f <- cumsum(stats::rnorm(TT)); l <- stats::rnorm(N)
+  d$Y <- 20 + 3 * stats::rnorm(N)[d$u] + f[d$t] * l[d$u] - 4 * d$D +
+    stats::rnorm(nrow(d))
+  gone <- if (all_post) d$t >= start else d$t %in% c(start + 2, start + 5)
+  d[!(gone & d$u > Ntr), c("ID", "time", "Y", "D")]
+}
+
+test_that("B7: no treated cell left after dropping control-free periods stops clearly", {
+  skip_on_cran()
+  d <- .fb_panel_057(all_post = TRUE)
+  for (m in c("gsynth", "fe")) {
+    ## 412d7ae: "non-numeric argument to binary operator" (gsynth),
+    ## "missing value where TRUE/FALSE needed" (fe)
+    expect_error(
+      .fb_quiet(fect::fect(Y ~ D, data = d, index = c("ID", "time"), method = m,
+                           force = "two-way", r = 1, CV = FALSE, se = FALSE,
+                           parallel = FALSE)),
+      "No treated observations remain after dropping the periods", info = m)
+  }
+  ## partial drops keep running
+  dp <- .fb_panel_057(all_post = FALSE)
+  fit <- .fb_quiet(fect::fect(Y ~ D, data = dp, index = c("ID", "time"),
+                              method = "gsynth", force = "two-way", r = 1,
+                              CV = FALSE, se = FALSE, parallel = FALSE))
+  expect_true(is.finite(fit$att.avg))
+  expect_equal(length(fit$rawtime), 60)   # two months dropped
+})

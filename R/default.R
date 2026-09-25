@@ -2133,6 +2133,7 @@ fect.default <- function(
                 )
             }
         }
+        time.drop <- time.uni[which(I.use == 0)] ## labels, for the check below
         TT <- TT - sum(I.use == 0)
         time.uni <- time.uni[-which(I.use == 0)]
 
@@ -2173,6 +2174,19 @@ fect.default <- function(
         } else {
             X <- array(0, dim = c(TT, (N - length(rm.id)), 0))
         }
+    }
+    ## If that removed every post-treatment period, no treated observation is
+    ## left and the estimators fail later with cryptic errors: stop here.
+    if (0 %in% I.use && sum(D == 1 & I == 1, na.rm = TRUE) == 0) {
+        lab <- paste(time.drop[seq_len(min(10L, length(time.drop)))], collapse = ", ")
+        if (length(time.drop) > 10L) {
+            lab <- paste0(lab, ", and ", length(time.drop) - 10L, " more")
+        }
+        stop("No treated observations remain after dropping the periods in ",
+             "which no unit is under control (", lab, "). fect needs control ",
+             "observations in the post-treatment periods to impute the ",
+             "counterfactuals; check whether the control units are observed ",
+             "after treatment starts.", call. = FALSE)
     }
 
     ## message("\nOK2\n")
