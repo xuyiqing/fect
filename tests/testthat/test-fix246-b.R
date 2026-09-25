@@ -218,3 +218,54 @@ test_that("B4: W.agg alone never enters the gsynth / never-treated CFE fit under
     expect_false(isTRUE(all.equal(est0$beta, none2$beta)), info = m)
   }
 })
+
+
+## -- B5  wgt.implied: Xu (2017)'s formula, Nco x Ntr ----------------------
+
+test_that("B5: wgt.implied rebuilds the counterfactual (gsynth and never-treated CFE)", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  for (m in c("gsynth", "cfe")) {
+    fit <- .fix246b_quiet(fect::fect(
+      Y ~ D, data = simgsynth, index = c("id", "time"), method = m,
+      time.component.from = "nevertreated", force = "none", r = 2, CV = FALSE,
+      se = FALSE, parallel = FALSE
+    ))
+    tr <- which(colSums(fit$D.dat) > 0)
+    co <- which(colSums(fit$D.dat) == 0)
+    W <- fit$wgt.implied
+    expect_equal(dim(W), c(length(co), length(tr)), info = m)
+    expect_identical(dimnames(W), list(as.character(fit$id[co]),
+                                       as.character(fit$id[tr])), info = m)
+    Lco <- unname(as.matrix(fit$lambda.co))
+    Ltr <- unname(as.matrix(fit$lambda.tr))
+    expect_equal(unname(t(Lco) %*% W), t(Ltr), tolerance = 1e-8, info = m)
+    ## no covariates, no fixed effects: the weights rebuild Y(0) - mu exactly
+    rebuilt <- (fit$Y.dat[, co] - fit$mu) %*% unname(W)
+    expect_equal(unname(rebuilt), unname(fit$Y.ct[, tr] - fit$mu),
+                 tolerance = 1e-8, info = m)
+  }
+})
+
+test_that("B5: simplex weights have the same Nco x Ntr orientation", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  fit <- .fix246b_quiet(fect::fect(
+    Y ~ D, data = simgsynth, index = c("id", "time"), method = "ife",
+    time.component.from = "nevertreated", force = "two-way", r = 2,
+    CV = FALSE, se = FALSE, parallel = FALSE, loading.bound = "simplex",
+    gamma.loading = 1
+  ))
+  expect_identical(fit$loading.bound, "simplex")
+  tr <- which(colSums(fit$D.dat) > 0)
+  co <- which(colSums(fit$D.dat) == 0)
+  W <- fit$wgt.implied
+  expect_equal(dim(W), c(length(co), length(tr)))
+  expect_identical(colnames(W), as.character(fit$id[tr]))
+  expect_equal(unname(colSums(W)), rep(1, length(tr)), tolerance = 1e-6)
+  expect_true(all(W >= -1e-10))
+  for (i in seq_along(tr)) {
+    expect_equal(as.numeric(fit$lambda.tr[i, ]),
+                 as.numeric(crossprod(fit$lambda.co, W[, i])), tolerance = 1e-6)
+  }
+})

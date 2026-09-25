@@ -69,6 +69,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     carryover.pos <- placebo.pos <- na.pos <- NULL
     res.sd1 <- res.sd2 <- NULL
+    wgt.implied <- NULL ## implied control weights (Nco x Ntr), set when r.cv > 0
     ## unit id and time
     TT <- dim(Y)[1]
     N <- dim(Y)[2]
@@ -1383,16 +1384,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
         if (boot == 0) {
             if (use_bounded && !is.null(W_tr)) {
-                wgt.implied <- W_tr
+                ## simplex weights: one column per treated unit, as below
+                wgt.implied <- t(W_tr)
             } else {
-                inv.tr <- try(
-                    ginv(t(as.matrix(lambda.tr))),
-                    silent = TRUE
-                )
-
-                if (!"try-error" %in% class(inv.tr)) {
-                    wgt.implied <- t(inv.tr %*% t(as.matrix(est.co.best$lambda)))
-                }
+                wgt.implied <- .fect_nt_implied_weights(est.co.best$lambda, lambda.tr)
             }
         }
     } ## end of r!=0 case
@@ -2580,10 +2575,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
     ## Implied weights
     if (has_factor && boot == 0 && !is.null(lambda.tr)) {
-        inv.tr <- try(ginv(t(as.matrix(lambda.tr))), silent = TRUE)
-        if (!"try-error" %in% class(inv.tr)) {
-            wgt.implied <- t(inv.tr %*% t(as.matrix(est.co.best$lambda)))
-        }
+        wgt.implied <- .fect_nt_implied_weights(est.co.best$lambda, lambda.tr)
     }
 
     ## r=0 path (for equivalence test baseline — uses FE-only model)
@@ -3302,13 +3294,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             lambda.co = as.matrix(lambda.co),
             lambda.tr = as.matrix(lambda.tr)
         ))
-        if (boot == 0) {
-            if (exists("use_bounded", inherits = FALSE) && isTRUE(use_bounded)) {
-                out <- c(out, list(wgt.implied = wgt.implied))
-            } else if (exists("inv.tr", inherits = FALSE) &&
-                       !inherits(inv.tr, "try-error")) {
-                out <- c(out, list(wgt.implied = wgt.implied))
-            }
+        ## included only when the weights could be computed
+        if (boot == 0 && !is.null(wgt.implied)) {
+            out <- c(out, list(wgt.implied = wgt.implied))
         }
         if (exists("use_bounded", inherits = FALSE) && isTRUE(use_bounded)) {
             out <- c(out, list(
@@ -3408,6 +3396,21 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         ))
     }
     invisible(NULL)
+}
+
+## Implied weights of the control units (Xu 2017). The factor part of
+## treated unit i's counterfactual, F lambda_i, equals the controls' factor
+## parts weighted by w_i = Lco (Lco'Lco)^{-1} lambda_i. So
+## W = ginv(t(Lco)) %*% t(Ltr) is Nco x Ntr (column i = treated unit i) and
+## satisfies t(Lco) %*% W = t(Ltr). Before 2.4.6 the code used the treated
+## units' Gram matrix, Lco (Ltr'Ltr)^{-1} Ltr', which does not rebuild the
+## counterfactual. Returns NULL if the pseudo-inverse fails.
+.fect_nt_implied_weights <- function(lambda.co, lambda.tr) {
+    w <- try(
+        MASS::ginv(t(as.matrix(lambda.co))) %*% t(as.matrix(lambda.tr)),
+        silent = TRUE
+    )
+    if (inherits(w, "try-error")) NULL else w
 }
 
 ## Why cross-validation is skipped when the searched range is r = 0 only.

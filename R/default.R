@@ -3407,6 +3407,13 @@ fect.default <- function(
     }
     colnames(out$eff) <- iname
     rownames(out$eff) <- tname
+    ## implied weights: rows = control units, columns = treated units
+    if (is.matrix(out$wgt.implied) &&
+        nrow(out$wgt.implied) == length(out$co) &&
+        ncol(out$wgt.implied) == length(out$tr)) {
+        dimnames(out$wgt.implied) <- list(as.character(iname[out$co]),
+                                          as.character(iname[out$tr]))
+    }
     out$eff.calendar <- cbind(
         matrix(out$eff.calendar, ncol = 1),
         out$N.calendar

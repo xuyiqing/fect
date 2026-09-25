@@ -59,7 +59,12 @@ test_that("I.1: default loading.bound = 'none' matches pinned dev@69bf243 output
     expect_equal(fit$att.avg,   pinned$att.avg,   tolerance = 1e-10)
     expect_equal(fit$lambda.tr, pinned$lambda.tr, tolerance = 1e-10)
     expect_equal(fit$lambda.co, pinned$lambda.co, tolerance = 1e-10)
-    expect_equal(fit$wgt.implied, pinned$wgt.implied, tolerance = 1e-10)
+    ## wgt.implied changed in 2.4.6 (Xu 2017's Lco (Lco'Lco)^-1 Ltr', Nco x Ntr
+    ## with dimnames), so it is checked against that formula applied to the
+    ## pinned loadings rather than against the pinned (pre-2.4.6) weights.
+    expect_equal(unname(fit$wgt.implied),
+                 unname(MASS::ginv(t(pinned$lambda.co)) %*% t(pinned$lambda.tr)),
+                 tolerance = 1e-10)
 })
 
 ## ---------------------------------------------------------------------------
@@ -75,7 +80,8 @@ test_that("I.2: simplex bound produces lambda.tr in conv(lambda.co)", {
     expect_equal(fit$gamma.loading, 1.0, tolerance = 1e-12)
 
     for (i in seq_len(nrow(fit$lambda.tr))) {
-        w_i <- fit$wgt.implied[i, ]
+        ## column i holds treated unit i's weights (Nco x Ntr since 2.4.6)
+        w_i <- fit$wgt.implied[, i]
         expect_equal(sum(w_i), 1, tolerance = 1e-6)
         expect_true(all(w_i >= -1e-10))
         expect_equal(as.numeric(fit$lambda.tr[i, ]),
