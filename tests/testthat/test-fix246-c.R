@@ -252,7 +252,8 @@ test_that("C2: duplicated covariate names, or X naming Y or D, stop", {
   fit <- function(X) fect::fect(data = d, Y = "Y", D = "D", X = X,
                                 index = c("id", "time"), method = "fe",
                                 se = FALSE, parallel = FALSE)
-  ## before 2.4.6: coefficients -2.03 and 2.03 for the two copies, no warning
+  ## before 2.4.6 a duplicated name entered the model twice (exactly
+  ## collinear): garbage coefficients, or "inv(): matrix is singular" as here
   expect_error(fit(c("X1", "X2", "X1")), "duplicated covariate names: \"X1\"")
   expect_error(fit(c("X1", "D")), "outcome or the treatment variable \\(\"D\"\\)")
   expect_error(fit(c("Y", "X1")), "outcome or the treatment variable \\(\"Y\"\\)")
