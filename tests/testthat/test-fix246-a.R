@@ -237,3 +237,25 @@ test_that("A2: every se = TRUE fit stores its vartype; se = FALSE fits do not", 
   expect_null(f0$vartype)
   expect_identical(.fx_param_fit()$vartype, "parametric")
 })
+
+
+## -- A3  normalize = TRUE leaves parametric SEs on the outcome's scale -------
+
+test_that("A3: parametric SEs are the same with and without normalize", {
+  skip_on_cran()
+  fits <- lapply(c(FALSE, TRUE), function(nz) {
+    .fx_quiet(fect::fect(
+      turnout ~ policy_edr + policy_mail_in + policy_motor,
+      data = .fx_turnout(), index = c("abb", "year"), method = "gsynth",
+      force = "two-way", r = 1, CV = FALSE, se = TRUE,
+      vartype = "parametric", nboots = 30, parallel = FALSE, seed = 11,
+      normalize = nz))
+  })
+  expect_equal(fits[[2]]$att.avg, fits[[1]]$att.avg, tolerance = 1e-6)
+  ## normalization only rescales the problem; the SEs must not move
+  ## (the EM tolerance leaves differences far below 1e-4)
+  expect_equal(fits[[2]]$est.avg[1, "S.E."], fits[[1]]$est.avg[1, "S.E."],
+               tolerance = 1e-4)
+  expect_equal(fits[[2]]$est.att[, "S.E."], fits[[1]]$est.att[, "S.E."],
+               tolerance = 1e-4)
+})
