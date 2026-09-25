@@ -341,3 +341,84 @@ test_that("B7: no treated cell left after dropping control-free periods stops cl
   expect_true(is.finite(fit$att.avg))
   expect_equal(length(fit$rawtime), 60)   # two months dropped
 })
+
+
+## -- B8  loading.bound = "simplex" is honoured on every path ---------------
+
+.fb_simplex_cols <- function(W) {
+  is.matrix(W) && isTRUE(all.equal(unname(colSums(W)), rep(1, ncol(W)),
+                                   tolerance = 1e-6)) && all(W >= -1e-10)
+}
+
+test_that("B8: simplex is kept for gsynth without SEs and in every CV path", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  run <- function(...) .fb_quiet(fect::fect(
+    Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"),
+    force = "two-way", se = FALSE, parallel = FALSE, seed = 1,
+    loading.bound = "simplex", ...))
+  fits <- list(
+    gsynth_noCV = run(method = "gsynth", r = 2, CV = FALSE),
+    gsynth_CV   = run(method = "gsynth", r = c(2, 2), CV = TRUE),
+    ife_nt_CV   = run(method = "ife", time.component.from = "nevertreated",
+                      r = c(2, 2), CV = TRUE))
+  for (nm in names(fits)) {
+    ## 412d7ae: loading.bound "none" and unbounded weights
+    expect_identical(fits[[nm]]$loading.bound, "simplex", info = nm)
+    expect_true(.fb_simplex_cols(fits[[nm]]$wgt.implied), info = nm)
+  }
+})
+
+test_that("B8: every refit of a simplex fit with SEs uses the bound and the fit's gamma", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  orig <- get("fect_nevertreated", envir = asNamespace("fect"))
+  rec <- new.env()
+  settings <- list(
+    list(CV = TRUE, r = c(2, 2), vartype = "bootstrap", gamma = NULL),
+    list(CV = TRUE, r = c(2, 2), vartype = "parametric", gamma = NULL),
+    list(CV = FALSE, r = 2, vartype = "parametric", gamma = 1))
+  for (s in settings) {
+    rec$lb <- character(0)
+    rec$g <- numeric(0)
+    fit <- testthat::with_mocked_bindings(
+      .fb_quiet(fect::fect(Y ~ D, data = simgsynth, index = c("id", "time"),
+                           method = "gsynth", force = "two-way", r = s$r,
+                           CV = s$CV, se = TRUE, vartype = s$vartype,
+                           nboots = 10, loading.bound = "simplex",
+                           gamma.loading = s$gamma, parallel = FALSE,
+                           seed = 1)),
+      fect_nevertreated = function(..., loading.bound = "none",
+                                   gamma.loading = NULL) {
+        rec$lb <- c(rec$lb, loading.bound)
+        rec$g <- c(rec$g, if (is.null(gamma.loading)) NA_real_ else gamma.loading)
+        orig(..., loading.bound = loading.bound, gamma.loading = gamma.loading)
+      },
+      .package = "fect")
+    info <- paste(s$vartype, "CV =", s$CV)
+    expect_identical(fit$loading.bound, "simplex", info = info)
+    ## the main fit plus 10 (bootstrap) or 20 (parametric) refits
+    expect_gte(length(rec$lb), 11)
+    ## 412d7ae: "none" in the CV main fit and in the parametric refits
+    expect_true(all(rec$lb == "simplex"), info = info)
+    ## the refits reuse the main fit's gamma (no CV of gamma per replicate)
+    expect_true(all(rec$g[-1] == fit$gamma.loading), info = info)
+    expect_true(all(is.finite(fit$att.avg.boot)), info = info)
+  }
+})
+
+test_that("B8: simplex with no factor in the model says it has no effect", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  out <- .fb_msgs(fect::fect(Y ~ D, data = simgsynth, index = c("id", "time"),
+                             method = "fe", time.component.from = "nevertreated",
+                             se = FALSE, parallel = FALSE,
+                             loading.bound = "simplex"))
+  expect_false(inherits(out$res, "error"))
+  expect_true(any(grepl("loading.bound = \"simplex\" has no effect because the selected number of factors is 0",
+                        out$msgs, fixed = TRUE)))
+  out0 <- .fb_msgs(fect::fect(Y ~ D, data = simgsynth, index = c("id", "time"),
+                              method = "gsynth", r = 0, CV = FALSE, se = FALSE,
+                              parallel = FALSE))
+  expect_false(any(grepl("has no effect", out0$msgs, fixed = TRUE)))
+})

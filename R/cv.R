@@ -46,7 +46,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     do_parallel_cv   = FALSE,   ## pre-computed flag from default.R
                     do_parallel_boot = FALSE,    ## threaded through; not used in cv.R
                     cv.rule = "1se",             ## "1se" (default), "min", or "1pct" (legacy)
-                    W.in.fit = TRUE              ## whether W enters the outcome-model fit
+                    W.in.fit = TRUE,             ## whether W enters the outcome-model fit
+                    loading.bound = "none",      ## simplex bound on the treated loadings
+                    gamma.loading = NULL,        ##   (never-treated IFE / gsynth only;
+                    gamma.loading.grid = NULL    ##   applied to the final fit at r.cv)
                     ) {
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     ## -------------------------------##
@@ -213,7 +216,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 min.T0 = min.T0, k = k, criterion = criterion, cv.rule = cv.rule,
                 parallel = parallel, cores = cores,
                 do_parallel_cv = do_parallel_cv,
-                W.in.fit = W.in.fit
+                W.in.fit = W.in.fit,
+                loading.bound = loading.bound,
+                gamma.loading = gamma.loading,
+                gamma.loading.grid = gamma.loading.grid
             )
             return(out)
         }
@@ -236,7 +242,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 min.T0 = min.T0, k = k, criterion = criterion, cv.rule = cv.rule,
                 parallel = parallel, cores = cores,
                 do_parallel_cv = do_parallel_cv,
-                W.in.fit = W.in.fit
+                W.in.fit = W.in.fit,
+                loading.bound = loading.bound,
+                gamma.loading = gamma.loading,
+                gamma.loading.grid = gamma.loading.grid
             )
             return(out)
         }

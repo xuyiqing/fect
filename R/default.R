@@ -2646,7 +2646,10 @@ fect.default <- function(
                     cores = cores,
                     do_parallel_cv   = do_parallel_cv,
                     do_parallel_boot = do_parallel_boot,
-                    cv.rule = cv.rule
+                    cv.rule = cv.rule,
+                    loading.bound      = loading.bound,
+                    gamma.loading      = gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid
                 )
             } else {
                 out <- fect_binary_cv(
@@ -2852,7 +2855,10 @@ fect.default <- function(
                     group.level = g.level,
                     group = G,
                     parallel = parallel,
-                    cores = cores
+                    cores = cores,
+                    loading.bound      = loading.bound,
+                    gamma.loading      = gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid
                 )
             } else if (method == "mc") {
                 out <- fect_mc(
@@ -3661,6 +3667,12 @@ fect.default <- function(
     ## se = FALSE fits keep it NULL.
     if (se == 1 && is.null(output$vartype)) {
         output$vartype <- vartype
+    }
+
+    ## The simplex bound applies to the treated units' factor loadings, so a
+    ## model without factors has nothing to bound.
+    if (identical(loading.bound, "simplex") && isTRUE(output[["r.cv"]] == 0)) {
+        message("loading.bound = \"simplex\" has no effect because the selected number of factors is 0.")
     }
 
     ## When W is supplied AND the aggregation surface should be weighted
