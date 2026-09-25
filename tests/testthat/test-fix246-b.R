@@ -425,3 +425,54 @@ test_that("B8: simplex with no factors says it has no effect", {
     "loading.bound = \"simplex\" has no effect because the selected number of factors is 0.",
     out$messages, fixed = TRUE)))
 })
+
+
+## -- B9  CV folds do not depend on se; remove.id --------------------------
+
+## N = 30, T = 16, 10 treated units adopting at t = 11..13, two factors, one
+## covariate (the panel of test-cv-seed.R).
+.fix246b_seed_panel <- function() {
+  withr::with_seed(2, {
+    N <- 30; TT <- 16; Ntr <- 10
+    F <- matrix(stats::rnorm(TT * 2), TT, 2)
+    L <- matrix(stats::rnorm(N * 2), N, 2); L[, 2] <- 0.5 * L[, 2]
+    a <- stats::rnorm(N); xi <- stats::rnorm(TT)
+    X <- matrix(stats::rnorm(N * TT), TT, N)
+    T0 <- rep(Inf, N); T0[seq_len(Ntr)] <- sample(11:13, Ntr, replace = TRUE)
+    D <- sapply(seq_len(N), function(i) as.integer(seq_len(TT) >= T0[i]))
+    Y <- outer(xi, rep(1, N)) + outer(rep(1, TT), a) + F %*% t(L) + 0.5 * X +
+      2 * D + matrix(stats::rnorm(N * TT), TT, N)
+    data.frame(id = rep(seq_len(N), each = TT), time = rep(seq_len(TT), N),
+               Y = c(Y), D = c(D), X = c(X))
+  })
+}
+
+test_that("B9: with parallel = FALSE, se = TRUE draws the same CV folds as se = FALSE", {
+  skip_on_cran()
+  d <- .fix246b_seed_panel()
+  for (m in c("ife", "gsynth")) {
+    tab <- if (m == "ife") "CV.out.ife" else "CV.out"
+    fit <- function(...) .fix246b_quiet(fect::fect(
+      Y ~ D + X, data = d, index = c("id", "time"), method = m, CV = TRUE,
+      r = c(0, 3), k = 5, seed = 7, parallel = FALSE, ...
+    ))
+    nose <- fit(se = FALSE)
+    boot <- fit(se = TRUE, nboots = 5)
+    expect_identical(boot[[tab]], nose[[tab]], info = m)
+    expect_identical(boot$r.cv, nose$r.cv, info = m)
+    expect_identical(boot$att.avg, nose$att.avg, info = m)
+  }
+})
+
+test_that("B9: remove.id lists the removed units even when unit 1 stays", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  ## control unit 120 is observed in 3 periods only (< min.T0 = 5)
+  d <- simgsynth[!(simgsynth$id == 120 & simgsynth$time > 3), ]
+  fit <- .fix246b_quiet(fect::fect(
+    Y ~ D, data = d, index = c("id", "time"), method = "gsynth", r = 1,
+    CV = FALSE, se = FALSE, parallel = FALSE
+  ))
+  expect_equal(ncol(fit$Y.dat), 49)
+  expect_equal(fit$remove.id, 120)
+})
