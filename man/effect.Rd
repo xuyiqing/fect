@@ -20,9 +20,9 @@ effect(
 }
 
 \arguments{
-  \item{x}{A \code{fect} object containing treatment effect estimates and bootstrap results.}
+  \item{x}{A \code{fect} object containing treatment effect estimates and bootstrap results (fitted with \code{se = TRUE} and \code{keep.sims = TRUE}).}
 
-  \item{cumu}{Logical. If \code{TRUE} (default), calculates cumulative treatment effects. If \code{FALSE}, calculates period-specific average treatment effects.}
+  \item{cumu}{Logical. If \code{TRUE} (default), calculates cumulative treatment effects: the running sum of the per-period average effects. If \code{FALSE}, calculates period-specific average treatment effects.}
 
   \item{id}{Character vector or NULL. Unit identifiers to include in the analysis. If \code{NULL} (default), all treated units are included.}
 
@@ -46,19 +46,19 @@ effect(
 
   2. Calculates relative time to treatment for each unit.
 
-  3. If \code{cumu = TRUE}, computes cumulative effects by summing average effects up to each period.
+  3. If \code{cumu = TRUE}, computes cumulative effects by summing average effects up to each period. Each period's average effect is the mean over the selected treated units' cells at that event time, so the cumulative effect at event time \eqn{k} is the sum of these averages from \code{period[1]} to \eqn{k}. \code{att.cumu(x, weighted = TRUE)} gives the count-weighted version that \code{fect} used before version 2.4.6 (it differs when the number of treated cells changes across event times).
 
   4. Performs bootstrap analysis to estimate uncertainty (standard errors, confidence intervals, and p-values).
 
-  The function supports different inference methods (bootstrap, jackknife, parametric) and adjusts calculations accordingly.
+  The function supports different inference methods (bootstrap, jackknife, parametric) and adjusts calculations accordingly. It uses the variance type stored on the fit (\code{x$vartype}).
 
   Note: The function requires bootstrap results in the input \code{fect} object (\code{keep.sims = TRUE} must be set when fitting the model).
 }
 
 \value{
-  Returns a list containing:
-  \item{eff}{Vector of point estimates for cumulative or average treatment effects.}
-  \item{est.eff}{Matrix containing the following columns:
+  Returns the input \code{fect} object \code{x} with two added elements:
+  \item{effect.est.avg}{Numeric vector of point estimates, one per event time from \code{period[1]} to \code{period[2]}: the cumulative effects if \code{cumu = TRUE}, or the per-period average effects if \code{cumu = FALSE}.}
+  \item{effect.est.att}{Matrix with one row per event time (the row names are the event times) and the following columns; present when the fit has standard errors:
     \itemize{
       \item ATT: Point estimates
       \item S.E.: Standard errors
@@ -67,33 +67,34 @@ effect(
       \item p.value: Two-sided p-values
     }
   }
+  With \code{plot = TRUE}, the plot is also drawn.
 }
 
 \section{Warning}{
   The function will stop with an error if:
   \itemize{
     \item No bootstrap results are available in the input object
-    \item The panel contains treatment reversals
     \item The specified ending period exceeds the maximum available period
   }
+  For a panel with treatment reversals it returns \code{NULL} with a warning.
 }
 
 \examples{
 \donttest{
 library(fect)
-data(simdata)
-fit <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+data(simgsynth)
+fit <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"),
             method = "fe", force = "two-way", se = TRUE, nboots = 50,
             parallel = FALSE, keep.sims = TRUE)
 
 # Cumulative effects for all treated units
 results <- effect(fit)
-head(results$est.catt)
+head(results$effect.est.att)
 
 # Period-specific effects for two treated units over event times 1 to 4
-ids <- head(unique(simdata$id[simdata$D == 1]), 2)
+ids <- head(unique(simgsynth$id[simgsynth$D == 1]), 2)
 results_specific <- effect(fit, cumu = FALSE, id = ids, period = c(1, 4))
-head(results_specific$est.catt)
+results_specific$effect.est.att
 }
 }
 

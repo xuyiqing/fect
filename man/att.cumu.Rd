@@ -6,12 +6,12 @@
   Calculate cumulative treatment effects based on the results of a \code{\link{fect}} object.
 }
 \usage{
-att.cumu(x, period = NULL, weighted = TRUE, alpha = 0.05, type = "on", plot = FALSE)
+att.cumu(x, period = NULL, weighted = FALSE, alpha = 0.05, type = "on", plot = FALSE)
 }
 \arguments{
   \item{x}{A \code{\link{fect}} object.}
-  \item{period}{A two-element numeric vector specifying the range of terms during which treatment effects are to be accumulated, e.g., \code{period = c(-1, 1)}.}
-  \item{weighted}{A logical flag specifying whether to calculate weighted cumulative treatment effects based on counts at each period. Default is \code{TRUE}.}
+  \item{period}{A two-element numeric vector specifying the range of terms during which treatment effects are to be accumulated, e.g., \code{period = c(-1, 1)}. Default \code{NULL}: from event time 1 to the last event time.}
+  \item{weighted}{A logical flag choosing how the per-period ATTs are combined. Each per-period ATT, \eqn{ATT_j}, is the average effect over the treated cells at event time \eqn{j} (the values in \code{x$att}). \code{FALSE} (the default) returns their running sum: the cumulative ATT from event time \eqn{s} to \eqn{k} is \eqn{\sum_{j=s}^{k} ATT_j}{ATT_s + ... + ATT_k}. \code{TRUE} returns the count-weighted version: \eqn{L} times the average effect over all treated cells in the \eqn{L} event times from \eqn{s} to \eqn{k}, that is \eqn{L \sum_j n_j ATT_j / \sum_j n_j}{L * sum(n_j * ATT_j) / sum(n_j)}, where \eqn{n_j} is the number of treated cells at event time \eqn{j}. This was \code{fect}'s cumulative ATT before version 2.4.6. The two agree when every event time has the same number of treated cells.}
   \item{alpha}{A numerical value specifying the significance level. Default is \code{0.05}.}
   \item{type}{A string that specifies the type of effect to calculate. Must be one of the following: \code{"on"} (switch-on treatment effect) or \code{"off"} (switch-off treatment effect). Default is \code{"on"}.}
   \item{plot}{A logical flag indicating whether to plot cumulative effects. Default is \code{FALSE}.}
@@ -19,11 +19,13 @@ att.cumu(x, period = NULL, weighted = TRUE, alpha = 0.05, type = "on", plot = FA
 \value{
   A numeric matrix with one row per accumulation window, from \code{period[1]}
   to each subsequent period up to \code{period[2]}, with columns \code{start},
-  \code{end}, and \code{catt} (the cumulative average treatment effect on the
-  treated over that window). When the \code{fect} object carries uncertainty
-  estimates, four further columns give the bootstrap standard error
-  (\code{S.E.}), the confidence interval at level \code{alpha}
-  (\code{CI.lower}, \code{CI.upper}), and the \code{p.value}. With
+  \code{end}, and \code{catt}: the cumulative ATT over that window, defined by
+  \code{weighted} (by default, the sum of the per-period ATTs from \code{start}
+  to \code{end}). The first row is the ATT of the first period. When the fit
+  has standard errors (\code{se = TRUE}), four further columns give the
+  bootstrap standard error (\code{S.E.}), the confidence interval at level
+  \code{alpha} (\code{CI.lower}, \code{CI.upper}), and the \code{p.value};
+  without standard errors only the first three columns are returned. With
   \code{plot = TRUE} the cumulative effects are also plotted.
 }
 \author{
