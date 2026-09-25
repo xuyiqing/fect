@@ -39,7 +39,8 @@ estimand(
     draws saved with \code{keep.sims = TRUE} at fit time, except for
     \code{"att"} with \code{by = "event.time"} and default arguments and
     \code{"att.cumu"} with \code{by = "overall"}, which use the
-    pre-aggregated draws that every \code{se = TRUE} fit keeps.}
+    pre-aggregated draws that every \code{se = TRUE} fit keeps. Without
+    them, the other calls stop.}
 
   \item{by}{Grouping axis. One of \code{"event.time"} (default),
     \code{"cohort"}, \code{"calendar.time"}, \code{"overall"}, or any
@@ -69,7 +70,9 @@ estimand(
     otherwise uniform.}
 
   \item{window}{Optional event-time window \code{c(L, R)}; convenience
-    sugar for \code{cells = ~ event.time >= L & event.time <= R}.}
+    sugar for \code{cells = ~ event.time >= L & event.time <= R}. It
+    works only with \code{by = "overall"}; the event-time series stop
+    when it is given.}
 
   \item{direction}{Either \code{"on"} (default) or \code{"off"}; see
     \code{\link{imputed_outcomes}}.}
@@ -83,7 +86,9 @@ estimand(
     "wild"} at fit time) are consumed transparently and reported as
     \code{"wild"} in the output column.}
 
-  \item{conf.level}{Two-sided confidence level. Defaults to 0.95.}
+  \item{conf.level}{Two-sided confidence level. Defaults to 0.95. Not
+    used for \code{"att.cumu"}; the per-event-time ATT without a test
+    accepts only 0.95.}
 
   \item{ci.method}{One of \code{"basic"}, \code{"percentile"},
     \code{"bc"} (bias-corrected percentile), \code{"bca"}
@@ -104,7 +109,12 @@ estimand(
     \code{ci.method} is: bootstrap percentiles for bootstrap fits, and
     for parametric fits the estimate plus or minus a critical value
     (normal for \code{"overall"}, t for \code{"event.time"}) times
-    the SE.}
+    the SE. \code{NULL} still resolves to \code{"basic"} there, so
+    \code{estimand()} warns about tail quantiles when \code{nboots} is
+    below 1000, and a jackknife fit needs \code{ci.method = "normal"}.
+    For \code{"att"} with \code{by = "event.time"} and no test, only
+    the default is available (it returns \code{fit$est.att}); other
+    values stop, so use \code{by = "overall"}.}
 }
 
 \value{

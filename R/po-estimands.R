@@ -573,6 +573,7 @@ imputed_outcomes <- function(fit,
 #'   except for \code{"att"} with \code{by = "event.time"} and default
 #'   arguments and \code{"att.cumu"} with \code{by = "overall"}, which use
 #'   the pre-aggregated draws that every \code{se = TRUE} fit keeps.
+#'   Without them, the other calls stop.
 #' @param by Grouping axis. One of \code{"event.time"} (default;
 #'   per-event-time series), \code{"cohort"}, \code{"calendar.time"},
 #'   \code{"overall"} (one row), or any column name resolvable in the
@@ -595,7 +596,9 @@ imputed_outcomes <- function(fit,
 #'   \code{fit$W.agg} if the fit was built with \code{W} or \code{W.agg};
 #'   otherwise uniform.
 #' @param window Optional event-time window \code{c(L, R)}; convenience
-#'   sugar for \code{cells = ~ event.time >= L & event.time <= R}.
+#'   sugar for \code{cells = ~ event.time >= L & event.time <= R}. It
+#'   works only with \code{by = "overall"}; the event-time series stop
+#'   when it is given.
 #' @param direction Either \code{"on"} (default) or \code{"off"}; see
 #'   \code{\link{imputed_outcomes}}.
 #' @param vartype \code{"bootstrap"} (default), \code{"jackknife"},
@@ -605,11 +608,14 @@ imputed_outcomes <- function(fit,
 #'   which may differ from this argument value if the fit was produced
 #'   with a different setting --- the argument is informational and does
 #'   not re-aggregate replicates.
-#' @param conf.level Two-sided confidence level. Defaults to 0.95.
+#' @param conf.level Two-sided confidence level. Defaults to 0.95. Not
+#'   used for \code{"att.cumu"}; the per-event-time ATT without a test
+#'   accepts only 0.95.
 #' @param ci.method One of \code{"basic"} (reflected),
 #'   \code{"percentile"} (raw bootstrap quantiles), \code{"bc"}
 #'   (bias-corrected percentile; Efron 1987 minus the acceleration),
-#'   or \code{"normal"} (Wald: \eqn{\hat\theta \pm z \cdot SE}).
+#'   \code{"bca"} (bias-corrected accelerated), or \code{"normal"}
+#'   (Wald: \eqn{\hat\theta \pm z \cdot SE}).
 #'   Default is \code{NULL}, which triggers a per-type default:
 #'   \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
 #'   already uses), \code{"aptt"} -> \code{"bca"} and \code{"log.att"} ->
@@ -620,7 +626,13 @@ imputed_outcomes <- function(fit,
 #'   (\code{by = "event.time"}), whatever \code{ci.method} is: bootstrap
 #'   percentiles for bootstrap fits, and for parametric fits the estimate
 #'   plus or minus a critical value (normal for \code{"overall"}, t for
-#'   \code{"event.time"}) times the SE.
+#'   \code{"event.time"}) times the SE. \code{NULL} still resolves to
+#'   \code{"basic"} there, so \code{estimand()} warns about tail quantiles
+#'   when \code{nboots} is below 1000, and a jackknife fit needs
+#'   \code{ci.method = "normal"}. For \code{"att"} with
+#'   \code{by = "event.time"} and no test, only the default is available
+#'   (it returns \code{fit$est.att}); other values stop, so use
+#'   \code{by = "overall"}.
 #'
 #' @return A data frame with columns \code{<by_key>}, \code{estimate},
 #'   \code{se}, \code{ci.lo}, \code{ci.hi}, \code{n_cells}, and
