@@ -3,6 +3,53 @@
 
 Development version, not yet on CRAN.
 
+## Changes that affect results
+
+* `estimand()` now reads each bootstrap replicate's own units. Before, its standard errors for the overall ATT, APTT, log-ATT and the placebo and carryover tests were wrong whenever the treated units did not come first in the data with one adoption time (3 to 6 times too small on `turnout`). `imputed_outcomes(replicates = TRUE)` had the same error (#150).
+* `effect()`, `att.cumu()` and `estimand("att.cumu")` now use the variance type stored on the fit. With parametric inference, their confidence intervals were centered near zero when `vartype` was not typed as a string in the call, and in `att.cumu()` always.
+* Parametric standard errors with `normalize = TRUE` are no longer multiplied by the standard deviation of the outcome; on `turnout` they were 14 times too large (xuyiqing/gsynth#14).
+* The bootstrap now draws the right units when it resamples from a single unit: one treated unit, one unit with treatment reversals, or, for `vartype = "parametric"`, two never-treated units. With one treated unit most draws used to be dropped without a message, so the standard error came from a few draws or was NA.
+* `criterion = "pc"` now selects the number of factors with the lowest PC when the model is fitted on never-treated units (`method = "gsynth"`, or `time.component.from = "nevertreated"`); it used the MSPE rule. The cross-validation table of `method = "ife"` under `"pc"` also had mislabeled columns (xuyiqing/gsynth#24).
+* With `CV = TRUE`, `W.agg` given alone no longer weights the model fit or its cross-validation for never-treated fitting (`method = "gsynth"`, or `time.component.from = "nevertreated"`); it weights only the averages, as documented (xuyiqing/gsynth#101).
+* `wgt.implied` now uses the formula of Xu (2017), so the weighted control outcomes rebuild the factor part of each treated unit's counterfactual. It has one row per control unit and one column per treated unit, named by unit id, also under `loading.bound = "simplex"`. Its values change (xuyiqing/gsynth#17).
+* With `parallel = FALSE`, `se = TRUE` now draws the same cross-validation folds as `se = FALSE` for the same `seed`, so both select the same number of factors. It used to draw the folds of `seed + 1`.
+* With `time.component.from = "nevertreated"`, `se = TRUE` now uses the same never-treated estimator as `se = FALSE`. Before, `method = "ife"` or `"fe"` without cross-validation reported the not-yet-treated estimate and its standard errors, and `method = "cfe"` took its bootstrap and jackknife standard errors and its leave-one-out placebos from the not-yet-treated model.
+* The cumulative ATT (`att.cumu()`, `effect(cumu = TRUE)`, `estimand("att.cumu")`) is now the running sum of the per-period ATTs, as documented. Before, at event time k it was k times the average effect over all treated cells in event times 1 to k, which differs when the number of treated units changes over event time (on `turnout` with `method = "gsynth"` and `r = 0`, 8.26 instead of 21.50 at k = 10). `att.cumu(weighted = TRUE)` gives the old number (xuyiqing/gsynth#75).
+* A factor time index is now read in its level order, and a factor whose levels are increasing numbers gives the same fit as those numbers. Before, it was sorted as text ("1", "10", "2", ...), which scrambled the event times or made `method = "gsynth"` stop with a false message about treatment reversals (xuyiqing/gsynth#13).
+* A covariate that is an exact linear combination of other covariates no longer changes the estimate: it is dropped with a warning and its coefficient is NA, as in `lm()`. Before, it could move the ATT, for example from 5.54 to 6.51 with `X3 = 2 * X1` on `simgsynth` (`method = "gsynth"`, `r = 2`), or stop the fit with "inv(): matrix is singular" (xuyiqing/gsynth#83).
+
+## Input checks that now stop or warn
+
+* Formula terms must be column names. `log(Y + 20) ~ D`, `factor(g)`, `X1 * X2` and `.` now stop with a message that says to create the column first; before, `log(Y + 20) ~ D` was fitted as `Y ~ D`, `factor(g)` as one linear term and `X1 * X2` as `X1 + X2`. An outcome that also appears on the right-hand side stops too. Intercept terms such as `+ 0` or `- 1` are still accepted and ignored. The same rules apply to `interFE()` (xuyiqing/gsynth#13, xuyiqing/gsynth#23).
+* Covariates given both in the formula and in `X` now stop; `X` used to be ignored. `X` with a repeated name, or naming the outcome or the treatment, also stops (xuyiqing/gsynth#13, xuyiqing/gsynth#23).
+* Non-numeric covariates (factor, character, Date) now stop with a message that says to create numeric dummy columns first; they used to stop with misleading errors. Logical covariates are used as 0/1, as before.
+* A character time index must hold numbers; otherwise `fect()` stops and suggests a number, a Date, or a factor whose levels are in time order.
+* Covariates that cannot be estimated on the cells used to fit the model are dropped with one warning that names each covariate and the reason: an exact linear combination of other covariates, absorbed by the fixed effects, or no variation on those cells. Their coefficients are NA, and `fit$X` keeps the requested names. A covariate with no variation on those cells used to be dropped without a warning.
+* Covariates absorbed by the fixed effects (constant over time within each unit, or constant across units within each period) no longer stop `fect()`; they are dropped as above. The old message had the unit and time labels swapped. `interFE()` still stops on them, now with the correct label (xuyiqing/gsynth#40).
+
+## Bug fixes
+
+* `effect()` works when `id` names one unit and on fits with one treated unit; it stopped with "dim(X) must have a positive length" (xuyiqing/gsynth#45, xuyiqing/gsynth#53).
+* A `cells` formula in `estimand()` and `imputed_outcomes()` can use variables defined in the calling function; it stopped with "object not found".
+* Weights (`W` or `W.agg`) now work with `vartype = "parametric"`; the run stopped with "number of items to replace is not a multiple of replacement length" (#150, xuyiqing/gsynth#101).
+* `vartype = "parametric"` with fewer than two never-treated units now stops with a message; it failed with "invalid first argument".
+* The cluster bootstrap (`cl`) with clusters of unequal size now runs with `keep.sims = TRUE` (it stopped), and its counterfactual bands use every replicate. `cl` is checked: one column name, constant within each unit, at least two clusters. With `vartype = "parametric"`, `cl` is ignored with a warning, and `print()` no longer shows "Cluster SE" for parametric or jackknife fits (xuyiqing/gsynth#41, xuyiqing/gsynth#86).
+* Bootstrap runs with few never-treated units no longer stop with "number of items to replace ..."; a replicate that cannot be fitted is dropped. Whenever replicates are dropped, `fect()` says how many, and it warns when fewer than two remain. A main fit whose factors cannot be estimated stops with a plain message.
+* Cross-validation of `r` with never-treated fitting now searches at most the number of never-treated units minus one, and says so; a larger range stopped with "Mat::head_cols(): size out of bounds" (xuyiqing/gsynth#32).
+* When cross-validation of `r` is skipped because only one value was given, the message says so; it used to blame too few pre-treatment periods.
+* `method = "cfe"` with `time.component.from = "nevertreated"` and `W.agg` alone no longer stops with "subscript out of bounds".
+* `plot(type = "counterfactual")` works on fits without standard errors, and `plot(type = "factors")` works with a Date or other non-numeric time index.
+* When dropping the periods without any control observation leaves no treated observation, `fect()` stops with a message that names the dropped periods; it used to fail later with an unrelated error (xuyiqing/gsynth#57).
+* `loading.bound = "simplex"` is now used with cross-validation, with `method = "gsynth"` and `se = FALSE`, and in the parametric bootstrap; it was dropped there without a message, and the fit reported `"none"`. When no factor is selected, `fect()` says the bound has no effect.
+* Leave-one-out refits (`loo = TRUE`) of a `loading.bound = "simplex"` fit keep the bound, and with `gamma.loading = NULL` they reuse the main fit's `gamma.loading`.
+* `remove.id` now lists the removed units whenever units are removed; it was set only when the first unit was among them.
+* `dloo = TRUE` with `time.component.from = "nevertreated"` now stops; the never-treated setting used to be ignored.
+* `att.cumu()` works on fits without standard errors.
+* `method = "cfe"` with `time.component.from = "nevertreated"` now runs with a single treated unit.
+* `imputed_outcomes()` reports the aggregation weights of weighted fits; it reported NA. The fit stores these weights in `W.agg`.
+
+## New features and other changes
+
 * Add `dloo` and `dloo.adjust` flags to `fect()`: double (cohort-wise)
   leave-one-out pre-trend placebos, computed as a closed-form overlay on the
   in-sample fit -- **no re-fitting of the imputation model**. Like `loo`,
