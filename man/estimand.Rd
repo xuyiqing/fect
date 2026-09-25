@@ -31,11 +31,14 @@ estimand(
 
   \item{type}{Estimand type. \code{"att"} returns per-cell mean
     treatment effect aggregated per group; \code{"att.cumu"} returns
-    cumulative ATT through each event time (replaces \code{\link{effect}});
+    cumulative ATT through each event time, the running sum of the
+    per-period ATTs (replaces \code{\link{effect}});
     \code{"aptt"} returns the average proportional treatment effect on
     the treated (Chen and Roth 2024 QJE); \code{"log.att"} returns the
-    mean log-scale treatment effect. \code{"aptt"} and \code{"log.att"}
-    require \code{keep.sims = TRUE} at fit time for SE/CI.}
+    mean log-scale treatment effect. Standard errors need
+    \code{keep.sims = TRUE} at fit time for every call except
+    \code{"att"} by event time and \code{"att.cumu"} with
+    \code{by = "overall"}; without it, the other calls stop.}
 
   \item{by}{Grouping axis. One of \code{"event.time"} (default),
     \code{"cohort"}, \code{"calendar.time"}, \code{"overall"}, or any
@@ -65,7 +68,9 @@ estimand(
     otherwise uniform.}
 
   \item{window}{Optional event-time window \code{c(L, R)}; convenience
-    sugar for \code{cells = ~ event.time >= L & event.time <= R}.}
+    sugar for \code{cells = ~ event.time >= L & event.time <= R}. Not
+    available for \code{type = "att"} with \code{by = "event.time"}
+    and \code{test = "none"}.}
 
   \item{direction}{Either \code{"on"} (default) or \code{"off"}; see
     \code{\link{imputed_outcomes}}.}
@@ -79,7 +84,10 @@ estimand(
     "wild"} at fit time) are consumed transparently and reported as
     \code{"wild"} in the output column.}
 
-  \item{conf.level}{Two-sided confidence level. Defaults to 0.95.}
+  \item{conf.level}{Two-sided confidence level. Defaults to 0.95. Not
+    used for \code{type = "att.cumu"}; for \code{type = "att"} with
+    \code{by = "event.time"} and \code{test = "none"}, only 0.95 is
+    available.}
 
   \item{ci.method}{One of \code{"basic"}, \code{"percentile"},
     \code{"bc"} (bias-corrected percentile), \code{"bca"}
@@ -87,15 +95,24 @@ estimand(
     \code{"normal"} (Wald: \eqn{\hat\theta \pm z \cdot SE}). Default
     is \code{NULL}, which triggers a per-type default:
     \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
-    already uses internally), \code{"att.cumu"} -> \code{"percentile"}
-    (matches what \code{att.cumu()} does internally),
-    \code{"aptt"} -> \code{"bca"} and \code{"log.att"} ->
+    already uses internally), \code{"aptt"} -> \code{"bca"} and
+    \code{"log.att"} ->
     \code{"bca"} (ratio / log estimators benefit from joint
     bias and acceleration corrections when the bootstrap distribution
     is skewed; \code{"bc"} can degenerate at the boundary when the
     point estimate falls outside the bootstrap support). Pass an
     explicit value to override. \code{"bca"} requires bootstrap- or
-    wild-bootstrap-sourced replicates.}
+    wild-bootstrap-sourced replicates. For \code{type = "att"} with
+    \code{by = "event.time"} and \code{test = "none"}, only the
+    default is available; other values stop with an error (use
+    \code{by = "overall"}).
+    \code{type = "att.cumu"} does not use \code{ci.method}: it returns
+    the 95\% intervals of \code{effect()} (by event time) or
+    \code{att.cumu()} (\code{by = "overall"}), which are percentile
+    intervals for bootstrap fits and symmetric intervals built from the
+    standard error for parametric fits. \code{NULL} still resolves to
+    \code{"basic"} for it, so a jackknife fit needs
+    \code{ci.method = "normal"}.}
 }
 
 \value{

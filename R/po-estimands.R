@@ -558,16 +558,18 @@ imputed_outcomes <- function(fit,
 #'   \describe{
 #'     \item{\code{"att"}}{Per-cell mean treatment effect, aggregated
 #'       per group: \eqn{\mathrm{ATT}_g = \mathrm{mean}_{(t,i)\in g, D=1}(Y_{ti} - \widehat Y_{ti}(0))}.}
-#'     \item{\code{"att.cumu"}}{Cumulative ATT through each event time.
+#'     \item{\code{"att.cumu"}}{Cumulative ATT through each event time,
+#'       the running sum of the per-period ATTs.
 #'       Replaces \code{\link{effect}} for the unified API.}
 #'     \item{\code{"aptt"}}{Average proportional treatment effect on the
 #'       treated (Chen & Roth 2024 QJE):
-#'       \eqn{\mathrm{APTT}_g = \mathrm{mean}_g(Y - \widehat Y(0)) / \mathrm{mean}_g(\widehat Y(0))}.
-#'       Requires \code{keep.sims = TRUE} at fit time.}
+#'       \eqn{\mathrm{APTT}_g = \mathrm{mean}_g(Y - \widehat Y(0)) / \mathrm{mean}_g(\widehat Y(0))}.}
 #'     \item{\code{"log.att"}}{Mean log-scale treatment effect:
-#'       \eqn{\mathrm{logATT}_g = \mathrm{mean}_g(\log Y - \log \widehat Y(0))}.
-#'       Requires \code{keep.sims = TRUE}.}
+#'       \eqn{\mathrm{logATT}_g = \mathrm{mean}_g(\log Y - \log \widehat Y(0))}.}
 #'   }
+#'   Standard errors need \code{keep.sims = TRUE} at fit time for every
+#'   call except \code{"att"} by event time and \code{"att.cumu"} with
+#'   \code{by = "overall"}; without it, the other calls stop.
 #' @param by Grouping axis. One of \code{"event.time"} (default;
 #'   per-event-time series), \code{"cohort"}, \code{"calendar.time"},
 #'   \code{"overall"} (one row), or any column name resolvable in the
@@ -590,7 +592,9 @@ imputed_outcomes <- function(fit,
 #'   \code{fit$W.agg} if the fit was built with \code{W} or \code{W.agg};
 #'   otherwise uniform.
 #' @param window Optional event-time window \code{c(L, R)}; convenience
-#'   sugar for \code{cells = ~ event.time >= L & event.time <= R}.
+#'   sugar for \code{cells = ~ event.time >= L & event.time <= R}. Not
+#'   available for \code{type = "att"} with \code{by = "event.time"}
+#'   and \code{test = "none"}.
 #' @param direction Either \code{"on"} (default) or \code{"off"}; see
 #'   \code{\link{imputed_outcomes}}.
 #' @param vartype \code{"bootstrap"} (default), \code{"jackknife"},
@@ -600,18 +604,30 @@ imputed_outcomes <- function(fit,
 #'   which may differ from this argument value if the fit was produced
 #'   with a different setting --- the argument is informational and does
 #'   not re-aggregate replicates.
-#' @param conf.level Two-sided confidence level. Defaults to 0.95.
+#' @param conf.level Two-sided confidence level. Defaults to 0.95. Not
+#'   used for \code{type = "att.cumu"}; for \code{type = "att"} with
+#'   \code{by = "event.time"} and \code{test = "none"}, only 0.95 is
+#'   available.
 #' @param ci.method One of \code{"basic"} (reflected),
 #'   \code{"percentile"} (raw bootstrap quantiles), \code{"bc"}
 #'   (bias-corrected percentile; Efron 1987 minus the acceleration),
-#'   or \code{"normal"} (Wald: \eqn{\hat\theta \pm z \cdot SE}).
+#'   \code{"bca"} (bias-corrected accelerated), or \code{"normal"}
+#'   (Wald: \eqn{\hat\theta \pm z \cdot SE}).
 #'   Default is \code{NULL}, which triggers a per-type default:
 #'   \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
-#'   already uses), \code{"att.cumu"} -> \code{"percentile"} (matches
-#'   what \code{att.cumu()} does internally), \code{"aptt"} ->
-#'   \code{"bc"} and \code{"log.att"} -> \code{"bc"} (ratio / log
-#'   estimators benefit from bias correction when the bootstrap
-#'   distribution is skewed). Pass an explicit value to override.
+#'   already uses), \code{"aptt"} -> \code{"bca"} and
+#'   \code{"log.att"} -> \code{"bca"} (ratio / log estimators benefit
+#'   from bias correction when the bootstrap distribution is skewed).
+#'   Pass an explicit value to override. For \code{type = "att"} with
+#'   \code{by = "event.time"} and \code{test = "none"}, only the
+#'   default is available; other values stop with an error (use
+#'   \code{by = "overall"}). \code{type = "att.cumu"} does not use
+#'   \code{ci.method}: it returns the 95\% intervals of \code{effect()}
+#'   (by event time) or \code{att.cumu()} (\code{by = "overall"}),
+#'   which are percentile intervals for bootstrap fits and symmetric
+#'   intervals built from the standard error for parametric fits.
+#'   \code{NULL} still resolves to \code{"basic"} for it, so a jackknife
+#'   fit needs \code{ci.method = "normal"}.
 #'
 #' @return A data frame with columns \code{<by_key>}, \code{estimate},
 #'   \code{se}, \code{ci.lo}, \code{ci.hi}, \code{n_cells}, and
