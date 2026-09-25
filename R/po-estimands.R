@@ -592,9 +592,8 @@ imputed_outcomes <- function(fit,
 #'   \code{fit$W.agg} if the fit was built with \code{W} or \code{W.agg};
 #'   otherwise uniform.
 #' @param window Optional event-time window \code{c(L, R)}; convenience
-#'   sugar for \code{cells = ~ event.time >= L & event.time <= R}. Not
-#'   available for \code{type = "att"} with \code{by = "event.time"}
-#'   and \code{test = "none"}.
+#'   sugar for \code{cells = ~ event.time >= L & event.time <= R}. The
+#'   per-event-time ATT without a test does not accept it.
 #' @param direction Either \code{"on"} (default) or \code{"off"}; see
 #'   \code{\link{imputed_outcomes}}.
 #' @param vartype \code{"bootstrap"} (default), \code{"jackknife"},

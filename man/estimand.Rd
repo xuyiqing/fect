@@ -68,9 +68,8 @@ estimand(
     otherwise uniform.}
 
   \item{window}{Optional event-time window \code{c(L, R)}; convenience
-    sugar for \code{cells = ~ event.time >= L & event.time <= R}. Not
-    available for \code{type = "att"} with \code{by = "event.time"}
-    and \code{test = "none"}.}
+    sugar for \code{cells = ~ event.time >= L & event.time <= R}. The
+    per-event-time ATT without a test does not accept it.}
 
   \item{direction}{Either \code{"on"} (default) or \code{"off"}; see
     \code{\link{imputed_outcomes}}.}
