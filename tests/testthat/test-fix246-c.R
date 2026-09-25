@@ -507,6 +507,15 @@ test_that("C5: the C++ (X'X)^-1 falls back to a pseudo-inverse when singular", {
   expect_equal(fect:::XXinv(y), solve(yy), tolerance = 1e-12)
 })
 
+test_that("C5 guard: a covariate holding Inf runs as before (no new error)", {
+  d <- .fc_sim()
+  d$X1[5] <- Inf
+  ## 412d7ae returned NA estimates here; an unguarded pinv() would stop with
+  ## "pinv(): svd failed"
+  fit <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d, method = "fe", r = 0))
+  expect_true(is.na(fit$att.avg))
+})
+
 test_that("C6: interFE() labels absorbed covariates correctly", {
   d <- .fc_sim()
   d$Zu <- stats::ave(d$X1, d$id)

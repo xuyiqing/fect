@@ -309,10 +309,16 @@ arma::mat data_ub_adj (const arma::mat& I_data, const arma::mat& data) {
    covers what that check cannot see (e.g. a bootstrap replicate that is
    rank deficient by chance). A well-conditioned X'X keeps the exact inverse
    used before, so such fits are unchanged; a singular or near-singular one
-   gets the Moore-Penrose pseudo-inverse instead of an error or garbage. */
+   gets the Moore-Penrose pseudo-inverse instead of an error or garbage.
+   An X'X with non-finite entries (a covariate holding Inf) also keeps the
+   old inverse: pinv() cannot factor it, and the old path returns NaN
+   estimates rather than stopping. */
 static const double XX_RCOND_MIN = 1e-12 ;
 
-static bool xx_well_conditioned (const arma::mat& xx) {
+static bool xx_keep_inverse (const arma::mat& xx) {
+  if (!xx.is_finite()) {
+    return(true) ;
+  }
   double rc = arma::rcond(xx) ;
   return(std::isfinite(rc) && rc > XX_RCOND_MIN) ;
 }
@@ -332,7 +338,7 @@ arma::mat XXinv (const arma::cube& X) {
       }
     }
   } 
-  if (xx_well_conditioned(xx)) {
+  if (xx_keep_inverse(xx)) {
     return(inv(xx)) ;
   }
   return(arma::pinv(xx)) ;
@@ -355,7 +361,7 @@ arma::mat wXXinv (const arma::cube& X, const arma::mat& w) {
       }
     }
   }  
-  if (xx_well_conditioned(xx)) {
+  if (xx_keep_inverse(xx)) {
     return(inv_sympd(xx)) ;
   }
   return(arma::pinv(xx)) ;

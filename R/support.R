@@ -838,7 +838,9 @@ v_replace <- function(needle, haystack) {
             fe[[paste0("extra", k)]] <- extra.fe[, , k][cells]
         }
     }
-    ok <- stats::complete.cases(Xm)
+    ## only finite cells enter the check (a covariate holding Inf is left to
+    ## the estimators, as before)
+    ok <- rowSums(!is.finite(Xm)) == 0
     if (length(fe) > 0) {
         for (f in fe) ok <- ok & !is.na(f)
     }
@@ -863,12 +865,20 @@ v_replace <- function(needle, haystack) {
         if (length(fe) == 0) {
             Xd <- sweep(Xm, 2, colMeans(Xm))
         } else {
-            Xd <- fixest::demean(Xm, f = fe, tol = 1e-10, iter = 10000,
-                                 nthreads = 1, notes = FALSE)
-            Xd <- matrix(Xd, nrow = nrow(Xm))
+            ## the check must never stop a fit: if demeaning fails, skip steps
+            ## 2 and 3 (the C++ guard remains)
+            Xd <- tryCatch(
+                matrix(fixest::demean(Xm, f = fe, tol = 1e-10, iter = 10000,
+                                      nthreads = 1, notes = FALSE),
+                       nrow = nrow(Xm)),
+                error = function(e) NULL
+            )
+            if (is.null(Xd) || anyNA(Xd[, rest])) {
+                rest <- integer(0)
+            }
         }
         for (j in rest) {
-            if (norm2(Xd[, j]) > 1e-8 * c0[j]) next
+            if (!isTRUE(norm2(Xd[, j]) <= 1e-8 * c0[j])) next
             if (force %in% c(1, 3) &&
                 norm2(Xm[, j] - stats::ave(Xm[, j], unit)) <= 1e-8 * c0[j]) {
                 reason[j] <- "does not vary over time within units, so it is absorbed by the unit fixed effects"
@@ -883,7 +893,7 @@ v_replace <- function(needle, haystack) {
         }
         ## 3. exact linear combinations of the other covariates; like lm(),
         ## keep the earlier column of a collinear set
-        rest <- which(is.na(reason))
+        rest <- intersect(rest, which(is.na(reason)))
         if (length(rest) > 1) {
             q <- qr(Xd[, rest, drop = FALSE], tol = 1e-7)
             if (q$rank < length(rest)) {
