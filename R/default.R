@@ -650,6 +650,17 @@ fect.default <- function(
                 call. = FALSE
             )
         }
+        if (vartype == "parametric" && !is.null(cl) &&
+            !identical(cl, index[1])) {
+            warning(
+                "vartype = \"parametric\" with cl = ... : the cl argument is ",
+                "ignored. The parametric bootstrap simulates errors unit by ",
+                "unit and does not resample clusters, so the SEs do not ",
+                "account for within-cluster correlation. Use ",
+                "vartype = \"bootstrap\" with cl for cluster-aware inference.",
+                call. = FALSE
+            )
+        }
         if (!para.error %in% c("auto", "ar", "empirical", "wild")) {
             stop(
                 "\"para.error\" must be one of \"auto\", \"ar\", \"empirical\", or \"wild\".",
@@ -1283,14 +1294,41 @@ fect.default <- function(
     }
 
     if (!is.null(cl)) {
-        if (!cl %in% names(data)) {
-            stop("\"cl\" misspecified.\n")
+        ## length before membership: with two names `%in%` gives two values
+        ## and the `if` stopped with R's "the condition has length > 1"
+        if (!is.character(cl) || length(cl) != 1L) {
+            stop("\"cl\" must be a single column name.", call. = FALSE)
         }
-        if (length(cl) != 1) {
-            stop("Length of \"cl\" must be 1.\n")
+        if (!cl %in% names(data)) {
+            stop("\"cl\" (\"", cl, "\") is not a column of data.",
+                 call. = FALSE)
         }
         if (cl == index[1]) {
             cl <- NULL
+        }
+    }
+    if (se == TRUE && vartype == "bootstrap" && !is.null(cl)) {
+        ## The cluster bootstrap maps each unit to one cluster and resamples
+        ## whole units by cluster, so a unit's cluster must not change.
+        n.cl.unit <- tapply(data[[cl]], data[[index[1]]],
+                            function(x) length(unique(x[!is.na(x)])))
+        bad.cl <- names(n.cl.unit)[!is.na(n.cl.unit) & n.cl.unit > 1]
+        if (length(bad.cl) > 0) {
+            bad.show <- if (length(bad.cl) > 10) {
+                paste0(paste(bad.cl[1:10], collapse = ", "), ", and ",
+                       length(bad.cl) - 10, " more")
+            } else {
+                paste(bad.cl, collapse = ", ")
+            }
+            stop("\"cl\" (\"", cl, "\") must be constant within each unit (",
+                 index[1], "): the cluster bootstrap resamples whole units ",
+                 "by cluster. Units whose cluster changes: ", bad.show, ".",
+                 call. = FALSE)
+        }
+        if (length(unique(data[[cl]][!is.na(data[[cl]])])) < 2) {
+            stop("\"cl\" (\"", cl, "\") has fewer than two distinct values; ",
+                 "the cluster bootstrap needs at least two clusters.",
+                 call. = FALSE)
         }
     }
 

@@ -99,6 +99,40 @@ trim_closure_env <- function(fun) {
   x[sample.int(length(x), size, replace = replace)]
 }
 
+## Store matrix `m` (TT x w) in slice j of `arr` (TT x W x B), padding with NA.
+## Widens `arr` (new columns NA) when w > W. An all-NA `m` (failed replicate)
+## never widens. Cluster-bootstrap replicates have varying width w (the units
+## of the drawn clusters); colnames.boot[[j]] records the real width. When
+## every replicate has width W the result equals `arr[, , j] <- m`.
+.fect_store_slice <- function(arr, m, j) {
+  if (is.null(m)) {
+    arr[, , j] <- NA
+    return(arr)
+  }
+  m <- as.matrix(m)
+  W <- dim(arr)[2]
+  w <- ncol(m)
+  if (nrow(m) != dim(arr)[1]) {
+    stop("replicate matrix has ", nrow(m), " rows; expected ", dim(arr)[1], ".",
+         call. = FALSE)
+  }
+  if (w > W) {
+    if (all(is.na(m))) {
+      arr[, , j] <- NA
+      return(arr)
+    }
+    grown <- array(NA, dim = c(dim(arr)[1], w, dim(arr)[3]))
+    grown[, seq_len(W), ] <- arr
+    arr <- grown
+    W <- w
+  }
+  if (w < W) {
+    arr[, , j] <- NA
+  }
+  arr[, seq_len(w), j] <- m
+  arr
+}
+
 fect_boot <- function(
   Y,
   X,
@@ -1956,9 +1990,9 @@ fect_boot <- function(
       }
       if (keep.sims) {
         colnames(boot.out[[j]]$eff) <- boot.out[[j]]$boot.id
-        eff.boot[,, j] <- boot.out[[j]]$eff
-        D.boot[,, j] <- boot.out[[j]]$D
-        I.boot[,, j] <- boot.out[[j]]$I
+        eff.boot <- .fect_store_slice(eff.boot, boot.out[[j]]$eff, j)
+        D.boot <- .fect_store_slice(D.boot, boot.out[[j]]$D, j)
+        I.boot <- .fect_store_slice(I.boot, boot.out[[j]]$I, j)
         if (is.null(boot.out[[j]]$boot.id)) {
           colnames.boot <- c(colnames.boot, list(1:N))
         } else {
@@ -2077,9 +2111,9 @@ fect_boot <- function(
       if (keep.sims) {
         colnames(boot$eff) <- boot$boot.id
         # assign("boot", boot, .GlobalEnv)
-        eff.boot[,, j] <- boot$eff
-        D.boot[,, j] <- boot$D
-        I.boot[,, j] <- boot$I
+        eff.boot <- .fect_store_slice(eff.boot, boot$eff, j)
+        D.boot <- .fect_store_slice(D.boot, boot$D, j)
+        I.boot <- .fect_store_slice(I.boot, boot$I, j)
         if (is.null(boot$boot.id)) {
           colnames.boot <- c(colnames.boot, list(1:N)) # Parametric bootstrap
           # assign("boot", boot, .GlobalEnv)
@@ -2548,6 +2582,12 @@ fect_boot <- function(
           if (vartype == "jackknife") {
             expected_N_b <- N - 1
           }
+          if (!is.null(cl) && vartype == "bootstrap") {
+            ## cluster bootstrap: a replicate holds the units of the drawn
+            ## clusters, so its width varies; this block only uses the
+            ## replicate's own D_b, Y_b and Y.ct
+            expected_N_b <- N_b
+          }
           if (N > 0 && N_b != expected_N_b) {
             warning(
               paste(
@@ -2733,6 +2773,11 @@ fect_boot <- function(
             }
             # if N=0, expected_N_b = -1. N_b is likely 0. This path is complex if N=0.
             # However, N=0 is caught by an early return. So N > 0 here.
+          }
+          if (!is.null(cl) && vartype == "bootstrap") {
+            ## cluster bootstrap: a replicate holds the units of the drawn
+            ## clusters, so its width varies; only D_b, Y_b, Y.ct are used
+            expected_N_b <- N_b
           }
 
           if (N > 0 && N_b != expected_N_b) {

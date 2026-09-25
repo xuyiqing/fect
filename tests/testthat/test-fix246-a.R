@@ -321,3 +321,96 @@ test_that("A5: parametric bootstrap with one never-treated unit stops clearly", 
     "needs at least two never-treated units \\(found 1\\)"
   )
 })
+
+
+## -- A6  cluster bootstrap: varying width, cl checks, parametric --------
+
+## Five clusters of sizes 2, 3, 4, 5, 6; each has treated and control units.
+.fix246_cl <- c(1, 2, 3, 4, 5, 5, 1, 2, 3, 3, 4, 4, 5, 5, 2, 3, 4, 4, 5, 5)
+
+test_that("A6: unequal clusters work with keep.sims = TRUE", {
+  skip_on_cran()
+  d <- .fix246_panel()
+  d$cl <- .fix246_cl[d$id]
+  fit <- .fix246_fit(d, vartype = "bootstrap", cl = "cl")
+  widths <- lengths(fit$colnames.boot)
+  expect_equal(length(widths), dim(fit$eff.boot)[3])
+  expect_gt(length(unique(widths)), 1)
+  expect_equal(dim(fit$eff.boot)[2], max(widths))
+  ## columns beyond a replicate's own width are NA padding
+  b <- which.min(widths)
+  expect_true(all(is.na(fit$eff.boot[, -seq_len(widths[b]), b])))
+  expect_true(all(is.na(fit$D.boot[, -seq_len(widths[b]), b])))
+  ## readers of the replicate arrays still work
+  est <- fect::estimand(fit, "att", "overall")
+  expect_equal(est$se, unname(fit$est.avg[1, "S.E."]), tolerance = 1e-10)
+  M <- suppressMessages(fect::effect(fit, plot = FALSE))$effect.est.att
+  expect_true(all(is.finite(M[, "S.E."])))
+  po_b <- fect::imputed_outcomes(fit, replicates = TRUE)
+  expect_equal(unname(c(tapply(po_b$eff, po_b$replicate, mean))),
+               unname(c(fit$att.avg.boot)), tolerance = 1e-10)
+})
+
+test_that("A6: cluster replicates of any width enter the average-outcome bands", {
+  skip_on_cran()
+  d <- .fix246_panel()
+  d$cl <- .fix246_cl[d$id]
+  out <- .fix246_capture(
+    fect::fect(Y ~ D, data = d, index = c("id", "time"), method = "gsynth",
+               r = 1, CV = FALSE, se = TRUE, nboots = 40, parallel = FALSE,
+               seed = 1, cl = "cl")
+  )
+  expect_false(any(grepl("Skipping replicate", out$warnings)))
+  expect_true(any(is.finite(out$value$Y.avg$lower.ct)))
+})
+
+test_that("A6: cl must be one column, constant within units, with two clusters", {
+  d <- .fix246_panel()
+  d$cl <- .fix246_cl[d$id]
+  d$clv <- d$cl
+  d$clv[d$id == 3 & d$time > 8] <- 9
+  d$one <- 1
+  fit_cl <- function(...) {
+    suppressWarnings(suppressMessages(
+      fect::fect(Y ~ D, data = d, index = c("id", "time"), method = "gsynth",
+                 r = 1, CV = FALSE, se = TRUE, nboots = 10, parallel = FALSE,
+                 ...)
+    ))
+  }
+  expect_error(fit_cl(cl = c("cl", "id")), "must be a single column name")
+  expect_error(fit_cl(cl = "nope"), "is not a column of data")
+  expect_error(fit_cl(cl = "clv"),
+               "must be constant within each unit \\(id\\).*Units whose cluster changes: 3")
+  expect_error(fit_cl(cl = "one"), "needs at least two clusters")
+})
+
+test_that("A6: parametric inference warns that cl is ignored; print says so", {
+  skip_on_cran()
+  d <- .fix246_panel()
+  d$cl <- .fix246_cl[d$id]
+  out <- .fix246_capture(
+    fect::fect(Y ~ D, data = d, index = c("id", "time"), method = "gsynth",
+               r = 1, CV = FALSE, se = TRUE, vartype = "parametric",
+               nboots = 10, parallel = FALSE, seed = 1, cl = "cl")
+  )
+  expect_true(any(grepl("vartype = \"parametric\" with cl = .*ignored",
+                        out$warnings)))
+  expect_false(any(grepl("Cluster SE", utils::capture.output(print(out$value)))))
+  fit_b <- .fix246_fit(d, vartype = "bootstrap", nboots = 10, cl = "cl")
+  expect_true(any(grepl("^Cluster SE:.*cl", utils::capture.output(print(fit_b)))))
+})
+
+test_that("A6: .fect_store_slice() pads, widens, and never widens for failures", {
+  arr <- array(0, dim = c(2, 3, 2))
+  a1 <- fect:::.fect_store_slice(arr, matrix(1, 2, 4), 1)
+  expect_equal(dim(a1), c(2, 4, 2))
+  expect_true(all(a1[, , 1] == 1))
+  expect_true(all(a1[, 1:3, 2] == 0) && all(is.na(a1[, 4, 2])))
+  a2 <- fect:::.fect_store_slice(a1, matrix(5, 2, 2), 2)
+  expect_equal(a2[, , 2], cbind(matrix(5, 2, 2), matrix(NA, 2, 2)))
+  a3 <- fect:::.fect_store_slice(arr, matrix(NA_real_, 2, 5), 2)
+  expect_equal(dim(a3), c(2, 3, 2))
+  expect_true(all(is.na(a3[, , 2])))
+  expect_identical(fect:::.fect_store_slice(arr, matrix(2, 2, 3), 1)[, , 1],
+                   matrix(2, 2, 3))
+})
