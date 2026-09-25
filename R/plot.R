@@ -931,6 +931,10 @@ plot.fect <- function(
         p <- p + guides(colour = guide_legend(title = "Factor(s)", ncol = 4))
 
         if (!is.numeric(time.label)) {
+          ## label positions for a non-numeric time index (Date, character);
+          ## same thinning rule as the other plot types. Before 2.4.6 T.b was
+          ## undefined here ("object 'T.b' not found").
+          T.b <- if (nT > 20) seq(1, nT, by = ceiling(nT / 20)) else seq_len(nT)
           p <- p +
             scale_x_continuous(expand = c(0, 0), breaks = show[T.b], labels = time.label[T.b])
         }
@@ -1710,7 +1714,7 @@ plot.fect <- function(
         ct.info_unit <- Y.ct[show_abs, unit_col_idx_in_Y.tr] # Subset by show_abs here
         y_data_for_range_calc <- c(tr.info_unit, ct.info_unit) # Already subsetted
         if (raw == "none") {
-          if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
+          if (identical(x$vartype, "parametric") && !is.null(id) && !is.null(x$eff.boot)) {
             if (plot.ci == "95") {
               para.ci <- basic_ci_alpha(
                 rowMeans(x$eff.boot[, which(tr %in% subset.tr), ]),
@@ -1740,7 +1744,7 @@ plot.fect <- function(
             } else {
               warning("Invalid plot.ci provided.")
             }
-          } else if (x$vartype == "parametric" & raw == "none" & is.null(id)) {
+          } else if (identical(x$vartype, "parametric") && raw == "none" && is.null(id)) {
             if (plot.ci == "95") {
               x$Y.avg <- data.frame(
                 period   = x$rawtime,
@@ -1857,7 +1861,7 @@ plot.fect <- function(
         Yb_show_abs <- Yb[show_abs, , drop = FALSE]
         y_data_for_range_calc <- c(Yb_show_abs[, 1], Yb_show_abs[, 2])
         if (raw == "none") {
-          if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
+          if (identical(x$vartype, "parametric") && !is.null(id) && !is.null(x$eff.boot)) {
             subset.eff.boot <- sapply(seq_len(dim(x$eff.boot)[3]), function(j) {
               rowMeans(x$eff.boot[, which(tr %in% subset.tr), j], na.rm = TRUE)
             })
@@ -1890,7 +1894,7 @@ plot.fect <- function(
             } else {
               warning("Invalid plot.ci provided.")
             }
-          } else if (x$vartype == "parametric" & raw == "none" & is.null(id)) {
+          } else if (identical(x$vartype, "parametric") && raw == "none" && is.null(id)) {
             if (plot.ci == "95") {
               x$Y.avg <- data.frame(
                 period   = x$rawtime,
@@ -2156,7 +2160,7 @@ plot.fect <- function(
       y_data_for_range_calc <- c(Yb_data_subset[, 1], Yb_data_subset[, 2])
 
       if (raw == "none") {
-        if (x$vartype == "parametric" & !is.null(id) & !is.null(x$eff.boot)) {
+        if (identical(x$vartype, "parametric") && !is.null(id) && !is.null(x$eff.boot)) {
           subset.eff.boot <- sapply(seq_len(dim(x$eff.boot)[3]), function(j) {
             rowMeans(align_time_series(
               x$eff.boot[, which(tr %in% subset.tr), j],
@@ -2193,7 +2197,7 @@ plot.fect <- function(
           } else {
             warning("Invalid plot.ci provided.")
           }
-        } else if (x$vartype == "parametric" & raw == "none" & is.null(id)) {
+        } else if (identical(x$vartype, "parametric") && raw == "none" && is.null(id)) {
           if (plot.ci == "95") {
             x$Y.avg <- data.frame(
               period   = xx$timeline,

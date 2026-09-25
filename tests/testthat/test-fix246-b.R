@@ -269,3 +269,39 @@ test_that("B5: simplex weights have the same Nco x Ntr orientation", {
                  as.numeric(crossprod(fit$lambda.co, W[, i])), tolerance = 1e-6)
   }
 })
+
+
+## -- B6  plots of fits without SEs, and factors with a Date index -------
+
+test_that("B6: counterfactual plots work when se = FALSE (vartype is NULL)", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  fit <- .fix246b_quiet(fect::fect(
+    Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"),
+    method = "gsynth", force = "two-way", r = 2, CV = FALSE, se = FALSE,
+    parallel = FALSE
+  ))
+  expect_null(fit$vartype)
+  p1 <- .fix246b_quiet(plot(fit, type = "counterfactual"))
+  expect_s3_class(p1, "ggplot")
+  p2 <- .fix246b_quiet(plot(fit, type = "ct", id = 101))
+  expect_s3_class(p2, "ggplot")
+})
+
+test_that("B6: the factors plot labels a Date time index", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  d <- simgsynth
+  d$date <- as.Date("2000-01-01") + (d$time - 1) * 31
+  fit <- .fix246b_quiet(fect::fect(
+    Y ~ D + X1 + X2, data = d, index = c("id", "date"), method = "gsynth",
+    force = "two-way", r = 2, CV = FALSE, se = FALSE, parallel = FALSE
+  ))
+  p <- .fix246b_quiet(plot(fit, type = "factors"))
+  expect_s3_class(p, "ggplot")
+  ## 30 periods: labels thinned to every 2nd period
+  b <- ggplot2::ggplot_build(p)
+  labs <- b$layout$panel_params[[1]]$x$get_labels()
+  expect_equal(length(labs), 15)
+  expect_equal(as.character(labs[1]), as.character(fit$rawtime[1]))
+})
