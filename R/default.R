@@ -887,7 +887,8 @@ fect.default <- function(
     ## Time index. A factor is used in its level order: if its levels are
     ## increasing numbers, as those numbers (the same fit as passing the
     ## numbers); otherwise as level positions 1, 2, ..., with the levels kept
-    ## as labels for the output (rawtime, row names, data.long, messages). A
+    ## as labels for the output (rawtime, row names, data.long, messages), and
+    ## a warning when the levels are numbers out of numeric order. A
     ## character index must hold numbers. Before 2.4.6 both were ordered as
     ## text ("1", "10", "11", ..., "2"). Numeric, Date and other classes are
     ## used as they are.
@@ -902,6 +903,22 @@ fect.default <- function(
                 all(diff(time.num) > 0)) {
                 data[[time]] <- time.num[as.integer(time.f)]
             } else {
+                if (length(time.lev) > 0 && !anyNA(time.num)) {
+                    ## levels that are numbers but not in increasing order,
+                    ## e.g. factor(as.character(year)) with levels "1",
+                    ## "10", "2": still used in level order, with a warning
+                    time.eg <- time.lev[seq_len(min(3L, length(time.lev)))]
+                    warning(
+                        "The time index \"", time, "\" is a factor whose ",
+                        "levels are numbers but not in increasing order (for ",
+                        "example ", paste0("\"", time.eg, "\"", collapse = ", "),
+                        "); fect orders the periods by the factor levels. If ",
+                        "that is not the time order, pass a numeric index ",
+                        "(e.g. as.numeric(as.character(", time, "))) or ",
+                        "reorder the levels.",
+                        call. = FALSE
+                    )
+                }
                 data[[time]] <- as.integer(time.f)
                 time.labels <- time.lev
             }

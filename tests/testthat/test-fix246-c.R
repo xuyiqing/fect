@@ -377,6 +377,41 @@ test_that("C4: a character time index must hold numbers", {
   expect_s3_class(g5$rawtime, "Date")
 })
 
+test_that("C4b: numbers as factor levels out of numeric order give a warning; level order is kept", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  fit <- function(d) .fix246c_warnings(fect::fect(
+    Y ~ D + X1 + X2, data = d, index = c("id", "time"), method = "ife",
+    r = 2, CV = FALSE, se = FALSE, parallel = FALSE
+  ))
+  c4b <- "is a factor whose levels are numbers but not in increasing order"
+  ## factor(as.character(time)) has the levels "1", "10", "11", ..., "9"
+  d1 <- simgsynth
+  d1$time <- factor(as.character(d1$time))
+  w1 <- fit(d1)
+  msg <- paste0(
+    "The time index \"time\" is a factor whose levels are numbers but not in ",
+    "increasing order (for example \"1\", \"10\", \"11\"); fect orders the ",
+    "periods by the factor levels. If that is not the time order, pass a ",
+    "numeric index (e.g. as.numeric(as.character(time))) or reorder the levels."
+  )
+  expect_identical(sum(w1$warnings == msg), 1L)
+  expect_identical(sum(grepl(c4b, w1$warnings, fixed = TRUE)), 1L)
+  ## the levels are still used in their order: the same fit as labels that
+  ## are not numbers, in the same order
+  d2 <- simgsynth
+  d2$time <- factor(paste0("p", d2$time), levels = paste0("p", levels(d1$time)))
+  w2 <- fit(d2)
+  expect_false(any(grepl(c4b, w2$warnings, fixed = TRUE)))
+  expect_identical(w1$value$att.avg, w2$value$att.avg)
+  expect_identical(unname(w1$value$eff), unname(w2$value$eff))
+  expect_identical(w1$value$rawtime, levels(d1$time))
+  ## levels that are increasing numbers: no warning
+  d3 <- simgsynth
+  d3$time <- factor(d3$time)
+  expect_false(any(grepl(c4b, fit(d3)$warnings, fixed = TRUE)))
+})
+
 
 ## -- C5 + C6  collinear and FE-absorbed covariates --------------------------
 
