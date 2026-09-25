@@ -167,3 +167,43 @@ test_that("B3: too few pre-treatment records keep their message; one never-treat
   expect_false(any(grepl("records of treated units are too few", out1$msgs,
                          fixed = TRUE)))
 })
+
+
+## -- B4  W.agg never enters the fit or its CV scoring ------------------------
+
+## simgsynth with unit weights and 60 control cells dropped at random, so a
+## fit weight would change the control-panel fit.
+.fb_unbalanced_weighted <- function() {
+  d0 <- .fb_data("simgsynth")
+  set.seed(7)
+  ids <- unique(d0$id)
+  w <- stats::setNames(stats::runif(length(ids), 0.2, 5), ids)
+  d0$w <- w[as.character(d0$id)]
+  ctrl_rows <- which(!(d0$id %in% 101:105))
+  set.seed(3)
+  d0[-sample(ctrl_rows, 60), ]
+}
+
+test_that("B4: W.agg alone leaves the model fit and its CV unweighted (gsynth, cfe)", {
+  skip_on_cran()
+  d <- .fb_unbalanced_weighted()
+  for (m in c("gsynth", "cfe")) {
+    fit <- function(...) .fb_quiet(fect::fect(
+      Y ~ D + X1 + X2, data = d, index = c("id", "time"), method = m,
+      force = "two-way", time.component.from = "nevertreated", se = FALSE,
+      parallel = FALSE, seed = 1, ...))
+    u1 <- fit(r = c(2, 2), CV = TRUE)
+    a1 <- fit(r = c(2, 2), CV = TRUE, W.agg = "w")
+    e1 <- fit(r = c(2, 2), CV = TRUE, W.est = "w")
+    ## 412d7ae: the W.agg fit equals the W.est fit (beta diff 0.015)
+    expect_equal(a1$beta, u1$beta, tolerance = 1e-10, info = m)
+    expect_equal(a1$eff, u1$eff, tolerance = 1e-10, info = m)
+    expect_equal(a1$CV.out, u1$CV.out, tolerance = 1e-10, info = m)
+    ## a fit weight still acts on this panel
+    expect_gt(max(abs(e1$beta - u1$beta)), 1e-3)
+    ## 412d7ae, cfe: "subscript out of bounds" even with CV = FALSE
+    a0 <- fit(r = 2, CV = FALSE, W.agg = "w")
+    u0 <- fit(r = 2, CV = FALSE)
+    expect_equal(a0$eff, u0$eff, tolerance = 1e-10, info = m)
+  }
+})

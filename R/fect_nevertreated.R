@@ -196,6 +196,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         W.use <- as.matrix(W[, co, drop = FALSE])
         W.use[which(II.co == 0)] <- 0
     }
+    ## Weights that enter the fit and its CV scoring: W only when it is a fit
+    ## weight (W.est). An aggregation-only weight (W.agg, W.in.fit = FALSE)
+    ## weights the ATT aggregation below and nothing else.
+    W.cvfit <- if (isTRUE(W.in.fit)) W else NULL
 
     ## ---- cv.method validation ---- ##
     cv.method <- .fect_normalize_cv_method(
@@ -205,7 +209,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     if (isTRUE(CV == TRUE)) .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
     ## ---- W for treated units (scoring) ---- ##
-    if (!is.null(W)) {
+    if (!is.null(W) && isTRUE(W.in.fit)) {
         W.tr <- as.matrix(W[, tr, drop = FALSE])
     } else {
         W.tr <- NULL
@@ -626,7 +630,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                             X.co          = X.co,
                             II.co         = II.co,
                             W.use         = W.use,
-                            W             = W,
+                            W             = W.cvfit,
                             beta0CV.co    = beta0CV.co,
                             rmCV          = rmCV,
                             estCV         = estCV,
@@ -664,7 +668,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     task_idx <- which(vapply(tasks_ife, function(t) t$ri == i, logical(1)))
                     all_resid    <- unlist(lapply(fold_scores_ife[task_idx], `[[`, "resid"))
                     all_time_idx <- unlist(lapply(fold_scores_ife[task_idx], `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_scores_ife[task_idx], `[[`, "obs_w")) else c()
+                    all_obs_w    <- if (!is.null(W.cvfit)) unlist(lapply(fold_scores_ife[task_idx], `[[`, "obs_w")) else c()
 
                     if (length(all_resid) == 0) {
                         scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
@@ -674,7 +678,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         agg <- .fect_cv_aggregate_folds(
                             fold_list  = fold_scores_ife[task_idx],
                             count.T.cv = count.T.cv,
-                            use_weight = as.integer(!is.null(W)),
+                            use_weight = as.integer(!is.null(W.cvfit)),
                             norm.para  = NULL
                         )
                         scores <- agg$pooled
@@ -900,7 +904,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         X.co     = X.co,
                         II.co    = II.co,
                         W.use    = W.use,
-                        W        = W,
+                        W        = W.cvfit,
                         beta0CV.co = beta0CV.co,
                         rmCV     = rmCV,
                         estCV    = estCV,
@@ -918,7 +922,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     agg <- .fect_cv_aggregate_folds(
                         fold_list  = fold_results,
                         count.T.cv = count.T.cv,
-                        use_weight = as.integer(!is.null(W)),
+                        use_weight = as.integer(!is.null(W.cvfit)),
                         norm.para  = NULL
                     )
                     scores <- agg$pooled
@@ -1420,7 +1424,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     }
     initialOut <- Y0.co <- NULL
     oci <- which(c(II.co) == 1)
-    if (is.null(W)) {
+    if (is.null(W) || !W.in.fit) {
         initialOut <- initialFit(data = data.ini, force = force, oci = oci)
     } else {
         initialOut <- initialFit(data = data.ini, force = force, w = c(W.use), oci = oci)
@@ -1726,7 +1730,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                             X.co            = X.co,
                             II.co           = II.co,
                             W.use           = W.use,
-                            W               = W,
+                            W               = W.cvfit,
                             beta0CV.co      = beta0CV.co,
                             X.extra.FE.co.B = X.extra.FE.co.B,
                             X.Z.co          = X.Z.co,
@@ -1772,7 +1776,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
                     ## Aggregate fold scores for this rank
                     task_idx <- which(vapply(tasks_cfe, function(t) t$ri == i, logical(1)))
-                    agg    <- .cfe_fold_scores(fold_scores_cfe[task_idx], !is.null(W), NULL)
+                    agg    <- .cfe_fold_scores(fold_scores_cfe[task_idx], !is.null(W.cvfit), NULL)
                     scores <- agg$pooled
                     se_v   <- agg$se
 
@@ -2022,7 +2026,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         X.co            = X.co,
                         II.co           = II.co,
                         W.use           = W.use,
-                        W               = W,
+                        W               = W.cvfit,
                         beta0CV.co      = beta0CV.co,
                         X.extra.FE.co.B = X.extra.FE.co.B,
                         X.Z.co          = X.Z.co,
@@ -2039,7 +2043,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         max.iteration   = max.iteration
                     )
                 })
-                agg    <- .cfe_fold_scores(fold_results, !is.null(W), NULL)
+                agg    <- .cfe_fold_scores(fold_results, !is.null(W.cvfit), NULL)
                 scores <- agg$pooled
                 se_v   <- agg$se
 

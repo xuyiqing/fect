@@ -212,7 +212,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 cv.prop = cv.prop, cv.donut = cv.donut, cv.buffer = cv.buffer,
                 min.T0 = min.T0, k = k, criterion = criterion, cv.rule = cv.rule,
                 parallel = parallel, cores = cores,
-                do_parallel_cv = do_parallel_cv
+                do_parallel_cv = do_parallel_cv,
+                W.in.fit = W.in.fit
             )
             return(out)
         }
@@ -234,7 +235,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 cv.prop = cv.prop, cv.donut = cv.donut, cv.buffer = cv.buffer,
                 min.T0 = min.T0, k = k, criterion = criterion, cv.rule = cv.rule,
                 parallel = parallel, cores = cores,
-                do_parallel_cv = do_parallel_cv
+                do_parallel_cv = do_parallel_cv,
+                W.in.fit = W.in.fit
             )
             return(out)
         }
@@ -260,7 +262,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 cv.prop = cv.prop, cv.donut = cv.donut, cv.buffer = cv.buffer,
                 min.T0 = min.T0, k = k, criterion = criterion, cv.rule = cv.rule,
                 parallel = parallel, cores = cores,
-                do_parallel_cv = do_parallel_cv
+                do_parallel_cv = do_parallel_cv,
+                W.in.fit = W.in.fit
             )
             return(out)
         }
