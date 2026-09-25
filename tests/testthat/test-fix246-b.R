@@ -68,3 +68,55 @@ test_that("B1: fect's IFE CV table under 'pc' has the PC columns, correctly labe
   ## fect's own IFE path already selects argmin PC
   expect_equal(as.numeric(fit$r.cv), unname(cv[which.min(cv[, "PC"]), "r"]))
 })
+
+
+## -- B2  the CV range for r is capped by the number of never-treated units --
+
+test_that("B2: CV with few never-treated units searches at most Nco - 1 factors", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  d4 <- simgsynth[simgsynth$id %in% c(101:105, 106:109), ]  # 4 never-treated
+  for (m in c("gsynth", "ife", "cfe")) {
+    args <- list(Y ~ D + X1 + X2, data = d4, index = c("id", "time"),
+                 method = m, force = "two-way", CV = TRUE, r = c(0, 5),
+                 se = FALSE, parallel = FALSE, seed = 1)
+    if (m != "gsynth") args$time.component.from <- "nevertreated"
+    out <- .fb_msgs(do.call(fect::fect, args))
+    ## 412d7ae: "Mat::head_cols(): size out of bounds"
+    expect_false(inherits(out$res, "error"), info = m)
+    expect_true(any(grepl(
+      "With 4 never-treated units at most 3 factor(s) can be estimated",
+      out$msgs, fixed = TRUE)), info = m)
+    if (!inherits(out$res, "error")) {
+      expect_equal(unname(out$res$CV.out[, "r"]), 0:3, info = m)
+      expect_true(out$res$r.cv <= 3, info = m)
+    }
+  }
+})
+
+test_that("B2: a feasible CV range is not changed by the cap", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  out <- .fb_msgs(fect::fect(Y ~ D + X1 + X2, data = simgsynth,
+                             index = c("id", "time"), method = "gsynth",
+                             force = "two-way", CV = TRUE, r = c(0, 5),
+                             se = FALSE, parallel = FALSE, seed = 1))
+  expect_false(any(grepl("factor(s) can be estimated", out$msgs, fixed = TRUE)))
+  expect_equal(unname(out$res$CV.out[, "r"]), 0:5)
+})
+
+test_that("B2: panel_factor() extracts at most min(T, N) factors (C++ guard)", {
+  set.seed(1)
+  E <- matrix(stats::rnorm(20), 5, 4)
+  ## 412d7ae: "Mat::head_cols(): size out of bounds"
+  pf <- fect:::panel_factor(E, 6L)
+  expect_equal(dim(pf$factor), c(5L, 4L))
+  expect_equal(dim(pf$lambda), c(4L, 4L))
+  expect_equal(dim(pf$FE), c(5L, 4L))
+  ## r within range: unchanged meaning
+  pf2 <- fect:::panel_factor(E, 2L)
+  expect_equal(dim(pf2$factor), c(5L, 2L))
+  pf0 <- fect:::panel_factor(E, 0L)
+  expect_equal(dim(pf0$factor), c(5L, 0L))
+  expect_equal(pf0$FE, matrix(0, 5, 4))
+})

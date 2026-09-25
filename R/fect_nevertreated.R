@@ -339,6 +339,16 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         } else {
             r.max <- max(min((T0.min - 2), r.end), 0)
         }
+        ## The factors are estimated from the never-treated units only, so at
+        ## most Nco - 1 of them can be estimated (the rule fect applies to a
+        ## fixed r). A larger r used to crash the factor step
+        ## ("Mat::head_cols(): size out of bounds").
+        r.max.co <- max(Nco - 1L, 0L)
+        if (r.max > r.max.co) {
+            r <- min(r, r.max.co)
+            message(sprintf("With %d never-treated units at most %d factor(s) can be estimated; cross-validation searches r = %d to %d.", Nco, r.max.co, r, r.max.co))
+            r.max <- r.max.co
+        }
 
         if (r.max == 0) {
             r.cv <- 0
@@ -1436,6 +1446,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             r.max <- max(min((T0.min - 1), r.end), 0)
         } else {
             r.max <- max(min((T0.min - 2), r.end), 0)
+        }
+        ## At most Nco - 1 factors from Nco never-treated units, as in the IFE
+        ## block.
+        r.max.co <- max(Nco - 1L, 0L)
+        if (r.max > r.max.co) {
+            r <- min(r, r.max.co)
+            message(sprintf("With %d never-treated units at most %d factor(s) can be estimated; cross-validation searches r = %d to %d.", Nco, r.max.co, r, r.max.co))
+            r.max <- r.max.co
         }
 
         if (r.max == 0) {
