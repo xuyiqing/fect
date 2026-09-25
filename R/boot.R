@@ -133,6 +133,24 @@ trim_closure_env <- function(fun) {
   arr
 }
 
+## A replicate refit counts as successful only if it returned the fields the
+## collector stores, in the shapes the collector expects. A degenerate resample
+## (e.g. collinear factors in a panel with few distinct controls) used to come
+## back as a short list and crash the collector.
+.fect_boot_result_ok <- function(res, n.time, TT, keep.sims = FALSE,
+                                 width = NULL) {
+  if (!is.list(res)) return(FALSE)
+  if (length(res$att.avg) != 1L || length(res$att.avg.unit) != 1L) {
+    return(FALSE)
+  }
+  if (length(res$att) != n.time) return(FALSE)
+  if (isTRUE(keep.sims)) {
+    if (!is.matrix(res$eff) || nrow(res$eff) != TT) return(FALSE)
+    if (!is.null(width) && ncol(res$eff) != width) return(FALSE)
+  }
+  TRUE
+}
+
 fect_boot <- function(
   Y,
   X,
@@ -674,7 +692,7 @@ fect_boot <- function(
       I.boot <- array(NA, dim = c(TT, N, nboots))
       eff.boot <- array(0, dim = c(TT, N, nboots)) ## to store results
     }
-    colnames.boot <- c()
+    colnames.boot <- vector("list", nboots) ## filled by index in the collector
   }
 
   att.avg.boot <- matrix(0, 1, nboots)
@@ -703,7 +721,7 @@ fect_boot <- function(
   calendar.eff.fit.boot <- matrix(0, TT, nboots)
 
   if (hasRevs == 1) {
-    eff.off.boot <- c()
+    eff.off.boot <- vector("list", nboots) ## filled by index (keep.sims)
     att.off.boot <- matrix(0, length(time.off), nboots)
     att.off.count.boot <- matrix(0, length(time.off), nboots)
   }
@@ -855,7 +873,10 @@ fect_boot <- function(
         silent = TRUE
       )
 
-      if ("try-error" %in% class(boot)) {
+      ## A7: a result without the fields the collector stores (degenerate
+      ## replicate) counts as failed, like an error.
+      if ("try-error" %in% class(boot) ||
+          !.fect_boot_result_ok(boot, length(time.on), TT, keep.sims, N)) {
         boot0 <- list(
           att.avg = NA,
           att = NA,
@@ -1266,7 +1287,9 @@ fect_boot <- function(
         silent = TRUE
       )
 
-      if ("try-error" %in% class(synth.out)) {
+      if ("try-error" %in% class(synth.out) ||
+          !.fect_boot_result_ok(synth.out, length(time.on), TT, keep.sims,
+                                length(id.boot))) {
         boot0 <- list(
           att.avg = NA,
           att = NA,
@@ -1652,7 +1675,9 @@ fect_boot <- function(
         if (is.null(boot)) {
           stop(paste0("Unsupported bootstrap method: ", method))
         }
-        if ("try-error" %in% class(boot)) {
+        if ("try-error" %in% class(boot) ||
+            !.fect_boot_result_ok(boot, length(time.on), TT, keep.sims,
+                                  length(boot.id))) {
           boot0 <- list(
             att.avg = NA,
             att = NA,
@@ -1971,245 +1996,150 @@ fect_boot <- function(
         }
       }
     }
-
-    for (j in 1:nboots) {
-      if (inherits(boot.out[[j]], "error")) {
-        warning(
-          paste0("Bootstrap iteration ", j, " failed in parallel worker: ", conditionMessage(boot.out[[j]]))
-        )
-        boot.out[[j]] <- make_boot_na()
-      }
-      att.avg.boot[, j] <- boot.out[[j]]$att.avg
-      att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
-      att.boot[, j] <- boot.out[[j]]$att
-      att.count.boot[, j] <- boot.out[[j]]$count
-      if (dloo) {
-        pre.att.boot[, j] <- boot.out[[j]]$dloo.pre
-        if (dloo.ng > 0)
-          pre.att.group.boot[, , j] <- boot.out[[j]]$dloo.pre.group
-      }
-      if (keep.sims) {
-        colnames(boot.out[[j]]$eff) <- boot.out[[j]]$boot.id
-        eff.boot <- .fect_store_slice(eff.boot, boot.out[[j]]$eff, j)
-        D.boot <- .fect_store_slice(D.boot, boot.out[[j]]$D, j)
-        I.boot <- .fect_store_slice(I.boot, boot.out[[j]]$I, j)
-        if (is.null(boot.out[[j]]$boot.id)) {
-          colnames.boot <- c(colnames.boot, list(1:N))
-        } else {
-          colnames.boot <- c(colnames.boot, list(boot.out[[j]]$boot.id))
-        }
-      }
-      calendar.eff.boot[, j] <- boot.out[[j]]$eff.calendar
-      calendar.eff.fit.boot[, j] <- boot.out[[j]]$eff.calendar.fit
-      if (p > 0) {
-        beta.boot[, j] <- boot.out[[j]]$beta
-        if (binary == TRUE) {
-          marginal.boot[, j] <- boot.out[[j]]$marginal
-        }
-      }
-      if (hasRevs == 1) {
-        att.off.boot[, j] <- boot.out[[j]]$att.off
-        att.off.count.boot[, j] <- boot.out[[j]]$count.off
-        if (keep.sims) {
-          eff.off.boot <- c(eff.off.boot, list(boot.out[[j]]$eff.off))
-        }
-      }
-      if (!is.null(T.on.carry)) {
-        carry.att.boot[, j] <- boot.out[[j]]$carry.att
-      }
-      if (!is.null(balance.period)) {
-        balance.att.boot[, j] <- boot.out[[j]]$balance.att
-        balance.count.boot[, j] <- boot.out[[j]]$balance.count
-        balance.avg.att.boot[, j] <- boot.out[[j]]$balance.avg.att
-        if (!is.null(placebo.period) & placeboTest == TRUE) {
-          balance.att.placebo.boot[, j] <- boot.out[[j]]$balance.att.placebo
-        }
-      }
-      if (!is.null(W)) {
-        att.avg.W.boot[, j] <- boot.out[[j]]$att.avg.W
-        att.on.W.boot[, j] <- boot.out[[j]]$att.on.W
-        att.on.count.W.boot[, j] <- boot.out[[j]]$count.on.W
-        if (!is.null(placebo.period) & placeboTest == TRUE) {
-          att.placebo.W.boot[, j] <- boot.out[[j]]$att.placebo.W
-        }
-        if (hasRevs == 1) {
-          att.off.W.boot[, j] <- boot.out[[j]]$att.off.W
-          att.off.count.W.boot[, j] <- boot.out[[j]]$count.off.W
-          if (!is.null(carryover.period) & carryoverTest == TRUE) {
-            att.carryover.W.boot[, j] <- boot.out[[j]]$att.carryover.W
-          }
-        }
-      }
-
-      if (!is.null(placebo.period) & placeboTest == TRUE) {
-        att.placebo.boot[, j] <- boot.out[[j]]$att.placebo
-      }
-      if (!is.null(carryover.period) & carryoverTest == TRUE) {
-        att.carryover.boot[, j] <- boot.out[[j]]$att.carryover
-      }
-      if (!is.null(group)) {
-        group.att.boot[, j] <- boot.out[[j]]$group.att
-        for (sub.name in group.output.name) {
-          if (is.null(boot.out[[j]]$group.output[[sub.name]]$att.on)) {
-            group.atts.boot[[sub.name]][, j] <- NA
-          } else {
-            group.atts.boot[[sub.name]][, j] <- boot.out[[j]]$group.output[[
-              sub.name
-            ]]$att.on
-          }
-          if (hasRevs == 1) {
-            if (is.null(boot.out[[j]]$group.output[[sub.name]]$att.off)) {
-              group.atts.off.boot[[sub.name]][, j] <- NA
-            } else {
-              group.atts.off.boot[[sub.name]][, j] <- boot.out[[
-                j
-              ]]$group.output[[sub.name]]$att.off
-            }
-          }
-          if (placeboTest) {
-            if (is.null(boot.out[[j]]$group.output[[sub.name]]$att.placebo)) {
-              group.att.placebo.boot[[sub.name]][, j] <- NA
-            } else {
-              group.att.placebo.boot[[sub.name]][, j] <- boot.out[[
-                j
-              ]]$group.output[[sub.name]]$att.placebo
-            }
-          }
-          if (carryoverTest) {
-            if (is.null(boot.out[[j]]$group.output[[sub.name]]$att.carryover)) {
-              group.att.carryover.boot[[sub.name]][, j] <- NA
-            } else {
-              group.att.carryover.boot[[sub.name]][, j] <- boot.out[[
-                j
-              ]]$group.output[[sub.name]]$att.carryover
-            }
-          }
-        }
-      }
-    }
   } else {
     boot.out <- vector("list", nboots)
-    # pb <- txtProgressBar(
-    #     min = 0,
-    #     max = nboots,
-    #     style = 3,
-    #     width = 50,
-    #     char = "="
-    # )
     for (j in 1:nboots) {
-      boot <- one.nonpara(boot.seq[j])
-      boot.out[[j]] <- boot
-      att.avg.boot[, j] <- boot$att.avg
-      att.avg.unit.boot[, j] <- boot$att.avg.unit
-      att.boot[, j] <- boot$att
-      att.count.boot[, j] <- boot$count
-      if (dloo) {
-        pre.att.boot[, j] <- boot$dloo.pre
-        if (dloo.ng > 0)
-          pre.att.group.boot[, , j] <- boot$dloo.pre.group
-      }
-      if (keep.sims) {
-        colnames(boot$eff) <- boot$boot.id
-        # assign("boot", boot, .GlobalEnv)
-        eff.boot <- .fect_store_slice(eff.boot, boot$eff, j)
-        D.boot <- .fect_store_slice(D.boot, boot$D, j)
-        I.boot <- .fect_store_slice(I.boot, boot$I, j)
-        if (is.null(boot$boot.id)) {
-          colnames.boot <- c(colnames.boot, list(1:N)) # Parametric bootstrap
-          # assign("boot", boot, .GlobalEnv)
-        } else {
-          colnames.boot <- c(colnames.boot, list(boot$boot.id)) # Raw bootstrap and jackknife
-        }
-      }
-      calendar.eff.boot[, j] <- boot$eff.calendar
-      calendar.eff.fit.boot[, j] <- boot$eff.calendar.fit
-      if (p > 0) {
-        beta.boot[, j] <- boot$beta
-        if (binary == TRUE) {
-          marginal.boot[, j] <- boot$marginal
-        }
-      }
-      if (hasRevs == 1) {
-        if (keep.sims) {
-          eff.off.boot <- c(eff.off.boot, list(boot$eff.off))
-        }
-        att.off.boot[, j] <- boot$att.off
-        att.off.count.boot[, j] <- boot$count.off
-      }
-      if (!is.null(T.on.carry)) {
-        carry.att.boot[, j] <- boot$carry.att
-      }
-      if (!is.null(balance.period)) {
-        balance.att.boot[, j] <- boot$balance.att
-        balance.count.boot[, j] <- boot$balance.count
-        balance.avg.att.boot[, j] <- boot$balance.avg.att
-        if (!is.null(placebo.period) & placeboTest == TRUE) {
-          balance.att.placebo.boot[, j] <- boot$balance.att.placebo
-        }
-      }
-      if (!is.null(W)) {
-        att.avg.W.boot[, j] <- boot$att.avg.W
-        att.on.W.boot[, j] <- boot$att.on.W
-        att.on.count.W.boot[, j] <- boot$count.on.W
-        if (!is.null(placebo.period) & placeboTest == TRUE) {
-          att.placebo.W.boot[, j] <- boot$att.placebo.W
-        }
-        if (hasRevs == 1) {
-          att.off.W.boot[, j] <- boot$att.off.W
-          att.off.count.W.boot[, j] <- boot$count.off.W
-          if (!is.null(carryover.period) & carryoverTest == TRUE) {
-            att.carryover.W.boot[, j] <- boot$att.carryover.W
+      boot.out[[j]] <- one.nonpara(boot.seq[j])
+    }
+  }
+
+  ## Collect the replicates into the per-replicate slots; the serial and
+  ## parallel paths share this loop. Every slot is written by index, so a
+  ## replicate can be written twice: when a result cannot be stored (an odd
+  ## shape from a degenerate resample) the replicate is recorded as failed,
+  ## as a failed parallel worker is, so that boot.rm drops it and the count
+  ## message below reports it. keep.sims arrays go through .fect_store_slice(),
+  ## which pads narrower replicates (cluster bootstrap) with NA columns.
+  for (j in 1:nboots) {
+    if (inherits(boot.out[[j]], "error")) {
+      warning(
+        paste0("Bootstrap iteration ", j, " failed in parallel worker: ", conditionMessage(boot.out[[j]]))
+      )
+      boot.out[[j]] <- make_boot_na()
+    }
+    for (attempt in 1:2) {
+      boot <- boot.out[[j]]
+      stored <- tryCatch(
+        {
+          att.avg.boot[, j] <- boot$att.avg
+          att.avg.unit.boot[, j] <- boot$att.avg.unit
+          att.boot[, j] <- boot$att
+          att.count.boot[, j] <- boot$count
+          if (dloo) {
+            pre.att.boot[, j] <- boot$dloo.pre
+            if (dloo.ng > 0)
+              pre.att.group.boot[, , j] <- boot$dloo.pre.group
           }
-        }
-      }
-      if (!is.null(placebo.period) & placeboTest == TRUE) {
-        att.placebo.boot[, j] <- boot$att.placebo
-      }
-      if (!is.null(carryover.period) & carryoverTest == TRUE) {
-        att.carryover.boot[, j] <- boot$att.carryover
-      }
-      if (!is.null(group)) {
-        group.att.boot[, j] <- boot$group.att
-        for (sub.name in group.output.name) {
-          if (is.null(boot$group.output[[sub.name]]$att.on)) {
-            group.atts.boot[[sub.name]][, j] <- NA
-          } else {
-            group.atts.boot[[sub.name]][, j] <- boot$group.output[[
-              sub.name
-            ]]$att.on
+          if (keep.sims) {
+            colnames(boot$eff) <- boot$boot.id
+            if (NCOL(boot$D) != NCOL(boot$eff) || NCOL(boot$I) != NCOL(boot$eff)) {
+              stop("replicate eff, D and I differ in width.", call. = FALSE)
+            }
+            eff.boot <- .fect_store_slice(eff.boot, boot$eff, j)
+            D.boot <- .fect_store_slice(D.boot, boot$D, j)
+            I.boot <- .fect_store_slice(I.boot, boot$I, j)
+            ## original unit positions of the replicate's columns: the drawn
+            ## units (case bootstrap, jackknife) or treated units then drawn
+            ## controls (parametric); 1:N for refits on the full panel
+            colnames.boot[j] <- list(if (is.null(boot$boot.id)) 1:N else boot$boot.id)
+          }
+          calendar.eff.boot[, j] <- boot$eff.calendar
+          calendar.eff.fit.boot[, j] <- boot$eff.calendar.fit
+          if (p > 0) {
+            beta.boot[, j] <- boot$beta
+            if (binary == TRUE) {
+              marginal.boot[, j] <- boot$marginal
+            }
           }
           if (hasRevs == 1) {
-            if (is.null(boot$group.output[[sub.name]]$att.off)) {
-              group.atts.off.boot[[sub.name]][, j] <- NA
-            } else {
-              group.atts.off.boot[[sub.name]][, j] <- boot$group.output[[
-                sub.name
-              ]]$att.off
+            att.off.boot[, j] <- boot$att.off
+            att.off.count.boot[, j] <- boot$count.off
+            if (keep.sims) {
+              eff.off.boot[j] <- list(boot$eff.off)
             }
           }
-          if (placeboTest) {
-            if (is.null(boot$group.output[[sub.name]]$att.placebo)) {
-              group.att.placebo.boot[[sub.name]][, j] <- NA
-            } else {
-              group.att.placebo.boot[[sub.name]][, j] <- boot$group.output[[
-                sub.name
-              ]]$att.placebo
+          if (!is.null(T.on.carry)) {
+            carry.att.boot[, j] <- boot$carry.att
+          }
+          if (!is.null(balance.period)) {
+            balance.att.boot[, j] <- boot$balance.att
+            balance.count.boot[, j] <- boot$balance.count
+            balance.avg.att.boot[, j] <- boot$balance.avg.att
+            if (!is.null(placebo.period) & placeboTest == TRUE) {
+              balance.att.placebo.boot[, j] <- boot$balance.att.placebo
             }
           }
-          if (carryoverTest) {
-            if (is.null(boot$group.output[[sub.name]]$att.carryover)) {
-              group.att.carryover.boot[[sub.name]][, j] <- NA
-            } else {
-              group.att.carryover.boot[[sub.name]][, j] <- boot$group.output[[
-                sub.name
-              ]]$att.carryover
+          if (!is.null(W)) {
+            att.avg.W.boot[, j] <- boot$att.avg.W
+            att.on.W.boot[, j] <- boot$att.on.W
+            att.on.count.W.boot[, j] <- boot$count.on.W
+            if (!is.null(placebo.period) & placeboTest == TRUE) {
+              att.placebo.W.boot[, j] <- boot$att.placebo.W
+            }
+            if (hasRevs == 1) {
+              att.off.W.boot[, j] <- boot$att.off.W
+              att.off.count.W.boot[, j] <- boot$count.off.W
+              if (!is.null(carryover.period) & carryoverTest == TRUE) {
+                att.carryover.W.boot[, j] <- boot$att.carryover.W
+              }
             }
           }
+          if (!is.null(placebo.period) & placeboTest == TRUE) {
+            att.placebo.boot[, j] <- boot$att.placebo
+          }
+          if (!is.null(carryover.period) & carryoverTest == TRUE) {
+            att.carryover.boot[, j] <- boot$att.carryover
+          }
+          if (!is.null(group)) {
+            group.att.boot[, j] <- boot$group.att
+            for (sub.name in group.output.name) {
+              if (is.null(boot$group.output[[sub.name]]$att.on)) {
+                group.atts.boot[[sub.name]][, j] <- NA
+              } else {
+                group.atts.boot[[sub.name]][, j] <- boot$group.output[[
+                  sub.name
+                ]]$att.on
+              }
+              if (hasRevs == 1) {
+                if (is.null(boot$group.output[[sub.name]]$att.off)) {
+                  group.atts.off.boot[[sub.name]][, j] <- NA
+                } else {
+                  group.atts.off.boot[[sub.name]][, j] <- boot$group.output[[
+                    sub.name
+                  ]]$att.off
+                }
+              }
+              if (placeboTest) {
+                if (is.null(boot$group.output[[sub.name]]$att.placebo)) {
+                  group.att.placebo.boot[[sub.name]][, j] <- NA
+                } else {
+                  group.att.placebo.boot[[sub.name]][, j] <- boot$group.output[[
+                    sub.name
+                  ]]$att.placebo
+                }
+              }
+              if (carryoverTest) {
+                if (is.null(boot$group.output[[sub.name]]$att.carryover)) {
+                  group.att.carryover.boot[[sub.name]][, j] <- NA
+                } else {
+                  group.att.carryover.boot[[sub.name]][, j] <- boot$group.output[[
+                    sub.name
+                  ]]$att.carryover
+                }
+              }
+            }
+          }
+          TRUE
+        },
+        error = function(e) {
+          ## make_boot_na() always fits the slots; a failure there is a bug
+          if (attempt == 2L) stop(e)
+          FALSE
         }
-      }
-      # setTxtProgressBar(pb, j)
+      )
+      if (stored) break
+      boot.out[[j]] <- make_boot_na()
     }
-    # close(pb)
   }
   ## end of bootstrapping
   ## remove failure bootstrap

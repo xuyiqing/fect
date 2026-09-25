@@ -414,3 +414,72 @@ test_that("A6: .fect_store_slice() pads, widens, and never widens for failures",
   expect_identical(fect:::.fect_store_slice(arr, matrix(2, 2, 3), 1)[, , 1],
                    matrix(2, 2, 3))
 })
+
+
+## -- A7  degenerate replicates are dropped and counted --------------------
+
+## Three treated units and only four never-treated units: many resamples
+## hold two or three distinct controls, so r = 2 factors are collinear there.
+.fix246_a7_panel <- function(Nco = 4, Ntr = 3, TT = 30, T0 = 20, seed = 32) {
+  set.seed(seed)
+  N <- Ntr + Nco
+  d <- expand.grid(time = 1:TT, id = 1:N)[, c("id", "time")]
+  F <- matrix(stats::rnorm(TT * 2), TT, 2)
+  L <- matrix(stats::rnorm(N * 2), N, 2)
+  d$X1 <- stats::rnorm(nrow(d))
+  d$X2 <- stats::rnorm(nrow(d))
+  d$D <- as.numeric(d$id <= Ntr & d$time > T0)
+  d$Y <- 1 + stats::rnorm(N)[d$id] + stats::rnorm(TT)[d$time] +
+    rowSums(F[d$time, ] * L[d$id, ]) + 0.5 * d$X1 + 0.3 * d$X2 + 2 * d$D +
+    stats::rnorm(nrow(d), sd = 0.3)
+  d
+}
+
+test_that("A7: degenerate bootstrap replicates are dropped and counted", {
+  skip_on_cran()
+  dd <- .fix246_a7_panel()
+  for (vt in c("bootstrap", "parametric")) {
+    nb <- if (vt == "bootstrap") 50 else 20
+    out <- .fix246_capture(
+      fect::fect(Y ~ D + X1 + X2, data = dd, index = c("id", "time"),
+                 method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+                 se = TRUE, vartype = vt, nboots = nb, parallel = FALSE,
+                 seed = 1, keep.sims = TRUE)
+    )
+    fit <- out$value
+    kept <- ncol(fit$att.avg.boot)
+    expect_lt(kept, nb)
+    expect_true(any(grepl(
+      sprintf("^%d of %d bootstrap replicates failed and were dropped; uncertainty estimates use the remaining %d\\.",
+              nb - kept, nb, kept),
+      out$messages)), info = vt)
+    expect_true(is.finite(fit$est.avg[1, "S.E."]), info = vt)
+    expect_equal(dim(fit$eff.boot)[3], kept, info = vt)
+    expect_equal(length(fit$colnames.boot), kept, info = vt)
+  }
+})
+
+test_that("A7: a fit whose factors are collinear stops with a clear message", {
+  dd <- .fix246_a7_panel()
+  ## controls 6 and 7 are exact copies of controls 4 and 5
+  for (k in 0:1) {
+    dd[dd$id == 6 + k, c("Y", "X1", "X2")] <- dd[dd$id == 4 + k, c("Y", "X1", "X2")]
+  }
+  expect_error(
+    suppressWarnings(suppressMessages(
+      fect::fect(Y ~ D, data = dd, index = c("id", "time"), method = "gsynth",
+                 force = "two-way", r = 2, CV = FALSE, se = FALSE)
+    )),
+    "factor loadings cannot be estimated.*r = 2"
+  )
+})
+
+test_that("A7: .fect_boot_result_ok() rejects the short list of a failed fit", {
+  short <- list(att = rep(NA, 30), att.avg = NA, beta = matrix(NA, 0, 1))
+  expect_false(fect:::.fect_boot_result_ok(short, n.time = 30, TT = 30))
+  ok <- list(att = rep(0, 30), att.avg = 1, att.avg.unit = 1,
+             eff = matrix(0, 30, 7))
+  expect_true(fect:::.fect_boot_result_ok(ok, 30, 30, keep.sims = TRUE, width = 7))
+  expect_false(fect:::.fect_boot_result_ok(ok, 30, 30, keep.sims = TRUE, width = 8))
+  expect_false(fect:::.fect_boot_result_ok(ok, 29, 30))
+})
