@@ -628,7 +628,7 @@ The result is a different counterfactual representation. The pseudo-inverse is d
 
 #### Reading the comparison
 
-Because `sim_gsynth` follows a clean IFE DGP and treated units sit reliably inside the convex hull of control loadings, the two fits give very similar ATTs --- the simplex constraint barely binds at the *loading* level. The *weight* representations differ substantially even when the implied counterfactuals do not, which is informative on its own: bounded loadings buy interpretability and robustness without paying much in fit on well-behaved data. Real datasets with sparse donor pools (few treated units alongside controls with disparate factor loadings) typically show larger ATT gaps; in those settings, the simplex bound corrects the extrapolation that pure least-squares performs and provides a more honest synthetic-control counterfactual.
+`sim_gsynth` follows an IFE data generating process. In the unbounded fit, four of the five treated units have loadings inside the convex hull of the control loadings, and one lies outside it. The two fits give ATTs of 4.64 (unbounded) and 5.10 (bounded); the true ATT in `sim_gsynth` is 5.46. The gap between the two fits, 0.46, is about half of either fit's standard error (about 0.9). The *weight* representations differ much more than the estimates, which is informative on its own: the bounded weights are non-negative and concentrate on fewer donors. Real datasets with sparse donor pools (few treated units alongside controls with disparate factor loadings) typically show larger ATT gaps; in those settings, the simplex bound corrects the extrapolation that pure least-squares performs and provides a more honest synthetic-control counterfactual.
 
 ### Caveats
 
