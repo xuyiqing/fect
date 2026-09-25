@@ -697,6 +697,16 @@ fect.default <- function(
                  "latent-factor / matrix-completion models (ife, mc, gsynth, ",
                  "both, cfe).")
         }
+        ## dloo's closed-form placebo is the not-yet-treated two-way FE model.
+        ## Checked here, before the bootstrap it forces, rather than by the
+        ## post-fit check on `method` (the never-treated fit is labelled
+        ## "gsynth", which a user who typed method = "fe" cannot act on).
+        if (identical(time.component.from, "nevertreated")) {
+            stop("\"dloo\" is only supported with time.component.from = \"notyettreated\" ",
+                 "(the default). Its closed-form placebo is validated for the two-way ",
+                 "fixed-effects model fitted on not-yet-treated observations, not for ",
+                 "fixed effects fitted on never-treated units only.")
+        }
         ## Like `loo`, dloo reports pre-trend SEs; ensure the native bootstrap
         ## runs even if the user left se = FALSE. The overlay is applied to each
         ## replicate INSIDE fect_boot, so no separate resampler and no retention

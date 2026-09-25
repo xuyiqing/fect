@@ -1635,6 +1635,58 @@ fect_boot <- function(
             ),
             silent = TRUE
           )
+        } else if (method == "cfe" && identical(time.component.from, "nevertreated")) {
+          ## cfe + never-treated: the same estimator as the point fit (and as
+          ## the parametric refits, impute_Y0() branch 3). Before 2.4.6 these
+          ## replicates went to fect_cfe(), the not-yet-treated model.
+          boot <- try(
+            fect_nevertreated(
+              Y = Y.input[, boot.id],
+              X = X.boot,
+              D = D.boot,
+              W = W.boot,
+              W.in.fit = W.in.fit,
+              I = I.boot,
+              II = II[, boot.id],
+              T.on = T.on[, boot.id],
+              T.off = T.off.boot,
+              CV = 0,
+              T.on.balance = T.on.balance[, boot.id],
+              balance.period = balance.period,
+              r = r.boot,
+              binary = binary,
+              QR = QR,
+              force = force,
+              hasRevs = hasRevs,
+              tol = tol,
+              max.iteration = max.iteration,
+              boot = 1,
+              norm.para = norm.para,
+              calendar.enp.seq = target.enp,
+              time.on.seq = time.on,
+              time.off.seq = time.off,
+              time.on.seq.W = time.on.W,
+              time.off.seq.W = time.off.W,
+              placebo.period = placebo.period.boot,
+              placeboTest = placeboTest,
+              time.on.balance.seq = balance.time,
+              carryoverTest = carryoverTest,
+              carryover.period = carryover.period.boot,
+              group.level = group.level,
+              group = boot.group,
+              time.on.seq.group = group.time.on,
+              time.off.seq.group = group.time.off,
+              method = "cfe",
+              X.extra.FE = X.extra.FE[, boot.id, , drop = FALSE],
+              X.Z = X.Z[, boot.id, , drop = FALSE],
+              X.Q = X.Q[, boot.id, , drop = FALSE],
+              X.gamma = X.gamma[, boot.id, , drop = FALSE],
+              X.kappa = X.kappa[, boot.id, , drop = FALSE],
+              Zgamma.id = Zgamma.id,
+              kappaQ.id = kappaQ.id
+            ),
+            silent = TRUE
+          )
         } else if (method == "cfe") {
           X.extra.FE.boot <- X.extra.FE[, boot.id, , drop = FALSE]
           X.Z.boot <- X.Z[, boot.id, , drop = FALSE]
