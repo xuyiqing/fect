@@ -517,7 +517,8 @@ main fit and every replicate) inverts X'X through `XXinv()` or its weighted twin
    with `inv()` (`XXinv()`) or `inv_sympd()` (`wXXinv()`), as at 412d7ae.
 4. Otherwise (exact or near-exact collinearity, or an all-zero covariate) the result is
    `D pinv(xs) D`: a symmetric generalized inverse G of X'X (`X'X G X'X = X'X`), with a zero row
-   and column for an all-zero covariate, instead of the error "inv(): matrix is singular".
+   and column for an all-zero covariate. At 412d7ae, `inv()` on such a matrix either stopped with
+   "inv(): matrix is singular" or returned an inaccurate inverse that changed the estimates.
 
 The test is on `xs`, not on X'X, because the rcond of the raw X'X depends on the covariates' units:
 two columns whose scales differ by a factor s give an rcond of about 1/s^2. A test on the raw X'X
