@@ -165,3 +165,37 @@ test_that("C2: duplicated covariate names, or X naming Y or D, stop", {
                "`X` contains the outcome or the treatment variable: \"D\"",
                fixed = TRUE)
 })
+
+
+## -- C3  non-numeric covariates -------------------------------------------
+
+test_that("C3: factor, character and Date covariates stop with a clear message", {
+  d <- .fc_sim()
+  set.seed(2)
+  d$Xf <- factor(sample(c("a", "b", "c"), nrow(d), replace = TRUE))
+  d$Xc <- as.character(d$Xf)
+  d$Xd <- as.Date("2000-01-01") + seq_len(nrow(d))
+  ## 412d7ae: "Calling var(x) on a factor x is defunct." for the factor and
+  ## a false "Variable \"Xc\" is unit-invariant." for the character column
+  expect_error(.fc_quiet(.fc_fit(Y ~ D + X1 + Xf, data = d)),
+               "Covariate \"Xf\" is a factor; fect() needs numeric covariates",
+               fixed = TRUE)
+  expect_error(.fc_quiet(.fc_fit(Y ~ D + X1 + Xc, data = d)),
+               "Covariate \"Xc\" is character; fect() needs numeric covariates",
+               fixed = TRUE)
+  expect_error(.fc_quiet(.fc_fit(Y ~ D + X1 + Xd, data = d)),
+               "Covariate \"Xd\" is of class \"Date\"", fixed = TRUE)
+  expect_error(.fc_quiet(.fc_fit(Y ~ D + X1 + Xf, data = d, method = "fe",
+                                 r = 0)),
+               "model.matrix(~ Xf, data)", fixed = TRUE)
+})
+
+test_that("C3 guard: a logical covariate is used as 0/1", {
+  d <- .fc_sim()
+  d$Xl <- d$X1 > 0
+  d$Xn <- as.numeric(d$Xl)
+  a <- .fc_quiet(.fc_fit(Y ~ D + X2 + Xl, data = d))
+  b <- .fc_quiet(.fc_fit(Y ~ D + X2 + Xn, data = d))
+  expect_identical(a$att.avg, b$att.avg)
+  expect_identical(unname(a$beta), unname(b$beta))
+})
