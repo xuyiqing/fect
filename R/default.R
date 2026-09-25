@@ -3201,9 +3201,13 @@ fect.default <- function(
                     method = method,
                     time.component.from = time.component.from,
                     ## the simplex bound, as the main fit receives it (before
-                    ## 2.4.6 the loo refits silently used unbounded loadings)
+                    ## 2.4.6 the loo refits silently used unbounded loadings).
+                    ## Without a user-given gamma, hold it at the main fit's
+                    ## CV choice, as r is held at r.cv and as the bootstrap
+                    ## replicates do: the refits differ from the main fit only
+                    ## by the held-out period, with no re-tuning.
                     loading.bound      = loading.bound,
-                    gamma.loading      = gamma.loading,
+                    gamma.loading      = if (is.null(gamma.loading)) out[["gamma.loading"]] else gamma.loading,
                     gamma.loading.grid = gamma.loading.grid,
                     degree = degree,
                     X.extra.FE = X.extra.FE,

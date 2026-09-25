@@ -680,15 +680,14 @@ test_that("B8b: the leave-one-period-out refits of a simplex fit use the bound",
   simgsynth <- .fb_data("simgsynth")
   orig <- get("fect_boot", envir = asNamespace("fect"))
   rec <- new.env()
-  loo_fit <- function(lb) {
+  loo_fit <- function(lb, gamma = if (lb == "simplex") 1 else NULL) {
     rec$lb <- character(0)
     rec$g <- numeric(0)
     testthat::with_mocked_bindings(
       .fb_quiet(fect::fect(Y ~ D, data = simgsynth, index = c("id", "time"),
                            method = "gsynth", force = "two-way", r = 2,
                            CV = FALSE, se = TRUE, nboots = 5, loo = TRUE,
-                           loading.bound = lb,
-                           gamma.loading = if (lb == "simplex") 1 else NULL,
+                           loading.bound = lb, gamma.loading = gamma,
                            parallel = FALSE, seed = 1)),
       fect_boot = function(..., loading.bound = "none", gamma.loading = NULL) {
         rec$lb <- c(rec$lb, loading.bound)
@@ -714,4 +713,13 @@ test_that("B8b: the leave-one-period-out refits of a simplex fit use the bound",
   ## a fit without the bound passes "none" to every refit, as before
   expect_true(all(lb_n == "none"))
   expect_true(all(is.finite(fs$pre.est.att[, "ATT"])))
+  ## gamma.loading = NULL: the main fit chooses gamma by CV; every loo refit
+  ## receives that choice (498e039 and earlier: NULL, so each refit re-tuned
+  ## gamma on its own random folds)
+  f0 <- loo_fit("simplex", gamma = NULL)
+  expect_true(is.finite(f0$gamma.loading))
+  expect_true(is.na(rec$g[1]))          # the main fit: gamma chosen by CV
+  expect_gt(length(rec$g), 10)
+  expect_true(all(rec$g[-1] == f0$gamma.loading))
+  expect_true(all(rec$lb == "simplex"))
 })
