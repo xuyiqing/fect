@@ -2354,7 +2354,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     .estimate_alpha <- function(U.cur) {
         if (!force %in% c(1, 3)) return(matrix(0, Ntr, 1))
         if (max(T0) == T0.min & (!0 %in% I.tr)) {
-            return(as.matrix(colMeans(U.cur[1:T0.min, ])))
+            return(as.matrix(colMeans(U.cur[1:T0.min, , drop = FALSE])))
         } else {
             U.pre.v <- as.vector(U.cur)[which(pre.v == 1)]
             U.pre.l <- split(U.pre.v, id.tr.pre.v)
