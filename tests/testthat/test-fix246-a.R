@@ -252,3 +252,37 @@ test_that("A3: parametric SEs are the same with and without normalize = TRUE", {
   expect_equal(f1$est.avg[1, "S.E."], f0$est.avg[1, "S.E."], tolerance = 1e-4)
   expect_equal(f1$est.att[, "S.E."], f0$est.att[, "S.E."], tolerance = 1e-4)
 })
+
+
+## -- A4  weights with the parametric bootstrap --------------------------
+
+test_that("A4: weighted parametric bootstrap runs and uses the weights", {
+  skip_on_cran()
+  d <- .fix246_panel()
+  d$w1 <- 1
+  set.seed(3)
+  d$w2 <- stats::runif(20, 0.5, 2)[d$id]
+  f0 <- .fix246_fit(d, vartype = "parametric")
+  f1 <- .fix246_fit(d, vartype = "parametric", W = "w1")
+  f2 <- .fix246_fit(d, vartype = "parametric", W = "w2")
+  ## unit weights reproduce the unweighted SE
+  expect_equal(f1$est.avg[1, "S.E."], f0$est.avg[1, "S.E."], tolerance = 1e-10)
+  expect_true(is.finite(f2$est.avg[1, "S.E."]))
+  expect_false(isTRUE(all.equal(f2$est.avg[1, "S.E."], f0$est.avg[1, "S.E."])))
+  expect_equal(ncol(f2$att.avg.boot), 40L)
+})
+
+test_that("A4: the example of fect #73 (weights + CV + parametric) runs", {
+  skip_on_cran()
+  e <- new.env()
+  utils::data("simgsynth", package = "fect", envir = e)
+  sg <- e$simgsynth
+  sg$Cweights <- 1
+  fit <- suppressWarnings(suppressMessages(
+    fect::fect(Y ~ D + X1 + X2, data = sg, index = c("id", "time"),
+               method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+               se = TRUE, nboots = 30, vartype = "parametric",
+               parallel = FALSE, W = "Cweights", seed = 7)
+  ))
+  expect_true(is.finite(fit$est.avg[1, "S.E."]))
+})
