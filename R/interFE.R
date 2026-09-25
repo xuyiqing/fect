@@ -39,6 +39,19 @@ interFE.formula <- function(formula = NULL, data, # a data frame
                             binary = FALSE,
                             QR = FALSE,
                             normalize = FALSE) {
+    ## the formula carries the covariates, so `X` must not be given as well
+    ## (before 2.4.6 it was silently ignored)
+    X.given <- !missing(X) &&
+        !is.null(tryCatch(X, error = function(e) "<unevaluable>"))
+    if (X.given) {
+        stop(
+            "Covariates were given both in the formula and in `X`. Put the ",
+            "covariates in the formula (Y ~ X1 + X2), or give Y and X as ",
+            "column names without a formula, not both.",
+            call. = FALSE
+        )
+    }
+
     ## parsing: every term must be a bare column name (see
     ## .fect_formula_names() in R/support.R); intercept specifiers are ignored
     fnames <- .fect_formula_names(formula, fun = "interFE")

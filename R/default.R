@@ -191,6 +191,21 @@ fect.formula <- function(
     gamma.loading.grid = NULL,
     cv.rule = "1se"
 ) {
+    ## The formula carries the covariates, so `X` must not be given as well
+    ## (before 2.4.6 it was silently ignored). gsynth passes X = NULL here,
+    ## which is fine. Y and D are not evaluated: gsynth passes them as missing
+    ## arguments.
+    X.given <- !missing(X) &&
+        !is.null(tryCatch(X, error = function(e) "<unevaluable>"))
+    if (X.given) {
+        stop(
+            "Covariates were given both in the formula and in `X`. Put the ",
+            "covariates in the formula (Y ~ D + X1 + X2), or give Y, D and X ",
+            "as column names without a formula, not both.",
+            call. = FALSE
+        )
+    }
+
     ## parsing: every term must be a bare column name (see
     ## .fect_formula_names() in R/support.R); intercept specifiers are ignored
     fnames <- .fect_formula_names(formula, fun = "fect")
@@ -620,6 +635,30 @@ fect.default <- function(
         stop(
             "\"index\" option misspecified. Try, for example, index = c(\"unit.id\", \"time\")."
         )
+    }
+
+    ## covariate names: each covariate once, and neither the outcome nor the
+    ## treatment (a repeated name made X'X singular and gave garbage
+    ## coefficients without a warning before 2.4.6)
+    if (!is.null(X)) {
+        X.dup <- unique(X[duplicated(X)])
+        if (length(X.dup) > 0) {
+            stop(
+                "`X` contains duplicated covariate names: ",
+                paste0("\"", X.dup, "\"", collapse = ", "),
+                ". Give each covariate once.",
+                call. = FALSE
+            )
+        }
+        X.yd <- intersect(X, c(Y, D))
+        if (length(X.yd) > 0) {
+            stop(
+                "`X` contains the outcome or the treatment variable: ",
+                paste0("\"", X.yd, "\"", collapse = ", "),
+                ". Covariates must be other columns.",
+                call. = FALSE
+            )
+        }
     }
 
     if (!is.null(Z.param)) {

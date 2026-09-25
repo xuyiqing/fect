@@ -108,3 +108,60 @@ test_that("C1: interFE() stops on D:time instead of splitting it into D and time
   expect_identical(a$beta, b$beta)
   expect_length(a$beta, 4)
 })
+
+
+## -- C2  X together with a formula; duplicated covariate names -----------
+
+test_that("C2: X given together with a formula stops", {
+  d <- .fc_sim()
+  ## 412d7ae ignored X here and fitted Y ~ D without covariates
+  expect_error(
+    .fc_quiet(.fc_fit(Y ~ D, data = d, X = c("X1", "X2"))),
+    "Covariates were given both in the formula and in `X`", fixed = TRUE
+  )
+  ## an unquoted name is never looked up as a column: it stops too
+  expect_error(
+    .fc_quiet(.fc_fit(Y ~ D, data = d, X = X1)),
+    "Covariates were given both in the formula and in `X`", fixed = TRUE
+  )
+  expect_error(
+    .fc_quiet(fect::interFE(Y ~ D + X1, data = d, X = "X2",
+                            index = c("id", "time"), r = 2)),
+    "Covariates were given both in the formula and in `X`", fixed = TRUE
+  )
+})
+
+test_that("C2 guard: X = NULL with a formula (gsynth's call) still runs", {
+  d <- .fc_sim()
+  ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d))
+  a <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d, X = NULL))
+  ## gsynth forwards its own X argument (default NULL) and missing Y and D
+  wrapper <- function(formula, data, Y, D, X = NULL) {
+    fect::fect(formula = formula, data = data, Y = Y, D = D, X = X,
+               index = c("id", "time"), method = "gsynth",
+               force = "two-way", r = 2, CV = FALSE, se = FALSE,
+               parallel = FALSE)
+  }
+  b <- .fc_quiet(wrapper(Y ~ D + X1 + X2, data = d))
+  expect_identical(a$att.avg, ref$att.avg)
+  expect_identical(b$att.avg, ref$att.avg)
+  expect_identical(b$beta, ref$beta)
+})
+
+test_that("C2: duplicated covariate names, or X naming Y or D, stop", {
+  d <- .fc_sim()
+  fit_x <- function(X) {
+    fect::fect(data = d, Y = "Y", D = "D", X = X, index = c("id", "time"),
+               method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+               se = FALSE, parallel = FALSE)
+  }
+  ## 412d7ae ran with beta = (-2.03, 2.03) for X = c("X1", "X1")
+  expect_error(.fc_quiet(fit_x(c("X1", "X1"))),
+               "`X` contains duplicated covariate names: \"X1\"", fixed = TRUE)
+  expect_error(.fc_quiet(fit_x(c("X1", "Y"))),
+               "`X` contains the outcome or the treatment variable: \"Y\"",
+               fixed = TRUE)
+  expect_error(.fc_quiet(fit_x(c("D", "X2"))),
+               "`X` contains the outcome or the treatment variable: \"D\"",
+               fixed = TRUE)
+})
