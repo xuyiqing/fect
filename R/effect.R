@@ -112,18 +112,28 @@ effect <- function(x, ## a fect object
 
     catt.boot <- matrix(NA, period[2] - period[1] + 1, nboots)
 
+    TT.boot <- dim(x$eff.boot)[1]
+
     # Calculate treatment effect for each bootstrap sample
     for (i in 1:nboots) {
-      # Extract bootstrap matrices
+      # Width of replicate i = its number of units. Under the cluster
+      # bootstrap it varies and the stored arrays are padded with NA beyond it.
+      w <- if (!is.null(x$colnames.boot) && length(x$colnames.boot) >= i &&
+               length(x$colnames.boot[[i]]) > 0) {
+        length(x$colnames.boot[[i]])
+      } else {
+        dim(x$eff.boot)[2]
+      }
+      # Extract bootstrap matrices (TT x w)
       if (has.D.boot) {
-        D.boot <- x$D.boot[, , i]
-        I.boot <- x$I.boot[, , i]
+        D.boot <- matrix(x$D.boot[, seq_len(w), i], nrow = TT.boot)
+        I.boot <- matrix(x$I.boot[, seq_len(w), i], nrow = TT.boot)
       } else {
         # Fallback: use original D.dat and I.dat (less accurate but prevents crash)
         D.boot <- x$D.dat
         I.boot <- x$I.dat
       }
-      eff.boot <- x$eff.boot[, , i]
+      eff.boot <- matrix(x$eff.boot[, seq_len(w), i], nrow = TT.boot)
 
       # Select treated units in bootstrap sample
       if (is.null(id)){

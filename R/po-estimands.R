@@ -162,13 +162,31 @@
                 )
             }
         } else {
-            if (!identical(dim(eb)[1:2], c(TT, N))) {
+            ## Cluster bootstrap: a replicate holds the units of the drawn
+            ## clusters, so replicates can be wider than N; the array is
+            ## then padded with NA and fit$colnames.boot[[b]] gives each
+            ## replicate's units (and hence its width).
+            if (dim(eb)[1] != TT || dim(eb)[2] < N) {
                 stop(
                     "Slot contract: fit$eff.boot first two dimensions (",
                     dim(eb)[1], " x ", dim(eb)[2],
                     ") must match TT x N (", TT, " x ", N, ").",
                     call. = FALSE
                 )
+            }
+            if (dim(eb)[2] > N) {
+                cbl <- fit$colnames.boot
+                if (is.null(cbl) || length(cbl) < dim(eb)[3] ||
+                    any(lengths(cbl) > dim(eb)[2])) {
+                    stop(
+                        "Slot contract: fit$eff.boot has ", dim(eb)[2],
+                        " columns for N = ", N, " units; replicates wider ",
+                        "than N (cluster bootstrap) need fit$colnames.boot ",
+                        "with each replicate's units, at most ",
+                        dim(eb)[2], " per replicate.",
+                        call. = FALSE
+                    )
+                }
             }
         }
     }

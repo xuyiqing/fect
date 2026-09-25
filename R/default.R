@@ -650,6 +650,19 @@ fect.default <- function(
                 call. = FALSE
             )
         }
+        ## (cl equal to the unit id means unit-level clustering, which is
+        ## what the parametric bootstrap does already: no warning.)
+        if (vartype == "parametric" && !is.null(cl) &&
+            !identical(cl, index[1])) {
+            warning(
+                "vartype = \"parametric\" with cl = ...: the cl argument is ",
+                "ignored. The parametric bootstrap simulates errors unit by ",
+                "unit and does not resample clusters, so the SEs do not ",
+                "account for within-cluster correlation. Use ",
+                "vartype = \"bootstrap\" with cl for cluster-aware inference.",
+                call. = FALSE
+            )
+        }
         if (!para.error %in% c("auto", "ar", "empirical", "wild")) {
             stop(
                 "\"para.error\" must be one of \"auto\", \"ar\", \"empirical\", or \"wild\".",
@@ -1283,14 +1296,44 @@ fect.default <- function(
     }
 
     if (!is.null(cl)) {
-        if (!cl %in% names(data)) {
-            stop("\"cl\" misspecified.\n")
+        if (!is.character(cl) || length(cl) != 1L) {
+            stop("\"cl\" must be a single column name.", call. = FALSE)
         }
-        if (length(cl) != 1) {
-            stop("Length of \"cl\" must be 1.\n")
+        if (!cl %in% names(data)) {
+            stop("\"cl\" (\"", cl, "\") is not a column of data.",
+                 call. = FALSE)
         }
         if (cl == index[1]) {
             cl <- NULL
+        }
+    }
+    ## The cluster bootstrap resamples whole units by cluster, so each unit
+    ## must sit in one cluster (units are mapped to clusters with a column
+    ## mean of cl in fect_boot), and there must be two clusters to resample.
+    if (se == 1 && vartype == "bootstrap" && !is.null(cl)) {
+        cl.per.unit <- tapply(data[[cl]], data[[index[1]]], function(x) {
+            length(unique(x[!is.na(x)]))
+        })
+        cl.bad.units <- names(cl.per.unit)[!is.na(cl.per.unit) & cl.per.unit > 1]
+        if (length(cl.bad.units) > 0) {
+            stop(
+                "\"cl\" (\"", cl, "\") must be constant within each unit (",
+                index[1], "): the cluster bootstrap resamples whole units by ",
+                "cluster. Units whose cluster changes: ",
+                paste(utils::head(cl.bad.units, 10), collapse = ", "),
+                if (length(cl.bad.units) > 10) {
+                    paste0(" and ", length(cl.bad.units) - 10, " more")
+                } else "",
+                ".",
+                call. = FALSE
+            )
+        }
+        if (length(unique(data[[cl]][!is.na(data[[cl]])])) < 2) {
+            stop(
+                "\"cl\" (\"", cl, "\") has a single cluster; the cluster ",
+                "bootstrap needs at least two clusters.",
+                call. = FALSE
+            )
         }
     }
 

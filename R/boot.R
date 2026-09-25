@@ -100,6 +100,35 @@ trim_closure_env <- function(fun) {
   x[sample.int(length(x), size, replace = replace)]
 }
 
+## Store replicate j's TT x w matrix `m` in slice j of the TT x W x B array
+## `arr` (keep.sims). Under the cluster bootstrap a replicate holds the units
+## of the drawn clusters, so its width w varies: columns beyond w are NA, and
+## the array widens (new columns NA in every slice) when w > W. An all-NA m
+## (a failed replicate) never widens the array. When every replicate has
+## width W the result is the same as arr[, , j] <- m.
+.fect_store_slice <- function(arr, m, j) {
+  if (is.null(m)) {
+    arr[, , j] <- NA
+    return(arr)
+  }
+  m <- as.matrix(m)
+  W <- dim(arr)[2]
+  w <- ncol(m)
+  if (w > W) {
+    if (all(is.na(m))) {
+      m <- m[, seq_len(W), drop = FALSE]
+      w <- W
+    } else {
+      wide <- array(NA, dim = c(dim(arr)[1], w, dim(arr)[3]))
+      wide[, seq_len(W), ] <- arr
+      arr <- wide
+    }
+  }
+  arr[, , j] <- NA
+  arr[, seq_len(w), j] <- m
+  arr
+}
+
 fect_boot <- function(
   Y,
   X,
@@ -1955,14 +1984,13 @@ fect_boot <- function(
       }
       if (keep.sims) {
         colnames(boot.out[[j]]$eff) <- boot.out[[j]]$boot.id
-        eff.boot[,, j] <- boot.out[[j]]$eff
-        D.boot[,, j] <- boot.out[[j]]$D
-        I.boot[,, j] <- boot.out[[j]]$I
-        if (is.null(boot.out[[j]]$boot.id)) {
-          colnames.boot <- c(colnames.boot, list(1:N))
-        } else {
-          colnames.boot <- c(colnames.boot, list(boot.out[[j]]$boot.id))
-        }
+        ## a replicate's width varies under the cluster bootstrap
+        eff.boot <- .fect_store_slice(eff.boot, boot.out[[j]]$eff, j)
+        D.boot <- .fect_store_slice(D.boot, boot.out[[j]]$D, j)
+        I.boot <- .fect_store_slice(I.boot, boot.out[[j]]$I, j)
+        colnames.boot[j] <- list(
+          if (is.null(boot.out[[j]]$boot.id)) 1:N else boot.out[[j]]$boot.id
+        )
       }
       calendar.eff.boot[, j] <- boot.out[[j]]$eff.calendar
       calendar.eff.fit.boot[, j] <- boot.out[[j]]$eff.calendar.fit
@@ -2075,16 +2103,13 @@ fect_boot <- function(
       }
       if (keep.sims) {
         colnames(boot$eff) <- boot$boot.id
-        # assign("boot", boot, .GlobalEnv)
-        eff.boot[,, j] <- boot$eff
-        D.boot[,, j] <- boot$D
-        I.boot[,, j] <- boot$I
-        if (is.null(boot$boot.id)) {
-          colnames.boot <- c(colnames.boot, list(1:N)) # Parametric bootstrap
-          # assign("boot", boot, .GlobalEnv)
-        } else {
-          colnames.boot <- c(colnames.boot, list(boot$boot.id)) # Raw bootstrap and jackknife
-        }
+        ## a replicate's width varies under the cluster bootstrap
+        eff.boot <- .fect_store_slice(eff.boot, boot$eff, j)
+        D.boot <- .fect_store_slice(D.boot, boot$D, j)
+        I.boot <- .fect_store_slice(I.boot, boot$I, j)
+        ## boot.id: resampled units (bootstrap, parametric), (1:N)[-j]
+        ## (jackknife); NULL for a failed replicate or the binary parametric
+        colnames.boot[j] <- list(if (is.null(boot$boot.id)) 1:N else boot$boot.id)
       }
       calendar.eff.boot[, j] <- boot$eff.calendar
       calendar.eff.fit.boot[, j] <- boot$eff.calendar.fit
@@ -2546,6 +2571,12 @@ fect_boot <- function(
           if (vartype == "jackknife") {
             expected_N_b <- N - 1
           }
+          if (!is.null(cl) && vartype == "bootstrap") {
+            ## cluster bootstrap: a replicate holds the units of the drawn
+            ## clusters, so its width varies; the averages below use only
+            ## the replicate's own D_b, Y_b and Y.ct.
+            expected_N_b <- N_b
+          }
           if (N > 0 && N_b != expected_N_b) {
             warning(
               paste(
@@ -2731,6 +2762,12 @@ fect_boot <- function(
             }
             # if N=0, expected_N_b = -1. N_b is likely 0. This path is complex if N=0.
             # However, N=0 is caught by an early return. So N > 0 here.
+          }
+          if (!is.null(cl) && vartype == "bootstrap") {
+            ## cluster bootstrap: a replicate holds the units of the drawn
+            ## clusters, so its width varies; the averages below use only
+            ## the replicate's own D_b, Y_b and Y.ct.
+            expected_N_b <- N_b
           }
 
           if (N > 0 && N_b != expected_N_b) {

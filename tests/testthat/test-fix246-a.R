@@ -366,3 +366,89 @@ test_that("A5: parametric bootstrap stops clearly with fewer than two never-trea
       vartype = "parametric", nboots = 20, parallel = FALSE, seed = 7)),
     "needs at least two never-treated units (found 1)", fixed = TRUE)
 })
+
+
+## -- A6  cluster bootstrap: varying replicate width, cl checks ---------------
+
+## turnout with clusters of unequal size (first letter of the state code).
+.fx_turnout_cl <- function() {
+  d <- .fx_turnout()
+  d$region <- substr(d$abb, 1, 1)
+  d
+}
+
+.fx_cl_fit <- function(d, ...) {
+  fect::fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
+             data = d, index = c("abb", "year"), method = "gsynth",
+             force = "two-way", r = 1, CV = FALSE, se = TRUE, nboots = 30,
+             parallel = FALSE, seed = 11, ...)
+}
+
+.fx_warnings <- function(expr) {
+  w <- character(0)
+  val <- withCallingHandlers(
+    suppressMessages(expr),
+    warning = function(x) {
+      w <<- c(w, conditionMessage(x))
+      invokeRestart("muffleWarning")
+    })
+  list(value = val, warnings = w)
+}
+
+test_that("A6: unequal clusters run with keep.sims = TRUE; effect()/estimand() work", {
+  skip_on_cran()
+  d <- .fx_turnout_cl()
+  run <- .fx_warnings(.fx_cl_fit(d, cl = "region", keep.sims = TRUE))
+  fit <- run$value
+  N <- ncol(fit$Y.dat)
+  widths <- lengths(fit$colnames.boot)
+  expect_equal(length(widths), dim(fit$eff.boot)[3])
+  expect_true(length(unique(widths)) > 1)          # replicate widths vary
+  expect_equal(dim(fit$eff.boot)[2], max(N, widths))
+  ## columns beyond a replicate's own width are NA padding
+  b <- which.min(widths)
+  expect_true(all(is.na(fit$eff.boot[, -seq_len(widths[b]), b])))
+  ## same SEs as the fit without keep.sims
+  fit0 <- .fx_quiet(.fx_cl_fit(d, cl = "region"))
+  expect_equal(fit$est.avg, fit0$est.avg)
+  ## post-hoc readers use each replicate's own width and units
+  est <- fect::estimand(fit, "att", "overall")
+  expect_equal(est$se, unname(fit$est.avg[1, "S.E."]), tolerance = 1e-8)
+  withr::local_options(fect.suppress_estimand_deprecation = TRUE)
+  ef <- fect::effect(fit)$effect.est.att
+  expect_true(all(is.finite(ef[, "S.E."])))
+  ## no "Skipping replicate" warnings from the average-outcome block
+  expect_false(any(grepl("Skipping replicate", run$warnings)))
+})
+
+test_that("A6: counterfactual bands use every cluster-bootstrap replicate", {
+  skip_on_cran()
+  run <- .fx_warnings(.fx_cl_fit(.fx_turnout_cl(), cl = "region"))
+  expect_false(any(grepl("Skipping replicate", run$warnings)))
+  ya <- run$value$Y.avg
+  expect_true(sum(is.finite(ya$lower.ct)) > 0)
+})
+
+test_that("A6: cl is validated (one name, a column, constant within units, two clusters)", {
+  skip_on_cran()
+  d <- .fx_turnout_cl()
+  expect_error(.fx_cl_fit(d, cl = c("region", "abb")),
+               "\"cl\" must be a single column name.", fixed = TRUE)
+  expect_error(.fx_cl_fit(d, cl = "no_such_col"),
+               "is not a column of data", fixed = TRUE)
+  d$clv <- d$region
+  d$clv[d$year == 2000] <- "Z"                      # changes within units
+  expect_error(.fx_cl_fit(d, cl = "clv"), "must be constant within each unit")
+  d$one <- "A"
+  expect_error(.fx_cl_fit(d, cl = "one"), "needs at least two clusters")
+})
+
+test_that("A6: cl under the parametric bootstrap warns and is not printed as clustered", {
+  skip_on_cran()
+  run <- .fx_warnings(.fx_cl_fit(.fx_turnout_cl(), cl = "region",
+                                 vartype = "parametric"))
+  expect_true(any(grepl("vartype = \"parametric\" with cl = ...: the cl argument is ignored",
+                        run$warnings, fixed = TRUE)))
+  out <- utils::capture.output(print(run$value))
+  expect_false(any(grepl("^Cluster SE", out)))
+})
