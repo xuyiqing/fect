@@ -453,9 +453,11 @@ imputed_outcomes <- function(fit,
         })
     }
 
-    W_mat <- if (is.null(fit$W.agg)) {
-                 matrix(1, nrow = TT, ncol = N)
-             } else fit$W.agg
+    ## Aggregation weight of each cell: the fit's W.agg matrix when W or
+    ## W.agg weighted the ATT aggregation, else 1. Exact extraction:
+    ## `fit$W.agg` partially matched the column-name slot W.agg.col (a
+    ## string), which reported W.agg = NA for every cell of a weighted fit.
+    W_mat <- .po_agg_weights(fit, TT, N)
 
     df_point <- data.frame(
         id          = fit$id[i_idx],
@@ -1811,6 +1813,20 @@ estimand <- function(fit,
 ## ---------------------------------------------------------------------------
 ## Internal helpers
 ## ---------------------------------------------------------------------------
+
+## Aggregation weights of a fit as a TT x N matrix (1 where unweighted).
+## Fits built before 2.4.6 have no W.agg slot; their weight matrix is the
+## TT x N matrix stored under the name "W" (after the column-name slot of
+## the same name).
+.po_agg_weights <- function(fit, TT, N) {
+    W_mat <- fit[["W.agg", exact = TRUE]]
+    if (is.null(W_mat) && isTRUE(fit[["W.in.agg", exact = TRUE]])) {
+        cand <- Filter(function(z) is.matrix(z) && identical(dim(z), c(TT, N)),
+                       fit[names(fit) == "W"])
+        if (length(cand) > 0L) W_mat <- cand[[1L]]
+    }
+    if (is.null(W_mat)) matrix(1, nrow = TT, ncol = N) else W_mat
+}
 
 ## Internal: the draws of bootstrap / parametric replicate b at the cells of
 ## `cell_mask`.

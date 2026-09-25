@@ -195,3 +195,38 @@ test_that("B12: cfe + never-treated runs with a single treated unit and equals g
   expect_true(is.finite(fb$est.avg[1, "S.E."]))
   expect_equal(fb$est.avg[1, "S.E."], gb$est.avg[1, "S.E."], tolerance = 1e-6)
 })
+
+
+## -- B13  imputed_outcomes() reports the aggregation weights ----------------
+
+test_that("B13: imputed_outcomes() reports the weights of a weighted fit", {
+  skip_on_cran()
+  simgsynth <- .fix246p_data("simgsynth")
+  simgsynth$w2 <- 0.5 + (as.integer(factor(simgsynth$id)) %% 7) / 4
+  for (role in c("W", "W.agg", "W.est")) {
+    args <- list(Y ~ D, data = simgsynth, index = c("id", "time"),
+                 method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+                 se = FALSE, parallel = FALSE)
+    args[[role]] <- "w2"
+    fit <- .fix246p_quiet(do.call(fect::fect, args))
+    po  <- fect::imputed_outcomes(fit)
+    ## one row per treated cell (5afa708: every cell twice for W / W.agg)
+    expect_equal(anyDuplicated(po[, c("id", "time")]), 0L, info = role)
+    w_data <- simgsynth$w2[match(paste(po$id, po$time),
+                                 paste(simgsynth$id, simgsynth$time))]
+    ## W.est weights the fit only; the aggregation stays unweighted
+    expected <- if (role == "W.est") rep(1, nrow(po)) else w_data
+    ## 5afa708: fit$W.agg partially matched W.agg.col, giving W.agg = NA
+    expect_equal(po$W.agg, expected, info = role)
+    ## the reported weights reproduce the fit's ATT
+    expect_equal(sum(po$eff * po$W.agg) / sum(po$W.agg), fit$att.avg,
+                 tolerance = 1e-10, info = role)
+    if (role != "W.est") {
+      expect_equal(dim(fit[["W.agg"]]), dim(fit$Y.dat), info = role)
+      ## a fit object made before 2.4.6 has no W.agg slot
+      old <- fit
+      old[["W.agg"]] <- NULL
+      expect_equal(fect::imputed_outcomes(old)$W.agg, expected, info = role)
+    }
+  }
+})

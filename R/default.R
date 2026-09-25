@@ -4068,6 +4068,15 @@ fect.default <- function(
         output$vartype <- vartype
     }
 
+    ## The aggregation weights as a TT x N matrix on the fit's panel (like
+    ## Y.dat), when W or W.agg weights the ATT aggregation. imputed_outcomes()
+    ## reports them cell by cell. The estimators' own copy of the matrix is
+    ## stored under "W", behind the column-name slot of the same name, and
+    ## `fit$W.agg` used to partially match the column-name slot W.agg.col.
+    if (!is.null(Wname) && isTRUE(use.W.in.agg)) {
+        output$W.agg <- W
+    }
+
     ## When W is supplied AND the aggregation surface should be weighted
     ## (W or W.agg supplied), route the W-weighted aggregations into the
     ## canonical slot names so fit$att, fit$time, fit$count, fit$att.avg,
