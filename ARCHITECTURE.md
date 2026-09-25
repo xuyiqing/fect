@@ -5,6 +5,10 @@
 > Blue nodes and "yes" rows mark what this run changed: the correctness fixes A1-A7, B1-B9 (with
 > B8b-B8e) and C1-C6 listed in `NEWS.md` under fect 2.4.6, with two amendments made after review:
 > C5b (the trigger of the C++ `XXinv()` guard) and C4b (a warning for factor time indices).
+>
+> Updated on 2026-09-25 for branch `fix/246-followup` (run `2026-09-25-port-onto-151`), which adds five
+> fixes on top of PR #151: B10-cfe, B11, B12, B13 and M1 (also in `NEWS.md` under 2.4.6). Rows, nodes
+> and notes marked "follow-up" describe them; blue nodes include them.
 
 ## Overview
 
@@ -108,6 +112,7 @@ graph TD
 
     style A1 fill:#1e90ff,stroke:#1565c0,color:#fff
     style A2 fill:#1e90ff,stroke:#1565c0,color:#fff
+    style A3 fill:#1e90ff,stroke:#1565c0,color:#fff
     style V1 fill:#1e90ff,stroke:#1565c0,color:#fff
     style V2 fill:#1e90ff,stroke:#1565c0,color:#fff
     style E4 fill:#1e90ff,stroke:#1565c0,color:#fff
@@ -124,23 +129,23 @@ graph TD
 
 > One unified diagram. The "Input Validation" layer is a set of helpers inside `R/default.R` (new in
 > this run, except the older `index`/`W`/`group.fe` checks). `O2` is blue because `print.R` changed;
-> `esplot.R` did not.
+> `esplot.R` did not. `A3` is blue for the follow-up M1 (`fect_mspe.R`); `did_wrapper.R` did not change.
 
 ### Module Reference
 
 | Module / File | Layer | Purpose | Key Exports | Changed in this run |
 | --- | --- | --- | --- | --- |
-| `R/default.R` (4,121 lines) | API + Validation | `fect()` generic, formula and default methods: input checks, reshaping to T x N matrices, CV / fit / bootstrap routing, diagnostics, output assembly | `fect()` | yes: A2 (stores `vartype`), A6 (`cl` checks, parametric warning), B5 (`wgt.implied` dimnames), B7, B8, B8b-d (loo refit arguments), B9, C1-C6, C4b |
+| `R/default.R` (4,140 lines) | API + Validation | `fect()` generic, formula and default methods: input checks, reshaping to T x N matrices, CV / fit / bootstrap routing, diagnostics, output assembly | `fect()` | yes: A2 (stores `vartype`), A6 (`cl` checks, parametric warning), B5 (`wgt.implied` dimnames), B7, B8, B8b-d (loo refit arguments), B9, C1-C6, C4b; follow-up: B10-cfe (`dloo` with never-treated fitting stops in the argument checks), B13 (stores the `W.agg` matrix) |
 | `R/interFE.R` (539) | API | Standalone interactive fixed effects estimator | `interFE()` | yes: C1, C2 (formula parser, `X` with formula), C6 (absorbed-covariate labels) |
-| `R/did_wrapper.R` (659), `R/fect_mspe.R` (371) | API | DID estimator wrappers; MSPE model comparison | `did_wrapper()`, `fect_mspe()` | no |
-| `R/po-estimands.R` (2,154) | Post-hoc | `imputed_outcomes()` long-form accessor and `estimand()` dispatcher; replicate alignment helpers | `estimand()`, `imputed_outcomes()` | yes: A1 (`.po_replicate_cells()`, `.po_replicate_att()`, `cells` scoping), A6 (slot contract allows padded arrays) |
-| `R/effect.R` (420), `R/cumu.R` (220) | Post-hoc | Cumulative / subgroup effects (soft-deprecated) | `effect()`, `att.cumu()` | yes: A2 (stored `vartype`, `drop = FALSE`, parametric normal CI in `att.cumu()`), A6 (replicate width) |
+| `R/did_wrapper.R` (659), `R/fect_mspe.R` (376) | API | DID estimator wrappers; MSPE model comparison | `did_wrapper()`, `fect_mspe()` | follow-up: M1 (`fect_mspe()` refits no longer pass the call's `Y`, `D`, `X`; the rebuilt formula carries them) |
+| `R/po-estimands.R` (2,205) | Post-hoc | `imputed_outcomes()` long-form accessor and `estimand()` dispatcher; replicate alignment helpers | `estimand()`, `imputed_outcomes()` | yes: A1 (`.po_replicate_cells()`, `.po_replicate_att()`, `cells` scoping), A6 (slot contract allows padded arrays); follow-up: B13 (`.po_agg_weights()`) |
+| `R/effect.R` (422), `R/cumu.R` (239) | Post-hoc | Cumulative / subgroup effects (soft-deprecated) | `effect()`, `att.cumu()` | yes: A2 (stored `vartype`, `drop = FALSE`, parametric normal CI in `att.cumu()`), A6 (replicate width); follow-up: B11 (running sum of the per-period ATTs) |
 | `R/fe.R` (959), `R/mc.R` (809), `R/cfe.R` (1,175) | Estimation | IFE / FE, matrix completion, complex FE fits | internal | no |
-| `R/fect_nevertreated.R` (3,592) | Estimation | Never-treated estimators (gsynth, IFE and CFE with `time.component.from = "nevertreated"`), their CV, implied weights | internal | yes: A7 (degenerate solves stop), B1 (`"pc"`), B2 (CV cap), B3 (skip messages), B4 (`W.cvfit`), B5 (`.fect_nt_implied_weights()`) |
+| `R/fect_nevertreated.R` (3,592) | Estimation | Never-treated estimators (gsynth, IFE and CFE with `time.component.from = "nevertreated"`), their CV, implied weights | internal | yes: A7 (degenerate solves stop), B1 (`"pc"`), B2 (CV cap), B3 (skip messages), B4 (`W.cvfit`), B5 (`.fect_nt_implied_weights()`); follow-up: B12 (one treated unit in the CFE branch) |
 | `R/dloo.R` (711) | Estimation | Double leave-one-out pre-trend overlay (closed form, no refits) | internal | no |
 | `R/cv.R` (2,067) | CV | `fect_cv()`: selection of `r` / `lambda`; delegates never-treated CV to `fect_nevertreated()` | internal | yes: B1 (`"pc"` table), B4 (`W.in.fit` forwarded), B8 (`loading.bound` arguments) |
 | `R/cv-rolling.R` (403), `R/cv-rule-helpers.R` (127), `R/cv-helpers.R` (554), `R/cv_binary.R` (441) | CV | Rolling CV, 1se / min / 1pct rules, fold helpers, binary CV | `r.cv.rolling()` | no |
-| `R/boot.R` (4,934) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing) |
+| `R/boot.R` (4,986) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing); follow-up: B10-cfe (cfe + never-treated replicates) |
 | `R/impute_Y0.R` (246) | Inference | Y(0) imputer used by the parametric bootstrap | internal | yes: A4 (`W.in.fit`), B8 (`loading.bound` arguments) |
 | `R/valid_controls.R` (34), `R/permutation.R` (264) | Inference | Control screening for the parametric bootstrap; permutation test | internal | no |
 | `R/diagtest.R` (233), `R/fittest.R` (636), `R/fect_sens.R` (232), `R/fect_iden.R` (224) | Diagnostics | Pre-trend / placebo / carryover / equivalence tests; sensitivity; identification | `fect_sens()`, `fect_iden()` | no |
@@ -297,6 +302,7 @@ graph TD
     EF["effect()"]
     AC["att.cumu()"]
     IO["imputed_outcomes()"]
+    AW[".po_agg_weights()"]
     CF[".apply_cells_filter()"]
     RA[".po_replicate_att()"]
     RC[".po_replicate_cells()"]
@@ -311,6 +317,7 @@ graph TD
     EA --> OV
     EA --> ET
     OV --> IO
+    IO --> AW
     IO --> CF
     IO --> RC
     OV --> RA
@@ -328,6 +335,7 @@ graph TD
     style AP fill:#1e90ff,stroke:#1565c0,color:#fff
     style LA fill:#1e90ff,stroke:#1565c0,color:#fff
     style IO fill:#1e90ff,stroke:#1565c0,color:#fff
+    style AW fill:#1e90ff,stroke:#1565c0,color:#fff
     style CF fill:#1e90ff,stroke:#1565c0,color:#fff
     style RA fill:#1e90ff,stroke:#1565c0,color:#fff
     style RC fill:#1e90ff,stroke:#1565c0,color:#fff
@@ -350,11 +358,11 @@ graph TD
 | `interFE.formula()` | `R/interFE.R` | `interFE()` | `.fect_formula_names()`, `interFE.default()` | yes (C1, C2) | Same parser; stops on `X` with a formula |
 | `interFE.default()` | `R/interFE.R` | `interFE()` | C++ `inter_fe()` | yes (C6) | Stops on FE-absorbed covariates with correct labels, only for fixed effects in the model |
 | `fect_cv()` | `R/cv.R` | `fect.default()`, `fect_boot()` | `fect_fe()`, `fect_mc()`, `fect_nevertreated()` | yes (B1, B4, B8) | CV of `r` / `lambda`; forwards `W.in.fit` and `loading.bound` to never-treated CV |
-| `fect_nevertreated()` | `R/fect_nevertreated.R` | `fect.default()`, `fect_cv()`, `fect_boot()`, `impute_Y0()` | `panel_factor()`, `.fect_nt_*()` helpers, simplex projection | yes (A7, B1-B5) | Never-treated IFE / CFE fits and CV; `r.cv <- r.pc` under `"pc"`; CV range capped at `Nco - 1`; `W.cvfit`; `stop()` instead of 3-field early returns |
+| `fect_nevertreated()` | `R/fect_nevertreated.R` | `fect.default()`, `fect_cv()`, `fect_boot()`, `impute_Y0()` | `panel_factor()`, `.fect_nt_*()` helpers, simplex projection | yes (A7, B1-B5; follow-up B12) | Never-treated IFE / CFE fits and CV; `r.cv <- r.pc` under `"pc"`; CV range capped at `Nco - 1`; `W.cvfit`; `stop()` instead of 3-field early returns; the CFE helper `.estimate_alpha()` keeps a one-column matrix (`drop = FALSE`), so one treated unit works |
 | `.fect_nt_r_max()`, `.fect_nt_cap_message()`, `.fect_nt_no_cv_message()` | `R/fect_nevertreated.R` | `fect_nevertreated()` | — | new (B2, B3) | Cap and messages for the searched range of `r` |
 | `.fect_nt_implied_weights()` | `R/fect_nevertreated.R` | `fect_nevertreated()` | `MASS::ginv()` | new (B5) | `ginv(t(Lco)) %*% t(Ltr)` (Nco x Ntr), NULL on failure |
-| `fect_boot()` | `R/boot.R` | `fect.default()` (se = TRUE, loo refits) | `fect_cv()`, `one.nonpara()`, `draw.error()`, collector | yes (A3-A7, B8, B8e) | Replicates, collector, `boot.rm`, SEs / CIs |
-| `one.nonpara()` (binary parametric, parametric, nonparametric) | `R/boot.R` (closures) | serial loop, parallel `foreach` | `.fect_resample()`, `impute_Y0()`, estimators, `.fect_boot_result_ok()` | yes (A3, A4, A5, A7, B8) | One replicate; parametric: `Y.boot / norm.para[1]` before refit (A3), `W[, id.boot]` (A4) |
+| `fect_boot()` | `R/boot.R` | `fect.default()` (se = TRUE, loo refits) | `fect_cv()`, `one.nonpara()`, `draw.error()`, collector | yes (A3-A7, B8, B8e; follow-up B10-cfe) | Replicates, collector, `boot.rm`, SEs / CIs |
+| `one.nonpara()` (binary parametric, parametric, nonparametric) | `R/boot.R` (closures) | serial loop, parallel `foreach` | `.fect_resample()`, `impute_Y0()`, estimators, `.fect_boot_result_ok()` | yes (A3, A4, A5, A7, B8; follow-up B10-cfe) | One replicate; parametric: `Y.boot / norm.para[1]` before refit (A3), `W[, id.boot]` (A4); nonparametric: cfe + never-treated replicates refit `fect_nevertreated(method = "cfe")`, like the point fit (B10-cfe) |
 | `.fect_resample()` | `R/boot.R` | replicate functions, `draw.error()` | `sample.int()` | new (A5) | `x[sample.int(length(x), size, replace)]`: same draws as `sample()` for length > 1, literal for length 1 |
 | `.fect_boot_result_ok()` | `R/boot.R` | replicate functions | — | new (A7) | Rejects replicate results of the wrong shape (counted as failed) |
 | `.fect_store_slice()` | `R/boot.R` | collector loop | — | new (A6) | Stores a T x w replicate in a T x W x B array, padding with NA and widening when w > W |
@@ -364,9 +372,11 @@ graph TD
 | `.po_replicate_att()` | `R/po-estimands.R` | overall and event-time ATT | `.po_replicate_cells()` | new (A1) | Per-replicate mean; empty replicate gives NA |
 | `.validate_po_contract()` | `R/po-estimands.R` | `estimand()`, `imputed_outcomes()` | — | yes (A6) | Accepts arrays wider than N when `colnames.boot` gives each width |
 | `.apply_cells_filter()` | `R/po-estimands.R` | `imputed_outcomes()` | `eval()` | yes (A1) | Evaluates a `cells` formula in `environment(cells)` |
-| `imputed_outcomes()` | `R/po-estimands.R` | user, `.estimand_att_overall()` | `.po_replicate_cells()` | yes (A1) | Replicate rows are each replicate's own cells |
-| `effect()` | `R/effect.R` | user, `.compute_att_cumu_event_time()` | `getEffect()` | yes (A2, A6) | Reads `x$vartype`; slices each replicate to its real width |
-| `att.cumu()` / `att.cumu.sub()` | `R/cumu.R` | user, `.compute_att_cumu_overall()` | — | yes (A2) | Parametric fits: normal CI and p-value |
+| `imputed_outcomes()` | `R/po-estimands.R` | user, `.estimand_att_overall()` | `.po_replicate_cells()`, `.po_agg_weights()` | yes (A1; follow-up B13) | Replicate rows are each replicate's own cells; the `W.agg` column comes from `.po_agg_weights()` |
+| `.po_agg_weights()` | `R/po-estimands.R` | `imputed_outcomes()` | — | new (follow-up B13) | TT x N aggregation weights: `fit[["W.agg", exact = TRUE]]`; for fit objects made before that slot existed, the TT x N matrix stored under the name "W" when `W.in.agg`; otherwise 1 |
+| `effect()` | `R/effect.R` | user, `.compute_att_cumu_event_time()` | `getEffect()` | yes (A2, A6; follow-up B11) | Reads `x$vartype`; slices each replicate to its real width; `getEffect()` builds the cumulative series as the running sum of the per-period means, NA from an event time with no treated cell on |
+| `att.cumu()` / `att.cumu.sub()` | `R/cumu.R` | user, `.compute_att_cumu_overall()` | — | yes (A2; follow-up B11) | Parametric fits: normal CI and p-value; `weighted = FALSE` (default): running sum, and a replicate missing an event time of the window is dropped; `weighted = TRUE`: the count-weighted number, identical to 5afa708; works on fits without SEs |
+| `.build_rerun_args()` | `R/fect_mspe.R` (inside `fect_mspe()`) | `fect_mspe()` | — | yes (follow-up M1) | Arguments of each refit: the rebuilt formula plus the call's other arguments, without `Y`, `D`, `X` (#151's C2 stops on `X` given with a formula) |
 | `plot.fect()` | `R/plot.R` | user | ggplot2 | yes (B6) | `identical(x$vartype, "parametric")`; factors-plot label positions |
 | `print.fect()` | `R/print.R` | user | — | yes (A6) | No "Cluster SE" line for parametric and jackknife fits (they ignore `cl`) |
 | `panel_factor()` | `src/fe_sub.cpp` | C++ IFE cores | Armadillo SVD | yes (B2) | `r_use = min(r, T, N)` |
@@ -444,10 +454,10 @@ graph TD
 | drop periods | `fect.default()` step 2 | Periods with no control are dropped; if no treated cell is left, stop (B7) |
 | rank check | `fect.default()` step 7b | `.fect_check_covariates()` on the estimation cells; dropped covariates leave `X` before every later fit (C5, C6) |
 | select r / lambda | `fect_cv()` / `fect_nevertreated()` | `"pc"` rule, CV cap, `W.agg` kept out, bounds honoured (B1-B4, B8); serial seed as `se = FALSE` (B9) |
-| replicates | `fect_boot()` | Routing (B8e), replicate checks (A7), resampling (A5), parametric scale and weights (A3, A4), collector with padding (A6), count message |
-| loo refits | `fect.default()` loo block | Refits keep `loading.bound`, `time.component.from`, `para.error` (B8b-d) |
-| assemble | `fect.default()` output | NA rows for dropped covariates, `wgt.implied` dimnames, `remove.id`, `vartype`, labelled `rawtime` / `data.long` |
-| post-hoc | `po-estimands.R`, `effect.R`, `cumu.R`, `plot.R` | Replicates read through `colnames.boot` (A1, A6); stored `vartype` (A2); NULL-safe plots (B6) |
+| replicates | `fect_boot()` | Routing (B8e), replicate checks (A7), resampling (A5), parametric scale and weights (A3, A4), collector with padding (A6), count message; cfe + never-treated replicates use the never-treated model (follow-up B10-cfe) |
+| loo refits | `fect.default()` loo block | Refits keep `loading.bound`, `time.component.from`, `para.error` (B8b-d); their replicates follow the routing above (follow-up B10-cfe) |
+| assemble | `fect.default()` output | NA rows for dropped covariates, `wgt.implied` dimnames, `remove.id`, `vartype`, labelled `rawtime` / `data.long`; the `W.agg` matrix when `W` or `W.agg` weights the aggregation (follow-up B13) |
+| post-hoc | `po-estimands.R`, `effect.R`, `cumu.R`, `plot.R` | Replicates read through `colnames.boot` (A1, A6); stored `vartype` (A2); NULL-safe plots (B6); cumulative ATT as a running sum (follow-up B11) |
 
 ---
 
@@ -542,6 +552,37 @@ Nco x Ntr; the simplex path stores `t(W_tr)`, also Nco x Ntr. `fect.default()` s
 (control ids x treated ids). `t(lambda.co) %*% wgt.implied == t(lambda.tr)`; with time fixed
 effects the unbounded columns sum to zero (control loadings are centred). NULL when r = 0.
 
+### cfe + never-treated replicates (follow-up B10-cfe)
+
+The point fit of `method = "cfe"` with `time.component.from = "nevertreated"` is
+`fect_nevertreated(method = "cfe")`, and so are its parametric refits (`impute_Y0()`). The
+nonparametric `one.nonpara()` has a branch for the same case, placed before the plain `cfe` branch,
+so case-bootstrap and jackknife replicates, including those inside the `loo` refits, use that
+estimator too. The parallel loop's trimmed closure keeps `time.component.from`, which the branch
+reads. `dloo = TRUE` with never-treated fitting stops in `fect.default()`'s argument checks, after
+the `vartype` and `method` checks and before the bootstrap.
+
+### Cumulative ATT (follow-up B11)
+
+At event time k the cumulative ATT is the running sum of the per-period ATTs (`fit$att`) from the
+window's first event time to k. `getEffect()` (so `effect(cumu = TRUE)` and
+`estimand("att.cumu", "event.time")`) and `att.cumu.sub()` (so `att.cumu()` with its default
+`weighted = FALSE` and `estimand("att.cumu", "overall")`) compute it the same way for the point
+estimate and for each replicate. A replicate with no treated cell at one of the window's event times
+gives NA and is dropped (`na.rm`) in both, so their bootstrap and parametric SEs agree.
+`att.cumu(weighted = TRUE)` keeps the count-weighted number (L times the mean effect over the
+window's treated cells) with its old replicate rescaling, identical to 5afa708. Known gap, not
+changed here: for jackknife fits `att.cumu()` does not scale the replicate spread by sqrt(N - 1) as
+`effect()` does, so their S.E. differ from the second row on.
+
+### Aggregation weights `fit$W.agg` (follow-up B13)
+
+`fect.default()` stores the TT x N aggregation weights as `output$W.agg` only when `W` or `W.agg`
+weights the aggregation. Read it with `fit[["W.agg", exact = TRUE]]`: on a fit without the slot,
+`fit$W.agg` partially matches the string slot `W.agg.col`. The estimators' own copy of the matrix
+sits under the name "W", after the column-name slot of the same name, where extraction by name
+cannot reach it; `.po_agg_weights()` falls back to it for fit objects made before the slot existed.
+
 ---
 
 ## Architectural Patterns
@@ -577,7 +618,8 @@ effects the unbounded columns sum to zero (control loadings are centred). NULL w
 - **Rolling-window CV and the 1-SE rule (v2.3.0)**: default CV design and selection rule;
   `criterion = "pc"` bypasses the rule and picks the lowest PC.
 - **Per-role weights (v2.3.1)**: `W.est` (fit) and `W.agg` (aggregation); since this run `W.agg`
-  never reaches the fit or the CV scores, and weights reach the parametric bootstrap.
+  never reaches the fit or the CV scores, and weights reach the parametric bootstrap. The
+  follow-up stores the aggregation weights on the fit as `W.agg` (B13).
 
 ---
 
