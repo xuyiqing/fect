@@ -422,3 +422,36 @@ test_that("B8: simplex with no factor in the model says it has no effect", {
                               parallel = FALSE))
   expect_false(any(grepl("has no effect", out0$msgs, fixed = TRUE)))
 })
+
+
+## -- B9  CV folds do not depend on se; remove.id whenever units are removed --
+
+test_that("B9: with parallel = FALSE, se = TRUE draws the CV folds of se = FALSE", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  for (m in c("gsynth", "ife")) {
+    run <- function(se) .fb_quiet(fect::fect(
+      Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"), method = m,
+      force = "two-way", CV = TRUE, r = c(0, 4), se = se, nboots = 5,
+      parallel = FALSE, seed = 12))
+    f0 <- run(FALSE)
+    f1 <- run(TRUE)
+    slot <- if (m == "gsynth") "CV.out" else "CV.out.ife"
+    ## 412d7ae: se = TRUE used the folds of seed + 1 (CV.out differs by 1.25)
+    expect_identical(f1[[slot]], f0[[slot]], info = m)
+    expect_identical(f1$r.cv, f0$r.cv, info = m)
+    expect_identical(f1$att.avg, f0$att.avg, info = m)
+  }
+})
+
+test_that("B9: remove.id lists the removed units even when the first unit is kept", {
+  simgsynth <- .fb_data("simgsynth")
+  ## unit 103 keeps only 3 pre-treatment periods (< min.T0 = 5)
+  d2 <- simgsynth[!(simgsynth$id == 103 & simgsynth$time <= 17), ]
+  fit <- .fb_quiet(fect::fect(Y ~ D, data = d2, index = c("id", "time"),
+                              method = "gsynth", force = "two-way", r = 0,
+                              CV = FALSE, se = FALSE, parallel = FALSE))
+  expect_false(103 %in% fit$id)
+  ## 412d7ae: remove.id was set only when unit 1 (here 101) was removed
+  expect_equal(as.numeric(fit[["remove.id"]]), 103)
+})

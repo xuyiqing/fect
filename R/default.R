@@ -2542,9 +2542,13 @@ fect.default <- function(
     old.future.plan <- NULL
 
     if ((se == TRUE | permute == TRUE) & !do_parallel_boot) {
-        ## set seed
+        ## set seed. With CV the folds are drawn first (fect_boot() runs
+        ## fect_cv() before the bootstrap), so seed them with `seed` as the
+        ## se = FALSE run and the parallel bootstrap do: the same seed then
+        ## gives the same folds, and the same r, with and without SEs.
+        ## Without CV keep seed + 1, so the bootstrap draws are unchanged.
         if (is.null(seed) == FALSE) {
-            set.seed(seed + 1)
+            set.seed(if (isTRUE(CV == TRUE)) seed else seed + 1)
         }
     }
 
@@ -3527,7 +3531,7 @@ fect.default <- function(
         out
     )
 
-    if (1 %in% rm.id) {
+    if (length(rm.id) > 0) {
         output <- c(output, list(remove.id = remove.id))
         ## message("list of removed units:",remove.id)
         ## message("\n\n")
