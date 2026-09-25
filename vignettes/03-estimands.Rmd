@@ -342,7 +342,7 @@ plus or minus a critical value times the SE.
 
 ## Migration
 
-The legacy functions `effect()` and `att.cumu()` still work and produce identical results, but now emit a one-time-per-session deprecation message pointing here. Direct replacements:
+The legacy functions `effect()` and `att.cumu()` still work, but now emit a one-time-per-session deprecation message pointing here. Direct replacements:
 
 | Today | Replacement |
 | --- | --- |
@@ -350,4 +350,4 @@ The legacy functions `effect()` and `att.cumu()` still work and produce identica
 | `effect(fit, cumu = FALSE)` | `estimand(fit, "att", "event.time")` |
 | `att.cumu(fit, period = c(L, R))` | `estimand(fit, "att.cumu", "overall", window = c(L, R))` |
 
-Outputs from `estimand()` and the legacy functions match to all decimals (verified by package tests). The only user-facing difference is that `estimand()` returns a data frame instead of the legacy matrix.
+For the cumulative ATT the replacements give the same numbers to all decimals: `estimand(fit, "att.cumu", "event.time")` returns what `effect(fit, cumu = TRUE)` returns, and the overall form returns the last row of `att.cumu()`. For `effect(fit, cumu = FALSE)`, the point estimates and standard errors equal those of `estimand(fit, "att", "event.time")`, but the intervals differ. `effect()` takes the 2.5% and 97.5% quantiles of the bootstrap replicates, while `estimand()` returns the normal intervals of `fit$est.att`. In the example above they differ by up to 0.57; at event time 1 they are [4.01, 5.26] and [3.99, 5.23]. The other difference is that `estimand()` returns a data frame instead of the legacy matrix.

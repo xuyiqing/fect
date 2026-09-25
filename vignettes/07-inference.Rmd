@@ -20,9 +20,9 @@ A `fect()` fit with `se = TRUE` and `keep.sims = TRUE` stores bootstrap estimate
 
 - **`fect()`** fills the `fit$est.att` and `fit$est.avg` slots during the original fit. These give per-event-time and overall estimates. The CI method is set by the `ci.method` argument in `fect()`, which accepts two values: `"normal"` (the default; Wald) and `"basic"`.
 
-- **`estimand()`** is used after fitting. It aggregates `fit$eff.boot` into a one-dimensional bootstrap distribution for the requested estimand: `att`, `att.cumu`, `aptt`, or `log.att`. It then builds a CI using the selected `ci.method`. Five values are accepted: `"normal"`, `"basic"`, `"percentile"`, `"bc"`, and `"bca"`.
+- **`estimand()`** is used after fitting. It aggregates `fit$eff.boot` into a one-dimensional bootstrap distribution for the requested estimand: `att`, `att.cumu`, `aptt`, or `log.att`. It then builds a CI using the selected `ci.method` (the cumulative ATT is an exception; see below). Five values are accepted: `"normal"`, `"basic"`, `"percentile"`, `"bc"`, and `"bca"`.
 
-The two paths give byte-identical results where they overlap, namely for `"normal"` and `"basic"` CIs at the overall and per-event-time levels. The additional methods, `"percentile"`, `"bc"`, and `"bca"`, are available only through `estimand()`. This is also where the estimand-specific defaults are defined: `att.cumu → "basic"`, `aptt → "bca"`, and `log.att → "bca"`.
+The two paths give the same results where they overlap. `estimand(fit, "att", "event.time")` returns `fit$est.att` as it is, and the overall ATT with `"normal"` or `"basic"` CIs matches `fit$est.avg` up to rounding error. The additional methods, `"percentile"`, `"bc"`, and `"bca"`, are available only through `estimand()`. This is also where the estimand-specific defaults are defined: `aptt → "bca"` and `log.att → "bca"`.
 
 **vartype** controls the distribution semantics:
 
@@ -42,7 +42,7 @@ The two paths give byte-identical results where they overlap, namely for `"norma
 | `"bc"` | bias-shifted percentile, with $z_0 = \Phi^{-1}(P(B < \hat\theta))$ | adapts | ✓ | ✗ |
 | `"bca"` | bias + acceleration $a$ from cell-level jackknife | adapts | ✓ | ✓ |
 
-The default `ci.method` depends on the estimand: `att` → `"normal"`, `att.cumu` → `"basic"`, `aptt` → `"bca"`, and `log.att` → `"bca"`. These defaults follow the meaning of each estimand, not performance on any specific DGP. See the coverage results below for the full comparison.
+The default `ci.method` depends on the estimand: `att` → `"normal"`, `aptt` → `"bca"`, and `log.att` → `"bca"`. The cumulative ATT does not use `ci.method` (see below). These defaults follow the meaning of each estimand, not performance on any specific DGP. See the coverage results below for the full comparison.
 
 **On `"basic"` vs `"percentile"`.** The two rely on different ideas. The `"basic"` interval inverts the pivot $T = \hat\theta - \theta$ and gives $[2\hat\theta - q_{1-\alpha},\ 2\hat\theta - q_\alpha]$. The `"percentile"` interval uses the bootstrap quantiles directly, $[q_\alpha,\ q_{1-\alpha}]$. Davison and Hinkley (1997, §5.2.1) recommend `"basic"` as the default, and this is what `boot::boot.ci(type = "basic")` returns. The `"percentile"` interval requires an additional symmetry condition on the bootstrap distribution to be valid [@hesterberg2014]. When the distribution is symmetric, the two intervals coincide; when it is skewed, `"basic"` is usually more reliable.
 
@@ -136,7 +136,7 @@ Use `fect()` for the standard `att` workflow. Use `estimand()` for alternative e
 fect(..., ci.method = "normal")  # default; Wald: theta_hat +- z * SE
 fect(..., ci.method = "basic")   # reflected pivot: 2 * theta_hat - quantile(boot, ...)
 ```
-The `"basic"` interval is the reflected (pivot) CI of @davison_hinkley1997 §5.2.1. It is the standard "percentile" CI in the literature and is what `boot::boot.ci(type = "basic")` returns in R. The default is `"normal"`. The `est.att` (per-event-time) and `est.avg` (overall) slots returned by `fect()` use the requested method and match `estimand(fit, "att", ci.method)` exactly on the same fit.
+The `"basic"` interval is the reflected (pivot) CI of @davison_hinkley1997 §5.2.1. It is the standard "percentile" CI in the literature and is what `boot::boot.ci(type = "basic")` returns in R. The default is `"normal"`. The `est.att` (per-event-time) and `est.avg` (overall) slots returned by `fect()` use the requested method. On the same fit, `estimand(fit, "att", "event.time")` returns `est.att` as it is, and `estimand(fit, "att", "overall", ci.method = ...)` with the same method matches `est.avg` up to rounding error.
 
 **Parametric fits get a location shift.** When `vartype = "parametric"`, `eff.boot` is centered at $0$ under $H_0$, so the $H_0: \theta = 0$ test is correctly calibrated. For `ci.method = "basic"`, the reflected pivot would otherwise be centered around $2\hat\theta$. To avoid this, `fect()` applies a variance-preserving location shift, `eff.boot.ci <- eff.boot - mean(eff.boot) + theta_hat`, as in `estimand()` (`R/po-estimands.R`). This shift is used only for the CI; the SE and the $H_0$-based $p$-value are unchanged.
 
@@ -144,7 +144,7 @@ The `"basic"` interval is the reflected (pivot) CI of @davison_hinkley1997 §5.2
 
 **nboots warning.** The `"basic"` interval uses the 2.5th and 97.5th order statistics of the bootstrap distribution. These tail quantiles can be unstable when `nboots` is small. `fect()` issues a warning when `ci.method = "basic"` is used with `nboots < 1000`, and recommends refitting with `nboots = 1000` for publication-quality CIs [@efron1987 §3; @diciccio_efron1996 §4].
 
-**Other slots.** The location-shift fix is applied only to `est.att` and `est.avg`. If your workflow uses other `fect()` slots, such as `est.calendar`, `est.cohort.att`, `est.subgroup.att`, balanced-sample, by-W, placebo, or carryover, and you use `vartype = "parametric"` with `ci.method = "basic"`, those slots still use the legacy reflected formula on the raw $H_0$-centered bootstrap. Their CIs may not be correctly centered. Until these slots are updated, use `estimand(fit, type, by, ci.method = "basic")` for the estimand you need.
+**Other slots.** The location-shift fix is applied only to `est.att` and `est.avg`. If your workflow uses other `fect()` slots, such as `est.calendar`, `est.cohort.att`, `est.subgroup.att`, balanced-sample, by-W, placebo, or carryover, and you use `vartype = "parametric"` with `ci.method = "basic"`, those slots still use the legacy reflected formula on the raw $H_0$-centered bootstrap. Their CIs may not be correctly centered. Until these slots are updated, get the placebo and carryover series from `estimand(fit, "att", "event.time", test = "placebo", ci.method = "basic")` (or `test = "carryover"`). `estimand()` has no counterpart yet for the calendar-time, cohort, subgroup, balanced-sample and by-W slots.
 
 The legacy `quantile.CI` argument is **soft-deprecated** as of v2.4.2. Setting `quantile.CI = FALSE` is equivalent to `ci.method = "normal"`, and `quantile.CI = TRUE` is equivalent to `ci.method = "basic"`. Both remain available but issue a one-time deprecation warning.
 
@@ -155,22 +155,24 @@ The legacy `quantile.CI` argument is **soft-deprecated** as of v2.4.2. Setting `
 | `ci.method` | Formula | When to prefer |
 |-------------|---------|----------------|
 | `"normal"` | $\hat\theta \pm z \cdot \mathrm{SE}$ (Wald) | Symmetric distributions; the per-type default for `att` |
-| `"basic"` | $(2\hat\theta - q_{1-\alpha/2},\ 2\hat\theta - q_{\alpha/2})$ | Reflected pivot CI [@davison_hinkley1997 §5.2.1; `boot::boot.ci(type = "basic")`]; the per-type default for `att.cumu` |
+| `"basic"` | $(2\hat\theta - q_{1-\alpha/2},\ 2\hat\theta - q_{\alpha/2})$ | Reflected pivot CI [@davison_hinkley1997 §5.2.1; `boot::boot.ci(type = "basic")`] |
 | `"percentile"` | $(q_{\alpha/2},\ q_{1-\alpha/2})$ | Raw bootstrap quantiles; preserved for replication and `boot::boot.ci(type = "perc")` parity --- prefer `"basic"` for routine work |
 | `"bc"` | Bias-corrected percentile [@efron1987 minus acceleration]; cutoffs shifted by $2 z_0$ | Skewed distributions where the bootstrap median is biased |
 | `"bca"` (new in v2.4.2) | Bias-corrected accelerated [@efron1987 in full]; adds an acceleration parameter via cell-level jackknife | Skewed *and* heavy-tailed; the per-type default for `aptt` and `log.att` |
 
-In `estimand()`, `ci.method = NULL` uses an estimand-specific default: `att` → `"normal"`, `att.cumu` → `"basic"`, `aptt` → `"bca"`, and `log.att` → `"bca"`. Pass an explicit value to override the default.
+In `estimand()`, `ci.method = NULL` uses an estimand-specific default: `att` → `"normal"`, `aptt` → `"bca"`, and `log.att` → `"bca"`. Pass an explicit value to override the default. The per-event-time ATT is the exception: `estimand(fit, "att", "event.time")` returns `fit$est.att` as a data frame, and any other `ci.method`, `conf.level` or `window` value stops with an error. Use `by = "overall"` for the other methods.
+
+The cumulative ATT does not use `ci.method` or `conf.level`. `estimand(fit, "att.cumu", ...)` returns the 95% intervals of `effect()` (by event time) or `att.cumu()` (over one window). For bootstrap fits these are percentile intervals: the 2.5% and 97.5% quantiles of the replicates' cumulative ATTs. For parametric fits they are symmetric intervals around the estimate, built from the bootstrap standard error. Internally, `ci.method = NULL` still becomes `"basic"` for `att.cumu`. So `estimand()` warns about tail quantiles when `nboots` is below 1000, and a jackknife fit needs `ci.method = "normal"`; with the default it stops.
 
 For methods based on tail quantiles, `"basic"`, `"percentile"`, `"bc"`, and `"bca"`, `estimand()` warns when the fit has fewer than 1000 bootstrap replicates. It recommends refitting with `nboots = 1000` for more stable tail estimates [@efron1987 §3; @diciccio_efron1996 §4].
 
 ### When the two surfaces overlap
 
-`fect(ci.method = "normal")` and `estimand(fit, type = "att", ci.method = "normal")` give the same estimates for the average effect. They are identical up to RNG noise from independent fits, and byte-identical when they use the same `fit$eff.boot`. The same is true for `"basic"`.
+`fect(ci.method = "normal")` and `estimand(fit, type = "att", ci.method = "normal")` give the same per-event-time estimates and intervals. For the overall ATT, which needs `keep.sims = TRUE`, `estimand(fit, "att", "overall", ci.method = ...)` matches `fit$est.avg` for `"normal"`, and for `"basic"` when the fit also used `ci.method = "basic"`. They agree up to rounding error (differences of about $10^{-15}$) when they use the same `fit$eff.boot`; two separate fits differ by bootstrap noise.
 
-The two interfaces serve different purposes. `fect()` fills the `est.*` slots at fit time, so users get a CI in the printed output without calling `estimand()` separately. The two options, `"normal"` and `"basic"`, cover the routine `att` workflow. `estimand()` provides the full five-method set for alternative estimands, including `att.cumu`, `aptt`, and `log.att`, where the bootstrap distribution can be skewed and bias correction can change the CI.
+The two interfaces serve different purposes. `fect()` fills the `est.*` slots at fit time, so users get a CI in the printed output without calling `estimand()` separately. The two options, `"normal"` and `"basic"`, cover the routine `att` workflow. `estimand()` provides the full five-method set for the overall ATT, `aptt` and `log.att`, where the bootstrap distribution can be skewed and bias correction can change the CI.
 
-To use `bca` for the standard `att` estimand, fit the model with the default `ci.method` and then call `estimand(fit, type = "att", ci.method = "bca")`. `fect()` rejects `ci.method = "bca"`, `"bc"`, and `"percentile"` with an error that points users to `estimand()`.
+To use `bca` for the overall ATT, fit the model with `keep.sims = TRUE` and then call `estimand(fit, "att", "overall", ci.method = "bca")`. In this release the per-event-time series has only the interval stored in `fit$est.att`. `fect()` rejects `ci.method = "bca"`, `"bc"`, and `"percentile"` with an error that points users to `estimand()`.
 
 ## $p$-values via test inversion
 
