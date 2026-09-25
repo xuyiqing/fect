@@ -471,24 +471,31 @@ imputed_outcomes <- function(fit,
     eb <- fit$eff.boot
     nboots <- dim(eb)[3]
 
-    n_cells <- nrow(df_point)
-
     ## Re-derive cell coordinates against the (potentially-filtered)
-    ## df_point so we map back into the original eff.boot array.
-    t_idx_f <- match(df_point$time, fit$rawtime)
-    i_idx_f <- match(df_point$id,   fit$id)
+    ## df_point, as a TT x N mask of the selected cells.
+    t_idx_f  <- match(df_point$time, fit$rawtime)
+    i_idx_f  <- match(df_point$id,   fit$id)
+    cell_key <- (i_idx_f - 1L) * TT + t_idx_f
+    sel <- matrix(FALSE, nrow = TT, ncol = N)
+    sel[cell_key] <- TRUE
 
-    df_rep <- df_point[rep(seq_len(n_cells), each = nboots), , drop = FALSE]
-    df_rep$replicate <- rep(seq_len(nboots), times = n_cells)
+    ## Each replicate contributes ITS OWN copies of the selected cells:
+    ## replicate b stores its units in fit$colnames.boot[[b]] order, so a
+    ## unit drawn twice by the case bootstrap gives two rows and an undrawn
+    ## unit none (the parametric bootstrap keeps every treated unit once).
+    ## Rows are in replicate-major order.
+    row_list <- vector("list", nboots)
+    eff_list <- vector("list", nboots)
+    for (b in seq_len(nboots)) {
+        rc <- .po_replicate_cells(fit, sel, b)
+        row_list[[b]] <- match(rc$orig, cell_key)
+        eff_list[[b]] <- rc$eff
+    }
+    n_per_rep <- lengths(row_list)
 
-    eff_rep <- vapply(
-        seq_len(n_cells),
-        function(k) eb[t_idx_f[k], i_idx_f[k], ],
-        numeric(nboots)
-    )
-    ## eff_rep is nboots x n_cells; flatten in (cell-major, replicate-minor)
-    ## order to match df_rep's row order.
-    df_rep$eff    <- as.vector(eff_rep)
+    df_rep <- df_point[unlist(row_list), , drop = FALSE]
+    df_rep$replicate <- rep(seq_len(nboots), times = n_per_rep)
+    df_rep$eff    <- as.numeric(unlist(eff_list))
     df_rep$Y0_hat <- df_rep$Y_obs - df_rep$eff
 
     rownames(df_rep) <- NULL
@@ -818,13 +825,11 @@ estimand <- function(fit,
         estimate[k] <- mean(eff_t, na.rm = TRUE)
 
         if (nboots > 0L && vartype != "none") {
-            eff_boot_cells <- apply(fit$eff.boot, 3,
-                                    function(eb) eb[cell_mask])
-            if (!is.matrix(eff_boot_cells)) {
-                eff_boot_cells <- matrix(eff_boot_cells,
-                                         nrow = sum(cell_mask))
-            }
-            att_b <- colMeans(eff_boot_cells, na.rm = TRUE)
+            ## Each replicate's own cells at this event time (columns of
+            ## replicate b follow fit$colnames.boot[[b]]).
+            att_b <- vapply(seq_len(nboots), function(b) {
+                .po_mean_or_na(.po_replicate_cells(fit, cell_mask, b)$eff)
+            }, numeric(1))
 
             ## PARAMETRIC SHIFT (v2.4.2 fix): center att_b at the point estimate.
             ## For parametric vartype, eff.boot is H0-centered; only ci.method="normal"
@@ -1003,9 +1008,11 @@ estimand <- function(fit,
                                                    vartype))
         }
 
+        ## Replicate b stores its units in its own column order
+        ## (fit$colnames.boot[[b]]); read each replicate's own cells.
         nboots <- dim(fit$eff.boot)[3]
         att_b  <- vapply(seq_len(nboots), function(b) {
-            mean(fit$eff.boot[, , b][cell_mask], na.rm = TRUE)
+            .po_mean_or_na(.po_replicate_cells(fit, cell_mask, b)$eff)
         }, numeric(1))
 
         ## PARAMETRIC SHIFT (v2.4.2 fix)
@@ -1436,34 +1443,42 @@ estimand <- function(fit,
                     ci_hi[k]  <- estimate[k] + z_q * se_vec[k]
                 }
             } else {
-                ## Bootstrap / wild / parametric branch (original code).
-                ## eff_boot_cells: rows = cells in this group, cols = replicates.
-                eff_boot_cells <- apply(fit$eff.boot, 3, function(eb) eb[cell_mask])
-                if (!is.matrix(eff_boot_cells)) {
-                    eff_boot_cells <- matrix(eff_boot_cells,
-                                             nrow = sum(cell_mask))
+                ## Bootstrap / wild / parametric branch. Replicate b's own
+                ## cells at this event time: rc$eff holds its draws and
+                ## rc$orig their source cells in the original panel, so
+                ## Y.dat[rc$orig] is the observed outcome of each drawn cell.
+                num_b     <- rep(NA_real_, nboots)
+                den_b     <- rep(NA_real_, nboots)
+                has_cells <- logical(nboots)
+                for (b in seq_len(nboots)) {
+                    rc <- .po_replicate_cells(fit, cell_mask, b)
+                    if (length(rc$eff) == 0L) next
+                    has_cells[b] <- TRUE
+                    num_b[b] <- mean(rc$eff, na.rm = TRUE)
+                    den_b[b] <- mean(fit$Y.dat[rc$orig] - rc$eff, na.rm = TRUE)
                 }
-                Y0_boot <- Y_t - eff_boot_cells
 
                 ## Hard-error on cell-drop pathology (v2.4.2+).
                 ## See .compute_log_att_event_time for the full rationale.
                 ## For APTT specifically: when E(Y0_b) crosses zero in any
                 ## replicate, the denominator blows up (or flips sign),
                 ## producing wildly unstable per-replicate APTT values.
-                mean_Y0_per_rep <- colMeans(Y0_boot, na.rm = TRUE)
-                n_bad_reps <- sum(abs(mean_Y0_per_rep) < 1e-10 |
-                                  is.na(mean_Y0_per_rep))
+                ## A replicate that holds no cell of this group (its units
+                ## were not drawn) gives no draw: it stays NA, is ignored
+                ## like any NA draw, and is not counted here.
+                n_rep_cells <- sum(has_cells)
+                n_bad_reps  <- sum(has_cells &
+                                   (abs(den_b) < 1e-10 | is.na(den_b)))
                 if (n_bad_reps > 0L) {
-                    pct_bad <- 100 * n_bad_reps / length(mean_Y0_per_rep)
+                    pct_bad <- 100 * n_bad_reps / n_rep_cells
                     stop(sprintf(
                         "APTT bootstrap is unreliable at event time %s\n  (E(Y0_hat) at the point = %.4f, but %d of %d bootstrap replicates\n  (%.1f%%) have E(Y0_b) ~ 0, blowing up the APTT denominator and\n  producing wildly unstable per-replicate ratios).\n\n  Options:\n    1. Filter out cells where E(Y0_hat) is small relative to E(Y):\n         estimand(fit, \"aptt\", \"event.time\",\n                  cells = ~ abs(Y0_hat) > <threshold>)\n    2. Transform the outcome to keep Y0_hat away from zero\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this denominator instability",
                         as.character(et), den, n_bad_reps,
-                        length(mean_Y0_per_rep), pct_bad
+                        n_rep_cells, pct_bad
                     ), call. = FALSE)
                 }
 
-                aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
-                           mean_Y0_per_rep
+                aptt_b  <- num_b / den_b
 
                 ## PARAMETRIC SHIFT (v2.4.2 fix)
                 is_parametric <- isTRUE(fit$vartype == "parametric") ||
@@ -1642,16 +1657,29 @@ estimand <- function(fit,
                     ci_hi[k]  <- estimate[k] + z_q * se_vec[k]
                 }
             } else {
-                ## Bootstrap / wild / parametric branch (original code).
-                eff_boot_cells <- apply(fit$eff.boot, 3,
-                                        function(eb) eb[cell_mask])
-                if (!is.matrix(eff_boot_cells)) {
-                    eff_boot_cells <- matrix(eff_boot_cells,
-                                             nrow = sum(cell_mask))
+                ## Bootstrap / wild / parametric branch. Restrict the mask
+                ## to the point-level `ok` cells, then read replicate b's own
+                ## copies of them (rc$orig = source cell in the original
+                ## panel; a unit drawn twice gives two copies).
+                ok_mask <- cell_mask
+                ok_mask[cell_mask] <- ok
+                ok_idx    <- which(ok_mask)          ## same order as Y_t[ok]
+                n_contain <- integer(length(ok_idx)) ## replicates holding cell c
+                n_bad     <- integer(length(ok_idx)) ## ... with Y0_b <= 0 in some copy
+                Y_list    <- vector("list", nboots)
+                Y0_list   <- vector("list", nboots)
+                for (b in seq_len(nboots)) {
+                    rc   <- .po_replicate_cells(fit, ok_mask, b)
+                    Y_b  <- fit$Y.dat[rc$orig]
+                    Y0_b <- Y_b - rc$eff
+                    hit  <- match(unique(rc$orig), ok_idx)
+                    n_contain[hit] <- n_contain[hit] + 1L
+                    bad  <- match(unique(rc$orig[!is.na(Y0_b) & Y0_b <= 0]),
+                                  ok_idx)
+                    n_bad[bad] <- n_bad[bad] + 1L
+                    Y_list[[b]]  <- Y_b
+                    Y0_list[[b]] <- Y0_b
                 }
-                eff_ok    <- eff_boot_cells[ok, , drop = FALSE]
-                Y_ok      <- Y_t[ok]
-                Y0_b_ok   <- Y_ok - eff_ok
 
                 ## Hard-error on cell-drop pathology (v2.4.2+).
                 ##
@@ -1667,25 +1695,30 @@ estimand <- function(fit,
                 ## (small dropping is benign at the bootstrap-distribution
                 ## scale; >5% indicates a genuinely unstable cell that
                 ## needs filtering or a different estimand).
-                n_reps_per_cell <- rowSums(Y0_b_ok <= 0, na.rm = TRUE)
-                n_total_reps    <- ncol(Y0_b_ok)
-                drop_frac       <- n_reps_per_cell / n_total_reps
-                worst_idx       <- which.max(drop_frac)
-                worst_frac      <- drop_frac[worst_idx]
+                ## The share for cell c is taken over the replicates that
+                ## contain c (each replicate counted once per cell).
+                drop_frac  <- n_bad / n_contain
+                worst_idx  <- which.max(drop_frac)
+                worst_frac <- drop_frac[worst_idx]
                 if (length(worst_frac) && worst_frac > 0.05) {
                     worst_Y0 <- Y0_t[ok][worst_idx]
                     stop(sprintf(
                         "log-ATT bootstrap is unreliable at event time %s.\n  The worst cell has Y0_hat = %.4f but %d of %d bootstrap replicates\n  (%.1f%%) have Y0_b <= 0 for it, so log(Y0_b) is undefined and the\n  per-replicate average silently drops the cell. This contaminates the\n  bootstrap distribution and yields meaningless inference.\n\n  Options:\n    1. Filter out unstable cells:\n         estimand(fit, \"log.att\", \"event.time\",\n                  cells = ~ Y0_hat > <threshold>)\n    2. Transform the outcome before fect: log(Y + c) for some c > 0\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this pathology",
                         as.character(et), worst_Y0,
-                        n_reps_per_cell[worst_idx], n_total_reps,
+                        n_bad[worst_idx], n_contain[worst_idx],
                         100 * worst_frac
                     ), call. = FALSE)
                 }
 
-                log_Y0_b  <- log(Y0_b_ok)
-                log_Y     <- log(Y_ok)
-                log_diff_b <- log_Y - log_Y0_b
-                logatt_b  <- colMeans(log_diff_b, na.rm = TRUE)
+                ## One log() over all draws (as before: at most one
+                ## "NaNs produced" warning), then the mean per replicate.
+                rep_of     <- rep(seq_len(nboots), lengths(Y_list))
+                log_diff_b <- log(unlist(Y_list)) - log(unlist(Y0_list))
+                logatt_b   <- vapply(
+                    split(log_diff_b, factor(rep_of, levels = seq_len(nboots))),
+                    .po_mean_or_na, numeric(1)
+                )
+                logatt_b   <- unname(logatt_b)
 
                 ## PARAMETRIC SHIFT (v2.4.2 fix)
                 ## Note: log.att with parametric vartype requires strictly positive Y0_hat,
@@ -1732,6 +1765,45 @@ estimand <- function(fit,
 ## ---------------------------------------------------------------------------
 ## Internal helpers
 ## ---------------------------------------------------------------------------
+
+## Cells of replicate b that correspond to `cell_mask` (TT x N, original panel).
+## A bootstrap replicate stores its columns in its own order: the resampled
+## units (case bootstrap: `boot.id`; parametric: treated units first, then the
+## drawn controls). `fit$colnames.boot[[b]]` holds the original unit position
+## (1..N) of each replicate column. A unit drawn k times contributes k copies
+## of its cells; an undrawn unit contributes none.
+## Returns list(eff = the replicate's cell values, orig = the linear index of
+## each value's source cell in the original TT x N panel), so fit$Y.dat[orig],
+## fit$D.dat[orig], ... read the matching original cells.
+.po_replicate_cells <- function(fit, cell_mask, b) {
+    TT  <- nrow(cell_mask)
+    cbl <- fit$colnames.boot
+    ids <- if (!is.null(cbl) && length(cbl) >= b && length(cbl[[b]]) > 0L) {
+        as.integer(cbl[[b]])
+    } else {
+        ## legacy / hand-built fits without colnames.boot: identity mapping
+        seq_len(min(dim(fit$eff.boot)[2], ncol(cell_mask)))
+    }
+    m   <- cell_mask[, ids, drop = FALSE]              ## TT x w
+    pos <- which(m)                                    ## column-major index in TT x w
+    col <- (pos - 1L) %/% TT + 1L
+    row <- (pos - 1L) %% TT + 1L
+    ## seq_along(ids): the replicate's own width (cluster-bootstrap arrays
+    ## are padded with NA beyond it).
+    eb  <- matrix(fit$eff.boot[, seq_along(ids), b], nrow = dim(fit$eff.boot)[1])
+    list(eff = eb[pos], orig = (ids[col] - 1L) * TT + row)
+}
+
+
+## Mean of a replicate's draws; NA (not NaN) when the replicate holds no
+## usable cell (e.g. the unit carrying the cells was not drawn). NA draws are
+## ignored downstream by sd(..., na.rm = TRUE) and friends.
+.po_mean_or_na <- function(v) {
+    if (length(v) == 0L) return(NA_real_)
+    m <- mean(v, na.rm = TRUE)
+    if (is.nan(m)) NA_real_ else m
+}
+
 
 ## Compute SE and (lo, hi) confidence-interval bounds from a bootstrap
 ## distribution `boot` (a numeric vector of replicate-level estimates),
@@ -2030,7 +2102,11 @@ estimand <- function(fit,
             stop("cells: formula must be one-sided (e.g., `~ event.time > 0`).",
                  call. = FALSE)
         }
-        mask <- eval(cells[[2]], envir = df, enclos = parent.frame())
+        ## Evaluate in the formula's own environment, so a formula built in
+        ## the caller's function can use that function's local variables.
+        enc <- environment(cells)
+        if (is.null(enc)) enc <- parent.frame()
+        mask <- eval(cells[[2]], envir = df, enclos = enc)
         if (!is.logical(mask) || length(mask) != nrow(df)) {
             stop("cells: formula must evaluate to a logical vector of ",
                  "length nrow(data).", call. = FALSE)
