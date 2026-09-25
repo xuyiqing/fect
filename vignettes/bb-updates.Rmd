@@ -15,10 +15,10 @@
 * `loading.bound = "simplex"` is now applied with cross-validation, without SEs for `method = "gsynth"`, in the parametric bootstrap, and in the `loo` refits. The `loo` refits also keep `time.component.from` and `para.error`.
 * `method = "ife"` with `time.component.from = "nevertreated"` now fits the never-treated model with `se = TRUE`, as it did with `se = FALSE`.
 * With `parallel = FALSE`, the same `seed` now gives the same cross-validation folds with and without `se`.
-* A factor time index is used in its level order, not sorted as text.
+* A factor time index is used in its level order, not sorted as text; if its levels are numbers out of numeric order, `fect()` warns. A character time index that holds numbers is read as numbers.
 * Exactly collinear covariates, and covariates absorbed by the fixed effects, are dropped with a warning (coefficient `NA`). Collinear covariates used to change the estimates silently.
 
-**Input checks.** Formula terms must be bare column names (`log(Y)`, `factor(g)`, `X1:X2` now stop); `X` cannot be combined with a formula; covariates must be numeric; a character time index must hold numbers; `cl` must be one column, constant within units, with at least two clusters. Each stop says what to do instead.
+**Input checks.** Formula terms must be bare column names (`log(Y)`, `factor(g)`, `X1:X2` now stop); `X` cannot be combined with a formula; covariates must be numeric; a character time index must hold numbers; `cl` must be one column and, for the cluster bootstrap, constant within units with at least two clusters. Each stop says what to do instead.
 
 **Other fixes.** The cluster bootstrap works with clusters of unequal size and `keep.sims = TRUE`; failed bootstrap replicates are dropped and counted instead of stopping the run; cross-validation of `r` no longer crashes when `r` exceeds the number of never-treated units; counterfactual plots work without SEs; `effect()` works for one unit; clearer messages when cross-validation is skipped or no treated observation is left.
 

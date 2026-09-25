@@ -56,10 +56,14 @@ Each bullet names the fits whose numbers change.
 * With `parallel = FALSE`, `se = TRUE` (or `permute = TRUE`) and `CV = TRUE`,
   `seed` now gives the same cross-validation folds, and so the same `r`, as
   `se = FALSE`; it used the folds of `seed + 1`.
-* A factor time index is now used in its level order (levels that are
-  increasing numbers give the same fit as the numbers). It was sorted as text
-  ("1", "10", "2", ...), which scrambled event time and made gsynth report
-  treatment reversals (gsynth #13).
+* A factor time index is now used in its level order: levels that are
+  increasing numbers give the same fit as the numbers, and levels that are
+  numbers out of numeric order (as in `factor(as.character(1:30))`) are used
+  in level order with a warning. It was sorted as text ("1", "10", "2", ...),
+  which scrambled event time and made gsynth report treatment reversals
+  (gsynth #13).
+* A character time index that holds numbers is now read as numbers; it was
+  also sorted as text.
 * Covariates that are exact linear combinations of others, absorbed by the
   fixed effects, or constant on the cells used to fit the model are now
   dropped with one warning and an `NA` coefficient, so the estimates equal
@@ -82,7 +86,8 @@ says what to do.
 * Non-numeric covariates (factor, character, Date) stop and ask for numeric
   dummy columns; logical covariates are used as 0/1, as before.
 * A character time index must hold numbers; values such as `"t01"` stop.
-* `cl` must be one column name that is constant within each unit and has at
+* `cl` must be one column name, and for the cluster bootstrap (`se = TRUE`,
+  `vartype = "bootstrap"`) it must be constant within each unit and have at
   least two clusters; a varying or single cluster gave NA or zero SEs
   (gsynth #41, #86).
 * `method = "ife"` with `time.component.from = "nevertreated"` and `se = TRUE`
