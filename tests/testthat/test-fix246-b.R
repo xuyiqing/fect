@@ -671,3 +671,47 @@ test_that("B13: imputed_outcomes() reports the weights of a weighted fit", {
     }
   }
 })
+
+
+## -- B8b  leave-one-out refits keep loading.bound (leader-added) ------------
+
+test_that("B8b: the leave-one-period-out refits of a simplex fit use the bound", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  orig <- get("fect_boot", envir = asNamespace("fect"))
+  rec <- new.env()
+  loo_fit <- function(lb) {
+    rec$lb <- character(0)
+    rec$g <- numeric(0)
+    testthat::with_mocked_bindings(
+      .fb_quiet(fect::fect(Y ~ D, data = simgsynth, index = c("id", "time"),
+                           method = "gsynth", force = "two-way", r = 2,
+                           CV = FALSE, se = TRUE, nboots = 5, loo = TRUE,
+                           loading.bound = lb,
+                           gamma.loading = if (lb == "simplex") 1 else NULL,
+                           parallel = FALSE, seed = 1)),
+      fect_boot = function(..., loading.bound = "none", gamma.loading = NULL) {
+        rec$lb <- c(rec$lb, loading.bound)
+        rec$g <- c(rec$g, if (is.null(gamma.loading)) NA_real_ else gamma.loading)
+        orig(..., loading.bound = loading.bound, gamma.loading = gamma.loading)
+      },
+      .package = "fect")
+  }
+  fs <- loo_fit("simplex")
+  lb_s <- rec$lb
+  g_s <- rec$g
+  fn <- loo_fit("none")
+  lb_n <- rec$lb
+  ## the main fit plus one refit per pre-treatment period
+  expect_gt(length(lb_s), 10)
+  ## da20c2f / 412d7ae: every loo refit got loading.bound = "none"
+  expect_true(all(lb_s == "simplex"))
+  expect_true(all(g_s == 1))
+  ## so the loo placebo estimates now differ from the unbounded fit's (before,
+  ## the two fits shared the same unbounded refits and were identical)
+  expect_identical(fs$loading.bound, "simplex")
+  expect_gt(max(abs(fs$pre.est.att[, "ATT"] - fn$pre.est.att[, "ATT"])), 1e-4)
+  ## a fit without the bound passes "none" to every refit, as before
+  expect_true(all(lb_n == "none"))
+  expect_true(all(is.finite(fs$pre.est.att[, "ATT"])))
+})

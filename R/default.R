@@ -3200,6 +3200,11 @@ fect.default <- function(
                     T.on.carry = T.on.carry,
                     method = method,
                     time.component.from = time.component.from,
+                    ## the simplex bound, as the main fit receives it (before
+                    ## 2.4.6 the loo refits silently used unbounded loadings)
+                    loading.bound      = loading.bound,
+                    gamma.loading      = gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid,
                     degree = degree,
                     X.extra.FE = X.extra.FE,
                     X.Z = X.Z,
