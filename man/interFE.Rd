@@ -10,10 +10,10 @@
          binary = FALSE, QR = FALSE, normalize = FALSE)
 }
 \arguments{
-  \item{formula}{an object of class "formula": a symbolic description of the model to be fitted.}
+  \item{formula}{a two-sided formula such as \code{Y ~ X1 + X2}: the outcome on the left and at least one covariate on the right. Every term must be a column name of \code{data}. Transformed terms (\code{log(X1)}), \code{factor()} terms, interactions (\code{X1 * X2}) and \code{.} stop with an error: create the column first and use its name. The outcome may not appear on the right-hand side. Intercept terms such as \code{+ 0} or \code{- 1} are ignored. With a formula, list the covariates in the formula; giving \code{X} as well stops.}
   \item{data}{a data frame.}
   \item{Y}{outcome variable.}
-  \item{X}{time-varying covariates.}
+  \item{X}{a character vector of covariate names, used when the model is given through \code{Y} instead of a formula. A covariate that is constant over time within every unit, or constant across units within every period, stops with an error; remove it.}
   \item{W}{weights.}
   \item{index}{a two-element string vector specifying the unit (group) and time indicators.}
   \item{r}{an integer specifying the number of factors.}

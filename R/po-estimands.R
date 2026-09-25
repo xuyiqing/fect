@@ -309,14 +309,16 @@
 #'   \code{~ event.time \%in\% 1:5 & !id \%in\% bad_ids}).
 #' @param replicates Logical. \code{FALSE} (default) returns one row per
 #'   treated cell with the point-estimate \code{Y0_hat}. \code{TRUE}
-#'   expands by bootstrap/jackknife replicate; requires the fit to have
-#'   been built with \code{keep.sims = TRUE}.
+#'   returns the treated cells of every bootstrap replicate instead (see
+#'   \code{replicate} below); requires the fit to have been built with
+#'   \code{keep.sims = TRUE}, and stops for jackknife fits.
 #' @param direction Either \code{"on"} (default; event time relative to
 #'   treatment onset) or \code{"off"} (relative to treatment exit; only
 #'   meaningful on reversal panels).
 #'
-#' @return A data frame with one row per (treated cell) or per
-#'   (treated cell, replicate). Columns:
+#' @return A data frame with one row per treated cell or, with
+#'   \code{replicates = TRUE}, one row per treated cell of each bootstrap
+#'   replicate. Columns:
 #'   \describe{
 #'     \item{\code{id}}{unit identifier from \code{fit$id}.}
 #'     \item{\code{time}}{calendar time from \code{fit$rawtime}.}
@@ -339,13 +341,24 @@
 #'     \item{\code{W.agg}}{aggregation weight at this cell; 1 if the fit
 #'       was built without \code{W} or \code{W.agg}.}
 #'     \item{\code{replicate}}{(only when \code{replicates = TRUE})
-#'       1..\code{nboots} for bootstrap, or the dropped-unit index for
-#'       jackknife.}
+#'       the bootstrap replicate, from 1 to the number of replicates kept.
+#'       A replicate's rows are the treated cells of the units it drew:
+#'       under the case bootstrap a unit drawn twice gives two rows and a
+#'       unit not drawn gives none, so the number of rows varies across
+#'       replicates; under the parametric bootstrap every replicate has each
+#'       treated cell once. Each row keeps the \code{id}, \code{time},
+#'       \code{Y_obs} and \code{W.agg} of its source cell, with the
+#'       replicate's \code{eff} and \code{Y0_hat = Y_obs - eff}. For an
+#'       unweighted fit and no \code{cells} filter, the mean of \code{eff}
+#'       within a replicate equals that replicate's overall ATT
+#'       (\code{fit$att.avg.boot}).}
 #'   }
 #'
 #' @section Memory cost:
-#'   With \code{replicates = TRUE} the returned data frame has
-#'   \code{n_treated_cells * nboots} rows. For typical panels this is
+#'   With \code{replicates = TRUE} the returned data frame has about
+#'   \code{n_treated_cells * nboots} rows (exactly that many under the
+#'   parametric bootstrap; under the case bootstrap the count varies by
+#'   replicate). For typical panels this is
 #'   manageable; for large panels (\eqn{TT \times N \ge 50{,}000} and
 #'   \eqn{nboots \ge 500}) consider filtering via \code{cells} before
 #'   expansion.
@@ -368,9 +381,13 @@
 #' ## Filter to first 5 event times.
 #' po5 <- imputed_outcomes(fit, cells = ~ event.time \%in\% 1:5)
 #'
-#' ## Bootstrap replicate expansion (requires keep.sims = TRUE).
+#' ## Bootstrap replicates (requires keep.sims = TRUE): each replicate's own
+#' ## treated cells, so the number of rows varies across replicates.
 #' po_b <- imputed_outcomes(fit, replicates = TRUE)
-#' nrow(po_b) == nrow(po) * 200    # one row per (cell, replicate)
+#' head(table(po_b$replicate))
+#' ## The mean of eff within a replicate is that replicate's overall ATT.
+#' all.equal(as.numeric(tapply(po_b$eff, po_b$replicate, mean)),
+#'           as.numeric(fit$att.avg.boot))
 #' }
 #'
 #' @export
