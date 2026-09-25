@@ -470,19 +470,108 @@ test_that("C5: bootstrap outputs keep one row per requested covariate", {
   expect_true(all(is.na(g$beta.boot[2, ])))
 })
 
-test_that("C5: the C++ inverse of X'X falls back to the pseudo-inverse when singular", {
+test_that("C5: the C++ inverse of X'X falls back to a generalized inverse when singular", {
   set.seed(3)
   x <- array(stats::rnorm(24), dim = c(4, 3, 2))
+  w1 <- matrix(1, 4, 3)
   xx <- matrix(c(sum(x[, , 1]^2), sum(x[, , 1] * x[, , 2]),
                  sum(x[, , 1] * x[, , 2]), sum(x[, , 2]^2)), 2, 2)
   ## well-conditioned: the ordinary inverse, as before
   expect_equal(fect:::XXinv(x), solve(xx), tolerance = 1e-10)
-  expect_equal(fect:::wXXinv(x, matrix(1, 4, 3)), solve(xx), tolerance = 1e-10)
-  ## singular: before 2.4.6 "inv(): matrix is singular"
-  x[, , 2] <- 2 * x[, , 1]
-  xs <- matrix(c(1, 2, 2, 4) * sum(x[, , 1]^2), 2, 2)
-  expect_equal(fect:::XXinv(x), MASS::ginv(xs), tolerance = 1e-10)
-  expect_equal(fect:::wXXinv(x, matrix(1, 4, 3)), MASS::ginv(xs), tolerance = 1e-10)
+  expect_equal(fect:::wXXinv(x, w1), solve(xx), tolerance = 1e-10)
+  ## singular: before 2.4.6 "inv(): matrix is singular". The fallback is a
+  ## symmetric generalized inverse G of X'X (X'X G X'X = X'X, G X'X G = G),
+  ## also when the collinear covariates are on very different scales.
+  for (k in c(2, 2e8)) {
+    x[, , 2] <- k * x[, , 1]
+    xs <- matrix(c(1, k, k, k^2) * sum(x[, , 1]^2), 2, 2)
+    for (G in list(fect:::XXinv(x), fect:::wXXinv(x, w1))) {
+      expect_true(all(is.finite(G)))
+      expect_equal(G, t(G), tolerance = 1e-10)
+      expect_equal(xs %*% G %*% xs, xs, tolerance = 1e-10)
+      expect_equal(G %*% xs %*% G, G, tolerance = 1e-10)
+    }
+  }
+  ## an all-zero covariate: its row and column of G are 0
+  x[, , 2] <- 0
+  for (G in list(fect:::XXinv(x), fect:::wXXinv(x, w1))) {
+    expect_equal(G, matrix(c(1 / sum(x[, , 1]^2), 0, 0, 0), 2, 2),
+                 tolerance = 1e-12)
+  }
+})
+
+test_that("C5b: the C++ inverse of X'X does not depend on the covariates' units", {
+  set.seed(3)
+  x <- array(stats::rnorm(60), dim = c(5, 4, 3))
+  ## full rank, but columns in very different units: rcond of the raw X'X is
+  ## about 1e-22, rcond after scaling X'X to unit diagonal is not small
+  x[, , 1] <- x[, , 1] * 1e8
+  x[, , 3] <- x[, , 3] * 1e-3
+  w <- matrix(stats::runif(20, 0.5, 2), 5, 4)
+  gram <- function(x, w) {
+    p <- dim(x)[3]
+    outer(seq_len(p), seq_len(p),
+          Vectorize(function(k, m) sum(w * x[, , k] * x[, , m])))
+  }
+  for (wt in list(NULL, w)) {
+    xx <- gram(x, if (is.null(wt)) 1 else wt)
+    G <- if (is.null(wt)) fect:::XXinv(x) else fect:::wXXinv(x, wt)
+    ## the ordinary inverse; compared on the unit-diagonal scale so that every
+    ## entry counts. The first version of the guard returned pinv(X'X) here,
+    ## which zeroes the directions of the small-scale covariates.
+    sc <- sqrt(diag(xx))
+    expect_equal(G * outer(sc, sc), solve(xx / outer(sc, sc)), tolerance = 1e-8)
+  }
+})
+
+test_that("C5b: covariates in very different units give the fit in the original units", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  d0 <- simgsynth
+  set.seed(4)
+  d0$wt <- stats::runif(nrow(d0), 0.5, 2)
+  fit <- function(d, f, args) .fix246c_quiet(do.call(fect::fect, c(list(
+    f, data = d, index = c("id", "time"), CV = FALSE, se = FALSE,
+    parallel = FALSE), args)))
+  specs <- list(
+    fe = list(method = "fe"),
+    ife = list(method = "ife", r = 2),
+    mc = list(method = "mc", lambda = 0.01),
+    gsynth = list(method = "gsynth", r = 2),
+    ife.weighted = list(method = "ife", r = 2, W = "wt")
+  )
+  for (nm in names(specs)) {
+    base <- fit(d0, Y ~ D + X1 + X2, specs[[nm]])
+    for (s in c(1e8, 1e9)) {
+      d <- d0
+      d$GDP <- d0$X1 * s
+      g <- fit(d, Y ~ D + GDP + X2, specs[[nm]])
+      ## first version of the C5 guard: fe att.avg 4.0686 instead of 5.0852,
+      ## gsynth 4.9664 instead of 5.5433, X2 coefficient about 1e-16
+      info <- paste(nm, "x", s)
+      expect_equal(g$att.avg, base$att.avg, tolerance = 1e-10, info = info)
+      expect_equal(g$eff, base$eff, tolerance = 1e-8, info = info)
+      expect_equal(unname(g$beta[, 1] * c(s, 1)), unname(base$beta[, 1]),
+                   tolerance = 1e-8, info = info)
+    }
+  }
+})
+
+test_that("C5b: parametric SEs do not depend on the covariates' units", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  fit <- function(d, f) .fix246c_quiet(fect::fect(
+    f, data = d, index = c("id", "time"), method = "gsynth", r = 2,
+    CV = FALSE, se = TRUE, vartype = "parametric", nboots = 20, seed = 1,
+    parallel = FALSE
+  ))
+  base <- fit(simgsynth, Y ~ D + X1 + X2)
+  d <- simgsynth
+  d$GDP <- d$X1 * 1e8
+  g <- fit(d, Y ~ D + GDP + X2)
+  ## first version of the C5 guard: S.E. 0.9256 instead of 0.2886
+  expect_equal(g$att.avg, base$att.avg, tolerance = 1e-10)
+  expect_equal(g$est.avg[, "S.E."], base$est.avg[, "S.E."], tolerance = 1e-4)
 })
 
 test_that("C6: covariates absorbed by the fixed effects are dropped with a warning naming the fixed effect", {

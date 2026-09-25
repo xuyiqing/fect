@@ -304,14 +304,46 @@ arma::mat data_ub_adj (const arma::mat& I_data, const arma::mat& data) {
   return(data_adj);
 }
 
-/* Reciprocal condition number below which X'X is treated as singular:
-   the (weighted) inverses below then return the Moore-Penrose
-   pseudo-inverse instead of stopping with "inv(): matrix is singular".
+/* Reciprocal condition number, computed on the column-scaled X'X, below
+   which X'X is treated as singular. The test does not depend on the
+   covariates' units: X'X is first scaled to unit diagonal,
+   xs = D X'X D with D = diag(s), s_j = 1 / sqrt(X'X_jj) (the
+   correlation-scaled X'X). If every covariate is non-zero and
+   rcond(xs) > FECT_XX_RCOND_MIN, the (weighted) inverses below invert the
+   unscaled X'X exactly as before (inv() / inv_sympd()), so a full-rank
+   design keeps that path whatever the scale of its covariates. Otherwise
+   (exact or near-exact collinearity, or an all-zero covariate, whose s_j
+   is set to 1) they return D pinv(xs) D, a symmetric generalized inverse
+   G of X'X (X'X G X'X = X'X, with a zero row and column for an all-zero
+   covariate), instead of stopping with "inv(): matrix is singular".
    fect() drops exactly collinear covariates before fitting; this guards
    the cases it cannot see, e.g. a bootstrap replicate whose covariates
-   happen to be collinear. Well-conditioned matrices are inverted exactly
-   as before. */
+   happen to be collinear. */
 static const double FECT_XX_RCOND_MIN = 1e-12;
+
+/* Column scaling for the test above: fills s and xs = diag(s) xx diag(s)
+   and returns true when xx is to be inverted as before (every diagonal
+   entry positive and rcond(xs) > FECT_XX_RCOND_MIN). */
+static bool xx_scaled_ok (const arma::mat& xx, arma::vec& s, arma::mat& xs) {
+  arma::uword p = xx.n_rows ;
+  s.set_size(p) ;
+  bool all_pos = true ;
+  for (arma::uword j = 0; j < p; j++) {
+    if (xx(j, j) > 0) {
+      s(j) = 1.0 / std::sqrt(xx(j, j)) ;
+    }
+    else {
+      s(j) = 1.0 ;
+      all_pos = false ;
+    }
+  }
+  xs = arma::diagmat(s) * xx * arma::diagmat(s) ;
+  if (!all_pos) {
+    return(false) ;
+  }
+  double rc = arma::rcond(xs) ;
+  return(std::isfinite(rc) && rc > FECT_XX_RCOND_MIN) ;
+}
 
 /* Three dimensional matrix inverse */
 // [[Rcpp::export]]
@@ -328,11 +360,16 @@ arma::mat XXinv (const arma::cube& X) {
       }
     }
   } 
-  double rc = arma::rcond(xx) ;
-  if (std::isfinite(rc) && rc > FECT_XX_RCOND_MIN) {
+  /* non-finite entries: inverted as before */
+  if (!xx.is_finite()) {
     return(inv(xx)) ;
   }
-  return(arma::pinv(xx)) ;
+  arma::vec s ;
+  arma::mat xs ;
+  if (xx_scaled_ok(xx, s, xs)) {
+    return(inv(xx)) ;
+  }
+  return(arma::diagmat(s) * arma::pinv(xs) * arma::diagmat(s)) ;
 }
 
 /* weighted inverse*/
@@ -352,11 +389,16 @@ arma::mat wXXinv (const arma::cube& X, const arma::mat& w) {
       }
     }
   }  
-  double rc = arma::rcond(xx) ;
-  if (std::isfinite(rc) && rc > FECT_XX_RCOND_MIN) {
+  /* non-finite entries: inverted as before */
+  if (!xx.is_finite()) {
     return(inv_sympd(xx)) ;
   }
-  return(arma::pinv(xx)) ;
+  arma::vec s ;
+  arma::mat xs ;
+  if (xx_scaled_ok(xx, s, xs)) {
+    return(inv_sympd(xx)) ;
+  }
+  return(arma::diagmat(s) * arma::pinv(xs) * arma::diagmat(s)) ;
 }
 
 
