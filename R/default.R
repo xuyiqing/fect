@@ -3233,7 +3233,14 @@ fect.default <- function(
                     cores = cores,
                     group.level = g.level,
                     group = pG,
-                    dis = FALSE
+                    dis = FALSE,
+                    ## The refits use the main fit's loading bound (and its
+                    ## gamma, CV-selected when none was given), as they use
+                    ## its r.cv and lambda.cv. Before 2.4.6 the bound was not
+                    ## passed, so every refit ran with unbounded loadings.
+                    loading.bound      = loading.bound,
+                    gamma.loading      = if (!is.null(out$gamma.loading)) out$gamma.loading else gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid
                 )
 
                 p.est.att <- p.out$est.att
