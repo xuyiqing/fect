@@ -1278,10 +1278,11 @@ estimand <- function(fit,
 
 
 ## Compute event-time cumulative ATT series. Delegates to the existing
-## effect() function for the actual numerics (which use a per-cell mean
-## approach, not a simple cumsum of fit$att). Reshapes the matrix into
-## the tidy estimand return schema. Numerical equality with effect() is
-## by construction.
+## effect() function for the actual numerics: the running sum of the
+## per-period ATTs (the mean effect over the treated cells at each event
+## time), for the point estimate and for each replicate. Reshapes the
+## matrix into the tidy estimand return schema. Numerical equality with
+## effect() is by construction.
 .compute_att_cumu_event_time <- function(fit, conf.level, ci.method,
                                           vartype) {
 
@@ -1318,9 +1319,10 @@ estimand <- function(fit,
 
 
 ## Compute single overall cumulative ATT in a window. Delegates to the
-## existing att.cumu() function for the canonical math (count-weighted
-## across event times, percentile bootstrap CI). Returns the final row
-## reshaped into the tidy estimand schema.
+## existing att.cumu() function for the canonical math (the running sum of
+## the per-period ATTs over the window; percentile bootstrap CI, normal CI
+## for parametric fits). Returns the final row reshaped into the tidy
+## estimand schema.
 .compute_att_cumu_overall <- function(fit, window, conf.level, ci.method,
                                        vartype) {
 

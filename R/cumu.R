@@ -3,7 +3,7 @@
 ##---------------------------------------##
 att.cumu <- function(x, ## a fect object
                      period = NULL, ## range, length = 2
-                     weighted = TRUE, ## weighted cumulative effect
+                     weighted = FALSE, ## FALSE: running sum of the per-period ATTs; TRUE: count-weighted (pre-2.4.6)
                      alpha = 0.05,
                      type = "on", ## switch on or switch off
                      plot = FALSE
@@ -28,13 +28,17 @@ att.cumu <- function(x, ## a fect object
         stop("period[1] should be smaller than period[2].\n")
     }
 
+    if (!is.logical(weighted) || length(weighted) != 1L || is.na(weighted)) {
+        stop("\"weighted\" must be TRUE or FALSE.", call. = FALSE)
+    }
+
     ## start point
     se <- 0
     time <- x$time
     att <- x$att
     est.att <- x$est.att
 
-    if (!is.null(est.att) & sum(abs(c(x$att.boot)),na.rm = TRUE) != 0) {
+    if (!is.null(est.att) && sum(abs(c(x$att.boot)),na.rm = TRUE) != 0) {
         se <- 1
     }
 
@@ -101,7 +105,7 @@ att.cumu <- function(x, ## a fect object
 
 att.cumu.sub <- function(x, ## a fect object
                          period, ## range, length = 2
-                         weighted = TRUE, ## weighted cumulative effect
+                         weighted = FALSE, ## see att.cumu()
                          alpha = 0.05, 
                          type = "on" ## switch on or switch off
                         ) {
@@ -144,13 +148,21 @@ att.cumu.sub <- function(x, ## a fect object
     att.pos <- which(time>=period[1]&time<=period[2])
     att <- att[att.pos]
     count <- count[att.pos]
+    ok <- !is.na(att) & !is.na(count)   ## event times that enter the estimate
     rm.pos1 <- which(is.na(att))
     rm.pos2 <- which(is.na(count))
     if (NA %in% att | NA %in% count) {
         att <- att[-c(rm.pos1, rm.pos2)]
         count <- count[-c(rm.pos1, rm.pos2)]
     }
-    catt <- sum(att*count*(length(count)/sum(count)))
+    if (weighted) {
+        ## count-weighted: L times the mean over all treated cells of the
+        ## window's L event times (fect's cumulative ATT before 2.4.6)
+        catt <- sum(att*count*(length(count)/sum(count)))
+    } else {
+        ## running sum of the per-period ATTs
+        catt <- sum(att)
+    }
 
 
     if (se == 1) {
@@ -161,6 +173,13 @@ att.cumu.sub <- function(x, ## a fect object
         catt.boot <- rep(NA, nboots)
         
         for (i in 1:nboots) {
+            if (!weighted) {
+                ## this replicate's running sum over the same event times;
+                ## NA when it has no treated cell at one of them (dropped
+                ## by the na.rm below)
+                catt.boot[i] <- sum(att.boot[ok, i])
+                next
+            }
             att.sub <- att.boot[,i]
             count.sub <- count.boot[,i]
             rm.pos1 <- which(is.na(att.sub))
