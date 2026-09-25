@@ -35,11 +35,19 @@ effect <- function(x, ## a fect object
     mask <- (colnames(x$eff) %in% id)
   }
 
-  # Extract relevant matrices for selected units
-  eff <- x$eff[, mask]      # Treatment effects
-  D <- x$D.dat[, mask]      # Treatment indicators
-  I <- x$I.dat[, mask]      # Inclusion (non-missing) indicators
-  inference <- x$call$vartype  # Inference type
+  # Extract relevant matrices for selected units (drop = FALSE keeps a
+  # single selected unit a TT x 1 matrix)
+  eff <- x$eff[, mask, drop = FALSE]      # Treatment effects
+  D <- x$D.dat[, mask, drop = FALSE]      # Treatment indicators
+  I <- x$I.dat[, mask, drop = FALSE]      # Inclusion (non-missing) indicators
+  # Inference type: the resolved vartype stored on the fit (every se = TRUE
+  # fit has it). x$call$vartype is NULL when vartype was not typed (e.g.
+  # gsynth's default parametric inference) and a symbol when it was passed
+  # as a variable, so the call is only a fallback for fits without the slot.
+  inference <- if (!is.null(x$vartype)) x$vartype else {
+    v <- x$call$vartype
+    if (is.character(v) && length(v) == 1L) v else "bootstrap"  # fect's default
+  }
   method <- x$method        # Method
 
   # Get dimensions of data

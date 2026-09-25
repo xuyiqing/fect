@@ -183,3 +183,58 @@ test_that("A1: estimand SEs equal fect's own SEs when treated units are not firs
                  unname(c(fit$att.avg.boot)), tolerance = 1e-10, info = vt)
   }
 })
+
+
+## -- A2  effect() / att.cumu() use the fit's stored vartype --------------
+
+test_that("A2: effect() reads the stored vartype when vartype was passed as a variable", {
+  skip_on_cran()
+  d <- .fix246_panel()
+  vt <- "parametric"
+  fit <- suppressWarnings(suppressMessages(
+    fect::fect(Y ~ D, data = d, index = c("id", "time"), method = "gsynth",
+               r = 1, CV = FALSE, se = TRUE, vartype = vt, nboots = 40,
+               parallel = FALSE, keep.sims = TRUE, seed = 1)
+  ))
+  expect_identical(fit$vartype, "parametric")
+  expect_true(is.name(fit$call$vartype))
+  M <- suppressMessages(fect::effect(fit, cumu = TRUE, plot = FALSE))$effect.est.att
+  ## parametric draws are centred at 0; the CI must be centred on the estimate
+  expect_equal(unname((M[, "CI.lower"] + M[, "CI.upper"]) / 2),
+               unname(M[, "ATT"]), tolerance = 1e-8)
+  expect_true(all(M[, "CI.lower"] < M[, "ATT"] & M[, "ATT"] < M[, "CI.upper"]))
+  ## the effect is 2 per period, so the cumulative effect is clearly nonzero
+  expect_true(all(M[, "p.value"] < 0.01))
+  est <- fect::estimand(fit, "att.cumu", "event.time", ci.method = "percentile")
+  expect_equal(est$ci.lo, unname(M[, "CI.lower"]))
+})
+
+test_that("A2: att.cumu() gives parametric fits a CI around the cumulative effect", {
+  skip_on_cran()
+  d <- .fix246_panel()
+  fit <- .fix246_fit(d, vartype = "parametric")
+  cm <- suppressMessages(fect::att.cumu(fit, period = c(1, 5), plot = FALSE))
+  last <- cm[nrow(cm), ]
+  z <- stats::qnorm(0.975)
+  expect_equal(unname(last["CI.lower"]), unname(last["catt"] - z * last["S.E."]))
+  expect_equal(unname(last["CI.upper"]), unname(last["catt"] + z * last["S.E."]))
+  expect_equal(unname(last["p.value"]),
+               unname(2 * stats::pnorm(-abs(last["catt"] / last["S.E."]))))
+  ov <- fect::estimand(fit, "att.cumu", "overall", window = c(1, 5))
+  expect_equal(ov$ci.lo, unname(last["CI.lower"]))
+  expect_true(ov$ci.lo < ov$estimate && ov$estimate < ov$ci.hi)
+})
+
+test_that("A2: effect() works for a single unit and for fits with one treated unit", {
+  skip_on_cran()
+  d <- .fix246_panel()
+  fit <- .fix246_fit(d, vartype = "bootstrap")
+  one <- suppressMessages(fect::effect(fit, cumu = TRUE, id = 8, plot = FALSE))
+  expect_true(is.matrix(one$effect.est.att))
+  expect_true(all(is.finite(one$effect.est.att[, "ATT"])))
+
+  d1 <- .fix246_panel(N = 12, tr = 5, T0 = 9)
+  fit1 <- .fix246_fit(d1, vartype = "parametric")
+  eff1 <- suppressMessages(fect::effect(fit1, cumu = TRUE, plot = FALSE))
+  expect_true(all(is.finite(eff1$effect.est.att[, "S.E."])))
+})
