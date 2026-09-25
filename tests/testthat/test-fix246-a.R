@@ -302,3 +302,67 @@ test_that("A4: weights equal to 1 reproduce the unweighted parametric SEs", {
   expect_equal(f1$est.avg, f0$est.avg)
   expect_equal(f1$est.att, f0$est.att)
 })
+
+
+## -- A5  resampling from length-1 vectors; dropped replicates are counted ----
+
+## simgsynth with only its first treated unit, relabelled so that it is the
+## LAST column of the panel (sample(k, ...) on a length-1 vector draws 1:k).
+.fx_one_treated <- function() {
+  d  <- .fx_simgsynth()
+  tr <- sort(unique(d$id[d$D == 1]))
+  d  <- d[!(d$id %in% tr[-1]), ]
+  d$id[d$id == tr[1]] <- 999
+  d
+}
+
+.fx_messages <- function(expr) {
+  msgs <- character(0)
+  val <- withCallingHandlers(
+    suppressWarnings(expr),
+    message = function(m) {
+      msgs <<- c(msgs, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    })
+  list(value = val, messages = msgs)
+}
+
+test_that("A5: case bootstrap with one treated unit keeps every draw", {
+  skip_on_cran()
+  run <- .fx_messages(fect::fect(
+    Y ~ D, data = .fx_one_treated(), index = c("id", "time"), method = "fe",
+    force = "two-way", se = TRUE, vartype = "bootstrap", nboots = 30,
+    parallel = FALSE, seed = 7))
+  fit <- run$value
+  expect_equal(length(fit$att.avg.boot), 30L)
+  expect_true(is.finite(fit$est.avg[1, "S.E."]))
+  expect_false(any(grepl("replicates failed", run$messages)))
+})
+
+test_that("A5: dropped replicates are reported with their count", {
+  skip_on_cran()
+  ## jackknife with one treated unit: the replicate that leaves it out has
+  ## no treated unit and is dropped
+  d <- .fx_one_treated()
+  run <- .fx_messages(fect::fect(
+    Y ~ D, data = d, index = c("id", "time"), method = "fe",
+    force = "two-way", se = TRUE, vartype = "jackknife", parallel = FALSE))
+  N <- length(unique(d$id))
+  expect_true(any(grepl(sprintf(
+    "1 of %d jackknife replicates failed and were dropped; uncertainty estimates use the remaining %d",
+    N, N - 1L), run$messages, fixed = TRUE)))
+  expect_equal(length(run$value$att.avg.boot), N - 1L)
+})
+
+test_that("A5: parametric bootstrap stops clearly with fewer than two never-treated units", {
+  skip_on_cran()
+  d  <- .fx_simgsynth()
+  tr <- unique(d$id[d$D == 1])
+  d2 <- d[d$id %in% c(tr, max(d$id)), ]           # one never-treated unit
+  expect_error(
+    .fx_quiet(fect::fect(
+      Y ~ D, data = d2, index = c("id", "time"), method = "gsynth",
+      force = "two-way", r = 0, CV = FALSE, se = TRUE,
+      vartype = "parametric", nboots = 20, parallel = FALSE, seed = 7)),
+    "needs at least two never-treated units (found 1)", fixed = TRUE)
+})
