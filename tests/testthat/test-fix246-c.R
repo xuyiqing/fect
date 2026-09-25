@@ -294,3 +294,25 @@ test_that("C4 guard: the dropped-period message shows the level label", {
     "There are not any observations under control at w25", fixed = TRUE
   )
 })
+
+
+## -- C5 + C6  collinear and FE-absorbed covariates ------------------------
+
+test_that("C5: the C++ (X'X)^-1 falls back to a pseudo-inverse when singular", {
+  set.seed(4)
+  x <- array(stats::rnorm(60), c(10, 3, 2))
+  x[, , 2] <- 2 * x[, , 1]
+  ## 412d7ae: "inv(): matrix is singular"
+  a <- fect:::XXinv(x)
+  b <- fect:::wXXinv(x, matrix(1, 10, 3))
+  xx <- matrix(c(sum(x[, , 1]^2), rep(sum(x[, , 1] * x[, , 2]), 2),
+                 sum(x[, , 2]^2)), 2)
+  expect_true(all(is.finite(a)))
+  expect_equal(a, MASS::ginv(xx), tolerance = 1e-8)
+  expect_equal(b, MASS::ginv(xx), tolerance = 1e-8)
+  ## guard: a well-conditioned X'X keeps the exact inverse
+  y <- array(stats::rnorm(60), c(10, 3, 2))
+  yy <- matrix(c(sum(y[, , 1]^2), rep(sum(y[, , 1] * y[, , 2]), 2),
+                 sum(y[, , 2]^2)), 2)
+  expect_equal(fect:::XXinv(y), solve(yy), tolerance = 1e-12)
+})

@@ -304,6 +304,19 @@ arma::mat data_ub_adj (const arma::mat& I_data, const arma::mat& data) {
   return(data_adj);
 }
 
+/* Singularity guard for (X'X)^{-1}. fect.default() drops collinear and
+   FE-absorbed covariates before estimation; this second line of defence
+   covers what that check cannot see (e.g. a bootstrap replicate that is
+   rank deficient by chance). A well-conditioned X'X keeps the exact inverse
+   used before, so such fits are unchanged; a singular or near-singular one
+   gets the Moore-Penrose pseudo-inverse instead of an error or garbage. */
+static const double XX_RCOND_MIN = 1e-12 ;
+
+static bool xx_well_conditioned (const arma::mat& xx) {
+  double rc = arma::rcond(xx) ;
+  return(std::isfinite(rc) && rc > XX_RCOND_MIN) ;
+}
+
 /* Three dimensional matrix inverse */
 // [[Rcpp::export]]
 arma::mat XXinv (const arma::cube& X) { 
@@ -319,7 +332,10 @@ arma::mat XXinv (const arma::cube& X) {
       }
     }
   } 
-  return(inv(xx)) ;
+  if (xx_well_conditioned(xx)) {
+    return(inv(xx)) ;
+  }
+  return(arma::pinv(xx)) ;
 }
 
 /* weighted inverse*/
@@ -339,7 +355,10 @@ arma::mat wXXinv (const arma::cube& X, const arma::mat& w) {
       }
     }
   }  
-  return(inv_sympd(xx)) ;
+  if (xx_well_conditioned(xx)) {
+    return(inv_sympd(xx)) ;
+  }
+  return(arma::pinv(xx)) ;
 }
 
 
