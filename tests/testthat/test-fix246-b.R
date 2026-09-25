@@ -207,3 +207,50 @@ test_that("B4: W.agg alone leaves the model fit and its CV unweighted (gsynth, c
     expect_equal(a0$eff, u0$eff, tolerance = 1e-10, info = m)
   }
 })
+
+
+## -- B5  wgt.implied: Xu (2017)'s weights, Nco x Ntr in both modes ----------
+
+test_that("B5: wgt.implied solves t(Lco) W = t(Ltr) and rebuilds the counterfactual", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  for (m in c("gsynth", "cfe")) {
+    args <- list(Y ~ D, data = simgsynth, index = c("id", "time"), method = m,
+                 force = "none", r = 2, CV = FALSE, se = FALSE,
+                 parallel = FALSE)
+    if (m == "cfe") args$time.component.from <- "nevertreated"
+    fit <- .fb_quiet(do.call(fect::fect, args))
+    W   <- fit$wgt.implied
+    tr  <- which(colSums(fit$D.dat) > 0)
+    co  <- which(colSums(fit$D.dat) == 0)
+    expect_equal(dim(W), c(length(co), length(tr)), info = m)
+    expect_identical(rownames(W), as.character(fit$id[co]), info = m)
+    expect_identical(colnames(W), as.character(fit$id[tr]), info = m)
+    ## the defining equation (412d7ae misses by 40)
+    expect_equal(unname(t(fit$lambda.co) %*% W), unname(t(fit$lambda.tr)),
+                 tolerance = 1e-10, info = m)
+    ## no fixed effects, no covariates: the controls' outcomes weighted by W
+    ## rebuild the treated counterfactuals (412d7ae misses by 111)
+    mu <- if (is.null(fit$mu)) 0 else as.numeric(fit$mu)
+    Y0.tr <- (fit$Y.dat - fit$eff)[, tr, drop = FALSE]
+    rebuilt <- mu + (fit$Y.dat[, co, drop = FALSE] - mu) %*% W
+    expect_equal(unname(rebuilt), unname(Y0.tr), tolerance = 1e-8, info = m)
+  }
+})
+
+test_that("B5: simplex wgt.implied is Nco x Ntr with columns on the simplex", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  fit <- .fb_quiet(fect::fect(Y ~ D, data = simgsynth, index = c("id", "time"),
+                              method = "ife", time.component.from = "nevertreated",
+                              force = "two-way", r = 2, CV = FALSE, se = FALSE,
+                              parallel = FALSE, loading.bound = "simplex",
+                              gamma.loading = 1))
+  expect_identical(fit$loading.bound, "simplex")
+  W <- fit$wgt.implied
+  expect_equal(dim(W), c(45L, 5L))   # 412d7ae: 5 x 45
+  expect_equal(unname(colSums(W)), rep(1, 5), tolerance = 1e-6)
+  expect_true(all(W >= -1e-10))
+  expect_equal(unname(t(fit$lambda.co) %*% W), unname(t(fit$lambda.tr)),
+               tolerance = 1e-8)
+})

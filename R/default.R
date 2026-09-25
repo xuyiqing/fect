@@ -3412,6 +3412,11 @@ fect.default <- function(
     }
     colnames(out$eff) <- iname
     rownames(out$eff) <- tname
+    ## wgt.implied: controls (rows) x treated units (columns)
+    if (is.matrix(out[["wgt.implied"]])) {
+        dimnames(out$wgt.implied) <- list(as.character(iname[out[["co"]]]),
+                                          as.character(iname[out[["tr"]]]))
+    }
     out$eff.calendar <- cbind(
         matrix(out$eff.calendar, ncol = 1),
         out$N.calendar

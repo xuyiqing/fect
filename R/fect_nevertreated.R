@@ -68,6 +68,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     ## -------------------------------##
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     carryover.pos <- placebo.pos <- na.pos <- NULL
+    wgt.implied <- NULL ## implied weights; set below when r.cv > 0 (boot == 0)
     res.sd1 <- res.sd2 <- NULL
     ## unit id and time
     TT <- dim(Y)[1]
@@ -1378,16 +1379,21 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
         if (boot == 0) {
             if (use_bounded && !is.null(W_tr)) {
-                wgt.implied <- W_tr
+                ## Nco x Ntr like the unbounded weights: column i holds
+                ## treated unit i's simplex weights on the controls.
+                wgt.implied <- t(W_tr)
             } else {
-                inv.tr <- try(
-                    ginv(t(as.matrix(lambda.tr))),
+                ## Implied weights of Xu (2017): W = Lco (Lco'Lco)^-1 Ltr',
+                ## Nco x Ntr, the minimum-norm solution of
+                ## t(Lco) %*% W = t(Ltr). Column i rebuilds the factor part of
+                ## treated unit i's counterfactual from the controls. (Before
+                ## 2.4.6 the weights used Ltr'Ltr in place of Lco'Lco.)
+                wgt.implied <- try(
+                    MASS::ginv(t(as.matrix(est.co.best$lambda))) %*%
+                        t(as.matrix(lambda.tr)),
                     silent = TRUE
                 )
-
-                if (!"try-error" %in% class(inv.tr)) {
-                    wgt.implied <- t(inv.tr %*% t(as.matrix(est.co.best$lambda)))
-                }
+                if (inherits(wgt.implied, "try-error")) wgt.implied <- NULL
             }
         }
     } ## end of r!=0 case
@@ -2571,12 +2577,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     }
     lambda.co <- if (has_factor) est.co.best$lambda else NULL
 
-    ## Implied weights
+    ## Implied weights of Xu (2017), Nco x Ntr, as in the IFE path
     if (has_factor && boot == 0 && !is.null(lambda.tr)) {
-        inv.tr <- try(ginv(t(as.matrix(lambda.tr))), silent = TRUE)
-        if (!"try-error" %in% class(inv.tr)) {
-            wgt.implied <- t(inv.tr %*% t(as.matrix(est.co.best$lambda)))
-        }
+        wgt.implied <- try(
+            MASS::ginv(t(as.matrix(est.co.best$lambda))) %*%
+                t(as.matrix(lambda.tr)),
+            silent = TRUE
+        )
+        if (inherits(wgt.implied, "try-error")) wgt.implied <- NULL
     }
 
     ## r=0 path (for equivalence test baseline — uses FE-only model)
@@ -3295,13 +3303,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             lambda.co = as.matrix(lambda.co),
             lambda.tr = as.matrix(lambda.tr)
         ))
-        if (boot == 0) {
-            if (exists("use_bounded", inherits = FALSE) && isTRUE(use_bounded)) {
-                out <- c(out, list(wgt.implied = wgt.implied))
-            } else if (exists("inv.tr", inherits = FALSE) &&
-                       !inherits(inv.tr, "try-error")) {
-                out <- c(out, list(wgt.implied = wgt.implied))
-            }
+        ## included only when the computation succeeded
+        if (boot == 0 && !is.null(wgt.implied)) {
+            out <- c(out, list(wgt.implied = wgt.implied))
         }
         if (exists("use_bounded", inherits = FALSE) && isTRUE(use_bounded)) {
             out <- c(out, list(
