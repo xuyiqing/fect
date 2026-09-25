@@ -455,7 +455,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             r.pc <- est.pc.best <- MSPE.best <- WMSPE.best <- MSPE.pc.best <- NULL
             gmoment.best <- moment.best <- MAD.best <- GMSPE.best <- WGMSPE.best <- NULL
 
-            if (criterion == "PC") {
+            ## criterion = "pc" scores no folds, so its table has no MSPE-family
+            ## columns. (Before 2.4.6 this tested "PC", which never matched, and
+            ## the "pc" row values landed under the wrong column names.)
+            if (criterion == "pc") {
                 CV.out.ife <- matrix(NA, (r.max - r.old + 1), 6)
                 colnames(CV.out.ife) <- c("r", "sigma2", "IC", "PC", "MSPTATT", "MSE")
             } else {
@@ -467,7 +470,11 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             }
 
             CV.out.ife[, "r"] <- c(r.old:r.max)
-            CV.out.ife[, "PC"] <- CV.out.ife[, "GMoment"] <- CV.out.ife[, "Moment"] <- CV.out.ife[, "MAD"] <- CV.out.ife[, "MSPE"] <- CV.out.ife[, "WMSPE"] <- CV.out.ife[, "GMSPE"] <- CV.out.ife[, "WGMSPE"] <- 1e20
+            sentinel.cols <- intersect(
+                c("PC", "GMoment", "Moment", "MAD", "MSPE", "WMSPE", "GMSPE", "WGMSPE"),
+                colnames(CV.out.ife)
+            )
+            CV.out.ife[, sentinel.cols] <- 1e20
 
             ## Per-fold SE matrix parallel to CV.out.ife. Populated below in
             ## both parallel and serial branches; consumed at the end of the

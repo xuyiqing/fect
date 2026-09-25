@@ -1043,6 +1043,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             }
             ## --------------------------------------------------------------
 
+            ## criterion = "pc": pick the r with the lowest PC, as fect's IFE
+            ## path does. The rules above only serve the MSPE-family criteria;
+            ## before 2.4.6 r.pc was tracked here but never used. The final fit
+            ## below re-estimates the model at r.cv.
+            if (identical(criterion, "pc") && !is.null(r.pc)) {
+                r.cv <- r.pc
+            }
+
             if (r > (T0.min - 1)) {
                 message(" (r hits maximum)")
             }
@@ -2144,6 +2152,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
             }
             ## -----------------------------------------------------------------
+
+            ## criterion = "pc": the r with the lowest PC (as in the IFE block).
+            if (identical(criterion, "pc") && !is.null(r.pc)) {
+                r.cv <- r.pc
+            }
 
             MSPE.best <- min(CV.out[, "MSPE"])
             if (r > (T0.min - 1)) {
