@@ -259,3 +259,46 @@ test_that("A3: parametric SEs are the same with and without normalize", {
   expect_equal(fits[[2]]$est.att[, "S.E."], fits[[1]]$est.att[, "S.E."],
                tolerance = 1e-4)
 })
+
+
+## -- A4  weights with the parametric bootstrap ------------------------------
+
+.fx_param_w_fit <- function(d, ...) {
+  .fx_quiet(fect::fect(
+    Y ~ D + X1 + X2, data = d, index = c("id", "time"), method = "gsynth",
+    force = "two-way", CV = FALSE, r = 2, se = TRUE, vartype = "parametric",
+    nboots = 20, parallel = FALSE, seed = 5, ...))
+}
+
+test_that("A4: weighted parametric bootstrap runs and each replicate uses the weights", {
+  skip_on_cran()
+  d <- .fx_simgsynth()
+  d$w2 <- 0.5 + (as.integer(factor(d$id)) %% 7) / 4
+  fit <- .fx_param_w_fit(d, W = "w2", keep.sims = TRUE)
+  expect_true(is.finite(fit$est.avg[1, "S.E."]))
+  expect_equal(unname(fit$est.avg[1, "S.E."]), stats::sd(fit$att.avg.boot))
+  ## replicate b's ATT is the W-weighted mean of its treated cells, with the
+  ## weights of its own units (colnames.boot[[b]])
+  Wm <- matrix(NA_real_, nrow(fit$Y.dat), ncol(fit$Y.dat))
+  Wm[cbind(match(d$time, fit$rawtime), match(d$id, fit$id))] <- d$w2
+  att_w <- vapply(seq_len(dim(fit$eff.boot)[3]), function(b) {
+    ids <- fit$colnames.boot[[b]]
+    eb  <- fit$eff.boot[, seq_along(ids), b]
+    trt <- fit$D.dat[, ids] == 1
+    sum(eb * Wm[, ids] * trt) / sum(Wm[, ids] * trt)
+  }, numeric(1))
+  expect_equal(att_w, as.numeric(fit$att.avg.boot), tolerance = 1e-10)
+  ## W.agg alone (weights in the aggregation only) runs as well
+  fa <- .fx_param_w_fit(d, W.agg = "w2")
+  expect_true(is.finite(fa$est.avg[1, "S.E."]))
+})
+
+test_that("A4: weights equal to 1 reproduce the unweighted parametric SEs", {
+  skip_on_cran()
+  d <- .fx_simgsynth()
+  d$w1 <- 1
+  f0 <- .fx_param_w_fit(d)
+  f1 <- .fx_param_w_fit(d, W = "w1")
+  expect_equal(f1$est.avg, f0$est.avg)
+  expect_equal(f1$est.att, f0$est.att)
+})

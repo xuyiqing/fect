@@ -20,6 +20,7 @@ impute_Y0 <- function(
   X,                # TT x N x p covariate array, or NULL
   D,                # TT x N treatment indicator
   W,                # TT x N weight matrix or NULL
+  W.in.fit = TRUE,  # FALSE: W enters only the aggregation (W.agg), not the fit
   I,                # TT x N observation indicator
   II,               # TT x N estimation indicator
   T.on,             # TT x N integer matrix: periods since onset
@@ -70,6 +71,7 @@ impute_Y0 <- function(
       X              = X,
       D              = D,
       W              = W,
+      W.in.fit       = W.in.fit,
       I              = I,
       II             = II,
       T.on           = T.on,
@@ -107,6 +109,7 @@ impute_Y0 <- function(
       X              = X,
       D              = D,
       W              = W,
+      W.in.fit       = W.in.fit,
       I              = I,
       II             = II,
       T.on           = T.on,
@@ -142,6 +145,7 @@ impute_Y0 <- function(
       X              = X,
       D              = D,
       W              = W,
+      W.in.fit       = W.in.fit,
       I              = I,
       II             = II,
       T.on           = T.on,
@@ -186,6 +190,7 @@ impute_Y0 <- function(
       X              = X,
       D              = D,
       W              = W,
+      W.in.fit       = W.in.fit,
       X.extra.FE    = X.extra.FE,
       X.Z           = X.Z,
       X.Q           = X.Q,

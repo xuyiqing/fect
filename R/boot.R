@@ -1117,10 +1117,9 @@ fect_boot <- function(
       I.boot <- out$I[, id.boot, drop = FALSE]
       II.boot <- out$II[, id.boot, drop = FALSE]
       II.cm.boot <- out$II.cm[, id.boot, drop = FALSE]
-      W.boot <- NULL
-      if (!is.null(W)) {
-        W.boot <- NULL
-      }
+      ## Weights follow the replicate's units (treated first, then the drawn
+      ## controls), so each replicate returns its weighted aggregates.
+      W.boot <- if (is.null(W)) NULL else W[, id.boot, drop = FALSE]
       boot.group <- NULL
       if (!is.null(group)) {
         if (is.matrix(group) || length(dim(group)) == 2) {
@@ -1176,6 +1175,7 @@ fect_boot <- function(
           X          = X.boot,
           D          = D.boot,
           W          = W.boot,
+          W.in.fit   = W.in.fit,
           I          = I.boot,
           II         = II.boot,
           T.on       = T.on[, id.boot],
