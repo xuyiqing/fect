@@ -292,3 +292,86 @@ test_that("C3: logical covariates are used as 0/1", {
   expect_identical(a$att.avg, b$att.avg)
   expect_identical(unname(a$beta), unname(b$beta))
 })
+
+
+## -- C4  time index given as a factor or as character ------------------------
+
+test_that("C4: a factor time index is used in its level order", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  fit <- function(d, m) .fix246c_quiet(fect::fect(
+    Y ~ D + X1 + X2, data = d, index = c("id", "time"), method = m, r = 2,
+    CV = FALSE, se = FALSE, parallel = FALSE
+  ))
+  base.g <- fit(simgsynth, "gsynth")
+  base.i <- fit(simgsynth, "ife")
+  ## levels that are increasing numbers: the same fit as the numbers.
+  ## Before 2.4.6 the levels were sorted as text ("1", "10", "11", ...):
+  ## gsynth stopped with a false "reversals" error and ife ran with 22
+  ## event times instead of 30.
+  d1 <- simgsynth
+  d1$time <- factor(d1$time)
+  g1 <- fit(d1, "gsynth")
+  i1 <- fit(d1, "ife")
+  expect_identical(g1$att.avg, base.g$att.avg)
+  expect_identical(g1$eff, base.g$eff)
+  expect_identical(g1$rawtime, base.g$rawtime)
+  expect_identical(i1$att.avg, base.i$att.avg)
+  expect_identical(i1$time, base.i$time)
+  ## other levels: level order, with the labels kept for the output
+  lev <- paste0("p", 1:30)
+  d2 <- simgsynth
+  d2$time <- factor(paste0("p", d2$time), levels = lev)
+  g2 <- fit(d2, "gsynth")
+  expect_identical(g2$att.avg, base.g$att.avg)
+  expect_identical(unname(g2$eff), unname(base.g$eff))
+  expect_identical(g2$rawtime, lev)
+  expect_identical(rownames(g2$eff), lev)
+  expect_true(is.factor(g2$data.long$time))
+  expect_identical(levels(g2$data.long$time), lev)
+  expect_setequal(as.character(g2$data.long$time), lev)
+})
+
+test_that("C4: a period without controls is reported by its label", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  lev <- paste0("p", 1:30)
+  d <- simgsynth
+  d$time <- factor(paste0("p", d$time), levels = lev)
+  tr <- unique(d$id[d$D == 1])
+  ## no control unit is observed in the last period
+  d <- d[!(d$time == "p30" & !d$id %in% tr), ]
+  res <- .fix246c_messages(fect::fect(
+    Y ~ D + X1 + X2, data = d, index = c("id", "time"), method = "gsynth",
+    r = 2, CV = FALSE, se = FALSE, parallel = FALSE
+  ))
+  expect_true(any(grepl("under control at p30, drop that period", res$messages)))
+  expect_identical(res$value$rawtime, lev[1:29])
+})
+
+test_that("C4: a character time index must hold numbers", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  fit <- function(d) .fix246c_quiet(fect::fect(
+    Y ~ D + X1 + X2, data = d, index = c("id", "time"), method = "gsynth",
+    r = 2, CV = FALSE, se = FALSE, parallel = FALSE
+  ))
+  base <- fit(simgsynth)
+  d3 <- simgsynth
+  d3$time <- as.character(d3$time)
+  g3 <- fit(d3)
+  ## before 2.4.6: ordered as text, and gsynth stopped ("reversals")
+  expect_identical(g3$att.avg, base$att.avg)
+  expect_identical(g3$eff, base$eff)
+  expect_identical(g3$rawtime, base$rawtime)
+  d4 <- simgsynth
+  d4$time <- sprintf("t%02d", d4$time)
+  expect_error(fit(d4), paste0("The time index \"time\" is character and some ",
+                               "values are not numbers \\(for example \"t01\"\\)"))
+  ## Date indices are used as before
+  d5 <- simgsynth
+  d5$time <- as.Date("2000-01-01") + 31 * d5$time
+  g5 <- fit(d5)
+  expect_identical(g5$att.avg, base$att.avg)
+  expect_s3_class(g5$rawtime, "Date")
+})

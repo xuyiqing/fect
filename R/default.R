@@ -180,6 +180,17 @@ fect <- function(
     list(Y = Yname, rhs = rhs)
 }
 
+## The data.long slot of a fit: the input panel's index, outcome and
+## treatment columns. With a factor time index whose levels are not numbers
+## the time column holds level positions internally (see time.labels in
+## fect.default()); return it as a factor of the labels, in level order.
+.fect_data_long <- function(d, time, time.labels) {
+    if (!is.null(time.labels)) {
+        d[[time]] <- factor(time.labels[d[[time]]], levels = time.labels)
+    }
+    d
+}
+
 ## formula method
 
 fect.formula <- function(
@@ -727,6 +738,45 @@ fect.default <- function(
 
     id <- index[1]
     time <- index[2]
+
+    ## Time index. A factor is used in its level order: if its levels are
+    ## increasing numbers, as those numbers (the same fit as passing the
+    ## numbers); otherwise as level positions 1, 2, ..., with the levels kept
+    ## as labels for the output (rawtime, row names, data.long, messages). A
+    ## character index must hold numbers. Before 2.4.6 both were ordered as
+    ## text ("1", "10", "11", ..., "2"). Numeric, Date and other classes are
+    ## used as they are.
+    time.labels <- NULL
+    if (length(time) == 1L && !is.na(time) && time %in% colnames(data)) {
+        time.col <- data[[time]]
+        if (is.factor(time.col)) {
+            time.f <- droplevels(time.col)
+            time.lev <- levels(time.f)
+            time.num <- suppressWarnings(as.numeric(time.lev))
+            if (length(time.lev) > 0 && !anyNA(time.num) &&
+                all(diff(time.num) > 0)) {
+                data[[time]] <- time.num[as.integer(time.f)]
+            } else {
+                data[[time]] <- as.integer(time.f)
+                time.labels <- time.lev
+            }
+        } else if (is.character(time.col)) {
+            time.num <- suppressWarnings(as.numeric(time.col))
+            time.bad <- !is.na(time.col) & is.na(time.num)
+            if (any(time.bad)) {
+                stop(
+                    "The time index \"", time, "\" is character and some ",
+                    "values are not numbers (for example \"",
+                    time.col[time.bad][1], "\"). Convert it to a number, a ",
+                    "Date, or a factor whose levels are in time order.",
+                    call. = FALSE
+                )
+            }
+            data[[time]] <- time.num
+        }
+    }
+    ## labels of time values for messages and output
+    .time_label <- function(v) if (is.null(time.labels)) v else time.labels[v]
 
 
     if (cm == TRUE & ! method %in% c("fe", "ife")) {
@@ -1684,10 +1734,8 @@ fect.default <- function(
     if (class(data[, index[1]])[1] == "factor") {
         data[, index[1]] <- as.character(data[, index[1]])
     }
-
-    if (class(data[, index[2]])[1] == "factor") {
-        data[, index[2]] <- as.character(data[, index[2]])
-    }
+    ## (a factor time index was converted to numbers right after `time` was
+    ## set; see time.labels)
 
     TT.old <- TT <- length(unique(data[, time]))
     N.old <- N <- length(unique(data[, id]))
@@ -2256,12 +2304,12 @@ fect.default <- function(
     I.use <- apply(II, 1, sum)
     time.dropped <- NULL
     if (0 %in% I.use) {
-        time.dropped <- time.uni[which(I.use == 0)]
+        time.dropped <- .time_label(time.uni[which(I.use == 0)])
         for (i in 1:TT) {
             if (I.use[i] == 0) {
                 message(
                     "\nThere are not any observations under control at ",
-                    time.uni[i],
+                    .time_label(time.uni[i]),
                     ", drop that period.\n"
                 )
             }
@@ -3487,6 +3535,10 @@ fect.default <- function(
     } else {
         tname.old <- tname <- unique(sort(data.old[, time]))[which(I.use != 0)]
     }
+    ## factor time index: report the level labels (in level order)
+    if (!is.null(time.labels)) {
+        tname.old <- tname <- time.labels[tname]
+    }
 
     if (length(rm.id) > 0) {
         remove.id <- iname[rm.id]
@@ -3682,7 +3734,8 @@ fect.default <- function(
             ## panelView::panelview(fit) can render the full set of
             ## units --- including those fect dropped (always-treated,
             ## insufficient pre-period, etc.) --- as "Not used" cells.
-            data.long = data.old[, c(index, Yname, Dname), drop = FALSE],
+            data.long = .fect_data_long(data.old[, c(index, Yname, Dname), drop = FALSE],
+                                        time, time.labels),
             time.component.from = time.component.from,
             em = em
         ),
