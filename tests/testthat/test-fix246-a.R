@@ -563,3 +563,31 @@ test_that("A7: the collectors drop a replicate whose fields do not fit, instead 
     expect_true(is.finite(run$value$est.avg[1, "S.E."]))
   }
 })
+
+test_that("A5/A7: when fewer than two replicates survive, fect warns and reports NA SEs", {
+  skip_on_cran()
+  real_fn <- fect:::fect_nevertreated
+  testthat::local_mocked_bindings(
+    fect_nevertreated = function(..., boot = 0) {
+      if (isTRUE(boot == 1)) {           # every bootstrap refit degenerate
+        return(list(att = rep(NA, 30), att.avg = NA, beta = matrix(NA, 0, 1)))
+      }
+      real_fn(..., boot = boot)
+    },
+    .package = "fect")
+  w <- character(0)
+  fit <- withCallingHandlers(
+    suppressMessages(fect::fect(
+      Y ~ D, data = .fx_simgsynth(), index = c("id", "time"),
+      method = "gsynth", force = "two-way", r = 2, CV = FALSE, se = TRUE,
+      nboots = 20, parallel = FALSE, seed = 2, keep.sims = TRUE)),
+    warning = function(x) {
+      w <<- c(w, conditionMessage(x))
+      invokeRestart("muffleWarning")
+    })
+  expect_true(any(grepl(
+    "Only 0 of 20 bootstrap replicates succeeded; standard errors and confidence intervals are not available (NA).",
+    w, fixed = TRUE)))
+  expect_equal(length(fit$att.avg.boot), 0L)
+  expect_true(is.na(fit$est.avg[1, "S.E."]))
+})
