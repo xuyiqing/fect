@@ -169,3 +169,52 @@ test_that("B3: one never-treated unit skips CV with its own message", {
   expect_equal(unname(out$value$r.cv), 0)
   expect_true(is.finite(out$value$att.avg))
 })
+
+
+## -- B4  W.agg stays out of the never-treated CV fits and scores ---------
+
+## simgsynth with unit weights and 60 control cells dropped (unbalanced
+## controls, so a fit weight would change the estimates).
+.fix246b_weighted_panel <- function() {
+  data(simgsynth, package = "fect")
+  d <- simgsynth
+  set.seed(7)
+  ids <- unique(d$id)
+  w <- stats::setNames(stats::runif(length(ids), 0.2, 5), ids)
+  d$w <- w[as.character(d$id)]
+  tr.ids <- unique(d$id[d$D == 1])
+  ctrl.rows <- which(!(d$id %in% tr.ids))
+  set.seed(3)
+  d[-sample(ctrl.rows, 60), ]
+}
+
+test_that("B4: W.agg alone never enters the gsynth / never-treated CFE fit under CV", {
+  skip_on_cran()
+  d <- .fix246b_weighted_panel()
+  for (m in c("gsynth", "cfe")) {
+    fit <- function(...) .fix246b_quiet(fect::fect(
+      Y ~ D + X1 + X2, data = d, index = c("id", "time"), method = m,
+      time.component.from = "nevertreated", force = "two-way", k = 5,
+      se = FALSE, parallel = FALSE, seed = 1, ...
+    ))
+    none <- fit(CV = TRUE, r = c(0, 3))
+    agg  <- fit(CV = TRUE, r = c(0, 3), W.agg = "w")
+    ## same fit, same CV table, same r
+    expect_identical(agg$CV.out, none$CV.out, info = m)
+    expect_identical(agg$r.cv, none$r.cv, info = m)
+    expect_identical(agg$beta, none$beta, info = m)
+    expect_identical(agg$eff, none$eff, info = m)
+    ## the weights still enter the aggregation
+    expect_false(isTRUE(all.equal(agg$att.avg, none$att.avg)), info = m)
+    ## a fixed r without CV (CFE crashed here: "subscript out of bounds")
+    none2 <- fit(CV = FALSE, r = 2)
+    agg2  <- fit(CV = FALSE, r = 2, W.agg = "w")
+    expect_identical(agg2$beta, none2$beta, info = m)
+    expect_identical(agg2$eff, none2$eff, info = m)
+    ## W.est still weights the fit, with or without CV
+    est1 <- fit(CV = TRUE, r = c(2, 2), W.est = "w")
+    est0 <- fit(CV = FALSE, r = 2, W.est = "w")
+    expect_equal(est1$beta, est0$beta, tolerance = 1e-8, info = m)
+    expect_false(isTRUE(all.equal(est0$beta, none2$beta)), info = m)
+  }
+})

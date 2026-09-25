@@ -199,7 +199,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         if (method == "gsynth") {
             message("Interactive fixed effects model...\n")
             out <- fect_nevertreated(
-                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                Y = Y, D = D, X = X, W = W, W.in.fit = W.in.fit, I = I, II = II,
                 T.on = T.on, T.off = T.off,
                 T.on.balance = T.on.balance,
                 balance.period = balance.period,
@@ -221,7 +221,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         if (method == "ife" && time.component.from == "nevertreated") {
             message("IFE model with nevertreated factors...\n")
             out <- fect_nevertreated(
-                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                Y = Y, D = D, X = X, W = W, W.in.fit = W.in.fit, I = I, II = II,
                 T.on = T.on, T.off = T.off,
                 T.on.balance = T.on.balance,
                 balance.period = balance.period,
@@ -243,7 +243,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         if (method == "cfe" && time.component.from == "nevertreated") {
             message("CFE model with nevertreated factors...\n")
             out <- fect_nevertreated(
-                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                Y = Y, D = D, X = X, W = W, W.in.fit = W.in.fit, I = I, II = II,
                 T.on = T.on, T.off = T.off,
                 T.on.balance = T.on.balance,
                 balance.period = balance.period,
