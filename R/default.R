@@ -109,6 +109,77 @@ fect <- function(
     UseMethod("fect")
 }
 
+## Parse a model formula whose terms must be bare column names.
+## Returns list(Y = <outcome name>, rhs = <right-hand-side names, in order,
+## each once>). Before 2.4.6 formulas were read with all.vars(), so
+## `log(Y + 20) ~ D` fitted Y ~ D, `factor(g)` became one linear slope, and
+## `X1 * X2` became X1 + X2, all without a message. Intercept specifiers
+## (`+ 0`, `0 +`, `+ 1`, `1 +`, `- 0`, `- 1`, a leading `-1`) are accepted
+## and ignored, as before: fect always includes its own fixed effects.
+## Used by fect.formula() and interFE.formula().
+.fect_formula_names <- function(formula, fun = "fect") {
+    if (!inherits(formula, "formula") || length(formula) != 3L) {
+        stop(fun, "() needs a two-sided formula such as Y ~ D + X1 + X2.",
+             call. = FALSE)
+    }
+    is_icpt <- function(e) is.numeric(e) && length(e) == 1L && e %in% c(0, 1)
+    flat <- function(e) {
+        if (is.call(e) && identical(e[[1L]], as.name("+")) && length(e) == 3L) {
+            return(c(flat(e[[2L]]), flat(e[[3L]])))
+        }
+        if (is.call(e) && identical(e[[1L]], as.name("-")) && length(e) == 3L) {
+            ## `... - 1` / `... - 0` drop the intercept; any other `- term`
+            ## is reported on its own (not as the whole left operand)
+            if (is_icpt(e[[3L]])) return(flat(e[[2L]]))
+            return(c(flat(e[[2L]]), list(call("-", e[[3L]]))))
+        }
+        if (is.call(e) && identical(e[[1L]], as.name("-")) && length(e) == 2L &&
+            is_icpt(e[[2L]])) {
+            return(list()) # leading `-1` / `-0`
+        }
+        if (is_icpt(e)) return(list()) # `+ 0`, `0 +`, `+ 1`, `1 +`
+        list(e)
+    }
+    is_colname <- function(e) is.name(e) && !identical(as.character(e), ".")
+    lhs <- formula[[2L]]
+    rhs <- flat(formula[[3L]])
+    bad <- c(
+        if (!is_colname(lhs)) deparse1(lhs),
+        vapply(Filter(Negate(is_colname), rhs), deparse1, "")
+    )
+    if (length(bad) > 0L) {
+        stop(
+            fun, "() formulas take bare column names only; ",
+            if (length(bad) == 1L) "not a column name: " else "not column names: ",
+            paste0("`", bad, "`", collapse = ", "), ". ",
+            "Create the variable first (for example data$logY <- log(data$Y + 20)) ",
+            "and use its name in the formula. For a categorical covariate, create ",
+            "numeric dummy columns first (for example with model.matrix()); for an ",
+            "interaction, create the product column first.",
+            call. = FALSE
+        )
+    }
+    if (length(rhs) == 0L) {
+        stop(
+            fun, "() needs ",
+            if (fun == "fect") "a treatment variable" else "at least one covariate",
+            " on the right-hand side of the formula, for example ",
+            if (fun == "fect") "Y ~ D + X1." else "Y ~ X1 + X2.",
+            call. = FALSE
+        )
+    }
+    Yname <- as.character(lhs)
+    rhs <- unique(vapply(rhs, as.character, ""))
+    if (Yname %in% rhs) {
+        stop(
+            "The outcome \"", Yname, "\" also appears on the right-hand side ",
+            "of the formula.",
+            call. = FALSE
+        )
+    }
+    list(Y = Yname, rhs = rhs)
+}
+
 ## formula method
 
 fect.formula <- function(
@@ -191,15 +262,16 @@ fect.formula <- function(
     gamma.loading.grid = NULL,
     cv.rule = "1se"
 ) {
-    ## parsing
-    varnames <- all.vars(formula)
-    Yname <- varnames[1]
-    Dname <- varnames[2]
-    if (length(varnames) > 2) {
-        Xname <- varnames[3:length(varnames)]
+    ## parsing: bare column names only (see .fect_formula_names())
+    fnames <- .fect_formula_names(formula, fun = "fect")
+    Yname <- fnames$Y
+    Dname <- fnames$rhs[1]
+    if (length(fnames$rhs) > 1) {
+        Xname <- fnames$rhs[-1]
     } else {
         Xname <- NULL
     }
+    varnames <- c(Yname, fnames$rhs)
 
     namesData <- colnames(data)
     for (i in 1:length(varnames)) {

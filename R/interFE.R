@@ -39,11 +39,15 @@ interFE.formula <- function(formula = NULL, data, # a data frame
                             binary = FALSE,
                             QR = FALSE,
                             normalize = FALSE) {
-    ## parsing
-    varnames <- all.vars(formula)
-    Yname <- varnames[1]
-    Xname <- varnames[2:length(varnames)]
-
+    ## parsing: bare column names only (see .fect_formula_names())
+    fnames <- .fect_formula_names(formula, fun = "interFE")
+    Yname <- fnames$Y
+    Xname <- fnames$rhs
+    for (v in c(Yname, Xname)) {
+        if (!v %in% colnames(data)) {
+            stop("variable \"", v, "\" is not in the data set.", call. = FALSE)
+        }
+    }
 
     ## check binary outcome
     if (binary == TRUE) {
