@@ -396,15 +396,17 @@ getEffect <- function(D,           # Treatment indicator matrix
   effT <- ts:te    # Effective time range
 
   if (cumu == TRUE) {
-    # Calculate cumulative treatment effect
-    if (sum(!(effT %in% uniT)) == 0) {
-      pos <- c()
-      for (i in 1:length(effT)) {
-        # Accumulate positions for all periods up to current one
-        pos <- c(pos, which(vd == effT[i]))
-        # Calculate cumulative effect as mean effect times number of periods
-        aeff[i] <- mean(veff[pos]) * i
-      }
+    # Cumulative effect: the running sum of the per-period ATTs, each the
+    # mean effect over the treated cells at that event time. An event time
+    # with no treated cell makes the sum NA from that event time on. (Before
+    # 2.4.6: k times the mean over all treated cells of event times 1..k,
+    # which weights the periods by their numbers of cells.)
+    if (te >= ts) {
+      att.t <- vapply(effT, function(t) {
+        v <- veff[vd == t]
+        if (length(v) == 0) NA_real_ else mean(v)
+      }, numeric(1))
+      aeff[seq_along(effT)] <- cumsum(att.t)
     }
   } else {
     # Calculate average treatment effect for each period

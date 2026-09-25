@@ -6,7 +6,7 @@
   Calculate cumulative treatment effects based on the results of a \code{\link{fect}} object.
 }
 \usage{
-att.cumu(x, period = NULL, weighted = TRUE, alpha = 0.05, type = "on", plot = FALSE)
+att.cumu(x, period = NULL, weighted = FALSE, alpha = 0.05, type = "on", plot = FALSE)
 }
 \arguments{
   \item{x}{A \code{\link{fect}} object.}

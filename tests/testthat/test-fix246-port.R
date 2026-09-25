@@ -85,3 +85,78 @@ test_that("B10-cfe: dloo with never-treated fixed effects stops before the boots
                               parallel = FALSE, seed = 1)),
     "time.component.from")
 })
+
+
+## -- B11  cumulative ATT = running sum of the per-period ATTs ----------------
+
+test_that("B11: att.cumu(), effect() and estimand('att.cumu') return the running sum", {
+  skip_on_cran()
+  turnout <- .fix246p_data("turnout")
+  fit <- .fix246p_quiet(fect::fect(
+    turnout ~ policy_edr + policy_mail_in + policy_motor, data = turnout,
+    index = c("abb", "year"), method = "gsynth", r = 0, CV = FALSE,
+    force = "two-way", min.T0 = 5, se = TRUE, vartype = "bootstrap",
+    nboots = 50, seed = 2139, keep.sims = TRUE, parallel = FALSE))
+  k   <- 1:10
+  att <- fit$att[match(k, fit$time)]
+  n   <- fit$count[match(k, fit$time)]
+  running <- cumsum(att)
+  ## treated counts vary over event time (9 8 6 6 6 3 3 3 3 3), so the two
+  ## definitions differ: 21.501 (running sum) vs 8.259 (5afa708) at k = 10
+  eff <- .fix246p_quiet(fect::effect(fit, period = c(1, 10)))
+  acu <- .fix246p_quiet(fect::att.cumu(fit, period = c(1, 10)))
+  est <- .fix246p_quiet(fect::estimand(fit, "att.cumu", "event.time"))
+  ov5 <- .fix246p_quiet(fect::estimand(fit, "att.cumu", "overall",
+                                       window = c(1, 5)))
+  expect_equal(unname(eff$effect.est.avg), running, tolerance = 1e-10)
+  expect_equal(unname(acu[, 3]), running, tolerance = 1e-10)
+  expect_equal(est$estimate[1:10], running, tolerance = 1e-10)
+  expect_equal(ov5$estimate, running[5], tolerance = 1e-10)
+  ## weighted = TRUE keeps the count-weighted number
+  acw <- .fix246p_quiet(fect::att.cumu(fit, period = c(1, 10),
+                                       weighted = TRUE))
+  expect_equal(unname(acw[, 3]), k * cumsum(att * n) / cumsum(n),
+               tolerance = 1e-10)
+  ## att.cumu() and effect() use the same replicate running sums
+  ## (5afa708: 37.85 vs 27.54 at k = 10)
+  expect_equal(unname(acu[2:10, "S.E."]),
+               unname(eff$effect.est.att[2:10, "S.E."]), tolerance = 1e-10)
+  expect_error(.fix246p_quiet(fect::att.cumu(fit, period = c(1, 10),
+                                             weighted = NA)),
+               "must be TRUE or FALSE")
+})
+
+test_that("B11: equal counts per event time give the old numbers; fits without SEs work", {
+  skip_on_cran()
+  simgsynth <- .fix246p_data("simgsynth")
+  fit <- .fix246p_quiet(fect::fect(Y ~ D + X1 + X2, data = simgsynth,
+                                   index = c("id", "time"), method = "gsynth",
+                                   force = "two-way", r = 2, CV = FALSE,
+                                   se = TRUE, vartype = "bootstrap",
+                                   nboots = 20, seed = 3, keep.sims = TRUE,
+                                   parallel = FALSE))
+  k   <- 1:10
+  att <- fit$att[match(k, fit$time)]
+  n   <- fit$count[match(k, fit$time)]
+  expect_true(all(n == 5))
+  old <- k * cumsum(att * n) / cumsum(n)
+  eff <- .fix246p_quiet(fect::effect(fit, period = c(1, 10)))
+  acu <- .fix246p_quiet(fect::att.cumu(fit, period = c(1, 10)))
+  expect_equal(unname(eff$effect.est.avg), old, tolerance = 1e-10)
+  expect_equal(unname(acu[, 3]), old, tolerance = 1e-10)
+  ## a fit without SEs (5afa708: "non-numeric argument to mathematical
+  ## function")
+  f0 <- .fix246p_quiet(fect::fect(Y ~ D + X1 + X2, data = simgsynth,
+                                  index = c("id", "time"), method = "gsynth",
+                                  force = "two-way", r = 2, CV = FALSE,
+                                  se = FALSE, parallel = FALSE))
+  run0 <- cumsum(f0$att[match(k, f0$time)])
+  a0 <- .fix246p_quiet(fect::att.cumu(f0, period = c(1, 10)))
+  a1 <- .fix246p_quiet(fect::att.cumu(f0, period = c(1, 10), weighted = TRUE))
+  expect_equal(unname(a0[, 3]), run0, tolerance = 1e-10)
+  expect_equal(unname(a1[, 3]), unname(a0[, 3]), tolerance = 1e-10)
+  ov <- .fix246p_quiet(fect::estimand(f0, "att.cumu", "overall",
+                                      window = c(1, 5)))
+  expect_equal(ov$estimate, run0[5], tolerance = 1e-10)
+  expect_true(is.na(ov$se))
+})
