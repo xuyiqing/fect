@@ -676,6 +676,44 @@ fect.default <- function(
     id <- index[1]
     time <- index[2]
 
+    ## Time index. A factor is read in its level order; a character index
+    ## must hold numbers. Before 2.4.6 both were sorted as text ("1", "10",
+    ## "11", ..., "2"), which scrambled the event-time axis and made gsynth
+    ## stop with a false "reversals" error. A factor whose levels are
+    ## increasing numbers becomes those numbers (the same fit as passing the
+    ## numbers); any other factor becomes its level positions, and the level
+    ## labels (time.labels) are used for display. Numeric, integer, Date and
+    ## POSIXct indices are left as they are.
+    time.labels <- NULL
+    if (!is.na(time) && time %in% names(data)) {
+        time.col <- data[[time]]
+        if (is.factor(time.col)) {
+            time.f <- droplevels(time.col)
+            time.lev <- levels(time.f)
+            time.num <- suppressWarnings(as.numeric(time.lev))
+            if (!anyNA(time.num) && all(diff(time.num) > 0)) {
+                data[[time]] <- time.num[as.integer(time.f)]
+            } else {
+                data[[time]] <- as.integer(time.f)
+                time.labels <- time.lev
+            }
+        } else if (is.character(time.col)) {
+            time.num <- suppressWarnings(as.numeric(time.col))
+            time.bad <- !is.na(time.col) & is.na(time.num)
+            if (any(time.bad)) {
+                stop(
+                    "The time index \"", time, "\" is character and some ",
+                    "values are not numbers (for example \"",
+                    time.col[time.bad][1], "\"). Convert it to a number, a ",
+                    "Date, or a factor whose levels are in time order.",
+                    call. = FALSE
+                )
+            }
+            data[[time]] <- time.num
+        }
+        rm(time.col)
+    }
+
 
     if (cm == TRUE & ! method %in% c("fe", "ife")) {
         stop("\"cm\" option is only available for the \"fe\" and \"ife\" methods.")
@@ -1638,10 +1676,6 @@ fect.default <- function(
         data[, index[1]] <- as.character(data[, index[1]])
     }
 
-    if (class(data[, index[2]])[1] == "factor") {
-        data[, index[2]] <- as.character(data[, index[2]])
-    }
-
     TT.old <- TT <- length(unique(data[, time]))
     N.old <- N <- length(unique(data[, id]))
     p <- length(Xname)
@@ -2212,7 +2246,7 @@ fect.default <- function(
             if (I.use[i] == 0) {
                 message(
                     "\nThere are not any observations under control at ",
-                    time.uni[i],
+                    if (is.null(time.labels)) time.uni[i] else time.labels[time.uni[i]],
                     ", drop that period.\n"
                 )
             }
@@ -3425,6 +3459,14 @@ fect.default <- function(
     } else {
         tname.old <- tname <- unique(sort(data.old[, time]))[which(I.use != 0)]
     }
+    ## a factor time index with non-numeric levels was fitted on its level
+    ## positions; report the level labels (rawtime, row names, data.long)
+    data.long <- data.old[, c(index, Yname, Dname), drop = FALSE]
+    if (!is.null(time.labels)) {
+        tname.old <- tname <- time.labels[tname]
+        data.long[[time]] <- factor(time.labels[data.long[[time]]],
+                                    levels = time.labels)
+    }
 
     if (length(rm.id) > 0) {
         remove.id <- iname[rm.id]
@@ -3618,7 +3660,7 @@ fect.default <- function(
             ## panelView::panelview(fit) can render the full set of
             ## units --- including those fect dropped (always-treated,
             ## insufficient pre-period, etc.) --- as "Not used" cells.
-            data.long = data.old[, c(index, Yname, Dname), drop = FALSE],
+            data.long = data.long,
             time.component.from = time.component.from,
             em = em
         ),

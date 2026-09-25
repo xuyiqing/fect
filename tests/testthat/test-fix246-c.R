@@ -199,3 +199,98 @@ test_that("C3 guard: a logical covariate is used as 0/1", {
   expect_identical(a$att.avg, b$att.avg)
   expect_identical(unname(a$beta), unname(b$beta))
 })
+
+
+## -- C4  time index given as factor or character --------------------------
+
+test_that("C4: a factor or character time index in numeric order fits like the numbers", {
+  d <- .fc_sim()
+  ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d))
+  ## 412d7ae sorted both as text ("1", "10", ...) and gsynth stopped with
+  ## "Gsynth can't be used when treatments have reversals."
+  df <- d
+  df$time <- factor(df$time)
+  a <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = df))
+  dc <- d
+  dc$time <- as.character(dc$time)
+  b <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = dc))
+  for (o in list(a, b)) {
+    expect_identical(o$att.avg, ref$att.avg)
+    expect_identical(unname(o$eff), unname(ref$eff))
+    expect_identical(o$rawtime, ref$rawtime)
+  }
+  ## levels that are increasing numbers become those numbers
+  dy <- d
+  dy$time <- factor(dy$time + 2000)
+  y <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = dy))
+  expect_identical(y$att.avg, ref$att.avg)
+  expect_identical(y$rawtime, ref$rawtime + 2000)
+})
+
+test_that("C4: a factor with non-numeric levels is read in level order", {
+  d <- .fc_sim()
+  ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d))
+  lev <- paste0("2018-", 1:30)               # not in time order as text
+  dl <- d
+  dl$time <- factor(paste0("2018-", dl$time), levels = lev)
+  o <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = dl))
+  expect_identical(o$att.avg, ref$att.avg)
+  expect_identical(unname(o$eff), unname(ref$eff))
+  expect_identical(o$rawtime, lev)
+  expect_identical(rownames(o$eff), lev)
+  expect_identical(levels(o$data.long$time), lev)
+  expect_identical(as.character(o$data.long$time), as.character(dl$time))
+})
+
+test_that("C4: ife with a factor time index keeps the event-time axis", {
+  d <- .fc_sim()
+  ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d, method = "ife"))
+  df <- d
+  df$time <- factor(df$time)
+  o <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = df, method = "ife"))
+  ## 412d7ae: 22 event times instead of 30
+  expect_identical(o$time, ref$time)
+  expect_identical(o$att, ref$att)
+  expect_identical(unname(o$eff), unname(ref$eff))
+})
+
+test_that("C4: a character time index with non-numbers stops", {
+  d <- .fc_sim()
+  d$time <- sprintf("t%02d", d$time)
+  ## 412d7ae sorted these as text (here in time order) and ran
+  expect_error(
+    .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d, method = "fe", r = 0)),
+    "The time index \"time\" is character and some values are not numbers (for example \"t01\")",
+    fixed = TRUE
+  )
+})
+
+test_that("C4 guard: Date and unbalanced factor indices with unused levels", {
+  d <- .fc_sim()
+  ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d))
+  dd <- d
+  dd$time <- as.Date("2000-01-01") + 7 * dd$time
+  o <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = dd))
+  expect_identical(o$att.avg, ref$att.avg)
+  expect_s3_class(o$rawtime, "Date")
+  ## the original gsynth #13 setting: unbalanced panel, factor indices with
+  ## unused levels
+  ub <- d[!(d$id >= 140 & d$time <= 3), ]
+  ub.ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = ub))
+  uf <- ub
+  uf$time <- factor(uf$time + 2000, levels = 1990:2040)
+  uf$id <- factor(uf$id, levels = 90:160)
+  o2 <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = uf))
+  expect_identical(o2$att.avg, ub.ref$att.avg)
+})
+
+test_that("C4 guard: the dropped-period message shows the level label", {
+  d <- .fc_sim()
+  ## no control unit is observed in period 25, so fect drops that period
+  d <- d[!(d$time == 25 & d$id > 105), ]
+  d$time <- factor(paste0("w", d$time), levels = paste0("w", 1:30))
+  expect_message(
+    .fc_fit(Y ~ D + X1 + X2, data = d, method = "fe", r = 0),
+    "There are not any observations under control at w25", fixed = TRUE
+  )
+})
