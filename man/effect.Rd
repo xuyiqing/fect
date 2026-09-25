@@ -22,7 +22,7 @@ effect(
 \arguments{
   \item{x}{A \code{fect} object containing treatment effect estimates and bootstrap results.}
 
-  \item{cumu}{Logical. If \code{TRUE} (default), calculates cumulative treatment effects. If \code{FALSE}, calculates period-specific average treatment effects.}
+  \item{cumu}{Logical. If \code{TRUE} (default), calculates cumulative treatment effects: the running sum of the per-period average effects. If \code{FALSE}, calculates period-specific average treatment effects.}
 
   \item{id}{Character vector or NULL. Unit identifiers to include in the analysis; one unit is fine. If \code{NULL} (default), all treated units are included.}
 
@@ -46,7 +46,7 @@ effect(
 
   2. Calculates relative time to treatment for each unit.
 
-  3. If \code{cumu = TRUE}, computes cumulative effects by summing average effects up to each period.
+  3. If \code{cumu = TRUE}, computes cumulative effects by summing average effects up to each period. Each period's average effect is the mean over the selected treated units' cells at that event time, so the cumulative effect at event time \eqn{k} is the sum of these averages from \code{period[1]} to \eqn{k}. \code{att.cumu(x, weighted = TRUE)} gives the count-weighted version that \code{fect} used before version 2.4.6; it differs when the number of treated cells changes across event times.
 
   4. Performs bootstrap analysis to estimate uncertainty (standard errors, confidence intervals, and p-values).
 

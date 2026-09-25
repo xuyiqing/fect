@@ -344,8 +344,10 @@
 #'       \code{eff = (Y_obs - Y0_hat) + eff_debias}.}
 #'     \item{\code{eff_debias}}{debias correction; 0 for plain imputation
 #'       estimators, populated for DR estimators.}
-#'     \item{\code{W.agg}}{aggregation weight at this cell; 1 if the fit
-#'       was built without \code{W} or \code{W.agg}.}
+#'     \item{\code{W.agg}}{aggregation weight at this cell: the weight
+#'       given by \code{W} or \code{W.agg} (stored on the fit as
+#'       \code{fit$W.agg}); 1 if the fit was built without \code{W} or
+#'       \code{W.agg}, or with \code{W.est} only.}
 #'     \item{\code{replicate}}{(only when \code{replicates = TRUE}) the
 #'       replicate number, 1 to the number of replicates kept. Within a
 #'       replicate, \code{eff} and \code{Y0_hat} are that replicate's
@@ -556,7 +558,8 @@ imputed_outcomes <- function(fit,
 #'   \describe{
 #'     \item{\code{"att"}}{Per-cell mean treatment effect, aggregated
 #'       per group: \eqn{\mathrm{ATT}_g = \mathrm{mean}_{(t,i)\in g, D=1}(Y_{ti} - \widehat Y_{ti}(0))}.}
-#'     \item{\code{"att.cumu"}}{Cumulative ATT through each event time.
+#'     \item{\code{"att.cumu"}}{Cumulative ATT through each event time,
+#'       the running sum of the per-period ATTs.
 #'       Replaces \code{\link{effect}} for the unified API.}
 #'     \item{\code{"aptt"}}{Average proportional treatment effect on the
 #'       treated (Chen & Roth 2024 QJE):

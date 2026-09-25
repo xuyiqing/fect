@@ -225,7 +225,8 @@ bootstrap always resamples units regardless of \code{cl}), and
 placebos. When \code{TRUE}, \code{fect} estimates these directly from the in-sample fit -- without re-fitting
 the imputation model. With covariates, the covariate coefficients are re-estimated for each cohort and tested
 period on that cohort's comparison sample (its other pre-treatment periods, and the units that adopt later or
-never, before the cohort adopts), so data from later periods do not affect the placebos.}
+never, before the cohort adopts), so data from later periods do not affect the placebos. Requires
+\code{time.component.from = "notyettreated"} (the default); with \code{"nevertreated"}, \code{fect} stops.}
 \item{dloo.adjust}{a logical flag, used only with \code{dloo = TRUE}. When
 \code{TRUE}, the pre-trend estimates use the pre-treatment-average baseline of
 Liu (2025) instead of the leave-one-out baseline -- equivalently, the
@@ -259,6 +260,7 @@ Ignored when \code{CV = FALSE}.}
   \item{X}{names of the requested covariates, including any dropped before the fit (see the \code{X} argument).}
   \item{method}{the estimation method. A \code{method = "ife"} fit with \code{time.component.from = "nevertreated"} reports \code{"gsynth"}.}
   \item{W}{name of the weight variable.}
+  \item{W.agg}{with \code{W} or \code{W.agg}: the aggregation weights as a T-by-N matrix on the fit's panel (like \code{Y.dat}); read by \code{\link{imputed_outcomes}}. Absent for unweighted fits and with \code{W.est} alone.}
   \item{index}{name of the unit and time indicators.}
   \item{force}{specified fixed effects option.}
   \item{T}{number of time periods.}

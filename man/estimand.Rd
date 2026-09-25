@@ -31,7 +31,8 @@ estimand(
 
   \item{type}{Estimand type. \code{"att"} returns per-cell mean
     treatment effect aggregated per group; \code{"att.cumu"} returns
-    cumulative ATT through each event time (replaces \code{\link{effect}});
+    cumulative ATT through each event time, the running sum of the
+    per-period ATTs (replaces \code{\link{effect}});
     \code{"aptt"} returns the average proportional treatment effect on
     the treated (Chen and Roth 2024 QJE); \code{"log.att"} returns the
     mean log-scale treatment effect. SEs and CIs need the replicate
