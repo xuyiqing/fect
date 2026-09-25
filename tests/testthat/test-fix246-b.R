@@ -389,9 +389,10 @@ test_that("B8: parametric replicates bound the loadings too", {
   expect_identical(res$loading.bound, "simplex")
   expect_equal(unname(colSums(res$wgt.implied)), rep(1, 5), tolerance = 1e-6)
   ## every fect_nevertreated() call of a parametric fit gets the bound: the
-  ## main fit, the simulated errors (draw.error) and the replicates. (trace()
-  ## records each call's loading.bound; a mocked binding would not reach the
-  ## replicate closures, whose environments fect_boot() trims.)
+  ## main fit, the simulated errors (draw.error) and the replicates. trace()
+  ## reads only loading.bound; a wrapper that evaluates list(...) would force
+  ## arguments the function never uses (time.on.W does not exist without
+  ## weights), and the replicates would fail inside try().
   seen <- new.env()
   seen$lb <- character(0)
   suppressMessages(trace(
