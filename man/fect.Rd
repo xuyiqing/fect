@@ -215,7 +215,7 @@ placebos. When \code{TRUE}, \code{fect} estimates these directly from the in-sam
 the imputation model. With covariates, the covariate coefficients are re-estimated for each cohort and tested
 period on that cohort's comparison sample (its other pre-treatment periods, and the units that adopt later or
 never, before the cohort adopts), so data from later periods do not affect the placebos. Requires
-\code{time.component.from = "notyettreated"} (the default); with \code{"nevertreated"}, \code{fect} stops.}
+\code{time.component.from = "notyettreated"} (the default); with never-treated fitting, \code{fect} stops.}
 \item{dloo.adjust}{a logical flag, used only with \code{dloo = TRUE}. When
 \code{TRUE}, the pre-trend estimates use the pre-treatment-average baseline of
 Liu (2025) instead of the leave-one-out baseline -- equivalently, the
@@ -276,7 +276,7 @@ Ignored when \code{CV = FALSE}.}
   \item{validX}{logical indicating if valid covariates exist (0 when every covariate was dropped).}
   \item{validF}{logical indicating if factors exist.}
   \item{id}{vector of unit IDs.}
-  \item{remove.id}{IDs of the units removed before estimation (for example by \code{min.T0} or \code{max.missing}); \code{NULL} when no unit is removed.}
+  \item{remove.id}{IDs of the units removed before estimation (for example, units with too few pre-treatment periods or too many missing values); \code{NULL} when no unit is removed.}
   \item{rawtime}{vector of time periods.}
   \item{obs.missing}{matrix indicating missingness patterns.}
   \item{Y.ct}{T-by-N matrix of predicted outcomes under no treatment.}
@@ -308,7 +308,7 @@ Ignored when \code{CV = FALSE}.}
   \item{balance.att.placebo}{ATT for placebo period in balanced sample.}
   \item{group.att}{ATT for different groups.}
   \item{group.output}{list of switch-on treatment effects by group.}
-  \item{vartype}{the variance estimator used for the uncertainty estimates: \code{"bootstrap"}, \code{"jackknife"} or \code{"parametric"}. Present only when \code{se = TRUE}; \code{effect()}, \code{att.cumu()} and \code{estimand()} read it.}
+  \item{vartype}{the variance estimator used for the uncertainty estimates; present only when \code{se = TRUE}. It is one of \code{"bootstrap"}, \code{"jackknife"} and \code{"parametric"}. \code{effect()}, \code{att.cumu()} and \code{estimand()} read it.}
   \item{est.att.avg}{inference for \code{att.avg}.}
   \item{est.att.avg.unit}{inference for \code{att.avg.unit}.}
   \item{est.att}{inference for \code{att}.}

@@ -57,7 +57,7 @@ effect(
 
 \value{
   Returns the input \code{fect} object \code{x} with two added elements:
-  \item{effect.est.avg}{Numeric vector of point estimates, one per event time from \code{period[1]} to \code{period[2]}: the cumulative effects if \code{cumu = TRUE}, or the per-period average effects if \code{cumu = FALSE}.}
+  \item{effect.est.avg}{Numeric vector of point estimates, one per event time in \code{period}: the cumulative effects if \code{cumu = TRUE}, or the per-period average effects if \code{cumu = FALSE}.}
   \item{effect.est.att}{Matrix with one row per event time (the row names are the event times) and the following columns; present when the fit has standard errors:
     \itemize{
       \item ATT: Point estimates
