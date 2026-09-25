@@ -331,11 +331,11 @@ out_turnout <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
 
 ### Implied weights
 
-`out$wgt.implied` ($N_{co}\times N_{tr}$) stores the implied weights of all control units for each treated unit. Different from the synthetic control method, the weights can take both positive and negative values. Below we show the control unit weights for Wisconsin.
+`out$wgt.implied` ($N_{co}\times N_{tr}$) stores the implied weights of all control units for each treated unit: one row per control unit and one column per treated unit, named by unit. They follow @Xu2017, so the weighted control outcomes rebuild the factor part of each treated unit's counterfactual. Different from the synthetic control method, the weights can take both positive and negative values. Below we show the control unit weights for Wisconsin.
 
 ```{r turnout-implied-weights}
 dim(out_turnout$wgt.implied)
-sort(out_turnout$wgt.implied[,8])
+sort(out_turnout$wgt.implied[, "WI"])
 ```
 
 ### Visualizing results
@@ -591,7 +591,7 @@ For one-factor models ($r = 1$), the same `loading.overlap` diagnostic renders a
 
 #### Implicit donor weights: bounded vs. unbounded
 
-Each treated counterfactual $\hat Y_i(0) = F\,\hat\lambda_i$ is a linear combination of control-implied outcomes. The coefficients on the controls --- stored in `wgt.implied`, an $N_{tr} \times N_{co}$ matrix --- are the *implicit donor weights*. Under `loading.bound = "none"`, these come from the Moore-Penrose pseudo-inverse and may be negative, exceed one, or vary wildly with small perturbations. Under `loading.bound = "simplex"`, each row is non-negative and sums to one (a proper synthetic-control weighting). The scatter below shows every (treated unit, control unit) pair: x-axis is the unbounded weight, y-axis is the bounded weight.
+Each treated counterfactual $\hat Y_i(0) = F\,\hat\lambda_i$ is a linear combination of control-implied outcomes. The coefficients on the controls are the *implicit donor weights*, stored in `wgt.implied`: an $N_{co} \times N_{tr}$ matrix with one row per control unit and one column per treated unit, in both fits. Under `loading.bound = "none"`, these come from the Moore-Penrose pseudo-inverse and may be negative, exceed one, or vary wildly with small perturbations. Under `loading.bound = "simplex"`, each column is non-negative and sums to one (a proper synthetic-control weighting). The scatter below shows every (treated unit, control unit) pair: x-axis is the unbounded weight, y-axis is the bounded weight.
 
 ```{r bounded-vs-unbounded-weights, fig.width = 6.5, fig.height = 5, message = FALSE}
 library(ggplot2)
@@ -622,7 +622,7 @@ Three patterns are worth checking:
 
 2. **Negative unbounded weights become zero.** Points with $x < 0$ sit at $y = 0$, or close to it. The simplex projection cannot use negative weights, so it removes those donors from the counterfactual. This matches the synthetic-control intuition: a counterfactual should not be a negative combination of donors.
 
-3. **Bounded weights cannot exceed one.** Points with $x > 1$ move to $y \leq 1$. When the pseudo-inverse puts too much weight on one donor, the simplex caps that weight and redistributes the rest across other donors.
+3. **Bounded weights concentrate on a few donors.** In this example every unbounded weight is small, between about $-0.11$ and $0.10$: the pseudo-inverse spreads each treated unit's weight over all 45 controls. The simplex weights lie between zero and one and give a few donors much larger weights, so those donors' points lie well above the dashed line.
 
 The result is a different counterfactual representation. The pseudo-inverse is dense and can extrapolate. The simplex is sparse, uses interpolation only, and gives each weight a synthetic-control interpretation.
 

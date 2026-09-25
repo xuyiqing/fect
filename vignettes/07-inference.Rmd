@@ -22,7 +22,7 @@ A `fect()` fit with `se = TRUE` stores bootstrap estimates in `fit$eff.boot`, a 
 
 - **`estimand()`** is used after fitting. It aggregates `fit$eff.boot` into a one-dimensional bootstrap distribution for the requested estimand: `att`, `att.cumu`, `aptt`, or `log.att`. It then builds a CI using the selected `ci.method`. Five values are accepted: `"normal"`, `"basic"`, `"percentile"`, `"bc"`, and `"bca"`.
 
-The two paths give byte-identical results where they overlap, namely for `"normal"` and `"basic"` CIs at the overall and per-event-time levels. The additional methods, `"percentile"`, `"bc"`, and `"bca"`, are available only through `estimand()`. This is also where the estimand-specific defaults are defined: `att.cumu → "basic"`, `aptt → "bca"`, and `log.att → "bca"`.
+The two paths give the same results, up to rounding error, where they overlap, namely for `"normal"` and `"basic"` CIs at the overall and per-event-time levels. The additional methods, `"percentile"`, `"bc"`, and `"bca"`, are available only through `estimand()`. This is also where the estimand-specific defaults are defined: `att.cumu → "basic"`, `aptt → "bca"`, and `log.att → "bca"`.
 
 **vartype** controls the distribution semantics:
 
@@ -164,7 +164,7 @@ For methods based on tail quantiles, `"basic"`, `"percentile"`, `"bc"`, and `"bc
 
 ### When the two surfaces overlap
 
-`fect(ci.method = "normal")` and `estimand(fit, type = "att", ci.method = "normal")` give the same estimates for the average effect. They are identical up to RNG noise from independent fits, and byte-identical when they use the same `fit$eff.boot`. The same is true for `"basic"`.
+`fect(ci.method = "normal")` and `estimand(fit, type = "att", ci.method = "normal")` give the same estimates for the average effect. They are identical up to RNG noise from independent fits, and identical up to rounding error (differences of about $10^{-15}$) when they use the same `fit$eff.boot`. The same is true for `"basic"`.
 
 The two interfaces serve different purposes. `fect()` fills the `est.*` slots at fit time, so users get a CI in the printed output without calling `estimand()` separately. The two options, `"normal"` and `"basic"`, cover the routine `att` workflow. `estimand()` provides the full five-method set for alternative estimands, including `att.cumu`, `aptt`, and `log.att`, where the bootstrap distribution can be skewed and bias correction can change the CI.
 
