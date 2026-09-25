@@ -339,6 +339,17 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         } else {
             r.max <- max(min((T0.min - 2), r.end), 0)
         }
+        ## The factors come from the never-treated units alone, so at most
+        ## Nco - 1 of them can be estimated (fect's rule for a fixed r: at
+        ## least r + 1 never-treated units). Before 2.4.6 a larger r reached
+        ## panel_factor() and crashed ("Mat::head_cols(): size out of bounds")
+        ## or fit an r that is not identified.
+        r.max.co <- .fect_nt_r_max(Nco)
+        if (r.max > r.max.co) {
+            r <- min(r, r.max.co)
+            .fect_nt_cap_message(Nco, r, r.max.co)
+            r.max <- r.max.co
+        }
 
         if (r.max == 0) {
             r.cv <- 0
@@ -1439,6 +1450,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             r.max <- max(min((T0.min - 1), r.end), 0)
         } else {
             r.max <- max(min((T0.min - 2), r.end), 0)
+        }
+        ## at most Nco - 1 factors from the never-treated units (as in the IFE block)
+        r.max.co <- .fect_nt_r_max(Nco)
+        if (r.max > r.max.co) {
+            r <- min(r, r.max.co)
+            .fect_nt_cap_message(Nco, r, r.max.co)
+            r.max <- r.max.co
         }
 
         if (r.max == 0) {
@@ -3354,6 +3372,32 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         ))
     }
     return(out)
+}
+
+
+## ====================================================================
+## Cross-validation range helpers (IFE and CFE never-treated blocks)
+## ====================================================================
+
+## Largest number of factors the never-treated units can identify: the
+## factors are estimated from the Nco control units alone, so at most Nco - 1
+## (the rule fect.default() applies to a fixed r: at least r + 1 never-treated
+## units).
+.fect_nt_r_max <- function(Nco) {
+    max(as.integer(Nco) - 1L, 0L)
+}
+
+## Message for a cross-validation range cut down to r.max.co. With a single
+## never-treated unit (r.max.co = 0) cross-validation is skipped instead, and
+## the caller says so.
+.fect_nt_cap_message <- function(Nco, r.start, r.max.co) {
+    if (r.max.co > 0) {
+        message(sprintf(
+            "With %d never-treated units at most %d factor(s) can be estimated; cross-validation searches r = %d to %d.",
+            Nco, r.max.co, r.start, r.max.co
+        ))
+    }
+    invisible(NULL)
 }
 
 

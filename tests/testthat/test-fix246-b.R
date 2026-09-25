@@ -74,3 +74,50 @@ test_that("B1: fect's IFE CV table under criterion = 'pc' has the right columns"
   expect_true(all(tab[, "PC"] < 1e19))
   expect_equal(unname(fit$r.cv), unname(tab[which.min(tab[, "PC"]), "r"]))
 })
+
+
+## -- B2  CV range for r capped by the number of never-treated units ------
+
+test_that("B2: the CV range for r is capped at Nco - 1 with a message", {
+  skip_on_cran()
+  d <- .fix246b_panel(Nco = 4)
+  for (m in c("gsynth", "cfe")) {
+    ## r = c(0, 5) with 4 never-treated units crashed in panel_factor()
+    ## ("Mat::head_cols(): size out of bounds")
+    out <- .fix246b_messages(fect::fect(
+      Y ~ D, data = d, index = c("id", "time"), method = m,
+      time.component.from = "nevertreated", force = "two-way", CV = TRUE,
+      r = c(0, 5), k = 5, se = FALSE, parallel = FALSE, seed = 1
+    ))
+    expect_true(any(grepl(
+      "With 4 never-treated units at most 3 factor(s) can be estimated; cross-validation searches r = 0 to 3.",
+      out$messages, fixed = TRUE)), info = m)
+    expect_equal(unname(out$value$CV.out[, "r"]), 0:3, info = m)
+    expect_true(out$value$r.cv <= 3, info = m)
+    ## a feasible range is searched as given, without the message
+    ok <- .fix246b_messages(fect::fect(
+      Y ~ D, data = d, index = c("id", "time"), method = m,
+      time.component.from = "nevertreated", force = "two-way", CV = TRUE,
+      r = c(0, 3), k = 5, se = FALSE, parallel = FALSE, seed = 1
+    ))
+    expect_false(any(grepl("never-treated units at most", ok$messages)), info = m)
+    expect_equal(unname(ok$value$CV.out[, "r"]), 0:3, info = m)
+  }
+})
+
+test_that("B2: panel_factor() clamps r at min(T, N)", {
+  set.seed(2)
+  E <- matrix(stats::rnorm(20), 5, 4)   # T = 5 > N = 4
+  big <- fect:::panel_factor(E, 6L)
+  full <- fect:::panel_factor(E, 4L)
+  expect_equal(dim(big$factor), c(5L, 4L))
+  expect_equal(dim(big$lambda), c(4L, 4L))
+  expect_equal(big$FE, full$FE)
+  Et <- t(E)                             # T = 4 < N = 5
+  bigt <- fect:::panel_factor(Et, 9L)
+  expect_equal(dim(bigt$factor), c(4L, 4L))
+  expect_equal(bigt$FE, fect:::panel_factor(Et, 4L)$FE)
+  zero <- fect:::panel_factor(E, 0L)
+  expect_equal(dim(zero$factor), c(5L, 0L))
+  expect_equal(zero$FE, matrix(0, 5, 4))
+})
