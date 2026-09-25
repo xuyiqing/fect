@@ -238,3 +238,17 @@ test_that("A2: effect() works for a single unit and for fits with one treated un
   eff1 <- suppressMessages(fect::effect(fit1, cumu = TRUE, plot = FALSE))
   expect_true(all(is.finite(eff1$effect.est.att[, "S.E."])))
 })
+
+
+## -- A3  normalize = TRUE and the parametric bootstrap --------------------
+
+test_that("A3: parametric SEs are the same with and without normalize = TRUE", {
+  skip_on_cran()
+  d <- .fix246_panel()
+  f0 <- .fix246_fit(d, vartype = "parametric", normalize = FALSE)
+  f1 <- .fix246_fit(d, vartype = "parametric", normalize = TRUE)
+  ## before 2.4.6 the normalized SEs were multiplied by sd(Y)
+  expect_gt(stats::sd(d$Y), 1.5)
+  expect_equal(f1$est.avg[1, "S.E."], f0$est.avg[1, "S.E."], tolerance = 1e-4)
+  expect_equal(f1$est.att[, "S.E."], f0$est.att[, "S.E."], tolerance = 1e-4)
+})

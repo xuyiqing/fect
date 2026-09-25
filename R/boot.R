@@ -1158,6 +1158,16 @@ fect_boot <- function(
           X.kappa
       }
 
+      ## Scales: fit.out (out$Y.ct) and the simulated errors are on the
+      ## ORIGINAL outcome scale (the estimators multiply their outputs back by
+      ## norm.para, and draw.error() divides by it). impute_Y0(norm.para = )
+      ## expects the NORMALIZED scale, as X is, and multiplies its outputs by
+      ## sd(Y). Without this line normalize = TRUE multiplied the parametric
+      ## SEs by sd(Y).
+      if (!is.null(norm.para)) {
+        Y.boot <- Y.boot / norm.para[1]
+      }
+
       synth.out <- try(
         impute_Y0(
           method     = method,
