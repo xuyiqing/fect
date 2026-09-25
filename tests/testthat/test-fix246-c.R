@@ -490,6 +490,25 @@ test_that("C5: the C++ (X'X)^-1 falls back to a pseudo-inverse when singular", {
   expect_equal(fect:::XXinv(y), solve(yy), tolerance = 1e-12)
 })
 
+test_that("C6: interFE() labels absorbed covariates correctly", {
+  d <- .fc_sim()
+  d$Zu <- stats::ave(d$X1, d$id)
+  d$Zt <- stats::ave(d$X1, d$time)
+  ## 412d7ae: Zu "is unit-invariant", Zt "is time-invariant" (swapped)
+  expect_error(
+    fect::interFE(Y ~ D + X1 + Zu, data = d, index = c("id", "time"), r = 2,
+                  force = "two-way"),
+    "Variable \"Zu\" does not vary over time within units (it is absorbed by the unit fixed effects). Remove it.",
+    fixed = TRUE
+  )
+  expect_error(
+    fect::interFE(Y ~ D + X1 + Zt, data = d, index = c("id", "time"), r = 2,
+                  force = "two-way"),
+    "Variable \"Zt\" does not vary across units within periods (it is absorbed by the time fixed effects). Remove it.",
+    fixed = TRUE
+  )
+})
+
 test_that("C5 guard: full-rank covariates give no new warning", {
   d <- .fc_sim()
   for (m in c("fe", "gsynth", "ife")) {

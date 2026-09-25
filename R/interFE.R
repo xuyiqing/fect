@@ -203,11 +203,12 @@ interFE.default <- function(formula = NULL, data, # a data frame
                 stop(paste("Missing values in variable \"", Xname[i], "\".", sep = ""))
             }
 
+            ## (before 2.4.6 the two labels were swapped)
             if (sum(tapply(data[, Xname[i]], data[, id], var), na.rm = TRUE) == 0) {
-                stop(paste("Variable \"", Xname[i], "\" is unit-invariant. Try to remove it.", sep = ""))
+                stop(paste("Variable \"", Xname[i], "\" does not vary over time within units (it is absorbed by the unit fixed effects). Remove it.", sep = ""))
             }
             if (sum(tapply(data[, Xname[i]], data[, time], var), na.rm = TRUE) == 0) {
-                stop(paste("Variable \"", Xname[i], "\" is time-invariant. Try to remove it.", sep = ""))
+                stop(paste("Variable \"", Xname[i], "\" does not vary across units within periods (it is absorbed by the time fixed effects). Remove it.", sep = ""))
             }
         }
     }
