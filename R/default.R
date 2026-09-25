@@ -191,15 +191,24 @@ fect.formula <- function(
     gamma.loading.grid = NULL,
     cv.rule = "1se"
 ) {
-    ## parsing
-    varnames <- all.vars(formula)
-    Yname <- varnames[1]
-    Dname <- varnames[2]
-    if (length(varnames) > 2) {
-        Xname <- varnames[3:length(varnames)]
+    ## parsing: every term must be a bare column name (see
+    ## .fect_formula_names() in R/support.R); intercept specifiers are ignored
+    fnames <- .fect_formula_names(formula, fun = "fect")
+    Yname <- fnames$Y
+    Dname <- fnames$rhs[1]
+    if (length(fnames$rhs) > 1) {
+        Xname <- fnames$rhs[-1]
     } else {
         Xname <- NULL
     }
+    if (Yname %in% fnames$rhs) {
+        stop(
+            "The outcome \"", Yname, "\" also appears on the right-hand side ",
+            "of the formula.",
+            call. = FALSE
+        )
+    }
+    varnames <- c(Yname, fnames$rhs)
 
     namesData <- colnames(data)
     for (i in 1:length(varnames)) {

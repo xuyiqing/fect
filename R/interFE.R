@@ -39,10 +39,23 @@ interFE.formula <- function(formula = NULL, data, # a data frame
                             binary = FALSE,
                             QR = FALSE,
                             normalize = FALSE) {
-    ## parsing
-    varnames <- all.vars(formula)
-    Yname <- varnames[1]
-    Xname <- varnames[2:length(varnames)]
+    ## parsing: every term must be a bare column name (see
+    ## .fect_formula_names() in R/support.R); intercept specifiers are ignored
+    fnames <- .fect_formula_names(formula, fun = "interFE")
+    Yname <- fnames$Y
+    Xname <- fnames$rhs
+    if (Yname %in% Xname) {
+        stop(
+            "The outcome \"", Yname, "\" also appears on the right-hand side ",
+            "of the formula.",
+            call. = FALSE
+        )
+    }
+    for (v in c(Yname, Xname)) {
+        if (!v %in% colnames(data)) {
+            stop("variable \"", v, "\" is not in the data set.", call. = FALSE)
+        }
+    }
 
 
     ## check binary outcome

@@ -731,3 +731,74 @@ v_replace <- function(needle, haystack) {
     }
     return(out)
 }
+
+
+## Formula parser shared by fect.formula() and interFE.formula().
+## fect reads a formula as a list of column names. Before 2.4.6 it used
+## all.vars(), so a transformed term was silently fitted as its raw column:
+## log(Y + 20) ~ D fitted Y ~ D, factor(g) entered as one linear slope,
+## X1 * X2 as X1 + X2. Now every term must be a bare column name, and anything
+## else stops with a message that says to create the column first.
+## Intercept specifiers (+ 0, 0 +, + 1, 1 +, - 0, - 1, unary -1) are accepted
+## and ignored, as before: fect always adds its own fixed effects.
+## Returns list(Y = <outcome name>, rhs = <right-hand-side names, deduplicated,
+## in order>) or stops.
+.fect_formula_names <- function(formula, fun = "fect") {
+    if (!inherits(formula, "formula") || length(formula) != 3L) {
+        stop(fun, "() needs a two-sided formula such as Y ~ D + X1 + X2.",
+             call. = FALSE)
+    }
+    is_icpt <- function(e) {
+        is.numeric(e) && length(e) == 1L && e %in% c(0, 1)
+    }
+    flat <- function(e) {
+        if (is.call(e) && identical(e[[1L]], as.name("+")) && length(e) == 3L) {
+            return(c(flat(e[[2L]]), flat(e[[3L]])))
+        }
+        if (is.call(e) && identical(e[[1L]], as.name("-")) && length(e) == 3L &&
+            is_icpt(e[[3L]])) {
+            return(flat(e[[2L]]))                     # `... - 1`, `... - 0`
+        }
+        if (is.call(e) && identical(e[[1L]], as.name("-")) && length(e) == 2L &&
+            is_icpt(e[[2L]])) {
+            return(list())                            # unary `-1`, `-0`
+        }
+        if (is_icpt(e)) {
+            return(list())                            # `+ 0`, `0 +`, `+ 1`, `1 +`
+        }
+        list(e)
+    }
+    is_col <- function(e) is.name(e) && !identical(as.character(e), ".")
+    lhs <- formula[[2L]]
+    rhs <- flat(formula[[3L]])
+    bad <- c(
+        if (!is_col(lhs)) deparse1(lhs),
+        vapply(Filter(Negate(is_col), rhs), deparse1, "")
+    )
+    if (length(bad) > 0L) {
+        stop(
+            fun, "() formulas take bare column names only; ",
+            if (length(bad) == 1L) "not a column name: " else "not column names: ",
+            paste0("`", bad, "`", collapse = ", "), ". ",
+            "Create the variable first (for example ",
+            "`data$logY <- log(data$Y + 20)`) and use it in the formula. ",
+            "For a categorical covariate create numeric dummy columns first ",
+            "(for example with `model.matrix()`); for an interaction create ",
+            "the product column first.",
+            call. = FALSE
+        )
+    }
+    if (length(rhs) == 0L) {
+        stop(
+            fun, "() needs ",
+            if (identical(fun, "interFE")) {
+                "at least one covariate on the right-hand side of the formula, for example Y ~ X1 + X2."
+            } else {
+                "a treatment variable on the right-hand side of the formula, for example Y ~ D + X1."
+            },
+            call. = FALSE
+        )
+    }
+    list(Y = as.character(lhs),
+         rhs = unique(vapply(rhs, as.character, "")))
+}
