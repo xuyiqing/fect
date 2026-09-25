@@ -455,3 +455,87 @@ test_that("B9: remove.id lists the removed units even when the first unit is kep
   ## 412d7ae: remove.id was set only when unit 1 (here 101) was removed
   expect_equal(as.numeric(fit[["remove.id"]]), 103)
 })
+
+
+## -- B10  se = TRUE uses the never-treated estimator for ife / fe / cfe ------
+
+.fb_nt_fit <- function(...) {
+  simgsynth <- .fb_data("simgsynth")
+  .fb_quiet(fect::fect(Y ~ D + X1 + X2, data = simgsynth,
+                       index = c("id", "time"), force = "two-way",
+                       CV = FALSE, parallel = FALSE, seed = 1, nboots = 10,
+                       ...))
+}
+
+test_that("B10: ife + never-treated with se = TRUE is the gsynth fit (all vartypes)", {
+  skip_on_cran()
+  f0 <- .fb_nt_fit(method = "ife", time.component.from = "nevertreated",
+                   r = 2, se = FALSE)
+  for (vt in c("bootstrap", "parametric", "jackknife")) {
+    a <- .fb_nt_fit(method = "ife", time.component.from = "nevertreated",
+                    r = 2, se = TRUE, vartype = vt)
+    g <- .fb_nt_fit(method = "gsynth", r = 2, se = TRUE, vartype = vt)
+    ## 412d7ae: 5.5788 (the not-yet-treated fit) vs 5.5433 without SEs
+    expect_identical(a$att.avg, f0$att.avg, info = vt)
+    for (s in c("att.avg", "att", "est.avg", "est.att", "est.beta",
+                "att.avg.boot")) {
+      expect_identical(a[[s]], g[[s]], info = paste(vt, s))
+    }
+    expect_identical(a$method, "gsynth", info = vt)
+  }
+  ## method = "fe" arrives as "ife" with r = 0
+  fe <- .fb_nt_fit(method = "fe", time.component.from = "nevertreated",
+                   se = TRUE, vartype = "bootstrap")
+  g0 <- .fb_nt_fit(method = "gsynth", r = 0, se = TRUE, vartype = "bootstrap")
+  for (s in c("att.avg", "att", "est.avg", "est.att", "att.avg.boot")) {
+    expect_identical(fe[[s]], g0[[s]], info = paste("fe", s))
+  }
+})
+
+test_that("B10: cfe + never-treated replicates use the never-treated estimator", {
+  skip_on_cran()
+  c0 <- .fb_nt_fit(method = "cfe", time.component.from = "nevertreated",
+                   r = 2, se = FALSE)
+  for (vt in c("bootstrap", "jackknife")) {
+    cc <- .fb_nt_fit(method = "cfe", time.component.from = "nevertreated",
+                     r = 2, se = TRUE, vartype = vt)
+    g <- .fb_nt_fit(method = "gsynth", r = 2, se = TRUE, vartype = vt)
+    expect_identical(cc$att.avg, c0$att.avg, info = vt)
+    ## same model as gsynth (no extra FE); the solvers agree to ~5e-5.
+    ## 412d7ae: the replicates were not-yet-treated CFE fits (off by 0.1-0.2)
+    expect_lt(max(abs(cc$est.att[, "S.E."] - g$est.att[, "S.E."]), na.rm = TRUE),
+              1e-3)
+    expect_lt(max(abs(cc$att.avg.boot - g$att.avg.boot)), 1e-3)
+  }
+})
+
+test_that("B10: the leave-one-period-out refits use the never-treated estimator", {
+  skip_on_cran()
+  lo <- function(...) .fb_nt_fit(r = 2, se = TRUE, loo = TRUE, ...)
+  g  <- lo(method = "gsynth")
+  a  <- lo(method = "ife", time.component.from = "nevertreated")
+  cc <- lo(method = "cfe", time.component.from = "nevertreated")
+  expect_identical(a$pre.est.att, g$pre.est.att)
+  ## 412d7ae: the cfe loo refits were not-yet-treated CFE fits
+  expect_lt(max(abs(cc$pre.est.att - g$pre.est.att), na.rm = TRUE), 1e-3)
+})
+
+test_that("B10: dloo with never-treated fixed effects stops before the bootstrap", {
+  set.seed(42)
+  rows <- list(); id <- 0
+  for (g in c(4, 6, Inf)) for (u in seq_len(25)) {
+    id <- id + 1
+    y <- stats::rnorm(1) + 0.1 * (1:8) + stats::rnorm(8, 0, 0.4)
+    d <- as.integer(!is.infinite(g) & (1:8) >= g)
+    rows[[length(rows) + 1]] <- data.frame(id = id, time = 1:8, Y = y + 2 * d, D = d)
+  }
+  dat <- do.call(rbind, rows)
+  ## 412d7ae: ran, silently ignoring time.component.from
+  expect_error(
+    suppressMessages(fect::fect(Y ~ D, data = dat, index = c("id", "time"),
+                                method = "fe", force = "two-way", dloo = TRUE,
+                                se = TRUE, vartype = "bootstrap", nboots = 10,
+                                time.component.from = "nevertreated",
+                                parallel = FALSE)),
+    "time.component.from")
+})

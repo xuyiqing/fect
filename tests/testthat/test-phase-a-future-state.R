@@ -24,13 +24,18 @@ test_that("Phase A wall-time is stable across consecutive parallel calls", {
 
   skip_on_cran()
 
+  ## simgsynth, not simdata: simdata has treatment reversals, which the
+  ## never-treated estimator cannot fit (se = TRUE ran before 2.4.6 only
+  ## because it silently fitted the not-yet-treated model).
+  utils::data("simgsynth", package = "fect", envir = environment())
+
   one_call <- function(seed) {
     set.seed(seed)
     t0 <- Sys.time()
     suppressWarnings(suppressMessages(
       fect::fect(
         Y ~ D,
-        data      = simdata,
+        data      = simgsynth,
         index     = c("id", "time"),
         method    = "ife",
         r         = 1,

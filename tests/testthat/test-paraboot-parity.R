@@ -82,10 +82,13 @@ test_that("PAR-2: ife+nevertreated+parametric parity (byte-identical; must equal
     tol = 1e-3, max.iteration = 1000
   )))
 
-  expect_true(identical(out$att.avg, baseline$ife_nev_para$att.avg))
-  expect_true(identical(out$att,     baseline$ife_nev_para$att))
-  expect_true(identical(out$count,   baseline$ife_nev_para$count))
-  expect_true(identical(out$est.att, baseline$ife_nev_para$est.att))
+  ## 2.4.6: ife + never-treated with se = TRUE is the gsynth estimator (the
+  ## ife_nev_para entry was captured from the not-yet-treated fit), so it
+  ## must equal the gsynth entry byte for byte.
+  expect_true(identical(out$att.avg, baseline$gsynth_para$att.avg))
+  expect_true(identical(out$att,     baseline$gsynth_para$att))
+  expect_true(identical(out$count,   baseline$gsynth_para$count))
+  expect_true(identical(out$est.att, baseline$gsynth_para$est.att))
 })
 
 ## ---- PAR-3: bootstrap parity — ife+notyettreated ----------------------------
@@ -125,9 +128,11 @@ test_that("PAR-4: bootstrap vartype parity — ife+nevertreated", {
     tol = 1e-3, max.iteration = 1000
   )))
 
-  expect_true(identical(out$att.avg, baseline$ife_nev_boot$att.avg))
-  expect_true(identical(out$att,     baseline$ife_nev_boot$att))
-  expect_true(identical(out$est.att, baseline$ife_nev_boot$est.att))
+  ## 2.4.6: the gsynth estimator, as in PAR-2 (ife_nev_boot was captured
+  ## from the not-yet-treated fit).
+  expect_true(identical(out$att.avg, baseline$gsynth_boot$att.avg))
+  expect_true(identical(out$att,     baseline$gsynth_boot$att))
+  expect_true(identical(out$est.att, baseline$gsynth_boot$est.att))
 })
 
 ## ---- PAR-5: bootstrap parity — gsynth ---------------------------------------
