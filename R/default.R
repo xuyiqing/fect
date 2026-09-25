@@ -2118,7 +2118,9 @@ fect.default <- function(
 
     ## 2. check if some periods when all units are missing or treated
     I.use <- apply(II, 1, sum)
+    time.dropped <- NULL
     if (0 %in% I.use) {
+        time.dropped <- time.uni[which(I.use == 0)]
         for (i in 1:TT) {
             if (I.use[i] == 0) {
                 message(
@@ -2168,6 +2170,22 @@ fect.default <- function(
         } else {
             X <- array(0, dim = c(TT, (N - length(rm.id)), 0))
         }
+    }
+    ## If those periods held every treated observation, nothing is left to
+    ## estimate. Before 2.4.6 fect went on and failed later with an unrelated
+    ## error ("non-numeric argument to binary operator", "missing value where
+    ## TRUE/FALSE needed").
+    if (length(time.dropped) > 0 && sum(D == 1 & I == 1, na.rm = TRUE) == 0) {
+        stop(
+            "No treated observations remain after dropping the periods in which ",
+            "no unit is under control (",
+            paste(utils::head(as.character(time.dropped), 10), collapse = ", "),
+            if (length(time.dropped) > 10) ", ..." else "",
+            "). fect needs control observations in the post-treatment periods ",
+            "to impute the counterfactuals; check whether the control units are ",
+            "observed after treatment starts.",
+            call. = FALSE
+        )
     }
 
     ## message("\nOK2\n")

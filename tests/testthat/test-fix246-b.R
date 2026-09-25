@@ -305,3 +305,35 @@ test_that("B6: the factors plot labels a Date time index", {
   expect_equal(length(labs), 15)
   expect_equal(as.character(labs[1]), as.character(fit$rawtime[1]))
 })
+
+
+## -- B7  no treated observation left after dropping control-less periods --
+
+test_that("B7: dropping every post-treatment period stops with a plain message", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  tr.ids <- unique(simgsynth$id[simgsynth$D == 1])
+  start <- min(simgsynth$time[simgsynth$D == 1])
+  ## the controls are not observed once treatment starts
+  d <- simgsynth[!(simgsynth$time >= start & !(simgsynth$id %in% tr.ids)), ]
+  for (m in c("gsynth", "ife", "fe", "mc")) {
+    expect_error(
+      .fix246b_quiet(fect::fect(
+        Y ~ D, data = d, index = c("id", "time"), method = m,
+        force = "two-way", r = 1, CV = FALSE,
+        lambda = if (m == "mc") 0.1 else NULL, se = FALSE, parallel = FALSE
+      )),
+      "No treated observations remain after dropping the periods in which no unit is under control \\(21, 22, 23",
+      info = m
+    )
+  }
+  ## dropping only some post-treatment periods keeps running
+  d2 <- simgsynth[!(simgsynth$time %in% c(start + 2, start + 3) &
+                      !(simgsynth$id %in% tr.ids)), ]
+  fit <- .fix246b_quiet(fect::fect(
+    Y ~ D, data = d2, index = c("id", "time"), method = "gsynth",
+    force = "two-way", r = 1, CV = FALSE, se = FALSE, parallel = FALSE
+  ))
+  expect_equal(nrow(fit$Y.dat), 28)
+  expect_true(is.finite(fit$att.avg))
+})
