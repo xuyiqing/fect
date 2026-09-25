@@ -160,3 +160,38 @@ test_that("B11: equal counts per event time give the old numbers; fits without S
   expect_equal(ov$estimate, run0[5], tolerance = 1e-10)
   expect_true(is.na(ov$se))
 })
+
+
+## -- B12  cfe + never-treated with one treated unit -------------------------
+
+test_that("B12: cfe + never-treated runs with a single treated unit and equals gsynth", {
+  skip_on_cran()
+  simgsynth <- .fix246p_data("simgsynth")
+  d <- simgsynth[!(simgsynth$id %in% 102:105), ]   # unit 101 + 45 controls
+  y1   <- d$Y[d$id == 101][order(d$time[d$id == 101])]
+  cbar <- tapply(d$Y[d$id != 101], d$time[d$id != 101], mean)
+  hand <- mean(y1[21:30] - cbar[21:30]) - mean(y1[1:20] - cbar[1:20])
+  run <- function(fml, method, force = "two-way", ...) {
+    args <- list(fml, data = d, index = c("id", "time"), method = method,
+                 force = force, r = 0, CV = FALSE, parallel = FALSE, seed = 1,
+                 ...)
+    if (method == "cfe") args$time.component.from <- "nevertreated"
+    .fix246p_quiet(do.call(fect::fect, args))
+  }
+  ## 5afa708: "'x' must be an array of at least two dimensions"
+  f  <- run(Y ~ D, "cfe", se = FALSE)
+  g  <- run(Y ~ D, "gsynth", se = FALSE)
+  expect_equal(f$att.avg, hand, tolerance = 1e-10)
+  expect_equal(f$att.avg, g$att.avg, tolerance = 1e-10)
+  fx <- run(Y ~ D + X1 + X2, "cfe", se = FALSE)
+  gx <- run(Y ~ D + X1 + X2, "gsynth", se = FALSE)
+  expect_equal(fx$att.avg, gx$att.avg, tolerance = 1e-8)
+  fu <- run(Y ~ D, "cfe", force = "unit", se = FALSE)
+  gu <- run(Y ~ D, "gsynth", force = "unit", se = FALSE)
+  expect_equal(fu$att.avg, gu$att.avg, tolerance = 1e-8)
+  ## with SEs (the replicates use the never-treated model, B10-cfe)
+  fb <- run(Y ~ D, "cfe", se = TRUE, vartype = "bootstrap", nboots = 20)
+  gb <- run(Y ~ D, "gsynth", se = TRUE, vartype = "bootstrap", nboots = 20)
+  expect_true(is.finite(fb$est.avg[1, "S.E."]))
+  expect_equal(fb$est.avg[1, "S.E."], gb$est.avg[1, "S.E."], tolerance = 1e-6)
+})
