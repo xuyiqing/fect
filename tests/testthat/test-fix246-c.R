@@ -298,6 +298,179 @@ test_that("C4 guard: the dropped-period message shows the level label", {
 
 ## -- C5 + C6  collinear and FE-absorbed covariates ------------------------
 
+## capture the warnings of a call, silencing messages
+.fc_warnings <- function(expr) {
+  w <- character(0)
+  val <- withCallingHandlers(
+    expr,
+    warning = function(x) {
+      w <<- c(w, conditionMessage(x))
+      invokeRestart("muffleWarning")
+    },
+    message = function(m) invokeRestart("muffleMessage")
+  )
+  list(value = val, warnings = w)
+}
+
+test_that("C5: an exactly collinear covariate is dropped with a warning (V10)", {
+  d <- .fc_sim()
+  d$X3 <- 2 * d$X1
+  d$X4 <- d$X1 + d$X2
+  for (r in c(0, 2)) {
+    ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d, r = r))
+    ## 412d7ae: ATT 5.0841 -> 7.1057 (r = 0) and 5.5435 -> 6.5098 (r = 2)
+    ## with X3 = 2 * X1; validX stayed 1 and nothing was reported
+    for (z in c("X3", "X4")) {
+      f <- stats::reformulate(c("D", "X1", "X2", z), response = "Y")
+      o <- .fc_warnings(.fc_fit(f, data = d, r = r))
+      expect_length(o$warnings, 1)
+      expect_match(o$warnings,
+                   paste0("Dropped 1 covariate that cannot be estimated on the cells used to fit the model: \"",
+                          z, "\" is a linear combination of other covariates"),
+                   fixed = TRUE)
+      fit <- o$value
+      expect_identical(fit$att.avg, ref$att.avg)
+      expect_identical(unname(fit$eff), unname(ref$eff))
+      expect_identical(fit$X, c("X1", "X2", z))
+      expect_identical(rownames(fit$beta), c("X1", "X2", z))
+      expect_identical(unname(fit$beta[1:2, 1]), unname(ref$beta[, 1]))
+      expect_true(is.na(fit$beta[3, 1]))
+      expect_equal(fit$validX, 1)
+    }
+  }
+})
+
+test_that("C5: collinear covariates no longer crash ife, fe, mc and cfe", {
+  d <- .fc_sim()
+  d$X3 <- 2 * d$X1
+  fits <- list(
+    ife = function(f) .fc_fit(f, data = d, method = "ife"),
+    fe  = function(f) .fc_fit(f, data = d, method = "fe", r = 0),
+    mc  = function(f) fect::fect(f, data = d, index = c("id", "time"),
+                                 method = "mc", lambda = 0.1, CV = FALSE,
+                                 se = FALSE, parallel = FALSE),
+    cfe = function(f) .fc_fit(f, data = d, method = "cfe", r = 0)
+  )
+  for (m in names(fits)) {
+    ref <- .fc_quiet(fits[[m]](Y ~ D + X1 + X2))
+    ## 412d7ae: "inv(): matrix is singular" for ife, fe and mc
+    o <- .fc_warnings(fits[[m]](Y ~ D + X1 + X2 + X3))
+    expect_match(o$warnings, "\"X3\" is a linear combination", fixed = TRUE)
+    expect_identical(o$value$att.avg, ref$att.avg)
+    expect_identical(unname(o$value$eff), unname(ref$eff))
+  }
+  ## like lm(), the earlier column of a collinear set is kept
+  ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d, method = "fe", r = 0))
+  o <- .fc_warnings(.fc_fit(Y ~ D + X3 + X1 + X2, data = d, method = "fe",
+                            r = 0))
+  expect_match(o$warnings, "\"X1\" is a linear combination", fixed = TRUE)
+  expect_identical(o$value$att.avg, ref$att.avg)
+  expect_identical(rownames(o$value$beta), c("X3", "X1", "X2"))
+  expect_true(is.na(o$value$beta["X1", 1]))
+  expect_equal(o$value$beta["X3", 1], ref$beta["X1", 1] / 2)
+})
+
+test_that("C6: covariates absorbed by the fixed effects are dropped with correct labels", {
+  d <- .fc_sim()
+  d$Zu <- stats::ave(d$X1, d$id)     # constant over time within each unit
+  d$Zt <- stats::ave(d$X1, d$time)   # constant across units in each period
+  ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d, method = "fe", r = 0))
+  ## 412d7ae stopped with swapped labels: Zu "is unit-invariant", Zt "is
+  ## time-invariant", while ?fect said such covariates are dropped
+  o <- .fc_warnings(.fc_fit(Y ~ D + X1 + X2 + Zu, data = d, method = "fe",
+                            r = 0))
+  expect_match(o$warnings,
+               "\"Zu\" does not vary over time within units, so it is absorbed by the unit fixed effects",
+               fixed = TRUE)
+  expect_identical(o$value$att.avg, ref$att.avg)
+  o <- .fc_warnings(.fc_fit(Y ~ D + X1 + X2 + Zt, data = d, method = "fe",
+                            r = 0))
+  expect_match(o$warnings,
+               "\"Zt\" does not vary across units within periods, so it is absorbed by the time fixed effects",
+               fixed = TRUE)
+  expect_identical(o$value$att.avg, ref$att.avg)
+  ## the same check under never-treated fitting (gsynth)
+  refg <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d))
+  o <- .fc_warnings(.fc_fit(Y ~ D + X1 + Zu + X2, data = d))
+  expect_match(o$warnings, "\"Zu\" does not vary over time within units",
+               fixed = TRUE)
+  expect_identical(o$value$att.avg, refg$att.avg)
+  expect_identical(rownames(o$value$beta), c("X1", "Zu", "X2"))
+})
+
+test_that("C6: when every covariate is dropped the fit has no covariates", {
+  d <- .fc_sim()
+  d$Zu <- stats::ave(d$X1, d$id)
+  d$Zt <- stats::ave(d$X1, d$time)
+  ref <- .fc_quiet(.fc_fit(Y ~ D, data = d, method = "fe", r = 0))
+  o <- .fc_warnings(.fc_fit(Y ~ D + Zu + Zt, data = d, method = "fe", r = 0))
+  expect_match(o$warnings, "^Dropped 2 covariates that cannot be estimated")
+  expect_match(o$warnings, "Their coefficients are reported as NA.",
+               fixed = TRUE)
+  fit <- o$value
+  expect_identical(fit$att.avg, ref$att.avg)
+  expect_identical(unname(fit$eff), unname(ref$eff))
+  expect_equal(fit$validX, 0)
+  expect_identical(fit$X, c("Zu", "Zt"))
+  expect_identical(dim(fit$beta), c(2L, 1L))
+  expect_true(all(is.na(fit$beta)))
+})
+
+test_that("C5: a covariate with no variation on the estimation cells is dropped with a warning", {
+  d <- .fc_sim()
+  set.seed(3)
+  ## zero for every never-treated unit: gsynth estimates beta on those only
+  d$Ztr <- ifelse(d$D == 1, stats::rnorm(nrow(d)), 0)
+  ref <- .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d))
+  ## 412d7ae shed it silently (same numbers, beta NA, no message)
+  o <- .fc_warnings(.fc_fit(Y ~ D + X1 + X2 + Ztr, data = d))
+  expect_match(o$warnings,
+               "\"Ztr\" has no variation on the cells used to estimate the covariate coefficients",
+               fixed = TRUE)
+  expect_identical(o$value$att.avg, ref$att.avg)
+  expect_identical(unname(o$value$eff), unname(ref$eff))
+})
+
+test_that("C5: a covariate absorbed by an extra fixed effect (cfe) is dropped", {
+  d <- .fc_sim()
+  d$rt <- paste((d$id %% 5) + 1, d$time)      # region x period effects
+  d$Zrt <- stats::ave(d$X1, d$rt)             # constant within region-period
+  ref <- .fc_quiet(fect::fect(Y ~ D + X1, data = d,
+                              index = c("id", "time", "rt"), method = "cfe",
+                              r = 0, CV = FALSE, se = FALSE, parallel = FALSE))
+  ## 412d7ae fitted it anyway (beta -0.467, a different ATT)
+  o <- .fc_warnings(fect::fect(Y ~ D + X1 + Zrt, data = d,
+                               index = c("id", "time", "rt"), method = "cfe",
+                               r = 0, CV = FALSE, se = FALSE,
+                               parallel = FALSE))
+  expect_match(o$warnings, "\"Zrt\" is absorbed by the fixed effects",
+               fixed = TRUE)
+  expect_identical(o$value$att.avg, ref$att.avg)
+})
+
+test_that("C5: standard errors with a dropped covariate: NA rows, same inference", {
+  skip_on_cran()
+  d <- .fc_sim()
+  d$X3 <- 2 * d$X1
+  fit_se <- function(f) {
+    fect::fect(f, data = d, index = c("id", "time"), method = "fe",
+               force = "two-way", se = TRUE, nboots = 20, seed = 11,
+               parallel = FALSE)
+  }
+  ref <- .fc_quiet(fit_se(Y ~ D + X1 + X2))
+  ## 412d7ae: "inv(): matrix is singular"
+  fit <- .fc_quiet(fit_se(Y ~ D + X1 + X3 + X2))
+  expect_identical(fit$est.avg, ref$est.avg)
+  expect_identical(fit$att.avg.boot, ref$att.avg.boot)
+  expect_identical(rownames(fit$est.beta), c("X1", "X3", "X2"))
+  expect_true(all(is.na(fit$est.beta["X3", ])))
+  expect_identical(unname(fit$est.beta[c("X1", "X2"), ]),
+                   unname(ref$est.beta))
+  expect_identical(dim(fit$beta.boot), c(3L, ncol(ref$beta.boot)))
+  expect_true(all(is.na(fit$beta.boot[2, ])))
+  expect_identical(fit$beta.boot[c(1, 3), ], ref$beta.boot)
+})
+
 test_that("C5: the C++ (X'X)^-1 falls back to a pseudo-inverse when singular", {
   set.seed(4)
   x <- array(stats::rnorm(60), c(10, 3, 2))
@@ -315,4 +488,14 @@ test_that("C5: the C++ (X'X)^-1 falls back to a pseudo-inverse when singular", {
   yy <- matrix(c(sum(y[, , 1]^2), rep(sum(y[, , 1] * y[, , 2]), 2),
                  sum(y[, , 2]^2)), 2)
   expect_equal(fect:::XXinv(y), solve(yy), tolerance = 1e-12)
+})
+
+test_that("C5 guard: full-rank covariates give no new warning", {
+  d <- .fc_sim()
+  for (m in c("fe", "gsynth", "ife")) {
+    expect_no_warning(
+      suppressMessages(.fc_fit(Y ~ D + X1 + X2, data = d, method = m,
+                               r = if (m == "fe") 0 else 2))
+    )
+  }
 })

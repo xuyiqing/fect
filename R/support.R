@@ -802,3 +802,176 @@ v_replace <- function(needle, haystack) {
     list(Y = as.character(lhs),
          rhs = unique(vapply(rhs, as.character, "")))
 }
+
+
+## Covariates that cannot be estimated on the cells used to fit the model.
+## Before 2.4.6 fect had no rank check: an exactly collinear covariate made
+## X'X singular (garbage estimates, or "inv(): matrix is singular"), and a
+## covariate absorbed by the fixed effects stopped with swapped labels.
+## fect.default() calls this once on the final estimation panel and drops
+## what it reports, as lm() does for aliased columns.
+##
+## X: TT x N x p covariate array. M: TT x N logical mask of the estimation
+## cells. force: 0 none, 1 unit, 2 time, 3 two-way. extra.fe: TT x N x k
+## array of additional fixed-effect codes (cfe), or NULL. Demeaning is
+## unweighted: exact collinearity does not depend on positive weights.
+## Returns list(drop = <indices into 1:p>, message = <one warning text or
+## NULL>).
+.fect_check_covariates <- function(X, M, force, Xname, extra.fe = NULL) {
+    p <- dim(X)[3]
+    none <- list(drop = integer(0), message = NULL)
+    if (is.null(p) || p == 0) {
+        return(none)
+    }
+    cells <- which(M)
+    Xm <- matrix(NA_real_, length(cells), p)
+    for (j in seq_len(p)) {
+        Xm[, j] <- X[, , j][cells]
+    }
+    unit <- col(M)[cells]
+    time <- row(M)[cells]
+    fe <- list()
+    if (force %in% c(1, 3)) fe$unit <- unit
+    if (force %in% c(2, 3)) fe$time <- time
+    if (!is.null(extra.fe) && dim(extra.fe)[3] > 0) {
+        for (k in seq_len(dim(extra.fe)[3])) {
+            fe[[paste0("extra", k)]] <- extra.fe[, , k][cells]
+        }
+    }
+    ok <- stats::complete.cases(Xm)
+    if (length(fe) > 0) {
+        for (f in fe) ok <- ok & !is.na(f)
+    }
+    Xm <- Xm[ok, , drop = FALSE]
+    fe <- lapply(fe, function(f) f[ok])
+    unit <- unit[ok]
+    time <- time[ok]
+    if (nrow(Xm) == 0) {
+        return(none)
+    }
+
+    reason <- rep(NA_character_, p)
+    norm2 <- function(v) sqrt(sum(v^2))
+    ## 1. no variation on the estimation cells (collinear with the intercept)
+    c0 <- apply(Xm, 2, function(v) norm2(v - mean(v)))
+    flat <- c0 <= 1e-12 * pmax(1, apply(Xm, 2, norm2))
+    reason[flat] <- "has no variation on the cells used to estimate the covariate coefficients"
+
+    ## 2. absorbed by the fixed effects
+    rest <- which(!flat)
+    if (length(rest) > 0) {
+        if (length(fe) == 0) {
+            Xd <- sweep(Xm, 2, colMeans(Xm))
+        } else {
+            Xd <- fixest::demean(Xm, f = fe, tol = 1e-10, iter = 10000,
+                                 nthreads = 1, notes = FALSE)
+            Xd <- matrix(Xd, nrow = nrow(Xm))
+        }
+        for (j in rest) {
+            if (norm2(Xd[, j]) > 1e-8 * c0[j]) next
+            if (force %in% c(1, 3) &&
+                norm2(Xm[, j] - stats::ave(Xm[, j], unit)) <= 1e-8 * c0[j]) {
+                reason[j] <- "does not vary over time within units, so it is absorbed by the unit fixed effects"
+            } else if (force %in% c(2, 3) &&
+                       norm2(Xm[, j] - stats::ave(Xm[, j], time)) <= 1e-8 * c0[j]) {
+                reason[j] <- "does not vary across units within periods, so it is absorbed by the time fixed effects"
+            } else if (force == 3 && is.null(extra.fe)) {
+                reason[j] <- "is absorbed by the unit and time fixed effects together"
+            } else {
+                reason[j] <- "is absorbed by the fixed effects"
+            }
+        }
+        ## 3. exact linear combinations of the other covariates; like lm(),
+        ## keep the earlier column of a collinear set
+        rest <- which(is.na(reason))
+        if (length(rest) > 1) {
+            q <- qr(Xd[, rest, drop = FALSE], tol = 1e-7)
+            if (q$rank < length(rest)) {
+                alias <- rest[q$pivot[-seq_len(q$rank)]]
+                reason[alias] <- "is a linear combination of other covariates (after removing the fixed effects)"
+            }
+        }
+    }
+
+    drop <- which(!is.na(reason))
+    if (length(drop) == 0) {
+        return(none)
+    }
+    list(
+        drop = drop,
+        message = paste0(
+            "Dropped ", length(drop), " covariate",
+            if (length(drop) > 1) "s" else "",
+            " that cannot be estimated on the cells used to fit the model: ",
+            paste0("\"", Xname[drop], "\" ", reason[drop], collapse = "; "),
+            ". ",
+            if (length(drop) > 1) "Their coefficients are" else "Its coefficient is",
+            " reported as NA."
+        )
+    )
+}
+
+## Put covariates dropped by .fect_check_covariates() back into a fit's
+## outputs, so that every coefficient output has one row per requested
+## covariate (NA for the dropped ones), and the stored covariate array and
+## the internal estimator objects line up with the requested names again.
+## keep: indices (into 1:p.all) of the covariates that were fitted, in order
+## (empty when every covariate was dropped).
+.fect_restore_covariates <- function(out, keep, p.all, X.all, se, binary) {
+    ## p.all-row version of a length(keep)-row matrix `m`; all NA (with
+    ## columns `cols`) when `m` does not have one row per kept covariate,
+    ## e.g. the scalar NA the estimators return when no covariate is left
+    expand <- function(m, cols) {
+        m <- if (is.null(m)) NULL else as.matrix(m)
+        if (length(keep) > 0 && !is.null(m) && nrow(m) == length(keep)) {
+            full <- matrix(NA_real_, p.all, ncol(m),
+                           dimnames = list(NULL, colnames(m)))
+            full[keep, ] <- m
+        } else {
+            full <- matrix(NA_real_, p.all, length(cols),
+                           dimnames = list(NULL, cols))
+        }
+        full
+    }
+    is.binary <- isTRUE(as.logical(binary))
+    out$beta <- expand(out$beta, "Coef")
+    if (is.binary) {
+        out$marginal <- expand(out$marginal, "marginal")
+    }
+    if (isTRUE(as.logical(se))) {
+        out$est.beta <- expand(
+            out$est.beta, c("Coef", "S.E.", "CI.lower", "CI.upper", "p.value")
+        )
+        if (is.binary) {
+            out$est.marginal <- expand(
+                out$est.marginal,
+                c("marginal", "S.E.", "CI.lower", "CI.upper", "p.value")
+            )
+        }
+        if (!is.null(out$beta.boot) && length(keep) > 0) {
+            bb <- as.matrix(out$beta.boot)
+            if (nrow(bb) == length(keep)) {
+                full <- matrix(NA_real_, p.all, ncol(bb))
+                full[keep, ] <- bb
+                out$beta.boot <- full
+            }
+        } else if (length(keep) == 0 && !is.null(out$att.avg.boot)) {
+            out$beta.boot <- matrix(NA_real_, p.all, length(out$att.avg.boot))
+        }
+    }
+    ## the estimator's covariate array and coefficient vectors, read by
+    ## name-based lookups (plot(type = "hte"/"calendar"), fect_iden())
+    if (is.array(out$X) && length(dim(out$X)) == 3 &&
+        dim(out$X)[3] == length(keep)) {
+        out$X <- X.all
+    }
+    for (slot in c("est", "est.cm")) {
+        b <- out[[slot]]$beta
+        if (length(keep) > 0 && !is.null(b) && length(b) == length(keep)) {
+            full <- matrix(NA_real_, p.all, 1)
+            full[keep, 1] <- as.numeric(b)
+            out[[slot]]$beta <- full
+        }
+    }
+    out
+}
