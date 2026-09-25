@@ -18,7 +18,7 @@ For summaries that `estimand()` does not cover, `imputed_outcomes()` returns the
 source("_common.R")
 ```
 
-The examples below use a small synthetic panel with positive outcomes so that log-scale calculations are well defined. The fit sets `keep.sims = TRUE` so that the cell-level imputed counterfactuals from each bootstrap replicate are saved on the fit object. APTT and log-scale ATT need these saved values to recompute their non-linear formulas inside each replicate. The level ATT and cumulative ATT use the pre-aggregated bootstrap that fect always keeps, so the default `keep.sims` is fine for those.
+The examples below use a small synthetic panel with positive outcomes so that log-scale calculations are well defined. The fit sets `keep.sims = TRUE` so that the cell-level imputed counterfactuals from each bootstrap replicate are saved on the fit object. APTT and log-scale ATT need these saved values to recompute their non-linear formulas inside each replicate. Only two calls work without them, because they read the pre-aggregated bootstrap that fect always keeps: the per-event-time level ATT and the cumulative ATT over a window (`by = "overall"`). See "Save bootstrap runs" below.
 
 ```{r setup-estimand, eval = TRUE, message = FALSE, results = 'hide'}
 library(dplyr)
@@ -240,11 +240,15 @@ po <- imputed_outcomes(fit)
 head(po)
 ```
 
-Each row is one treated cell. The columns are the unit and time coordinates, the observed outcome, the imputed counterfactual, the cell-level effect (the cell's contribution to the ATT estimator), and the aggregation weight. Setting `replicates = TRUE` expands the data so there is one row per cell per bootstrap replicate.
+Each row is one treated cell. The columns are the unit and time coordinates, the observed outcome, the imputed counterfactual, the cell-level effect (the cell's contribution to the ATT estimator), and the aggregation weight. Setting `replicates = TRUE` returns the cells of every bootstrap replicate, with a `replicate` column. Each replicate is a refit on a resampled panel, so its rows are the treated cells of the units it drew: a unit drawn twice appears twice, and a unit not drawn does not appear. The number of rows therefore varies by replicate (under the parametric bootstrap, every treated cell appears once per replicate). Averaging `eff` within a replicate gives that replicate's overall ATT.
 
 ```{r imp-out-rep, eval = TRUE}
 po_rep <- imputed_outcomes(fit, replicates = TRUE)
-nrow(po_rep) == nrow(po) * 200    # one row per (cell, replicate)
+## rows per replicate: that replicate's own treated cells
+summary(as.vector(table(po_rep$replicate)))
+## the mean of eff within each replicate is its overall ATT draw
+all.equal(c(tapply(po_rep$eff, po_rep$replicate, mean)),
+          c(fit$att.avg.boot), check.attributes = FALSE)
 ```
 
 An example: the per-event-time standard deviation of the cell-level treatment effect, a simple heterogeneity diagnostic.
@@ -262,9 +266,9 @@ To get bootstrap confidence intervals for a custom summary, group the replicate-
 
 ## Save bootstrap runs
 
-Setting `keep.sims = TRUE` at fit time saves the cell-level imputed counterfactuals from every bootstrap replicate on the fit object --- a three-dimensional array of dimension $T \times N \times \text{nboots}$. Some estimands need it, others do not.
+Setting `keep.sims = TRUE` at fit time saves the cell-level treatment effects from every bootstrap replicate on the fit object --- `fit$eff.boot`, a three-dimensional array of dimension $T \times N \times \text{nboots}$. Slice $b$ holds the units that replicate $b$ drew, in the order given by `fit$colnames.boot[[b]]` (their column positions in the original panel), not the units $1, \dots, N$ in order. With a cluster bootstrap (`cl`), replicates differ in size, and the array is padded with `NA` to the widest one. `estimand()`, `imputed_outcomes()` and `effect()` read each replicate through `colnames.boot`. Some estimands need these saved runs, others do not.
 
-The level ATT and the cumulative ATT (over either the event-time axis or an overall window) work without it, because they read the pre-aggregated bootstrap that fect always keeps. The other types --- APTT, log-scale ATT, and any call that filters cells or groups by something other than event time --- recompute their aggregations over the cell-level array and therefore need the saved runs.
+Two calls work without them, because they read the pre-aggregated bootstrap that fect always keeps: the per-event-time level ATT, `estimand(fit, "att", "event.time")`, and the cumulative ATT over a window, `estimand(fit, "att.cumu", "overall")`. Everything else --- the overall level ATT, the cumulative ATT by event time, APTT, log-scale ATT, and any call that filters cells --- recomputes its aggregation over the cell-level array and therefore needs the saved runs.
 
 A back-of-envelope memory cost:
 
@@ -312,9 +316,9 @@ fit_para <- fect(Y ~ D, data = sim_linear, index = c("id", "time"),
 
 est <- estimand(fit_para, "att", "event.time")
 head(est)
-#>   event.time     estimate        se      ci.lo     ci.hi n_cells    vartype
-#> 1        -39 -0.019958112 0.2427538 -0.4957469 0.4558307      80 parametric
-#> 2        -38 -0.006695018 0.1693391 -0.3385935 0.3252035      80 parametric
+#>   event.time   estimate        se     ci.lo      ci.hi n_cells    vartype
+#> 1        -39 -1.3251852 0.1476319 -1.614538 -1.0358320      80 parametric
+#> 2        -38 -0.8431369 0.1299598 -1.097853 -0.5884204      80 parametric
 #> ...
 ```
 
@@ -324,14 +328,17 @@ argument. The argument is informational; it does not re-aggregate
 replicates. The output matches `fit_para$est.att` exactly for the
 per-event-time path.
 
-For the other types (`"att.cumu"`, `"aptt"`, `"log.att"`, and
-`"att"` with `by = "overall"`), `estimand()` aggregates quantiles
-over `fit$eff.boot`. Under parametric, the simulated distribution is
-centered on the parametric DGP's mean rather than on the point
-estimate, so quantile-based confidence intervals reflect the
-parametric sampling distribution rather than a reflection around the
-point estimate. This matches what `fit$est.att` reports under
-parametric.
+For `"aptt"`, `"log.att"`, and `"att"` with `by = "overall"`,
+`estimand()` recomputes the statistic inside each replicate from
+`fit$eff.boot`, reading replicate $b$ through its own units
+(`fit$colnames.boot[[b]]`; under the parametric bootstrap the treated
+units come first). The parametric replicates are simulated under no
+treatment effect, so they are centered near zero; `estimand()` shifts
+them to center on the point estimate before building the interval,
+which leaves their spread, and so the SE, unchanged. `"att.cumu"` takes
+its interval from `att.cumu()` (`by = "overall"`) or `effect()`
+(`by = "event.time"`), which for parametric fits use the estimate
+plus or minus a critical value times the SE.
 
 ## Migration
 

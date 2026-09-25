@@ -138,7 +138,7 @@ out.fect$est.avg
 out.fect$beta
 ```
 
-After estimation with `se = TRUE`, bootstrap treatment effect estimates from each run are stored in `eff.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs). Standard errors for the period-wise ATTs are available in the output object alongside the point estimates.
+Standard errors for the period-wise ATTs are available in the output object alongside the point estimates. To also keep the cell-level treatment effects from each bootstrap run, set `keep.sims = TRUE`: they are stored in `eff.boot`, an array whose dimension = (#time periods \* #units \* #bootstrap runs). Slice `b` holds the units that run `b` drew, in the order `colnames.boot[[b]]` (their column positions in the data), so a unit drawn twice appears twice.
 
 ```{r extract-bootstrap, eval = FALSE}
 out.fect$eff.boot

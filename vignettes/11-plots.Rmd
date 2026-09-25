@@ -558,7 +558,7 @@ out_ife <- fect(Y ~ D + X1 + X2, data = simdata,
                 nboots = 200)
 ```
 
-The **factors** plot displays the estimated latent time factors. It uses the Okabe-Ito colorblind-safe palette with thinner lines for a clean, publication-ready appearance. Factor 0 (fixed effects, shown when `include.FE = TRUE`) appears in gray; subsequent factors appear in orange, blue, green, and so on. Use `nfactors` to limit the number of displayed factors.
+The **factors** plot displays the estimated latent time factors. It uses the Okabe-Ito colorblind-safe palette with thinner lines for a clean, publication-ready appearance. Factor 0 (fixed effects, shown when `include.FE = TRUE`) appears in gray; subsequent factors appear in orange, blue, green, and so on. The factors plot always shows all estimated factors; `nfactors` applies to the loadings plot only.
 
 ```{r plot-factors}
 plot(out_ife, type = "factors", main = "Estimated Latent Factors")
@@ -571,7 +571,7 @@ plot(out_ife, type = "factors", include.FE = FALSE,
      main = "Factors without Fixed Effects")
 ```
 
-The **loadings** plot displays the estimated factor loadings, comparing the distribution across treated and control units. It uses a navy/crimson color scheme with smaller, semi-transparent scatter points for cleaner visualization. When multiple factors are estimated, the plot is rendered as a pairs matrix via `GGally::ggpairs`.
+The **loadings** plot displays the estimated factor loadings, comparing the distribution across treated and control units. It uses a navy/crimson color scheme with smaller, semi-transparent scatter points for cleaner visualization. When multiple factors are estimated, the plot is rendered as a pairs matrix via `GGally::ggpairs`. Use `nfactors` to limit the number of factors whose loadings are shown (default: up to 4).
 
 ```{r plot-loadings}
 plot(out_ife, type = "loadings", main = "Factor Loadings")
@@ -721,9 +721,11 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 | `est.lwidth` / `est.pointsize` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | Yes |
 | `gridOff` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
 | `highlight.periods` / `highlight.shapes` | --- | --- | --- | --- | --- | --- | --- | --- | --- | Yes |
+| `id` | --- | --- | --- | --- | --- | Yes | Yes | --- | --- | --- |
+| `include.FE` | --- | --- | --- | --- | --- | --- | --- | Yes | Yes | --- |
 | `lcolor` / `lwidth` / `ltype` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
 | `legendOff` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | Yes |
-| `nfactors` / `include.FE` | --- | --- | --- | --- | --- | --- | --- | Yes | Yes | --- |
+| `nfactors` | --- | --- | --- | --- | --- | --- | --- | --- | Yes | --- |
 | `placebo.color` | Yes | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `plot.ci` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | --- |
 | `pre.color` / `post.color` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | Yes |

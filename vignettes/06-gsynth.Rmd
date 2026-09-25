@@ -331,11 +331,11 @@ out_turnout <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
 
 ### Implied weights
 
-`out$wgt.implied` ($N_{co}\times N_{tr}$) stores the implied weights of all control units for each treated unit. Different from the synthetic control method, the weights can take both positive and negative values. Below we show the control unit weights for Wisconsin.
+`out$wgt.implied` stores the implied weights of all control units for each treated unit: an $N_{co}\times N_{tr}$ matrix with one row per control unit and one column per treated unit, labeled by unit ID. Column $i$ holds the weights $w_i$ that rebuild the factor part of treated unit $i$'s counterfactual from the control units' factor parts, $\Lambda_{co}^\top w_i = \lambda_i$, with $w_i = \Lambda_{co}(\Lambda_{co}^\top\Lambda_{co})^{-1}\lambda_i$ [@Xu2017]. Different from the synthetic control method, the weights can take both positive and negative values; with time fixed effects in the model, each column sums to zero. Below we show the control unit weights for Wisconsin.
 
 ```{r turnout-implied-weights}
 dim(out_turnout$wgt.implied)
-sort(out_turnout$wgt.implied[,8])
+sort(out_turnout$wgt.implied[, "WI"])
 ```
 
 ### Visualizing results
@@ -591,7 +591,7 @@ For one-factor models ($r = 1$), the same `loading.overlap` diagnostic renders a
 
 #### Implicit donor weights: bounded vs. unbounded
 
-Each treated counterfactual $\hat Y_i(0) = F\,\hat\lambda_i$ is a linear combination of control-implied outcomes. The coefficients on the controls --- stored in `wgt.implied`, an $N_{tr} \times N_{co}$ matrix --- are the *implicit donor weights*. Under `loading.bound = "none"`, these come from the Moore-Penrose pseudo-inverse and may be negative, exceed one, or vary wildly with small perturbations. Under `loading.bound = "simplex"`, each row is non-negative and sums to one (a proper synthetic-control weighting). The scatter below shows every (treated unit, control unit) pair: x-axis is the unbounded weight, y-axis is the bounded weight.
+Each treated counterfactual $\hat Y_i(0) = F\,\hat\lambda_i$ is a linear combination of control-implied outcomes. The coefficients on the controls --- stored in `wgt.implied`, an $N_{co} \times N_{tr}$ matrix with one column per treated unit --- are the *implicit donor weights*. Under `loading.bound = "none"`, they come from the Moore-Penrose pseudo-inverse, $w_i = \Lambda_{co}(\Lambda_{co}^\top\Lambda_{co})^{-1}\lambda_i$, and can be negative; with time fixed effects in the model, each column sums to zero. Under `loading.bound = "simplex"`, each column is non-negative and sums to one (a proper synthetic-control weighting). Both matrices have the same layout, so the scatter below pairs the two weights of every (treated unit, control unit) pair: x-axis is the unbounded weight, y-axis is the bounded weight.
 
 ```{r bounded-vs-unbounded-weights, fig.width = 6.5, fig.height = 5, message = FALSE}
 library(ggplot2)
@@ -618,11 +618,11 @@ ggplot(df.w, aes(x = unbounded, y = bounded)) +
 
 Three patterns are worth checking:
 
-1. **Many weights near $y = 0$.** Bounded weights are sparse: most (treated, control) pairs receive zero weight, and only a small set of donors receives meaningful weight for each treated unit. This sparsity comes from the *simplex constraint*, not from the regularizer. Non-negative least squares on a probability simplex has an active-set property: at the optimum, many constraints $w_j = 0$ are active, and only a few donors have positive weight. The entropy regularizer pushes weights toward uniform $(1/N_{co})$, so it works against sparsity. With moderate $\gamma$, the constraint dominates; as $\gamma \to 0$, weights converge to uniform. Unbounded weights, by contrast, spread non-zero mass across the donor pool because the pseudo-inverse has no non-negativity constraint and no preference for sparsity.
+1. **Many weights near $y = 0$.** Bounded weights are sparse: most (treated, control) pairs receive zero weight, and for most treated units only a small set of donors receives meaningful weight. This sparsity comes from the *simplex constraint*, not from the regularizer. Non-negative least squares on a probability simplex has an active-set property: at the optimum, many constraints $w_j = 0$ are active, and only a few donors have positive weight. The entropy regularizer pushes weights toward uniform $(1/N_{co})$, so it works against sparsity. With moderate $\gamma$, the constraint dominates; as $\gamma \to 0$, weights converge to uniform. Unbounded weights, by contrast, spread non-zero mass across the donor pool because the pseudo-inverse has no non-negativity constraint and no preference for sparsity.
 
 2. **Negative unbounded weights become zero.** Points with $x < 0$ sit at $y = 0$, or close to it. The simplex projection cannot use negative weights, so it removes those donors from the counterfactual. This matches the synthetic-control intuition: a counterfactual should not be a negative combination of donors.
 
-3. **Bounded weights cannot exceed one.** Points with $x > 1$ move to $y \leq 1$. When the pseudo-inverse puts too much weight on one donor, the simplex caps that weight and redistributes the rest across other donors.
+3. **Large bounded weights go to donors the pseudo-inverse already favors.** The points well above $y = 0$ all have positive unbounded weights, among the largest of their treated unit. For most treated units, the simplex puts almost all the weight on a few of these donors, and no bounded weight can exceed one. The unbounded weights, which sum to zero, stay small and are spread over the whole donor pool.
 
 The result is a different counterfactual representation. The pseudo-inverse is dense and can extrapolate. The simplex is sparse, uses interpolation only, and gives each weight a synthetic-control interpretation.
 
