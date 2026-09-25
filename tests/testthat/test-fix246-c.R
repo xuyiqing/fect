@@ -258,3 +258,37 @@ test_that("C2: duplicated covariate names, or X naming Y or D, stop", {
   expect_error(fit(c("Y", "X1")), "outcome or the treatment variable \\(\"Y\"\\)")
   expect_error(fit(c("X1", "nosuchcol")), "variable \"nosuchcol\" is not in the data set")
 })
+
+
+## -- C3  non-numeric covariates ---------------------------------------------
+
+test_that("C3: non-numeric covariates stop with a clear message", {
+  d <- .fix246c_simdata()
+  d$Xf <- factor(ifelse(d$X1 > 0, "hi", "lo"))
+  d$Xc <- ifelse(d$X1 > 0, "hi", "lo")
+  d$Xd <- as.Date("2000-01-01") + seq_len(nrow(d))
+  fit <- function(f) fect::fect(f, data = d, index = c("id", "time"),
+                                method = "fe", se = FALSE, parallel = FALSE)
+  ## before 2.4.6: "Calling var(x) on a factor x is defunct" (factor) and a
+  ## false "unit-invariant" stop (character)
+  expect_error(fit(Y ~ D + Xf),
+               "Covariate \"Xf\" is a factor; fect\\(\\) needs numeric covariates")
+  expect_error(fit(Y ~ D + Xf), "model.matrix\\(~ Xf, data\\)")
+  expect_error(fit(Y ~ D + X1 + Xc), "Covariate \"Xc\" is character")
+  expect_error(fit(Y ~ D + X1 + Xd), "Covariate \"Xd\" is of class \"Date\"")
+})
+
+test_that("C3: logical covariates are used as 0/1", {
+  skip_on_cran()
+  d <- .fix246c_simdata()
+  d$Xl <- d$X1 > 0
+  d$Xn <- as.numeric(d$Xl)
+  fit <- function(f) .fix246c_quiet(fect::fect(
+    f, data = d, index = c("id", "time"), method = "fe", se = FALSE,
+    parallel = FALSE
+  ))
+  a <- fit(Y ~ D + X2 + Xl)
+  b <- fit(Y ~ D + X2 + Xn)
+  expect_identical(a$att.avg, b$att.avg)
+  expect_identical(unname(a$beta), unname(b$beta))
+})

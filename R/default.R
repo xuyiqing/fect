@@ -1553,6 +1553,32 @@ fect.default <- function(
         data <- data[, all.var]
     }
 
+    ## Covariates must be numeric; logical columns are used as 0/1 (as they
+    ## were before). Before 2.4.6 a factor stopped with R's "Calling var(x)
+    ## on a factor x is defunct" and a character column with a false
+    ## "unit-invariant" message.
+    for (x.name in X) {
+        x.col <- data[[x.name]]
+        if (is.logical(x.col)) {
+            data[[x.name]] <- as.numeric(x.col)
+        } else if (!is.numeric(x.col)) {
+            x.type <- if (is.factor(x.col)) {
+                "a factor"
+            } else if (is.character(x.col)) {
+                "character"
+            } else {
+                paste0("of class \"", class(x.col)[1], "\"")
+            }
+            stop(
+                "Covariate \"", x.name, "\" is ", x.type, "; fect() needs ",
+                "numeric covariates. Create numeric (dummy) columns first, for ",
+                "example with model.matrix(~ ", x.name, ", data), and use ",
+                "those columns.",
+                call. = FALSE
+            )
+        }
+    }
+
     if (na.rm == TRUE) {
         data <- na.omit(data)
     } else {
