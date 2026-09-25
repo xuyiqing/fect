@@ -121,3 +121,51 @@ test_that("B2: panel_factor() clamps r at min(T, N)", {
   expect_equal(dim(zero$factor), c(5L, 0L))
   expect_equal(zero$FE, matrix(0, 5, 4))
 })
+
+
+## -- B3  the reason cross-validation is skipped -------------------------
+
+test_that("B3: r = 0 with CV = TRUE says there is only one candidate r", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  for (m in c("gsynth", "cfe")) {
+    out <- .fix246b_messages(fect::fect(
+      Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"), method = m,
+      time.component.from = "nevertreated", force = "two-way", CV = TRUE,
+      r = 0, se = FALSE, parallel = FALSE
+    ))
+    expect_true(any(grepl(
+      "Only one candidate number of factors (r = 0) was given, so cross-validation is skipped and r.cv = 0.",
+      out$messages, fixed = TRUE)), info = m)
+    expect_false(any(grepl("too few", out$messages)), info = m)
+    expect_equal(unname(out$value$r.cv), 0, info = m)
+  }
+  ## too few pre-treatment records keep the old message: two-way FE with two
+  ## pre-treatment periods leaves no room for a factor
+  d <- .fix246b_panel(Nco = 10, TT = 10, T0 = 2)
+  few <- .fix246b_messages(fect::fect(
+    Y ~ D, data = d, index = c("id", "time"), method = "gsynth",
+    force = "two-way", CV = TRUE, r = c(0, 2), min.T0 = 2, k = 5, se = FALSE,
+    parallel = FALSE, seed = 1
+  ))
+  expect_true(any(grepl("pre-treatment records of treated units are too few",
+                        few$messages, fixed = TRUE)))
+  expect_false(any(grepl("Only one candidate", few$messages)))
+})
+
+test_that("B3: one never-treated unit skips CV with its own message", {
+  skip_on_cran()
+  ## Before the B2 cap this range crashed ("Not a matrix.").
+  d <- .fix246b_panel(Nco = 1)
+  out <- .fix246b_messages(fect::fect(
+    Y ~ D, data = d, index = c("id", "time"), method = "gsynth",
+    force = "two-way", CV = TRUE, r = c(0, 1), k = 5, se = FALSE,
+    parallel = FALSE, seed = 1
+  ))
+  expect_true(any(grepl(
+    "With 1 never-treated unit no factor can be estimated, so cross-validation is skipped and r.cv = 0.",
+    out$messages, fixed = TRUE)), info = paste(out$messages, collapse = " | "))
+  expect_false(any(grepl("too few", out$messages)))
+  expect_equal(unname(out$value$r.cv), 0)
+  expect_true(is.finite(out$value$att.avg))
+})

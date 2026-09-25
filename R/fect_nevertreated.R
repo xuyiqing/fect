@@ -345,7 +345,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         ## panel_factor() and crashed ("Mat::head_cols(): size out of bounds")
         ## or fit an r that is not identified.
         r.max.co <- .fect_nt_r_max(Nco)
-        if (r.max > r.max.co) {
+        r.capped.co <- r.max > r.max.co
+        if (r.capped.co) {
             r <- min(r, r.max.co)
             .fect_nt_cap_message(Nco, r, r.max.co)
             r.max <- r.max.co
@@ -353,7 +354,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
         if (r.max == 0) {
             r.cv <- 0
-            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
+            message(.fect_nt_no_cv_message(r.end, Nco, r.capped.co))
             est.co.best <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, 0, force, cv_tol, max.iteration,
                                         fit_init = fit.init.co)
         } else {
@@ -1453,7 +1454,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
         ## at most Nco - 1 factors from the never-treated units (as in the IFE block)
         r.max.co <- .fect_nt_r_max(Nco)
-        if (r.max > r.max.co) {
+        r.capped.co <- r.max > r.max.co
+        if (r.capped.co) {
             r <- min(r, r.max.co)
             .fect_nt_cap_message(Nco, r, r.max.co)
             r.max <- r.max.co
@@ -1461,7 +1463,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
         if (r.max == 0) {
             r.cv <- 0
-            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
+            message(.fect_nt_no_cv_message(r.end, Nco, r.capped.co))
             est.co.best <- complex_fe_ub(YY.co, Y0.co, X.co,
                 X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                 Zgamma.id, kappaQ.id,
@@ -3398,6 +3400,22 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         ))
     }
     invisible(NULL)
+}
+
+## Why cross-validation is skipped when the searched range is r = 0 only.
+## Before 2.4.6 every case got the "too few pre-treatment records" message,
+## including r = 0 with CV = TRUE.
+.fect_nt_no_cv_message <- function(r.end, Nco, capped) {
+    if (r.end == 0) {
+        "Only one candidate number of factors (r = 0) was given, so cross-validation is skipped and r.cv = 0."
+    } else if (isTRUE(capped)) {
+        sprintf(
+            "With %d never-treated unit%s no factor can be estimated, so cross-validation is skipped and r.cv = 0.",
+            Nco, if (Nco == 1) "" else "s"
+        )
+    } else {
+        "Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0."
+    }
 }
 
 
