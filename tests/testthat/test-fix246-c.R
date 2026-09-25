@@ -57,7 +57,7 @@ test_that("C1: factor(), interactions, `.` and other expressions stop", {
   ## every bad term is named in one message, which says what to do
   err <- tryCatch(.fc_fit(log(Y + 20) ~ D + I(X1^2) + X2, data = d),
                   error = conditionMessage)
-  expect_match(err, "not column names: `log(Y + 20)`, `I(X1^2)`", fixed = TRUE)
+  expect_match(err, "not a column name: `log(Y + 20)`, `I(X1^2)`", fixed = TRUE)
   expect_match(err, "Create the variable first", fixed = TRUE)
   expect_match(err, "model.matrix()", fixed = TRUE)
 })
@@ -65,7 +65,7 @@ test_that("C1: factor(), interactions, `.` and other expressions stop", {
 test_that("C1: the outcome on the right-hand side, or no treatment, stops", {
   ## 412d7ae dropped the repeated outcome silently (all.vars() deduplicates)
   expect_error(.fc_quiet(.fc_fit(Y ~ D + X1 + Y)),
-               "The outcome \"Y\" also appears on the right-hand side",
+               "the outcome \"Y\" also appears on the right-hand side",
                fixed = TRUE)
   expect_error(.fc_quiet(.fc_fit(Y ~ 1)),
                "needs a treatment variable on the right-hand side", fixed = TRUE)
@@ -201,7 +201,8 @@ test_that("C3: factor, character and Date covariates stop with a clear message",
                "Covariate \"Xc\" is character; fect() needs numeric covariates",
                fixed = TRUE)
   expect_error(.fc_quiet(.fc_fit(Y ~ D + X1 + Xd, data = d)),
-               "Covariate \"Xd\" is of class \"Date\"", fixed = TRUE)
+               "Covariate \"Xd\" is Date; fect() needs numeric covariates",
+               fixed = TRUE)
   expect_error(.fc_quiet(.fc_fit(Y ~ D + X1 + Xf, data = d, method = "fe",
                                  r = 0)),
                "model.matrix(~ Xf, data)", fixed = TRUE)
@@ -342,7 +343,7 @@ test_that("C5: an exactly collinear covariate is dropped with a warning (V10)", 
       o <- .fc_warnings(.fc_fit(f, data = d, r = r))
       expect_length(o$warnings, 1)
       expect_match(o$warnings,
-                   paste0("Dropped 1 covariate that cannot be estimated on the cells used to fit the model: \"",
+                   paste0("Dropped 1 covariate(s) that cannot be estimated on the cells used to fit the model: \"",
                           z, "\" is a linear combination of other covariates"),
                    fixed = TRUE)
       fit <- o$value
@@ -421,7 +422,8 @@ test_that("C6: when every covariate is dropped the fit has no covariates", {
   d$Zt <- stats::ave(d$X1, d$time)
   ref <- .fc_quiet(.fc_fit(Y ~ D, data = d, method = "fe", r = 0))
   o <- .fc_warnings(.fc_fit(Y ~ D + Zu + Zt, data = d, method = "fe", r = 0))
-  expect_match(o$warnings, "^Dropped 2 covariates that cannot be estimated")
+  expect_match(o$warnings, "Dropped 2 covariate(s) that cannot be estimated",
+               fixed = TRUE)
   expect_match(o$warnings, "Their coefficients are reported as NA.",
                fixed = TRUE)
   fit <- o$value

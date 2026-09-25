@@ -59,8 +59,8 @@ interFE.formula <- function(formula = NULL, data, # a data frame
     Xname <- fnames$rhs
     if (Yname %in% Xname) {
         stop(
-            "The outcome \"", Yname, "\" also appears on the right-hand side ",
-            "of the formula.",
+            "In the formula, the outcome \"", Yname, "\" also appears on the ",
+            "right-hand side.",
             call. = FALSE
         )
     }

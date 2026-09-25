@@ -777,8 +777,7 @@ v_replace <- function(needle, haystack) {
     )
     if (length(bad) > 0L) {
         stop(
-            fun, "() formulas take bare column names only; ",
-            if (length(bad) == 1L) "not a column name: " else "not column names: ",
+            fun, "() formulas take bare column names only; not a column name: ",
             paste0("`", bad, "`", collapse = ", "), ". ",
             "Create the variable first (for example ",
             "`data$logY <- log(data$Y + 20)`) and use it in the formula. ",
@@ -910,13 +909,10 @@ v_replace <- function(needle, haystack) {
     list(
         drop = drop,
         message = paste0(
-            "Dropped ", length(drop), " covariate",
-            if (length(drop) > 1) "s" else "",
-            " that cannot be estimated on the cells used to fit the model: ",
+            "Dropped ", length(drop), " covariate(s) that cannot be ",
+            "estimated on the cells used to fit the model: ",
             paste0("\"", Xname[drop], "\" ", reason[drop], collapse = "; "),
-            ". ",
-            if (length(drop) > 1) "Their coefficients are" else "Its coefficient is",
-            " reported as NA."
+            ". Their coefficients are reported as NA."
         )
     )
 }

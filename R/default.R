@@ -218,8 +218,8 @@ fect.formula <- function(
     }
     if (Yname %in% fnames$rhs) {
         stop(
-            "The outcome \"", Yname, "\" also appears on the right-hand side ",
-            "of the formula.",
+            "In the formula, the outcome \"", Yname, "\" also appears on the ",
+            "right-hand side.",
             call. = FALSE
         )
     }
@@ -1558,7 +1558,7 @@ fect.default <- function(
             } else if (is.character(x.col)) {
                 "character"
             } else {
-                paste0("of class \"", class(x.col)[1], "\"")
+                class(x.col)[1]
             }
             stop(
                 "Covariate \"", x.name, "\" is ", x.type, "; fect() needs ",
