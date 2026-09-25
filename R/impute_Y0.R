@@ -61,7 +61,14 @@ impute_Y0 <- function(
   max.iteration = 1000,
   norm.para    = NULL,
   group.level  = NULL,
-  group        = NULL
+  group        = NULL,
+
+  ## Bounded treated loadings: forwarded to Branch 1 only (the validation in
+  ## fect.default() allows loading.bound = "simplex" for gsynth and
+  ## ife + nevertreated). Before 2.4.6 the parametric replicates dropped it.
+  loading.bound      = "none",
+  gamma.loading      = NULL,
+  gamma.loading.grid = NULL
 ) {
 
   if (method == "gsynth" || (method == "ife" && predictive == "nevertreated")) {
@@ -99,7 +106,10 @@ impute_Y0 <- function(
       max.iteration  = max.iteration,
       group.level    = group.level,
       group          = group,
-      method         = "ife"
+      method         = "ife",
+      loading.bound      = loading.bound,
+      gamma.loading      = gamma.loading,
+      gamma.loading.grid = gamma.loading.grid
     )
 
   } else if (method == "ife" && predictive == "notyettreated") {

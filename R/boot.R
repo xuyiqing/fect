@@ -535,7 +535,10 @@ fect_boot <- function(
         kappaQ.id = kappaQ.id,
         parallel = parallel,
         cores = cores,
-        do_parallel_cv = do_parallel_cv
+        do_parallel_cv = do_parallel_cv,
+        loading.bound      = loading.bound,
+        gamma.loading      = gamma.loading,
+        gamma.loading.grid = gamma.loading.grid
       )
 
       if (!is.null(out$method)) {
@@ -1030,7 +1033,12 @@ fect_boot <- function(
           hasRevs    = hasRevs,
           tol        = tol,
           max.iteration = max.iteration,
-          norm.para  = norm.para
+          norm.para  = norm.para,
+          ## the pseudo-treated control's loadings are bounded like the
+          ## treated units' (gamma.loading is the main fit's, cached above)
+          loading.bound      = loading.bound,
+          gamma.loading      = gamma.loading,
+          gamma.loading.grid = gamma.loading.grid
         ),
         silent = TRUE
       )
@@ -1282,7 +1290,10 @@ fect_boot <- function(
           group.level  = group.level,
           group        = boot.group,
           force        = force,
-          hasRevs      = hasRevs
+          hasRevs      = hasRevs,
+          loading.bound      = loading.bound,
+          gamma.loading      = gamma.loading,
+          gamma.loading.grid = gamma.loading.grid
         ),
         silent = TRUE
       )

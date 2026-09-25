@@ -2645,7 +2645,10 @@ fect.default <- function(
                     cores = cores,
                     do_parallel_cv   = do_parallel_cv,
                     do_parallel_boot = do_parallel_boot,
-                    cv.rule = cv.rule
+                    cv.rule = cv.rule,
+                    loading.bound      = loading.bound,
+                    gamma.loading      = gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid
                 )
             } else {
                 out <- fect_binary_cv(
@@ -2851,7 +2854,10 @@ fect.default <- function(
                     group.level = g.level,
                     group = G,
                     parallel = parallel,
-                    cores = cores
+                    cores = cores,
+                    loading.bound      = loading.bound,
+                    gamma.loading      = gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid
                 )
             } else if (method == "mc") {
                 out <- fect_mc(
@@ -2967,6 +2973,13 @@ fect.default <- function(
             dloo.group.map     = if (!is.null(group)) rawgroup else NULL
         )
 
+    }
+
+    ## loading.bound bounds the treated units' factor loadings; with no
+    ## factors there is nothing to bound.
+    if (identical(loading.bound, "simplex") && !is.null(out$r.cv) &&
+        isTRUE(as.numeric(out$r.cv[1]) == 0)) {
+        message("loading.bound = \"simplex\" has no effect because the selected number of factors is 0.")
     }
 
     if ((out$validX == 0) & (p != 0)) {

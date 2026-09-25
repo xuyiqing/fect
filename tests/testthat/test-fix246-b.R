@@ -337,3 +337,91 @@ test_that("B7: dropping every post-treatment period stops with a plain message",
   expect_equal(nrow(fit$Y.dat), 28)
   expect_true(is.finite(fit$att.avg))
 })
+
+
+## -- B8  loading.bound = "simplex" honoured in every path ----------------
+
+test_that("B8: simplex is honoured with CV and for method = 'gsynth' without SEs", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  fit <- function(...) .fix246b_quiet(fect::fect(
+    Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"),
+    force = "two-way", k = 5, parallel = FALSE, seed = 1,
+    loading.bound = "simplex", gamma.loading = 1, ...
+  ))
+  ## the path that already honoured it: ife + nevertreated, fixed r
+  ref <- fit(method = "ife", time.component.from = "nevertreated", r = 2,
+             CV = FALSE, se = FALSE)
+  expect_identical(ref$loading.bound, "simplex")
+  cases <- list(
+    gsynth_fixed = list(method = "gsynth", r = 2, CV = FALSE, se = FALSE),
+    gsynth_cv    = list(method = "gsynth", r = c(0, 3), CV = TRUE, se = FALSE),
+    ifent_cv     = list(method = "ife", time.component.from = "nevertreated",
+                        r = c(0, 3), CV = TRUE, se = FALSE),
+    gsynth_cv_se = list(method = "gsynth", r = c(0, 3), CV = TRUE, se = TRUE,
+                        nboots = 10)
+  )
+  for (nm in names(cases)) {
+    f <- do.call(fit, cases[[nm]])
+    expect_identical(f$loading.bound, "simplex", info = nm)
+    expect_equal(f$gamma.loading, 1, info = nm)
+    expect_equal(unname(f$r.cv), 2, info = nm)
+    expect_equal(f$att.avg, ref$att.avg, tolerance = 1e-8, info = nm)
+    expect_equal(unname(colSums(f$wgt.implied)), rep(1, 5), tolerance = 1e-6,
+                 info = nm)
+  }
+})
+
+test_that("B8: parametric replicates bound the loadings too", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  ## impute_Y0() forwards the bound to fect_nevertreated()
+  d <- simgsynth
+  Y <- matrix(d$Y, 30, 50); D <- matrix(d$D, 30, 50)
+  I <- matrix(1, 30, 50); II <- I; II[D == 1] <- 0
+  T.on <- matrix(NA_real_, 30, 50); T.on[, 1:5] <- seq_len(30) - 20
+  res <- .fix246b_quiet(fect:::impute_Y0(
+    method = "gsynth", predictive = "nevertreated", Y = Y, X = NULL, D = D,
+    W = NULL, I = I, II = II, T.on = T.on, tuning = 2, boot = 0, force = 3,
+    hasRevs = 0,
+    tol = 1e-5, loading.bound = "simplex", gamma.loading = 1
+  ))
+  expect_identical(res$loading.bound, "simplex")
+  expect_equal(unname(colSums(res$wgt.implied)), rep(1, 5), tolerance = 1e-6)
+  ## every fect_nevertreated() call of a parametric fit gets the bound: the
+  ## main fit, the simulated errors (draw.error) and the replicates. (trace()
+  ## records each call's loading.bound; a mocked binding would not reach the
+  ## replicate closures, whose environments fect_boot() trims.)
+  seen <- new.env()
+  seen$lb <- character(0)
+  suppressMessages(trace(
+    "fect_nevertreated", where = asNamespace("fect"), print = FALSE,
+    tracer = bquote(assign("lb", c(get("lb", envir = .(seen)), loading.bound),
+                           envir = .(seen)))
+  ))
+  withr::defer(suppressMessages(
+    untrace("fect_nevertreated", where = asNamespace("fect"))
+  ))
+  fit <- .fix246b_quiet(fect::fect(
+    Y ~ D, data = simgsynth, index = c("id", "time"), method = "gsynth",
+    force = "two-way", r = 2, CV = FALSE, se = TRUE, vartype = "parametric",
+    nboots = 5, parallel = FALSE, seed = 1, loading.bound = "simplex",
+    gamma.loading = 1
+  ))
+  expect_identical(fit$loading.bound, "simplex")
+  expect_gte(length(seen$lb), 11)   # 1 main fit + 5 error draws + 5 replicates
+  expect_true(all(seen$lb == "simplex"))
+})
+
+test_that("B8: simplex with no factors says it has no effect", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  out <- .fix246b_messages(fect::fect(
+    Y ~ D, data = simgsynth, index = c("id", "time"), method = "gsynth",
+    force = "two-way", r = 0, CV = FALSE, se = FALSE, parallel = FALSE,
+    loading.bound = "simplex", gamma.loading = 1
+  ))
+  expect_true(any(grepl(
+    "loading.bound = \"simplex\" has no effect because the selected number of factors is 0.",
+    out$messages, fixed = TRUE)))
+})
