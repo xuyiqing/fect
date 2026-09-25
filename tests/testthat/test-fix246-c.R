@@ -314,6 +314,21 @@ test_that("C4 guard: the dropped-period message shows the level label", {
 })
 
 
+test_that("C4: the no-treated-cell stop (B7) names dropped periods by their labels", {
+  d <- .fc_sim()
+  ## no never-treated unit is observed from period 21 on, when units 101-105
+  ## are treated, so every post-treatment period is dropped
+  d <- d[!(d$time >= 21 & d$id > 105), ]
+  d$time <- factor(paste0("w", d$time), levels = paste0("w", 1:30))
+  ## 412d7ae crashed later ("missing value where TRUE/FALSE needed"); with B7
+  ## but without the C4 label mapping the stop listed level positions (21, ...)
+  expect_error(
+    .fc_quiet(.fc_fit(Y ~ D + X1 + X2, data = d, method = "fe", r = 0)),
+    "No treated observations remain after dropping the periods in which no unit is under control (w21, w22, w23, w24, w25, w26, w27, w28, w29, w30)",
+    fixed = TRUE
+  )
+})
+
 ## -- C5 + C6  collinear and FE-absorbed covariates ------------------------
 
 ## capture the warnings of a call, silencing messages

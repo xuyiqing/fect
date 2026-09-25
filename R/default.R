@@ -2223,6 +2223,11 @@ fect.default <- function(
             }
         }
         time.drop <- time.uni[which(I.use == 0)] ## labels, for the check below
+        if (!is.null(time.labels)) {
+            ## a factor time index with non-numeric levels was converted to
+            ## level positions (C4): name the dropped periods by their labels
+            time.drop <- time.labels[time.drop]
+        }
         TT <- TT - sum(I.use == 0)
         time.uni <- time.uni[-which(I.use == 0)]
 
