@@ -262,6 +262,22 @@ fect.formula <- function(
     gamma.loading.grid = NULL,
     cv.rule = "1se"
 ) {
+    ## Covariates come from the formula. Before 2.4.6 an `X` given with a
+    ## formula was silently ignored. `X = NULL` (what gsynth's wrapper
+    ## passes by default) is fine; an `X` that cannot be evaluated (e.g. an
+    ## unquoted name) counts as given. Y and D are not evaluated: gsynth
+    ## passes them as missing arguments.
+    X.given <- !missing(X) &&
+        !is.null(tryCatch(X, error = function(e) "<unevaluable>"))
+    if (X.given) {
+        stop(
+            "Covariates were given in `X` together with a formula. Put the ",
+            "covariates in the formula (Y ~ D + X1 + X2), or give Y, D and X ",
+            "as column names without a formula, not both.",
+            call. = FALSE
+        )
+    }
+
     ## parsing: bare column names only (see .fect_formula_names())
     fnames <- .fect_formula_names(formula, fun = "fect")
     Yname <- fnames$Y
@@ -539,6 +555,28 @@ fect.default <- function(
     if (is.data.frame(data) == FALSE || length(class(data)) > 1) {
         data <- as.data.frame(data)
         ## warning("Not a data frame.")
+    }
+
+    ## covariate names. Before 2.4.6 a duplicated name entered the model
+    ## twice (exactly collinear; the two coefficients were garbage).
+    if (!is.null(X)) {
+        X.dup <- unique(X[duplicated(X)])
+        if (length(X.dup) > 0) {
+            stop("`X` contains duplicated covariate names: ",
+                 paste0("\"", X.dup, "\"", collapse = ", "),
+                 ". Give each covariate once.", call. = FALSE)
+        }
+        X.yd <- intersect(X, c(if (!missing(Y)) Y, if (!missing(D)) D))
+        if (length(X.yd) > 0) {
+            stop("`X` contains the outcome or the treatment variable (",
+                 paste0("\"", X.yd, "\"", collapse = ", "),
+                 "). Give only covariates in `X`.", call. = FALSE)
+        }
+        X.absent <- setdiff(X, colnames(data))
+        if (length(X.absent) > 0) {
+            stop("variable \"", X.absent[1], "\" is not in the data set.",
+                 call. = FALSE)
+        }
     }
 
     ## ----------------------------------------------------------------

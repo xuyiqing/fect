@@ -226,3 +226,35 @@ test_that("C1: interFE() formulas take bare column names only", {
   expect_identical(a$beta, b$beta)
   expect_identical(a$X, c("X1", "X2"))
 })
+
+
+## -- C2  X with a formula; duplicated covariate names ------------------------
+
+test_that("C2: X given together with a formula stops (fect and interFE)", {
+  d <- .fix246c_simdata()
+  fit <- function(...) fect::fect(data = d, index = c("id", "time"),
+                                  method = "fe", se = FALSE, parallel = FALSE, ...)
+  ## before 2.4.6 X was ignored and the fit had no covariates
+  expect_error(fit(Y ~ D, X = c("X1", "X2")),
+               "Covariates were given in `X` together with a formula")
+  expect_error(fit(Y ~ D + X1, X = "X2"), "not both")
+  ## an unquoted name was never even evaluated
+  expect_error(fit(Y ~ D, X = X1), "together with a formula")
+  ## X = NULL with a formula is fine (gsynth's wrapper passes it)
+  f <- .fix246c_quiet(fit(Y ~ D + X1, X = NULL))
+  expect_identical(f$X, "X1")
+  expect_error(fect::interFE(Y ~ X1, data = d, index = c("id", "time"), X = "X2"),
+               "Covariates were given in `X` together with a formula")
+})
+
+test_that("C2: duplicated covariate names, or X naming Y or D, stop", {
+  d <- .fix246c_simdata()
+  fit <- function(X) fect::fect(data = d, Y = "Y", D = "D", X = X,
+                                index = c("id", "time"), method = "fe",
+                                se = FALSE, parallel = FALSE)
+  ## before 2.4.6: coefficients -2.03 and 2.03 for the two copies, no warning
+  expect_error(fit(c("X1", "X2", "X1")), "duplicated covariate names: \"X1\"")
+  expect_error(fit(c("X1", "D")), "outcome or the treatment variable \\(\"D\"\\)")
+  expect_error(fit(c("Y", "X1")), "outcome or the treatment variable \\(\"Y\"\\)")
+  expect_error(fit(c("X1", "nosuchcol")), "variable \"nosuchcol\" is not in the data set")
+})
