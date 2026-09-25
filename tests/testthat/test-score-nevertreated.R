@@ -126,6 +126,9 @@ test_that("NT5: fect_nevertreated cv.method='treated_units' selects r.cv (CFE)",
 test_that("NT6: fect_nevertreated default cv.method is treated_units", {
 
   skip_on_cran()
+  ## Both fits get seed = 42. The CV folds are random, so without a seed
+  ## each fit's r.cv depended on the RNG state that earlier tests left
+  ## behind, and the comparison failed now and then in the full suite.
   nt_default <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D,
@@ -136,7 +139,8 @@ test_that("NT6: fect_nevertreated default cv.method is treated_units", {
       CV              = TRUE,
       r               = c(0, 3),
       se              = FALSE,
-      parallel        = FALSE
+      parallel        = FALSE,
+      seed            = 42
     )
   ))
 
@@ -151,7 +155,8 @@ test_that("NT6: fect_nevertreated default cv.method is treated_units", {
       r               = c(0, 3),
       cv.method       = "treated_units",
       se              = FALSE,
-      parallel        = FALSE
+      parallel        = FALSE,
+      seed            = 42
     )
   ))
 
@@ -218,6 +223,9 @@ test_that("SEL1: 1% selection rule in IFE nevertreated", {
 test_that("SEL2: 1% selection rule in CFE nevertreated", {
 
   skip_on_cran()
+  ## Both fits get seed = 42, so they use the same CV folds and differ
+  ## only in tol. Without a seed the second fit drew other folds than the
+  ## first, and r.cv could differ for that reason alone.
   nt_bigtol <- suppressWarnings(suppressMessages(
     fect::fect(
       Y ~ D,
@@ -229,7 +237,8 @@ test_that("SEL2: 1% selection rule in CFE nevertreated", {
       r               = c(0, 3),
       se              = FALSE,
       parallel        = FALSE,
-      tol             = 0.5
+      tol             = 0.5,
+      seed            = 42
     )
   ))
   nt_smalltol <- suppressWarnings(suppressMessages(
@@ -243,7 +252,8 @@ test_that("SEL2: 1% selection rule in CFE nevertreated", {
       r               = c(0, 3),
       se              = FALSE,
       parallel        = FALSE,
-      tol             = 1e-3
+      tol             = 1e-3,
+      seed            = 42
     )
   ))
   expect_equal(nt_bigtol$r.cv, nt_smalltol$r.cv)
