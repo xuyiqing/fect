@@ -280,15 +280,18 @@ fect_boot <- function(
     Nco <- length(co)
   }
 
-  ## Internal: when `loading.bound != "none"`, normalize
-  ## `method = "ife"` + `time.component.from = "nevertreated"` to
-  ## `method = "gsynth"` so the bootstrap loop routes to fect_nevertreated
-  ## (which threads loading.bound) instead of fect_fe (which would silently
-  ## drop it). The default `loading.bound = "none"` path is left untouched
-  ## to preserve byte-identical RNG sequencing with pre-feature behavior.
-  if (!identical(loading.bound, "none") &&
-      identical(method, "ife") &&
-      identical(time.component.from, "nevertreated")) {
+  ## Internal: normalize `method = "ife"` + `time.component.from =
+  ## "nevertreated"` to `method = "gsynth"`, so the point fit and the
+  ## replicates run fect_nevertreated() (the never-treated estimator, which
+  ## also threads loading.bound) instead of fect_fe() (the not-yet-treated
+  ## estimator). This is what the se = FALSE path and fect_cv() already do.
+  ## Before 2.4.6 this happened only with a loading bound, so se = TRUE,
+  ## CV = FALSE fits of this model silently used the not-yet-treated
+  ## estimator. Binary (probit) models keep fect_fe(): fect_nevertreated()
+  ## has no probit estimator.
+  if (identical(method, "ife") &&
+      identical(time.component.from, "nevertreated") &&
+      (!identical(loading.bound, "none") || binary == 0)) {
       method <- "gsynth"
   }
 

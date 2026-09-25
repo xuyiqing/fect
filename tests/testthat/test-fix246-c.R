@@ -121,3 +121,32 @@ test_that("B8d: parametric loo refits use the fit's para.error", {
   expect_length(used, 9L)
   expect_true(all(used == "para.error = \"wild\""))
 })
+
+
+## -- B8e  ife + never-treated with se = TRUE, CV = FALSE -------------------
+
+test_that("B8e: ife + nevertreated gives the same point estimate with and without SEs", {
+  skip_on_cran()
+  data(simgsynth, package = "fect")
+  fit <- function(...) .fix246c_quiet(fect::fect(
+    Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"),
+    force = "two-way", r = 2, CV = FALSE, parallel = FALSE, ...
+  ))
+  a <- fit(method = "ife", time.component.from = "nevertreated", se = FALSE)
+  g <- fit(method = "gsynth", se = FALSE)
+  expect_equal(a$att.avg, g$att.avg, tolerance = 1e-12)
+  ## Before 2.4.6 the se = TRUE fits ran the not-yet-treated ife estimator
+  ## (att.avg 5.57884 instead of 5.54329).
+  for (vt in c("bootstrap", "parametric", "jackknife")) {
+    b <- fit(method = "ife", time.component.from = "nevertreated", se = TRUE,
+             vartype = vt, nboots = 10, seed = 1)
+    expect_equal(b$att.avg, a$att.avg, tolerance = 1e-12, info = vt)
+    expect_equal(b$eff, a$eff, tolerance = 1e-10, info = vt)
+    expect_identical(b$method, "gsynth", info = vt)
+  }
+  ## and the bootstrap is the gsynth bootstrap (same draws, same SE)
+  b <- fit(method = "ife", time.component.from = "nevertreated", se = TRUE,
+           nboots = 10, seed = 1)
+  bg <- fit(method = "gsynth", se = TRUE, nboots = 10, seed = 1)
+  expect_equal(b$est.avg, bg$est.avg, tolerance = 1e-12)
+})
