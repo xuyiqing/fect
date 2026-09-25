@@ -11,7 +11,8 @@ Each bullet names the fits whose numbers change.
   own units (`fit$colnames.boot`). Its SEs and CIs for `"att"` with
   `by = "overall"`, `"aptt"`, `"log.att"` and the placebo and carryover series
   were wrong (3-6 times too small on `turnout`) unless the treated units were
-  the first columns and adopted at one time (fect #141; gsynth #37, #60).
+  the first columns and adopted at one time (fect #141, #150; gsynth #37,
+  #60).
 * `imputed_outcomes(replicates = TRUE)` now returns each replicate's own
   treated cells: a unit drawn twice appears twice, so the row count varies by
   replicate, and the mean of `eff` within a replicate is its `att.avg.boot`
@@ -23,6 +24,15 @@ Each bullet names the fits whose numbers change.
 * `att.cumu()`, and so `estimand(fit, "att.cumu", "overall")`, now gives
   parametric fits a normal CI and p-value (estimate +/- z * SE); it took the
   quantiles of the parametric draws, which are centred near 0.
+* The cumulative ATT (`att.cumu()`, `effect(cumu = TRUE)`,
+  `estimand("att.cumu")`) is now the running sum of the per-period ATTs, as
+  documented. It was k times the average effect over all treated cells in
+  event times 1 to k, which differs when the number of treated units changes
+  over event time (on `turnout`, `method = "gsynth"`, `r = 0`: 21.50 instead
+  of 8.26 at k = 10). The `weighted` argument of `att.cumu()`, which had no
+  effect, now chooses: `FALSE` (the new default) gives the running sum and
+  `TRUE` the old number. For bootstrap fits, `att.cumu()` and `effect()` now
+  report the same S.E. (gsynth #75).
 * Parametric SEs with `normalize = TRUE` are no longer multiplied by sd(Y)
   (on `turnout`, 35.80 instead of 2.56; gsynth #14).
 * The bootstrap now resamples groups of one unit correctly: with one treated
@@ -53,6 +63,12 @@ Each bullet names the fits whose numbers change.
   now fits the never-treated model, as `se = FALSE` does, and reports
   `method = "gsynth"`; with `CV = FALSE` it fitted the not-yet-treated model
   (ATT 5.579 instead of 5.543 on `simgsynth`, `r = 2`).
+* `method = "cfe"` with `time.component.from = "nevertreated"` now computes
+  its bootstrap and jackknife SEs, and those of its `loo = TRUE` placebos,
+  with the never-treated model, as it does the point estimate. They came
+  from the not-yet-treated model, so SEs, CIs and p-values were off, mostly
+  in the pre-treatment periods (on `simgsynth`, `r = 2`, jackknife: S.E. 0.46
+  instead of 0.63 at event time -7).
 * With `parallel = FALSE`, `se = TRUE` (or `permute = TRUE`) and `CV = TRUE`,
   `seed` now gives the same cross-validation folds, and so the same `r`, as
   `se = FALSE`; it used the folds of `seed + 1`.
@@ -97,7 +113,7 @@ says what to do.
 ## Bug fixes
 
 * Weights (`W`, `W.est`, `W.agg`) now work with `vartype = "parametric"`
-  (fect #73; gsynth #101).
+  (fect #73, #150; gsynth #101).
 * The cluster bootstrap now handles clusters of unequal size: `keep.sims =
   TRUE` no longer stops (the replicate arrays are padded with `NA`; see
   `fit$colnames.boot`), and no replicate is skipped in the counterfactual
@@ -120,8 +136,17 @@ says what to do.
   columns correctly.
 * `effect()` now works for one unit (`id`) and for fits with one treated unit
   (gsynth #45, #53).
+* `method = "cfe"` with `time.component.from = "nevertreated"` now runs with
+  a single treated unit; it stopped with "'x' must be an array of at least
+  two dimensions" (gsynth #45).
+* `att.cumu()` now works on fits without standard errors; it stopped with
+  "non-numeric argument to mathematical function".
 * A `cells` formula in `estimand()` and `imputed_outcomes()` can now use
   variables of the function where it was written.
+* `imputed_outcomes()` now reports the aggregation weights of fits made with
+  `W` or `W.agg`, one row per treated cell; it listed every treated cell
+  twice, with a `W.agg` column that was mostly `NA`. The fit stores these
+  weights in `fit$W.agg`.
 * `plot(type = "counterfactual")` now works without SEs, and
   `plot(type = "factors")` with a Date or character time index
   (gsynth #69, #84, #89).
@@ -132,6 +157,12 @@ says what to do.
   only when the first unit is among them.
 * `interFE()` now names the fixed effect that absorbs a covariate (the unit and
   time labels were swapped).
+* `fect_mspe()` keeps working on fits made with `Y`, `D` and `X` given as
+  column names: its refits pass the covariates only in the formula, so the
+  new stop for `X` given together with a formula does not affect them.
+* `dloo = TRUE` works only with the default
+  `time.component.from = "notyettreated"`; with `"nevertreated"`, `fect()`
+  stops at once, with a message that names `time.component.from`.
 
 ## Documentation
 
