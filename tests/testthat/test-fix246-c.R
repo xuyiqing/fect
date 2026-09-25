@@ -74,6 +74,31 @@ test_that("B8b: loo pre-trend refits use the simplex bound of the fit", {
       placeboTest = TRUE, placebo.period = kk, se = FALSE, parallel = FALSE
     ))
     expect_equal(unname(f.s$pre.est.att[as.character(kk), "ATT"]),
-                 pl$att[which(pl$time == kk)], tolerance = 1e-10, info = kk)
+                 pl$att[which(pl$time == kk)], tolerance = 1e-10, info = paste("kk =", kk))
+  }
+})
+
+
+## -- B8c  loo refits keep time.component.from ------------------------------
+
+test_that("B8c: loo refits of a never-treated cfe fit use the never-treated estimator", {
+  skip_on_cran()
+  d <- .fix246c_panel()
+  f <- .fix246c_quiet(fect::fect(
+    Y ~ D + X1, data = d, index = c("id", "time"), method = "cfe",
+    time.component.from = "nevertreated", r = 2, CV = FALSE, loo = TRUE,
+    nboots = 5, parallel = FALSE, seed = 1
+  ))
+  ## Each loo estimate equals the same model refit with that period held
+  ## out. Before 2.4.6 the refits ran the not-yet-treated cfe estimator
+  ## (differences up to 0.69 on this panel).
+  for (kk in c(0, -1, -5)) {
+    pl <- .fix246c_quiet(fect::fect(
+      Y ~ D + X1, data = d, index = c("id", "time"), method = "cfe",
+      time.component.from = "nevertreated", r = 2, CV = FALSE,
+      placeboTest = TRUE, placebo.period = kk, se = FALSE, parallel = FALSE
+    ))
+    expect_equal(unname(f$pre.est.att[as.character(kk), "ATT"]),
+                 pl$att[which(pl$time == kk)], tolerance = 1e-10, info = paste("kk =", kk))
   }
 })

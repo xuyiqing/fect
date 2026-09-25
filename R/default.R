@@ -3240,7 +3240,11 @@ fect.default <- function(
                     ## passed, so every refit ran with unbounded loadings.
                     loading.bound      = loading.bound,
                     gamma.loading      = if (!is.null(out$gamma.loading)) out$gamma.loading else gamma.loading,
-                    gamma.loading.grid = gamma.loading.grid
+                    gamma.loading.grid = gamma.loading.grid,
+                    ## Without it fect_boot() assumed "notyettreated", so the
+                    ## refits of a never-treated cfe fit ran the not-yet-
+                    ## treated cfe estimator (before 2.4.6).
+                    time.component.from = time.component.from
                 )
 
                 p.est.att <- p.out$est.att
