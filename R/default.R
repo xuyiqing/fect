@@ -191,6 +191,151 @@ fect <- function(
     d
 }
 
+## Tolerances of .fect_check_covariates()
+.FECT_COV_NOVAR_TOL <- 1e-12  # centred norm / max(1, norm): no variation
+.FECT_COV_ABSORB_TOL <- 1e-8  # norm after removing the FE / centred norm
+.FECT_COV_QR_TOL <- 1e-7      # qr() tolerance, as in lm()
+.FECT_COV_DEMEAN_TOL <- 1e-10 # fixest::demean() convergence
+
+## Remove fixed effects `fe` (a list of equal-length group codes) from the
+## columns of `Xm`; with no fixed effect, remove the column means (the
+## model's grand mean).
+.fect_cov_demean <- function(Xm, fe) {
+    if (length(fe) == 0L) {
+        return(sweep(Xm, 2L, colMeans(Xm)))
+    }
+    Xd <- fixest::demean(Xm, f = as.data.frame(fe), tol = .FECT_COV_DEMEAN_TOL,
+                         iter = 10000L, nthreads = 1L, notes = FALSE)
+    matrix(as.numeric(Xd), nrow = nrow(Xm))
+}
+
+## Covariates that cannot be estimated on the cells used to fit the model.
+## X: TT x N x p covariate array; M: TT x N logical mask of the estimation
+## cells; force: 0-3 as in fect.default(); extra.fe: TT x N x k array of
+## additional fixed effects (cfe) or NULL. Checks, in this order: no
+## variation on M; absorbed by the fixed effects (named when one fixed
+## effect alone absorbs it); a linear combination of the covariates before
+## it after removing the fixed effects (lm()'s rule: the earlier column of a
+## collinear set is kept). Returns list(drop = <covariate positions>,
+## message = <warning text or NULL>).
+.fect_check_covariates <- function(X, M, force, Xname, extra.fe = NULL) {
+    none <- list(drop = integer(0), message = NULL)
+    p <- dim(X)[3]
+    cells <- which(M)
+    if (is.null(p) || p == 0L || length(cells) < 2L) {
+        return(none)
+    }
+    Xm <- matrix(NA_real_, length(cells), p)
+    for (j in seq_len(p)) {
+        Xm[, j] <- X[, , j][cells]
+    }
+    nrm <- function(v) sqrt(sum(v^2))
+    reason <- rep(NA_character_, p)
+    finite <- apply(Xm, 2L, function(v) all(is.finite(v)))
+    c0 <- rep(NA_real_, p)
+    c0[finite] <- apply(Xm[, finite, drop = FALSE], 2L, function(v) nrm(v - mean(v)))
+    raw <- apply(Xm, 2L, nrm)
+
+    ## (1) no variation on the estimation cells
+    novar <- finite & c0 <= .FECT_COV_NOVAR_TOL * pmax(1, raw)
+    reason[novar] <- "has no variation on the cells used to estimate the covariate coefficients"
+
+    rest <- which(finite & !novar)
+    if (length(rest) > 0L) {
+        unit <- col(M)[cells]
+        time <- row(M)[cells]
+        fe <- list()
+        if (force %in% c(1, 3)) fe$unit <- unit
+        if (force %in% c(2, 3)) fe$time <- time
+        if (!is.null(extra.fe) && length(dim(extra.fe)) == 3L) {
+            for (k in seq_len(dim(extra.fe)[3])) {
+                fe[[paste0("extra", k)]] <- extra.fe[, , k][cells]
+            }
+        }
+        Xd <- .fect_cov_demean(Xm[, rest, drop = FALSE], fe)
+
+        ## (2) absorbed by the fixed effects
+        absorbed <- rep(FALSE, length(rest))
+        if (length(fe) > 0L) {
+            absorbed <- apply(Xd, 2L, nrm) <= .FECT_COV_ABSORB_TOL * c0[rest]
+        }
+        for (jj in which(absorbed)) {
+            j <- rest[jj]
+            zeroed_by <- function(g) {
+                !is.null(g) && nrm(.fect_cov_demean(Xm[, j, drop = FALSE], list(g))) <=
+                    .FECT_COV_ABSORB_TOL * c0[j]
+            }
+            reason[j] <- if (zeroed_by(fe$unit)) {
+                "does not vary over time within units, so it is absorbed by the unit fixed effects"
+            } else if (zeroed_by(fe$time)) {
+                "does not vary across units within periods, so it is absorbed by the time fixed effects"
+            } else if (length(fe) == 2L && !is.null(fe$unit) && !is.null(fe$time)) {
+                "is the sum of a unit-level and a period-level variable, so it is absorbed by the unit and time fixed effects"
+            } else {
+                "is absorbed by the fixed effects"
+            }
+        }
+
+        ## (3) linear combinations of the other covariates
+        cand <- which(!absorbed)
+        if (length(cand) > 1L) {
+            q <- qr(Xd[, cand, drop = FALSE], tol = .FECT_COV_QR_TOL)
+            if (q$rank < length(cand)) {
+                alias <- rest[cand[q$pivot[-seq_len(q$rank)]]]
+                reason[alias] <- "is a linear combination of other covariates (after removing the fixed effects)"
+            }
+        }
+    }
+
+    drop <- which(!is.na(reason))
+    if (length(drop) == 0L) {
+        return(none)
+    }
+    k <- length(drop)
+    list(
+        drop = drop,
+        message = paste0(
+            "Dropped ", k, if (k == 1L) " covariate" else " covariates",
+            " that cannot be estimated on the cells used to fit the model: ",
+            paste0("\"", Xname[drop], "\" ", reason[drop], collapse = "; "),
+            ". ", if (k == 1L) "Its coefficient is" else "Their coefficients are",
+            " reported as NA."
+        )
+    )
+}
+
+## Covariates dropped before the fit (see .fect_check_covariates()) get NA
+## rows, so beta, est.beta, beta.boot (and, for binary models, marginal and
+## est.marginal) keep one row per requested covariate, in the requested
+## order. `keep` holds the positions of the covariates that were fitted.
+.fect_restore_dropped_covariates <- function(out, keep, p.all, se, binary) {
+    expand <- function(m, width) {
+        if (length(keep) > 0L && !is.null(m) && NROW(m) == length(keep)) {
+            m <- as.matrix(m)
+            full <- matrix(NA_real_, p.all, ncol(m),
+                           dimnames = list(NULL, colnames(m)))
+            full[keep, ] <- m
+            return(full)
+        }
+        matrix(NA_real_, p.all, width)
+    }
+    out$beta <- expand(out$beta, 1L)
+    if (length(keep) == 0L) {
+        out$validX <- 0
+    }
+    if (isTRUE(binary == TRUE)) {
+        out$marginal <- expand(out$marginal, 1L)
+    }
+    if (isTRUE(se == TRUE)) {
+        out$est.beta <- expand(out$est.beta, 5L)
+        out$beta.boot <- expand(out$beta.boot, NCOL(out$att.avg.boot))
+        if (isTRUE(binary == TRUE)) {
+            out$est.marginal <- expand(out$est.marginal, 5L)
+        }
+    }
+    out
+}
+
 ## formula method
 
 fect.formula <- function(
@@ -1812,7 +1957,10 @@ fect.default <- function(
     }
 
     ## message("\nOK1\n")
-    ## check variation in x
+    ## check missing values in x. (Covariates absorbed by the fixed effects
+    ## no longer stop here, with swapped "unit-invariant"/"time-invariant"
+    ## labels as before 2.4.6: they are dropped with a warning once the
+    ## estimation cells are known; see .fect_check_covariates().)
     if (p > 0) {
         for (i in 1:p) {
             if (sum(is.na(data[, Xname[i]])) > 0 & na.rm == TRUE) {
@@ -1822,38 +1970,6 @@ fect.default <- function(
                     "\".",
                     sep = ""
                 ))
-            }
-            if (force %in% c(1, 3)) {
-                if (
-                    sum(
-                        tapply(data[, Xname[i]], data[, id], var),
-                        na.rm = TRUE
-                    ) ==
-                        0
-                ) {
-                    stop(paste(
-                        "Variable \"",
-                        Xname[i],
-                        "\" is unit-invariant. Try to remove it.",
-                        sep = ""
-                    ))
-                }
-            }
-            if (force %in% c(2, 3)) {
-                if (
-                    sum(
-                        tapply(data[, Xname[i]], data[, time], var),
-                        na.rm = TRUE
-                    ) ==
-                        0
-                ) {
-                    stop(paste(
-                        "Variable \"",
-                        Xname[i],
-                        "\" is time-invariant. Try to remove it.",
-                        sep = ""
-                    ))
-                }
             }
         }
     }
@@ -2677,6 +2793,39 @@ fect.default <- function(
         dloo.maxpre <- suppressWarnings(max(dloo.first - 1L, na.rm = TRUE))
         if (!is.finite(dloo.maxpre) || dloo.maxpre < 2) {
             stop("\"dloo\" requires at least one cohort with >= 2 pre-treatment periods; none found.")
+        }
+    }
+
+    ## 7b. Covariates that cannot be estimated on the cells used to fit the
+    ## model: no variation there, absorbed by the fixed effects, or a linear
+    ## combination of other covariates (after removing the fixed effects).
+    ## They are dropped with a warning (keeping the first of a collinear set,
+    ## as lm() does), and their coefficients are reported as NA. Everything
+    ## below (the fit, loo refits, bootstrap, permutation, dloo) uses the
+    ## reduced X, so the estimates equal those of the fit without them.
+    ## Before 2.4.6 exactly collinear covariates changed the estimates
+    ## without a warning or crashed in C++, and FE-absorbed covariates
+    ## stopped with swapped labels.
+    Xname.all <- Xname
+    p.all <- p
+    X.keep <- seq_len(p)
+    if (p > 0) {
+        M.est <- II == 1
+        if (time.component.from == "nevertreated") {
+            ## the never-treated estimators fit the covariates on the
+            ## never-treated units only
+            M.est[, colSums(D == 1, na.rm = TRUE) > 0] <- FALSE
+        }
+        X.check <- .fect_check_covariates(
+            X, M.est, force, Xname,
+            extra.fe = if (method == "cfe" && dim(X.extra.FE)[3] > 0) X.extra.FE else NULL
+        )
+        if (length(X.check$drop) > 0) {
+            warning(X.check$message, call. = FALSE)
+            X.keep <- setdiff(seq_len(p), X.check$drop)
+            X <- X[, , X.keep, drop = FALSE]
+            Xname <- Xname[X.keep]
+            p <- length(X.keep)
         }
     }
 
@@ -3597,8 +3746,16 @@ fect.default <- function(
 
     # if cross-validation:
 
-    if (p > 0) {
-        Xname.tmp <- Xname
+    ## covariates dropped before the fit (step 7b) get NA rows, so the beta
+    ## outputs keep one row per requested covariate
+    if (p < p.all) {
+        out <- .fect_restore_dropped_covariates(out, keep = X.keep,
+                                                p.all = p.all, se = se,
+                                                binary = binary)
+    }
+
+    if (p.all > 0) {
+        Xname.tmp <- Xname.all
         rownames(out$beta) <- Xname.tmp
         colnames(out$beta) <- c("Coef")
         if (binary == TRUE) {
@@ -3691,7 +3848,7 @@ fect.default <- function(
             I.dat = I,
             Y = Yname,
             D = Dname,
-            X = Xname,
+            X = Xname.all, # requested covariates (dropped ones have NA beta)
             W = Wname,
             W.est.col = if (use.W.in.fit) Wname else NULL,
             W.agg.col = if (use.W.in.agg) Wname else NULL,

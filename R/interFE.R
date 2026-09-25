@@ -194,11 +194,18 @@ interFE.default <- function(formula = NULL, data, # a data frame
                 stop(paste("Missing values in variable \"", Xname[i], "\".", sep = ""))
             }
 
-            if (sum(tapply(data[, Xname[i]], data[, id], var), na.rm = TRUE) == 0) {
-                stop(paste("Variable \"", Xname[i], "\" is unit-invariant. Try to remove it.", sep = ""))
+            ## A covariate absorbed by a fixed effect of the model cannot be
+            ## estimated. Before 2.4.6 the two labels were swapped and both
+            ## checks ran whatever `force` was.
+            if (force %in% c(1, 3) &&
+                sum(tapply(data[, Xname[i]], data[, id], var), na.rm = TRUE) == 0) {
+                stop(paste("Variable \"", Xname[i], "\" does not vary over time within units (it is absorbed by the unit fixed effects). Remove it.", sep = ""),
+                     call. = FALSE)
             }
-            if (sum(tapply(data[, Xname[i]], data[, time], var), na.rm = TRUE) == 0) {
-                stop(paste("Variable \"", Xname[i], "\" is time-invariant. Try to remove it.", sep = ""))
+            if (force %in% c(2, 3) &&
+                sum(tapply(data[, Xname[i]], data[, time], var), na.rm = TRUE) == 0) {
+                stop(paste("Variable \"", Xname[i], "\" does not vary across units within periods (it is absorbed by the time fixed effects). Remove it.", sep = ""),
+                     call. = FALSE)
             }
         }
     }

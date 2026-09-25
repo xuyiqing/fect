@@ -375,3 +375,219 @@ test_that("C4: a character time index must hold numbers", {
   expect_identical(g5$att.avg, base$att.avg)
   expect_s3_class(g5$rawtime, "Date")
 })
+
+
+## -- C5 + C6  collinear and FE-absorbed covariates --------------------------
+
+## simgsynth plus covariates that cannot be estimated: X3 = 2 X1 and
+## X4 = X1 + X2 (collinear), U (unit-level), Tm (period-level), UT = U + Tm,
+## Z0 (zero for every never-treated unit).
+.fix246c_cov_data <- function() {
+  data(simgsynth, package = "fect")
+  d <- simgsynth
+  d$X3 <- 2 * d$X1
+  d$X4 <- d$X1 + d$X2
+  ids <- sort(unique(d$id))
+  set.seed(11)
+  d$U <- stats::rnorm(length(ids))[match(d$id, ids)]
+  d$Tm <- stats::rnorm(max(d$time))[d$time]
+  d$UT <- d$U + d$Tm
+  tr <- unique(d$id[d$D == 1])
+  d$Z0 <- ifelse(d$id %in% tr, stats::rnorm(nrow(d)), 0)
+  d
+}
+
+test_that("C5: an exactly collinear covariate is dropped with a warning; estimates equal those without it", {
+  skip_on_cran()
+  d <- .fix246c_cov_data()
+  for (m in c("gsynth", "ife")) {
+    fit <- function(f) fect::fect(f, data = d, index = c("id", "time"),
+                                  method = m, r = 2, CV = FALSE, se = FALSE,
+                                  parallel = FALSE)
+    base <- .fix246c_quiet(fit(Y ~ D + X1 + X2))
+    ## before 2.4.6: gsynth att.avg 6.5098 instead of 5.5433 with no warning;
+    ## ife stopped with "inv(): matrix is singular"
+    for (f in list(Y ~ D + X1 + X2 + X3, Y ~ D + X1 + X2 + X4)) {
+      w <- .fix246c_warnings(fit(f))
+      xn <- all.vars(f)[5]
+      expect_length(w$warnings, 1L)
+      expect_match(w$warnings, paste0(
+        "Dropped 1 covariate that cannot be estimated on the cells used to fit ",
+        "the model: \"", xn, "\" is a linear combination of other covariates ",
+        "\\(after removing the fixed effects\\)\\. Its coefficient is reported as NA\\."))
+      g <- w$value
+      expect_identical(g$att.avg, base$att.avg, info = paste(m, xn))
+      expect_identical(g$eff, base$eff, info = paste(m, xn))
+      expect_identical(rownames(g$beta), c("X1", "X2", xn))
+      expect_identical(unname(g$beta[1:2, 1]), unname(base$beta[, 1]))
+      expect_true(is.na(g$beta[3, 1]))
+      expect_identical(g$X, c("X1", "X2", xn))
+      expect_equal(g$validX, 1)
+    }
+  }
+  ## lm()'s rule: the earlier column of a collinear set is kept
+  w <- .fix246c_warnings(fect::fect(Y ~ D + X3 + X1 + X2, data = d,
+                                    index = c("id", "time"), method = "fe",
+                                    se = FALSE, parallel = FALSE))
+  expect_match(w$warnings, "\"X1\" is a linear combination", all = FALSE)
+  expect_true(is.na(w$value$beta["X1", 1]))
+  expect_false(is.na(w$value$beta["X3", 1]))
+})
+
+test_that("C5: a covariate with no variation on the estimation cells is dropped (never-treated fit)", {
+  skip_on_cran()
+  d <- .fix246c_cov_data()
+  fit <- function(f) fect::fect(f, data = d, index = c("id", "time"),
+                                method = "gsynth", r = 2, CV = FALSE,
+                                se = FALSE, parallel = FALSE)
+  base <- .fix246c_quiet(fit(Y ~ D + X1 + X2))
+  ## Z0 is 0 for every never-treated unit, which is where gsynth fits the
+  ## covariates. Before 2.4.6 it was dropped silently.
+  w <- .fix246c_warnings(fit(Y ~ D + X1 + X2 + Z0))
+  expect_match(w$warnings, paste0("\"Z0\" has no variation on the cells used to ",
+                                  "estimate the covariate coefficients"))
+  expect_identical(w$value$att.avg, base$att.avg)
+  expect_true(is.na(w$value$beta["Z0", 1]))
+})
+
+test_that("C5: bootstrap outputs keep one row per requested covariate", {
+  skip_on_cran()
+  d <- .fix246c_cov_data()
+  fit <- function(f) fect::fect(f, data = d, index = c("id", "time"),
+                                method = "gsynth", r = 2, CV = FALSE,
+                                se = TRUE, nboots = 10, seed = 1,
+                                parallel = FALSE)
+  base <- .fix246c_quiet(fit(Y ~ D + X1 + X2))
+  g <- .fix246c_quiet(fit(Y ~ D + X1 + X3 + X2))
+  expect_identical(g$est.avg, base$est.avg)
+  expect_identical(rownames(g$est.beta), c("X1", "X3", "X2"))
+  expect_identical(colnames(g$est.beta), colnames(base$est.beta))
+  expect_identical(unname(g$est.beta[c(1, 3), ]), unname(base$est.beta))
+  expect_true(all(is.na(g$est.beta["X3", ])))
+  expect_identical(dim(g$beta.boot), c(3L, ncol(base$beta.boot)))
+  expect_identical(unname(g$beta.boot[c(1, 3), ]), unname(base$beta.boot))
+  expect_true(all(is.na(g$beta.boot[2, ])))
+})
+
+test_that("C5: the C++ inverse of X'X falls back to the pseudo-inverse when singular", {
+  set.seed(3)
+  x <- array(stats::rnorm(24), dim = c(4, 3, 2))
+  xx <- matrix(c(sum(x[, , 1]^2), sum(x[, , 1] * x[, , 2]),
+                 sum(x[, , 1] * x[, , 2]), sum(x[, , 2]^2)), 2, 2)
+  ## well-conditioned: the ordinary inverse, as before
+  expect_equal(fect:::XXinv(x), solve(xx), tolerance = 1e-10)
+  expect_equal(fect:::wXXinv(x, matrix(1, 4, 3)), solve(xx), tolerance = 1e-10)
+  ## singular: before 2.4.6 "inv(): matrix is singular"
+  x[, , 2] <- 2 * x[, , 1]
+  xs <- matrix(c(1, 2, 2, 4) * sum(x[, , 1]^2), 2, 2)
+  expect_equal(fect:::XXinv(x), MASS::ginv(xs), tolerance = 1e-10)
+  expect_equal(fect:::wXXinv(x, matrix(1, 4, 3)), MASS::ginv(xs), tolerance = 1e-10)
+})
+
+test_that("C6: covariates absorbed by the fixed effects are dropped with a warning naming the fixed effect", {
+  skip_on_cran()
+  d <- .fix246c_cov_data()
+  fit <- function(f, m = "gsynth") fect::fect(
+    f, data = d, index = c("id", "time"), method = m, r = 2, CV = FALSE,
+    se = FALSE, parallel = FALSE, force = "two-way"
+  )
+  base <- .fix246c_quiet(fit(Y ~ D + X1 + X2))
+  ## before 2.4.6: stop with swapped labels (U was called "unit-invariant")
+  reasons <- c(
+    U = "does not vary over time within units, so it is absorbed by the unit fixed effects",
+    Tm = "does not vary across units within periods, so it is absorbed by the time fixed effects",
+    UT = "is the sum of a unit-level and a period-level variable, so it is absorbed by the unit and time fixed effects"
+  )
+  for (v in names(reasons)) {
+    w <- .fix246c_warnings(fit(stats::reformulate(c("D", "X1", "X2", v), "Y")))
+    expect_match(w$warnings, paste0("\"", v, "\" ", reasons[[v]]), fixed = TRUE)
+    expect_identical(w$value$att.avg, base$att.avg, info = v)
+    expect_identical(w$value$eff, base$eff, info = v)
+    expect_true(is.na(w$value$beta[v, 1]))
+  }
+})
+
+test_that("C6: when every covariate is dropped the fit has no covariates", {
+  skip_on_cran()
+  d <- .fix246c_cov_data()
+  fit <- function(f) fect::fect(f, data = d, index = c("id", "time"),
+                                method = "fe", se = FALSE, parallel = FALSE)
+  base <- .fix246c_quiet(fit(Y ~ D))
+  w <- .fix246c_warnings(fit(Y ~ D + U + Tm))
+  ## one warning (no extra "Multi-colinearity" warning)
+  expect_length(w$warnings, 1L)
+  expect_match(w$warnings, "^Dropped 2 covariates .*Their coefficients are reported as NA\\.$")
+  expect_identical(w$value$att.avg, base$att.avg)
+  expect_identical(w$value$eff, base$eff)
+  expect_identical(dim(w$value$beta), c(2L, 1L))
+  expect_identical(rownames(w$value$beta), c("U", "Tm"))
+  expect_true(all(is.na(w$value$beta)))
+  expect_equal(w$value$validX, 0)
+})
+
+test_that("C6: a covariate absorbed by an extra cfe fixed effect is dropped", {
+  skip_on_cran()
+  d <- .fix246c_cov_data()
+  d$region <- d$id %% 3
+  d$rt <- d$region * 100 + d$time
+  set.seed(5)
+  d$RT <- stats::rnorm(1000)[d$rt] # constant within region x period
+  fit <- function(f) fect::fect(f, data = d, index = c("id", "time", "rt"),
+                                method = "cfe", r = 0, se = FALSE,
+                                parallel = FALSE)
+  base <- .fix246c_quiet(fit(Y ~ D + X1))
+  w <- .fix246c_warnings(fit(Y ~ D + X1 + RT))
+  expect_match(w$warnings, "\"RT\" is absorbed by the fixed effects", fixed = TRUE)
+  expect_identical(w$value$att.avg, base$att.avg)
+})
+
+test_that("C6: covariates are checked only against the fixed effects in the model", {
+  skip_on_cran()
+  d <- .fix246c_cov_data()
+  ## with unit effects only, a period-level covariate is estimable
+  w <- .fix246c_warnings(fect::fect(Y ~ D + X1 + Tm, data = d,
+                                    index = c("id", "time"), method = "fe",
+                                    force = "unit", se = FALSE,
+                                    parallel = FALSE))
+  expect_length(w$warnings, 0L)
+  expect_true(all(is.finite(w$value$beta)))
+})
+
+test_that("C6: interFE() names the fixed effect that absorbs a covariate", {
+  d <- .fix246c_cov_data()
+  ## before 2.4.6 the labels were swapped ("unit-invariant" for U)
+  expect_error(fect::interFE(Y ~ X1 + U, data = d, index = c("id", "time")),
+               "Variable \"U\" does not vary over time within units \\(it is absorbed by the unit fixed effects\\)")
+  expect_error(fect::interFE(Y ~ X1 + Tm, data = d, index = c("id", "time")),
+               "Variable \"Tm\" does not vary across units within periods \\(it is absorbed by the time fixed effects\\)")
+  ## a covariate is checked only against the fixed effects in the model
+  f <- fect::interFE(Y ~ X1 + Tm, data = d, index = c("id", "time"), force = "unit")
+  expect_true(all(is.finite(f$beta)))
+})
+
+test_that("C5/C6: dropped covariates get NA rows in every beta output", {
+  ## the restore helper on a hand-built fit (a binary model with SEs)
+  out <- list(beta = matrix(c(1, 2), 2, 1), marginal = matrix(c(0.1, 0.2), 2, 1),
+              est.beta = matrix(1:10, 2, 5, dimnames = list(NULL, letters[1:5])),
+              est.marginal = matrix(11:20, 2, 5), beta.boot = matrix(1:6, 2, 3),
+              att.avg.boot = matrix(0, 1, 3), validX = 1)
+  r <- fect:::.fect_restore_dropped_covariates(out, keep = c(1L, 3L), p.all = 3L,
+                                               se = TRUE, binary = TRUE)
+  expect_identical(r$beta[, 1], c(1, NA, 2))
+  expect_identical(r$marginal[, 1], c(0.1, NA, 0.2))
+  expect_identical(r$est.beta[2, ], setNames(rep(NA_real_, 5), letters[1:5]))
+  expect_identical(unname(r$est.beta[3, 1]), 2)
+  expect_identical(dim(r$est.marginal), c(3L, 5L))
+  expect_identical(r$beta.boot[, 1], c(1, NA, 2))
+  expect_equal(r$validX, 1)
+  ## nothing kept: NA matrices of the right shape, validX 0
+  r0 <- fect:::.fect_restore_dropped_covariates(
+    list(beta = NA, att.avg.boot = matrix(0, 1, 4), validX = 0),
+    keep = integer(0), p.all = 2L, se = TRUE, binary = TRUE)
+  expect_identical(dim(r0$beta), c(2L, 1L))
+  expect_identical(dim(r0$marginal), c(2L, 1L))
+  expect_identical(dim(r0$est.beta), c(2L, 5L))
+  expect_identical(dim(r0$est.marginal), c(2L, 5L))
+  expect_identical(dim(r0$beta.boot), c(2L, 4L))
+  expect_equal(r0$validX, 0)
+})

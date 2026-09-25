@@ -304,6 +304,15 @@ arma::mat data_ub_adj (const arma::mat& I_data, const arma::mat& data) {
   return(data_adj);
 }
 
+/* Reciprocal condition number below which X'X is treated as singular:
+   the (weighted) inverses below then return the Moore-Penrose
+   pseudo-inverse instead of stopping with "inv(): matrix is singular".
+   fect() drops exactly collinear covariates before fitting; this guards
+   the cases it cannot see, e.g. a bootstrap replicate whose covariates
+   happen to be collinear. Well-conditioned matrices are inverted exactly
+   as before. */
+static const double FECT_XX_RCOND_MIN = 1e-12;
+
 /* Three dimensional matrix inverse */
 // [[Rcpp::export]]
 arma::mat XXinv (const arma::cube& X) { 
@@ -319,7 +328,11 @@ arma::mat XXinv (const arma::cube& X) {
       }
     }
   } 
-  return(inv(xx)) ;
+  double rc = arma::rcond(xx) ;
+  if (std::isfinite(rc) && rc > FECT_XX_RCOND_MIN) {
+    return(inv(xx)) ;
+  }
+  return(arma::pinv(xx)) ;
 }
 
 /* weighted inverse*/
@@ -339,7 +352,11 @@ arma::mat wXXinv (const arma::cube& X, const arma::mat& w) {
       }
     }
   }  
-  return(inv_sympd(xx)) ;
+  double rc = arma::rcond(xx) ;
+  if (std::isfinite(rc) && rc > FECT_XX_RCOND_MIN) {
+    return(inv_sympd(xx)) ;
+  }
+  return(arma::pinv(xx)) ;
 }
 
 
