@@ -254,3 +254,47 @@ test_that("B5: simplex wgt.implied is Nco x Ntr with columns on the simplex", {
   expect_equal(unname(t(fit$lambda.co) %*% W), unname(t(fit$lambda.tr)),
                tolerance = 1e-8)
 })
+
+
+## -- B6  plots with se = FALSE and with a non-numeric time index ------------
+
+.fb_builds <- function(p) {
+  inherits(p, "ggplot") &&
+    !inherits(tryCatch(ggplot2::ggplot_build(p), error = function(e) e), "error")
+}
+
+test_that("B6: counterfactual plots work for fits without SEs", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  fit <- .fb_quiet(fect::fect(Y ~ D + X1 + X2, data = simgsynth,
+                              index = c("id", "time"), method = "gsynth",
+                              force = "two-way", r = 2, CV = FALSE,
+                              se = FALSE, parallel = FALSE))
+  expect_null(fit[["vartype"]])   # se = FALSE fits store no vartype
+  ## 412d7ae: "argument is of length zero"
+  expect_true(.fb_builds(.fb_quiet(plot(fit, type = "counterfactual"))))
+  expect_true(.fb_builds(.fb_quiet(plot(fit, type = "ct", id = 101))))
+  turnout <- .fb_data("turnout")
+  fit2 <- .fb_quiet(fect::fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
+                               data = turnout, index = c("abb", "year"),
+                               method = "gsynth", force = "two-way", r = 1,
+                               CV = FALSE, se = FALSE, parallel = FALSE))
+  expect_true(.fb_builds(.fb_quiet(plot(fit2, type = "ct"))))
+  expect_true(.fb_builds(.fb_quiet(plot(fit2, type = "ct", id = "CT"))))
+})
+
+test_that("B6: the factors plot works with a Date time index", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  simgsynth$date <- as.Date("2020-01-01") + 7 * (simgsynth$time - 1)
+  fit <- .fb_quiet(fect::fect(Y ~ D + X1 + X2, data = simgsynth,
+                              index = c("id", "date"), method = "gsynth",
+                              force = "two-way", r = 2, CV = FALSE,
+                              se = FALSE, parallel = FALSE))
+  expect_s3_class(fit$rawtime, "Date")
+  ## 412d7ae: "object 'T.b' not found"
+  p <- .fb_quiet(plot(fit, type = "factors"))
+  expect_true(.fb_builds(p))
+  labs <- ggplot2::ggplot_build(p)$layout$panel_params[[1]]$x$get_labels()
+  expect_true("2020-01-01" %in% labs)
+})
