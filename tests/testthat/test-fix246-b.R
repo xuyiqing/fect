@@ -120,3 +120,50 @@ test_that("B2: panel_factor() extracts at most min(T, N) factors (C++ guard)", {
   expect_equal(dim(pf0$factor), c(5L, 0L))
   expect_equal(pf0$FE, matrix(0, 5, 4))
 })
+
+
+## -- B3  the "CV skipped" message states the real cause ----------------------
+
+test_that("B3: a single candidate r = 0 is reported as such, not as too few records", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  for (m in c("gsynth", "cfe")) {
+    args <- list(Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"),
+                 method = m, force = "two-way", CV = TRUE, r = 0,
+                 se = FALSE, parallel = FALSE, seed = 1)
+    if (m == "cfe") args$time.component.from <- "nevertreated"
+    out <- .fb_msgs(do.call(fect::fect, args))
+    expect_false(inherits(out$res, "error"), info = m)
+    expect_true(any(grepl("Only one candidate number of factors (r = 0) was given",
+                          out$msgs, fixed = TRUE)), info = m)
+    expect_false(any(grepl("records of treated units are too few", out$msgs,
+                           fixed = TRUE)), info = m)
+    ## which r is searched does not change
+    expect_equal(as.numeric(out$res$r.cv), 0, info = m)
+  }
+})
+
+test_that("B3: too few pre-treatment records keep their message; one never-treated unit gets its own", {
+  skip_on_cran()
+  simgsynth <- .fb_data("simgsynth")
+  ## two pre-treatment periods, two-way FE: no factor can be estimated
+  dT <- simgsynth[simgsynth$time >= 19, ]
+  out <- .fb_msgs(fect::fect(Y ~ D + X1 + X2, data = dT, index = c("id", "time"),
+                             method = "gsynth", force = "two-way", CV = TRUE,
+                             r = c(0, 5), min.T0 = 2, se = FALSE,
+                             parallel = FALSE, seed = 1))
+  expect_true(any(grepl("records of treated units are too few", out$msgs,
+                        fixed = TRUE)))
+  expect_false(any(grepl("Only one candidate", out$msgs, fixed = TRUE)))
+  ## one never-treated unit: no factor can be estimated (412d7ae: "Not a matrix.")
+  d1 <- simgsynth[simgsynth$id %in% c(101:105, 106), ]
+  out1 <- .fb_msgs(fect::fect(Y ~ D, data = d1, index = c("id", "time"),
+                              method = "gsynth", force = "two-way", CV = TRUE,
+                              r = c(0, 5), se = FALSE, parallel = FALSE,
+                              seed = 1))
+  expect_false(inherits(out1$res, "error"))
+  expect_true(any(grepl("with 1 never-treated unit no factor can be estimated",
+                        out1$msgs, fixed = TRUE)))
+  expect_false(any(grepl("records of treated units are too few", out1$msgs,
+                         fixed = TRUE)))
+})

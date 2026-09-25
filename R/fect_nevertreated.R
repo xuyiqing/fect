@@ -344,7 +344,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         ## fixed r). A larger r used to crash the factor step
         ## ("Mat::head_cols(): size out of bounds").
         r.max.co <- max(Nco - 1L, 0L)
-        if (r.max > r.max.co) {
+        r.max.capped <- r.max > r.max.co
+        if (r.max.capped) {
             r <- min(r, r.max.co)
             message(sprintf("With %d never-treated units at most %d factor(s) can be estimated; cross-validation searches r = %d to %d.", Nco, r.max.co, r, r.max.co))
             r.max <- r.max.co
@@ -352,7 +353,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
         if (r.max == 0) {
             r.cv <- 0
-            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
+            .fect_nt_cv_skip_message(r.end, r.max.capped, Nco)
             est.co.best <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, 0, force, cv_tol, max.iteration,
                                         fit_init = fit.init.co)
         } else {
@@ -1450,7 +1451,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         ## At most Nco - 1 factors from Nco never-treated units, as in the IFE
         ## block.
         r.max.co <- max(Nco - 1L, 0L)
-        if (r.max > r.max.co) {
+        r.max.capped <- r.max > r.max.co
+        if (r.max.capped) {
             r <- min(r, r.max.co)
             message(sprintf("With %d never-treated units at most %d factor(s) can be estimated; cross-validation searches r = %d to %d.", Nco, r.max.co, r, r.max.co))
             r.max <- r.max.co
@@ -1458,7 +1460,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
         if (r.max == 0) {
             r.cv <- 0
-            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
+            .fect_nt_cv_skip_message(r.end, r.max.capped, Nco)
             est.co.best <- complex_fe_ub(YY.co, Y0.co, X.co,
                 X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                 Zgamma.id, kappaQ.id,
@@ -3531,4 +3533,19 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
     }
     return(typeB.fit.tr)
+}
+
+## Why never-treated cross-validation of r is skipped (the search range is
+## r = 0 only), in order: a single candidate r = 0 was given; the number of
+## never-treated units allows no factor (the cap on the range above); or
+## the treated units have too few pre-treatment records.
+.fect_nt_cv_skip_message <- function(r.end, capped, Nco) {
+    if (isTRUE(r.end == 0)) {
+        message("Only one candidate number of factors (r = 0) was given, so cross-validation is skipped and r.cv = 0.")
+    } else if (isTRUE(capped)) {
+        message(sprintf("Cross-validation is skipped: with %d never-treated unit%s no factor can be estimated, so r.cv = 0.",
+                        Nco, if (Nco == 1) "" else "s"))
+    } else {
+        message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
+    }
 }
