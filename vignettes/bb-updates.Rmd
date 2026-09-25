@@ -8,23 +8,25 @@
 
 * `estimand()` now reads each bootstrap replicate through its own units. Its SEs for the overall ATT, APTT, log-ATT and the placebo and carryover series were too small unless the treated units came first in the panel and adopted at one time. `imputed_outcomes(replicates = TRUE)` now returns each replicate's own cells, so the row count varies by replicate.
 * `effect()` and `att.cumu()` (and `estimand("att.cumu")`) now use the variance type stored on the fit. Parametric fits could get intervals centred near zero.
+* The cumulative ATT of `att.cumu()`, `effect()` and `estimand("att.cumu")` is now the running sum of the per-period ATTs. It used to be count-weighted, which gives a different number when the number of treated units changes over event time; `att.cumu(weighted = TRUE)` still returns it.
 * Parametric SEs no longer depend on `normalize`; weights now work with the parametric bootstrap.
 * `criterion = "pc"` now picks the `r` with the lowest PC for `method = "gsynth"` and never-treated `"cfe"`.
 * `W.agg` alone no longer enters the model fit when `CV = TRUE`.
 * `wgt.implied` now follows @Xu2017: $\Lambda_{co}(\Lambda_{co}^\top\Lambda_{co})^{-1}\Lambda_{tr}^\top$, an $N_{co} \times N_{tr}$ matrix labeled by unit ID. The simplex weights have the same layout.
 * `loading.bound = "simplex"` is now applied with cross-validation, without SEs for `method = "gsynth"`, in the parametric bootstrap, and in the `loo` refits. The `loo` refits also keep `time.component.from` and `para.error`.
 * `method = "ife"` with `time.component.from = "nevertreated"` now fits the never-treated model with `se = TRUE`, as it did with `se = FALSE`.
+* `method = "cfe"` with `time.component.from = "nevertreated"` now takes its bootstrap and jackknife SEs, and the SEs of its `loo` placebos, from the never-treated model, as it does its point estimate. They came from the not-yet-treated model.
 * With `parallel = FALSE`, the same `seed` now gives the same cross-validation folds with and without `se`.
 * A factor time index is used in its level order, not sorted as text; if its levels are numbers out of numeric order, `fect()` warns. A character time index that holds numbers is read as numbers.
 * Exactly collinear covariates, and covariates absorbed by the fixed effects, are dropped with a warning (coefficient `NA`). Collinear covariates used to change the estimates silently.
 
 **Input checks.** Formula terms must be bare column names (`log(Y)`, `factor(g)`, `X1:X2` now stop); `X` cannot be combined with a formula; covariates must be numeric; a character time index must hold numbers; `cl` must be one column and, for the cluster bootstrap, constant within units with at least two clusters. Each stop says what to do instead.
 
-**Other fixes.** The cluster bootstrap works with clusters of unequal size and `keep.sims = TRUE`; failed bootstrap replicates are dropped and counted instead of stopping the run; cross-validation of `r` no longer crashes when `r` exceeds the number of never-treated units; counterfactual plots work without SEs; `effect()` works for one unit; clearer messages when cross-validation is skipped or no treated observation is left.
+**Other fixes.** The cluster bootstrap works with clusters of unequal size and `keep.sims = TRUE`; failed bootstrap replicates are dropped and counted instead of stopping the run; cross-validation of `r` no longer crashes when `r` exceeds the number of never-treated units; counterfactual plots work without SEs; `effect()` works for one unit; `method = "cfe"` with never-treated fitting works with one treated unit; `att.cumu()` works without SEs; `imputed_outcomes()` reports the aggregation weights of weighted fits, one row per treated cell; `fect_mspe()` keeps working on fits made with `Y`, `D` and `X` column names; `dloo` with never-treated fitting stops at once, with a message that says why; clearer messages when cross-validation is skipped or no treated observation is left.
 
 **Earlier 2.4.6 changes:**
 
-* New `dloo` and `dloo.adjust` flags on `fect()`, contributed by Anton Strezhnev: double leave-one-out pre-trend placebos, computed without re-fitting. With covariates, the covariate coefficients are re-estimated on each cohort's pre-treatment comparison sample. They require staggered adoption, a balanced pre-treatment panel, and `method = "fe"`. `dloo.adjust = TRUE` applies Ziyi Liu's correction.
+* New `dloo` and `dloo.adjust` flags on `fect()`, contributed by Anton Strezhnev: double leave-one-out pre-trend placebos, computed without re-fitting. With covariates, the covariate coefficients are re-estimated on each cohort's pre-treatment comparison sample. They require staggered adoption, a balanced pre-treatment panel, `method = "fe"`, and the default `time.component.from = "notyettreated"`. `dloo.adjust = TRUE` applies Ziyi Liu's correction.
 * `r` now defaults to `NULL`. For `method = "ife"` or `"gsynth"`, leaving out `r` now selects the number of factors by cross-validation over 0 to 5, instead of fitting zero factors.
 * Cross-validation fixes. Each can change the selected `r` or `lambda` for some existing calls:
   * Calls that name variables as strings, such as `fect(Y = "y", D = "d", ...)`, now use the same defaults as formula calls (rolling cross-validation, `nlambda = 10`). Set `cv.method = "block"` to get the old folds.

@@ -432,7 +432,7 @@ Carryover test periods are marked with **diamonds** (shape 18), while placebo te
 
 ## Cumulative Effects {#sec-cumul}
 
-This section shows how to *visualize* cumulative treatment effects. For the underlying estimand and the unified API that produces it, see [Chapter @sec-estimands]. The cumulative effect is only well-defined when there are no treatment reversals --- that is, all treated units remain treated for the duration of the study. The model must be estimated with `keep.sims = TRUE`.
+This section shows how to *visualize* cumulative treatment effects. The cumulative effect at event time $k$ is the sum of the per-period ATTs from event time 1 to $k$. For the underlying estimand and the unified API that produces it, see [Chapter @sec-estimands]. The cumulative effect is only well-defined when there are no treatment reversals --- that is, all treated units remain treated for the duration of the study. The model must be estimated with `keep.sims = TRUE`.
 
 We first apply it to `hh2019`, which has no treatment reversals.
 

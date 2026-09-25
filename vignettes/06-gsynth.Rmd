@@ -391,7 +391,7 @@ plot(out_turnout, type = "loadings")
 
 ### Cumulative Effects
 
-For staggered adoption without treatment reversals, the cumulative ATT summarizes how the total treatment dose accumulates over relative time — useful for outcomes where each additional treated period adds to a running total (e.g., cumulative voter mobilization). Because `out_turnout` was estimated with `keep.sims = TRUE` and `vartype = "parametric"`, the per-cell replicate surface needed for `estimand()` is available.
+For staggered adoption without treatment reversals, the cumulative ATT summarizes how the total treatment dose accumulates over relative time — useful for outcomes where each additional treated period adds to a running total (e.g., cumulative voter mobilization). The cumulative ATT at event time $k$ is the running sum of the per-period ATTs from event time 1 to $k$. Because `out_turnout` was estimated with `keep.sims = TRUE` and `vartype = "parametric"`, the per-cell replicate surface needed for `estimand()` is available.
 
 ```{r turnout-cumulative, fig.height=5, fig.width=7}
 cumu.turnout <- estimand(out_turnout, "att.cumu", "event.time")
