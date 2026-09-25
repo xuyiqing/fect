@@ -23,8 +23,16 @@ att.cumu(x, period = NULL, weighted = TRUE, alpha = 0.05, type = "on", plot = FA
   treated over that window). When the \code{fect} object carries uncertainty
   estimates, four further columns give the bootstrap standard error
   (\code{S.E.}), the confidence interval at level \code{alpha}
-  (\code{CI.lower}, \code{CI.upper}), and the \code{p.value}. With
-  \code{plot = TRUE} the cumulative effects are also plotted.
+  (\code{CI.lower}, \code{CI.upper}), and the \code{p.value}. The
+  interval and p-value depend on the fit's variance type
+  (\code{x$vartype}). For bootstrap fits they come from the quantiles of
+  the replicate estimates and from the share of replicates on each side
+  of zero. For parametric fits they are \code{catt} plus or minus the
+  normal critical value times \code{S.E.} and the two-sided normal
+  p-value, because parametric replicates are simulated under no treatment
+  effect and centred near zero. The first row repeats the one-period
+  estimate from \code{x$est.att}. With \code{plot = TRUE} the cumulative
+  effects are also plotted.
 }
 \author{
   Licheng Liu, Ye Wang, and Yiqing Xu

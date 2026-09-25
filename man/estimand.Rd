@@ -34,8 +34,11 @@ estimand(
     cumulative ATT through each event time (replaces \code{\link{effect}});
     \code{"aptt"} returns the average proportional treatment effect on
     the treated (Chen and Roth 2024 QJE); \code{"log.att"} returns the
-    mean log-scale treatment effect. \code{"aptt"} and \code{"log.att"}
-    require \code{keep.sims = TRUE} at fit time for SE/CI.}
+    mean log-scale treatment effect. SEs and CIs need the replicate
+    draws saved with \code{keep.sims = TRUE} at fit time, except for
+    \code{"att"} with \code{by = "event.time"} and default arguments and
+    \code{"att.cumu"} with \code{by = "overall"}, which use the
+    pre-aggregated draws that every \code{se = TRUE} fit keeps.}
 
   \item{by}{Grouping axis. One of \code{"event.time"} (default),
     \code{"cohort"}, \code{"calendar.time"}, \code{"overall"}, or any
@@ -87,15 +90,20 @@ estimand(
     \code{"normal"} (Wald: \eqn{\hat\theta \pm z \cdot SE}). Default
     is \code{NULL}, which triggers a per-type default:
     \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
-    already uses internally), \code{"att.cumu"} -> \code{"percentile"}
-    (matches what \code{att.cumu()} does internally),
+    already uses internally),
     \code{"aptt"} -> \code{"bca"} and \code{"log.att"} ->
     \code{"bca"} (ratio / log estimators benefit from joint
     bias and acceleration corrections when the bootstrap distribution
     is skewed; \code{"bc"} can degenerate at the boundary when the
     point estimate falls outside the bootstrap support). Pass an
     explicit value to override. \code{"bca"} requires bootstrap- or
-    wild-bootstrap-sourced replicates.}
+    wild-bootstrap-sourced replicates. For \code{"att.cumu"} the
+    interval comes from \code{\link{att.cumu}} (\code{by = "overall"})
+    or \code{\link{effect}} (\code{by = "event.time"}), whatever
+    \code{ci.method} is: bootstrap percentiles for bootstrap fits, and
+    for parametric fits the estimate plus or minus a critical value
+    (normal for \code{"overall"}, t for \code{"event.time"}) times
+    the SE.}
 }
 
 \value{
@@ -110,6 +118,12 @@ estimand(
   \code{ATT}, \code{S.E.}, \code{CI.lower}, \code{CI.upper} of
   \code{fit$est.att}, when default arguments are used. This invariant
   is asserted by package tests.
+
+  \code{estimand(fit, "att", "overall")$se} equals the SE in
+  \code{fit$est.avg} for unweighted bootstrap and parametric fits,
+  whatever the
+  order of the treated units in the panel: every replicate is read
+  through its own units (\code{fit$colnames.boot}).
 }
 
 \seealso{

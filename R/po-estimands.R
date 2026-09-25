@@ -309,14 +309,22 @@
 #'   \code{~ event.time \%in\% 1:5 & !id \%in\% bad_ids}).
 #' @param replicates Logical. \code{FALSE} (default) returns one row per
 #'   treated cell with the point-estimate \code{Y0_hat}. \code{TRUE}
-#'   expands by bootstrap/jackknife replicate; requires the fit to have
-#'   been built with \code{keep.sims = TRUE}.
+#'   returns the selected treated cells of every bootstrap or parametric
+#'   replicate, with a \code{replicate} column; requires the fit to have
+#'   been built with \code{keep.sims = TRUE}, and is not available for
+#'   jackknife fits. Replicate \eqn{b} is a refit on a resampled panel
+#'   whose units are \code{fit$colnames.boot[[b]]}, so its rows are the
+#'   copies of the selected cells that it contains: under the case
+#'   bootstrap a unit drawn twice appears twice and an undrawn unit not at
+#'   all, so the number of rows varies by replicate; under the parametric
+#'   bootstrap every treated cell appears once per replicate.
 #' @param direction Either \code{"on"} (default; event time relative to
 #'   treatment onset) or \code{"off"} (relative to treatment exit; only
 #'   meaningful on reversal panels).
 #'
-#' @return A data frame with one row per (treated cell) or per
-#'   (treated cell, replicate). Columns:
+#' @return A data frame with one row per treated cell, or, with
+#'   \code{replicates = TRUE}, one row per copy of a treated cell in each
+#'   replicate (rows in replicate order). Columns:
 #'   \describe{
 #'     \item{\code{id}}{unit identifier from \code{fit$id}.}
 #'     \item{\code{time}}{calendar time from \code{fit$rawtime}.}
@@ -338,17 +346,22 @@
 #'       estimators, populated for DR estimators.}
 #'     \item{\code{W.agg}}{aggregation weight at this cell; 1 if the fit
 #'       was built without \code{W} or \code{W.agg}.}
-#'     \item{\code{replicate}}{(only when \code{replicates = TRUE})
-#'       1..\code{nboots} for bootstrap, or the dropped-unit index for
-#'       jackknife.}
+#'     \item{\code{replicate}}{(only when \code{replicates = TRUE}) the
+#'       replicate number, 1 to the number of replicates kept. Within a
+#'       replicate, \code{eff} and \code{Y0_hat} are that replicate's
+#'       values, and \code{Y_obs} and \code{W.agg} those of the source cell.
+#'       Averaging \code{eff} within a replicate (unweighted fit, no
+#'       \code{cells} filter) gives that replicate's \code{att.avg.boot}
+#'       draw.}
 #'   }
 #'
 #' @section Memory cost:
-#'   With \code{replicates = TRUE} the returned data frame has
-#'   \code{n_treated_cells * nboots} rows. For typical panels this is
-#'   manageable; for large panels (\eqn{TT \times N \ge 50{,}000} and
-#'   \eqn{nboots \ge 500}) consider filtering via \code{cells} before
-#'   expansion.
+#'   With \code{replicates = TRUE} the returned data frame has about
+#'   \code{n_treated_cells * nboots} rows (exactly that many for the
+#'   parametric bootstrap; under the case bootstrap the count varies by
+#'   replicate). For typical panels this is manageable; for large panels
+#'   (\eqn{TT \times N \ge 50{,}000} and \eqn{nboots \ge 500}) consider
+#'   filtering via \code{cells} before expansion.
 #'
 #' @seealso \code{\link{estimand}} for the typed dispatcher built on top
 #'   of this accessor; \code{\link{fect}} for the fitting interface.
@@ -368,9 +381,14 @@
 #' ## Filter to first 5 event times.
 #' po5 <- imputed_outcomes(fit, cells = ~ event.time \%in\% 1:5)
 #'
-#' ## Bootstrap replicate expansion (requires keep.sims = TRUE).
+#' ## Bootstrap replicate expansion (requires keep.sims = TRUE): the rows of
+#' ## replicate b are the copies of the treated cells that replicate b drew.
 #' po_b <- imputed_outcomes(fit, replicates = TRUE)
-#' nrow(po_b) == nrow(po) * 200    # one row per (cell, replicate)
+#' head(table(po_b$replicate))    # rows per replicate vary
+#'
+#' ## Averaging eff within a replicate gives its overall ATT draw.
+#' head(tapply(po_b$eff, po_b$replicate, mean))
+#' head(c(fit$att.avg.boot))
 #' }
 #'
 #' @export
@@ -546,6 +564,10 @@ imputed_outcomes <- function(fit,
 #'       \eqn{\mathrm{logATT}_g = \mathrm{mean}_g(\log Y - \log \widehat Y(0))}.
 #'       Requires \code{keep.sims = TRUE}.}
 #'   }
+#'   SEs and CIs need the replicate draws saved with \code{keep.sims = TRUE},
+#'   except for \code{"att"} with \code{by = "event.time"} and default
+#'   arguments and \code{"att.cumu"} with \code{by = "overall"}, which use
+#'   the pre-aggregated draws that every \code{se = TRUE} fit keeps.
 #' @param by Grouping axis. One of \code{"event.time"} (default;
 #'   per-event-time series), \code{"cohort"}, \code{"calendar.time"},
 #'   \code{"overall"} (one row), or any column name resolvable in the
@@ -585,11 +607,15 @@ imputed_outcomes <- function(fit,
 #'   or \code{"normal"} (Wald: \eqn{\hat\theta \pm z \cdot SE}).
 #'   Default is \code{NULL}, which triggers a per-type default:
 #'   \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
-#'   already uses), \code{"att.cumu"} -> \code{"percentile"} (matches
-#'   what \code{att.cumu()} does internally), \code{"aptt"} ->
-#'   \code{"bc"} and \code{"log.att"} -> \code{"bc"} (ratio / log
-#'   estimators benefit from bias correction when the bootstrap
-#'   distribution is skewed). Pass an explicit value to override.
+#'   already uses), \code{"aptt"} -> \code{"bca"} and \code{"log.att"} ->
+#'   \code{"bca"} (ratio / log estimators benefit from bias correction
+#'   when the bootstrap distribution is skewed). Pass an explicit value to
+#'   override. For \code{"att.cumu"} the interval comes from
+#'   \code{\link{att.cumu}} (\code{by = "overall"}) or \code{\link{effect}}
+#'   (\code{by = "event.time"}), whatever \code{ci.method} is: bootstrap
+#'   percentiles for bootstrap fits, and for parametric fits the estimate
+#'   plus or minus a critical value (normal for \code{"overall"}, t for
+#'   \code{"event.time"}) times the SE.
 #'
 #' @return A data frame with columns \code{<by_key>}, \code{estimate},
 #'   \code{se}, \code{ci.lo}, \code{ci.hi}, \code{n_cells}, and
@@ -601,6 +627,10 @@ imputed_outcomes <- function(fit,
 #'   byte-identical to columns \code{ATT}, \code{S.E.}, \code{CI.lower},
 #'   \code{CI.upper} of \code{fit$est.att}, when default arguments are
 #'   used. This invariant is asserted by package tests.
+#'   \code{estimand(fit, "att", "overall")$se} equals the SE in
+#'   \code{fit$est.avg} for unweighted bootstrap and parametric fits,
+#'   whatever the order of the treated units in the panel: every replicate
+#'   is read through its own units (\code{fit$colnames.boot}).
 #'
 #' @seealso \code{\link{imputed_outcomes}} for the underlying long-form
 #'   accessor; \code{\link{fect}} for the fitting interface.
