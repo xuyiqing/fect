@@ -91,6 +91,14 @@ trim_closure_env <- function(fun) {
   fun
 }
 
+## Draw `size` elements of `x`. Unlike sample(x, size), a length-1 numeric
+## `x` is not read as "sample from 1:x" (one treated unit at column 15 would
+## otherwise resample columns 1..15). For length(x) > 1 this makes exactly
+## the RNG draws sample() makes, so those resamples are unchanged.
+.fect_resample <- function(x, size, replace = TRUE) {
+  x[sample.int(length(x), size, replace = replace)]
+}
+
 fect_boot <- function(
   Y,
   X,
@@ -870,6 +878,15 @@ fect_boot <- function(
     id.co <- which(sum.D == 0)
     Nco <- length(id.co)
     Ntr <- length(id.tr)
+    if (Nco < 2) {
+      stop(
+        "vartype = \"parametric\" needs at least two never-treated units ",
+        "(found ", Nco, "): each simulated error uses one control as a ",
+        "pseudo-treated unit and the others as controls. Use ",
+        "vartype = \"bootstrap\" or \"jackknife\".",
+        call. = FALSE
+      )
+    }
 
     fit.out[which(out$I == 0)] <- 0
 
@@ -879,7 +896,7 @@ fect_boot <- function(
 
     draw.error <- function() {
       repeat {
-        fake.tr <- sample(id.co, 1, replace = FALSE)
+        fake.tr <- id.co[sample.int(length(id.co), 1L)]
         if (fake.tr %in% valid.co) {
           break
         }
@@ -887,7 +904,7 @@ fect_boot <- function(
 
       id.co.rest <- id.co[which(!id.co %in% fake.tr)]
       repeat {
-        id.co.pseudo <- sample(id.co.rest, Nco, replace = TRUE)
+        id.co.pseudo <- .fect_resample(id.co.rest, Nco)
         if (sum(apply(as.matrix(out$I[, id.co.pseudo]), 1, sum) >= 1) == TT) {
           break
         }
@@ -1036,7 +1053,7 @@ fect_boot <- function(
     one.nonpara <- function(num = NULL) {
       ## boostrap ID
       repeat {
-        fake.co <- sample(id.co, Nco, replace = TRUE)
+        fake.co <- .fect_resample(id.co, Nco)
         if (sum(apply(as.matrix(II[, fake.co]), 1, sum) >= 1) == TT) {
           break
         }
@@ -1267,8 +1284,8 @@ fect_boot <- function(
           if (hasRevs == 0) {
             if (Nco > 0) {
               repeat {
-                fake.co <- sample(co, Nco, replace = TRUE)
-                fake.tr <- sample(tr, Ntr, replace = TRUE)
+                fake.co <- .fect_resample(co, Nco)
+                fake.tr <- .fect_resample(tr, Ntr)
                 boot.id <- c(fake.tr, fake.co)
                 if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                   break
@@ -1276,7 +1293,7 @@ fect_boot <- function(
               }
             } else {
               repeat {
-                boot.id <- sample(tr, Ntr, replace = TRUE)
+                boot.id <- .fect_resample(tr, Ntr)
                 if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                   break
                 }
@@ -1286,9 +1303,9 @@ fect_boot <- function(
             if (Ntr > 0) {
               if (Nco > 0) {
                 repeat {
-                  fake.co <- sample(co, Nco, replace = TRUE)
-                  fake.tr <- sample(tr, Ntr, replace = TRUE)
-                  fake.rev <- sample(rev, Nrev, replace = TRUE)
+                  fake.co <- .fect_resample(co, Nco)
+                  fake.tr <- .fect_resample(tr, Ntr)
+                  fake.rev <- .fect_resample(rev, Nrev)
                   boot.id <- c(fake.rev, fake.tr, fake.co)
                   if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
@@ -1296,8 +1313,8 @@ fect_boot <- function(
                 }
               } else {
                 repeat {
-                  fake.tr <- sample(tr, Ntr, replace = TRUE)
-                  fake.rev <- sample(rev, Nrev, replace = TRUE)
+                  fake.tr <- .fect_resample(tr, Ntr)
+                  fake.rev <- .fect_resample(rev, Nrev)
                   boot.id <- c(fake.rev, fake.tr)
                   if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
@@ -1307,8 +1324,8 @@ fect_boot <- function(
             } else {
               if (Nco > 0) {
                 repeat {
-                  fake.co <- sample(co, Nco, replace = TRUE)
-                  fake.rev <- sample(rev, Nrev, replace = TRUE)
+                  fake.co <- .fect_resample(co, Nco)
+                  fake.rev <- .fect_resample(rev, Nrev)
                   boot.id <- c(fake.rev, fake.co)
                   if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
@@ -1316,7 +1333,7 @@ fect_boot <- function(
                 }
               } else {
                 repeat {
-                  boot.id <- sample(rev, Nrev, replace = TRUE)
+                  boot.id <- .fect_resample(rev, Nrev)
                   if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
                   }
@@ -1326,7 +1343,7 @@ fect_boot <- function(
           }
         } else {
           cl.id <- c(apply(cl, 2, mean))
-          cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
+          cl.boot <- .fect_resample(cl.unique, length(cl.unique))
           cl.boot.uni <- unique(cl.boot)
           cl.boot.count <- as.numeric(table(cl.boot))
           boot.id <- c()
@@ -2164,8 +2181,10 @@ fect_boot <- function(
   ## remove failure bootstrap
   ## alternative condition? max(apply(is.na(att.boot),2,sum)) == dim(att.boot)[1]
   att.boot.original <- att.boot
+  n.fail <- 0L
   if (sum(is.na(c(att.avg.boot))) > 0) {
     boot.rm <- which(is.na(c(att.avg.boot)))
+    n.fail <- length(boot.rm)
     att.avg.boot <- t(as.matrix(att.avg.boot[, -boot.rm]))
     att.avg.unit.boot <- t(as.matrix(att.avg.unit.boot[, -boot.rm]))
     att.boot <- as.matrix(att.boot[, -boot.rm])
@@ -2254,6 +2273,23 @@ fect_boot <- function(
       D.boot <- D.boot[, , -boot.rm, drop = FALSE]
       I.boot <- I.boot[, , -boot.rm, drop = FALSE]
       colnames.boot <- colnames.boot[-boot.rm]
+    }
+  }
+  ## Say how many replicates failed (failed refits, degenerate resamples)
+  ## instead of dropping them silently.
+  if (n.fail > 0L) {
+    rep.kind <- if (vartype == "jackknife") "jackknife" else "bootstrap"
+    n.kept <- nboots - n.fail
+    if (n.kept >= 2L) {
+      message(sprintf(
+        "%d of %d %s replicates failed and were dropped; uncertainty estimates use the remaining %d.",
+        n.fail, nboots, rep.kind, n.kept
+      ))
+    } else {
+      warning(sprintf(
+        "Only %d of %d %s replicates succeeded; standard errors and confidence intervals are not available (NA).",
+        n.kept, nboots, rep.kind
+      ), call. = FALSE)
     }
   }
   if (dis) {

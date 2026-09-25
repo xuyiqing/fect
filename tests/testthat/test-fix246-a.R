@@ -286,3 +286,38 @@ test_that("A4: the example of fect #73 (weights + CV + parametric) runs", {
   ))
   expect_true(is.finite(fit$est.avg[1, "S.E."]))
 })
+
+
+## -- A5  resampling from a length-1 vector -----------------------------
+
+test_that("A5: .fect_resample() draws like sample() and treats length 1 literally", {
+  x <- c(4, 8, 15, 16)
+  set.seed(9)
+  a <- sample(x, 10, replace = TRUE)
+  set.seed(9)
+  b <- fect:::.fect_resample(x, 10)
+  expect_identical(a, b)
+  expect_identical(fect:::.fect_resample(15, 3), c(15, 15, 15))
+})
+
+test_that("A5: case bootstrap keeps every draw with one treated unit", {
+  skip_on_cran()
+  ## the only treated unit is unit 5 of 12
+  d1 <- .fix246_panel(N = 12, tr = 5, T0 = 9)
+  fit <- .fix246_fit(d1, vartype = "bootstrap")
+  expect_equal(ncol(fit$att.avg.boot), 40L)
+  expect_true(all(vapply(fit$colnames.boot, function(ids) 5L %in% ids,
+                         logical(1))))
+})
+
+test_that("A5: parametric bootstrap with one never-treated unit stops clearly", {
+  d2 <- .fix246_panel(N = 8, tr = 2:8)
+  expect_error(
+    suppressWarnings(suppressMessages(
+      fect::fect(Y ~ D, data = d2, index = c("id", "time"), method = "gsynth",
+                 r = 0, CV = FALSE, se = TRUE, vartype = "parametric",
+                 nboots = 10, parallel = FALSE)
+    )),
+    "needs at least two never-treated units \\(found 1\\)"
+  )
+})
