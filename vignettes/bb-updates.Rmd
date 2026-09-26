@@ -16,6 +16,7 @@ Version 2.4.6 was a development version on GitHub and was not released on CRAN.
 * For fits made with `W` or `W.agg`, `estimand()` and `effect()` now use those weights, as `fit$att` and `fit$att.avg` do. `estimand(fit, "att", "overall")` now equals `fit$att.avg`, with the standard error of `fit$est.avg`.
 * For jackknife fits, the standard error of `estimand(fit, "att", "overall")` now equals that of `fit$est.avg`. It came from the leave-one-out averages of the unit-level ATTs, a different quantity.
 * `fect_mspe()` now refits a gsynth fit with `gsynth()`, so it scores the fit's own model. It refitted fect's default fixed-effects model.
+* For parametric fits with `ci.method = "basic"`, the $p$-values of the effects now compare the estimate with the draws, which are simulated with no effect. They compared the draws with zero, which gave $p$-values near 1 whatever the estimate. The cohort $p$-values of parametric fits with `group` are corrected too.
 * Parametric SEs no longer depend on `normalize`; weights now work with the parametric bootstrap.
 * `criterion = "pc"` now picks the `r` with the lowest PC for `method = "gsynth"` and never-treated `"cfe"`.
 * `W.agg` alone no longer enters the model fit when `CV = TRUE`.

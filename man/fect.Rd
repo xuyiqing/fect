@@ -137,7 +137,12 @@ becomes the CIs reported in fect's \code{est.*} slots. Two values:
 \code{"basic"} (reflected pivot:
 \eqn{[2\hat\theta - q_{1-\alpha/2},\, 2\hat\theta - q_{\alpha/2}]}, the
 literature-standard "percentile" CI per Davison & Hinkley (1997, §5.2.1)
-and what \code{boot::boot.ci(type = "basic")} returns). For
+and what \code{boot::boot.ci(type = "basic")} returns). With
+\code{"basic"}, the p-values of the effects come from the replicates: for
+bootstrap fits, twice the smaller share of the replicates on either side of
+zero; for parametric fits, whose replicates are simulated with no effect,
+twice the smaller of the shares of the centered replicates at or above the
+estimate and at or below it. For
 \code{"percentile"}, \code{"bc"}, or \code{"bca"} CIs (typically wanted
 on alternative estimands like \code{aptt} and \code{log.att}), call
 \code{\link{estimand}} after fitting.}

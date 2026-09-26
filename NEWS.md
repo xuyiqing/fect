@@ -73,6 +73,18 @@ Each bullet names the fits whose numbers change.
   (on gsynth's `simdata`, a default fit scored an MSPE of 65.25 instead of
   110.96), and it stopped on a fit made with a gsynth-only argument such as
   `inference`.
+* For parametric fits (`vartype = "parametric"`, gsynth's default) with
+  `ci.method = "basic"`, the p-values of the effects (`est.att`, `est.avg`,
+  the placebo test and the other effect slots) now compare the estimate with
+  the draws, which are simulated with no effect: each p-value is twice the
+  smaller of the shares of the centered draws at or above the estimate and
+  at or below it. They compared the draws with zero, which gave values near
+  1 whatever the estimate (on gsynth's `simdata`, `r = 2`: an ATT of 5.54
+  with S.E. 0.25 had p = 0.97 and now has 0, as with `"normal"`; the placebo
+  test's p-value is 0.10 instead of 0.90). The intervals and the coefficient
+  p-values do not change, and neither do bootstrap fits or fits with
+  `ci.method = "normal"`, except the cohort effects of parametric fits with
+  `group` (`est.group.att`), whose default p-values had the same problem.
 * Parametric SEs with `normalize = TRUE` are no longer multiplied by sd(Y)
   (on `turnout`, 35.80 instead of 2.56; gsynth #14).
 * The bootstrap now resamples groups of one unit correctly: with one treated

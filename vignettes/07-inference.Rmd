@@ -188,9 +188,9 @@ For the standard no-effect null, $H_0: \theta = 0$:
 | `"bc"` | $2 \Phi\!\left(z_0 - |\Phi^{-1}(P(B \le 0)) - z_0|\right)$, where $z_0 = \Phi^{-1}(P(B < \hat\theta))$ |
 | `"bca"` | BCa formula using $z_0$ and acceleration $a$ |
 
-The legacy `fit$est.avg` $p$-value, stored in the `p.value` column of `fit$est.att`, uses the `"normal"` formula by default. When `quantile.CI = TRUE`, it uses the `"percentile"` formula. The current `estimand()` API does not yet return a `p.value` column. Users who need a non-`"normal"` $p$-value can compute it from `fit$eff.boot` using the formulas above. A `p.value` column is planned for a future release.
+The legacy `fit$est.avg` $p$-value, stored in the `p.value` column of `fit$est.att`, uses the `"normal"` formula by default. With `ci.method = "basic"` (the legacy `quantile.CI = TRUE`), it uses the `"percentile"` formula for bootstrap fits, and for parametric fits the formula below. The current `estimand()` API does not yet return a `p.value` column. Users who need a non-`"normal"` $p$-value can compute it from `fit$eff.boot` using the formulas above. A `p.value` column is planned for a future release.
 
-For `vartype = "parametric"`, `get.pvalue()` computes the two-sided $p$-value from the $H_0$-centered bootstrap distribution, not from the shifted distribution used for CIs. This is correct because the $p$-value tests $H_0: \mathrm{ATT} = 0$, and the $H_0$ simulation answers that test directly. For this reason, the location-shift fix in `estimand()` does not apply to `get.pvalue()`.
+For `vartype = "parametric"`, the draws are simulated with no effect, so they are centered at zero. With `ci.method = "basic"` the $p$-value is twice the smaller share of the centered draws $B - \bar B$ ($\bar B$ is the mean of the draws) at or beyond the estimate, $2 \min(P(B - \bar B \ge \hat\theta),\ P(B - \bar B \le \hat\theta))$. This is the `"basic"` row of the table applied to the shifted draws $B - \bar B + \hat\theta$ that the interval uses, so it is below $\alpha$ when the basic interval excludes zero, up to the resolution of the draws. Before v2.4.7 the zero-centered draws were compared with zero, as if they were centered at the estimate, which gave $p$-values near 1 whatever the estimate.
 
 ## How many bootstrap replicates?
 

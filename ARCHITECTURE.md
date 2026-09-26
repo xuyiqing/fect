@@ -11,11 +11,11 @@
 > and notes marked "follow-up" describe them; blue nodes include them.
 >
 > Updated on 2026-09-26 for the final batch on PR #151 (run `2026-09-25-pr151-final-batch`), which
-> adds eight fixes: J1 (jackknife SE of the cumulative ATT), J2 (jackknife SE of `estimand()`'s
+> adds nine fixes: J1 (jackknife SE of the cumulative ATT), J2 (jackknife SE of `estimand()`'s
 > overall ATT), W1 (aggregation weights in `estimand()` and `effect()`), S1 (normal intervals in
-> `effect()`), S2 and S4 (`fect_mspe()` refits), S3 (`est.cm`) and S5 (`interFE()`), and sets the
-> version to 2.4.7 (2.4.6 was a development version on GitHub, never on CRAN). Rows, nodes and notes
-> marked "final" describe them.
+> `effect()`), S2 and S4 (`fect_mspe()` refits), S3 (`est.cm`), S5 (`interFE()`) and P1 (p-values of
+> parametric fits with `ci.method = "basic"`), and sets the version to 2.4.7 (2.4.6 was a development
+> version on GitHub, never on CRAN). Rows, nodes and notes marked "final" describe them.
 
 ## Overview
 
@@ -153,7 +153,7 @@ graph TD
 | `R/dloo.R` (711) | Estimation | Double leave-one-out pre-trend overlay (closed form, no refits) | internal | no |
 | `R/cv.R` (2,067) | CV | `fect_cv()`: selection of `r` / `lambda`; delegates never-treated CV to `fect_nevertreated()` | internal | yes: B1 (`"pc"` table), B4 (`W.in.fit` forwarded), B8 (`loading.bound` arguments) |
 | `R/cv-rolling.R` (403), `R/cv-rule-helpers.R` (127), `R/cv-helpers.R` (554), `R/cv_binary.R` (441) | CV | Rolling CV, 1se / min / 1pct rules, fold helpers, binary CV | `r.cv.rolling()` | no |
-| `R/boot.R` (4,986) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing); follow-up: B10-cfe (cfe + never-treated replicates) |
+| `R/boot.R` (5,022) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing); follow-up: B10-cfe (cfe + never-treated replicates); final: P1 (`.pvalue.basic()`: effect p-values of parametric fits with `ci.method = "basic"`) |
 | `R/impute_Y0.R` (246) | Inference | Y(0) imputer used by the parametric bootstrap | internal | yes: A4 (`W.in.fit`), B8 (`loading.bound` arguments) |
 | `R/valid_controls.R` (34), `R/permutation.R` (264) | Inference | Control screening for the parametric bootstrap; permutation test | internal | no |
 | `R/diagtest.R` (233), `R/fittest.R` (636), `R/fect_sens.R` (232), `R/fect_iden.R` (224) | Diagnostics | Pre-trend / placebo / carryover / equivalence tests; sensitivity; identification | `fect_sens()`, `fect_iden()` | no |
@@ -424,7 +424,8 @@ graph TD
 | `fect_nevertreated()` | `R/fect_nevertreated.R` | `fect.default()`, `fect_cv()`, `fect_boot()`, `impute_Y0()` | `panel_factor()`, `.fect_nt_*()` helpers, simplex projection | yes (A7, B1-B5; follow-up B12) | Never-treated IFE / CFE fits and CV; `r.cv <- r.pc` under `"pc"`; CV range capped at `Nco - 1`; `W.cvfit`; `stop()` instead of 3-field early returns; the CFE helper `.estimate_alpha()` keeps a one-column matrix (`drop = FALSE`), so one treated unit works |
 | `.fect_nt_r_max()`, `.fect_nt_cap_message()`, `.fect_nt_no_cv_message()` | `R/fect_nevertreated.R` | `fect_nevertreated()` | — | new (B2, B3) | Cap and messages for the searched range of `r` |
 | `.fect_nt_implied_weights()` | `R/fect_nevertreated.R` | `fect_nevertreated()` | `MASS::ginv()` | new (B5) | `ginv(t(Lco)) %*% t(Ltr)` (Nco x Ntr), NULL on failure |
-| `fect_boot()` | `R/boot.R` | `fect.default()` (se = TRUE, loo refits) | `fect_cv()`, `one.nonpara()`, `draw.error()`, collector | yes (A3-A7, B8, B8e; follow-up B10-cfe) | Replicates, collector, `boot.rm`, SEs / CIs |
+| `fect_boot()` | `R/boot.R` | `fect.default()` (se = TRUE, loo refits) | `fect_cv()`, `one.nonpara()`, `draw.error()`, collector, `.pvalue.basic()` | yes (A3-A7, B8, B8e; follow-up B10-cfe; final P1) | Replicates, collector, `boot.rm`, SEs / CIs; p-values of the effects under `ci.method = "basic"` through `.pvalue.basic()` (final P1) |
+| `.pvalue.basic()` | `R/boot.R` (inside `fect_boot()`) | the `ci.method = "basic"` branches of the effect slots (22 sites, among them `est.group.att`, whose branches are swapped) | `get.pvalue()` | new (final P1) | Bootstrap draws (centered at the estimate): `get.pvalue(draws)`, as before. Parametric draws (simulated with no effect): `get.pvalue(draws - mean(draws) - estimate)`, twice the smaller of the shares of the centered draws at or above and at or below the estimate, the test inversion of the shifted basic interval. Coefficient p-values do not use it |
 | `one.nonpara()` (binary parametric, parametric, nonparametric) | `R/boot.R` (closures) | serial loop, parallel `foreach` | `.fect_resample()`, `impute_Y0()`, estimators, `.fect_boot_result_ok()` | yes (A3, A4, A5, A7, B8; follow-up B10-cfe) | One replicate; parametric: `Y.boot / norm.para[1]` before refit (A3), `W[, id.boot]` (A4); nonparametric: cfe + never-treated replicates refit `fect_nevertreated(method = "cfe")`, like the point fit (B10-cfe) |
 | `.fect_resample()` | `R/boot.R` | replicate functions, `draw.error()` | `sample.int()` | new (A5) | `x[sample.int(length(x), size, replace)]`: same draws as `sample()` for length > 1, literal for length 1 |
 | `.fect_boot_result_ok()` | `R/boot.R` | replicate functions | — | new (A7) | Rejects replicate results of the wrong shape (counted as failed) |
@@ -528,7 +529,7 @@ graph TD
 | drop periods | `fect.default()` step 2 | Periods with no control are dropped; if no treated cell is left, stop (B7) |
 | rank check | `fect.default()` step 7b | `.fect_check_covariates()` on the estimation cells; dropped covariates leave `X` before every later fit (C5, C6) |
 | select r / lambda | `fect_cv()` / `fect_nevertreated()` | `"pc"` rule, CV cap, `W.agg` kept out, bounds honoured (B1-B4, B8); serial seed as `se = FALSE` (B9) |
-| replicates | `fect_boot()` | Routing (B8e), replicate checks (A7), resampling (A5), parametric scale and weights (A3, A4), collector with padding (A6), count message; cfe + never-treated replicates use the never-treated model (follow-up B10-cfe) |
+| replicates | `fect_boot()` | Routing (B8e), replicate checks (A7), resampling (A5), parametric scale and weights (A3, A4), collector with padding (A6), count message; cfe + never-treated replicates use the never-treated model (follow-up B10-cfe); p-values of the effects of parametric fits under `ci.method = "basic"` (final P1) |
 | loo refits | `fect.default()` loo block | Refits keep `loading.bound`, `time.component.from`, `para.error` (B8b-d); their replicates follow the routing above (follow-up B10-cfe) |
 | assemble | `fect.default()` output | NA rows for dropped covariates, `wgt.implied` dimnames, `remove.id`, `vartype`, labelled `rawtime` / `data.long`; the `W.agg` matrix when `W` or `W.agg` weights the aggregation (follow-up B13); `est.cm` for `cm = TRUE` fits without SEs or after cross-validation (final S3; `cm` with never-treated controls stops in the argument checks) |
 | post-hoc | `po-estimands.R`, `effect.R`, `cumu.R`, `plot.R`, `fect_mspe.R` | Replicates read through `colnames.boot` (A1, A6); stored `vartype` (A2); NULL-safe plots (B6); cumulative ATT as a running sum (follow-up B11); weights of weighted fits in `estimand()` and `effect()` (final W1); jackknife SEs and normal intervals (final J1, J2, S1); `fect_mspe()` refits with the fit's own function, evaluating its call where it is called (final S2, S4) |
@@ -751,12 +752,15 @@ more with `r.cv` and `boot = 0`. No replicate fits this model. `cm = TRUE` with
   gives the same numbers) and is left as is: a relative rule would change the numbers of every such
   covariate fit. `fe_ad_covar_iter()` stops on the relative change of the fit and does not have
   this problem.
-- `boot.R` (4,986 lines), `plot.R` (5,312) and `default.R` (4,168) remain the largest files; the
+- `boot.R` (5,022 lines), `plot.R` (5,312) and `default.R` (4,168) remain the largest files; the
   shared collector loop removed one of `boot.R`'s duplicated blocks.
 - Found in the final batch and not changed: `fit$att.avg.unit` is NaN on panels with missing cells
   (fe and gsynth; cause not traced; `estimand()` no longer reads it); with `normalize = TRUE`,
   `est.cm` stays on the normalized scale; the first row of `att.cumu()` for a bootstrap fit is
-  `fit$est.att`'s (normal interval by default) while `effect()`'s is a quantile interval.
+  `fit$est.att`'s (normal interval by default) while `effect()`'s is a quantile interval; the two
+  `ci.method` branches of `est.group.att` (cohort effects with `group`) are swapped since v1.0.5
+  (`"normal"` prints the basic interval), so P1 changes its default p-values for parametric fits;
+  swapping the branches back would change every fit with `group` and SEs (a follow-up).
 - Vignettes are a Quarto book under `vignettes/` (build-ignored in the package tarball); chapters
   01-11 plus cheatsheet, changelog (`bb-updates.Rmd`) and references.
 - Ten bundled datasets (`simdata`, `simgsynth`, `sim_base`, `sim_gsynth`, `sim_linear`, `sim_region`,
