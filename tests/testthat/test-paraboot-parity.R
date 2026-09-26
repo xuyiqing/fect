@@ -82,7 +82,7 @@ test_that("PAR-2: ife+nevertreated+parametric parity (byte-identical; must equal
     tol = 1e-3, max.iteration = 1000
   )))
 
-  ## Since 2.4.6 (B8e) ife + nevertreated with se = TRUE runs the
+  ## Since 2.4.7 (B8e) ife + nevertreated with se = TRUE runs the
   ## never-treated estimator, as se = FALSE always did, i.e. the gsynth
   ## estimator, so the fit must equal the gsynth baseline byte for byte.
   ## (baseline$ife_nev_para recorded the old se = TRUE fit, whose point
@@ -131,7 +131,7 @@ test_that("PAR-4: bootstrap vartype parity — ife+nevertreated", {
     tol = 1e-3, max.iteration = 1000
   )))
 
-  ## Since 2.4.6 (B8e): the gsynth baseline, as in PAR-2 (the old
+  ## Since 2.4.7 (B8e): the gsynth baseline, as in PAR-2 (the old
   ## baseline$ife_nev_boot came from the not-yet-treated ife model).
   expect_true(identical(out$att.avg, baseline$gsynth_boot$att.avg))
   expect_true(identical(out$att,     baseline$gsynth_boot$att))

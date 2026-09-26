@@ -49,7 +49,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     W.in.fit = TRUE,             ## whether W enters the outcome-model fit
                     loading.bound = "none",      ## bounded treated loadings (gsynth and
                     gamma.loading = NULL,        ## ife + nevertreated delegations only;
-                    gamma.loading.grid = NULL    ## before 2.4.6 CV dropped them)
+                    gamma.loading.grid = NULL    ## before 2.4.7 CV dropped them)
                     ) {
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     ## -------------------------------##
@@ -463,7 +463,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             gmoment.best <- moment.best <- MAD.best <- GMSPE.best <- WGMSPE.best <- NULL
 
             ## criterion = "pc" scores no folds, so its table has no MSPE-family
-            ## columns. (Before 2.4.6 this tested "PC", which never matched, and
+            ## columns. (Before 2.4.7 this tested "PC", which never matched, and
             ## the "pc" row values landed under the wrong column names.)
             if (criterion == "pc") {
                 CV.out.ife <- matrix(NA, (r.max - r.old + 1), 6)

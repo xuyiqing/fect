@@ -40,7 +40,7 @@ interFE.formula <- function(formula = NULL, data, # a data frame
                             QR = FALSE,
                             normalize = FALSE) {
     ## covariates come from the formula (an `X` given with a formula was
-    ## silently ignored before 2.4.6)
+    ## silently ignored before 2.4.7)
     X.given <- !missing(X) &&
         !is.null(tryCatch(X, error = function(e) "<unevaluable>"))
     if (X.given) {
@@ -195,7 +195,7 @@ interFE.default <- function(formula = NULL, data, # a data frame
             }
 
             ## A covariate absorbed by a fixed effect of the model cannot be
-            ## estimated. Before 2.4.6 the two labels were swapped and both
+            ## estimated. Before 2.4.7 the two labels were swapped and both
             ## checks ran whatever `force` was.
             if (force %in% c(1, 3) &&
                 sum(tapply(data[, Xname[i]], data[, id], var), na.rm = TRUE) == 0) {

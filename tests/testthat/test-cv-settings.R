@@ -1,5 +1,5 @@
 ## The cross-validation uses the user's CV settings in every case (fixed in
-## 2.4.6). Before the fix:
+## 2.4.7). Before the fix:
 ##   * with se = TRUE, fect_boot() did not pass cv.rule, cv.buffer, cv.donut,
 ##     min.T0 or proportion on to fect_cv(), so the CV ran on fect_cv()'s
 ##     defaults ("1se", 1, 1, 5, 0) whatever the user set;
@@ -97,7 +97,7 @@ test_that("gsynth applies cv.rule, with and without se", {
 })
 
 ## CFE with never-treated factors kept its own in-loop 1% rule whatever
-## cv.rule was (fixed in 2.4.6). On panel 2 the lowest CV MSPE is at r = 2 and
+## cv.rule was (fixed in 2.4.7). On panel 2 the lowest CV MSPE is at r = 2 and
 ## the 1-SE rule picks r = 1; before the fix every rule returned r = 2.
 test_that("cfe with never-treated factors applies cv.rule, with and without se", {
   d <- .rule_panel(2)

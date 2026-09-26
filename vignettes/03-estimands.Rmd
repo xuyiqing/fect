@@ -64,7 +64,7 @@ estimand(fit, "att.cumu", "event.time") |>
   head(8)
 ```
 
-The cumulative ATT through each event time. Each row reports the running sum of the per-period average effect, computed cell by cell. This call replaces the legacy `effect()` function and produces identical numbers. Before fect 2.4.6 the cumulative ATT was count-weighted: at event time $k$ it was $k$ times the average effect over all treated cells in event times 1 to $k$. `att.cumu(fit, weighted = TRUE)` still returns that number, which differs from the running sum when the number of treated units changes over event time.
+The cumulative ATT through each event time. Each row reports the running sum of the per-period average effect, computed cell by cell. This call replaces the legacy `effect()` function and produces identical numbers. Before fect 2.4.7 the cumulative ATT was count-weighted: at event time $k$ it was $k$ times the average effect over all treated cells in event times 1 to $k$. `att.cumu(fit, weighted = TRUE)` still returns that number, which differs from the running sum when the number of treated units changes over event time.
 
 ```{r plot-cumu-event-time, eval = TRUE, fig.width = 6, fig.height = 4.5}
 cumu <- estimand(fit, "att.cumu", "event.time")

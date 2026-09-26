@@ -1,5 +1,5 @@
 ## ---------------------------------------------------------------
-## fect 2.4.6: fixes ported onto PR #151 (5afa708) from the home-mac run
+## fect 2.4.7: fixes ported onto PR #151 (5afa708) from the home-mac run
 ## 2026-09-24-fix246-correctness: B10-cfe, B11, B12, B13 and M1. Every
 ## test_that block below fails on 5afa708 and passes after the port.
 ## Self-contained: the helpers are defined here (prefix .fix246p_).
@@ -223,7 +223,7 @@ test_that("B13: imputed_outcomes() reports the weights of a weighted fit", {
                  tolerance = 1e-10, info = role)
     if (role != "W.est") {
       expect_equal(dim(fit[["W.agg"]]), dim(fit$Y.dat), info = role)
-      ## a fit object made before 2.4.6 has no W.agg slot
+      ## a fit object made before 2.4.7 has no W.agg slot
       old <- fit
       old[["W.agg"]] <- NULL
       expect_equal(fect::imputed_outcomes(old)$W.agg, expected, info = role)

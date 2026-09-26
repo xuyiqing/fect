@@ -46,7 +46,7 @@ effect(
 
   2. Calculates relative time to treatment for each unit.
 
-  3. If \code{cumu = TRUE}, computes cumulative effects by summing average effects up to each period. Each period's average effect is the mean over the selected treated units' cells at that event time, so the cumulative effect at event time \eqn{k} is the sum of these averages from \code{period[1]} to \eqn{k}. \code{att.cumu(x, weighted = TRUE)} gives the count-weighted version that \code{fect} used before version 2.4.6; it differs when the number of treated cells changes across event times.
+  3. If \code{cumu = TRUE}, computes cumulative effects by summing average effects up to each period. Each period's average effect is the mean over the selected treated units' cells at that event time, so the cumulative effect at event time \eqn{k} is the sum of these averages from \code{period[1]} to \eqn{k}. \code{att.cumu(x, weighted = TRUE)} gives the count-weighted version that \code{fect} used before version 2.4.7; it differs when the number of treated cells changes across event times.
 
   4. Performs bootstrap analysis to estimate uncertainty (standard errors, confidence intervals, and p-values).
 

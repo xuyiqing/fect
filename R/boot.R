@@ -221,7 +221,7 @@ fect_boot <- function(
   cv.donut = 1,
   min.T0 = 5,
   cv.rule = "1se",
-  proportion = 0,          # CV settings for the fect_cv() call below; before 2.4.6
+  proportion = 0,          # CV settings for the fect_cv() call below; before 2.4.7
                            # they were not passed, so se = TRUE ran CV on defaults
   dloo = FALSE,            # apply the dloo pre-trend overlay to each replicate
   dloo.adjust = FALSE,     # dloo: use Liu's pre-treatment-average baseline
@@ -285,7 +285,7 @@ fect_boot <- function(
   ## replicates run fect_nevertreated() (the never-treated estimator, which
   ## also threads loading.bound) instead of fect_fe() (the not-yet-treated
   ## estimator). This is what the se = FALSE path and fect_cv() already do.
-  ## Before 2.4.6 this happened only with a loading bound, so se = TRUE,
+  ## Before 2.4.7 this happened only with a loading bound, so se = TRUE,
   ## CV = FALSE fits of this model silently used the not-yet-treated
   ## estimator. Binary (probit) models keep fect_fe(): fect_nevertreated()
   ## has no probit estimator.
@@ -1202,7 +1202,7 @@ fect_boot <- function(
       II.cm.boot <- out$II.cm[, id.boot, drop = FALSE]
       ## The weights follow the units of the replicate (treated units first,
       ## then the drawn controls), so att.avg.W / att.on.W exist for the
-      ## collector. Before 2.4.6 W.boot was NULL and weighted parametric
+      ## collector. Before 2.4.7 W.boot was NULL and weighted parametric
       ## fits crashed there.
       W.boot <- if (is.null(W)) NULL else W[, id.boot, drop = FALSE]
       boot.group <- NULL
@@ -1637,7 +1637,7 @@ fect_boot <- function(
           )
         } else if (method == "cfe" && identical(time.component.from, "nevertreated")) {
           ## cfe + never-treated: the same estimator as the point fit (and as
-          ## the parametric refits, impute_Y0() branch 3). Before 2.4.6 these
+          ## the parametric refits, impute_Y0() branch 3). Before 2.4.7 these
           ## replicates went to fect_cfe(), the not-yet-treated model.
           boot <- try(
             fect_nevertreated(

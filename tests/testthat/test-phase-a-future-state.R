@@ -36,7 +36,7 @@ test_that("Phase A wall-time is stable across consecutive parallel calls", {
         r         = 1,
         CV        = FALSE,
         force     = "two-way",
-        ## Not-yet-treated ife: until 2.4.6 this call also set
+        ## Not-yet-treated ife: until 2.4.7 this call also set
         ## time.component.from = "nevertreated", but with se = TRUE it
         ## silently ran this not-yet-treated model (fixed in B8e). On simdata
         ## (reversals) the never-treated model cannot be estimated (se = FALSE

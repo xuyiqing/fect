@@ -1,8 +1,10 @@
 # Changelog {.unnumbered}
 
-## v2.4.6
+## v2.4.7
 
 [Development version, not yet on CRAN.]{.text-muted}
+
+Version 2.4.6 was a development version on GitHub and was not released on CRAN.
 
 **Correctness fixes that change results** (the full list, with issue numbers, is in `NEWS.md`):
 
@@ -24,7 +26,7 @@
 
 **Other fixes.** The cluster bootstrap works with clusters of unequal size and `keep.sims = TRUE`; failed bootstrap replicates are dropped and counted instead of stopping the run; cross-validation of `r` no longer crashes when `r` exceeds the number of never-treated units; counterfactual plots work without SEs; `effect()` works for one unit; `method = "cfe"` with never-treated fitting works with one treated unit; `att.cumu()` works without SEs; `imputed_outcomes()` reports the aggregation weights of weighted fits, one row per treated cell; `fect_mspe()` keeps working on fits made with `Y`, `D` and `X` column names; `dloo` with never-treated fitting stops at once, with a message that says why; clearer messages when cross-validation is skipped or no treated observation is left.
 
-**Earlier 2.4.6 changes:**
+**Earlier changes (on GitHub as 2.4.6):**
 
 * New `dloo` and `dloo.adjust` flags on `fect()`, contributed by Anton Strezhnev: double leave-one-out pre-trend placebos, computed without re-fitting. With covariates, the covariate coefficients are re-estimated on each cohort's pre-treatment comparison sample. They require staggered adoption, a balanced pre-treatment panel, `method = "fe"`, and the default `time.component.from = "notyettreated"`. `dloo.adjust = TRUE` applies Ziyi Liu's correction.
 * `r` now defaults to `NULL`. For `method = "ife"` or `"gsynth"`, leaving out `r` now selects the number of factors by cross-validation over 0 to 5, instead of fitting zero factors.
@@ -198,7 +200,7 @@ breaking the long-form schema.
 
 **Bounded factor loadings for GSC**:
 
-* New `loading.bound = "simplex"` (default `"none"`) constrains treated-unit loadings to the convex hull of control loadings via an entropy-regularized simplex projection. Companion arguments: `gamma.loading` (regularization strength; `NULL` triggers 5-fold CV) and `gamma.loading.grid`. Diagnostic outputs: `wgt.implied` (row-stochastic simplex weights; since v2.4.6 stored as an $N_{co} \times N_{tr}$ matrix whose columns sum to one), `loading.proj.resid` (extrapolation flag per treated unit). Currently `method = "ife"`/`"gsynth"` with `time.component.from = "nevertreated"` only.
+* New `loading.bound = "simplex"` (default `"none"`) constrains treated-unit loadings to the convex hull of control loadings via an entropy-regularized simplex projection. Companion arguments: `gamma.loading` (regularization strength; `NULL` triggers 5-fold CV) and `gamma.loading.grid`. Diagnostic outputs: `wgt.implied` (row-stochastic simplex weights; since v2.4.7 stored as an $N_{co} \times N_{tr}$ matrix whose columns sum to one), `loading.proj.resid` (extrapolation flag per treated unit). Currently `method = "ife"`/`"gsynth"` with `time.component.from = "nevertreated"` only.
 * Caveat: percentile-bootstrap intervals may under-cover when the constraint binds; boundary-corrected inference is deferred.
 * Companion plot: `plot(..., type = "loading.overlap")` shows treated loadings vs the control convex hull ($r \geq 2$) or mirror histogram with control-range band ($r = 1$).
 

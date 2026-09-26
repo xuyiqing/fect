@@ -111,7 +111,7 @@ fect <- function(
 
 ## Parse a model formula whose terms must be bare column names.
 ## Returns list(Y = <outcome name>, rhs = <right-hand-side names, in order,
-## each once>). Before 2.4.6 formulas were read with all.vars(), so
+## each once>). Before 2.4.7 formulas were read with all.vars(), so
 ## `log(Y + 20) ~ D` fitted Y ~ D, `factor(g)` became one linear slope, and
 ## `X1 * X2` became X1 + X2, all without a message. Intercept specifiers
 ## (`+ 0`, `0 +`, `+ 1`, `1 +`, `- 0`, `- 1`, a leading `-1`) are accepted
@@ -418,7 +418,7 @@ fect.formula <- function(
     gamma.loading.grid = NULL,
     cv.rule = "1se"
 ) {
-    ## Covariates come from the formula. Before 2.4.6 an `X` given with a
+    ## Covariates come from the formula. Before 2.4.7 an `X` given with a
     ## formula was silently ignored. `X = NULL` (what gsynth's wrapper
     ## passes by default) is fine; an `X` that cannot be evaluated (e.g. an
     ## unquoted name) counts as given. Y and D are not evaluated: gsynth
@@ -723,7 +723,7 @@ fect.default <- function(
         ## warning("Not a data frame.")
     }
 
-    ## covariate names. Before 2.4.6 a duplicated name entered the model
+    ## covariate names. Before 2.4.7 a duplicated name entered the model
     ## twice (exactly collinear; the two coefficients were garbage).
     if (!is.null(X)) {
         X.dup <- unique(X[duplicated(X)])
@@ -899,7 +899,7 @@ fect.default <- function(
     ## numbers); otherwise as level positions 1, 2, ..., with the levels kept
     ## as labels for the output (rawtime, row names, data.long, messages), and
     ## a warning when the levels are numbers out of numeric order. A
-    ## character index must hold numbers. Before 2.4.6 both were ordered as
+    ## character index must hold numbers. Before 2.4.7 both were ordered as
     ## text ("1", "10", "11", ..., "2"). Numeric, Date and other classes are
     ## used as they are.
     time.labels <- NULL
@@ -1156,12 +1156,12 @@ fect.default <- function(
         }
     }
 
-    ## `r = NULL` (the default since 2.4.6) means "not supplied". For the factor
+    ## `r = NULL` (the default since 2.4.7) means "not supplied". For the factor
     ## methods that is a request to cross-validate the number of factors over
     ## 0:5, mirroring `method = "mc"` with lambda = NULL. With CV switched off
     ## and no r, fall back to r = 0 (the FEct model) and say so, again as MC
     ## does. For fe / cfe / binary models, no r means no factors. (Before
-    ## 2.4.6 the default was r = 0 and `method = "ife"` without r silently ran
+    ## 2.4.7 the default was r = 0 and `method = "ife"` without r silently ran
     ## the two-way FE model; the manual's own LOO example did exactly that.)
     if (is.null(r)) {
         if (method == "both") {
@@ -1783,7 +1783,7 @@ fect.default <- function(
     }
 
     ## Covariates must be numeric; logical columns are used as 0/1 (as they
-    ## were before). Before 2.4.6 a factor stopped with R's "Calling var(x)
+    ## were before). Before 2.4.7 a factor stopped with R's "Calling var(x)
     ## on a factor x is defunct" and a character column with a false
     ## "unit-invariant" message.
     for (x.name in X) {
@@ -1993,7 +1993,7 @@ fect.default <- function(
     ## message("\nOK1\n")
     ## check missing values in x. (Covariates absorbed by the fixed effects
     ## no longer stop here, with swapped "unit-invariant"/"time-invariant"
-    ## labels as before 2.4.6: they are dropped with a warning once the
+    ## labels as before 2.4.7: they are dropped with a warning once the
     ## estimation cells are known; see .fect_check_covariates().)
     if (p > 0) {
         for (i in 1:p) {
@@ -2506,7 +2506,7 @@ fect.default <- function(
         }
     }
     ## If those periods held every treated observation, nothing is left to
-    ## estimate. Before 2.4.6 fect went on and failed later with an unrelated
+    ## estimate. Before 2.4.7 fect went on and failed later with an unrelated
     ## error ("non-numeric argument to binary operator", "missing value where
     ## TRUE/FALSE needed").
     if (length(time.dropped) > 0 && sum(D == 1 & I == 1, na.rm = TRUE) == 0) {
@@ -2837,7 +2837,7 @@ fect.default <- function(
     ## as lm() does), and their coefficients are reported as NA. Everything
     ## below (the fit, loo refits, bootstrap, permutation, dloo) uses the
     ## reduced X, so the estimates equal those of the fit without them.
-    ## Before 2.4.6 exactly collinear covariates changed the estimates
+    ## Before 2.4.7 exactly collinear covariates changed the estimates
     ## without a warning or crashed in C++, and FE-absorbed covariates
     ## stopped with swapped labels.
     Xname.all <- Xname
@@ -2911,7 +2911,7 @@ fect.default <- function(
         ## set seed. With CV the folds are drawn first (fect_boot() and the
         ## se = FALSE branch both start with the CV call), so seeding with
         ## `seed` draws the same folds, and picks the same r, as se = FALSE
-        ## and the parallel bootstrap. Before 2.4.6 this was always seed + 1.
+        ## and the parallel bootstrap. Before 2.4.7 this was always seed + 1.
         ## Without CV the bootstrap draws keep their seed + 1 stream.
         if (is.null(seed) == FALSE) {
             set.seed(if (isTRUE(CV == TRUE)) seed else seed + 1)
@@ -2954,7 +2954,7 @@ fect.default <- function(
     }
 
     if (se == FALSE & permute == FALSE & CV == TRUE) {
-        ## set seed for the cross-validation folds. Before 2.4.6 nothing
+        ## set seed for the cross-validation folds. Before 2.4.7 nothing
         ## seeded this case, so the folds came from the session RNG and
         ## ignored `seed`. set.seed(seed) is also what the parallel bootstrap
         ## (the default) uses, so with default settings a run with se = TRUE
@@ -3624,17 +3624,17 @@ fect.default <- function(
                     dis = FALSE,
                     ## The refits use the main fit's loading bound (and its
                     ## gamma, CV-selected when none was given), as they use
-                    ## its r.cv and lambda.cv. Before 2.4.6 the bound was not
+                    ## its r.cv and lambda.cv. Before 2.4.7 the bound was not
                     ## passed, so every refit ran with unbounded loadings.
                     loading.bound      = loading.bound,
                     gamma.loading      = if (!is.null(out$gamma.loading)) out$gamma.loading else gamma.loading,
                     gamma.loading.grid = gamma.loading.grid,
                     ## Without it fect_boot() assumed "notyettreated", so the
                     ## refits of a never-treated cfe fit ran the not-yet-
-                    ## treated cfe estimator (before 2.4.6).
+                    ## treated cfe estimator (before 2.4.7).
                     time.component.from = time.component.from,
                     ## the user's error strategy for parametric refits
-                    ## (before 2.4.6 they always used "auto")
+                    ## (before 2.4.7 they always used "auto")
                     para.error = para.error
                 )
 
@@ -3954,7 +3954,7 @@ fect.default <- function(
         out
     )
 
-    ## whenever units were removed (before 2.4.6: only when unit 1 was)
+    ## whenever units were removed (before 2.4.7: only when unit 1 was)
     if (length(rm.id) > 0) {
         output <- c(output, list(remove.id = remove.id))
         ## message("list of removed units:",remove.id)

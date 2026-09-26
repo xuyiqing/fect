@@ -1,7 +1,10 @@
 <!-- markdownlint-disable MD025 -->
-# fect 2.4.6
+# fect 2.4.7
 
 Development version, not yet on CRAN.
+
+Version 2.4.6 was a development version on GitHub and was not released on
+CRAN.
 
 ## Changes that affect results
 

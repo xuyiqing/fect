@@ -1,5 +1,5 @@
 ## ---------------------------------------------------------------
-## fect 2.4.6 correctness fixes, group A (inference and bootstrap).
+## fect 2.4.7 correctness fixes, group A (inference and bootstrap).
 ## Run 2026-09-24-fix246-correctness; one block per item (A1-A7).
 ## Every test here fails on dev @ 412d7ae and passes after the fix.
 ## ---------------------------------------------------------------
@@ -247,7 +247,7 @@ test_that("A3: parametric SEs are the same with and without normalize = TRUE", {
   d <- .fix246_panel()
   f0 <- .fix246_fit(d, vartype = "parametric", normalize = FALSE)
   f1 <- .fix246_fit(d, vartype = "parametric", normalize = TRUE)
-  ## before 2.4.6 the normalized SEs were multiplied by sd(Y)
+  ## before 2.4.7 the normalized SEs were multiplied by sd(Y)
   expect_gt(stats::sd(d$Y), 1.5)
   expect_equal(f1$est.avg[1, "S.E."], f0$est.avg[1, "S.E."], tolerance = 1e-4)
   expect_equal(f1$est.att[, "S.E."], f0$est.att[, "S.E."], tolerance = 1e-4)

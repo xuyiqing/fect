@@ -932,7 +932,7 @@ plot.fect <- function(
 
         if (!is.numeric(time.label)) {
           ## label positions for a non-numeric time index (Date, character);
-          ## same thinning rule as the other plot types. Before 2.4.6 T.b was
+          ## same thinning rule as the other plot types. Before 2.4.7 T.b was
           ## undefined here ("object 'T.b' not found").
           T.b <- if (nT > 20) seq(1, nT, by = ceiling(nT / 20)) else seq_len(nT)
           p <- p +

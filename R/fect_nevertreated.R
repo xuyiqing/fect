@@ -199,7 +199,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     }
     ## Weights for the cross-validation fold fits and their scores: only
     ## weights that enter the model fit. Aggregation-only weights (W.agg,
-    ## W.in.fit = FALSE) enter neither. Before 2.4.6 CV weighted by any W,
+    ## W.in.fit = FALSE) enter neither. Before 2.4.7 CV weighted by any W,
     ## and fect_cv() did not pass W.in.fit, so W.agg became a fit weight.
     W.cvfit <- if (isTRUE(W.in.fit)) W else NULL
 
@@ -347,7 +347,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
         ## The factors come from the never-treated units alone, so at most
         ## Nco - 1 of them can be estimated (fect's rule for a fixed r: at
-        ## least r + 1 never-treated units). Before 2.4.6 a larger r reached
+        ## least r + 1 never-treated units). Before 2.4.7 a larger r reached
         ## panel_factor() and crashed ("Mat::head_cols(): size out of bounds")
         ## or fit an r that is not identified.
         r.max.co <- .fect_nt_r_max(Nco)
@@ -1063,7 +1063,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             ## criterion = "pc": pick the r with the lowest PC, as fect's IFE
             ## path does. The rules above only serve the MSPE-family criteria;
-            ## before 2.4.6 r.pc was tracked here but never used. The final fit
+            ## before 2.4.7 r.pc was tracked here but never used. The final fit
             ## below re-estimates the model at r.cv.
             if (identical(criterion, "pc") && !is.null(r.pc)) {
                 r.cv <- r.pc
@@ -1425,7 +1425,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     initialOut <- Y0.co <- NULL
     oci <- which(c(II.co) == 1)
     ## W.agg-only weights (W.in.fit = FALSE) leave W.use as a 1 x 1
-    ## placeholder, so they must not reach initialFit() (before 2.4.6 this
+    ## placeholder, so they must not reach initialFit() (before 2.4.7 this
     ## crashed with "subscript out of bounds").
     if (is.null(W) || !W.in.fit) {
         initialOut <- initialFit(data = data.ini, force = force, oci = oci)
@@ -1485,7 +1485,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             r.pc <- est.co.pc.best <- NULL
 
             ## Per-fold SEs parallel to CV.out, for applying `cv.rule` after the
-            ## loop, as in the IFE block above. Before 2.4.6 this block kept its
+            ## loop, as in the IFE block above. Before 2.4.7 this block kept its
             ## in-loop 1% rule whatever `cv.rule` was.
             CV.out.se <- matrix(NA_real_, nrow(CV.out), ncol(CV.out))
             colnames(CV.out.se) <- colnames(CV.out)
@@ -3402,7 +3402,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 ## treated unit i's counterfactual, F lambda_i, equals the controls' factor
 ## parts weighted by w_i = Lco (Lco'Lco)^{-1} lambda_i. So
 ## W = ginv(t(Lco)) %*% t(Ltr) is Nco x Ntr (column i = treated unit i) and
-## satisfies t(Lco) %*% W = t(Ltr). Before 2.4.6 the code used the treated
+## satisfies t(Lco) %*% W = t(Ltr). Before 2.4.7 the code used the treated
 ## units' Gram matrix, Lco (Ltr'Ltr)^{-1} Ltr', which does not rebuild the
 ## counterfactual. Returns NULL if the pseudo-inverse fails.
 .fect_nt_implied_weights <- function(lambda.co, lambda.tr) {
@@ -3414,7 +3414,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 }
 
 ## Why cross-validation is skipped when the searched range is r = 0 only.
-## Before 2.4.6 every case got the "too few pre-treatment records" message,
+## Before 2.4.7 every case got the "too few pre-treatment records" message,
 ## including r = 0 with CV = TRUE.
 .fect_nt_no_cv_message <- function(r.end, Nco, capped) {
     if (r.end == 0) {

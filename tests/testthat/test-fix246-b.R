@@ -1,5 +1,5 @@
 ## ---------------------------------------------------------------
-## fect 2.4.6 correctness fixes, group B (CV, weights in CV, implied
+## fect 2.4.7 correctness fixes, group B (CV, weights in CV, implied
 ## weights, plots, guards). Run 2026-09-24-fix246-correctness; one block
 ## (or more) per item (B1-B9). Every test here fails on dev @ 412d7ae
 ## and passes after the fix.

@@ -423,7 +423,7 @@ getEffect <- function(D,           # Treatment indicator matrix
     # Cumulative effect: the running sum of the per-period ATTs, each the
     # mean effect over the treated cells at that event time. An event time
     # with no treated cell makes the sum NA from that event time on. (Before
-    # 2.4.6: k times the mean over all treated cells of event times 1..k,
+    # 2.4.7: k times the mean over all treated cells of event times 1..k,
     # which weights the periods by their numbers of cells.)
     if (te >= ts) {
       att.t <- vapply(effT, function(t) {

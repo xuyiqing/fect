@@ -3,7 +3,7 @@
 ##---------------------------------------##
 att.cumu <- function(x, ## a fect object
                      period = NULL, ## range, length = 2
-                     weighted = FALSE, ## FALSE: running sum of the per-period ATTs; TRUE: count-weighted (pre-2.4.6)
+                     weighted = FALSE, ## FALSE: running sum of the per-period ATTs; TRUE: count-weighted (pre-2.4.7)
                      alpha = 0.05,
                      type = "on", ## switch on or switch off
                      plot = FALSE
@@ -157,7 +157,7 @@ att.cumu.sub <- function(x, ## a fect object
     }
     if (weighted) {
         ## count-weighted: L times the mean over all treated cells of the
-        ## window's L event times (fect's cumulative ATT before 2.4.6)
+        ## window's L event times (fect's cumulative ATT before 2.4.7)
         catt <- sum(att*count*(length(count)/sum(count)))
     } else {
         ## running sum of the per-period ATTs

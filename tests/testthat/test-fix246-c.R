@@ -1,5 +1,5 @@
 ## ---------------------------------------------------------------
-## fect 2.4.6 correctness fixes, group C (input handling) and the
+## fect 2.4.7 correctness fixes, group C (input handling) and the
 ## loo / routing items B8b-B8e. Run 2026-09-24-fix246-correctness; one
 ## block (or more) per item. Every item has at least one block that fails
 ## on dev @ 412d7ae and passes after the fix.
@@ -63,7 +63,7 @@ test_that("B8b: loo pre-trend refits use the simplex bound of the fit", {
   f.s <- fit_loo(loading.bound = "simplex", gamma.loading = 1)
   f.n <- fit_loo()
   expect_identical(f.s$loading.bound, "simplex")
-  ## Before 2.4.6 every refit ran unbounded, so the two sets of loo
+  ## Before 2.4.7 every refit ran unbounded, so the two sets of loo
   ## pre-trend estimates were identical.
   expect_false(isTRUE(all.equal(f.s$pre.est.att[, "ATT"], f.n$pre.est.att[, "ATT"])))
   ## Each loo estimate is the bounded model refit with that period held out.
@@ -90,7 +90,7 @@ test_that("B8c: loo refits of a never-treated cfe fit use the never-treated esti
     nboots = 5, parallel = FALSE, seed = 1
   ))
   ## Each loo estimate equals the same model refit with that period held
-  ## out. Before 2.4.6 the refits ran the not-yet-treated cfe estimator
+  ## out. Before 2.4.7 the refits ran the not-yet-treated cfe estimator
   ## (differences up to 0.69 on this panel).
   for (kk in c(0, -1, -5)) {
     pl <- .fix246c_quiet(fect::fect(
@@ -117,7 +117,7 @@ test_that("B8d: parametric loo refits use the fit's para.error", {
   used <- regmatches(res$messages,
                      regexpr("para.error = \"[a-z]+\"", res$messages))
   ## one message for the main fit and one per refit (8 pre-periods);
-  ## before 2.4.6 the refits reported "empirical" (the "auto" choice)
+  ## before 2.4.7 the refits reported "empirical" (the "auto" choice)
   expect_length(used, 9L)
   expect_true(all(used == "para.error = \"wild\""))
 })
@@ -135,7 +135,7 @@ test_that("B8e: ife + nevertreated gives the same point estimate with and withou
   a <- fit(method = "ife", time.component.from = "nevertreated", se = FALSE)
   g <- fit(method = "gsynth", se = FALSE)
   expect_equal(a$att.avg, g$att.avg, tolerance = 1e-12)
-  ## Before 2.4.6 the se = TRUE fits ran the not-yet-treated ife estimator
+  ## Before 2.4.7 the se = TRUE fits ran the not-yet-treated ife estimator
   ## (att.avg 5.57884 instead of 5.54329).
   for (vt in c("bootstrap", "parametric", "jackknife")) {
     b <- fit(method = "ife", time.component.from = "nevertreated", se = TRUE,
@@ -165,7 +165,7 @@ test_that("C1: fect() stops on formula terms that are not bare column names", {
   d <- .fix246c_simdata()
   fit <- function(f) fect::fect(f, data = d, index = c("id", "time"),
                                 method = "fe", se = FALSE, parallel = FALSE)
-  ## before 2.4.6 these ran silently: log(Y + 20) ~ D fitted Y ~ D,
+  ## before 2.4.7 these ran silently: log(Y + 20) ~ D fitted Y ~ D,
   ## factor(g3) became one linear slope, X1 * X2 became X1 + X2
   expect_error(fit(log(Y + 20) ~ D), "not a column name: `log\\(Y \\+ 20\\)`")
   expect_error(fit(Y ~ D + factor(g3)), "not a column name: `factor\\(g3\\)`")
@@ -234,7 +234,7 @@ test_that("C2: X given together with a formula stops (fect and interFE)", {
   d <- .fix246c_simdata()
   fit <- function(...) fect::fect(data = d, index = c("id", "time"),
                                   method = "fe", se = FALSE, parallel = FALSE, ...)
-  ## before 2.4.6 X was ignored and the fit had no covariates
+  ## before 2.4.7 X was ignored and the fit had no covariates
   expect_error(fit(Y ~ D, X = c("X1", "X2")),
                "Covariates were given in `X` together with a formula")
   expect_error(fit(Y ~ D + X1, X = "X2"), "not both")
@@ -252,7 +252,7 @@ test_that("C2: duplicated covariate names, or X naming Y or D, stop", {
   fit <- function(X) fect::fect(data = d, Y = "Y", D = "D", X = X,
                                 index = c("id", "time"), method = "fe",
                                 se = FALSE, parallel = FALSE)
-  ## before 2.4.6 a duplicated name entered the model twice (exactly
+  ## before 2.4.7 a duplicated name entered the model twice (exactly
   ## collinear): garbage coefficients, or "inv(): matrix is singular" as here
   expect_error(fit(c("X1", "X2", "X1")), "duplicated covariate names: \"X1\"")
   expect_error(fit(c("X1", "D")), "outcome or the treatment variable \\(\"D\"\\)")
@@ -270,7 +270,7 @@ test_that("C3: non-numeric covariates stop with a clear message", {
   d$Xd <- as.Date("2000-01-01") + seq_len(nrow(d))
   fit <- function(f) fect::fect(f, data = d, index = c("id", "time"),
                                 method = "fe", se = FALSE, parallel = FALSE)
-  ## before 2.4.6: "Calling var(x) on a factor x is defunct" (factor) and a
+  ## before 2.4.7: "Calling var(x) on a factor x is defunct" (factor) and a
   ## false "unit-invariant" stop (character)
   expect_error(fit(Y ~ D + Xf),
                "Covariate \"Xf\" is a factor; fect\\(\\) needs numeric covariates")
@@ -307,7 +307,7 @@ test_that("C4: a factor time index is used in its level order", {
   base.g <- fit(simgsynth, "gsynth")
   base.i <- fit(simgsynth, "ife")
   ## levels that are increasing numbers: the same fit as the numbers.
-  ## Before 2.4.6 the levels were sorted as text ("1", "10", "11", ...):
+  ## Before 2.4.7 the levels were sorted as text ("1", "10", "11", ...):
   ## gsynth stopped with a false "reversals" error and ife ran with 22
   ## event times instead of 30.
   d1 <- simgsynth
@@ -361,7 +361,7 @@ test_that("C4: a character time index must hold numbers", {
   d3 <- simgsynth
   d3$time <- as.character(d3$time)
   g3 <- fit(d3)
-  ## before 2.4.6: ordered as text, and gsynth stopped ("reversals")
+  ## before 2.4.7: ordered as text, and gsynth stopped ("reversals")
   expect_identical(g3$att.avg, base$att.avg)
   expect_identical(g3$eff, base$eff)
   expect_identical(g3$rawtime, base$rawtime)
@@ -441,7 +441,7 @@ test_that("C5: an exactly collinear covariate is dropped with a warning; estimat
                                   method = m, r = 2, CV = FALSE, se = FALSE,
                                   parallel = FALSE)
     base <- .fix246c_quiet(fit(Y ~ D + X1 + X2))
-    ## before 2.4.6: gsynth att.avg 6.5098 instead of 5.5433 with no warning;
+    ## before 2.4.7: gsynth att.avg 6.5098 instead of 5.5433 with no warning;
     ## ife stopped with "inv(): matrix is singular"
     for (f in list(Y ~ D + X1 + X2 + X3, Y ~ D + X1 + X2 + X4)) {
       w <- .fix246c_warnings(fit(f))
@@ -478,7 +478,7 @@ test_that("C5: a covariate with no variation on the estimation cells is dropped 
                                 se = FALSE, parallel = FALSE)
   base <- .fix246c_quiet(fit(Y ~ D + X1 + X2))
   ## Z0 is 0 for every never-treated unit, which is where gsynth fits the
-  ## covariates. Before 2.4.6 it was dropped silently.
+  ## covariates. Before 2.4.7 it was dropped silently.
   w <- .fix246c_warnings(fit(Y ~ D + X1 + X2 + Z0))
   expect_match(w$warnings, paste0("\"Z0\" has no variation on the cells used to ",
                                   "estimate the covariate coefficients"))
@@ -514,7 +514,7 @@ test_that("C5: the C++ inverse of X'X falls back to a generalized inverse when s
   ## well-conditioned: the ordinary inverse, as before
   expect_equal(fect:::XXinv(x), solve(xx), tolerance = 1e-10)
   expect_equal(fect:::wXXinv(x, w1), solve(xx), tolerance = 1e-10)
-  ## singular: before 2.4.6 "inv(): matrix is singular". The fallback is a
+  ## singular: before 2.4.7 "inv(): matrix is singular". The fallback is a
   ## symmetric generalized inverse G of X'X (X'X G X'X = X'X, G X'X G = G),
   ## also when the collinear covariates are on very different scales.
   for (k in c(2, 2e8)) {
@@ -617,7 +617,7 @@ test_that("C6: covariates absorbed by the fixed effects are dropped with a warni
     se = FALSE, parallel = FALSE, force = "two-way"
   )
   base <- .fix246c_quiet(fit(Y ~ D + X1 + X2))
-  ## before 2.4.6: stop with swapped labels (U was called "unit-invariant")
+  ## before 2.4.7: stop with swapped labels (U was called "unit-invariant")
   reasons <- c(
     U = "does not vary over time within units, so it is absorbed by the unit fixed effects",
     Tm = "does not vary across units within periods, so it is absorbed by the time fixed effects",
@@ -680,7 +680,7 @@ test_that("C6: covariates are checked only against the fixed effects in the mode
 
 test_that("C6: interFE() names the fixed effect that absorbs a covariate", {
   d <- .fix246c_cov_data()
-  ## before 2.4.6 the labels were swapped ("unit-invariant" for U)
+  ## before 2.4.7 the labels were swapped ("unit-invariant" for U)
   expect_error(fect::interFE(Y ~ X1 + U, data = d, index = c("id", "time")),
                "Variable \"U\" does not vary over time within units \\(it is absorbed by the unit fixed effects\\)")
   expect_error(fect::interFE(Y ~ X1 + Tm, data = d, index = c("id", "time")),

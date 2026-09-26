@@ -101,7 +101,7 @@ test_that("I.4: cells = formula subsets correctly", {
 
 
 ## -- I.5  replicates = TRUE returns each replicate's own cells ------
-## (2.4.6: replicate b's rows are the copies of the treated cells that the
+## (2.4.7: replicate b's rows are the copies of the treated cells that the
 ## resampled panel of replicate b contains, read through colnames.boot. Under
 ## the case bootstrap a unit drawn twice appears twice and an undrawn unit
 ## not at all, so the row count varies by replicate.)

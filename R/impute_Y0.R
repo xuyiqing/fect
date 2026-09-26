@@ -65,7 +65,7 @@ impute_Y0 <- function(
 
   ## Bounded treated loadings: forwarded to Branch 1 only (the validation in
   ## fect.default() allows loading.bound = "simplex" for gsynth and
-  ## ife + nevertreated). Before 2.4.6 the parametric replicates dropped it.
+  ## ife + nevertreated). Before 2.4.7 the parametric replicates dropped it.
   loading.bound      = "none",
   gamma.loading      = NULL,
   gamma.loading.grid = NULL
