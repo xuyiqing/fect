@@ -236,8 +236,8 @@ test_that("B13: imputed_outcomes() reports the weights of a weighted fit", {
 
 test_that("M1: fect_mspe() refits a fit made with Y/D/X column names", {
   skip_on_cran()
-  ## fect_mspe() re-evaluates the call's `data` in its own frame for a fit
-  ## made without a formula, so the data must be reachable from anywhere
+  ## the call's `data` is found where fect_mspe() is called (here
+  ## fect::simgsynth, which is visible from anywhere)
   fs <- .fix246p_quiet(fect::fect(data = fect::simgsynth, Y = "Y", D = "D",
                                   X = c("X1", "X2"), index = c("id", "time"),
                                   method = "ife", r = 2, CV = FALSE,
