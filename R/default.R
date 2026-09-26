@@ -954,6 +954,13 @@ fect.default <- function(
     if (cm == TRUE & ! method %in% c("fe", "ife")) {
         stop("\"cm\" option is only available for the \"fe\" and \"ife\" methods.")
     }
+    ## The causal-moderation model is fitted with not-yet-treated controls
+    ## only; with never-treated controls the fit had no est.cm (before 2.4.7
+    ## without a message).
+    if (isTRUE(cm) && identical(time.component.from, "nevertreated")) {
+        stop("\"cm\" option is only available with ",
+             "time.component.from = \"notyettreated\".", call. = FALSE)
+    }
 
     ## Save user's literal method argument before any silent coercion (e.g.
     ## fe -> ife r=0 below). Referenced by the parametric/nevertreated gate
@@ -3088,6 +3095,8 @@ fect.default <- function(
                     W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
+                    cm = cm,
+                    II.cm = II.cm,
                     T.on = T.on,
                     T.off = T.off,
                     r.cv = r,
@@ -3337,6 +3346,25 @@ fect.default <- function(
             dloo.group.map     = if (!is.null(group)) rawgroup else NULL
         )
 
+    }
+
+    ## cm = TRUE: the model of the treated potential outcomes, fitted on the
+    ## treated cells (II.cm), is stored in est.cm (read by fect_iden() and
+    ## plot(type = "hte", cm = TRUE)). fect_fe() fits it with the main model;
+    ## after cross-validation the main model comes from fect_cv(), which does
+    ## not, so fit it here with the selected number of factors. Before 2.4.7
+    ## cross-validated fits (and fits with se = FALSE) had no est.cm.
+    if (isTRUE(cm) && is.null(out$est.cm) && identical(method, "ife") &&
+        !identical(time.component.from, "nevertreated")) {
+        out$est.cm <- fect_fe(
+            Y = Y, D = D, X = X, W = W, W.in.fit = use.W.in.fit,
+            I = I, II = II, cm = TRUE, II.cm = II.cm,
+            T.on = T.on, T.off = T.off,
+            r.cv = if (!is.null(out$r.cv)) as.numeric(out$r.cv[1]) else r[1],
+            binary = binary, QR = QR, force = force, hasRevs = hasRevs,
+            tol = tol, max.iteration = max.iteration, boot = 0,
+            norm.para = norm.para
+        )$est.cm
     }
 
     ## loading.bound bounds the treated units' factor loadings; with no

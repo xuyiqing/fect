@@ -54,6 +54,47 @@ test_that("S2: fect_mspe() refits a wrapper's fit with the wrapper, not with fec
 })
 
 
+## -- S3  causal moderation: est.cm ------------------------------------------
+
+test_that("S3: cm = TRUE stores est.cm without SEs and with cross-validation", {
+  skip_on_cran()
+  d <- .pfy_data("simdata")
+  cmfit <- function(...) {
+    .pfy_quiet(fect::fect(Y ~ D + X1 + X2, data = d, index = c("id", "time"),
+                          force = "two-way", parallel = FALSE, cm = TRUE, ...))
+  }
+  f0 <- cmfit(method = "fe", se = FALSE)
+  f1 <- cmfit(method = "fe", se = TRUE, nboots = 5, seed = 1)
+  ## b1dded6: no est.cm without SEs
+  expect_false(is.null(f0$est.cm))
+  expect_identical(f0$est.cm, f1$est.cm)
+  i0 <- cmfit(method = "ife", r = 2, CV = FALSE, se = FALSE)
+  i1 <- cmfit(method = "ife", r = 2, CV = FALSE, se = TRUE, nboots = 5,
+              seed = 1)
+  expect_identical(i0$est.cm, i1$est.cm)
+  ## b1dded6: no est.cm after cross-validation
+  cv <- cmfit(method = "ife", r = c(0, 3), CV = TRUE, se = FALSE, seed = 1)
+  ir <- cmfit(method = "ife", r = as.numeric(cv$r.cv), CV = FALSE, se = FALSE)
+  expect_false(is.null(cv$est.cm))
+  expect_identical(cv$est.cm, ir$est.cm)
+  ## the over-identification test runs without SEs, as with them
+  t0 <- .pfy_quiet(fect::fect_iden(f0, moderator = "X1"))
+  t1 <- .pfy_quiet(fect::fect_iden(f1, moderator = "X1"))
+  expect_identical(t0$e1$stat, t1$e1$stat)
+})
+
+test_that("S3: cm = TRUE with never-treated controls stops", {
+  sg <- .pfy_data("simgsynth")
+  ## b1dded6: ran, without est.cm and without a message
+  expect_error(
+    .pfy_quiet(fect::fect(Y ~ D, data = sg, index = c("id", "time"),
+                          method = "ife", r = 1, CV = FALSE,
+                          time.component.from = "nevertreated", cm = TRUE,
+                          se = FALSE, parallel = FALSE)),
+    "time.component.from = \"notyettreated\"", fixed = TRUE)
+})
+
+
 ## -- S4  fect_mspe() evaluates the fit's call where the caller can see it -----
 
 test_that("S4: fect_mspe() finds data and variables of the caller for fits made without a formula", {
