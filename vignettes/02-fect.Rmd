@@ -376,7 +376,7 @@ plot(out.fe.g, show.group = "Cohort:22",
 
 ### User-supplied weights
 
-Passing a weight column via `W` produces a weighted ATT. When `W` is supplied, every reported quantity on the returned fit object reflects those weights: `print(fit)`, `plot(fit)`, `fit$est.att`, `fit$est.avg`, and the bootstrap surfaces all carry the same W-weighted aggregation.
+Passing a weight column via `W` produces a weighted ATT. When `W` is supplied, every reported quantity on the returned fit object reflects those weights: `print(fit)`, `plot(fit)`, `fit$est.att`, `fit$est.avg`, and the bootstrap surfaces all carry the same W-weighted aggregation. So do `estimand()` and `effect()`, which aggregate with the weights stored in `fit$W.agg`.
 
 ```{r simdata_w, eval=TRUE, cache = TRUE}
 sim_base$Weight <- abs(rnorm(n = dim(sim_base)[1]))

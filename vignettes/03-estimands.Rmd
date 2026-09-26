@@ -338,7 +338,7 @@ them to center on the point estimate before building the interval,
 which leaves their spread, and so the SE, unchanged. `"att.cumu"` takes
 its interval from `att.cumu()` (`by = "overall"`) or `effect()`
 (`by = "event.time"`), which for parametric fits use the estimate
-plus or minus a critical value times the SE.
+plus or minus the normal critical value times the SE.
 
 ## Migration
 
