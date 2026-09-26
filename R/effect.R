@@ -194,12 +194,10 @@ effect <- function(x, ## a fect object
 
     # Calculate 95% confidence intervals
     if (is_jackknife || is_parametric) {
-      # For jackknife, use t-distribution with N-1 degrees of freedom
-      N_samples <- ncol(catt.boot)
-      t_critical <- stats::qt(0.975, df = N_samples - 1)
-      CI.att <- t(apply(cbind(catt, se.att), 1, function(row) {
-        c(row[1] - t_critical * row[2], row[1] + t_critical * row[2])
-      }))
+      # Normal critical value, as for fect's other jackknife and parametric
+      # intervals (fit$est.att, fit$est.avg, att.cumu())
+      z <- stats::qnorm(0.975)
+      CI.att <- cbind(catt - z * se.att, catt + z * se.att)
     } else {
       # For bootstrap, use empirical quantiles
       CI.att <- t(apply(catt.boot, 1, function(vec) {
@@ -209,12 +207,8 @@ effect <- function(x, ## a fect object
 
     # Calculate p-values
     if (is_jackknife || is_parametric) {
-      # For jackknife, use t-distribution for p-values
-      N_samples <- ncol(catt.boot)
-      pvalue.att <- sapply(1:nrow(catt.boot), function(i) {
-        t_stat <- catt[i] / se.att[i]
-        2 * stats::pt(-abs(t_stat), df = N_samples - 1)
-      })
+      # Normal approximation, as for the intervals
+      pvalue.att <- 2 * stats::pnorm(-abs(catt / se.att))
     } else {
       # For bootstrap, use empirical distribution
       pvalue.att <- apply(catt.boot, 1, get.pvalue)
