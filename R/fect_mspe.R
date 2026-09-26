@@ -61,6 +61,39 @@ fect_mspe <- function(
              res$msg, ". Call fect_mspe() where the objects that the call ",
              "names are visible.", call. = FALSE)
     }
+    ## The function that refits the model: fect() for a fit made by fect();
+    ## for a fit made by another function that stores its own call (gsynth()
+    ## does), that function, so the refit is the fit's own model, with that
+    ## function's defaults and argument names. Before 2.4.7 such a call was
+    ## replayed into fect(): a default gsynth() fit was refitted with fect's
+    ## default method = "fe", and gsynth-only arguments (e.g. `inference`)
+    ## stopped the refit.
+    .refit_fun <- function(out_obj) {
+        fn <- out_obj$call[[1]]
+        nm <- if (is.name(fn)) {
+            as.character(fn)
+        } else if (is.call(fn) && length(fn) == 3L &&
+                   as.character(fn[[1]]) %in% c("::", ":::")) {
+            as.character(fn[[3]])
+        } else {
+            ""
+        }
+        if (nm %in% c("fect", "fect.formula", "fect.default")) {
+            return(fect)
+        }
+        f <- if (is.name(fn)) {
+            get0(as.character(fn), envir = caller_env, mode = "function")
+        } else {
+            tryCatch(eval(fn, envir = caller_env), error = function(e) NULL)
+        }
+        if (!is.function(f)) {
+            stop("fect_mspe() refits each model with the function that made ",
+                 "it", if (nzchar(nm)) paste0(", ", nm, "(),") else "",
+                 " which cannot be found here. Load its package and try ",
+                 "again.", call. = FALSE)
+        }
+        f
+    }
     .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj, caller_env) {
         envs <- .call_envs(out_obj)
         call_args <- as.list(out_obj$call)[-1]
@@ -255,7 +288,12 @@ fect_mspe <- function(
             }
 
             envs_i <- .call_envs(out_i)
-            data_i <- .eval_call_arg(out_i$call$data, envs_i, "data")
+            refit_i <- .refit_fun(out_i)
+            ## the data: the data frame a gsynth() fit stores, else the call's
+            data_i <- out_i[["data", exact = TRUE]]
+            if (!is.data.frame(data_i)) {
+                data_i <- .eval_call_arg(out_i$call$data, envs_i, "data")
+            }
             idx_i <- .eval_call_arg(out_i$call$index, envs_i, "index")
             formula_obj_i <- tryCatch(
                 .eval_call_arg(out_i$call$formula, envs_i, "formula"),
@@ -307,7 +345,7 @@ fect_mspe <- function(
                     ## already fired when the user fit the original
                     ## model; emitting them once per model x fold
                     ## (= up to N_models * k times) is noise.
-                    out_new <- suppressMessages(do.call(fect, rerun_args))
+                    out_new <- suppressMessages(do.call(refit_i, rerun_args))
 
                     ## collect residuals at estCV positions
                     ## est_pos are flat column-major indices into the
