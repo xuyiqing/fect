@@ -162,13 +162,31 @@
                 )
             }
         } else {
-            if (!identical(dim(eb)[1:2], c(TT, N))) {
+            ## TT x W x B with W >= N: a cluster bootstrap draws a varying
+            ## number of units per replicate, so the arrays are as wide as
+            ## the widest replicate and narrower ones are padded with NA;
+            ## colnames.boot[[b]] gives replicate b's real width.
+            if (dim(eb)[1] != TT || dim(eb)[2] < N) {
                 stop(
                     "Slot contract: fit$eff.boot first two dimensions (",
                     dim(eb)[1], " x ", dim(eb)[2],
                     ") must match TT x N (", TT, " x ", N, ").",
                     call. = FALSE
                 )
+            }
+            if (dim(eb)[2] > N) {
+                cbl <- fit$colnames.boot
+                if (!is.list(cbl) || length(cbl) < dim(eb)[3] ||
+                    any(lengths(cbl) > dim(eb)[2])) {
+                    stop(
+                        "Slot contract: fit$eff.boot is wider than N (",
+                        dim(eb)[2], " > ", N, "), which is only valid for ",
+                        "cluster-bootstrap replicates of varying width; ",
+                        "fit$colnames.boot must then give each replicate's ",
+                        "units.",
+                        call. = FALSE
+                    )
+                }
             }
         }
     }
@@ -291,14 +309,22 @@
 #'   \code{~ event.time \%in\% 1:5 & !id \%in\% bad_ids}).
 #' @param replicates Logical. \code{FALSE} (default) returns one row per
 #'   treated cell with the point-estimate \code{Y0_hat}. \code{TRUE}
-#'   expands by bootstrap/jackknife replicate; requires the fit to have
-#'   been built with \code{keep.sims = TRUE}.
+#'   returns the selected treated cells of every bootstrap or parametric
+#'   replicate, with a \code{replicate} column; requires the fit to have
+#'   been built with \code{keep.sims = TRUE}, and is not available for
+#'   jackknife fits. Replicate \eqn{b} is a refit on a resampled panel
+#'   whose units are \code{fit$colnames.boot[[b]]}, so its rows are the
+#'   copies of the selected cells that it contains: under the case
+#'   bootstrap a unit drawn twice appears twice and an undrawn unit not at
+#'   all, so the number of rows varies by replicate; under the parametric
+#'   bootstrap every treated cell appears once per replicate.
 #' @param direction Either \code{"on"} (default; event time relative to
 #'   treatment onset) or \code{"off"} (relative to treatment exit; only
 #'   meaningful on reversal panels).
 #'
-#' @return A data frame with one row per (treated cell) or per
-#'   (treated cell, replicate). Columns:
+#' @return A data frame with one row per treated cell, or, with
+#'   \code{replicates = TRUE}, one row per copy of a treated cell in each
+#'   replicate (rows in replicate order). Columns:
 #'   \describe{
 #'     \item{\code{id}}{unit identifier from \code{fit$id}.}
 #'     \item{\code{time}}{calendar time from \code{fit$rawtime}.}
@@ -318,19 +344,26 @@
 #'       \code{eff = (Y_obs - Y0_hat) + eff_debias}.}
 #'     \item{\code{eff_debias}}{debias correction; 0 for plain imputation
 #'       estimators, populated for DR estimators.}
-#'     \item{\code{W.agg}}{aggregation weight at this cell; 1 if the fit
-#'       was built without \code{W} or \code{W.agg}.}
-#'     \item{\code{replicate}}{(only when \code{replicates = TRUE})
-#'       1..\code{nboots} for bootstrap, or the dropped-unit index for
-#'       jackknife.}
+#'     \item{\code{W.agg}}{aggregation weight at this cell: the weight
+#'       given by \code{W} or \code{W.agg} (stored on the fit as
+#'       \code{fit$W.agg}); 1 if the fit was built without \code{W} or
+#'       \code{W.agg}, or with \code{W.est} only.}
+#'     \item{\code{replicate}}{(only when \code{replicates = TRUE}) the
+#'       replicate number, 1 to the number of replicates kept. Within a
+#'       replicate, \code{eff} and \code{Y0_hat} are that replicate's
+#'       values, and \code{Y_obs} and \code{W.agg} those of the source cell.
+#'       Averaging \code{eff} within a replicate (unweighted fit, no
+#'       \code{cells} filter) gives that replicate's \code{att.avg.boot}
+#'       draw.}
 #'   }
 #'
 #' @section Memory cost:
-#'   With \code{replicates = TRUE} the returned data frame has
-#'   \code{n_treated_cells * nboots} rows. For typical panels this is
-#'   manageable; for large panels (\eqn{TT \times N \ge 50{,}000} and
-#'   \eqn{nboots \ge 500}) consider filtering via \code{cells} before
-#'   expansion.
+#'   With \code{replicates = TRUE} the returned data frame has about
+#'   \code{n_treated_cells * nboots} rows (exactly that many for the
+#'   parametric bootstrap; under the case bootstrap the count varies by
+#'   replicate). For typical panels this is manageable; for large panels
+#'   (\eqn{TT \times N \ge 50{,}000} and \eqn{nboots \ge 500}) consider
+#'   filtering via \code{cells} before expansion.
 #'
 #' @seealso \code{\link{estimand}} for the typed dispatcher built on top
 #'   of this accessor; \code{\link{fect}} for the fitting interface.
@@ -350,9 +383,14 @@
 #' ## Filter to first 5 event times.
 #' po5 <- imputed_outcomes(fit, cells = ~ event.time \%in\% 1:5)
 #'
-#' ## Bootstrap replicate expansion (requires keep.sims = TRUE).
+#' ## Bootstrap replicate expansion (requires keep.sims = TRUE): the rows of
+#' ## replicate b are the copies of the treated cells that replicate b drew.
 #' po_b <- imputed_outcomes(fit, replicates = TRUE)
-#' nrow(po_b) == nrow(po) * 200    # one row per (cell, replicate)
+#' head(table(po_b$replicate))    # rows per replicate vary
+#'
+#' ## Averaging eff within a replicate gives its overall ATT draw.
+#' head(tapply(po_b$eff, po_b$replicate, mean))
+#' head(c(fit$att.avg.boot))
 #' }
 #'
 #' @export
@@ -417,9 +455,11 @@ imputed_outcomes <- function(fit,
         })
     }
 
-    W_mat <- if (is.null(fit$W.agg)) {
-                 matrix(1, nrow = TT, ncol = N)
-             } else fit$W.agg
+    ## Aggregation weight of each cell: the fit's W.agg matrix when W or
+    ## W.agg weighted the ATT aggregation, else 1. Exact extraction:
+    ## `fit$W.agg` partially matched the column-name slot W.agg.col (a
+    ## string), which reported W.agg = NA for every cell of a weighted fit.
+    W_mat <- .po_agg_weights(fit, TT, N)
 
     df_point <- data.frame(
         id          = fit$id[i_idx],
@@ -468,27 +508,31 @@ imputed_outcomes <- function(fit,
         )
     }
 
-    eb <- fit$eff.boot
-    nboots <- dim(eb)[3]
-
-    n_cells <- nrow(df_point)
+    nboots <- dim(fit$eff.boot)[3]
 
     ## Re-derive cell coordinates against the (potentially-filtered)
-    ## df_point so we map back into the original eff.boot array.
-    t_idx_f <- match(df_point$time, fit$rawtime)
-    i_idx_f <- match(df_point$id,   fit$id)
+    ## df_point: linear index of each selected cell in the TT x N panel.
+    t_idx_f  <- match(df_point$time, fit$rawtime)
+    i_idx_f  <- match(df_point$id,   fit$id)
+    cell_lin <- (i_idx_f - 1L) * TT + t_idx_f
+    sel <- matrix(FALSE, nrow = TT, ncol = N)
+    sel[cell_lin] <- TRUE
 
-    df_rep <- df_point[rep(seq_len(n_cells), each = nboots), , drop = FALSE]
-    df_rep$replicate <- rep(seq_len(nboots), times = n_cells)
+    ## Replicate b is a refit on a resampled panel whose columns are the units
+    ## fit$colnames.boot[[b]]. Its rows are the copies of the selected cells it
+    ## contains: under the case bootstrap a unit drawn twice appears twice and
+    ## an undrawn unit not at all, so the row count varies by replicate; under
+    ## the parametric bootstrap every treated unit appears once per replicate.
+    ## Rows are in replicate-major order.
+    rcs <- lapply(seq_len(nboots), function(b) {
+        .po_replicate_cells(fit, sel, b)
+    })
+    n_per <- vapply(rcs, function(rc) length(rc$eff), integer(1))
+    src   <- match(unlist(lapply(rcs, function(rc) rc$orig)), cell_lin)
 
-    eff_rep <- vapply(
-        seq_len(n_cells),
-        function(k) eb[t_idx_f[k], i_idx_f[k], ],
-        numeric(nboots)
-    )
-    ## eff_rep is nboots x n_cells; flatten in (cell-major, replicate-minor)
-    ## order to match df_rep's row order.
-    df_rep$eff    <- as.vector(eff_rep)
+    df_rep <- df_point[src, , drop = FALSE]
+    df_rep$replicate <- rep(seq_len(nboots), n_per)
+    df_rep$eff    <- as.numeric(unlist(lapply(rcs, function(rc) rc$eff)))
     df_rep$Y0_hat <- df_rep$Y_obs - df_rep$eff
 
     rownames(df_rep) <- NULL
@@ -513,17 +557,25 @@ imputed_outcomes <- function(fit,
 #' @param type Estimand type. One of:
 #'   \describe{
 #'     \item{\code{"att"}}{Per-cell mean treatment effect, aggregated
-#'       per group: \eqn{\mathrm{ATT}_g = \mathrm{mean}_{(t,i)\in g, D=1}(Y_{ti} - \widehat Y_{ti}(0))}.}
-#'     \item{\code{"att.cumu"}}{Cumulative ATT through each event time.
+#'       per group (weighted by \code{fit$W.agg} for a weighted fit): \eqn{\mathrm{ATT}_g = \mathrm{mean}_{(t,i)\in g, D=1}(Y_{ti} - \widehat Y_{ti}(0))}.}
+#'     \item{\code{"att.cumu"}}{Cumulative ATT through each event time,
+#'       the running sum of the per-period ATTs.
 #'       Replaces \code{\link{effect}} for the unified API.}
 #'     \item{\code{"aptt"}}{Average proportional treatment effect on the
 #'       treated (Chen & Roth 2024 QJE):
-#'       \eqn{\mathrm{APTT}_g = \mathrm{mean}_g(Y - \widehat Y(0)) / \mathrm{mean}_g(\widehat Y(0))}.
+#'       \eqn{\mathrm{APTT}_g = \mathrm{mean}_g(Y - \widehat Y(0)) / \mathrm{mean}_g(\widehat Y(0))}
+#'       (a ratio of weighted means for a weighted fit).
 #'       Requires \code{keep.sims = TRUE} at fit time.}
 #'     \item{\code{"log.att"}}{Mean log-scale treatment effect:
-#'       \eqn{\mathrm{logATT}_g = \mathrm{mean}_g(\log Y - \log \widehat Y(0))}.
+#'       \eqn{\mathrm{logATT}_g = \mathrm{mean}_g(\log Y - \log \widehat Y(0))}
+#'       (a weighted mean for a weighted fit).
 #'       Requires \code{keep.sims = TRUE}.}
 #'   }
+#'   SEs and CIs need the replicate draws saved with \code{keep.sims = TRUE},
+#'   except for \code{"att"} with \code{by = "event.time"} and default
+#'   arguments and \code{"att.cumu"} with \code{by = "overall"}, which use
+#'   the pre-aggregated draws that every \code{se = TRUE} fit keeps.
+#'   Without them, the other calls stop.
 #' @param by Grouping axis. One of \code{"event.time"} (default;
 #'   per-event-time series), \code{"cohort"}, \code{"calendar.time"},
 #'   \code{"overall"} (one row), or any column name resolvable in the
@@ -542,11 +594,17 @@ imputed_outcomes <- function(fit,
 #' @param cells Optional filter on which treated cells to include.
 #'   Accepts \code{NULL} (default; all treated cells), a logical vector,
 #'   or a one-sided formula. See \code{\link{imputed_outcomes}}.
-#' @param weights Aggregation-weight handling. \code{NULL} (default) uses
-#'   \code{fit$W.agg} if the fit was built with \code{W} or \code{W.agg};
-#'   otherwise uniform.
+#' @param weights Must be \code{NULL} (the default). \code{estimand()}
+#'   aggregates with the fit's own weights: those given in \code{W} or
+#'   \code{W.agg} at fit time (stored in \code{fit$W.agg}), in the estimate
+#'   and in every replicate; a fit made without them, or with \code{W.est}
+#'   only, gets equal weights. Other values stop. For other weights,
+#'   aggregate the rows of \code{imputed_outcomes(fit)}, which reports each
+#'   treated cell's effect (\code{eff}) and weight (\code{W.agg}).
 #' @param window Optional event-time window \code{c(L, R)}; convenience
-#'   sugar for \code{cells = ~ event.time >= L & event.time <= R}.
+#'   sugar for \code{cells = ~ event.time >= L & event.time <= R}. It
+#'   works only with \code{by = "overall"}; the event-time series stop
+#'   when it is given.
 #' @param direction Either \code{"on"} (default) or \code{"off"}; see
 #'   \code{\link{imputed_outcomes}}.
 #' @param vartype \code{"bootstrap"} (default), \code{"jackknife"},
@@ -556,18 +614,31 @@ imputed_outcomes <- function(fit,
 #'   which may differ from this argument value if the fit was produced
 #'   with a different setting --- the argument is informational and does
 #'   not re-aggregate replicates.
-#' @param conf.level Two-sided confidence level. Defaults to 0.95.
+#' @param conf.level Two-sided confidence level. Defaults to 0.95. Not
+#'   used for \code{"att.cumu"}; the per-event-time ATT without a test
+#'   accepts only 0.95.
 #' @param ci.method One of \code{"basic"} (reflected),
 #'   \code{"percentile"} (raw bootstrap quantiles), \code{"bc"}
 #'   (bias-corrected percentile; Efron 1987 minus the acceleration),
-#'   or \code{"normal"} (Wald: \eqn{\hat\theta \pm z \cdot SE}).
+#'   \code{"bca"} (bias-corrected accelerated), or \code{"normal"}
+#'   (Wald: \eqn{\hat\theta \pm z \cdot SE}).
 #'   Default is \code{NULL}, which triggers a per-type default:
 #'   \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
-#'   already uses), \code{"att.cumu"} -> \code{"percentile"} (matches
-#'   what \code{att.cumu()} does internally), \code{"aptt"} ->
-#'   \code{"bc"} and \code{"log.att"} -> \code{"bc"} (ratio / log
-#'   estimators benefit from bias correction when the bootstrap
-#'   distribution is skewed). Pass an explicit value to override.
+#'   already uses), \code{"aptt"} -> \code{"bca"} and \code{"log.att"} ->
+#'   \code{"bca"} (ratio / log estimators benefit from bias correction
+#'   when the bootstrap distribution is skewed). Pass an explicit value to
+#'   override. For \code{"att.cumu"} the interval comes from
+#'   \code{\link{att.cumu}} (\code{by = "overall"}) or \code{\link{effect}}
+#'   (\code{by = "event.time"}), whatever \code{ci.method} is: bootstrap
+#'   percentiles for bootstrap fits, and for parametric and jackknife fits
+#'   the estimate plus or minus the normal critical value times the SE (the
+#'   jackknife SE for jackknife fits). \code{NULL} still resolves to
+#'   \code{"basic"} there, so \code{estimand()} warns about tail quantiles
+#'   when \code{nboots} is below 1000, and a jackknife fit needs
+#'   \code{ci.method = "normal"}. For \code{"att"} with
+#'   \code{by = "event.time"} and no test, only the default is available
+#'   (it returns \code{fit$est.att}); other values stop, so use
+#'   \code{by = "overall"}.
 #'
 #' @return A data frame with columns \code{<by_key>}, \code{estimate},
 #'   \code{se}, \code{ci.lo}, \code{ci.hi}, \code{n_cells}, and
@@ -579,6 +650,12 @@ imputed_outcomes <- function(fit,
 #'   byte-identical to columns \code{ATT}, \code{S.E.}, \code{CI.lower},
 #'   \code{CI.upper} of \code{fit$est.att}, when default arguments are
 #'   used. This invariant is asserted by package tests.
+#'   \code{estimand(fit, "att", "overall")} returns \code{fit$att.avg} as
+#'   its \code{estimate}, and its \code{se} equals the SE in
+#'   \code{fit$est.avg}, for bootstrap, parametric and jackknife fits,
+#'   weighted or not, whatever the order of the treated units in the panel:
+#'   every replicate is read through its own units
+#'   (\code{fit$colnames.boot}).
 #'
 #' @seealso \code{\link{imputed_outcomes}} for the underlying long-form
 #'   accessor; \code{\link{fect}} for the fitting interface.
@@ -680,6 +757,17 @@ estimand <- function(fit,
 
     .validate_po_contract(fit)
 
+    ## Aggregation weights: the fit's own (fit$W.agg for a fit made with W or
+    ## W.agg; equal weights otherwise). Other weights are not accepted.
+    if (!is.null(weights)) {
+        stop("`weights` must be NULL. estimand() aggregates with the fit's ",
+             "own weights: those given in `W` or `W.agg` (stored in ",
+             "fit$W.agg), or equal weights for a fit made without them. ",
+             "For other weights, aggregate the rows of imputed_outcomes(fit), ",
+             "which reports each treated cell's effect (eff) and weight ",
+             "(W.agg).", call. = FALSE)
+    }
+
     ## Jackknife ci.method guard: only "normal" is statistically valid.
     ## See .check_jackknife_ci_method() for the full rationale.
     ## Placed after .validate_po_contract() so fit is known to be a list.
@@ -772,11 +860,6 @@ estimand <- function(fit,
                                      vartype, conf.level, ci.method,
                                      test) {
 
-    if (!is.null(weights)) {
-        stop("estimand(\"att\", \"event.time\", test = \"", test, "\") ",
-             "with non-default weights is not yet supported.",
-             call. = FALSE)
-    }
     if (!is.null(cells)) {
         stop("estimand(\"att\", \"event.time\", test = \"", test, "\") ",
              "with `cells` filter is not yet supported.",
@@ -802,6 +885,7 @@ estimand <- function(fit,
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+    Wm <- .po_agg_weights_or_null(fit)
 
     estimate <- numeric(length(ets))
     se_vec   <- rep(NA_real_, length(ets))
@@ -815,16 +899,13 @@ estimand <- function(fit,
         n_cells[k] <- sum(cell_mask)
 
         eff_t <- fit$eff[cell_mask]
-        estimate[k] <- mean(eff_t, na.rm = TRUE)
+        w_t   <- if (is.null(Wm)) NULL else Wm[cell_mask]
+        estimate[k] <- .po_wmean(eff_t, w_t)
 
         if (nboots > 0L && vartype != "none") {
-            eff_boot_cells <- apply(fit$eff.boot, 3,
-                                    function(eb) eb[cell_mask])
-            if (!is.matrix(eff_boot_cells)) {
-                eff_boot_cells <- matrix(eff_boot_cells,
-                                         nrow = sum(cell_mask))
-            }
-            att_b <- colMeans(eff_boot_cells, na.rm = TRUE)
+            ## Each replicate's own cells at this event time (its columns
+            ## are the units colnames.boot[[b]]).
+            att_b <- .po_replicate_att(fit, cell_mask, Wm)
 
             ## PARAMETRIC SHIFT (v2.4.2 fix): center att_b at the point estimate.
             ## For parametric vartype, eff.boot is H0-centered; only ci.method="normal"
@@ -837,7 +918,7 @@ estimand <- function(fit,
             }
 
             jack_v <- if (ci.method == "bca") {
-                .cell_jackknife("att", eff = eff_t)
+                .cell_jackknife("att", eff = eff_t, w = w_t)
             } else NULL
 
             ci <- .compute_ci(estimate[k], att_b, ci.method, conf.level,
@@ -883,6 +964,7 @@ estimand <- function(fit,
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+    Wm <- .po_agg_weights_or_null(fit)
 
     estimate <- numeric(length(ets))
     se_vec   <- rep(NA_real_, length(ets))
@@ -896,7 +978,7 @@ estimand <- function(fit,
         n_cells[k] <- sum(cell_mask)
 
         eff_t <- fit$eff[cell_mask]
-        estimate[k] <- mean(eff_t, na.rm = TRUE)
+        estimate[k] <- .po_wmean(eff_t, if (is.null(Wm)) NULL else Wm[cell_mask])
 
         ## Jackknife: per-replicate leave-one-out mean over cells.
         if (nboots > 0L && vartype != "none") {
@@ -904,7 +986,8 @@ estimand <- function(fit,
             for (j in seq_len(nboots)) {
                 cm_j <- cell_mask[, -j, drop = FALSE]
                 eb_j <- fit$eff.boot[, , j]
-                theta_j[j] <- mean(eb_j[cm_j], na.rm = TRUE)
+                theta_j[j] <- .po_wmean(eb_j[cm_j],
+                    if (is.null(Wm)) NULL else Wm[, -j, drop = FALSE][cm_j])
             }
             theta_valid <- theta_j[is.finite(theta_j)]
             N_eff <- length(theta_valid)
@@ -939,10 +1022,6 @@ estimand <- function(fit,
                                   vartype, conf.level, ci.method,
                                   test = "none") {
 
-    if (!is.null(weights)) {
-        stop("estimand(\"att\", \"overall\") with non-default weights ",
-             "is not yet supported in v2.4.0.", call. = FALSE)
-    }
     if (test != "none" && !is.null(cells)) {
         stop("estimand(\"att\", \"overall\") with both test = \"", test,
              "\" and `cells` is not supported. The test = ... argument ",
@@ -979,7 +1058,10 @@ estimand <- function(fit,
              call. = FALSE)
     }
 
-    estimate <- mean(fit$eff[cell_mask], na.rm = TRUE)
+    ## Aggregation weights of a weighted fit (W or W.agg), else NULL
+    Wm <- .po_agg_weights_or_null(fit)
+    estimate <- .po_wmean(fit$eff[cell_mask],
+                          if (is.null(Wm)) NULL else Wm[cell_mask])
 
     se_val <- NA_real_
     ci_lo  <- NA_real_
@@ -1000,13 +1082,13 @@ estimand <- function(fit,
         ## jackknife-specific helper.
         if (isTRUE(fit$vartype == "jackknife")) {
             return(.estimand_att_overall_jackknife(fit, cell_mask, conf.level,
-                                                   vartype))
+                                                   vartype, Wm))
         }
 
-        nboots <- dim(fit$eff.boot)[3]
-        att_b  <- vapply(seq_len(nboots), function(b) {
-            mean(fit$eff.boot[, , b][cell_mask], na.rm = TRUE)
-        }, numeric(1))
+        ## Replicate b's columns are the units colnames.boot[[b]], so its
+        ## draws (and their weights) are read through .po_replicate_cells(),
+        ## not at the cell positions of the original panel.
+        att_b <- .po_replicate_att(fit, cell_mask, Wm)
 
         ## PARAMETRIC SHIFT (v2.4.2 fix)
         is_parametric <- isTRUE(fit$vartype == "parametric") ||
@@ -1016,7 +1098,8 @@ estimand <- function(fit,
         }
 
         jack_v <- if (ci.method == "bca") {
-            .cell_jackknife("att", eff = fit$eff[cell_mask])
+            .cell_jackknife("att", eff = fit$eff[cell_mask],
+                            w = if (is.null(Wm)) NULL else Wm[cell_mask])
         } else NULL
 
         ci <- .compute_ci(estimate, att_b, ci.method, conf.level,
@@ -1042,14 +1125,14 @@ estimand <- function(fit,
 }
 
 
-## Compute overall ATT under jackknife using the Tukey SE from the
-## per-event-time att.boot matrix.
+## Compute overall ATT under jackknife using the Tukey SE of its
+## leave-one-unit-out estimates.
 ##
 ## Strategy: eff.boot is TT x (N-1) x N for jackknife. Direct cell-masking
 ## is not applicable because each slice drops one unit column. Instead, use
-## the pre-aggregated att.avg.unit.boot (per-unit leave-one-out ATT averages,
-## 1 x N) to compute N scalar overall-ATT leave-one-out estimates, then apply
-## the Tukey SE formula.
+## the pre-aggregated att.avg.boot (the overall ATT of each leave-one-out
+## fit, 1 x N) as the N leave-one-out estimates, then apply the Tukey SE
+## formula.
 ##
 ## When a cells filter is active, fall back to per-replicate recomputation
 ## from eff.boot by mapping each replicate's reduced column space back to
@@ -1060,14 +1143,17 @@ estimand <- function(fit,
 ##   cell_mask  - logical TT x N matrix; TRUE at treated cells to include
 ##   conf.level - numeric confidence level (default 0.95)
 ##   vartype    - "jackknife" or "none"
+##   Wm         - aggregation weights of a weighted fit (a TT x N matrix,
+##                as fit$W.agg), or NULL for equal weights
 ##
 ## Returns a one-row data frame with estimate, se, ci.lo, ci.hi, n_cells,
 ## vartype (same schema as .estimand_att_overall()).
 .estimand_att_overall_jackknife <- function(fit, cell_mask, conf.level,
-                                             vartype) {
+                                             vartype, Wm = NULL) {
     if (vartype == "none") {
         ## No SE requested.
-        estimate <- mean(fit$eff[cell_mask], na.rm = TRUE)
+        estimate <- .po_wmean(fit$eff[cell_mask],
+                              if (is.null(Wm)) NULL else Wm[cell_mask])
         return(data.frame(
             estimate = estimate, se = NA_real_,
             ci.lo = NA_real_, ci.hi = NA_real_,
@@ -1077,27 +1163,30 @@ estimand <- function(fit,
         ))
     }
 
-    estimate <- mean(fit$eff[cell_mask], na.rm = TRUE)
+    estimate <- .po_wmean(fit$eff[cell_mask],
+                          if (is.null(Wm)) NULL else Wm[cell_mask])
     n_cells  <- sum(cell_mask)
 
     ## Determine whether the cell_mask is "all treated cells" (no filter
     ## beyond the standard treated-cell mask). In that case we can use the
-    ## pre-aggregated att.avg.unit.boot slot (1 x N matrix) for the
-    ## Tukey SE rather than recomputing from eff.boot.
-    ## att.avg.unit.boot is a unit-weighted grand average of all post-treatment
-    ## cells, which equals mean(eff[treated_mask]) when there is no
-    ## additional filter.
+    ## pre-aggregated att.avg.boot slot (1 x N matrix) for the Tukey SE
+    ## rather than recomputing from eff.boot. att.avg.boot[j] is the overall
+    ## ATT of the fit without unit j: the mean effect over its treated cells
+    ## (weighted by W.agg for a weighted fit), the estimand of `estimate`.
+    ## (Before 2.4.7: att.avg.unit.boot, the average of the unit-level ATTs,
+    ## a different estimand when units have different numbers of treated
+    ## cells.)
     all_treated_mask <- !is.na(fit$D.dat) & fit$D.dat == 1 &
                         !is.na(fit$T.on)
     use_precomp <- identical(cell_mask, all_treated_mask) &&
-                   !is.null(fit$att.avg.unit.boot)
+                   !is.null(fit$att.avg.boot)
 
     if (use_precomp) {
-        ## att.avg.unit.boot: 1 x N matrix (one row; N columns = jackknife
+        ## att.avg.boot: 1 x N matrix (one row; N columns = jackknife
         ## replicates). jackknifed() formula:
         ##   pseudo_j = N * theta_hat - (N-1) * theta_j
         ##   SE = sqrt(var(pseudo_j) / N)
-        theta_j <- as.vector(fit$att.avg.unit.boot)
+        theta_j <- as.vector(fit$att.avg.boot)
         N_jack  <- length(theta_j)
         theta_j_valid <- theta_j[!is.na(theta_j)]
         N_eff   <- length(theta_j_valid)
@@ -1113,7 +1202,7 @@ estimand <- function(fit,
         pseudo  <- N_jack * estimate - (N_jack - 1) * theta_j_valid
         se_val  <- sqrt(var(pseudo) / N_eff)
     } else {
-        ## Cells filter is active or att.avg.unit.boot is unavailable.
+        ## Cells filter is active or att.avg.boot is unavailable.
         ## Recompute per-replicate overall ATT from eff.boot.
         ##
         ## eff.boot[, , j] is TT x (N-1): the effect matrix for the panel
@@ -1132,10 +1221,11 @@ estimand <- function(fit,
         N_jack <- dim(fit$eff.boot)[3]
         theta_j <- numeric(N_jack)
         for (j in seq_len(N_jack)) {
-            ## Drop column j from cell_mask.
+            ## Drop column j from cell_mask (and from the weights).
             cm_j <- cell_mask[, -j, drop = FALSE]
             eb_j <- fit$eff.boot[, , j]  ## TT x (N-1)
-            theta_j[j] <- mean(eb_j[cm_j], na.rm = TRUE)
+            theta_j[j] <- .po_wmean(eb_j[cm_j],
+                if (is.null(Wm)) NULL else Wm[, -j, drop = FALSE][cm_j])
         }
         theta_j_valid <- theta_j[is.finite(theta_j)]
         N_eff <- length(theta_j_valid)
@@ -1208,10 +1298,6 @@ estimand <- function(fit,
              "supported (cumulative effects are defined relative to ",
              "treatment onset).", call. = FALSE)
     }
-    if (!is.null(weights)) {
-        stop("estimand(\"att.cumu\") with non-default weights is not ",
-             "yet supported in v2.4.0.", call. = FALSE)
-    }
     if (!is.null(cells) && by != "overall") {
         stop("estimand(\"att.cumu\") with `cells` is supported only when ",
              "by = \"overall\". For event-time series, use ",
@@ -1253,10 +1339,11 @@ estimand <- function(fit,
 
 
 ## Compute event-time cumulative ATT series. Delegates to the existing
-## effect() function for the actual numerics (which use a per-cell mean
-## approach, not a simple cumsum of fit$att). Reshapes the matrix into
-## the tidy estimand return schema. Numerical equality with effect() is
-## by construction.
+## effect() function for the actual numerics: the running sum of the
+## per-period ATTs (the mean effect over the treated cells at each event
+## time), for the point estimate and for each replicate. Reshapes the
+## matrix into the tidy estimand return schema. Numerical equality with
+## effect() is by construction.
 .compute_att_cumu_event_time <- function(fit, conf.level, ci.method,
                                           vartype) {
 
@@ -1293,9 +1380,10 @@ estimand <- function(fit,
 
 
 ## Compute single overall cumulative ATT in a window. Delegates to the
-## existing att.cumu() function for the canonical math (count-weighted
-## across event times, percentile bootstrap CI). Returns the final row
-## reshaped into the tidy estimand schema.
+## existing att.cumu() function for the canonical math (the running sum of
+## the per-period ATTs over the window; percentile bootstrap CI, normal CI
+## for parametric and jackknife fits). Returns the final row reshaped into
+## the tidy estimand schema.
 .compute_att_cumu_overall <- function(fit, window, conf.level, ci.method,
                                        vartype) {
 
@@ -1341,10 +1429,6 @@ estimand <- function(fit,
 .estimand_aptt <- function(fit, by, cells, weights, direction,
                            vartype, conf.level, ci.method, test = "none") {
 
-    if (!is.null(weights)) {
-        stop("estimand(\"aptt\") with non-default weights is not yet ",
-             "supported in v2.4.0.", call. = FALSE)
-    }
     if (!is.null(cells)) {
         stop("estimand(\"aptt\") with `cells` filter is not yet ",
              "supported in v2.4.0.", call. = FALSE)
@@ -1380,6 +1464,7 @@ estimand <- function(fit,
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+    Wm <- .po_agg_weights_or_null(fit)
 
     estimate <- numeric(length(ets))
     se_vec   <- rep(NA_real_, length(ets))
@@ -1395,12 +1480,13 @@ estimand <- function(fit,
         cell_mask <- treated_mask & Tev == et
         n_cells[k] <- sum(cell_mask)
 
-        ## Point estimate.
+        ## Point estimate (weighted means for a weighted fit).
         eff_t <- fit$eff[cell_mask]
         Y_t   <- fit$Y.dat[cell_mask]
         Y0_t  <- Y_t - eff_t
-        num   <- mean(eff_t, na.rm = TRUE)
-        den   <- mean(Y0_t, na.rm = TRUE)
+        w_t   <- if (is.null(Wm)) NULL else Wm[cell_mask]
+        num   <- .po_wmean(eff_t, w_t)
+        den   <- .po_wmean(Y0_t, w_t)
         estimate[k] <- num / den
 
         ## Bootstrap / jackknife distribution per replicate.
@@ -1419,9 +1505,11 @@ estimand <- function(fit,
                     eff_j_v   <- eb_j[cm_j_full]
                     Y_j       <- fit$Y.dat[, kcols, drop = FALSE][cm_j_full]
                     Y0_j_v    <- Y_j - eff_j_v
-                    denom_j   <- mean(Y0_j_v, na.rm = TRUE)
+                    w_j       <- if (is.null(Wm)) NULL else
+                                     Wm[, kcols, drop = FALSE][cm_j_full]
+                    denom_j   <- .po_wmean(Y0_j_v, w_j)
                     if (is.finite(denom_j) && abs(denom_j) > 1e-10) {
-                        theta_j[j] <- mean(eff_j_v, na.rm = TRUE) / denom_j
+                        theta_j[j] <- .po_wmean(eff_j_v, w_j) / denom_j
                     } else {
                         theta_j[j] <- NA_real_
                     }
@@ -1436,34 +1524,41 @@ estimand <- function(fit,
                     ci_hi[k]  <- estimate[k] + z_q * se_vec[k]
                 }
             } else {
-                ## Bootstrap / wild / parametric branch (original code).
-                ## eff_boot_cells: rows = cells in this group, cols = replicates.
-                eff_boot_cells <- apply(fit$eff.boot, 3, function(eb) eb[cell_mask])
-                if (!is.matrix(eff_boot_cells)) {
-                    eff_boot_cells <- matrix(eff_boot_cells,
-                                             nrow = sum(cell_mask))
+                ## Bootstrap / wild / parametric branch. Replicate b's
+                ## columns are the units colnames.boot[[b]]: read its own
+                ## cells at this event time and pair each draw with the
+                ## observed outcome of its source cell.
+                num_b <- rep(NA_real_, nboots)
+                den_b <- rep(NA_real_, nboots)
+                has_b <- logical(nboots)
+                for (b in seq_len(nboots)) {
+                    rc <- .po_replicate_cells(fit, cell_mask, b)
+                    if (length(rc$eff) == 0L) next  # no unit of this group drawn
+                    has_b[b] <- TRUE
+                    w_b <- if (is.null(Wm)) NULL else Wm[rc$orig]
+                    num_b[b] <- .po_wmean(rc$eff, w_b)
+                    den_b[b] <- .po_wmean(fit$Y.dat[rc$orig] - rc$eff, w_b)
                 }
-                Y0_boot <- Y_t - eff_boot_cells
 
                 ## Hard-error on cell-drop pathology (v2.4.2+).
                 ## See .compute_log_att_event_time for the full rationale.
                 ## For APTT specifically: when E(Y0_b) crosses zero in any
                 ## replicate, the denominator blows up (or flips sign),
                 ## producing wildly unstable per-replicate APTT values.
-                mean_Y0_per_rep <- colMeans(Y0_boot, na.rm = TRUE)
-                n_bad_reps <- sum(abs(mean_Y0_per_rep) < 1e-10 |
-                                  is.na(mean_Y0_per_rep))
+                ## A replicate that drew no unit of this group has no
+                ## denominator at all; it is a missing draw (NA), not a bad one.
+                n_bad_reps <- sum(has_b & (abs(den_b) < 1e-10 | is.na(den_b)))
                 if (n_bad_reps > 0L) {
-                    pct_bad <- 100 * n_bad_reps / length(mean_Y0_per_rep)
+                    pct_bad <- 100 * n_bad_reps / nboots
                     stop(sprintf(
                         "APTT bootstrap is unreliable at event time %s\n  (E(Y0_hat) at the point = %.4f, but %d of %d bootstrap replicates\n  (%.1f%%) have E(Y0_b) ~ 0, blowing up the APTT denominator and\n  producing wildly unstable per-replicate ratios).\n\n  Options:\n    1. Filter out cells where E(Y0_hat) is small relative to E(Y):\n         estimand(fit, \"aptt\", \"event.time\",\n                  cells = ~ abs(Y0_hat) > <threshold>)\n    2. Transform the outcome to keep Y0_hat away from zero\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this denominator instability",
                         as.character(et), den, n_bad_reps,
-                        length(mean_Y0_per_rep), pct_bad
+                        nboots, pct_bad
                     ), call. = FALSE)
                 }
 
-                aptt_b  <- colMeans(eff_boot_cells, na.rm = TRUE) /
-                           mean_Y0_per_rep
+                aptt_b <- num_b / den_b
+                aptt_b[is.nan(aptt_b)] <- NA_real_
 
                 ## PARAMETRIC SHIFT (v2.4.2 fix)
                 is_parametric <- isTRUE(fit$vartype == "parametric") ||
@@ -1475,7 +1570,7 @@ estimand <- function(fit,
                 ## Cell-level jackknife for the BCa acceleration parameter.
                 ## Only computed when bca is requested (cheap; no model refits).
                 jack_v <- if (ci.method == "bca") {
-                    .cell_jackknife("aptt", eff = eff_t, Y0 = Y0_t)
+                    .cell_jackknife("aptt", eff = eff_t, Y0 = Y0_t, w = w_t)
                 } else NULL
 
                 ci <- .compute_ci(estimate[k], aptt_b, ci.method, conf.level,
@@ -1515,10 +1610,6 @@ estimand <- function(fit,
                               vartype, conf.level, ci.method,
                               test = "none") {
 
-    if (!is.null(weights)) {
-        stop("estimand(\"log.att\") with non-default weights is not ",
-             "yet supported in v2.4.0.", call. = FALSE)
-    }
     if (!is.null(cells)) {
         stop("estimand(\"log.att\") with `cells` filter is not yet ",
              "supported in v2.4.0.", call. = FALSE)
@@ -1578,6 +1669,7 @@ estimand <- function(fit,
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+    Wm <- .po_agg_weights_or_null(fit)
 
     estimate <- numeric(length(ets))
     se_vec   <- rep(NA_real_, length(ets))
@@ -1595,6 +1687,7 @@ estimand <- function(fit,
         eff_t <- fit$eff[cell_mask]
         Y_t   <- fit$Y.dat[cell_mask]
         Y0_t  <- Y_t - eff_t
+        w_t   <- if (is.null(Wm)) NULL else Wm[cell_mask]
 
         ## Caller-level hard-stop in .estimand_log_att already guarantees
         ## all cells have Y > 0 and Y0_hat > 0; only NA filtering needed.
@@ -1607,7 +1700,8 @@ estimand <- function(fit,
         }
 
         log_diff <- log(Y_t[ok]) - log(Y0_t[ok])
-        estimate[k] <- mean(log_diff, na.rm = TRUE)
+        w_ok     <- if (is.null(w_t)) NULL else w_t[ok]
+        estimate[k] <- .po_wmean(log_diff, w_ok)
 
         if (nboots > 0L && vartype != "none") {
             if (isTRUE(fit$vartype == "jackknife")) {
@@ -1628,8 +1722,10 @@ estimand <- function(fit,
                     if (sum(ok_j) == 0L) {
                         theta_j[j] <- NA_real_
                     } else {
-                        theta_j[j] <- mean(log(Y_j[ok_j]) - log(Y0_j_v[ok_j]),
-                                           na.rm = TRUE)
+                        w_j <- if (is.null(Wm)) NULL else
+                                   Wm[, kcols, drop = FALSE][cm_j_full][ok_j]
+                        theta_j[j] <- .po_wmean(log(Y_j[ok_j]) - log(Y0_j_v[ok_j]),
+                                                w_j)
                     }
                 }
                 theta_valid <- theta_j[is.finite(theta_j)]
@@ -1642,23 +1738,32 @@ estimand <- function(fit,
                     ci_hi[k]  <- estimate[k] + z_q * se_vec[k]
                 }
             } else {
-                ## Bootstrap / wild / parametric branch (original code).
-                eff_boot_cells <- apply(fit$eff.boot, 3,
-                                        function(eb) eb[cell_mask])
-                if (!is.matrix(eff_boot_cells)) {
-                    eff_boot_cells <- matrix(eff_boot_cells,
-                                             nrow = sum(cell_mask))
-                }
-                eff_ok    <- eff_boot_cells[ok, , drop = FALSE]
-                Y_ok      <- Y_t[ok]
-                Y0_b_ok   <- Y_ok - eff_ok
+                ## Bootstrap / wild / parametric branch. Replicate b's
+                ## columns are the units colnames.boot[[b]]: read its own
+                ## copies of the point-level `ok` cells and pair each draw
+                ## with the observed outcome of its source cell.
+                ok_mask <- cell_mask
+                ok_mask[cell_mask] <- ok
+                ok_idx  <- which(ok_mask)          # same order as Y_t[ok]
+                rcs <- lapply(seq_len(nboots), function(b) {
+                    .po_replicate_cells(fit, ok_mask, b)
+                })
+                Y_all  <- unlist(lapply(rcs, function(rc) fit$Y.dat[rc$orig]))
+                Y0_all <- Y_all - unlist(lapply(rcs, function(rc) rc$eff))
+                W_all  <- if (is.null(Wm)) NULL else
+                              unlist(lapply(rcs, function(rc) Wm[rc$orig]))
+                rep_of <- rep(seq_len(nboots),
+                              vapply(rcs, function(rc) length(rc$eff),
+                                     integer(1)))
+                src_of <- match(unlist(lapply(rcs, function(rc) rc$orig)),
+                                ok_idx)
 
                 ## Hard-error on cell-drop pathology (v2.4.2+).
                 ##
                 ## When a cell used in the point estimate has Y0_b <= 0 in
                 ## a non-trivial fraction of bootstrap replicates, log(Y0_b)
-                ## returns NaN and colMeans(..., na.rm = TRUE) silently
-                ## averages over fewer cells in that replicate, breaking
+                ## returns NaN and the per-replicate mean (na.rm = TRUE)
+                ## silently averages over fewer cells in that replicate, breaking
                 ## the basic bootstrap principle and contaminating the
                 ## bootstrap distribution.
                 ##
@@ -1667,25 +1772,50 @@ estimand <- function(fit,
                 ## (small dropping is benign at the bootstrap-distribution
                 ## scale; >5% indicates a genuinely unstable cell that
                 ## needs filtering or a different estimand).
-                n_reps_per_cell <- rowSums(Y0_b_ok <= 0, na.rm = TRUE)
-                n_total_reps    <- ncol(Y0_b_ok)
-                drop_frac       <- n_reps_per_cell / n_total_reps
-                worst_idx       <- which.max(drop_frac)
-                worst_frac      <- drop_frac[worst_idx]
+                ##
+                ## Share for cell c = (replicates in which some copy of c has
+                ## Y0_b <= 0) / (replicates that contain c); each replicate
+                ## counts once per cell however often it drew the unit.
+                n_ok_cells   <- length(ok_idx)
+                key_in       <- unique(rep_of * (n_ok_cells + 1) + src_of)
+                n_total_reps <- tabulate(key_in %% (n_ok_cells + 1),
+                                         nbins = n_ok_cells)
+                nonpos       <- !is.na(Y0_all) & Y0_all <= 0
+                key_bad      <- unique(rep_of[nonpos] * (n_ok_cells + 1) +
+                                       src_of[nonpos])
+                n_reps_per_cell <- tabulate(key_bad %% (n_ok_cells + 1),
+                                            nbins = n_ok_cells)
+                drop_frac  <- ifelse(n_total_reps > 0L,
+                                     n_reps_per_cell / n_total_reps, 0)
+                worst_idx  <- which.max(drop_frac)
+                worst_frac <- drop_frac[worst_idx]
                 if (length(worst_frac) && worst_frac > 0.05) {
                     worst_Y0 <- Y0_t[ok][worst_idx]
                     stop(sprintf(
                         "log-ATT bootstrap is unreliable at event time %s.\n  The worst cell has Y0_hat = %.4f but %d of %d bootstrap replicates\n  (%.1f%%) have Y0_b <= 0 for it, so log(Y0_b) is undefined and the\n  per-replicate average silently drops the cell. This contaminates the\n  bootstrap distribution and yields meaningless inference.\n\n  Options:\n    1. Filter out unstable cells:\n         estimand(fit, \"log.att\", \"event.time\",\n                  cells = ~ Y0_hat > <threshold>)\n    2. Transform the outcome before fect: log(Y + c) for some c > 0\n    3. Use a different estimand: estimand(\"att\", ...) does not have\n       this pathology",
                         as.character(et), worst_Y0,
-                        n_reps_per_cell[worst_idx], n_total_reps,
+                        n_reps_per_cell[worst_idx], n_total_reps[worst_idx],
                         100 * worst_frac
                     ), call. = FALSE)
                 }
 
-                log_Y0_b  <- log(Y0_b_ok)
-                log_Y     <- log(Y_ok)
-                log_diff_b <- log_Y - log_Y0_b
-                logatt_b  <- colMeans(log_diff_b, na.rm = TRUE)
+                log_diff_all <- log(Y_all) - log(Y0_all)
+                logatt_b <- if (is.null(W_all)) {
+                    vapply(
+                        split(log_diff_all,
+                              factor(rep_of, levels = seq_len(nboots))),
+                        function(v) mean(v, na.rm = TRUE), numeric(1)
+                    )
+                } else {
+                    vapply(
+                        split(seq_along(log_diff_all),
+                              factor(rep_of, levels = seq_len(nboots))),
+                        function(ix) .po_wmean(log_diff_all[ix], W_all[ix]),
+                        numeric(1)
+                    )
+                }
+                logatt_b <- unname(logatt_b)
+                logatt_b[is.nan(logatt_b)] <- NA_real_
 
                 ## PARAMETRIC SHIFT (v2.4.2 fix)
                 ## Note: log.att with parametric vartype requires strictly positive Y0_hat,
@@ -1700,7 +1830,7 @@ estimand <- function(fit,
 
                 ## Cell-level jackknife on the per-cell log-diff vector.
                 jack_v <- if (ci.method == "bca") {
-                    .cell_jackknife("log.att", log_diff = log_diff)
+                    .cell_jackknife("log.att", log_diff = log_diff, w = w_ok)
                 } else NULL
 
                 ci <- .compute_ci(estimate[k], logatt_b, ci.method, conf.level,
@@ -1732,6 +1862,95 @@ estimand <- function(fit,
 ## ---------------------------------------------------------------------------
 ## Internal helpers
 ## ---------------------------------------------------------------------------
+
+## Aggregation weights of a fit made with W or W.agg, as a TT x N matrix on
+## the fit's panel (like Y.dat); NULL for a fit made without them (equal
+## weights; W.est alone weights only the model fit). Fits built before
+## 2.4.7 have no W.agg slot; their weight matrix is the TT x N matrix stored
+## under the name "W" (after the column-name slot of the same name).
+.po_agg_weights_or_null <- function(fit) {
+    W_mat <- fit[["W.agg", exact = TRUE]]
+    if (is.null(W_mat) && isTRUE(fit[["W.in.agg", exact = TRUE]])) {
+        TT <- nrow(fit$Y.dat)
+        N  <- ncol(fit$Y.dat)
+        cand <- Filter(function(z) is.matrix(z) && identical(dim(z), c(TT, N)),
+                       fit[names(fit) == "W"])
+        if (length(cand) > 0L) W_mat <- cand[[1L]]
+    }
+    W_mat
+}
+
+## Aggregation weights of a fit as a TT x N matrix (1 where unweighted).
+.po_agg_weights <- function(fit, TT, N) {
+    W_mat <- .po_agg_weights_or_null(fit)
+    if (is.null(W_mat)) matrix(1, nrow = TT, ncol = N) else W_mat
+}
+
+## Mean of `v` weighted by `w` over the entries where both are available;
+## with w = NULL the plain mean (na.rm = TRUE), as the unweighted estimands
+## have always used. NA when no weight is left.
+.po_wmean <- function(v, w = NULL) {
+    if (is.null(w)) {
+        return(mean(v, na.rm = TRUE))
+    }
+    ok <- !is.na(v) & !is.na(w)
+    if (!any(ok) || sum(w[ok]) == 0) {
+        return(NA_real_)
+    }
+    sum(v[ok] * w[ok]) / sum(w[ok])
+}
+
+## Internal: the draws of bootstrap / parametric replicate b at the cells of
+## `cell_mask`.
+##
+## `cell_mask` is a TT x N logical matrix in the coordinates of the fitted
+## panel (fit$Y.dat). Replicate b is a refit on a resampled panel whose
+## columns are the original units fit$colnames.boot[[b]], in that order (case
+## bootstrap: the drawn units; parametric bootstrap: the treated units first,
+## then the drawn controls). So fit$eff.boot[, k, b] belongs to unit
+## colnames.boot[[b]][k], not to unit k, and the mask has to be mapped through
+## that vector. A unit drawn k times contributes k copies of its cells; a unit
+## that was not drawn contributes none.
+##
+## Returns list(eff, orig): the replicate's draws at those cells and, for each
+## draw, the linear index of its source cell in the TT x N panel, which indexes
+## fit$Y.dat, fit$D.dat, fit$W.agg, fit$T.on, ... Fits without colnames.boot
+## (hand-built objects) use the identity mapping. The width seq_along(ids)
+## skips the NA padding of cluster-bootstrap arrays (replicates of varying
+## width). Not for jackknife fits, whose branches map columns themselves.
+.po_replicate_cells <- function(fit, cell_mask, b) {
+    TT  <- nrow(cell_mask)
+    cbl <- fit$colnames.boot
+    ids <- if (!is.null(cbl) && length(cbl) >= b && length(cbl[[b]]) > 0L) {
+        as.integer(cbl[[b]])
+    } else {
+        seq_len(min(dim(fit$eff.boot)[2], ncol(cell_mask)))
+    }
+    m   <- cell_mask[, ids, drop = FALSE]              # TT x w, replicate order
+    pos <- which(m)                                    # column-major in TT x w
+    col <- (pos - 1L) %/% TT + 1L
+    row <- (pos - 1L) %% TT + 1L
+    eb  <- matrix(fit$eff.boot[, seq_along(ids), b],
+                  nrow = dim(fit$eff.boot)[1])         # never drops to a vector
+    list(eff = eb[pos], orig = (ids[col] - 1L) * TT + row)
+}
+
+
+## Internal: per-replicate mean of the draws at the cells of `cell_mask`
+## (one value per replicate in fit$eff.boot), weighted by `W` (a TT x N
+## matrix; each draw takes the weight of its source cell) when given. A
+## replicate that contains no cell of the mask (none of its units was drawn)
+## gives NA, which the SE / CI code ignores, as it ignores NA draws.
+.po_replicate_att <- function(fit, cell_mask, W = NULL) {
+    nboots <- dim(fit$eff.boot)[3]
+    att_b <- vapply(seq_len(nboots), function(b) {
+        rc <- .po_replicate_cells(fit, cell_mask, b)
+        .po_wmean(rc$eff, if (is.null(W)) NULL else W[rc$orig])
+    }, numeric(1))
+    att_b[is.nan(att_b)] <- NA_real_
+    att_b
+}
+
 
 ## Compute SE and (lo, hi) confidence-interval bounds from a bootstrap
 ## distribution `boot` (a numeric vector of replicate-level estimates),
@@ -1901,6 +2120,20 @@ estimand <- function(fit,
 ## refits are too expensive.
 .cell_jackknife <- function(type, ...) {
     args <- list(...)
+    w <- args$w
+    if (!is.null(w)) {
+        ## Weighted leave-one-out means (the weighted estimands):
+        ##   (sum(w * v) - w_i * v_i) / (sum(w) - w_i)
+        loo <- function(v) {
+            n <- length(v)
+            if (n < 2L) return(rep(NA_real_, n))
+            (sum(w * v, na.rm = TRUE) - w * v) / (sum(w, na.rm = TRUE) - w)
+        }
+        if (type == "aptt")    return(loo(args$eff) / loo(args$Y0))
+        if (type == "log.att") return(loo(args$log_diff))
+        if (type == "att")     return(loo(args$eff))
+        stop("Unknown jackknife type = \"", type, "\".", call. = FALSE)
+    }
     if (type == "aptt") {
         eff <- args$eff; Y0 <- args$Y0
         n   <- length(eff)
@@ -2030,7 +2263,12 @@ estimand <- function(fit,
             stop("cells: formula must be one-sided (e.g., `~ event.time > 0`).",
                  call. = FALSE)
         }
-        mask <- eval(cells[[2]], envir = df, enclos = parent.frame())
+        ## Free variables in the formula (e.g. `~ event.time <= k` written
+        ## inside a function that defines k) resolve in the environment the
+        ## formula was created in, not in this helper's caller.
+        enclos <- environment(cells)
+        if (is.null(enclos)) enclos <- parent.frame()
+        mask <- eval(cells[[2]], envir = df, enclos = enclos)
         if (!is.logical(mask) || length(mask) != nrow(df)) {
             stop("cells: formula must evaluate to a logical vector of ",
                  "length nrow(data).", call. = FALSE)

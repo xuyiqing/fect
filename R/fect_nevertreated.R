@@ -69,6 +69,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     carryover.pos <- placebo.pos <- na.pos <- NULL
     res.sd1 <- res.sd2 <- NULL
+    wgt.implied <- NULL ## implied control weights (Nco x Ntr), set when r.cv > 0
     ## unit id and time
     TT <- dim(Y)[1]
     N <- dim(Y)[2]
@@ -196,6 +197,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         W.use <- as.matrix(W[, co, drop = FALSE])
         W.use[which(II.co == 0)] <- 0
     }
+    ## Weights for the cross-validation fold fits and their scores: only
+    ## weights that enter the model fit. Aggregation-only weights (W.agg,
+    ## W.in.fit = FALSE) enter neither. Before 2.4.7 CV weighted by any W,
+    ## and fect_cv() did not pass W.in.fit, so W.agg became a fit weight.
+    W.cvfit <- if (isTRUE(W.in.fit)) W else NULL
 
     ## ---- cv.method validation ---- ##
     cv.method <- .fect_normalize_cv_method(
@@ -205,7 +211,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     if (isTRUE(CV == TRUE)) .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
     ## ---- W for treated units (scoring) ---- ##
-    if (!is.null(W)) {
+    if (!is.null(W.cvfit)) {
         W.tr <- as.matrix(W[, tr, drop = FALSE])
     } else {
         W.tr <- NULL
@@ -339,10 +345,22 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         } else {
             r.max <- max(min((T0.min - 2), r.end), 0)
         }
+        ## The factors come from the never-treated units alone, so at most
+        ## Nco - 1 of them can be estimated (fect's rule for a fixed r: at
+        ## least r + 1 never-treated units). Before 2.4.7 a larger r reached
+        ## panel_factor() and crashed ("Mat::head_cols(): size out of bounds")
+        ## or fit an r that is not identified.
+        r.max.co <- .fect_nt_r_max(Nco)
+        r.capped.co <- r.max > r.max.co
+        if (r.capped.co) {
+            r <- min(r, r.max.co)
+            .fect_nt_cap_message(Nco, r, r.max.co)
+            r.max <- r.max.co
+        }
 
         if (r.max == 0) {
             r.cv <- 0
-            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
+            message(.fect_nt_no_cv_message(r.end, Nco, r.capped.co))
             est.co.best <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, 0, force, cv_tol, max.iteration,
                                         fit_init = fit.init.co)
         } else {
@@ -615,7 +633,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                             X.co          = X.co,
                             II.co         = II.co,
                             W.use         = W.use,
-                            W             = W,
+                            W             = W.cvfit,
                             beta0CV.co    = beta0CV.co,
                             rmCV          = rmCV,
                             estCV         = estCV,
@@ -653,7 +671,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     task_idx <- which(vapply(tasks_ife, function(t) t$ri == i, logical(1)))
                     all_resid    <- unlist(lapply(fold_scores_ife[task_idx], `[[`, "resid"))
                     all_time_idx <- unlist(lapply(fold_scores_ife[task_idx], `[[`, "time_idx"))
-                    all_obs_w    <- if (!is.null(W)) unlist(lapply(fold_scores_ife[task_idx], `[[`, "obs_w")) else c()
+                    all_obs_w    <- if (!is.null(W.cvfit)) unlist(lapply(fold_scores_ife[task_idx], `[[`, "obs_w")) else c()
 
                     if (length(all_resid) == 0) {
                         scores <- c(MSPE = Inf, WMSPE = Inf, GMSPE = Inf, WGMSPE = Inf,
@@ -663,7 +681,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         agg <- .fect_cv_aggregate_folds(
                             fold_list  = fold_scores_ife[task_idx],
                             count.T.cv = count.T.cv,
-                            use_weight = as.integer(!is.null(W)),
+                            use_weight = as.integer(!is.null(W.cvfit)),
                             norm.para  = NULL
                         )
                         scores <- agg$pooled
@@ -889,7 +907,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         X.co     = X.co,
                         II.co    = II.co,
                         W.use    = W.use,
-                        W        = W,
+                        W        = W.cvfit,
                         beta0CV.co = beta0CV.co,
                         rmCV     = rmCV,
                         estCV    = estCV,
@@ -907,7 +925,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     agg <- .fect_cv_aggregate_folds(
                         fold_list  = fold_results,
                         count.T.cv = count.T.cv,
-                        use_weight = as.integer(!is.null(W)),
+                        use_weight = as.integer(!is.null(W.cvfit)),
                         norm.para  = NULL
                     )
                     scores <- agg$pooled
@@ -1042,6 +1060,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
             }
             ## --------------------------------------------------------------
+
+            ## criterion = "pc": pick the r with the lowest PC, as fect's IFE
+            ## path does. The rules above only serve the MSPE-family criteria;
+            ## before 2.4.7 r.pc was tracked here but never used. The final fit
+            ## below re-estimates the model at r.cv.
+            if (identical(criterion, "pc") && !is.null(r.pc)) {
+                r.cv <- r.pc
+            }
 
             if (r > (T0.min - 1)) {
                 message(" (r hits maximum)")
@@ -1230,7 +1256,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     silent = TRUE
                 )
                 if ("try-error" %in% class(lambda.tr)) {
-                    return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1)))
+                    ## A7: stop, not a short list that crashed the bootstrap
+                    ## collector (a replicate's try() turns this into a failure).
+                    stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
                 }
             } else {
                 ## Bounded: solve simplex QP per treated unit on the r-col F block only
@@ -1269,8 +1297,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         return(l.tr) ## a vector of each individual lambdas
                     })), silent = TRUE)
                     if ("try-error" %in% class(lambda.tr)) {
-                        return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1)))
-                        ## stop("Error occurs. Please set a smaller value of factor number.")
+                        stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
                     }
                     if ((r.cv == 1) & (force %in% c(0, 2))) {
                         lambda.tr <- t(lambda.tr)
@@ -1317,8 +1344,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         silent = TRUE
                     )
                     if ("try-error" %in% class(test)) {
-                        return(list(att = rep(NA, TT), att.avg = NA, beta = matrix(NA, p, 1), eff = matrix(NA, TT, Ntr)))
-                        ## stop("Error occurs. Please set a smaller value of factor number.")
+                        stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
                     }
                 } else {
                     lambda.tr.r <- matrix(NA_real_, nrow = r.cv, ncol = Ntr)
@@ -1358,16 +1384,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         }
         if (boot == 0) {
             if (use_bounded && !is.null(W_tr)) {
-                wgt.implied <- W_tr
+                ## simplex weights: one column per treated unit, as below
+                wgt.implied <- t(W_tr)
             } else {
-                inv.tr <- try(
-                    ginv(t(as.matrix(lambda.tr))),
-                    silent = TRUE
-                )
-
-                if (!"try-error" %in% class(inv.tr)) {
-                    wgt.implied <- t(inv.tr %*% t(as.matrix(est.co.best$lambda)))
-                }
+                wgt.implied <- .fect_nt_implied_weights(est.co.best$lambda, lambda.tr)
             }
         }
     } ## end of r!=0 case
@@ -1404,7 +1424,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     }
     initialOut <- Y0.co <- NULL
     oci <- which(c(II.co) == 1)
-    if (is.null(W)) {
+    ## W.agg-only weights (W.in.fit = FALSE) leave W.use as a 1 x 1
+    ## placeholder, so they must not reach initialFit() (before 2.4.7 this
+    ## crashed with "subscript out of bounds").
+    if (is.null(W) || !W.in.fit) {
         initialOut <- initialFit(data = data.ini, force = force, oci = oci)
     } else {
         initialOut <- initialFit(data = data.ini, force = force, w = c(W.use), oci = oci)
@@ -1432,10 +1455,18 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         } else {
             r.max <- max(min((T0.min - 2), r.end), 0)
         }
+        ## at most Nco - 1 factors from the never-treated units (as in the IFE block)
+        r.max.co <- .fect_nt_r_max(Nco)
+        r.capped.co <- r.max > r.max.co
+        if (r.capped.co) {
+            r <- min(r, r.max.co)
+            .fect_nt_cap_message(Nco, r, r.max.co)
+            r.max <- r.max.co
+        }
 
         if (r.max == 0) {
             r.cv <- 0
-            message("Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0.")
+            message(.fect_nt_no_cv_message(r.end, Nco, r.capped.co))
             est.co.best <- complex_fe_ub(YY.co, Y0.co, X.co,
                 X.extra.FE.co.B, X.Z.co, X.Q.co, X.gamma.co, X.kappa.co,
                 Zgamma.id, kappaQ.id,
@@ -1454,7 +1485,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             r.pc <- est.co.pc.best <- NULL
 
             ## Per-fold SEs parallel to CV.out, for applying `cv.rule` after the
-            ## loop, as in the IFE block above. Before 2.4.6 this block kept its
+            ## loop, as in the IFE block above. Before 2.4.7 this block kept its
             ## in-loop 1% rule whatever `cv.rule` was.
             CV.out.se <- matrix(NA_real_, nrow(CV.out), ncol(CV.out))
             colnames(CV.out.se) <- colnames(CV.out)
@@ -1701,7 +1732,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                             X.co            = X.co,
                             II.co           = II.co,
                             W.use           = W.use,
-                            W               = W,
+                            W               = W.cvfit,
                             beta0CV.co      = beta0CV.co,
                             X.extra.FE.co.B = X.extra.FE.co.B,
                             X.Z.co          = X.Z.co,
@@ -1747,7 +1778,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
                     ## Aggregate fold scores for this rank
                     task_idx <- which(vapply(tasks_cfe, function(t) t$ri == i, logical(1)))
-                    agg    <- .cfe_fold_scores(fold_scores_cfe[task_idx], !is.null(W), NULL)
+                    agg    <- .cfe_fold_scores(fold_scores_cfe[task_idx], !is.null(W.cvfit), NULL)
                     scores <- agg$pooled
                     se_v   <- agg$se
 
@@ -1997,7 +2028,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         X.co            = X.co,
                         II.co           = II.co,
                         W.use           = W.use,
-                        W               = W,
+                        W               = W.cvfit,
                         beta0CV.co      = beta0CV.co,
                         X.extra.FE.co.B = X.extra.FE.co.B,
                         X.Z.co          = X.Z.co,
@@ -2014,7 +2045,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         max.iteration   = max.iteration
                     )
                 })
-                agg    <- .cfe_fold_scores(fold_results, !is.null(W), NULL)
+                agg    <- .cfe_fold_scores(fold_results, !is.null(W.cvfit), NULL)
                 scores <- agg$pooled
                 se_v   <- agg$se
 
@@ -2144,6 +2175,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 }
             }
             ## -----------------------------------------------------------------
+
+            ## criterion = "pc": the r with the lowest PC (as in the IFE block).
+            if (identical(criterion, "pc") && !is.null(r.pc)) {
+                r.cv <- r.pc
+            }
 
             MSPE.best <- min(CV.out[, "MSPE"])
             if (r > (T0.min - 1)) {
@@ -2314,7 +2350,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     .estimate_alpha <- function(U.cur) {
         if (!force %in% c(1, 3)) return(matrix(0, Ntr, 1))
         if (max(T0) == T0.min & (!0 %in% I.tr)) {
-            return(as.matrix(colMeans(U.cur[1:T0.min, ])))
+            return(as.matrix(colMeans(U.cur[1:T0.min, , drop = FALSE])))
         } else {
             U.pre.v <- as.vector(U.cur)[which(pre.v == 1)]
             U.pre.l <- split(U.pre.v, id.tr.pre.v)
@@ -2463,8 +2499,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 resid <- U.tr.L1 - kappa_fit - typeA_fit
                 result <- .estimate_lambda_fit(resid, F.hat.aug)
                 if (!result$ok) {
-                    return(list(att = rep(NA, TT), att.avg = NA,
-                                beta = matrix(NA, p, 1)))
+                    stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
                 }
                 lambda_fit <- result$fit
                 lambda.tr <- result$lambda
@@ -2496,8 +2531,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             resid <- U.tr.L1 - kappa_fit - typeA_fit
             result <- .estimate_lambda_fit(resid, F.hat.aug)
             if (!result$ok) {
-                return(list(att = rep(NA, TT), att.avg = NA,
-                            beta = matrix(NA, p, 1)))
+                stop(sprintf("The treated units' factor loadings cannot be estimated: the estimated factors are collinear over the pre-treatment periods (too few distinct control units or pre-treatment periods for r = %d). Try a smaller r.", r.cv), call. = FALSE)
             }
             lambda_fit <- result$fit
             lambda.tr <- result$lambda
@@ -2541,10 +2575,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
     ## Implied weights
     if (has_factor && boot == 0 && !is.null(lambda.tr)) {
-        inv.tr <- try(ginv(t(as.matrix(lambda.tr))), silent = TRUE)
-        if (!"try-error" %in% class(inv.tr)) {
-            wgt.implied <- t(inv.tr %*% t(as.matrix(est.co.best$lambda)))
-        }
+        wgt.implied <- .fect_nt_implied_weights(est.co.best$lambda, lambda.tr)
     }
 
     ## r=0 path (for equivalence test baseline — uses FE-only model)
@@ -3263,13 +3294,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             lambda.co = as.matrix(lambda.co),
             lambda.tr = as.matrix(lambda.tr)
         ))
-        if (boot == 0) {
-            if (exists("use_bounded", inherits = FALSE) && isTRUE(use_bounded)) {
-                out <- c(out, list(wgt.implied = wgt.implied))
-            } else if (exists("inv.tr", inherits = FALSE) &&
-                       !inherits(inv.tr, "try-error")) {
-                out <- c(out, list(wgt.implied = wgt.implied))
-            }
+        ## included only when the weights could be computed
+        if (boot == 0 && !is.null(wgt.implied)) {
+            out <- c(out, list(wgt.implied = wgt.implied))
         }
         if (exists("use_bounded", inherits = FALSE) && isTRUE(use_bounded)) {
             out <- c(out, list(
@@ -3343,6 +3370,63 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         ))
     }
     return(out)
+}
+
+
+## ====================================================================
+## Cross-validation range helpers (IFE and CFE never-treated blocks)
+## ====================================================================
+
+## Largest number of factors the never-treated units can identify: the
+## factors are estimated from the Nco control units alone, so at most Nco - 1
+## (the rule fect.default() applies to a fixed r: at least r + 1 never-treated
+## units).
+.fect_nt_r_max <- function(Nco) {
+    max(as.integer(Nco) - 1L, 0L)
+}
+
+## Message for a cross-validation range cut down to r.max.co. With a single
+## never-treated unit (r.max.co = 0) cross-validation is skipped instead, and
+## the caller says so.
+.fect_nt_cap_message <- function(Nco, r.start, r.max.co) {
+    if (r.max.co > 0) {
+        message(sprintf(
+            "With %d never-treated units at most %d factor(s) can be estimated; cross-validation searches r = %d to %d.",
+            Nco, r.max.co, r.start, r.max.co
+        ))
+    }
+    invisible(NULL)
+}
+
+## Implied weights of the control units (Xu 2017). The factor part of
+## treated unit i's counterfactual, F lambda_i, equals the controls' factor
+## parts weighted by w_i = Lco (Lco'Lco)^{-1} lambda_i. So
+## W = ginv(t(Lco)) %*% t(Ltr) is Nco x Ntr (column i = treated unit i) and
+## satisfies t(Lco) %*% W = t(Ltr). Before 2.4.7 the code used the treated
+## units' Gram matrix, Lco (Ltr'Ltr)^{-1} Ltr', which does not rebuild the
+## counterfactual. Returns NULL if the pseudo-inverse fails.
+.fect_nt_implied_weights <- function(lambda.co, lambda.tr) {
+    w <- try(
+        MASS::ginv(t(as.matrix(lambda.co))) %*% t(as.matrix(lambda.tr)),
+        silent = TRUE
+    )
+    if (inherits(w, "try-error")) NULL else w
+}
+
+## Why cross-validation is skipped when the searched range is r = 0 only.
+## Before 2.4.7 every case got the "too few pre-treatment records" message,
+## including r = 0 with CV = TRUE.
+.fect_nt_no_cv_message <- function(r.end, Nco, capped) {
+    if (r.end == 0) {
+        "Only one candidate number of factors (r = 0) was given, so cross-validation is skipped and r.cv = 0."
+    } else if (isTRUE(capped)) {
+        sprintf(
+            "With %d never-treated unit%s no factor can be estimated, so cross-validation is skipped and r.cv = 0.",
+            Nco, if (Nco == 1) "" else "s"
+        )
+    } else {
+        "Cross validation cannot be performed since available pre-treatment records of treated units are too few. So set r.cv = 0."
+    }
 }
 
 

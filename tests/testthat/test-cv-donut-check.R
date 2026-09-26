@@ -1,4 +1,4 @@
-## `cv.donut` is checked against `cv.nobs` (added in 2.4.6). Block
+## `cv.donut` is checked against `cv.nobs` (added in 2.4.7). Block
 ## cross-validation holds out cv.nobs consecutive periods and scores only the
 ## middle cv.nobs - 2 * cv.donut of them, so 2 * cv.donut >= cv.nobs left
 ## nothing to score. Before the check, fect() stopped deep inside the CV with

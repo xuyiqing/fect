@@ -36,7 +36,15 @@ test_that("Phase A wall-time is stable across consecutive parallel calls", {
         r         = 1,
         CV        = FALSE,
         force     = "two-way",
-        time.component.from = "nevertreated",
+        ## Not-yet-treated ife: until 2.4.7 this call also set
+        ## time.component.from = "nevertreated", but with se = TRUE it
+        ## silently ran this not-yet-treated model (fixed in B8e). On simdata
+        ## (reversals) the never-treated model cannot be estimated (se = FALSE
+        ## stops too), so the call now names the model it always ran. The
+        ## bootstrap work is unchanged, and so are its draws when fect() gets
+        ## a seed (seed = 2 gives S.E. 0.6214 before and after this change).
+        ## Here the S.E. changes from run to run, because set.seed() above
+        ## does not fix the parallel bootstrap draws. Only wall time is tested.
         se        = TRUE,
         vartype   = "bootstrap",
         nboots    = 20,

@@ -20,6 +20,7 @@ impute_Y0 <- function(
   X,                # TT x N x p covariate array, or NULL
   D,                # TT x N treatment indicator
   W,                # TT x N weight matrix or NULL
+  W.in.fit = TRUE,  # FALSE: W enters aggregation only (W.agg), not the fit
   I,                # TT x N observation indicator
   II,               # TT x N estimation indicator
   T.on,             # TT x N integer matrix: periods since onset
@@ -60,7 +61,14 @@ impute_Y0 <- function(
   max.iteration = 1000,
   norm.para    = NULL,
   group.level  = NULL,
-  group        = NULL
+  group        = NULL,
+
+  ## Bounded treated loadings: forwarded to Branch 1 only (the validation in
+  ## fect.default() allows loading.bound = "simplex" for gsynth and
+  ## ife + nevertreated). Before 2.4.7 the parametric replicates dropped it.
+  loading.bound      = "none",
+  gamma.loading      = NULL,
+  gamma.loading.grid = NULL
 ) {
 
   if (method == "gsynth" || (method == "ife" && predictive == "nevertreated")) {
@@ -70,6 +78,7 @@ impute_Y0 <- function(
       X              = X,
       D              = D,
       W              = W,
+      W.in.fit       = W.in.fit,
       I              = I,
       II             = II,
       T.on           = T.on,
@@ -97,7 +106,10 @@ impute_Y0 <- function(
       max.iteration  = max.iteration,
       group.level    = group.level,
       group          = group,
-      method         = "ife"
+      method         = "ife",
+      loading.bound      = loading.bound,
+      gamma.loading      = gamma.loading,
+      gamma.loading.grid = gamma.loading.grid
     )
 
   } else if (method == "ife" && predictive == "notyettreated") {
@@ -107,6 +119,7 @@ impute_Y0 <- function(
       X              = X,
       D              = D,
       W              = W,
+      W.in.fit       = W.in.fit,
       I              = I,
       II             = II,
       T.on           = T.on,
@@ -142,6 +155,7 @@ impute_Y0 <- function(
       X              = X,
       D              = D,
       W              = W,
+      W.in.fit       = W.in.fit,
       I              = I,
       II             = II,
       T.on           = T.on,
@@ -186,6 +200,7 @@ impute_Y0 <- function(
       X              = X,
       D              = D,
       W              = W,
+      W.in.fit       = W.in.fit,
       X.extra.FE    = X.extra.FE,
       X.Z           = X.Z,
       X.Q           = X.Q,

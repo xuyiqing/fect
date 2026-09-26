@@ -109,6 +109,233 @@ fect <- function(
     UseMethod("fect")
 }
 
+## Parse a model formula whose terms must be bare column names.
+## Returns list(Y = <outcome name>, rhs = <right-hand-side names, in order,
+## each once>). Before 2.4.7 formulas were read with all.vars(), so
+## `log(Y + 20) ~ D` fitted Y ~ D, `factor(g)` became one linear slope, and
+## `X1 * X2` became X1 + X2, all without a message. Intercept specifiers
+## (`+ 0`, `0 +`, `+ 1`, `1 +`, `- 0`, `- 1`, a leading `-1`) are accepted
+## and ignored, as before: fect always includes its own fixed effects.
+## Used by fect.formula() and interFE.formula().
+.fect_formula_names <- function(formula, fun = "fect") {
+    if (!inherits(formula, "formula") || length(formula) != 3L) {
+        stop(fun, "() needs a two-sided formula such as Y ~ D + X1 + X2.",
+             call. = FALSE)
+    }
+    is_icpt <- function(e) is.numeric(e) && length(e) == 1L && e %in% c(0, 1)
+    flat <- function(e) {
+        if (is.call(e) && identical(e[[1L]], as.name("+")) && length(e) == 3L) {
+            return(c(flat(e[[2L]]), flat(e[[3L]])))
+        }
+        if (is.call(e) && identical(e[[1L]], as.name("-")) && length(e) == 3L) {
+            ## `... - 1` / `... - 0` drop the intercept; any other `- term`
+            ## is reported on its own (not as the whole left operand)
+            if (is_icpt(e[[3L]])) return(flat(e[[2L]]))
+            return(c(flat(e[[2L]]), list(call("-", e[[3L]]))))
+        }
+        if (is.call(e) && identical(e[[1L]], as.name("-")) && length(e) == 2L &&
+            is_icpt(e[[2L]])) {
+            return(list()) # leading `-1` / `-0`
+        }
+        if (is_icpt(e)) return(list()) # `+ 0`, `0 +`, `+ 1`, `1 +`
+        list(e)
+    }
+    is_colname <- function(e) is.name(e) && !identical(as.character(e), ".")
+    lhs <- formula[[2L]]
+    rhs <- flat(formula[[3L]])
+    bad <- c(
+        if (!is_colname(lhs)) deparse1(lhs),
+        vapply(Filter(Negate(is_colname), rhs), deparse1, "")
+    )
+    if (length(bad) > 0L) {
+        stop(
+            fun, "() formulas take bare column names only; ",
+            if (length(bad) == 1L) "not a column name: " else "not column names: ",
+            paste0("`", bad, "`", collapse = ", "), ". ",
+            "Create the variable first (for example data$logY <- log(data$Y + 20)) ",
+            "and use its name in the formula. For a categorical covariate, create ",
+            "numeric dummy columns first (for example with model.matrix()); for an ",
+            "interaction, create the product column first.",
+            call. = FALSE
+        )
+    }
+    if (length(rhs) == 0L) {
+        stop(
+            fun, "() needs ",
+            if (fun == "fect") "a treatment variable" else "at least one covariate",
+            " on the right-hand side of the formula, for example ",
+            if (fun == "fect") "Y ~ D + X1." else "Y ~ X1 + X2.",
+            call. = FALSE
+        )
+    }
+    Yname <- as.character(lhs)
+    rhs <- unique(vapply(rhs, as.character, ""))
+    if (Yname %in% rhs) {
+        stop(
+            "The outcome \"", Yname, "\" also appears on the right-hand side ",
+            "of the formula.",
+            call. = FALSE
+        )
+    }
+    list(Y = Yname, rhs = rhs)
+}
+
+## The data.long slot of a fit: the input panel's index, outcome and
+## treatment columns. With a factor time index whose levels are not numbers
+## the time column holds level positions internally (see time.labels in
+## fect.default()); return it as a factor of the labels, in level order.
+.fect_data_long <- function(d, time, time.labels) {
+    if (!is.null(time.labels)) {
+        d[[time]] <- factor(time.labels[d[[time]]], levels = time.labels)
+    }
+    d
+}
+
+## Tolerances of .fect_check_covariates()
+.FECT_COV_NOVAR_TOL <- 1e-12  # centred norm / max(1, norm): no variation
+.FECT_COV_ABSORB_TOL <- 1e-8  # norm after removing the FE / centred norm
+.FECT_COV_QR_TOL <- 1e-7      # qr() tolerance, as in lm()
+.FECT_COV_DEMEAN_TOL <- 1e-10 # fixest::demean() convergence
+
+## Remove fixed effects `fe` (a list of equal-length group codes) from the
+## columns of `Xm`; with no fixed effect, remove the column means (the
+## model's grand mean).
+.fect_cov_demean <- function(Xm, fe) {
+    if (length(fe) == 0L) {
+        return(sweep(Xm, 2L, colMeans(Xm)))
+    }
+    Xd <- fixest::demean(Xm, f = as.data.frame(fe), tol = .FECT_COV_DEMEAN_TOL,
+                         iter = 10000L, nthreads = 1L, notes = FALSE)
+    matrix(as.numeric(Xd), nrow = nrow(Xm))
+}
+
+## Covariates that cannot be estimated on the cells used to fit the model.
+## X: TT x N x p covariate array; M: TT x N logical mask of the estimation
+## cells; force: 0-3 as in fect.default(); extra.fe: TT x N x k array of
+## additional fixed effects (cfe) or NULL. Checks, in this order: no
+## variation on M; absorbed by the fixed effects (named when one fixed
+## effect alone absorbs it); a linear combination of the covariates before
+## it after removing the fixed effects (lm()'s rule: the earlier column of a
+## collinear set is kept). Returns list(drop = <covariate positions>,
+## message = <warning text or NULL>).
+.fect_check_covariates <- function(X, M, force, Xname, extra.fe = NULL) {
+    none <- list(drop = integer(0), message = NULL)
+    p <- dim(X)[3]
+    cells <- which(M)
+    if (is.null(p) || p == 0L || length(cells) < 2L) {
+        return(none)
+    }
+    Xm <- matrix(NA_real_, length(cells), p)
+    for (j in seq_len(p)) {
+        Xm[, j] <- X[, , j][cells]
+    }
+    nrm <- function(v) sqrt(sum(v^2))
+    reason <- rep(NA_character_, p)
+    finite <- apply(Xm, 2L, function(v) all(is.finite(v)))
+    c0 <- rep(NA_real_, p)
+    c0[finite] <- apply(Xm[, finite, drop = FALSE], 2L, function(v) nrm(v - mean(v)))
+    raw <- apply(Xm, 2L, nrm)
+
+    ## (1) no variation on the estimation cells
+    novar <- finite & c0 <= .FECT_COV_NOVAR_TOL * pmax(1, raw)
+    reason[novar] <- "has no variation on the cells used to estimate the covariate coefficients"
+
+    rest <- which(finite & !novar)
+    if (length(rest) > 0L) {
+        unit <- col(M)[cells]
+        time <- row(M)[cells]
+        fe <- list()
+        if (force %in% c(1, 3)) fe$unit <- unit
+        if (force %in% c(2, 3)) fe$time <- time
+        if (!is.null(extra.fe) && length(dim(extra.fe)) == 3L) {
+            for (k in seq_len(dim(extra.fe)[3])) {
+                fe[[paste0("extra", k)]] <- extra.fe[, , k][cells]
+            }
+        }
+        Xd <- .fect_cov_demean(Xm[, rest, drop = FALSE], fe)
+
+        ## (2) absorbed by the fixed effects
+        absorbed <- rep(FALSE, length(rest))
+        if (length(fe) > 0L) {
+            absorbed <- apply(Xd, 2L, nrm) <= .FECT_COV_ABSORB_TOL * c0[rest]
+        }
+        for (jj in which(absorbed)) {
+            j <- rest[jj]
+            zeroed_by <- function(g) {
+                !is.null(g) && nrm(.fect_cov_demean(Xm[, j, drop = FALSE], list(g))) <=
+                    .FECT_COV_ABSORB_TOL * c0[j]
+            }
+            reason[j] <- if (zeroed_by(fe$unit)) {
+                "does not vary over time within units, so it is absorbed by the unit fixed effects"
+            } else if (zeroed_by(fe$time)) {
+                "does not vary across units within periods, so it is absorbed by the time fixed effects"
+            } else if (length(fe) == 2L && !is.null(fe$unit) && !is.null(fe$time)) {
+                "is the sum of a unit-level and a period-level variable, so it is absorbed by the unit and time fixed effects"
+            } else {
+                "is absorbed by the fixed effects"
+            }
+        }
+
+        ## (3) linear combinations of the other covariates
+        cand <- which(!absorbed)
+        if (length(cand) > 1L) {
+            q <- qr(Xd[, cand, drop = FALSE], tol = .FECT_COV_QR_TOL)
+            if (q$rank < length(cand)) {
+                alias <- rest[cand[q$pivot[-seq_len(q$rank)]]]
+                reason[alias] <- "is a linear combination of other covariates (after removing the fixed effects)"
+            }
+        }
+    }
+
+    drop <- which(!is.na(reason))
+    if (length(drop) == 0L) {
+        return(none)
+    }
+    k <- length(drop)
+    list(
+        drop = drop,
+        message = paste0(
+            "Dropped ", k, if (k == 1L) " covariate" else " covariates",
+            " that cannot be estimated on the cells used to fit the model: ",
+            paste0("\"", Xname[drop], "\" ", reason[drop], collapse = "; "),
+            ". ", if (k == 1L) "Its coefficient is" else "Their coefficients are",
+            " reported as NA."
+        )
+    )
+}
+
+## Covariates dropped before the fit (see .fect_check_covariates()) get NA
+## rows, so beta, est.beta, beta.boot (and, for binary models, marginal and
+## est.marginal) keep one row per requested covariate, in the requested
+## order. `keep` holds the positions of the covariates that were fitted.
+.fect_restore_dropped_covariates <- function(out, keep, p.all, se, binary) {
+    expand <- function(m, width) {
+        if (length(keep) > 0L && !is.null(m) && NROW(m) == length(keep)) {
+            m <- as.matrix(m)
+            full <- matrix(NA_real_, p.all, ncol(m),
+                           dimnames = list(NULL, colnames(m)))
+            full[keep, ] <- m
+            return(full)
+        }
+        matrix(NA_real_, p.all, width)
+    }
+    out$beta <- expand(out$beta, 1L)
+    if (length(keep) == 0L) {
+        out$validX <- 0
+    }
+    if (isTRUE(binary == TRUE)) {
+        out$marginal <- expand(out$marginal, 1L)
+    }
+    if (isTRUE(se == TRUE)) {
+        out$est.beta <- expand(out$est.beta, 5L)
+        out$beta.boot <- expand(out$beta.boot, NCOL(out$att.avg.boot))
+        if (isTRUE(binary == TRUE)) {
+            out$est.marginal <- expand(out$est.marginal, 5L)
+        }
+    }
+    out
+}
+
 ## formula method
 
 fect.formula <- function(
@@ -191,15 +418,32 @@ fect.formula <- function(
     gamma.loading.grid = NULL,
     cv.rule = "1se"
 ) {
-    ## parsing
-    varnames <- all.vars(formula)
-    Yname <- varnames[1]
-    Dname <- varnames[2]
-    if (length(varnames) > 2) {
-        Xname <- varnames[3:length(varnames)]
+    ## Covariates come from the formula. Before 2.4.7 an `X` given with a
+    ## formula was silently ignored. `X = NULL` (what gsynth's wrapper
+    ## passes by default) is fine; an `X` that cannot be evaluated (e.g. an
+    ## unquoted name) counts as given. Y and D are not evaluated: gsynth
+    ## passes them as missing arguments.
+    X.given <- !missing(X) &&
+        !is.null(tryCatch(X, error = function(e) "<unevaluable>"))
+    if (X.given) {
+        stop(
+            "Covariates were given in `X` together with a formula. Put the ",
+            "covariates in the formula (Y ~ D + X1 + X2), or give Y, D and X ",
+            "as column names without a formula, not both.",
+            call. = FALSE
+        )
+    }
+
+    ## parsing: bare column names only (see .fect_formula_names())
+    fnames <- .fect_formula_names(formula, fun = "fect")
+    Yname <- fnames$Y
+    Dname <- fnames$rhs[1]
+    if (length(fnames$rhs) > 1) {
+        Xname <- fnames$rhs[-1]
     } else {
         Xname <- NULL
     }
+    varnames <- c(Yname, fnames$rhs)
 
     namesData <- colnames(data)
     for (i in 1:length(varnames)) {
@@ -453,6 +697,16 @@ fect.default <- function(
                  "latent-factor / matrix-completion models (ife, mc, gsynth, ",
                  "both, cfe).")
         }
+        ## dloo's closed-form placebo is the not-yet-treated two-way FE model.
+        ## Checked here, before the bootstrap it forces, rather than by the
+        ## post-fit check on `method` (the never-treated fit is labelled
+        ## "gsynth", which a user who typed method = "fe" cannot act on).
+        if (identical(time.component.from, "nevertreated")) {
+            stop("\"dloo\" is only supported with time.component.from = \"notyettreated\" ",
+                 "(the default). Its closed-form placebo is validated for the two-way ",
+                 "fixed-effects model fitted on not-yet-treated observations, not for ",
+                 "fixed effects fitted on never-treated units only.")
+        }
         ## Like `loo`, dloo reports pre-trend SEs; ensure the native bootstrap
         ## runs even if the user left se = FALSE. The overlay is applied to each
         ## replicate INSIDE fect_boot, so no separate resampler and no retention
@@ -467,6 +721,28 @@ fect.default <- function(
     if (is.data.frame(data) == FALSE || length(class(data)) > 1) {
         data <- as.data.frame(data)
         ## warning("Not a data frame.")
+    }
+
+    ## covariate names. Before 2.4.7 a duplicated name entered the model
+    ## twice (exactly collinear; the two coefficients were garbage).
+    if (!is.null(X)) {
+        X.dup <- unique(X[duplicated(X)])
+        if (length(X.dup) > 0) {
+            stop("`X` contains duplicated covariate names: ",
+                 paste0("\"", X.dup, "\"", collapse = ", "),
+                 ". Give each covariate once.", call. = FALSE)
+        }
+        X.yd <- intersect(X, c(if (!missing(Y)) Y, if (!missing(D)) D))
+        if (length(X.yd) > 0) {
+            stop("`X` contains the outcome or the treatment variable (",
+                 paste0("\"", X.yd, "\"", collapse = ", "),
+                 "). Give only covariates in `X`.", call. = FALSE)
+        }
+        X.absent <- setdiff(X, colnames(data))
+        if (length(X.absent) > 0) {
+            stop("variable \"", X.absent[1], "\" is not in the data set.",
+                 call. = FALSE)
+        }
     }
 
     ## ----------------------------------------------------------------
@@ -618,9 +894,72 @@ fect.default <- function(
     id <- index[1]
     time <- index[2]
 
+    ## Time index. A factor is used in its level order: if its levels are
+    ## increasing numbers, as those numbers (the same fit as passing the
+    ## numbers); otherwise as level positions 1, 2, ..., with the levels kept
+    ## as labels for the output (rawtime, row names, data.long, messages), and
+    ## a warning when the levels are numbers out of numeric order. A
+    ## character index must hold numbers. Before 2.4.7 both were ordered as
+    ## text ("1", "10", "11", ..., "2"). Numeric, Date and other classes are
+    ## used as they are.
+    time.labels <- NULL
+    if (length(time) == 1L && !is.na(time) && time %in% colnames(data)) {
+        time.col <- data[[time]]
+        if (is.factor(time.col)) {
+            time.f <- droplevels(time.col)
+            time.lev <- levels(time.f)
+            time.num <- suppressWarnings(as.numeric(time.lev))
+            if (length(time.lev) > 0 && !anyNA(time.num) &&
+                all(diff(time.num) > 0)) {
+                data[[time]] <- time.num[as.integer(time.f)]
+            } else {
+                if (length(time.lev) > 0 && !anyNA(time.num)) {
+                    ## levels that are numbers but not in increasing order,
+                    ## e.g. factor(as.character(year)) with levels "1",
+                    ## "10", "2": still used in level order, with a warning
+                    time.eg <- time.lev[seq_len(min(3L, length(time.lev)))]
+                    warning(
+                        "The time index \"", time, "\" is a factor whose ",
+                        "levels are numbers but not in increasing order (for ",
+                        "example ", paste0("\"", time.eg, "\"", collapse = ", "),
+                        "); fect orders the periods by the factor levels. If ",
+                        "that is not the time order, pass a numeric index ",
+                        "(e.g. as.numeric(as.character(", time, "))) or ",
+                        "reorder the levels.",
+                        call. = FALSE
+                    )
+                }
+                data[[time]] <- as.integer(time.f)
+                time.labels <- time.lev
+            }
+        } else if (is.character(time.col)) {
+            time.num <- suppressWarnings(as.numeric(time.col))
+            time.bad <- !is.na(time.col) & is.na(time.num)
+            if (any(time.bad)) {
+                stop(
+                    "The time index \"", time, "\" is character and some ",
+                    "values are not numbers (for example \"",
+                    time.col[time.bad][1], "\"). Convert it to a number, a ",
+                    "Date, or a factor whose levels are in time order.",
+                    call. = FALSE
+                )
+            }
+            data[[time]] <- time.num
+        }
+    }
+    ## labels of time values for messages and output
+    .time_label <- function(v) if (is.null(time.labels)) v else time.labels[v]
+
 
     if (cm == TRUE & ! method %in% c("fe", "ife")) {
         stop("\"cm\" option is only available for the \"fe\" and \"ife\" methods.")
+    }
+    ## The causal-moderation model is fitted with not-yet-treated controls
+    ## only; with never-treated controls the fit had no est.cm (before 2.4.7
+    ## without a message).
+    if (isTRUE(cm) && identical(time.component.from, "nevertreated")) {
+        stop("\"cm\" option is only available with ",
+             "time.component.from = \"notyettreated\".", call. = FALSE)
     }
 
     ## Save user's literal method argument before any silent coercion (e.g.
@@ -647,6 +986,17 @@ fect.default <- function(
                 "cluster (block) jackknife. The resulting SEs do not account for ",
                 "within-cluster correlation. Use vartype = \"bootstrap\" with cl ",
                 "for cluster-aware inference.",
+                call. = FALSE
+            )
+        }
+        if (vartype == "parametric" && !is.null(cl) &&
+            !identical(cl, index[1])) {
+            warning(
+                "vartype = \"parametric\" with cl = ... : the cl argument is ",
+                "ignored. The parametric bootstrap simulates errors unit by ",
+                "unit and does not resample clusters, so the SEs do not ",
+                "account for within-cluster correlation. Use ",
+                "vartype = \"bootstrap\" with cl for cluster-aware inference.",
                 call. = FALSE
             )
         }
@@ -806,12 +1156,12 @@ fect.default <- function(
         }
     }
 
-    ## `r = NULL` (the default since 2.4.6) means "not supplied". For the factor
+    ## `r = NULL` (the default since 2.4.7) means "not supplied". For the factor
     ## methods that is a request to cross-validate the number of factors over
     ## 0:5, mirroring `method = "mc"` with lambda = NULL. With CV switched off
     ## and no r, fall back to r = 0 (the FEct model) and say so, again as MC
     ## does. For fe / cfe / binary models, no r means no factors. (Before
-    ## 2.4.6 the default was r = 0 and `method = "ife"` without r silently ran
+    ## 2.4.7 the default was r = 0 and `method = "ife"` without r silently ran
     ## the two-way FE model; the manual's own LOO example did exactly that.)
     if (is.null(r)) {
         if (method == "both") {
@@ -1283,14 +1633,41 @@ fect.default <- function(
     }
 
     if (!is.null(cl)) {
-        if (!cl %in% names(data)) {
-            stop("\"cl\" misspecified.\n")
+        ## length before membership: with two names `%in%` gives two values
+        ## and the `if` stopped with R's "the condition has length > 1"
+        if (!is.character(cl) || length(cl) != 1L) {
+            stop("\"cl\" must be a single column name.", call. = FALSE)
         }
-        if (length(cl) != 1) {
-            stop("Length of \"cl\" must be 1.\n")
+        if (!cl %in% names(data)) {
+            stop("\"cl\" (\"", cl, "\") is not a column of data.",
+                 call. = FALSE)
         }
         if (cl == index[1]) {
             cl <- NULL
+        }
+    }
+    if (se == TRUE && vartype == "bootstrap" && !is.null(cl)) {
+        ## The cluster bootstrap maps each unit to one cluster and resamples
+        ## whole units by cluster, so a unit's cluster must not change.
+        n.cl.unit <- tapply(data[[cl]], data[[index[1]]],
+                            function(x) length(unique(x[!is.na(x)])))
+        bad.cl <- names(n.cl.unit)[!is.na(n.cl.unit) & n.cl.unit > 1]
+        if (length(bad.cl) > 0) {
+            bad.show <- if (length(bad.cl) > 10) {
+                paste0(paste(bad.cl[1:10], collapse = ", "), ", and ",
+                       length(bad.cl) - 10, " more")
+            } else {
+                paste(bad.cl, collapse = ", ")
+            }
+            stop("\"cl\" (\"", cl, "\") must be constant within each unit (",
+                 index[1], "): the cluster bootstrap resamples whole units ",
+                 "by cluster. Units whose cluster changes: ", bad.show, ".",
+                 call. = FALSE)
+        }
+        if (length(unique(data[[cl]][!is.na(data[[cl]])])) < 2) {
+            stop("\"cl\" (\"", cl, "\") has fewer than two distinct values; ",
+                 "the cluster bootstrap needs at least two clusters.",
+                 call. = FALSE)
         }
     }
 
@@ -1405,6 +1782,32 @@ fect.default <- function(
         data <- data[, all.var]
     }
 
+    ## Covariates must be numeric; logical columns are used as 0/1 (as they
+    ## were before). Before 2.4.7 a factor stopped with R's "Calling var(x)
+    ## on a factor x is defunct" and a character column with a false
+    ## "unit-invariant" message.
+    for (x.name in X) {
+        x.col <- data[[x.name]]
+        if (is.logical(x.col)) {
+            data[[x.name]] <- as.numeric(x.col)
+        } else if (!is.numeric(x.col)) {
+            x.type <- if (is.factor(x.col)) {
+                "a factor"
+            } else if (is.character(x.col)) {
+                "character"
+            } else {
+                paste0("of class \"", class(x.col)[1], "\"")
+            }
+            stop(
+                "Covariate \"", x.name, "\" is ", x.type, "; fect() needs ",
+                "numeric covariates. Create numeric (dummy) columns first, for ",
+                "example with model.matrix(~ ", x.name, ", data), and use ",
+                "those columns.",
+                call. = FALSE
+            )
+        }
+    }
+
     if (na.rm == TRUE) {
         data <- na.omit(data)
     } else {
@@ -1510,10 +1913,8 @@ fect.default <- function(
     if (class(data[, index[1]])[1] == "factor") {
         data[, index[1]] <- as.character(data[, index[1]])
     }
-
-    if (class(data[, index[2]])[1] == "factor") {
-        data[, index[2]] <- as.character(data[, index[2]])
-    }
+    ## (a factor time index was converted to numbers right after `time` was
+    ## set; see time.labels)
 
     TT.old <- TT <- length(unique(data[, time]))
     N.old <- N <- length(unique(data[, id]))
@@ -1590,7 +1991,10 @@ fect.default <- function(
     }
 
     ## message("\nOK1\n")
-    ## check variation in x
+    ## check missing values in x. (Covariates absorbed by the fixed effects
+    ## no longer stop here, with swapped "unit-invariant"/"time-invariant"
+    ## labels as before 2.4.7: they are dropped with a warning once the
+    ## estimation cells are known; see .fect_check_covariates().)
     if (p > 0) {
         for (i in 1:p) {
             if (sum(is.na(data[, Xname[i]])) > 0 & na.rm == TRUE) {
@@ -1600,38 +2004,6 @@ fect.default <- function(
                     "\".",
                     sep = ""
                 ))
-            }
-            if (force %in% c(1, 3)) {
-                if (
-                    sum(
-                        tapply(data[, Xname[i]], data[, id], var),
-                        na.rm = TRUE
-                    ) ==
-                        0
-                ) {
-                    stop(paste(
-                        "Variable \"",
-                        Xname[i],
-                        "\" is unit-invariant. Try to remove it.",
-                        sep = ""
-                    ))
-                }
-            }
-            if (force %in% c(2, 3)) {
-                if (
-                    sum(
-                        tapply(data[, Xname[i]], data[, time], var),
-                        na.rm = TRUE
-                    ) ==
-                        0
-                ) {
-                    stop(paste(
-                        "Variable \"",
-                        Xname[i],
-                        "\" is time-invariant. Try to remove it.",
-                        sep = ""
-                    ))
-                }
             }
         }
     }
@@ -2080,12 +2452,14 @@ fect.default <- function(
 
     ## 2. check if some periods when all units are missing or treated
     I.use <- apply(II, 1, sum)
+    time.dropped <- NULL
     if (0 %in% I.use) {
+        time.dropped <- .time_label(time.uni[which(I.use == 0)])
         for (i in 1:TT) {
             if (I.use[i] == 0) {
                 message(
                     "\nThere are not any observations under control at ",
-                    time.uni[i],
+                    .time_label(time.uni[i]),
                     ", drop that period.\n"
                 )
             }
@@ -2130,6 +2504,22 @@ fect.default <- function(
         } else {
             X <- array(0, dim = c(TT, (N - length(rm.id)), 0))
         }
+    }
+    ## If those periods held every treated observation, nothing is left to
+    ## estimate. Before 2.4.7 fect went on and failed later with an unrelated
+    ## error ("non-numeric argument to binary operator", "missing value where
+    ## TRUE/FALSE needed").
+    if (length(time.dropped) > 0 && sum(D == 1 & I == 1, na.rm = TRUE) == 0) {
+        stop(
+            "No treated observations remain after dropping the periods in which ",
+            "no unit is under control (",
+            paste(utils::head(as.character(time.dropped), 10), collapse = ", "),
+            if (length(time.dropped) > 10) ", ..." else "",
+            "). fect needs control observations in the post-treatment periods ",
+            "to impute the counterfactuals; check whether the control units are ",
+            "observed after treatment starts.",
+            call. = FALSE
+        )
     }
 
     ## message("\nOK2\n")
@@ -2440,6 +2830,39 @@ fect.default <- function(
         }
     }
 
+    ## 7b. Covariates that cannot be estimated on the cells used to fit the
+    ## model: no variation there, absorbed by the fixed effects, or a linear
+    ## combination of other covariates (after removing the fixed effects).
+    ## They are dropped with a warning (keeping the first of a collinear set,
+    ## as lm() does), and their coefficients are reported as NA. Everything
+    ## below (the fit, loo refits, bootstrap, permutation, dloo) uses the
+    ## reduced X, so the estimates equal those of the fit without them.
+    ## Before 2.4.7 exactly collinear covariates changed the estimates
+    ## without a warning or crashed in C++, and FE-absorbed covariates
+    ## stopped with swapped labels.
+    Xname.all <- Xname
+    p.all <- p
+    X.keep <- seq_len(p)
+    if (p > 0) {
+        M.est <- II == 1
+        if (time.component.from == "nevertreated") {
+            ## the never-treated estimators fit the covariates on the
+            ## never-treated units only
+            M.est[, colSums(D == 1, na.rm = TRUE) > 0] <- FALSE
+        }
+        X.check <- .fect_check_covariates(
+            X, M.est, force, Xname,
+            extra.fe = if (method == "cfe" && dim(X.extra.FE)[3] > 0) X.extra.FE else NULL
+        )
+        if (length(X.check$drop) > 0) {
+            warning(X.check$message, call. = FALSE)
+            X.keep <- setdiff(seq_len(p), X.check$drop)
+            X <- X[, , X.keep, drop = FALSE]
+            Xname <- Xname[X.keep]
+            p <- length(X.keep)
+        }
+    }
+
     ## 8. Finally, check enough observations
     if (min(apply(II, 1, sum)) == 0) {
         if (placeboTest == 1) {
@@ -2485,9 +2908,13 @@ fect.default <- function(
     old.future.plan <- NULL
 
     if ((se == TRUE | permute == TRUE) & !do_parallel_boot) {
-        ## set seed
+        ## set seed. With CV the folds are drawn first (fect_boot() and the
+        ## se = FALSE branch both start with the CV call), so seeding with
+        ## `seed` draws the same folds, and picks the same r, as se = FALSE
+        ## and the parallel bootstrap. Before 2.4.7 this was always seed + 1.
+        ## Without CV the bootstrap draws keep their seed + 1 stream.
         if (is.null(seed) == FALSE) {
-            set.seed(seed + 1)
+            set.seed(if (isTRUE(CV == TRUE)) seed else seed + 1)
         }
     }
 
@@ -2527,7 +2954,7 @@ fect.default <- function(
     }
 
     if (se == FALSE & permute == FALSE & CV == TRUE) {
-        ## set seed for the cross-validation folds. Before 2.4.6 nothing
+        ## set seed for the cross-validation folds. Before 2.4.7 nothing
         ## seeded this case, so the folds came from the session RNG and
         ## ignored `seed`. set.seed(seed) is also what the parallel bootstrap
         ## (the default) uses, so with default settings a run with se = TRUE
@@ -2589,7 +3016,10 @@ fect.default <- function(
                     cores = cores,
                     do_parallel_cv   = do_parallel_cv,
                     do_parallel_boot = do_parallel_boot,
-                    cv.rule = cv.rule
+                    cv.rule = cv.rule,
+                    loading.bound      = loading.bound,
+                    gamma.loading      = gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid
                 )
             } else {
                 out <- fect_binary_cv(
@@ -2665,6 +3095,8 @@ fect.default <- function(
                     W.in.fit = use.W.in.fit,
                     I = I,
                     II = II,
+                    cm = cm,
+                    II.cm = II.cm,
                     T.on = T.on,
                     T.off = T.off,
                     r.cv = r,
@@ -2795,7 +3227,10 @@ fect.default <- function(
                     group.level = g.level,
                     group = G,
                     parallel = parallel,
-                    cores = cores
+                    cores = cores,
+                    loading.bound      = loading.bound,
+                    gamma.loading      = gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid
                 )
             } else if (method == "mc") {
                 out <- fect_mc(
@@ -2911,6 +3346,32 @@ fect.default <- function(
             dloo.group.map     = if (!is.null(group)) rawgroup else NULL
         )
 
+    }
+
+    ## cm = TRUE: the model of the treated potential outcomes, fitted on the
+    ## treated cells (II.cm), is stored in est.cm (read by fect_iden() and
+    ## plot(type = "hte", cm = TRUE)). fect_fe() fits it with the main model;
+    ## after cross-validation the main model comes from fect_cv(), which does
+    ## not, so fit it here with the selected number of factors. Before 2.4.7
+    ## cross-validated fits (and fits with se = FALSE) had no est.cm.
+    if (isTRUE(cm) && is.null(out$est.cm) && identical(method, "ife") &&
+        !identical(time.component.from, "nevertreated")) {
+        out$est.cm <- fect_fe(
+            Y = Y, D = D, X = X, W = W, W.in.fit = use.W.in.fit,
+            I = I, II = II, cm = TRUE, II.cm = II.cm,
+            T.on = T.on, T.off = T.off,
+            r.cv = if (!is.null(out$r.cv)) as.numeric(out$r.cv[1]) else r[1],
+            binary = binary, QR = QR, force = force, hasRevs = hasRevs,
+            tol = tol, max.iteration = max.iteration, boot = 0,
+            norm.para = norm.para
+        )$est.cm
+    }
+
+    ## loading.bound bounds the treated units' factor loadings; with no
+    ## factors there is nothing to bound.
+    if (identical(loading.bound, "simplex") && !is.null(out$r.cv) &&
+        isTRUE(as.numeric(out$r.cv[1]) == 0)) {
+        message("loading.bound = \"simplex\" has no effect because the selected number of factors is 0.")
     }
 
     if ((out$validX == 0) & (p != 0)) {
@@ -3160,7 +3621,21 @@ fect.default <- function(
                     cores = cores,
                     group.level = g.level,
                     group = pG,
-                    dis = FALSE
+                    dis = FALSE,
+                    ## The refits use the main fit's loading bound (and its
+                    ## gamma, CV-selected when none was given), as they use
+                    ## its r.cv and lambda.cv. Before 2.4.7 the bound was not
+                    ## passed, so every refit ran with unbounded loadings.
+                    loading.bound      = loading.bound,
+                    gamma.loading      = if (!is.null(out$gamma.loading)) out$gamma.loading else gamma.loading,
+                    gamma.loading.grid = gamma.loading.grid,
+                    ## Without it fect_boot() assumed "notyettreated", so the
+                    ## refits of a never-treated cfe fit ran the not-yet-
+                    ## treated cfe estimator (before 2.4.7).
+                    time.component.from = time.component.from,
+                    ## the user's error strategy for parametric refits
+                    ## (before 2.4.7 they always used "auto")
+                    para.error = para.error
                 )
 
                 p.est.att <- p.out$est.att
@@ -3264,6 +3739,10 @@ fect.default <- function(
     } else {
         tname.old <- tname <- unique(sort(data.old[, time]))[which(I.use != 0)]
     }
+    ## factor time index: report the level labels (in level order)
+    if (!is.null(time.labels)) {
+        tname.old <- tname <- time.labels[tname]
+    }
 
     if (length(rm.id) > 0) {
         remove.id <- iname[rm.id]
@@ -3322,8 +3801,16 @@ fect.default <- function(
 
     # if cross-validation:
 
-    if (p > 0) {
-        Xname.tmp <- Xname
+    ## covariates dropped before the fit (step 7b) get NA rows, so the beta
+    ## outputs keep one row per requested covariate
+    if (p < p.all) {
+        out <- .fect_restore_dropped_covariates(out, keep = X.keep,
+                                                p.all = p.all, se = se,
+                                                binary = binary)
+    }
+
+    if (p.all > 0) {
+        Xname.tmp <- Xname.all
         rownames(out$beta) <- Xname.tmp
         colnames(out$beta) <- c("Coef")
         if (binary == TRUE) {
@@ -3369,6 +3856,13 @@ fect.default <- function(
     }
     colnames(out$eff) <- iname
     rownames(out$eff) <- tname
+    ## implied weights: rows = control units, columns = treated units
+    if (is.matrix(out$wgt.implied) &&
+        nrow(out$wgt.implied) == length(out$co) &&
+        ncol(out$wgt.implied) == length(out$tr)) {
+        dimnames(out$wgt.implied) <- list(as.character(iname[out$co]),
+                                          as.character(iname[out$tr]))
+    }
     out$eff.calendar <- cbind(
         matrix(out$eff.calendar, ncol = 1),
         out$N.calendar
@@ -3409,7 +3903,7 @@ fect.default <- function(
             I.dat = I,
             Y = Yname,
             D = Dname,
-            X = Xname,
+            X = Xname.all, # requested covariates (dropped ones have NA beta)
             W = Wname,
             W.est.col = if (use.W.in.fit) Wname else NULL,
             W.agg.col = if (use.W.in.agg) Wname else NULL,
@@ -3452,14 +3946,16 @@ fect.default <- function(
             ## panelView::panelview(fit) can render the full set of
             ## units --- including those fect dropped (always-treated,
             ## insufficient pre-period, etc.) --- as "Not used" cells.
-            data.long = data.old[, c(index, Yname, Dname), drop = FALSE],
+            data.long = .fect_data_long(data.old[, c(index, Yname, Dname), drop = FALSE],
+                                        time, time.labels),
             time.component.from = time.component.from,
             em = em
         ),
         out
     )
 
-    if (1 %in% rm.id) {
+    ## whenever units were removed (before 2.4.7: only when unit 1 was)
+    if (length(rm.id) > 0) {
         output <- c(output, list(remove.id = remove.id))
         ## message("list of removed units:",remove.id)
         ## message("\n\n")
@@ -3591,6 +4087,23 @@ fect.default <- function(
     }
 
     output <- c(output, list(call = match.call()))
+
+    ## Every se = TRUE fit carries the resolved variance type (fect_boot puts
+    ## it on its result). effect() and att.cumu() read this slot rather than
+    ## x$call$vartype, which is NULL when vartype was not typed and a symbol
+    ## when it was passed as a variable. se = FALSE fits keep it NULL.
+    if (se == TRUE && is.null(output[["vartype"]])) {
+        output$vartype <- vartype
+    }
+
+    ## The aggregation weights as a TT x N matrix on the fit's panel (like
+    ## Y.dat), when W or W.agg weights the ATT aggregation. imputed_outcomes()
+    ## reports them cell by cell. The estimators' own copy of the matrix is
+    ## stored under "W", behind the column-name slot of the same name, and
+    ## `fit$W.agg` used to partially match the column-name slot W.agg.col.
+    if (!is.null(Wname) && isTRUE(use.W.in.agg)) {
+        output$W.agg <- W
+    }
 
     ## When W is supplied AND the aggregation surface should be weighted
     ## (W or W.agg supplied), route the W-weighted aggregations into the

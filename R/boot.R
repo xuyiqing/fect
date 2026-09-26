@@ -32,8 +32,9 @@ basic_ci_alpha <- function(theta, boots, alpha) {
 ## distribution row-wise from mean ~ 0 (H0) to mean ~ theta (H1) before
 ## computing the basic interval [2*theta - q_high, 2*theta - q_low]. The
 ## shift is variance-preserving, so the SE computed elsewhere on the
-## unshifted boot is unaffected; the H0-based p-value (computed via
-## get.pvalue() on the unshifted boot) is also unchanged.
+## unshifted boot is unaffected. The matching p-values are computed in
+## fect_boot() by .pvalue.basic(), which compares the estimate with the
+## zero-centered draws.
 ##
 ## - theta: vector of point estimates (length p)
 ## - boots: p x B matrix of bootstrap draws
@@ -89,6 +90,66 @@ trim_closure_env <- function(fun) {
   }
   environment(fun) <- new_env
   fun
+}
+
+## Draw `size` elements of `x`. Unlike sample(x, size), a length-1 numeric
+## `x` is not read as "sample from 1:x" (one treated unit at column 15 would
+## otherwise resample columns 1..15). For length(x) > 1 this makes exactly
+## the RNG draws sample() makes, so those resamples are unchanged.
+.fect_resample <- function(x, size, replace = TRUE) {
+  x[sample.int(length(x), size, replace = replace)]
+}
+
+## Store matrix `m` (TT x w) in slice j of `arr` (TT x W x B), padding with NA.
+## Widens `arr` (new columns NA) when w > W. An all-NA `m` (failed replicate)
+## never widens. Cluster-bootstrap replicates have varying width w (the units
+## of the drawn clusters); colnames.boot[[j]] records the real width. When
+## every replicate has width W the result equals `arr[, , j] <- m`.
+.fect_store_slice <- function(arr, m, j) {
+  if (is.null(m)) {
+    arr[, , j] <- NA
+    return(arr)
+  }
+  m <- as.matrix(m)
+  W <- dim(arr)[2]
+  w <- ncol(m)
+  if (nrow(m) != dim(arr)[1]) {
+    stop("replicate matrix has ", nrow(m), " rows; expected ", dim(arr)[1], ".",
+         call. = FALSE)
+  }
+  if (w > W) {
+    if (all(is.na(m))) {
+      arr[, , j] <- NA
+      return(arr)
+    }
+    grown <- array(NA, dim = c(dim(arr)[1], w, dim(arr)[3]))
+    grown[, seq_len(W), ] <- arr
+    arr <- grown
+    W <- w
+  }
+  if (w < W) {
+    arr[, , j] <- NA
+  }
+  arr[, seq_len(w), j] <- m
+  arr
+}
+
+## A replicate refit counts as successful only if it returned the fields the
+## collector stores, in the shapes the collector expects. A degenerate resample
+## (e.g. collinear factors in a panel with few distinct controls) used to come
+## back as a short list and crash the collector.
+.fect_boot_result_ok <- function(res, n.time, TT, keep.sims = FALSE,
+                                 width = NULL) {
+  if (!is.list(res)) return(FALSE)
+  if (length(res$att.avg) != 1L || length(res$att.avg.unit) != 1L) {
+    return(FALSE)
+  }
+  if (length(res$att) != n.time) return(FALSE)
+  if (isTRUE(keep.sims)) {
+    if (!is.matrix(res$eff) || nrow(res$eff) != TT) return(FALSE)
+    if (!is.null(width) && ncol(res$eff) != width) return(FALSE)
+  }
+  TRUE
 }
 
 fect_boot <- function(
@@ -161,7 +222,7 @@ fect_boot <- function(
   cv.donut = 1,
   min.T0 = 5,
   cv.rule = "1se",
-  proportion = 0,          # CV settings for the fect_cv() call below; before 2.4.6
+  proportion = 0,          # CV settings for the fect_cv() call below; before 2.4.7
                            # they were not passed, so se = TRUE ran CV on defaults
   dloo = FALSE,            # apply the dloo pre-trend overlay to each replicate
   dloo.adjust = FALSE,     # dloo: use Liu's pre-treatment-average baseline
@@ -220,15 +281,18 @@ fect_boot <- function(
     Nco <- length(co)
   }
 
-  ## Internal: when `loading.bound != "none"`, normalize
-  ## `method = "ife"` + `time.component.from = "nevertreated"` to
-  ## `method = "gsynth"` so the bootstrap loop routes to fect_nevertreated
-  ## (which threads loading.bound) instead of fect_fe (which would silently
-  ## drop it). The default `loading.bound = "none"` path is left untouched
-  ## to preserve byte-identical RNG sequencing with pre-feature behavior.
-  if (!identical(loading.bound, "none") &&
-      identical(method, "ife") &&
-      identical(time.component.from, "nevertreated")) {
+  ## Internal: normalize `method = "ife"` + `time.component.from =
+  ## "nevertreated"` to `method = "gsynth"`, so the point fit and the
+  ## replicates run fect_nevertreated() (the never-treated estimator, which
+  ## also threads loading.bound) instead of fect_fe() (the not-yet-treated
+  ## estimator). This is what the se = FALSE path and fect_cv() already do.
+  ## Before 2.4.7 this happened only with a loading bound, so se = TRUE,
+  ## CV = FALSE fits of this model silently used the not-yet-treated
+  ## estimator. Binary (probit) models keep fect_fe(): fect_nevertreated()
+  ## has no probit estimator.
+  if (identical(method, "ife") &&
+      identical(time.component.from, "nevertreated") &&
+      (!identical(loading.bound, "none") || binary == 0)) {
       method <- "gsynth"
   }
 
@@ -475,7 +539,10 @@ fect_boot <- function(
         kappaQ.id = kappaQ.id,
         parallel = parallel,
         cores = cores,
-        do_parallel_cv = do_parallel_cv
+        do_parallel_cv = do_parallel_cv,
+        loading.bound      = loading.bound,
+        gamma.loading      = gamma.loading,
+        gamma.loading.grid = gamma.loading.grid
       )
 
       if (!is.null(out$method)) {
@@ -632,7 +699,7 @@ fect_boot <- function(
       I.boot <- array(NA, dim = c(TT, N, nboots))
       eff.boot <- array(0, dim = c(TT, N, nboots)) ## to store results
     }
-    colnames.boot <- c()
+    colnames.boot <- vector("list", nboots) ## filled by index in the collector
   }
 
   att.avg.boot <- matrix(0, 1, nboots)
@@ -661,7 +728,7 @@ fect_boot <- function(
   calendar.eff.fit.boot <- matrix(0, TT, nboots)
 
   if (hasRevs == 1) {
-    eff.off.boot <- c()
+    eff.off.boot <- vector("list", nboots) ## filled by index (keep.sims)
     att.off.boot <- matrix(0, length(time.off), nboots)
     att.off.count.boot <- matrix(0, length(time.off), nboots)
   }
@@ -813,7 +880,10 @@ fect_boot <- function(
         silent = TRUE
       )
 
-      if ("try-error" %in% class(boot)) {
+      ## A7: a result without the fields the collector stores (degenerate
+      ## replicate) counts as failed, like an error.
+      if ("try-error" %in% class(boot) ||
+          !.fect_boot_result_ok(boot, length(time.on), TT, keep.sims, N)) {
         boot0 <- list(
           att.avg = NA,
           att = NA,
@@ -870,6 +940,15 @@ fect_boot <- function(
     id.co <- which(sum.D == 0)
     Nco <- length(id.co)
     Ntr <- length(id.tr)
+    if (Nco < 2) {
+      stop(
+        "vartype = \"parametric\" needs at least two never-treated units ",
+        "(found ", Nco, "): each simulated error uses one control as a ",
+        "pseudo-treated unit and the others as controls. Use ",
+        "vartype = \"bootstrap\" or \"jackknife\".",
+        call. = FALSE
+      )
+    }
 
     fit.out[which(out$I == 0)] <- 0
 
@@ -879,7 +958,7 @@ fect_boot <- function(
 
     draw.error <- function() {
       repeat {
-        fake.tr <- sample(id.co, 1, replace = FALSE)
+        fake.tr <- id.co[sample.int(length(id.co), 1L)]
         if (fake.tr %in% valid.co) {
           break
         }
@@ -887,7 +966,7 @@ fect_boot <- function(
 
       id.co.rest <- id.co[which(!id.co %in% fake.tr)]
       repeat {
-        id.co.pseudo <- sample(id.co.rest, Nco, replace = TRUE)
+        id.co.pseudo <- .fect_resample(id.co.rest, Nco)
         if (sum(apply(as.matrix(out$I[, id.co.pseudo]), 1, sum) >= 1) == TT) {
           break
         }
@@ -958,7 +1037,12 @@ fect_boot <- function(
           hasRevs    = hasRevs,
           tol        = tol,
           max.iteration = max.iteration,
-          norm.para  = norm.para
+          norm.para  = norm.para,
+          ## the pseudo-treated control's loadings are bounded like the
+          ## treated units' (gamma.loading is the main fit's, cached above)
+          loading.bound      = loading.bound,
+          gamma.loading      = gamma.loading,
+          gamma.loading.grid = gamma.loading.grid
         ),
         silent = TRUE
       )
@@ -1036,7 +1120,7 @@ fect_boot <- function(
     one.nonpara <- function(num = NULL) {
       ## boostrap ID
       repeat {
-        fake.co <- sample(id.co, Nco, replace = TRUE)
+        fake.co <- .fect_resample(id.co, Nco)
         if (sum(apply(as.matrix(II[, fake.co]), 1, sum) >= 1) == TT) {
           break
         }
@@ -1117,10 +1201,11 @@ fect_boot <- function(
       I.boot <- out$I[, id.boot, drop = FALSE]
       II.boot <- out$II[, id.boot, drop = FALSE]
       II.cm.boot <- out$II.cm[, id.boot, drop = FALSE]
-      W.boot <- NULL
-      if (!is.null(W)) {
-        W.boot <- NULL
-      }
+      ## The weights follow the units of the replicate (treated units first,
+      ## then the drawn controls), so att.avg.W / att.on.W exist for the
+      ## collector. Before 2.4.7 W.boot was NULL and weighted parametric
+      ## fits crashed there.
+      W.boot <- if (is.null(W)) NULL else W[, id.boot, drop = FALSE]
       boot.group <- NULL
       if (!is.null(group)) {
         if (is.matrix(group) || length(dim(group)) == 2) {
@@ -1158,6 +1243,16 @@ fect_boot <- function(
           X.kappa
       }
 
+      ## Scales: fit.out (out$Y.ct) and the simulated errors are on the
+      ## ORIGINAL outcome scale (the estimators multiply their outputs back by
+      ## norm.para, and draw.error() divides by it). impute_Y0(norm.para = )
+      ## expects the NORMALIZED scale, as X is, and multiplies its outputs by
+      ## sd(Y). Without this line normalize = TRUE multiplied the parametric
+      ## SEs by sd(Y).
+      if (!is.null(norm.para)) {
+        Y.boot <- Y.boot / norm.para[1]
+      }
+
       synth.out <- try(
         impute_Y0(
           method     = method,
@@ -1166,6 +1261,7 @@ fect_boot <- function(
           X          = X.boot,
           D          = D.boot,
           W          = W.boot,
+          W.in.fit   = W.in.fit,
           I          = I.boot,
           II         = II.boot,
           T.on       = T.on[, id.boot],
@@ -1198,12 +1294,17 @@ fect_boot <- function(
           group.level  = group.level,
           group        = boot.group,
           force        = force,
-          hasRevs      = hasRevs
+          hasRevs      = hasRevs,
+          loading.bound      = loading.bound,
+          gamma.loading      = gamma.loading,
+          gamma.loading.grid = gamma.loading.grid
         ),
         silent = TRUE
       )
 
-      if ("try-error" %in% class(synth.out)) {
+      if ("try-error" %in% class(synth.out) ||
+          !.fect_boot_result_ok(synth.out, length(time.on), TT, keep.sims,
+                                length(id.boot))) {
         boot0 <- list(
           att.avg = NA,
           att = NA,
@@ -1255,8 +1356,8 @@ fect_boot <- function(
           if (hasRevs == 0) {
             if (Nco > 0) {
               repeat {
-                fake.co <- sample(co, Nco, replace = TRUE)
-                fake.tr <- sample(tr, Ntr, replace = TRUE)
+                fake.co <- .fect_resample(co, Nco)
+                fake.tr <- .fect_resample(tr, Ntr)
                 boot.id <- c(fake.tr, fake.co)
                 if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                   break
@@ -1264,7 +1365,7 @@ fect_boot <- function(
               }
             } else {
               repeat {
-                boot.id <- sample(tr, Ntr, replace = TRUE)
+                boot.id <- .fect_resample(tr, Ntr)
                 if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                   break
                 }
@@ -1274,9 +1375,9 @@ fect_boot <- function(
             if (Ntr > 0) {
               if (Nco > 0) {
                 repeat {
-                  fake.co <- sample(co, Nco, replace = TRUE)
-                  fake.tr <- sample(tr, Ntr, replace = TRUE)
-                  fake.rev <- sample(rev, Nrev, replace = TRUE)
+                  fake.co <- .fect_resample(co, Nco)
+                  fake.tr <- .fect_resample(tr, Ntr)
+                  fake.rev <- .fect_resample(rev, Nrev)
                   boot.id <- c(fake.rev, fake.tr, fake.co)
                   if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
@@ -1284,8 +1385,8 @@ fect_boot <- function(
                 }
               } else {
                 repeat {
-                  fake.tr <- sample(tr, Ntr, replace = TRUE)
-                  fake.rev <- sample(rev, Nrev, replace = TRUE)
+                  fake.tr <- .fect_resample(tr, Ntr)
+                  fake.rev <- .fect_resample(rev, Nrev)
                   boot.id <- c(fake.rev, fake.tr)
                   if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
@@ -1295,8 +1396,8 @@ fect_boot <- function(
             } else {
               if (Nco > 0) {
                 repeat {
-                  fake.co <- sample(co, Nco, replace = TRUE)
-                  fake.rev <- sample(rev, Nrev, replace = TRUE)
+                  fake.co <- .fect_resample(co, Nco)
+                  fake.rev <- .fect_resample(rev, Nrev)
                   boot.id <- c(fake.rev, fake.co)
                   if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
@@ -1304,7 +1405,7 @@ fect_boot <- function(
                 }
               } else {
                 repeat {
-                  boot.id <- sample(rev, Nrev, replace = TRUE)
+                  boot.id <- .fect_resample(rev, Nrev)
                   if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break
                   }
@@ -1314,7 +1415,7 @@ fect_boot <- function(
           }
         } else {
           cl.id <- c(apply(cl, 2, mean))
-          cl.boot <- sample(cl.unique, length(cl.unique), replace = TRUE)
+          cl.boot <- .fect_resample(cl.unique, length(cl.unique))
           cl.boot.uni <- unique(cl.boot)
           cl.boot.count <- as.numeric(table(cl.boot))
           boot.id <- c()
@@ -1535,6 +1636,58 @@ fect_boot <- function(
             ),
             silent = TRUE
           )
+        } else if (method == "cfe" && identical(time.component.from, "nevertreated")) {
+          ## cfe + never-treated: the same estimator as the point fit (and as
+          ## the parametric refits, impute_Y0() branch 3). Before 2.4.7 these
+          ## replicates went to fect_cfe(), the not-yet-treated model.
+          boot <- try(
+            fect_nevertreated(
+              Y = Y.input[, boot.id],
+              X = X.boot,
+              D = D.boot,
+              W = W.boot,
+              W.in.fit = W.in.fit,
+              I = I.boot,
+              II = II[, boot.id],
+              T.on = T.on[, boot.id],
+              T.off = T.off.boot,
+              CV = 0,
+              T.on.balance = T.on.balance[, boot.id],
+              balance.period = balance.period,
+              r = r.boot,
+              binary = binary,
+              QR = QR,
+              force = force,
+              hasRevs = hasRevs,
+              tol = tol,
+              max.iteration = max.iteration,
+              boot = 1,
+              norm.para = norm.para,
+              calendar.enp.seq = target.enp,
+              time.on.seq = time.on,
+              time.off.seq = time.off,
+              time.on.seq.W = time.on.W,
+              time.off.seq.W = time.off.W,
+              placebo.period = placebo.period.boot,
+              placeboTest = placeboTest,
+              time.on.balance.seq = balance.time,
+              carryoverTest = carryoverTest,
+              carryover.period = carryover.period.boot,
+              group.level = group.level,
+              group = boot.group,
+              time.on.seq.group = group.time.on,
+              time.off.seq.group = group.time.off,
+              method = "cfe",
+              X.extra.FE = X.extra.FE[, boot.id, , drop = FALSE],
+              X.Z = X.Z[, boot.id, , drop = FALSE],
+              X.Q = X.Q[, boot.id, , drop = FALSE],
+              X.gamma = X.gamma[, boot.id, , drop = FALSE],
+              X.kappa = X.kappa[, boot.id, , drop = FALSE],
+              Zgamma.id = Zgamma.id,
+              kappaQ.id = kappaQ.id
+            ),
+            silent = TRUE
+          )
         } else if (method == "cfe") {
           X.extra.FE.boot <- X.extra.FE[, boot.id, , drop = FALSE]
           X.Z.boot <- X.Z[, boot.id, , drop = FALSE]
@@ -1589,7 +1742,9 @@ fect_boot <- function(
         if (is.null(boot)) {
           stop(paste0("Unsupported bootstrap method: ", method))
         }
-        if ("try-error" %in% class(boot)) {
+        if ("try-error" %in% class(boot) ||
+            !.fect_boot_result_ok(boot, length(time.on), TT, keep.sims,
+                                  length(boot.id))) {
           boot0 <- list(
             att.avg = NA,
             att = NA,
@@ -1908,252 +2063,159 @@ fect_boot <- function(
         }
       }
     }
-
-    for (j in 1:nboots) {
-      if (inherits(boot.out[[j]], "error")) {
-        warning(
-          paste0("Bootstrap iteration ", j, " failed in parallel worker: ", conditionMessage(boot.out[[j]]))
-        )
-        boot.out[[j]] <- make_boot_na()
-      }
-      att.avg.boot[, j] <- boot.out[[j]]$att.avg
-      att.avg.unit.boot[, j] <- boot.out[[j]]$att.avg.unit
-      att.boot[, j] <- boot.out[[j]]$att
-      att.count.boot[, j] <- boot.out[[j]]$count
-      if (dloo) {
-        pre.att.boot[, j] <- boot.out[[j]]$dloo.pre
-        if (dloo.ng > 0)
-          pre.att.group.boot[, , j] <- boot.out[[j]]$dloo.pre.group
-      }
-      if (keep.sims) {
-        colnames(boot.out[[j]]$eff) <- boot.out[[j]]$boot.id
-        eff.boot[,, j] <- boot.out[[j]]$eff
-        D.boot[,, j] <- boot.out[[j]]$D
-        I.boot[,, j] <- boot.out[[j]]$I
-        if (is.null(boot.out[[j]]$boot.id)) {
-          colnames.boot <- c(colnames.boot, list(1:N))
-        } else {
-          colnames.boot <- c(colnames.boot, list(boot.out[[j]]$boot.id))
-        }
-      }
-      calendar.eff.boot[, j] <- boot.out[[j]]$eff.calendar
-      calendar.eff.fit.boot[, j] <- boot.out[[j]]$eff.calendar.fit
-      if (p > 0) {
-        beta.boot[, j] <- boot.out[[j]]$beta
-        if (binary == TRUE) {
-          marginal.boot[, j] <- boot.out[[j]]$marginal
-        }
-      }
-      if (hasRevs == 1) {
-        att.off.boot[, j] <- boot.out[[j]]$att.off
-        att.off.count.boot[, j] <- boot.out[[j]]$count.off
-        if (keep.sims) {
-          eff.off.boot <- c(eff.off.boot, list(boot.out[[j]]$eff.off))
-        }
-      }
-      if (!is.null(T.on.carry)) {
-        carry.att.boot[, j] <- boot.out[[j]]$carry.att
-      }
-      if (!is.null(balance.period)) {
-        balance.att.boot[, j] <- boot.out[[j]]$balance.att
-        balance.count.boot[, j] <- boot.out[[j]]$balance.count
-        balance.avg.att.boot[, j] <- boot.out[[j]]$balance.avg.att
-        if (!is.null(placebo.period) & placeboTest == TRUE) {
-          balance.att.placebo.boot[, j] <- boot.out[[j]]$balance.att.placebo
-        }
-      }
-      if (!is.null(W)) {
-        att.avg.W.boot[, j] <- boot.out[[j]]$att.avg.W
-        att.on.W.boot[, j] <- boot.out[[j]]$att.on.W
-        att.on.count.W.boot[, j] <- boot.out[[j]]$count.on.W
-        if (!is.null(placebo.period) & placeboTest == TRUE) {
-          att.placebo.W.boot[, j] <- boot.out[[j]]$att.placebo.W
-        }
-        if (hasRevs == 1) {
-          att.off.W.boot[, j] <- boot.out[[j]]$att.off.W
-          att.off.count.W.boot[, j] <- boot.out[[j]]$count.off.W
-          if (!is.null(carryover.period) & carryoverTest == TRUE) {
-            att.carryover.W.boot[, j] <- boot.out[[j]]$att.carryover.W
-          }
-        }
-      }
-
-      if (!is.null(placebo.period) & placeboTest == TRUE) {
-        att.placebo.boot[, j] <- boot.out[[j]]$att.placebo
-      }
-      if (!is.null(carryover.period) & carryoverTest == TRUE) {
-        att.carryover.boot[, j] <- boot.out[[j]]$att.carryover
-      }
-      if (!is.null(group)) {
-        group.att.boot[, j] <- boot.out[[j]]$group.att
-        for (sub.name in group.output.name) {
-          if (is.null(boot.out[[j]]$group.output[[sub.name]]$att.on)) {
-            group.atts.boot[[sub.name]][, j] <- NA
-          } else {
-            group.atts.boot[[sub.name]][, j] <- boot.out[[j]]$group.output[[
-              sub.name
-            ]]$att.on
-          }
-          if (hasRevs == 1) {
-            if (is.null(boot.out[[j]]$group.output[[sub.name]]$att.off)) {
-              group.atts.off.boot[[sub.name]][, j] <- NA
-            } else {
-              group.atts.off.boot[[sub.name]][, j] <- boot.out[[
-                j
-              ]]$group.output[[sub.name]]$att.off
-            }
-          }
-          if (placeboTest) {
-            if (is.null(boot.out[[j]]$group.output[[sub.name]]$att.placebo)) {
-              group.att.placebo.boot[[sub.name]][, j] <- NA
-            } else {
-              group.att.placebo.boot[[sub.name]][, j] <- boot.out[[
-                j
-              ]]$group.output[[sub.name]]$att.placebo
-            }
-          }
-          if (carryoverTest) {
-            if (is.null(boot.out[[j]]$group.output[[sub.name]]$att.carryover)) {
-              group.att.carryover.boot[[sub.name]][, j] <- NA
-            } else {
-              group.att.carryover.boot[[sub.name]][, j] <- boot.out[[
-                j
-              ]]$group.output[[sub.name]]$att.carryover
-            }
-          }
-        }
-      }
-    }
   } else {
     boot.out <- vector("list", nboots)
-    # pb <- txtProgressBar(
-    #     min = 0,
-    #     max = nboots,
-    #     style = 3,
-    #     width = 50,
-    #     char = "="
-    # )
     for (j in 1:nboots) {
-      boot <- one.nonpara(boot.seq[j])
-      boot.out[[j]] <- boot
-      att.avg.boot[, j] <- boot$att.avg
-      att.avg.unit.boot[, j] <- boot$att.avg.unit
-      att.boot[, j] <- boot$att
-      att.count.boot[, j] <- boot$count
-      if (dloo) {
-        pre.att.boot[, j] <- boot$dloo.pre
-        if (dloo.ng > 0)
-          pre.att.group.boot[, , j] <- boot$dloo.pre.group
-      }
-      if (keep.sims) {
-        colnames(boot$eff) <- boot$boot.id
-        # assign("boot", boot, .GlobalEnv)
-        eff.boot[,, j] <- boot$eff
-        D.boot[,, j] <- boot$D
-        I.boot[,, j] <- boot$I
-        if (is.null(boot$boot.id)) {
-          colnames.boot <- c(colnames.boot, list(1:N)) # Parametric bootstrap
-          # assign("boot", boot, .GlobalEnv)
-        } else {
-          colnames.boot <- c(colnames.boot, list(boot$boot.id)) # Raw bootstrap and jackknife
-        }
-      }
-      calendar.eff.boot[, j] <- boot$eff.calendar
-      calendar.eff.fit.boot[, j] <- boot$eff.calendar.fit
-      if (p > 0) {
-        beta.boot[, j] <- boot$beta
-        if (binary == TRUE) {
-          marginal.boot[, j] <- boot$marginal
-        }
-      }
-      if (hasRevs == 1) {
-        if (keep.sims) {
-          eff.off.boot <- c(eff.off.boot, list(boot$eff.off))
-        }
-        att.off.boot[, j] <- boot$att.off
-        att.off.count.boot[, j] <- boot$count.off
-      }
-      if (!is.null(T.on.carry)) {
-        carry.att.boot[, j] <- boot$carry.att
-      }
-      if (!is.null(balance.period)) {
-        balance.att.boot[, j] <- boot$balance.att
-        balance.count.boot[, j] <- boot$balance.count
-        balance.avg.att.boot[, j] <- boot$balance.avg.att
-        if (!is.null(placebo.period) & placeboTest == TRUE) {
-          balance.att.placebo.boot[, j] <- boot$balance.att.placebo
-        }
-      }
-      if (!is.null(W)) {
-        att.avg.W.boot[, j] <- boot$att.avg.W
-        att.on.W.boot[, j] <- boot$att.on.W
-        att.on.count.W.boot[, j] <- boot$count.on.W
-        if (!is.null(placebo.period) & placeboTest == TRUE) {
-          att.placebo.W.boot[, j] <- boot$att.placebo.W
-        }
-        if (hasRevs == 1) {
-          att.off.W.boot[, j] <- boot$att.off.W
-          att.off.count.W.boot[, j] <- boot$count.off.W
-          if (!is.null(carryover.period) & carryoverTest == TRUE) {
-            att.carryover.W.boot[, j] <- boot$att.carryover.W
+      boot.out[[j]] <- one.nonpara(boot.seq[j])
+    }
+  }
+
+  ## Collect the replicates into the per-replicate slots; the serial and
+  ## parallel paths share this loop. Every slot is written by index, so a
+  ## replicate can be written twice: when a result cannot be stored (an odd
+  ## shape from a degenerate resample) the replicate is recorded as failed,
+  ## as a failed parallel worker is, so that boot.rm drops it and the count
+  ## message below reports it. keep.sims arrays go through .fect_store_slice(),
+  ## which pads narrower replicates (cluster bootstrap) with NA columns.
+  for (j in 1:nboots) {
+    if (inherits(boot.out[[j]], "error")) {
+      warning(
+        paste0("Bootstrap iteration ", j, " failed in parallel worker: ", conditionMessage(boot.out[[j]]))
+      )
+      boot.out[[j]] <- make_boot_na()
+    }
+    for (attempt in 1:2) {
+      boot <- boot.out[[j]]
+      stored <- tryCatch(
+        {
+          att.avg.boot[, j] <- boot$att.avg
+          att.avg.unit.boot[, j] <- boot$att.avg.unit
+          att.boot[, j] <- boot$att
+          att.count.boot[, j] <- boot$count
+          if (dloo) {
+            pre.att.boot[, j] <- boot$dloo.pre
+            if (dloo.ng > 0)
+              pre.att.group.boot[, , j] <- boot$dloo.pre.group
           }
-        }
-      }
-      if (!is.null(placebo.period) & placeboTest == TRUE) {
-        att.placebo.boot[, j] <- boot$att.placebo
-      }
-      if (!is.null(carryover.period) & carryoverTest == TRUE) {
-        att.carryover.boot[, j] <- boot$att.carryover
-      }
-      if (!is.null(group)) {
-        group.att.boot[, j] <- boot$group.att
-        for (sub.name in group.output.name) {
-          if (is.null(boot$group.output[[sub.name]]$att.on)) {
-            group.atts.boot[[sub.name]][, j] <- NA
-          } else {
-            group.atts.boot[[sub.name]][, j] <- boot$group.output[[
-              sub.name
-            ]]$att.on
+          if (keep.sims) {
+            colnames(boot$eff) <- boot$boot.id
+            if (NCOL(boot$D) != NCOL(boot$eff) || NCOL(boot$I) != NCOL(boot$eff)) {
+              stop("replicate eff, D and I differ in width.", call. = FALSE)
+            }
+            eff.boot <- .fect_store_slice(eff.boot, boot$eff, j)
+            D.boot <- .fect_store_slice(D.boot, boot$D, j)
+            I.boot <- .fect_store_slice(I.boot, boot$I, j)
+            ## original unit positions of the replicate's columns: the drawn
+            ## units (case bootstrap, jackknife) or treated units then drawn
+            ## controls (parametric); 1:N for refits on the full panel
+            colnames.boot[j] <- list(if (is.null(boot$boot.id)) 1:N else boot$boot.id)
+          }
+          calendar.eff.boot[, j] <- boot$eff.calendar
+          calendar.eff.fit.boot[, j] <- boot$eff.calendar.fit
+          if (p > 0) {
+            beta.boot[, j] <- boot$beta
+            if (binary == TRUE) {
+              marginal.boot[, j] <- boot$marginal
+            }
           }
           if (hasRevs == 1) {
-            if (is.null(boot$group.output[[sub.name]]$att.off)) {
-              group.atts.off.boot[[sub.name]][, j] <- NA
-            } else {
-              group.atts.off.boot[[sub.name]][, j] <- boot$group.output[[
-                sub.name
-              ]]$att.off
+            att.off.boot[, j] <- boot$att.off
+            att.off.count.boot[, j] <- boot$count.off
+            if (keep.sims) {
+              eff.off.boot[j] <- list(boot$eff.off)
             }
           }
-          if (placeboTest) {
-            if (is.null(boot$group.output[[sub.name]]$att.placebo)) {
-              group.att.placebo.boot[[sub.name]][, j] <- NA
-            } else {
-              group.att.placebo.boot[[sub.name]][, j] <- boot$group.output[[
-                sub.name
-              ]]$att.placebo
+          if (!is.null(T.on.carry)) {
+            carry.att.boot[, j] <- boot$carry.att
+          }
+          if (!is.null(balance.period)) {
+            balance.att.boot[, j] <- boot$balance.att
+            balance.count.boot[, j] <- boot$balance.count
+            balance.avg.att.boot[, j] <- boot$balance.avg.att
+            if (!is.null(placebo.period) & placeboTest == TRUE) {
+              balance.att.placebo.boot[, j] <- boot$balance.att.placebo
             }
           }
-          if (carryoverTest) {
-            if (is.null(boot$group.output[[sub.name]]$att.carryover)) {
-              group.att.carryover.boot[[sub.name]][, j] <- NA
-            } else {
-              group.att.carryover.boot[[sub.name]][, j] <- boot$group.output[[
-                sub.name
-              ]]$att.carryover
+          if (!is.null(W)) {
+            att.avg.W.boot[, j] <- boot$att.avg.W
+            att.on.W.boot[, j] <- boot$att.on.W
+            att.on.count.W.boot[, j] <- boot$count.on.W
+            if (!is.null(placebo.period) & placeboTest == TRUE) {
+              att.placebo.W.boot[, j] <- boot$att.placebo.W
+            }
+            if (hasRevs == 1) {
+              att.off.W.boot[, j] <- boot$att.off.W
+              att.off.count.W.boot[, j] <- boot$count.off.W
+              if (!is.null(carryover.period) & carryoverTest == TRUE) {
+                att.carryover.W.boot[, j] <- boot$att.carryover.W
+              }
             }
           }
+          if (!is.null(placebo.period) & placeboTest == TRUE) {
+            att.placebo.boot[, j] <- boot$att.placebo
+          }
+          if (!is.null(carryover.period) & carryoverTest == TRUE) {
+            att.carryover.boot[, j] <- boot$att.carryover
+          }
+          if (!is.null(group)) {
+            group.att.boot[, j] <- boot$group.att
+            for (sub.name in group.output.name) {
+              if (is.null(boot$group.output[[sub.name]]$att.on)) {
+                group.atts.boot[[sub.name]][, j] <- NA
+              } else {
+                group.atts.boot[[sub.name]][, j] <- boot$group.output[[
+                  sub.name
+                ]]$att.on
+              }
+              if (hasRevs == 1) {
+                if (is.null(boot$group.output[[sub.name]]$att.off)) {
+                  group.atts.off.boot[[sub.name]][, j] <- NA
+                } else {
+                  group.atts.off.boot[[sub.name]][, j] <- boot$group.output[[
+                    sub.name
+                  ]]$att.off
+                }
+              }
+              if (placeboTest) {
+                if (is.null(boot$group.output[[sub.name]]$att.placebo)) {
+                  group.att.placebo.boot[[sub.name]][, j] <- NA
+                } else {
+                  group.att.placebo.boot[[sub.name]][, j] <- boot$group.output[[
+                    sub.name
+                  ]]$att.placebo
+                }
+              }
+              if (carryoverTest) {
+                if (is.null(boot$group.output[[sub.name]]$att.carryover)) {
+                  group.att.carryover.boot[[sub.name]][, j] <- NA
+                } else {
+                  group.att.carryover.boot[[sub.name]][, j] <- boot$group.output[[
+                    sub.name
+                  ]]$att.carryover
+                }
+              }
+            }
+          }
+          TRUE
+        },
+        error = function(e) {
+          ## make_boot_na() always fits the slots; a failure there is a bug
+          if (attempt == 2L) stop(e)
+          FALSE
         }
-      }
-      # setTxtProgressBar(pb, j)
+      )
+      if (stored) break
+      boot.out[[j]] <- make_boot_na()
     }
-    # close(pb)
   }
   ## end of bootstrapping
   ## remove failure bootstrap
   ## alternative condition? max(apply(is.na(att.boot),2,sum)) == dim(att.boot)[1]
   att.boot.original <- att.boot
+  n.fail <- 0L
   if (sum(is.na(c(att.avg.boot))) > 0) {
     boot.rm <- which(is.na(c(att.avg.boot)))
+    n.fail <- length(boot.rm)
     att.avg.boot <- t(as.matrix(att.avg.boot[, -boot.rm]))
     att.avg.unit.boot <- t(as.matrix(att.avg.unit.boot[, -boot.rm]))
     att.boot <- as.matrix(att.boot[, -boot.rm])
@@ -2242,6 +2304,23 @@ fect_boot <- function(
       D.boot <- D.boot[, , -boot.rm, drop = FALSE]
       I.boot <- I.boot[, , -boot.rm, drop = FALSE]
       colnames.boot <- colnames.boot[-boot.rm]
+    }
+  }
+  ## Say how many replicates failed (failed refits, degenerate resamples)
+  ## instead of dropping them silently.
+  if (n.fail > 0L) {
+    rep.kind <- if (vartype == "jackknife") "jackknife" else "bootstrap"
+    n.kept <- nboots - n.fail
+    if (n.kept >= 2L) {
+      message(sprintf(
+        "%d of %d %s replicates failed and were dropped; uncertainty estimates use the remaining %d.",
+        n.fail, nboots, rep.kind, n.kept
+      ))
+    } else {
+      warning(sprintf(
+        "Only %d of %d %s replicates succeeded; standard errors and confidence intervals are not available (NA).",
+        n.kept, nboots, rep.kind
+      ), call. = FALSE)
     }
   }
   if (dis) {
@@ -2500,6 +2579,12 @@ fect_boot <- function(
           if (vartype == "jackknife") {
             expected_N_b <- N - 1
           }
+          if (!is.null(cl) && vartype == "bootstrap") {
+            ## cluster bootstrap: a replicate holds the units of the drawn
+            ## clusters, so its width varies; this block only uses the
+            ## replicate's own D_b, Y_b and Y.ct
+            expected_N_b <- N_b
+          }
           if (N > 0 && N_b != expected_N_b) {
             warning(
               paste(
@@ -2685,6 +2770,11 @@ fect_boot <- function(
             }
             # if N=0, expected_N_b = -1. N_b is likely 0. This path is complex if N=0.
             # However, N=0 is caught by an early return. So N > 0 here.
+          }
+          if (!is.null(cl) && vartype == "bootstrap") {
+            ## cluster bootstrap: a replicate holds the units of the drawn
+            ## clusters, so its width varies; only D_b, Y_b, Y.ct are used
+            expected_N_b <- N_b
           }
 
           if (N > 0 && N_b != expected_N_b) {
@@ -3720,6 +3810,36 @@ fect_boot <- function(
     ## machinery so fit$est.* slots match estimand() byte-equally.
     .is_param <- isTRUE(vartype == "parametric")
 
+    ## p-values for ci.method = "basic", one per row of `boots` (or one for a
+    ## vector), to go with the basic intervals. Case-bootstrap draws are
+    ## centered at the estimate: get.pvalue() is twice the smaller share of
+    ## the draws on either side of zero. Parametric draws of a treatment
+    ## effect are simulated with no effect, so they are centered at zero,
+    ## not at the estimate: the p-value is twice the smaller share of the
+    ## centered draws (the draws minus their mean) at or beyond the estimate,
+    ## on either side. That is the normal p-value, 2 * min(F(est), 1 - F(est))
+    ## with F the distribution of the estimate under no effect, with the
+    ## draws in place of N(0, SE^2). It is below alpha when the basic
+    ## interval excludes zero, up to the resolution of the draws. (Before
+    ## 2.4.7 get.pvalue() was applied to the parametric draws as they are,
+    ## which gives about 1 whatever the estimate.) Coefficient draws are
+    ## centered at the estimate in both schemes and keep get.pvalue().
+    .pvalue.basic <- function(theta, boots) {
+      if (!.is_param) {
+        if (is.matrix(boots)) {
+          return(apply(boots, 1, get.pvalue))
+        }
+        return(get.pvalue(boots))
+      }
+      null.p <- function(th, b) get.pvalue(b - mean(b, na.rm = TRUE) - th)
+      if (is.matrix(boots)) {
+        return(vapply(seq_len(nrow(boots)), function(k) {
+          null.p(theta[k], boots[k, ])
+        }, numeric(1)))
+      }
+      null.p(theta, boots)
+    }
+
     se.att <- apply(att.boot, 1, function(vec) sd(vec, na.rm = TRUE))
     if (quantile.CI == FALSE) {
       CI.att <- cbind(
@@ -3729,7 +3849,7 @@ fect_boot <- function(
       pvalue.att <- (1 - pnorm(abs(att / se.att))) * 2
     } else {
       CI.att <- .basic_ci_shifted(att, att.boot, alpha, .is_param)
-      pvalue.att <- apply(att.boot, 1, get.pvalue)  # original (H0-centered)
+      pvalue.att <- .pvalue.basic(att, att.boot)
     }
 
     #vcov.att <- cov(t(att.boot), use = "pairwise.complete.obs")
@@ -3784,7 +3904,7 @@ fect_boot <- function(
         pvalue.att.off <- (1 - pnorm(abs(att.off / se.att.off))) * 2
       } else {
         CI.att.off <- .basic_ci_shifted(att.off, att.off.boot, alpha, .is_param)
-        pvalue.att.off <- apply(att.off.boot, 1, get.pvalue)
+        pvalue.att.off <- .pvalue.basic(att.off, att.off.boot)
       }
 
       #vcov.att.off <- cov(t(att.off.boot), use = "pairwise.complete.obs")
@@ -3841,7 +3961,7 @@ fect_boot <- function(
         pvalue.carry.att <- (1 - pnorm(abs(carry.att / se.carry.att))) * 2
       } else {
         CI.carry.att <- .basic_ci_shifted(carry.att, carry.att.boot, alpha, .is_param)
-        pvalue.carry.att <- apply(carry.att.boot, 1, get.pvalue)
+        pvalue.carry.att <- .pvalue.basic(carry.att, carry.att.boot)
       }
 
       est.carry.att <- cbind(
@@ -3873,7 +3993,7 @@ fect_boot <- function(
         pvalue.balance.att <- (1 - pnorm(abs(balance.att / se.balance.att))) * 2
       } else {
         CI.balance.att <- .basic_ci_shifted(balance.att, balance.att.boot, alpha, .is_param)
-        pvalue.balance.att <- apply(balance.att.boot, 1, get.pvalue)
+        pvalue.balance.att <- .pvalue.basic(balance.att, balance.att.boot)
       }
 
       #vcov.balance.att <- cov(t(balance.att.boot), use = "pairwise.complete.obs")
@@ -3917,7 +4037,7 @@ fect_boot <- function(
         CI.balance.avg.att <- .basic_ci_shifted_one(balance.avg.att,
                                                     balance.avg.att.boot,
                                                     alpha, .is_param)
-        p.balance.avg.att <- get.pvalue(balance.avg.att.boot)
+        p.balance.avg.att <- .pvalue.basic(balance.avg.att, balance.avg.att.boot)
       }
 
       est.balance.avg <- t(as.matrix(c(
@@ -3968,7 +4088,8 @@ fect_boot <- function(
           balance.CI.placebo.bound <- .basic_ci_shifted_one(balance.att.placebo,
                                                             balance.att.placebo.boot,
                                                             2 * alpha, .is_param)
-          balance.pvalue.placebo <- get.pvalue(balance.att.placebo.boot)
+          balance.pvalue.placebo <- .pvalue.basic(balance.att.placebo,
+                                                 balance.att.placebo.boot)
         }
 
         est.balance.placebo <- t(as.matrix(c(
@@ -4002,7 +4123,7 @@ fect_boot <- function(
       } else {
         CI.att.avg.W <- .basic_ci_shifted_one(att.avg.W, att.avg.W.boot,
                                                alpha, .is_param)
-        p.att.avg.W <- get.pvalue(att.avg.W.boot)
+        p.att.avg.W <- .pvalue.basic(att.avg.W, att.avg.W.boot)
       }
 
       est.avg.W <- t(as.matrix(c(
@@ -4034,7 +4155,7 @@ fect_boot <- function(
       } else {
         CI.att.W   <- .basic_ci_shifted(att.on.W, att.on.W.boot, alpha,     .is_param)
         att.W.bound <- .basic_ci_shifted(att.on.W, att.on.W.boot, 2 * alpha, .is_param)
-        pvalue.att.W <- apply(att.on.W.boot, 1, get.pvalue)
+        pvalue.att.W <- .pvalue.basic(att.on.W, att.on.W.boot)
       }
 
       #vcov.att.W <- cov(t(att.on.W.boot), use = "pairwise.complete.obs")
@@ -4100,7 +4221,7 @@ fect_boot <- function(
         } else {
           CI.placebo.W       <- .basic_ci_shifted_one(att.placebo.W, att.placebo.W.boot, alpha,     .is_param)
           CI.placebo.bound.W <- .basic_ci_shifted_one(att.placebo.W, att.placebo.W.boot, 2 * alpha, .is_param)
-          pvalue.placebo.w <- get.pvalue(att.placebo.W.boot)
+          pvalue.placebo.w <- .pvalue.basic(att.placebo.W, att.placebo.W.boot)
         }
 
         est.placebo.W <- t(as.matrix(c(
@@ -4138,7 +4259,7 @@ fect_boot <- function(
         } else {
           CI.att.off.W   <- .basic_ci_shifted(att.off.W, att.off.W.boot, alpha,     .is_param)
           att.off.W.bound <- .basic_ci_shifted(att.off.W, att.off.W.boot, 2 * alpha, .is_param)
-          pvalue.att.off.W <- apply(att.off.W.boot, 1, get.pvalue)
+          pvalue.att.off.W <- .pvalue.basic(att.off.W, att.off.W.boot)
         }
 
         #vcov.att.off.W <- cov(t(att.off.W.boot), use = "pairwise.complete.obs")
@@ -4188,7 +4309,7 @@ fect_boot <- function(
           } else {
             CI.carryover.W       <- .basic_ci_shifted_one(att.carryover.W, att.carryover.W.boot, alpha,     .is_param)
             CI.carryover.bound.W <- .basic_ci_shifted_one(att.carryover.W, att.carryover.W.boot, 2 * alpha, .is_param)
-            pvalue.carryover.w <- get.pvalue(att.carryover.W.boot)
+            pvalue.carryover.w <- .pvalue.basic(att.carryover.W, att.carryover.W.boot)
           }
 
           est.carryover.W <- t(as.matrix(c(
@@ -4226,7 +4347,7 @@ fect_boot <- function(
       ## quantiles (an inconsistency with the per-event-time block, which
       ## already used basic).  v2.4.2 standardizes on basic at both sites.
       CI.avg <- .basic_ci_shifted_one(att.avg, att.avg.boot, alpha, .is_param)
-      pvalue.avg <- get.pvalue(att.avg.boot)
+      pvalue.avg <- .pvalue.basic(att.avg, att.avg.boot)
     }
 
     est.avg <- t(as.matrix(c(att.avg, se.avg, CI.avg, pvalue.avg)))
@@ -4242,7 +4363,7 @@ fect_boot <- function(
     } else {
       CI.avg.unit <- .basic_ci_shifted_one(att.avg.unit, att.avg.unit.boot,
                                             alpha, .is_param)
-      pvalue.avg.unit <- get.pvalue(att.avg.unit.boot)
+      pvalue.avg.unit <- .pvalue.basic(att.avg.unit, att.avg.unit.boot)
     }
 
     est.avg.unit <- t(as.matrix(c(
@@ -4272,7 +4393,7 @@ fect_boot <- function(
     } else {
       CI.eff.calendar <- .basic_ci_shifted(calendar.eff, calendar.eff.boot,
                                             alpha, .is_param)
-      pvalue.eff.calendar <- apply(calendar.eff.boot, 1, get.pvalue)
+      pvalue.eff.calendar <- .pvalue.basic(calendar.eff, calendar.eff.boot)
     }
     est.eff.calendar <- cbind(
       calendar.eff,
@@ -4305,7 +4426,8 @@ fect_boot <- function(
       CI.eff.calendar.fit <- .basic_ci_shifted(calendar.eff.fit,
                                                 calendar.eff.fit.boot,
                                                 alpha, .is_param)
-      pvalue.eff.calendar.fit <- apply(calendar.eff.fit.boot, 1, get.pvalue)
+      pvalue.eff.calendar.fit <- .pvalue.basic(calendar.eff.fit,
+                                                calendar.eff.fit.boot)
     }
     est.eff.calendar.fit <- cbind(
       calendar.eff.fit,
@@ -4382,7 +4504,7 @@ fect_boot <- function(
       } else {
         CI.placebo       <- .basic_ci_shifted_one(att.placebo, att.placebo.boot, alpha,     .is_param)
         CI.placebo.bound <- .basic_ci_shifted_one(att.placebo, att.placebo.boot, 2 * alpha, .is_param)
-        pvalue.placebo <- get.pvalue(att.placebo.boot)
+        pvalue.placebo <- .pvalue.basic(att.placebo, att.placebo.boot)
       }
 
       est.placebo <- t(as.matrix(c(
@@ -4420,7 +4542,7 @@ fect_boot <- function(
       } else {
         CI.carryover       <- .basic_ci_shifted_one(att.carryover, att.carryover.boot, alpha,     .is_param)
         CI.carryover.bound <- .basic_ci_shifted_one(att.carryover, att.carryover.boot, 2 * alpha, .is_param)
-        pvalue.carryover <- get.pvalue(att.carryover.boot)
+        pvalue.carryover <- .pvalue.basic(att.carryover, att.carryover.boot)
       }
       est.carryover <- t(as.matrix(c(
         att.carryover,
@@ -4454,7 +4576,7 @@ fect_boot <- function(
       } else {
         CI.group.att <- .basic_ci_shifted(c(out$group.att), group.att.boot,
                                            alpha, .is_param)
-        pvalue.group.att <- apply(group.att.boot, 1, get.pvalue)
+        pvalue.group.att <- .pvalue.basic(c(out$group.att), group.att.boot)
       }
 
       est.group.att <- cbind(
@@ -4495,7 +4617,7 @@ fect_boot <- function(
             )
           } else {
             subgroup.CI.att   <- .basic_ci_shifted(subgroup.atts, subgroup.atts.boot, alpha,     .is_param)
-            subgroup.pvalue.att <- apply(subgroup.atts.boot, 1, get.pvalue)
+            subgroup.pvalue.att <- .pvalue.basic(subgroup.atts, subgroup.atts.boot)
             subgroup.att.bound <- .basic_ci_shifted(subgroup.atts, subgroup.atts.boot, 2 * alpha, .is_param)
           }
           subgroup.est.att <- cbind(
@@ -4552,7 +4674,8 @@ fect_boot <- function(
               subgroup.CI.att.off <- .basic_ci_shifted(subgroup.atts.off,
                                                         subgroup.atts.off.boot,
                                                         alpha, .is_param)
-              subgroup.pvalue.att.off <- apply(subgroup.atts.off.boot, 1, get.pvalue)
+              subgroup.pvalue.att.off <- .pvalue.basic(subgroup.atts.off,
+                                                        subgroup.atts.off.boot)
               subgroup.att.off.bound <- .basic_ci_shifted(subgroup.atts.off,
                                                            subgroup.atts.off.boot,
                                                            2 * alpha, .is_param)
@@ -4613,7 +4736,8 @@ fect_boot <- function(
               subgroup.CI.placebo.bound <- .basic_ci_shifted_one(subgroup.att.placebo,
                                                                   group.att.placebo.boot[[sub.name]],
                                                                   2 * alpha, .is_param)
-              subgroup.pvalue.placebo <- get.pvalue(group.att.placebo.boot[[sub.name]])
+              subgroup.pvalue.placebo <- .pvalue.basic(subgroup.att.placebo,
+                                                      group.att.placebo.boot[[sub.name]])
             }
 
             subgroup.est.placebo <- t(as.matrix(c(
@@ -4669,7 +4793,8 @@ fect_boot <- function(
               subgroup.CI.carryover.bound <- .basic_ci_shifted_one(subgroup.att.carryover,
                                                                     group.att.carryover.boot[[sub.name]],
                                                                     2 * alpha, .is_param)
-              subgroup.pvalue.carryover <- get.pvalue(group.att.carryover.boot[[sub.name]])
+              subgroup.pvalue.carryover <- .pvalue.basic(subgroup.att.carryover,
+                                                        group.att.carryover.boot[[sub.name]])
             }
 
             subgroup.est.carryover <- t(as.matrix(c(

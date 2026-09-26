@@ -46,7 +46,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     do_parallel_cv   = FALSE,   ## pre-computed flag from default.R
                     do_parallel_boot = FALSE,    ## threaded through; not used in cv.R
                     cv.rule = "1se",             ## "1se" (default), "min", or "1pct" (legacy)
-                    W.in.fit = TRUE              ## whether W enters the outcome-model fit
+                    W.in.fit = TRUE,             ## whether W enters the outcome-model fit
+                    loading.bound = "none",      ## bounded treated loadings (gsynth and
+                    gamma.loading = NULL,        ## ife + nevertreated delegations only;
+                    gamma.loading.grid = NULL    ## before 2.4.7 CV dropped them)
                     ) {
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     ## -------------------------------##
@@ -199,7 +202,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         if (method == "gsynth") {
             message("Interactive fixed effects model...\n")
             out <- fect_nevertreated(
-                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                Y = Y, D = D, X = X, W = W, W.in.fit = W.in.fit, I = I, II = II,
                 T.on = T.on, T.off = T.off,
                 T.on.balance = T.on.balance,
                 balance.period = balance.period,
@@ -212,7 +215,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 cv.prop = cv.prop, cv.donut = cv.donut, cv.buffer = cv.buffer,
                 min.T0 = min.T0, k = k, criterion = criterion, cv.rule = cv.rule,
                 parallel = parallel, cores = cores,
-                do_parallel_cv = do_parallel_cv
+                do_parallel_cv = do_parallel_cv,
+                loading.bound = loading.bound, gamma.loading = gamma.loading,
+                gamma.loading.grid = gamma.loading.grid
             )
             return(out)
         }
@@ -221,7 +226,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         if (method == "ife" && time.component.from == "nevertreated") {
             message("IFE model with nevertreated factors...\n")
             out <- fect_nevertreated(
-                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                Y = Y, D = D, X = X, W = W, W.in.fit = W.in.fit, I = I, II = II,
                 T.on = T.on, T.off = T.off,
                 T.on.balance = T.on.balance,
                 balance.period = balance.period,
@@ -234,7 +239,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 cv.prop = cv.prop, cv.donut = cv.donut, cv.buffer = cv.buffer,
                 min.T0 = min.T0, k = k, criterion = criterion, cv.rule = cv.rule,
                 parallel = parallel, cores = cores,
-                do_parallel_cv = do_parallel_cv
+                do_parallel_cv = do_parallel_cv,
+                loading.bound = loading.bound, gamma.loading = gamma.loading,
+                gamma.loading.grid = gamma.loading.grid
             )
             return(out)
         }
@@ -243,7 +250,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         if (method == "cfe" && time.component.from == "nevertreated") {
             message("CFE model with nevertreated factors...\n")
             out <- fect_nevertreated(
-                Y = Y, D = D, X = X, W = W, I = I, II = II,
+                Y = Y, D = D, X = X, W = W, W.in.fit = W.in.fit, I = I, II = II,
                 T.on = T.on, T.off = T.off,
                 T.on.balance = T.on.balance,
                 balance.period = balance.period,
@@ -455,7 +462,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             r.pc <- est.pc.best <- MSPE.best <- WMSPE.best <- MSPE.pc.best <- NULL
             gmoment.best <- moment.best <- MAD.best <- GMSPE.best <- WGMSPE.best <- NULL
 
-            if (criterion == "PC") {
+            ## criterion = "pc" scores no folds, so its table has no MSPE-family
+            ## columns. (Before 2.4.7 this tested "PC", which never matched, and
+            ## the "pc" row values landed under the wrong column names.)
+            if (criterion == "pc") {
                 CV.out.ife <- matrix(NA, (r.max - r.old + 1), 6)
                 colnames(CV.out.ife) <- c("r", "sigma2", "IC", "PC", "MSPTATT", "MSE")
             } else {
@@ -467,7 +477,11 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             }
 
             CV.out.ife[, "r"] <- c(r.old:r.max)
-            CV.out.ife[, "PC"] <- CV.out.ife[, "GMoment"] <- CV.out.ife[, "Moment"] <- CV.out.ife[, "MAD"] <- CV.out.ife[, "MSPE"] <- CV.out.ife[, "WMSPE"] <- CV.out.ife[, "GMSPE"] <- CV.out.ife[, "WGMSPE"] <- 1e20
+            sentinel.cols <- intersect(
+                c("PC", "GMoment", "Moment", "MAD", "MSPE", "WMSPE", "GMSPE", "WGMSPE"),
+                colnames(CV.out.ife)
+            )
+            CV.out.ife[, sentinel.cols] <- 1e20
 
             ## Per-fold SE matrix parallel to CV.out.ife. Populated below in
             ## both parallel and serial branches; consumed at the end of the

@@ -1,10 +1,40 @@
 # Changelog {.unnumbered}
 
-## v2.4.6
+## v2.4.7
 
 [Development version, not yet on CRAN.]{.text-muted}
 
-* New `dloo` and `dloo.adjust` flags on `fect()`, contributed by Anton Strezhnev: double leave-one-out pre-trend placebos, computed without re-fitting. With covariates, the covariate coefficients are re-estimated on each cohort's pre-treatment comparison sample. They require staggered adoption, a balanced pre-treatment panel, and `method = "fe"`. `dloo.adjust = TRUE` applies Ziyi Liu's correction.
+Version 2.4.6 was a development version on GitHub and was not released on CRAN.
+
+**Correctness fixes that change results** (the full list, with issue numbers, is in `NEWS.md`):
+
+* `estimand()` now reads each bootstrap replicate through its own units. Its SEs for the overall ATT, APTT, log-ATT and the placebo and carryover series were too small unless the treated units came first in the panel and adopted at one time. `imputed_outcomes(replicates = TRUE)` now returns each replicate's own cells, so the row count varies by replicate.
+* `effect()` and `att.cumu()` (and `estimand("att.cumu")`) now use the variance type stored on the fit. Parametric fits could get intervals centred near zero.
+* The cumulative ATT of `att.cumu()`, `effect()` and `estimand("att.cumu")` is now the running sum of the per-period ATTs. It used to be count-weighted, which gives a different number when the number of treated units changes over event time; `att.cumu(weighted = TRUE)` still returns it.
+* For jackknife fits, `att.cumu()`, `effect()` and `estimand("att.cumu")` now give the jackknife standard error of the cumulative ATT, computed as for the fit's own standard errors, with a normal interval. `att.cumu()` reported one about $\sqrt{N-1}$ times too small for $N$ units, and `effect()` one $\sqrt{N/(N-1)}$ times too large.
+* For parametric fits, `effect()` (and so `estimand(fit, "att.cumu", "event.time")`) now builds its intervals from the normal critical value, as `att.cumu()` does. It used a $t$ critical value, so its intervals were slightly wider.
+* For fits made with `W` or `W.agg`, `estimand()` and `effect()` now use those weights, as `fit$att` and `fit$att.avg` do. `estimand(fit, "att", "overall")` now equals `fit$att.avg`, with the standard error of `fit$est.avg`.
+* For jackknife fits, the standard error of `estimand(fit, "att", "overall")` now equals that of `fit$est.avg`. It came from the leave-one-out averages of the unit-level ATTs, a different quantity.
+* `fect_mspe()` now refits a gsynth fit with `gsynth()`, so it scores the fit's own model. It refitted fect's default fixed-effects model.
+* For parametric fits with `ci.method = "basic"`, the $p$-values of the effects now compare the estimate with the draws, which are simulated with no effect. They compared the draws with zero, which gave $p$-values near 1 whatever the estimate. The cohort $p$-values of parametric fits with `group` are corrected too.
+* Parametric SEs no longer depend on `normalize`; weights now work with the parametric bootstrap.
+* `criterion = "pc"` now picks the `r` with the lowest PC for `method = "gsynth"` and never-treated `"cfe"`.
+* `W.agg` alone no longer enters the model fit when `CV = TRUE`.
+* `wgt.implied` now follows @Xu2017: $\Lambda_{co}(\Lambda_{co}^\top\Lambda_{co})^{-1}\Lambda_{tr}^\top$, an $N_{co} \times N_{tr}$ matrix labeled by unit ID. The simplex weights have the same layout.
+* `loading.bound = "simplex"` is now applied with cross-validation, without SEs for `method = "gsynth"`, in the parametric bootstrap, and in the `loo` refits. The `loo` refits also keep `time.component.from` and `para.error`.
+* `method = "ife"` with `time.component.from = "nevertreated"` now fits the never-treated model with `se = TRUE`, as it did with `se = FALSE`.
+* `method = "cfe"` with `time.component.from = "nevertreated"` now takes its bootstrap and jackknife SEs, and the SEs of its `loo` placebos, from the never-treated model, as it does its point estimate. They came from the not-yet-treated model.
+* With `parallel = FALSE`, the same `seed` now gives the same cross-validation folds with and without `se`.
+* A factor time index is used in its level order, not sorted as text; if its levels are numbers out of numeric order, `fect()` warns. A character time index that holds numbers is read as numbers.
+* Exactly collinear covariates, and covariates absorbed by the fixed effects, are dropped with a warning (coefficient `NA`). Collinear covariates used to change the estimates silently.
+
+**Input checks.** Formula terms must be bare column names (`log(Y)`, `factor(g)`, `X1:X2` now stop); `X` cannot be combined with a formula; covariates must be numeric; a character time index must hold numbers; `cl` must be one column and, for the cluster bootstrap, constant within units with at least two clusters; `cm = TRUE` needs `time.component.from = "notyettreated"`; `interFE()` stops when its intercept, or its unit and time effects together, absorb a covariate. Each stop says what to do instead.
+
+**Other fixes.** The cluster bootstrap works with clusters of unequal size and `keep.sims = TRUE`; failed bootstrap replicates are dropped and counted instead of stopping the run; cross-validation of `r` no longer crashes when `r` exceeds the number of never-treated units; counterfactual plots work without SEs; `effect()` works for one unit; `method = "cfe"` with never-treated fitting works with one treated unit; `att.cumu()` works without SEs; `imputed_outcomes()` reports the aggregation weights of weighted fits, one row per treated cell; `fect_mspe()` keeps working on fits made with `Y`, `D` and `X` column names; `dloo` with never-treated fitting stops at once, with a message that says why; clearer messages when cross-validation is skipped or no treated observation is left; `cm = TRUE` stores `est.cm` also without SEs and after cross-validation; `fect_mspe()` finds a fit's data and arguments where it is called, so a data frame local to a function works.
+
+**Earlier changes (on GitHub as 2.4.6):**
+
+* New `dloo` and `dloo.adjust` flags on `fect()`, contributed by Anton Strezhnev: double leave-one-out pre-trend placebos, computed without re-fitting. With covariates, the covariate coefficients are re-estimated on each cohort's pre-treatment comparison sample. They require staggered adoption, a balanced pre-treatment panel, `method = "fe"`, and the default `time.component.from = "notyettreated"`. `dloo.adjust = TRUE` applies Ziyi Liu's correction.
 * `r` now defaults to `NULL`. For `method = "ife"` or `"gsynth"`, leaving out `r` now selects the number of factors by cross-validation over 0 to 5, instead of fitting zero factors.
 * Cross-validation fixes. Each can change the selected `r` or `lambda` for some existing calls:
   * Calls that name variables as strings, such as `fect(Y = "y", D = "d", ...)`, now use the same defaults as formula calls (rolling cross-validation, `nlambda = 10`). Set `cv.method = "block"` to get the old folds.
@@ -176,7 +206,7 @@ breaking the long-form schema.
 
 **Bounded factor loadings for GSC**:
 
-* New `loading.bound = "simplex"` (default `"none"`) constrains treated-unit loadings to the convex hull of control loadings via an entropy-regularized simplex projection. Companion arguments: `gamma.loading` (regularization strength; `NULL` triggers 5-fold CV) and `gamma.loading.grid`. Diagnostic outputs: `wgt.implied` (row-stochastic simplex weights), `loading.proj.resid` (extrapolation flag per treated unit). Currently `method = "ife"`/`"gsynth"` with `time.component.from = "nevertreated"` only.
+* New `loading.bound = "simplex"` (default `"none"`) constrains treated-unit loadings to the convex hull of control loadings via an entropy-regularized simplex projection. Companion arguments: `gamma.loading` (regularization strength; `NULL` triggers 5-fold CV) and `gamma.loading.grid`. Diagnostic outputs: `wgt.implied` (row-stochastic simplex weights; since v2.4.7 stored as an $N_{co} \times N_{tr}$ matrix whose columns sum to one), `loading.proj.resid` (extrapolation flag per treated unit). Currently `method = "ife"`/`"gsynth"` with `time.component.from = "nevertreated"` only.
 * Caveat: percentile-bootstrap intervals may under-cover when the constraint binds; boundary-corrected inference is deferred.
 * Companion plot: `plot(..., type = "loading.overlap")` shows treated loadings vs the control convex hull ($r \geq 2$) or mirror histogram with control-range band ($r = 1$).
 

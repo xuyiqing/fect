@@ -299,7 +299,7 @@ out.mc.loo <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id","time"),
   parallel = TRUE, cores = 16, nboots = 200, loo = TRUE)
 ```
 
-As with the placebo test, the LOO test is run on a settled model, so we fix the tuning parameters at the values selected earlier (`r` set to 2 for IFEct, `lambda` set to `out.mc$lambda.cv` for MC) and turn cross-validation off. Since v2.4.6, `method = "ife"` without `r` selects the number of factors by cross-validation (0 to 5); with `CV = FALSE` and no `r`, it falls back to zero factors, the FEct model, with a message.
+As with the placebo test, the LOO test is run on a settled model, so we fix the tuning parameters at the values selected earlier (`r` set to 2 for IFEct, `lambda` set to `out.mc$lambda.cv` for MC) and turn cross-validation off. Since v2.4.7, `method = "ife"` without `r` selects the number of factors by cross-validation (0 to 5); with `CV = FALSE` and no `r`, it falls back to zero factors, the FEct model, with a message.
 
 With covariates, each leave-one-out fit still estimates the covariate coefficients from all remaining untreated observations, as the imputation estimator always does. These include the control units' observations after the treated units adopt, so a LOO estimate is out of sample for the held-out period but can still move with later data through those coefficients. Under staggered adoption with `method = "fe"`, the double leave-one-out placebos of [Chapter @sec-fect] re-estimate the coefficients on pre-treatment data only.
 
@@ -440,7 +440,7 @@ See [Chapter @sec-plots] for the full table of `highlight` / `highlight.fill` pa
 
 * **Survey or sample weights.** Pass `W = "ws"`. The same column applies to both the model fit and the aggregation. This is the standard treatment when the weight reflects the sampling design.
 * **Weight only in the outcome-model fit.** Pass `W.est = "wr"` alone. The weight enters the IFE / MC / CFE solver but the across-treated-obs aggregation gives each treated cell weight 1. Use this when the weight reflects fit-side considerations (e.g., a precision weight specific to the outcome model) and the estimand is the unweighted average ATT across treated cells.
-* **Weight only in the aggregation.** Pass `W.agg = "your_column"` alone. The outcome model is fit unweighted and the weight is applied only when summarizing across treated cells. Common cases include calibration weights to a target population, or post-stratification weights that should adjust the summary but not the model fit.
+* **Weight only in the aggregation.** Pass `W.agg = "your_column"` alone. The outcome model is fit unweighted (also when `CV = TRUE`) and the weight is applied only when summarizing across treated cells. Common cases include calibration weights to a target population, or post-stratification weights that should adjust the summary but not the model fit.
 
 ::: callout-warning
 ## If your weights are inverse-probability weights for confounding adjustment

@@ -1,7 +1,248 @@
 <!-- markdownlint-disable MD025 -->
-# fect 2.4.6
+# fect 2.4.7
 
 Development version, not yet on CRAN.
+
+Version 2.4.6 was a development version on GitHub and was not released on
+CRAN.
+
+## Changes that affect results
+
+Each bullet names the fits whose numbers change.
+
+* `estimand()` now reads each bootstrap or parametric replicate through its
+  own units (`fit$colnames.boot`). Its SEs and CIs for `"att"` with
+  `by = "overall"`, `"aptt"`, `"log.att"` and the placebo and carryover series
+  were wrong (3-6 times too small on `turnout`) unless the treated units were
+  the first columns and adopted at one time (fect #141, #150; gsynth #37,
+  #60).
+* `imputed_outcomes(replicates = TRUE)` now returns each replicate's own
+  treated cells: a unit drawn twice appears twice, so the row count varies by
+  replicate, and the mean of `eff` within a replicate is its `att.avg.boot`
+  draw. Before, every replicate reused the original cells.
+* `effect()` now takes the variance type from the fit (`fit$vartype`), not
+  from the call, and so does `estimand(fit, "att.cumu", "event.time")`;
+  parametric fits whose `vartype` was not typed as a string (gsynth's
+  default, or a variable) got CIs centred near 0 (gsynth #37, #75).
+* `att.cumu()`, and so `estimand(fit, "att.cumu", "overall")`, now gives
+  parametric fits a normal CI and p-value (estimate +/- z * SE); it took the
+  quantiles of the parametric draws, which are centred near 0.
+* The cumulative ATT (`att.cumu()`, `effect(cumu = TRUE)`,
+  `estimand("att.cumu")`) is now the running sum of the per-period ATTs, as
+  documented. It was k times the average effect over all treated cells in
+  event times 1 to k, which differs when the number of treated units changes
+  over event time (on `turnout`, `method = "gsynth"`, `r = 0`: 21.50 instead
+  of 8.26 at k = 10). The `weighted` argument of `att.cumu()`, which had no
+  effect, now chooses: `FALSE` (the new default) gives the running sum and
+  `TRUE` the old estimate (for jackknife fits with a new S.E.; see the next
+  bullet). `att.cumu()` and `effect()` now report the same S.E. (gsynth #75),
+  and the same interval and p-value except in the first row of a bootstrap
+  fit, which `att.cumu()` copies from `fit$est.att`.
+* For jackknife fits, `att.cumu()`, `effect()` and `estimand("att.cumu")`
+  now report the jackknife S.E. of the cumulative ATT, computed as for the
+  fit's own jackknife SEs, with a normal interval and p-value. `att.cumu()`
+  used the spread of the leave-one-out estimates, about sqrt(N - 1) times
+  too small for N units (on `turnout`, 47 units, `method = "gsynth"`,
+  `r = 0`, at event time 10: 5.29 instead of 35.50; with `weighted = TRUE`,
+  5.73 instead of 38.42), and took their quantiles as the interval.
+  `effect()` was sqrt(N/(N - 1)) times too large (35.89, about 1% here) and
+  used t critical values.
+* For parametric fits, `effect()`, and so
+  `estimand(fit, "att.cumu", "event.time")`, now gives the normal interval
+  and p-value, as `att.cumu()` and the fit's own intervals do. It used a t
+  critical value with `nboots - 1` degrees of freedom, so its intervals were
+  wider (by 0.6% at the default `nboots = 200`, 2.5% at 50). The SEs do not
+  change.
+* For fits made with `W` or `W.agg`, `estimand()` and `effect()` now use
+  those weights, in the estimates and in every replicate, as `?estimand`
+  said and as `fit$att` and `fit$att.avg` do. So
+  `estimand(fit, "att", "overall")` now equals `fit$att.avg`, with the SE of
+  `fit$est.avg` (on `simgsynth` with unit weights, `method = "gsynth"`,
+  `r = 2`: 4.6408 instead of the unweighted 4.6396). Fits made without
+  weights, or with `W.est` only, do not change. The `weights` argument of
+  `estimand()` must stay `NULL`; other values still stop, now with a message
+  that points to `imputed_outcomes()`, which reports each treated cell's
+  effect and weight.
+* For jackknife fits, `estimand(fit, "att", "overall")` now takes its SE from
+  each leave-one-out fit's overall ATT, as `fit$est.avg` does. It used each
+  leave-one-out fit's average of the unit-level ATTs, a different quantity
+  when units have different numbers of treated periods (on `turnout`: 3.84
+  instead of 3.28).
+* `fect_mspe()` now refits a fit made by `gsynth()` with `gsynth()`, so it
+  scores the fit's own model. It refitted fect's default fixed-effects model
+  (on gsynth's `simdata`, a default fit scored an MSPE of 65.25 instead of
+  110.96), and it stopped on a fit made with a gsynth-only argument such as
+  `inference`.
+* For parametric fits (`vartype = "parametric"`, gsynth's default) with
+  `ci.method = "basic"`, the p-values of the effects (`est.att`, `est.avg`,
+  the placebo test and the other effect slots) now compare the estimate with
+  the draws, which are simulated with no effect: each p-value is twice the
+  smaller of the shares of the centered draws at or above the estimate and
+  at or below it. They compared the draws with zero, which gave values near
+  1 whatever the estimate (on gsynth's `simdata`, `r = 2`: an ATT of 5.54
+  with S.E. 0.25 had p = 0.97 and now has 0, as with `"normal"`; the placebo
+  test's p-value is 0.10 instead of 0.90). The intervals and the coefficient
+  p-values do not change, and neither do bootstrap fits or fits with
+  `ci.method = "normal"`, except the cohort effects of parametric fits with
+  `group` (`est.group.att`), whose default p-values had the same problem.
+* Parametric SEs with `normalize = TRUE` are no longer multiplied by sd(Y)
+  (on `turnout`, 35.80 instead of 2.56; gsynth #14).
+* The bootstrap now resamples groups of one unit correctly: with one treated
+  unit every draw contains it (most draws lacked it and were dropped
+  silently, e.g. 92 of 100), and with one reversal unit, or two never-treated
+  units under `vartype = "parametric"`, the right units are drawn.
+* `criterion = "pc"` now selects the `r` with the lowest PC for
+  `method = "gsynth"` and for `method = "cfe"` with
+  `time.component.from = "nevertreated"`, as it did for `"ife"`; these two
+  used the MSPE rule (on `turnout`, r = 2 instead of 4; gsynth #24).
+* `W.agg` alone no longer enters the model fit or the cross-validation scores
+  of `method = "gsynth"` and never-treated `"ife"`/`"cfe"` fits with
+  `CV = TRUE`, which now equal the unweighted fit except for the weighted
+  averages (gsynth #101).
+* `wgt.implied` now follows Xu (2017), `Lco (Lco'Lco)^-1 Ltr'`, whose columns
+  rebuild the factor part of each treated counterfactual (the old formula used
+  the treated units' Gram matrix). It is an Nco x Ntr matrix with unit ids as
+  dimnames, also under `loading.bound = "simplex"`, whose weights were stored
+  transposed (gsynth #17, #82).
+* `loading.bound = "simplex"` is now applied with `CV = TRUE`, for
+  `method = "gsynth"` without SEs, and in the parametric bootstrap replicates;
+  it was dropped there silently.
+* The `loo = TRUE` pre-trend refits now use the fit's `loading.bound` (with its
+  `gamma.loading`), `time.component.from` and `para.error`; they used
+  unbounded loadings, the not-yet-treated estimator for never-treated `"cfe"`
+  fits, and `para.error = "auto"`.
+* `method = "ife"` with `time.component.from = "nevertreated"` and `se = TRUE`
+  now fits the never-treated model, as `se = FALSE` does, and reports
+  `method = "gsynth"`; with `CV = FALSE` it fitted the not-yet-treated model
+  (ATT 5.579 instead of 5.543 on `simgsynth`, `r = 2`).
+* `method = "cfe"` with `time.component.from = "nevertreated"` now computes
+  its bootstrap and jackknife SEs, and those of its `loo = TRUE` placebos,
+  with the never-treated model, as it does the point estimate. They came
+  from the not-yet-treated model, so SEs, CIs and p-values were off, mostly
+  in the pre-treatment periods (on `simgsynth`, `r = 2`, jackknife: S.E. 0.46
+  instead of 0.63 at event time -7).
+* With `parallel = FALSE`, `se = TRUE` (or `permute = TRUE`) and `CV = TRUE`,
+  `seed` now gives the same cross-validation folds, and so the same `r`, as
+  `se = FALSE`; it used the folds of `seed + 1`.
+* A factor time index is now used in its level order: levels that are
+  increasing numbers give the same fit as the numbers, and levels that are
+  numbers out of numeric order (as in `factor(as.character(1:30))`) are used
+  in level order with a warning. It was sorted as text ("1", "10", "2", ...),
+  which scrambled event time and made gsynth report treatment reversals
+  (gsynth #13).
+* A character time index that holds numbers is now read as numbers; it was
+  also sorted as text.
+* Covariates that are exact linear combinations of others, absorbed by the
+  fixed effects, or constant on the cells used to fit the model are now
+  dropped with one warning and an `NA` coefficient, so the estimates equal
+  those of the fit without them. Collinear covariates changed the estimates
+  silently (ATT 5.543 -> 6.510 on `simgsynth`) or crashed (gsynth #40, #80,
+  #83).
+
+### Calls that now stop
+
+These calls ran, often with wrong numbers. They now stop with a message that
+says what to do.
+
+* `fect()` and `interFE()` formulas take bare column names only: `log(Y)`,
+  `factor(g)`, `X1:X2`, `X1 * X2` and `I(X^2)` stop, naming the term (they
+  were read as their bare variables, so `log(Y + 20) ~ D` fitted `Y ~ D`).
+  Intercept terms such as `+ 0` or `- 1` are still accepted and ignored
+  (gsynth #13, #23, #62).
+* `X` given together with a formula stops (it was ignored), and so do
+  duplicated names in `X` and an `X` that names the outcome or treatment.
+* Non-numeric covariates (factor, character, Date) stop and ask for numeric
+  dummy columns; logical covariates are used as 0/1, as before.
+* A character time index must hold numbers; values such as `"t01"` stop.
+* `cl` must be one column name, and for the cluster bootstrap (`se = TRUE`,
+  `vartype = "bootstrap"`) it must be constant within each unit and have at
+  least two clusters; a varying or single cluster gave NA or zero SEs
+  (gsynth #41, #86).
+* `method = "ife"` with `time.component.from = "nevertreated"` and `se = TRUE`
+  stops where the never-treated model cannot be estimated, as `se = FALSE`
+  does; it fitted the not-yet-treated model instead.
+* `cm = TRUE` with `time.component.from = "nevertreated"` stops. It ran
+  without `est.cm`, which that model does not estimate.
+* `interFE()` stops, naming the covariate, when a covariate does not vary
+  and the model has no fixed effects (`force = "none"`), and when a
+  covariate is the sum of a unit-level and a period-level variable under
+  `force = "two-way"`. Such a covariate got the coefficient `NaN` (about
+  1e-16 on unbalanced panels) without a message.
+
+## Bug fixes
+
+* Weights (`W`, `W.est`, `W.agg`) now work with `vartype = "parametric"`
+  (fect #73, #150; gsynth #101).
+* The cluster bootstrap now handles clusters of unequal size: `keep.sims =
+  TRUE` no longer stops (the replicate arrays are padded with `NA`; see
+  `fit$colnames.boot`), and no replicate is skipped in the counterfactual
+  bands.
+* `vartype = "parametric"` now warns that `cl` is ignored, and `print()` no
+  longer shows "Cluster SE" for parametric and jackknife fits, which ignore
+  `cl`.
+* Bootstrap replicates that cannot be estimated are now dropped and counted in
+  a message instead of stopping the run; a main fit whose factors are
+  collinear stops with a clear message.
+* `vartype = "parametric"` with fewer than two never-treated units stops with
+  a clear message.
+* Cross-validation of `r` for never-treated fits now searches at most
+  `r = Nco - 1`, with a message, instead of crashing with
+  `Mat::head_cols(): size out of bounds` (gsynth #32, #97).
+* When cross-validation is skipped because only `r = 0` was given, or there is
+  one never-treated unit, the message now says so instead of blaming too few
+  pre-treatment records.
+* fect's IFE cross-validation table under `criterion = "pc"` now labels its
+  columns correctly.
+* `effect()` now works for one unit (`id`) and for fits with one treated unit
+  (gsynth #45, #53).
+* `method = "cfe"` with `time.component.from = "nevertreated"` now runs with
+  a single treated unit; it stopped with "'x' must be an array of at least
+  two dimensions" (gsynth #45).
+* `att.cumu()` now works on fits without standard errors; it stopped with
+  "non-numeric argument to mathematical function".
+* A `cells` formula in `estimand()` and `imputed_outcomes()` can now use
+  variables of the function where it was written.
+* `imputed_outcomes()` now reports the aggregation weights of fits made with
+  `W` or `W.agg`, one row per treated cell; it listed every treated cell
+  twice, with a `W.agg` column that was mostly `NA`. The fit stores these
+  weights in `fit$W.agg`.
+* `plot(type = "counterfactual")` now works without SEs, and
+  `plot(type = "factors")` with a Date or character time index
+  (gsynth #69, #84, #89).
+* When dropping the periods without control observations leaves no treated
+  observation, fect stops with a plain message instead of an unrelated error
+  (gsynth #57).
+* `fit$remove.id` now lists the removed units whenever units are removed, not
+  only when the first unit is among them.
+* `interFE()` now names the fixed effect that absorbs a covariate (the unit and
+  time labels were swapped).
+* `fect_mspe()` keeps working on fits made with `Y`, `D` and `X` given as
+  column names: its refits pass the covariates only in the formula, so the
+  new stop for `X` given together with a formula does not affect them.
+* `fect_mspe()` now looks up the data and the other arguments of a fit made
+  without a formula where `fect_mspe()` is called, as it does for formula
+  fits. A data frame local to a function was not found, and an argument such
+  as `min.T0 = k + 3` could take `fect_mspe()`'s own `k`. A formula fit made
+  inside a function can now be scored outside it.
+* `cm = TRUE` now stores `est.cm` without standard errors and after
+  cross-validation of the number of factors (as with `method = "ife"`
+  without `r`), so `fect_iden()` and `plot(type = "hte", cm = TRUE)` work on
+  those fits; they stopped, saying that `est.cm` was missing.
+* `dloo = TRUE` works only with the default
+  `time.component.from = "notyettreated"`; with `"nevertreated"`, `fect()`
+  stops at once, with a message that names `time.component.from`.
+
+## Documentation
+
+* `?fect`: `seed` is needed for reproducible parallel bootstrap draws, since
+  `set.seed()` does not fix them; `formula`, `X`, `index`, `cl`, `W.agg`,
+  `criterion`, `loading.bound` and the returned `wgt.implied` are updated.
+* `?plot.fect`: `id` applies to the counterfactual and status plots only, and
+  `nfactors` to the loadings plot only.
+
+## New features and other changes
+
+Several of these also change results; each bullet says which calls.
 
 * Add `dloo` and `dloo.adjust` flags to `fect()`: double (cohort-wise)
   leave-one-out pre-trend placebos, computed as a closed-form overlay on the
@@ -72,7 +313,9 @@ Development version, not yet on CRAN.
   that set `seed` with `se = FALSE`. To reproduce an earlier result that
   relied on a `set.seed()` call before `fect()`, keep that call and drop
   `seed`. Calls without `seed`, and calls with `se = TRUE` or
-  `permute = TRUE`, give the same results as before.
+  `permute = TRUE`, give the same results as before, except serial
+  (`parallel = FALSE`) ones that cross-validate (see "Changes that affect
+  results").
 * Cross-validation now uses the settings passed to `fect()` in two cases
   where it silently used defaults. With `se = TRUE`, it ignored `cv.rule`,
   `cv.buffer`, `cv.donut`, `min.T0` and `proportion` and ran with `"1se"`,

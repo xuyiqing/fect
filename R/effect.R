@@ -35,11 +35,19 @@ effect <- function(x, ## a fect object
     mask <- (colnames(x$eff) %in% id)
   }
 
-  # Extract relevant matrices for selected units
-  eff <- x$eff[, mask]      # Treatment effects
-  D <- x$D.dat[, mask]      # Treatment indicators
-  I <- x$I.dat[, mask]      # Inclusion (non-missing) indicators
-  inference <- x$call$vartype  # Inference type
+  # Extract relevant matrices for selected units (drop = FALSE keeps a
+  # single selected unit a TT x 1 matrix)
+  eff <- x$eff[, mask, drop = FALSE]      # Treatment effects
+  D <- x$D.dat[, mask, drop = FALSE]      # Treatment indicators
+  I <- x$I.dat[, mask, drop = FALSE]      # Inclusion (non-missing) indicators
+  # Inference type: the resolved vartype stored on the fit (every se = TRUE
+  # fit has it). x$call$vartype is NULL when vartype was not typed (e.g.
+  # gsynth's default parametric inference) and a symbol when it was passed
+  # as a variable, so the call is only a fallback for fits without the slot.
+  inference <- if (!is.null(x$vartype)) x$vartype else {
+    v <- x$call$vartype
+    if (is.character(v) && length(v) == 1L) v else "bootstrap"  # fect's default
+  }
   method <- x$method        # Method
 
   # Get dimensions of data
@@ -78,8 +86,13 @@ effect <- function(x, ## a fect object
     period <- period.raw
   }
 
+  # Aggregation weights of a fit made with W or W.agg (NULL otherwise): the
+  # per-period ATTs are then weighted means, as fit$att is.
+  W.agg <- .po_agg_weights_or_null(x)
+
   # Calculate cumulative average treatment effect
-  catt <- getEffect(D, I, eff, cumu, period)
+  catt <- getEffect(D, I, eff, cumu, period,
+                    W = if (is.null(W.agg)) NULL else W.agg[, mask, drop = FALSE])
 
   # Initialize bootstrap results
   catt.boot <- NULL
@@ -105,17 +118,38 @@ effect <- function(x, ## a fect object
     catt.boot <- matrix(NA, period[2] - period[1] + 1, nboots)
 
     # Calculate treatment effect for each bootstrap sample
+    TT.boot <- dim(x$eff.boot)[1]
     for (i in 1:nboots) {
-      # Extract bootstrap matrices
+      # Real width of replicate i: a cluster bootstrap draws a varying
+      # number of units, and the arrays are padded with NA columns beyond it.
+      w <- if (!is.null(x$colnames.boot) && length(x$colnames.boot) >= i &&
+               length(x$colnames.boot[[i]]) > 0L) {
+        length(x$colnames.boot[[i]])
+      } else {
+        dim(x$eff.boot)[2]
+      }
+      # The units of replicate i, in its column order (fit$colnames.boot),
+      # carry their weights with them.
+      W.boot <- NULL
+      if (!is.null(W.agg)) {
+        ids <- if (!is.null(x$colnames.boot) && length(x$colnames.boot) >= i &&
+                   length(x$colnames.boot[[i]]) > 0L) {
+          as.integer(x$colnames.boot[[i]])
+        } else {
+          seq_len(w)
+        }
+        W.boot <- W.agg[, ids, drop = FALSE]
+      }
+      # Extract bootstrap matrices (TT x w)
       if (has.D.boot) {
-        D.boot <- x$D.boot[, , i]
-        I.boot <- x$I.boot[, , i]
+        D.boot <- matrix(x$D.boot[, seq_len(w), i], nrow = TT.boot)
+        I.boot <- matrix(x$I.boot[, seq_len(w), i], nrow = TT.boot)
       } else {
         # Fallback: use original D.dat and I.dat (less accurate but prevents crash)
         D.boot <- x$D.dat
         I.boot <- x$I.dat
       }
-      eff.boot <- x$eff.boot[, , i]
+      eff.boot <- matrix(x$eff.boot[, seq_len(w), i], nrow = TT.boot)
 
       # Select treated units in bootstrap sample
       if (is.null(id)){
@@ -134,7 +168,8 @@ effect <- function(x, ## a fect object
         as.matrix(Dtr.boot),
         as.matrix(Itr.boot),
         as.matrix(eff.tr.boot),
-        cumu, period)
+        cumu, period,
+        W = if (is.null(W.boot)) NULL else as.matrix(W.boot[, mask.boot]))
     }
   }
 
@@ -164,25 +199,23 @@ effect <- function(x, ## a fect object
     is_jackknife <- !is.null(inference) && inference == "jackknife"
     is_parametric <- !is.null(inference) && inference == "parametric"
 
-    # Calculate standard errors with proper scaling for jackknife
+    # Standard errors. Jackknife replicates are leave-one-unit-out
+    # estimates: use the jackknife SE (Tukey's formula, as for the fit's
+    # own SEs). Bootstrap and parametric draws: their standard deviation.
     if (is_jackknife) {
-      # For jackknife, scale by sqrt(N-1)
-      N_samples <- ncol(catt.boot)
-      jackknife_scale <- sqrt(N_samples - 1)
-      se.att <- apply(catt.boot, 1, function(vec) sd(vec, na.rm = TRUE) * jackknife_scale)
+      se.att <- vapply(seq_len(nrow(catt.boot)), function(k) {
+        .jackknife_se(catt[k], catt.boot[k, ])
+      }, numeric(1))
     } else {
-      # Standard calculation for bootstrap
       se.att <- apply(catt.boot, 1, function(vec) sd(vec, na.rm = TRUE))
     }
 
     # Calculate 95% confidence intervals
     if (is_jackknife || is_parametric) {
-      # For jackknife, use t-distribution with N-1 degrees of freedom
-      N_samples <- ncol(catt.boot)
-      t_critical <- stats::qt(0.975, df = N_samples - 1)
-      CI.att <- t(apply(cbind(catt, se.att), 1, function(row) {
-        c(row[1] - t_critical * row[2], row[1] + t_critical * row[2])
-      }))
+      # Normal critical value, as for fect's other jackknife and parametric
+      # intervals (fit$est.att, fit$est.avg, att.cumu())
+      z <- stats::qnorm(0.975)
+      CI.att <- cbind(catt - z * se.att, catt + z * se.att)
     } else {
       # For bootstrap, use empirical quantiles
       CI.att <- t(apply(catt.boot, 1, function(vec) {
@@ -192,12 +225,8 @@ effect <- function(x, ## a fect object
 
     # Calculate p-values
     if (is_jackknife || is_parametric) {
-      # For jackknife, use t-distribution for p-values
-      N_samples <- ncol(catt.boot)
-      pvalue.att <- sapply(1:nrow(catt.boot), function(i) {
-        t_stat <- catt[i] / se.att[i]
-        2 * stats::pt(-abs(t_stat), df = N_samples - 1)
-      })
+      # Normal approximation, as for the intervals
+      pvalue.att <- 2 * stats::pnorm(-abs(catt / se.att))
     } else {
       # For bootstrap, use empirical distribution
       pvalue.att <- apply(catt.boot, 1, get.pvalue)
@@ -325,7 +354,8 @@ getEffect <- function(D,           # Treatment indicator matrix
                       I,           # Inclusion indicator matrix
                       eff,         # Effect matrix
                       cumu,        # Logical: whether to calculate cumulative effect
-                      period) {    # Event window range: c(start, end)
+                      period,      # Event window range: c(start, end)
+                      W = NULL) {  # Aggregation weights (same shape as eff), or NULL
   # Initialize output vector with NAs
   aeff <- rep(NA, period[2] - period[1] + 1)
 
@@ -362,12 +392,23 @@ getEffect <- function(D,           # Treatment indicator matrix
   # Flatten matrices to vectors for processing
   vd <- c(D)       # Vector of relative times
   veff <- c(eff)   # Vector of effects
+  vw <- if (is.null(W)) NULL else c(W)   # Vector of weights
 
   # Remove NA entries
   if (sum(is.na(vd)) > 0) {
     vd.rm <- which(is.na(vd))
     vd <- vd[-vd.rm]
     veff <- veff[-vd.rm]
+    if (!is.null(vw)) vw <- vw[-vd.rm]
+  }
+
+  # Mean effect of the cells `ix`: weighted by W when given (cells with an NA
+  # weight left out), as the fit's own per-period ATTs are
+  cell.mean <- function(ix) {
+    if (is.null(vw)) return(mean(veff[ix]))
+    ix <- ix[!is.na(vw[ix])]
+    if (length(ix) == 0L || sum(vw[ix]) == 0) return(NA_real_)
+    sum(veff[ix] * vw[ix]) / sum(vw[ix])
   }
 
   # Get unique relative time periods
@@ -379,19 +420,25 @@ getEffect <- function(D,           # Treatment indicator matrix
   effT <- ts:te    # Effective time range
 
   if (cumu == TRUE) {
-    # Calculate cumulative treatment effect
-    if (sum(!(effT %in% uniT)) == 0) {
-      pos <- c()
-      for (i in 1:length(effT)) {
-        # Accumulate positions for all periods up to current one
-        pos <- c(pos, which(vd == effT[i]))
-        # Calculate cumulative effect as mean effect times number of periods
-        aeff[i] <- mean(veff[pos]) * i
-      }
+    # Cumulative effect: the running sum of the per-period ATTs, each the
+    # mean effect over the treated cells at that event time. An event time
+    # with no treated cell makes the sum NA from that event time on. (Before
+    # 2.4.7: k times the mean over all treated cells of event times 1..k,
+    # which weights the periods by their numbers of cells.)
+    if (te >= ts) {
+      att.t <- vapply(effT, function(t) {
+        ix <- which(vd == t)
+        if (length(ix) == 0) NA_real_ else cell.mean(ix)
+      }, numeric(1))
+      aeff[seq_along(effT)] <- cumsum(att.t)
     }
   } else {
     # Calculate average treatment effect for each period
-    ave <- as.numeric(tapply(veff, vd, mean))
+    ave <- if (is.null(vw)) {
+      as.numeric(tapply(veff, vd, mean))
+    } else {
+      as.numeric(tapply(seq_along(veff), vd, cell.mean))
+    }
     effT2 <- period[1]:period[2]
     for (i in 1:length(effT2)) {
       if (effT2[i] %in% uniT) {

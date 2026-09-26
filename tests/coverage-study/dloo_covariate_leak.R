@@ -4,7 +4,7 @@
 ## Adds +50 to one never-treated unit's outcome in the last period (after every
 ## cohort has adopted, so outside every dloo comparison sample) and reports how
 ## much each pre-treatment placebo moves, for
-##   * dloo with covariates   (Y ~ D + X1 + X2): should not move (fixed in 2.4.6)
+##   * dloo with covariates   (Y ~ D + X1 + X2): should not move (fixed in 2.4.7)
 ##   * dloo without covariates (Y ~ D):         does not move
 ##   * loo with covariates:                      moves, by design (the imputation
 ##     fit estimates beta from all untreated observations; see ch. 4)

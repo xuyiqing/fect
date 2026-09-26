@@ -31,19 +31,85 @@ fect_mspe <- function(
     use_rolling <- (cv.method == "rolling")
     .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
-    ## ---- helper functions (unchanged) ---- ##
+    ## ---- helper functions ---- ##
+    ## Where the expressions of a fit's stored call (data, index, formula
+    ## and the other arguments) are evaluated: the frame fect_mspe() was
+    ## called from, then, for a fit made with a formula, the formula's
+    ## environment (where the fit was made). Before 2.4.7 a fit made
+    ## without a formula had them evaluated inside fect_mspe(): a data frame
+    ## local to the caller's function was not found, and a name such as `k`
+    ## took fect_mspe()'s own value.
+    .call_envs <- function(out_obj) {
+        envs <- list(caller_env)
+        fo <- out_obj[["formula", exact = TRUE]]
+        if (inherits(fo, "formula") && is.environment(environment(fo)) &&
+            !identical(environment(fo), caller_env)) {
+            envs <- c(envs, list(environment(fo)))
+        }
+        envs
+    }
+    .eval_call_arg <- function(expr, envs, what) {
+        res <- list(ok = FALSE, msg = "")
+        for (e in envs) {
+            res <- tryCatch(list(ok = TRUE, value = eval(expr, envir = e)),
+                            error = function(cond) {
+                                list(ok = FALSE, msg = conditionMessage(cond))
+                            })
+            if (isTRUE(res$ok)) return(res$value)
+        }
+        stop("fect_mspe() cannot evaluate `", what, "` of the fit's call: ",
+             res$msg, ". Call fect_mspe() where the objects that the call ",
+             "names are visible.", call. = FALSE)
+    }
+    ## The function that refits the model: fect() for a fit made by fect();
+    ## for a fit made by another function that stores its own call (gsynth()
+    ## does), that function, so the refit is the fit's own model, with that
+    ## function's defaults and argument names. Before 2.4.7 such a call was
+    ## replayed into fect(): a default gsynth() fit was refitted with fect's
+    ## default method = "fe", and gsynth-only arguments (e.g. `inference`)
+    ## stopped the refit.
+    .refit_fun <- function(out_obj) {
+        fn <- out_obj$call[[1]]
+        nm <- if (is.name(fn)) {
+            as.character(fn)
+        } else if (is.call(fn) && length(fn) == 3L &&
+                   as.character(fn[[1]]) %in% c("::", ":::")) {
+            as.character(fn[[3]])
+        } else {
+            ""
+        }
+        if (nm %in% c("fect", "fect.formula", "fect.default")) {
+            return(fect)
+        }
+        f <- if (is.name(fn)) {
+            get0(as.character(fn), envir = caller_env, mode = "function")
+        } else {
+            tryCatch(eval(fn, envir = caller_env), error = function(e) NULL)
+        }
+        if (!is.function(f)) {
+            stop("fect_mspe() refits each model with the function that made ",
+                 "it", if (nzchar(nm)) paste0(", ", nm, "(),") else "",
+                 " which cannot be found here. Load its package and try ",
+                 "again.", call. = FALSE)
+        }
+        f
+    }
     .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj, caller_env) {
-        formula_env <- environment(out_obj$call$formula)
-        if (is.null(formula_env)) formula_env <- caller_env
+        envs <- .call_envs(out_obj)
         call_args <- as.list(out_obj$call)[-1]
         rerun_args <- list(
             formula = formula_obj,
             data = data_obj,
             index = index_obj
         )
-        arg_names <- setdiff(names(call_args), c("", "formula", "data", "index"))
+        ## The refit always passes a formula, which carries Y, D and the
+        ## covariates, so the call's own Y/D/X are not forwarded: fect()
+        ## stops when X is given together with a formula (a fit made with
+        ## Y = , D = , X = strings has all three in its call).
+        arg_names <- setdiff(names(call_args),
+                             c("", "formula", "data", "index", "Y", "D", "X"))
         for (nm in arg_names) {
-            rerun_args[[nm]] <- eval(call_args[[nm]], envir = formula_env, enclos = caller_env)
+            rerun_args[[nm]] <- .eval_call_arg(call_args[[nm]], envs, nm)
         }
         rerun_args
     }
@@ -221,12 +287,16 @@ fect_mspe <- function(
                 stop("Each out.fect must provide Y and D matrices.")
             }
 
-            formula_env_i <- environment(out_i$call$formula)
-            if (is.null(formula_env_i)) formula_env_i <- caller_env
-            data_i <- eval(out_i$call$data, envir = formula_env_i, enclos = caller_env)
-            idx_i <- eval(out_i$call$index, envir = formula_env_i, enclos = caller_env)
+            envs_i <- .call_envs(out_i)
+            refit_i <- .refit_fun(out_i)
+            ## the data: the data frame a gsynth() fit stores, else the call's
+            data_i <- out_i[["data", exact = TRUE]]
+            if (!is.data.frame(data_i)) {
+                data_i <- .eval_call_arg(out_i$call$data, envs_i, "data")
+            }
+            idx_i <- .eval_call_arg(out_i$call$index, envs_i, "index")
             formula_obj_i <- tryCatch(
-                eval(out_i$call$formula, envir = formula_env_i, enclos = caller_env),
+                .eval_call_arg(out_i$call$formula, envs_i, "formula"),
                 error = function(e) NULL
             )
             if (!inherits(formula_obj_i, "formula")) {
@@ -275,7 +345,7 @@ fect_mspe <- function(
                     ## already fired when the user fit the original
                     ## model; emitting them once per model x fold
                     ## (= up to N_models * k times) is noise.
-                    out_new <- suppressMessages(do.call(fect, rerun_args))
+                    out_new <- suppressMessages(do.call(refit_i, rerun_args))
 
                     ## collect residuals at estCV positions
                     ## est_pos are flat column-major indices into the
