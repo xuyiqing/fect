@@ -749,6 +749,17 @@ estimand <- function(fit,
 
     .validate_po_contract(fit)
 
+    ## Aggregation weights: the fit's own (fit$W.agg for a fit made with W or
+    ## W.agg; equal weights otherwise). Other weights are not accepted.
+    if (!is.null(weights)) {
+        stop("`weights` must be NULL. estimand() aggregates with the fit's ",
+             "own weights: those given in `W` or `W.agg` (stored in ",
+             "fit$W.agg), or equal weights for a fit made without them. ",
+             "For other weights, aggregate the rows of imputed_outcomes(fit), ",
+             "which reports each treated cell's effect (eff) and weight ",
+             "(W.agg).", call. = FALSE)
+    }
+
     ## Jackknife ci.method guard: only "normal" is statistically valid.
     ## See .check_jackknife_ci_method() for the full rationale.
     ## Placed after .validate_po_contract() so fit is known to be a list.
@@ -841,11 +852,6 @@ estimand <- function(fit,
                                      vartype, conf.level, ci.method,
                                      test) {
 
-    if (!is.null(weights)) {
-        stop("estimand(\"att\", \"event.time\", test = \"", test, "\") ",
-             "with non-default weights is not yet supported.",
-             call. = FALSE)
-    }
     if (!is.null(cells)) {
         stop("estimand(\"att\", \"event.time\", test = \"", test, "\") ",
              "with `cells` filter is not yet supported.",
@@ -871,6 +877,7 @@ estimand <- function(fit,
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+    Wm <- .po_agg_weights_or_null(fit)
 
     estimate <- numeric(length(ets))
     se_vec   <- rep(NA_real_, length(ets))
@@ -884,12 +891,13 @@ estimand <- function(fit,
         n_cells[k] <- sum(cell_mask)
 
         eff_t <- fit$eff[cell_mask]
-        estimate[k] <- mean(eff_t, na.rm = TRUE)
+        w_t   <- if (is.null(Wm)) NULL else Wm[cell_mask]
+        estimate[k] <- .po_wmean(eff_t, w_t)
 
         if (nboots > 0L && vartype != "none") {
             ## Each replicate's own cells at this event time (its columns
             ## are the units colnames.boot[[b]]).
-            att_b <- .po_replicate_att(fit, cell_mask)
+            att_b <- .po_replicate_att(fit, cell_mask, Wm)
 
             ## PARAMETRIC SHIFT (v2.4.2 fix): center att_b at the point estimate.
             ## For parametric vartype, eff.boot is H0-centered; only ci.method="normal"
@@ -902,7 +910,7 @@ estimand <- function(fit,
             }
 
             jack_v <- if (ci.method == "bca") {
-                .cell_jackknife("att", eff = eff_t)
+                .cell_jackknife("att", eff = eff_t, w = w_t)
             } else NULL
 
             ci <- .compute_ci(estimate[k], att_b, ci.method, conf.level,
@@ -948,6 +956,7 @@ estimand <- function(fit,
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+    Wm <- .po_agg_weights_or_null(fit)
 
     estimate <- numeric(length(ets))
     se_vec   <- rep(NA_real_, length(ets))
@@ -961,7 +970,7 @@ estimand <- function(fit,
         n_cells[k] <- sum(cell_mask)
 
         eff_t <- fit$eff[cell_mask]
-        estimate[k] <- mean(eff_t, na.rm = TRUE)
+        estimate[k] <- .po_wmean(eff_t, if (is.null(Wm)) NULL else Wm[cell_mask])
 
         ## Jackknife: per-replicate leave-one-out mean over cells.
         if (nboots > 0L && vartype != "none") {
@@ -969,7 +978,8 @@ estimand <- function(fit,
             for (j in seq_len(nboots)) {
                 cm_j <- cell_mask[, -j, drop = FALSE]
                 eb_j <- fit$eff.boot[, , j]
-                theta_j[j] <- mean(eb_j[cm_j], na.rm = TRUE)
+                theta_j[j] <- .po_wmean(eb_j[cm_j],
+                    if (is.null(Wm)) NULL else Wm[, -j, drop = FALSE][cm_j])
             }
             theta_valid <- theta_j[is.finite(theta_j)]
             N_eff <- length(theta_valid)
@@ -1004,10 +1014,6 @@ estimand <- function(fit,
                                   vartype, conf.level, ci.method,
                                   test = "none") {
 
-    if (!is.null(weights)) {
-        stop("estimand(\"att\", \"overall\") with non-default weights ",
-             "is not yet supported in v2.4.0.", call. = FALSE)
-    }
     if (test != "none" && !is.null(cells)) {
         stop("estimand(\"att\", \"overall\") with both test = \"", test,
              "\" and `cells` is not supported. The test = ... argument ",
@@ -1044,7 +1050,10 @@ estimand <- function(fit,
              call. = FALSE)
     }
 
-    estimate <- mean(fit$eff[cell_mask], na.rm = TRUE)
+    ## Aggregation weights of a weighted fit (W or W.agg), else NULL
+    Wm <- .po_agg_weights_or_null(fit)
+    estimate <- .po_wmean(fit$eff[cell_mask],
+                          if (is.null(Wm)) NULL else Wm[cell_mask])
 
     se_val <- NA_real_
     ci_lo  <- NA_real_
@@ -1065,13 +1074,13 @@ estimand <- function(fit,
         ## jackknife-specific helper.
         if (isTRUE(fit$vartype == "jackknife")) {
             return(.estimand_att_overall_jackknife(fit, cell_mask, conf.level,
-                                                   vartype))
+                                                   vartype, Wm))
         }
 
         ## Replicate b's columns are the units colnames.boot[[b]], so its
-        ## draws are read through .po_replicate_cells(), not at the cell
-        ## positions of the original panel.
-        att_b <- .po_replicate_att(fit, cell_mask)
+        ## draws (and their weights) are read through .po_replicate_cells(),
+        ## not at the cell positions of the original panel.
+        att_b <- .po_replicate_att(fit, cell_mask, Wm)
 
         ## PARAMETRIC SHIFT (v2.4.2 fix)
         is_parametric <- isTRUE(fit$vartype == "parametric") ||
@@ -1081,7 +1090,8 @@ estimand <- function(fit,
         }
 
         jack_v <- if (ci.method == "bca") {
-            .cell_jackknife("att", eff = fit$eff[cell_mask])
+            .cell_jackknife("att", eff = fit$eff[cell_mask],
+                            w = if (is.null(Wm)) NULL else Wm[cell_mask])
         } else NULL
 
         ci <- .compute_ci(estimate, att_b, ci.method, conf.level,
@@ -1125,14 +1135,17 @@ estimand <- function(fit,
 ##   cell_mask  - logical TT x N matrix; TRUE at treated cells to include
 ##   conf.level - numeric confidence level (default 0.95)
 ##   vartype    - "jackknife" or "none"
+##   Wm         - aggregation weights of a weighted fit (a TT x N matrix,
+##                as fit$W.agg), or NULL for equal weights
 ##
 ## Returns a one-row data frame with estimate, se, ci.lo, ci.hi, n_cells,
 ## vartype (same schema as .estimand_att_overall()).
 .estimand_att_overall_jackknife <- function(fit, cell_mask, conf.level,
-                                             vartype) {
+                                             vartype, Wm = NULL) {
     if (vartype == "none") {
         ## No SE requested.
-        estimate <- mean(fit$eff[cell_mask], na.rm = TRUE)
+        estimate <- .po_wmean(fit$eff[cell_mask],
+                              if (is.null(Wm)) NULL else Wm[cell_mask])
         return(data.frame(
             estimate = estimate, se = NA_real_,
             ci.lo = NA_real_, ci.hi = NA_real_,
@@ -1142,7 +1155,8 @@ estimand <- function(fit,
         ))
     }
 
-    estimate <- mean(fit$eff[cell_mask], na.rm = TRUE)
+    estimate <- .po_wmean(fit$eff[cell_mask],
+                          if (is.null(Wm)) NULL else Wm[cell_mask])
     n_cells  <- sum(cell_mask)
 
     ## Determine whether the cell_mask is "all treated cells" (no filter
@@ -1199,10 +1213,11 @@ estimand <- function(fit,
         N_jack <- dim(fit$eff.boot)[3]
         theta_j <- numeric(N_jack)
         for (j in seq_len(N_jack)) {
-            ## Drop column j from cell_mask.
+            ## Drop column j from cell_mask (and from the weights).
             cm_j <- cell_mask[, -j, drop = FALSE]
             eb_j <- fit$eff.boot[, , j]  ## TT x (N-1)
-            theta_j[j] <- mean(eb_j[cm_j], na.rm = TRUE)
+            theta_j[j] <- .po_wmean(eb_j[cm_j],
+                if (is.null(Wm)) NULL else Wm[, -j, drop = FALSE][cm_j])
         }
         theta_j_valid <- theta_j[is.finite(theta_j)]
         N_eff <- length(theta_j_valid)
@@ -1274,10 +1289,6 @@ estimand <- function(fit,
         stop("estimand(\"att.cumu\") with direction = \"off\" is not ",
              "supported (cumulative effects are defined relative to ",
              "treatment onset).", call. = FALSE)
-    }
-    if (!is.null(weights)) {
-        stop("estimand(\"att.cumu\") with non-default weights is not ",
-             "yet supported in v2.4.0.", call. = FALSE)
     }
     if (!is.null(cells) && by != "overall") {
         stop("estimand(\"att.cumu\") with `cells` is supported only when ",
@@ -1410,10 +1421,6 @@ estimand <- function(fit,
 .estimand_aptt <- function(fit, by, cells, weights, direction,
                            vartype, conf.level, ci.method, test = "none") {
 
-    if (!is.null(weights)) {
-        stop("estimand(\"aptt\") with non-default weights is not yet ",
-             "supported in v2.4.0.", call. = FALSE)
-    }
     if (!is.null(cells)) {
         stop("estimand(\"aptt\") with `cells` filter is not yet ",
              "supported in v2.4.0.", call. = FALSE)
@@ -1449,6 +1456,7 @@ estimand <- function(fit,
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+    Wm <- .po_agg_weights_or_null(fit)
 
     estimate <- numeric(length(ets))
     se_vec   <- rep(NA_real_, length(ets))
@@ -1464,12 +1472,13 @@ estimand <- function(fit,
         cell_mask <- treated_mask & Tev == et
         n_cells[k] <- sum(cell_mask)
 
-        ## Point estimate.
+        ## Point estimate (weighted means for a weighted fit).
         eff_t <- fit$eff[cell_mask]
         Y_t   <- fit$Y.dat[cell_mask]
         Y0_t  <- Y_t - eff_t
-        num   <- mean(eff_t, na.rm = TRUE)
-        den   <- mean(Y0_t, na.rm = TRUE)
+        w_t   <- if (is.null(Wm)) NULL else Wm[cell_mask]
+        num   <- .po_wmean(eff_t, w_t)
+        den   <- .po_wmean(Y0_t, w_t)
         estimate[k] <- num / den
 
         ## Bootstrap / jackknife distribution per replicate.
@@ -1488,9 +1497,11 @@ estimand <- function(fit,
                     eff_j_v   <- eb_j[cm_j_full]
                     Y_j       <- fit$Y.dat[, kcols, drop = FALSE][cm_j_full]
                     Y0_j_v    <- Y_j - eff_j_v
-                    denom_j   <- mean(Y0_j_v, na.rm = TRUE)
+                    w_j       <- if (is.null(Wm)) NULL else
+                                     Wm[, kcols, drop = FALSE][cm_j_full]
+                    denom_j   <- .po_wmean(Y0_j_v, w_j)
                     if (is.finite(denom_j) && abs(denom_j) > 1e-10) {
-                        theta_j[j] <- mean(eff_j_v, na.rm = TRUE) / denom_j
+                        theta_j[j] <- .po_wmean(eff_j_v, w_j) / denom_j
                     } else {
                         theta_j[j] <- NA_real_
                     }
@@ -1516,8 +1527,9 @@ estimand <- function(fit,
                     rc <- .po_replicate_cells(fit, cell_mask, b)
                     if (length(rc$eff) == 0L) next  # no unit of this group drawn
                     has_b[b] <- TRUE
-                    num_b[b] <- mean(rc$eff, na.rm = TRUE)
-                    den_b[b] <- mean(fit$Y.dat[rc$orig] - rc$eff, na.rm = TRUE)
+                    w_b <- if (is.null(Wm)) NULL else Wm[rc$orig]
+                    num_b[b] <- .po_wmean(rc$eff, w_b)
+                    den_b[b] <- .po_wmean(fit$Y.dat[rc$orig] - rc$eff, w_b)
                 }
 
                 ## Hard-error on cell-drop pathology (v2.4.2+).
@@ -1550,7 +1562,7 @@ estimand <- function(fit,
                 ## Cell-level jackknife for the BCa acceleration parameter.
                 ## Only computed when bca is requested (cheap; no model refits).
                 jack_v <- if (ci.method == "bca") {
-                    .cell_jackknife("aptt", eff = eff_t, Y0 = Y0_t)
+                    .cell_jackknife("aptt", eff = eff_t, Y0 = Y0_t, w = w_t)
                 } else NULL
 
                 ci <- .compute_ci(estimate[k], aptt_b, ci.method, conf.level,
@@ -1590,10 +1602,6 @@ estimand <- function(fit,
                               vartype, conf.level, ci.method,
                               test = "none") {
 
-    if (!is.null(weights)) {
-        stop("estimand(\"log.att\") with non-default weights is not ",
-             "yet supported in v2.4.0.", call. = FALSE)
-    }
     if (!is.null(cells)) {
         stop("estimand(\"log.att\") with `cells` filter is not yet ",
              "supported in v2.4.0.", call. = FALSE)
@@ -1653,6 +1661,7 @@ estimand <- function(fit,
     }
 
     nboots <- if (is.null(fit$eff.boot)) 0L else dim(fit$eff.boot)[3]
+    Wm <- .po_agg_weights_or_null(fit)
 
     estimate <- numeric(length(ets))
     se_vec   <- rep(NA_real_, length(ets))
@@ -1670,6 +1679,7 @@ estimand <- function(fit,
         eff_t <- fit$eff[cell_mask]
         Y_t   <- fit$Y.dat[cell_mask]
         Y0_t  <- Y_t - eff_t
+        w_t   <- if (is.null(Wm)) NULL else Wm[cell_mask]
 
         ## Caller-level hard-stop in .estimand_log_att already guarantees
         ## all cells have Y > 0 and Y0_hat > 0; only NA filtering needed.
@@ -1682,7 +1692,8 @@ estimand <- function(fit,
         }
 
         log_diff <- log(Y_t[ok]) - log(Y0_t[ok])
-        estimate[k] <- mean(log_diff, na.rm = TRUE)
+        w_ok     <- if (is.null(w_t)) NULL else w_t[ok]
+        estimate[k] <- .po_wmean(log_diff, w_ok)
 
         if (nboots > 0L && vartype != "none") {
             if (isTRUE(fit$vartype == "jackknife")) {
@@ -1703,8 +1714,10 @@ estimand <- function(fit,
                     if (sum(ok_j) == 0L) {
                         theta_j[j] <- NA_real_
                     } else {
-                        theta_j[j] <- mean(log(Y_j[ok_j]) - log(Y0_j_v[ok_j]),
-                                           na.rm = TRUE)
+                        w_j <- if (is.null(Wm)) NULL else
+                                   Wm[, kcols, drop = FALSE][cm_j_full][ok_j]
+                        theta_j[j] <- .po_wmean(log(Y_j[ok_j]) - log(Y0_j_v[ok_j]),
+                                                w_j)
                     }
                 }
                 theta_valid <- theta_j[is.finite(theta_j)]
@@ -1729,6 +1742,8 @@ estimand <- function(fit,
                 })
                 Y_all  <- unlist(lapply(rcs, function(rc) fit$Y.dat[rc$orig]))
                 Y0_all <- Y_all - unlist(lapply(rcs, function(rc) rc$eff))
+                W_all  <- if (is.null(Wm)) NULL else
+                              unlist(lapply(rcs, function(rc) Wm[rc$orig]))
                 rep_of <- rep(seq_len(nboots),
                               vapply(rcs, function(rc) length(rc$eff),
                                      integer(1)))
@@ -1777,11 +1792,20 @@ estimand <- function(fit,
                 }
 
                 log_diff_all <- log(Y_all) - log(Y0_all)
-                logatt_b <- vapply(
-                    split(log_diff_all,
-                          factor(rep_of, levels = seq_len(nboots))),
-                    function(v) mean(v, na.rm = TRUE), numeric(1)
-                )
+                logatt_b <- if (is.null(W_all)) {
+                    vapply(
+                        split(log_diff_all,
+                              factor(rep_of, levels = seq_len(nboots))),
+                        function(v) mean(v, na.rm = TRUE), numeric(1)
+                    )
+                } else {
+                    vapply(
+                        split(seq_along(log_diff_all),
+                              factor(rep_of, levels = seq_len(nboots))),
+                        function(ix) .po_wmean(log_diff_all[ix], W_all[ix]),
+                        numeric(1)
+                    )
+                }
                 logatt_b <- unname(logatt_b)
                 logatt_b[is.nan(logatt_b)] <- NA_real_
 
@@ -1798,7 +1822,7 @@ estimand <- function(fit,
 
                 ## Cell-level jackknife on the per-cell log-diff vector.
                 jack_v <- if (ci.method == "bca") {
-                    .cell_jackknife("log.att", log_diff = log_diff)
+                    .cell_jackknife("log.att", log_diff = log_diff, w = w_ok)
                 } else NULL
 
                 ci <- .compute_ci(estimate[k], logatt_b, ci.method, conf.level,
@@ -1831,18 +1855,41 @@ estimand <- function(fit,
 ## Internal helpers
 ## ---------------------------------------------------------------------------
 
-## Aggregation weights of a fit as a TT x N matrix (1 where unweighted).
-## Fits built before 2.4.6 have no W.agg slot; their weight matrix is the
-## TT x N matrix stored under the name "W" (after the column-name slot of
-## the same name).
-.po_agg_weights <- function(fit, TT, N) {
+## Aggregation weights of a fit made with W or W.agg, as a TT x N matrix on
+## the fit's panel (like Y.dat); NULL for a fit made without them (equal
+## weights; W.est alone weights only the model fit). Fits built before
+## 2.4.7 have no W.agg slot; their weight matrix is the TT x N matrix stored
+## under the name "W" (after the column-name slot of the same name).
+.po_agg_weights_or_null <- function(fit) {
     W_mat <- fit[["W.agg", exact = TRUE]]
     if (is.null(W_mat) && isTRUE(fit[["W.in.agg", exact = TRUE]])) {
+        TT <- nrow(fit$Y.dat)
+        N  <- ncol(fit$Y.dat)
         cand <- Filter(function(z) is.matrix(z) && identical(dim(z), c(TT, N)),
                        fit[names(fit) == "W"])
         if (length(cand) > 0L) W_mat <- cand[[1L]]
     }
+    W_mat
+}
+
+## Aggregation weights of a fit as a TT x N matrix (1 where unweighted).
+.po_agg_weights <- function(fit, TT, N) {
+    W_mat <- .po_agg_weights_or_null(fit)
     if (is.null(W_mat)) matrix(1, nrow = TT, ncol = N) else W_mat
+}
+
+## Mean of `v` weighted by `w` over the entries where both are available;
+## with w = NULL the plain mean (na.rm = TRUE), as the unweighted estimands
+## have always used. NA when no weight is left.
+.po_wmean <- function(v, w = NULL) {
+    if (is.null(w)) {
+        return(mean(v, na.rm = TRUE))
+    }
+    ok <- !is.na(v) & !is.na(w)
+    if (!any(ok) || sum(w[ok]) == 0) {
+        return(NA_real_)
+    }
+    sum(v[ok] * w[ok]) / sum(w[ok])
 }
 
 ## Internal: the draws of bootstrap / parametric replicate b at the cells of
@@ -1882,13 +1929,15 @@ estimand <- function(fit,
 
 
 ## Internal: per-replicate mean of the draws at the cells of `cell_mask`
-## (one value per replicate in fit$eff.boot). A replicate that contains no
-## cell of the mask (none of its units was drawn) gives NA, which the SE / CI
-## code ignores, as it ignores NA draws.
-.po_replicate_att <- function(fit, cell_mask) {
+## (one value per replicate in fit$eff.boot), weighted by `W` (a TT x N
+## matrix; each draw takes the weight of its source cell) when given. A
+## replicate that contains no cell of the mask (none of its units was drawn)
+## gives NA, which the SE / CI code ignores, as it ignores NA draws.
+.po_replicate_att <- function(fit, cell_mask, W = NULL) {
     nboots <- dim(fit$eff.boot)[3]
     att_b <- vapply(seq_len(nboots), function(b) {
-        mean(.po_replicate_cells(fit, cell_mask, b)$eff, na.rm = TRUE)
+        rc <- .po_replicate_cells(fit, cell_mask, b)
+        .po_wmean(rc$eff, if (is.null(W)) NULL else W[rc$orig])
     }, numeric(1))
     att_b[is.nan(att_b)] <- NA_real_
     att_b
@@ -2063,6 +2112,20 @@ estimand <- function(fit,
 ## refits are too expensive.
 .cell_jackknife <- function(type, ...) {
     args <- list(...)
+    w <- args$w
+    if (!is.null(w)) {
+        ## Weighted leave-one-out means (the weighted estimands):
+        ##   (sum(w * v) - w_i * v_i) / (sum(w) - w_i)
+        loo <- function(v) {
+            n <- length(v)
+            if (n < 2L) return(rep(NA_real_, n))
+            (sum(w * v, na.rm = TRUE) - w * v) / (sum(w, na.rm = TRUE) - w)
+        }
+        if (type == "aptt")    return(loo(args$eff) / loo(args$Y0))
+        if (type == "log.att") return(loo(args$log_diff))
+        if (type == "att")     return(loo(args$eff))
+        stop("Unknown jackknife type = \"", type, "\".", call. = FALSE)
+    }
     if (type == "aptt") {
         eff <- args$eff; Y0 <- args$Y0
         n   <- length(eff)

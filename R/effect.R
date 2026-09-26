@@ -86,8 +86,13 @@ effect <- function(x, ## a fect object
     period <- period.raw
   }
 
+  # Aggregation weights of a fit made with W or W.agg (NULL otherwise): the
+  # per-period ATTs are then weighted means, as fit$att is.
+  W.agg <- .po_agg_weights_or_null(x)
+
   # Calculate cumulative average treatment effect
-  catt <- getEffect(D, I, eff, cumu, period)
+  catt <- getEffect(D, I, eff, cumu, period,
+                    W = if (is.null(W.agg)) NULL else W.agg[, mask, drop = FALSE])
 
   # Initialize bootstrap results
   catt.boot <- NULL
@@ -123,6 +128,18 @@ effect <- function(x, ## a fect object
       } else {
         dim(x$eff.boot)[2]
       }
+      # The units of replicate i, in its column order (fit$colnames.boot),
+      # carry their weights with them.
+      W.boot <- NULL
+      if (!is.null(W.agg)) {
+        ids <- if (!is.null(x$colnames.boot) && length(x$colnames.boot) >= i &&
+                   length(x$colnames.boot[[i]]) > 0L) {
+          as.integer(x$colnames.boot[[i]])
+        } else {
+          seq_len(w)
+        }
+        W.boot <- W.agg[, ids, drop = FALSE]
+      }
       # Extract bootstrap matrices (TT x w)
       if (has.D.boot) {
         D.boot <- matrix(x$D.boot[, seq_len(w), i], nrow = TT.boot)
@@ -151,7 +168,8 @@ effect <- function(x, ## a fect object
         as.matrix(Dtr.boot),
         as.matrix(Itr.boot),
         as.matrix(eff.tr.boot),
-        cumu, period)
+        cumu, period,
+        W = if (is.null(W.boot)) NULL else as.matrix(W.boot[, mask.boot]))
     }
   }
 
@@ -336,7 +354,8 @@ getEffect <- function(D,           # Treatment indicator matrix
                       I,           # Inclusion indicator matrix
                       eff,         # Effect matrix
                       cumu,        # Logical: whether to calculate cumulative effect
-                      period) {    # Event window range: c(start, end)
+                      period,      # Event window range: c(start, end)
+                      W = NULL) {  # Aggregation weights (same shape as eff), or NULL
   # Initialize output vector with NAs
   aeff <- rep(NA, period[2] - period[1] + 1)
 
@@ -373,12 +392,23 @@ getEffect <- function(D,           # Treatment indicator matrix
   # Flatten matrices to vectors for processing
   vd <- c(D)       # Vector of relative times
   veff <- c(eff)   # Vector of effects
+  vw <- if (is.null(W)) NULL else c(W)   # Vector of weights
 
   # Remove NA entries
   if (sum(is.na(vd)) > 0) {
     vd.rm <- which(is.na(vd))
     vd <- vd[-vd.rm]
     veff <- veff[-vd.rm]
+    if (!is.null(vw)) vw <- vw[-vd.rm]
+  }
+
+  # Mean effect of the cells `ix`: weighted by W when given (cells with an NA
+  # weight left out), as the fit's own per-period ATTs are
+  cell.mean <- function(ix) {
+    if (is.null(vw)) return(mean(veff[ix]))
+    ix <- ix[!is.na(vw[ix])]
+    if (length(ix) == 0L || sum(vw[ix]) == 0) return(NA_real_)
+    sum(veff[ix] * vw[ix]) / sum(vw[ix])
   }
 
   # Get unique relative time periods
@@ -397,14 +427,18 @@ getEffect <- function(D,           # Treatment indicator matrix
     # which weights the periods by their numbers of cells.)
     if (te >= ts) {
       att.t <- vapply(effT, function(t) {
-        v <- veff[vd == t]
-        if (length(v) == 0) NA_real_ else mean(v)
+        ix <- which(vd == t)
+        if (length(ix) == 0) NA_real_ else cell.mean(ix)
       }, numeric(1))
       aeff[seq_along(effT)] <- cumsum(att.t)
     }
   } else {
     # Calculate average treatment effect for each period
-    ave <- as.numeric(tapply(veff, vd, mean))
+    ave <- if (is.null(vw)) {
+      as.numeric(tapply(veff, vd, mean))
+    } else {
+      as.numeric(tapply(seq_along(veff), vd, cell.mean))
+    }
     effT2 <- period[1]:period[2]
     for (i in 1:length(effT2)) {
       if (effT2[i] %in% uniT) {

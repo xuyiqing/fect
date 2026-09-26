@@ -101,6 +101,58 @@ test_that("S1: effect() gives parametric fits normal intervals, as att.cumu() do
 })
 
 
+## -- W1  aggregation weights -----------------------------------------------
+
+test_that("W1: estimand() and effect() aggregate with the weights of a weighted fit", {
+  skip_on_cran()
+  sg <- .pf_data("simgsynth")
+  sg$w2 <- 0.5 + (as.integer(factor(sg$id)) %% 7) / 4
+  k <- 1:10
+  fits <- list()
+  for (vt in c("bootstrap", "parametric", "jackknife")) {
+    args <- list(Y ~ D, data = sg, index = c("id", "time"), method = "gsynth",
+                 force = "two-way", r = 2, CV = FALSE, se = TRUE,
+                 vartype = vt, keep.sims = TRUE, parallel = FALSE, W = "w2")
+    if (vt != "jackknife") {
+      args$nboots <- 20
+      args$seed <- 1
+    }
+    fit <- fits[[vt]] <- .pf_quiet(do.call(fect::fect, args))
+    ## the overall ATT: b1dded6 gave the unweighted mean (4.6396, while
+    ## att.avg is 4.6408) and the SE of the unweighted mean
+    ov <- .pf_quiet(fect::estimand(fit, "att", "overall", ci.method = "normal"))
+    expect_equal(ov$estimate, fit$att.avg, tolerance = 1e-10, info = vt)
+    expect_equal(ov$se, unname(fit$est.avg[1, "S.E."]), tolerance = 1e-8,
+                 info = vt)
+    ## per-period and cumulative effects: the fit's own weighted ATTs
+    e0 <- .pf_quiet(fect::effect(fit, cumu = FALSE, period = c(1, 10)))
+    expect_equal(unname(e0$effect.est.avg), fit$att[match(k, fit$time)],
+                 tolerance = 1e-10, info = vt)
+    expect_equal(unname(e0$effect.est.att[, "S.E."]),
+                 unname(fit$est.att[as.character(k), "S.E."]),
+                 tolerance = 1e-8, info = vt)
+    ec <- .pf_quiet(fect::effect(fit, period = c(1, 10)))$effect.est.att
+    ac <- .pf_quiet(fect::att.cumu(fit, period = c(1, 10)))
+    expect_equal(unname(ec[, "ATT"]), unname(ac[, "catt"]), tolerance = 1e-10,
+                 info = vt)
+    expect_equal(unname(ec[, "S.E."]), unname(ac[, "S.E."]), tolerance = 1e-8,
+                 info = vt)
+  }
+  ## APTT: weighted numerator and denominator (b1dded6: unweighted)
+  fb <- fits$bootstrap
+  ap <- .pf_quiet(fect::estimand(fb, "aptt", "event.time", ci.method = "normal"))
+  W  <- fb[["W.agg", exact = TRUE]]
+  m1 <- !is.na(fb$D.dat) & fb$D.dat == 1 & !is.na(fb$T.on) & fb$T.on == 1
+  hand <- (sum(fb$eff[m1] * W[m1]) / sum(W[m1])) /
+    (sum((fb$Y.dat[m1] - fb$eff[m1]) * W[m1]) / sum(W[m1]))
+  expect_equal(ap$estimate[ap$event.time == 1], hand, tolerance = 1e-10)
+  ## only the fit's own weights are used; other values stop with a message
+  ## that says so (b1dded6: "not yet supported in v2.4.0")
+  expect_error(fect::estimand(fb, "att", "overall", weights = FALSE),
+               "`weights` must be NULL")
+})
+
+
 ## -- J2  jackknife SE of the overall ATT in estimand() ----------------------
 
 test_that("J2: estimand()'s overall ATT has the fit's own jackknife SE", {
