@@ -50,7 +50,7 @@ assumptions.}
 
 \item{W.est}{a string giving the column name of a weight variable that enters the outcome-model fit (the weighted least squares applied inside the IFE / MC / CFE solver). When \code{NULL}, falls back to \code{W}. Use this (with \code{W.agg = NULL}) when the weight reflects fit-side considerations and the estimand is the unweighted average ATT across treated cells.}
 
-\item{W.agg}{a string giving the column name of a weight variable that enters the across-treated-obs aggregation (\code{att.on}, \code{est.avg}, \code{est.att}). When \code{NULL}, falls back to \code{W}. Use this (with \code{W.est = NULL}) when the user's estimand differs from "ATT for the treated units in the analysis sample" --- common cases include calibration weights to a target population or post-stratification weights that should adjust the summary but not the model fit. Given alone, \code{W.agg} enters only the aggregation: never the model fit, and never the cross-validation scores when \code{CV = TRUE}.
+\item{W.agg}{a string giving the column name of a weight variable that enters the across-treated-obs aggregation (\code{att.on}, \code{est.avg}, \code{est.att}, and the summaries of \code{\link{estimand}}, \code{\link{effect}} and \code{\link{att.cumu}}). When \code{NULL}, falls back to \code{W}. Use this (with \code{W.est = NULL}) when the user's estimand differs from "ATT for the treated units in the analysis sample" --- common cases include calibration weights to a target population or post-stratification weights that should adjust the summary but not the model fit. Given alone, \code{W.agg} enters only the aggregation: never the model fit, and never the cross-validation scores when \code{CV = TRUE}.
 
 A clean in-package solution for inverse-probability weights for confounding adjustment is under development for fect 3.0 (a cross-fit doubly-robust path); \code{W.agg} is not a substitute for that work and does not deliver the doubly-robust properties an IPW user expects.
 
@@ -260,7 +260,7 @@ Ignored when \code{CV = FALSE}.}
   \item{X}{names of the requested covariates, including any dropped before the fit (see the \code{X} argument).}
   \item{method}{the estimation method. A \code{method = "ife"} fit with \code{time.component.from = "nevertreated"} reports \code{"gsynth"}.}
   \item{W}{name of the weight variable.}
-  \item{W.agg}{with \code{W} or \code{W.agg}: the aggregation weights as a T-by-N matrix on the fit's panel (like \code{Y.dat}); read by \code{\link{imputed_outcomes}}. Absent for unweighted fits and with \code{W.est} alone.}
+  \item{W.agg}{with \code{W} or \code{W.agg}: the aggregation weights as a T-by-N matrix on the fit's panel (like \code{Y.dat}); read by \code{\link{imputed_outcomes}}, \code{\link{estimand}} and \code{\link{effect}}. Absent for unweighted fits and with \code{W.est} alone.}
   \item{index}{name of the unit and time indicators.}
   \item{force}{specified fixed effects option.}
   \item{T}{number of time periods.}
