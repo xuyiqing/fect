@@ -34,8 +34,44 @@ Each bullet names the fits whose numbers change.
   over event time (on `turnout`, `method = "gsynth"`, `r = 0`: 21.50 instead
   of 8.26 at k = 10). The `weighted` argument of `att.cumu()`, which had no
   effect, now chooses: `FALSE` (the new default) gives the running sum and
-  `TRUE` the old number. For bootstrap fits, `att.cumu()` and `effect()` now
-  report the same S.E. (gsynth #75).
+  `TRUE` the old estimate (for jackknife fits with a new S.E.; see the next
+  bullet). `att.cumu()` and `effect()` now report the same S.E. (gsynth #75),
+  and the same interval and p-value except in the first row of a bootstrap
+  fit, which `att.cumu()` copies from `fit$est.att`.
+* For jackknife fits, `att.cumu()`, `effect()` and `estimand("att.cumu")`
+  now report the jackknife S.E. of the cumulative ATT, computed as for the
+  fit's own jackknife SEs, with a normal interval and p-value. `att.cumu()`
+  used the spread of the leave-one-out estimates, about sqrt(N - 1) times
+  too small for N units (on `turnout`, 47 units, `method = "gsynth"`,
+  `r = 0`, at event time 10: 5.29 instead of 35.50; with `weighted = TRUE`,
+  5.73 instead of 38.42), and took their quantiles as the interval.
+  `effect()` was about 1% too large (35.89) and used t critical values.
+* For parametric fits, `effect()`, and so
+  `estimand(fit, "att.cumu", "event.time")`, now gives the normal interval
+  and p-value, as `att.cumu()` and the fit's own intervals do. It used a t
+  critical value with `nboots - 1` degrees of freedom, so its intervals were
+  wider (by 0.6% at the default `nboots = 200`, 2.5% at 50). The SEs do not
+  change.
+* For fits made with `W` or `W.agg`, `estimand()` and `effect()` now use
+  those weights, in the estimates and in every replicate, as `?estimand`
+  said and as `fit$att` and `fit$att.avg` do. So
+  `estimand(fit, "att", "overall")` now equals `fit$att.avg`, with the SE of
+  `fit$est.avg` (on `simgsynth` with unit weights, `method = "gsynth"`,
+  `r = 2`: 4.6408 instead of the unweighted 4.6396). Fits made without
+  weights, or with `W.est` only, do not change. The `weights` argument of
+  `estimand()` must stay `NULL`; other values still stop, now with a message
+  that points to `imputed_outcomes()`, which reports each treated cell's
+  effect and weight.
+* For jackknife fits, `estimand(fit, "att", "overall")` now takes its SE from
+  each leave-one-out fit's overall ATT, as `fit$est.avg` does. It used each
+  leave-one-out fit's average of the unit-level ATTs, a different quantity
+  when units have different numbers of treated periods (on `turnout`: 3.84
+  instead of 3.28).
+* `fect_mspe()` now refits a fit made by `gsynth()` with `gsynth()`, so it
+  scores the fit's own model. It refitted fect's default fixed-effects model
+  (on gsynth's `simdata`, a default fit scored an MSPE of 65.25 instead of
+  110.96), and it stopped on a fit made with a gsynth-only argument such as
+  `inference`.
 * Parametric SEs with `normalize = TRUE` are no longer multiplied by sd(Y)
   (on `turnout`, 35.80 instead of 2.56; gsynth #14).
 * The bootstrap now resamples groups of one unit correctly: with one treated
@@ -112,6 +148,13 @@ says what to do.
 * `method = "ife"` with `time.component.from = "nevertreated"` and `se = TRUE`
   stops where the never-treated model cannot be estimated, as `se = FALSE`
   does; it fitted the not-yet-treated model instead.
+* `cm = TRUE` with `time.component.from = "nevertreated"` stops. It ran
+  without `est.cm`, which that model does not estimate.
+* `interFE()` stops, naming the covariate, when a covariate does not vary
+  and the model has no fixed effects (`force = "none"`), and when a
+  covariate is the sum of a unit-level and a period-level variable under
+  `force = "two-way"`. Such a covariate got the coefficient `NaN` (about
+  1e-16 on unbalanced panels) without a message.
 
 ## Bug fixes
 
@@ -163,6 +206,15 @@ says what to do.
 * `fect_mspe()` keeps working on fits made with `Y`, `D` and `X` given as
   column names: its refits pass the covariates only in the formula, so the
   new stop for `X` given together with a formula does not affect them.
+* `fect_mspe()` now looks up the data and the other arguments of a fit made
+  without a formula where `fect_mspe()` is called, as it does for formula
+  fits. A data frame local to a function was not found, and an argument such
+  as `min.T0 = k + 3` could take `fect_mspe()`'s own `k`. A formula fit made
+  inside a function can now be scored outside it.
+* `cm = TRUE` now stores `est.cm` without standard errors and after
+  cross-validation of the number of factors (as with `method = "ife"`
+  without `r`), so `fect_iden()` and `plot(type = "hte", cm = TRUE)` work on
+  those fits; they stopped, saying that `est.cm` was missing.
 * `dloo = TRUE` works only with the default
   `time.component.from = "notyettreated"`; with `"nevertreated"`, `fect()`
   stops at once, with a message that names `time.component.from`.
