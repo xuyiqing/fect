@@ -1107,14 +1107,14 @@ estimand <- function(fit,
 }
 
 
-## Compute overall ATT under jackknife using the Tukey SE from the
-## per-event-time att.boot matrix.
+## Compute overall ATT under jackknife using the Tukey SE of its
+## leave-one-unit-out estimates.
 ##
 ## Strategy: eff.boot is TT x (N-1) x N for jackknife. Direct cell-masking
 ## is not applicable because each slice drops one unit column. Instead, use
-## the pre-aggregated att.avg.unit.boot (per-unit leave-one-out ATT averages,
-## 1 x N) to compute N scalar overall-ATT leave-one-out estimates, then apply
-## the Tukey SE formula.
+## the pre-aggregated att.avg.boot (the overall ATT of each leave-one-out
+## fit, 1 x N) as the N leave-one-out estimates, then apply the Tukey SE
+## formula.
 ##
 ## When a cells filter is active, fall back to per-replicate recomputation
 ## from eff.boot by mapping each replicate's reduced column space back to
@@ -1147,22 +1147,24 @@ estimand <- function(fit,
 
     ## Determine whether the cell_mask is "all treated cells" (no filter
     ## beyond the standard treated-cell mask). In that case we can use the
-    ## pre-aggregated att.avg.unit.boot slot (1 x N matrix) for the
-    ## Tukey SE rather than recomputing from eff.boot.
-    ## att.avg.unit.boot is a unit-weighted grand average of all post-treatment
-    ## cells, which equals mean(eff[treated_mask]) when there is no
-    ## additional filter.
+    ## pre-aggregated att.avg.boot slot (1 x N matrix) for the Tukey SE
+    ## rather than recomputing from eff.boot. att.avg.boot[j] is the overall
+    ## ATT of the fit without unit j: the mean effect over its treated cells
+    ## (weighted by W.agg for a weighted fit), the estimand of `estimate`.
+    ## (Before 2.4.7: att.avg.unit.boot, the average of the unit-level ATTs,
+    ## a different estimand when units have different numbers of treated
+    ## cells.)
     all_treated_mask <- !is.na(fit$D.dat) & fit$D.dat == 1 &
                         !is.na(fit$T.on)
     use_precomp <- identical(cell_mask, all_treated_mask) &&
-                   !is.null(fit$att.avg.unit.boot)
+                   !is.null(fit$att.avg.boot)
 
     if (use_precomp) {
-        ## att.avg.unit.boot: 1 x N matrix (one row; N columns = jackknife
+        ## att.avg.boot: 1 x N matrix (one row; N columns = jackknife
         ## replicates). jackknifed() formula:
         ##   pseudo_j = N * theta_hat - (N-1) * theta_j
         ##   SE = sqrt(var(pseudo_j) / N)
-        theta_j <- as.vector(fit$att.avg.unit.boot)
+        theta_j <- as.vector(fit$att.avg.boot)
         N_jack  <- length(theta_j)
         theta_j_valid <- theta_j[!is.na(theta_j)]
         N_eff   <- length(theta_j_valid)
@@ -1178,7 +1180,7 @@ estimand <- function(fit,
         pseudo  <- N_jack * estimate - (N_jack - 1) * theta_j_valid
         se_val  <- sqrt(var(pseudo) / N_eff)
     } else {
-        ## Cells filter is active or att.avg.unit.boot is unavailable.
+        ## Cells filter is active or att.avg.boot is unavailable.
         ## Recompute per-replicate overall ATT from eff.boot.
         ##
         ## eff.boot[, , j] is TT x (N-1): the effect matrix for the panel

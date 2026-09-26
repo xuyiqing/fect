@@ -99,3 +99,16 @@ test_that("S1: effect() gives parametric fits normal intervals, as att.cumu() do
   expect_equal(et$ci.lo[match(1:10, et$event.time)], unname(eff[, "CI.lower"]),
                tolerance = 1e-10)
 })
+
+
+## -- J2  jackknife SE of the overall ATT in estimand() ----------------------
+
+test_that("J2: estimand()'s overall ATT has the fit's own jackknife SE", {
+  skip_on_cran()
+  fit <- .pf_turnout("jackknife")
+  ov <- .pf_quiet(fect::estimand(fit, "att", "overall", ci.method = "normal"))
+  ## b1dded6: 3.280, the jackknife SE of the average of the unit-level ATTs
+  ## (a different estimand); est.avg: 3.842
+  expect_equal(ov$estimate, fit$att.avg, tolerance = 1e-10)
+  expect_equal(ov$se, unname(fit$est.avg[1, "S.E."]), tolerance = 1e-8)
+})
