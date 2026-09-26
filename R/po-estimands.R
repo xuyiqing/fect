@@ -1361,8 +1361,8 @@ estimand <- function(fit,
 ## Compute single overall cumulative ATT in a window. Delegates to the
 ## existing att.cumu() function for the canonical math (the running sum of
 ## the per-period ATTs over the window; percentile bootstrap CI, normal CI
-## for parametric fits). Returns the final row reshaped into the tidy
-## estimand schema.
+## for parametric and jackknife fits). Returns the final row reshaped into
+## the tidy estimand schema.
 .compute_att_cumu_overall <- function(fit, window, conf.level, ci.method,
                                        vartype) {
 

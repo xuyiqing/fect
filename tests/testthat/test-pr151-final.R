@@ -25,6 +25,55 @@
     keep.sims = TRUE, parallel = FALSE, ...))
 }
 
+## Jackknife (Tukey) SE of `est` from leave-one-unit-out replicates `reps`:
+## the formula of the fit's own jackknife SEs.
+.pf_jack_se <- function(est, reps) {
+  B <- length(reps)
+  ok <- is.finite(reps)
+  pseudo <- B * est - (B - 1) * reps[ok]
+  sqrt(stats::var(pseudo) / sum(ok))
+}
+
+
+## -- J1  jackknife SE of the cumulative ATT --------------------------------
+
+test_that("J1: att.cumu(), effect() and estimand() give the jackknife SE of the cumulative ATT", {
+  skip_on_cran()
+  fit <- .pf_turnout("jackknife")
+  k   <- 1:10
+  pos <- match(k, fit$time)
+  run <- apply(fit$att.boot[pos, , drop = FALSE], 2, cumsum)  # 10 x N
+  est <- cumsum(fit$att[pos])
+  se  <- vapply(k, function(i) .pf_jack_se(est[i], run[i, ]), numeric(1))
+  acu <- .pf_quiet(fect::att.cumu(fit, period = c(1, 10)))
+  eff <- .pf_quiet(fect::effect(fit, period = c(1, 10)))$effect.est.att
+  et  <- .pf_quiet(fect::estimand(fit, "att.cumu", "event.time",
+                                  ci.method = "normal"))
+  ov  <- .pf_quiet(fect::estimand(fit, "att.cumu", "overall",
+                                  window = c(1, 5), ci.method = "normal"))
+  ## b1dded6 at k = 2, 5, 10: att.cumu() 0.910, 2.881, 5.291 (the SD of the
+  ## leave-one-out values); effect() 6.171, 19.540, 35.887
+  expect_equal(unname(acu[, "S.E."]), se, tolerance = 1e-8)
+  expect_equal(unname(eff[, "S.E."]), se, tolerance = 1e-8)
+  expect_equal(et$se[match(k, et$event.time)], se, tolerance = 1e-8)
+  expect_equal(ov$se, se[5], tolerance = 1e-8)
+  ## normal intervals and p-values, the same in all three
+  z <- stats::qnorm(0.975)
+  expect_equal(unname(acu[, "CI.lower"]), est - z * se, tolerance = 1e-8)
+  expect_equal(unname(acu[, "CI.upper"]), est + z * se, tolerance = 1e-8)
+  expect_equal(unname(acu[, "p.value"]), 2 * stats::pnorm(-abs(est / se)),
+               tolerance = 1e-8)
+  expect_equal(unname(eff[, c("CI.lower", "CI.upper", "p.value")]),
+               unname(acu[, c("CI.lower", "CI.upper", "p.value")]),
+               tolerance = 1e-8)
+  expect_equal(c(ov$ci.lo, ov$ci.hi),
+               unname(acu[5, c("CI.lower", "CI.upper")]), tolerance = 1e-8)
+  ## per period, effect() gives the fit's own jackknife SEs
+  e0 <- .pf_quiet(fect::effect(fit, cumu = FALSE, period = c(1, 10)))
+  expect_equal(unname(e0$effect.est.att[, "S.E."]),
+               unname(fit$est.att[as.character(k), "S.E."]), tolerance = 1e-8)
+})
+
 
 ## -- S1  parametric intervals of the cumulative ATT ------------------------
 

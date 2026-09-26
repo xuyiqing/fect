@@ -181,14 +181,14 @@ effect <- function(x, ## a fect object
     is_jackknife <- !is.null(inference) && inference == "jackknife"
     is_parametric <- !is.null(inference) && inference == "parametric"
 
-    # Calculate standard errors with proper scaling for jackknife
+    # Standard errors. Jackknife replicates are leave-one-unit-out
+    # estimates: use the jackknife SE (Tukey's formula, as for the fit's
+    # own SEs). Bootstrap and parametric draws: their standard deviation.
     if (is_jackknife) {
-      # For jackknife, scale by sqrt(N-1)
-      N_samples <- ncol(catt.boot)
-      jackknife_scale <- sqrt(N_samples - 1)
-      se.att <- apply(catt.boot, 1, function(vec) sd(vec, na.rm = TRUE) * jackknife_scale)
+      se.att <- vapply(seq_len(nrow(catt.boot)), function(k) {
+        .jackknife_se(catt[k], catt.boot[k, ])
+      }, numeric(1))
     } else {
-      # Standard calculation for bootstrap
       se.att <- apply(catt.boot, 1, function(vec) sd(vec, na.rm = TRUE))
     }
 

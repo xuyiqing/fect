@@ -191,14 +191,24 @@ att.cumu.sub <- function(x, ## a fect object
             catt.boot[i] <- sum(att.sub*count.sub*(length(count.sub)/sum(count.sub)))*(pl)/(length(count.sub))
         }
 
-        catt.se <- sd(catt.boot, na.rm = TRUE)
-        if (isTRUE(x$vartype == "parametric")) {
+        if (isTRUE(x$vartype == "jackknife")) {
+            ## Jackknife replicates are leave-one-unit-out estimates, not
+            ## draws from the sampling distribution: their spread understates
+            ## the SE about sqrt(N - 1)-fold, and their quantiles and signs
+            ## are not a CI or a p-value. Use the jackknife SE (as for the
+            ## fit's own SEs) with the normal approximation.
+            catt.se <- .jackknife_se(catt, catt.boot)
+            catt.ci <- catt + c(-1, 1) * stats::qnorm(1 - alpha / 2) * catt.se
+            catt.p <- 2 * stats::pnorm(-abs(catt / catt.se))
+        } else if (isTRUE(x$vartype == "parametric")) {
             ## Parametric draws are centred at 0 (simulated under no effect),
             ## so their quantiles are not a CI for catt and their signs are
             ## not a p-value. Use the normal approximation with their SE.
+            catt.se <- sd(catt.boot, na.rm = TRUE)
             catt.ci <- catt + c(-1, 1) * stats::qnorm(1 - alpha / 2) * catt.se
             catt.p <- 2 * stats::pnorm(-abs(catt / catt.se))
         } else {
+            catt.se <- sd(catt.boot, na.rm = TRUE)
             catt.ci <- quantile(catt.boot, c(alpha/2, 1 - alpha/2), na.rm = TRUE)
             catt.p <- get.pvalue(catt.boot)
         }
@@ -214,6 +224,21 @@ att.cumu.sub <- function(x, ## a fect object
   
     return(result)
 } 
+
+## Jackknife standard error of `est` from its leave-one-unit-out replicates
+## `reps` (Tukey's formula, as in jackknifed() in R/boot.R, which gives the
+## fit's own jackknife SEs): the pseudo-values B * est - (B - 1) * reps over
+## the finite replicates, B = length(reps); SE = sqrt(var(pseudo) / n), n the
+## number of finite replicates. NA with fewer than two finite replicates.
+.jackknife_se <- function(est, reps) {
+    B <- length(reps)
+    ok <- is.finite(reps)
+    if (sum(ok) < 2L || !is.finite(est)) {
+        return(NA_real_)
+    }
+    pseudo <- B * est - (B - 1) * reps[ok]
+    sqrt(stats::var(pseudo) / sum(ok))
+}
 
 ##############################
 ##   equivalence test       ##
