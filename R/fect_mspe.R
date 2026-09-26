@@ -31,10 +31,38 @@ fect_mspe <- function(
     use_rolling <- (cv.method == "rolling")
     .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
-    ## ---- helper functions (unchanged) ---- ##
+    ## ---- helper functions ---- ##
+    ## Where the expressions of a fit's stored call (data, index, formula
+    ## and the other arguments) are evaluated: the frame fect_mspe() was
+    ## called from, then, for a fit made with a formula, the formula's
+    ## environment (where the fit was made). Before 2.4.7 a fit made
+    ## without a formula had them evaluated inside fect_mspe(): a data frame
+    ## local to the caller's function was not found, and a name such as `k`
+    ## took fect_mspe()'s own value.
+    .call_envs <- function(out_obj) {
+        envs <- list(caller_env)
+        fo <- out_obj[["formula", exact = TRUE]]
+        if (inherits(fo, "formula") && is.environment(environment(fo)) &&
+            !identical(environment(fo), caller_env)) {
+            envs <- c(envs, list(environment(fo)))
+        }
+        envs
+    }
+    .eval_call_arg <- function(expr, envs, what) {
+        res <- list(ok = FALSE, msg = "")
+        for (e in envs) {
+            res <- tryCatch(list(ok = TRUE, value = eval(expr, envir = e)),
+                            error = function(cond) {
+                                list(ok = FALSE, msg = conditionMessage(cond))
+                            })
+            if (isTRUE(res$ok)) return(res$value)
+        }
+        stop("fect_mspe() cannot evaluate `", what, "` of the fit's call: ",
+             res$msg, ". Call fect_mspe() where the objects that the call ",
+             "names are visible.", call. = FALSE)
+    }
     .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj, caller_env) {
-        formula_env <- environment(out_obj$call$formula)
-        if (is.null(formula_env)) formula_env <- caller_env
+        envs <- .call_envs(out_obj)
         call_args <- as.list(out_obj$call)[-1]
         rerun_args <- list(
             formula = formula_obj,
@@ -48,7 +76,7 @@ fect_mspe <- function(
         arg_names <- setdiff(names(call_args),
                              c("", "formula", "data", "index", "Y", "D", "X"))
         for (nm in arg_names) {
-            rerun_args[[nm]] <- eval(call_args[[nm]], envir = formula_env, enclos = caller_env)
+            rerun_args[[nm]] <- .eval_call_arg(call_args[[nm]], envs, nm)
         }
         rerun_args
     }
@@ -226,12 +254,11 @@ fect_mspe <- function(
                 stop("Each out.fect must provide Y and D matrices.")
             }
 
-            formula_env_i <- environment(out_i$call$formula)
-            if (is.null(formula_env_i)) formula_env_i <- caller_env
-            data_i <- eval(out_i$call$data, envir = formula_env_i, enclos = caller_env)
-            idx_i <- eval(out_i$call$index, envir = formula_env_i, enclos = caller_env)
+            envs_i <- .call_envs(out_i)
+            data_i <- .eval_call_arg(out_i$call$data, envs_i, "data")
+            idx_i <- .eval_call_arg(out_i$call$index, envs_i, "index")
             formula_obj_i <- tryCatch(
-                eval(out_i$call$formula, envir = formula_env_i, enclos = caller_env),
+                .eval_call_arg(out_i$call$formula, envs_i, "formula"),
                 error = function(e) NULL
             )
             if (!inherits(formula_obj_i, "formula")) {
