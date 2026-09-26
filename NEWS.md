@@ -45,7 +45,8 @@ Each bullet names the fits whose numbers change.
   too small for N units (on `turnout`, 47 units, `method = "gsynth"`,
   `r = 0`, at event time 10: 5.29 instead of 35.50; with `weighted = TRUE`,
   5.73 instead of 38.42), and took their quantiles as the interval.
-  `effect()` was about 1% too large (35.89) and used t critical values.
+  `effect()` was sqrt(N/(N - 1)) times too large (35.89, about 1% here) and
+  used t critical values.
 * For parametric fits, `effect()`, and so
   `estimand(fit, "att.cumu", "event.time")`, now gives the normal interval
   and p-value, as `att.cumu()` and the fit's own intervals do. It used a t
