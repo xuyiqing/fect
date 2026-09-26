@@ -30,12 +30,14 @@ estimand(
   \item{fit}{A \code{fect} object.}
 
   \item{type}{Estimand type. \code{"att"} returns per-cell mean
-    treatment effect aggregated per group; \code{"att.cumu"} returns
+    treatment effect aggregated per group (weighted by \code{fit$W.agg}
+    for a weighted fit); \code{"att.cumu"} returns
     cumulative ATT through each event time, the running sum of the
     per-period ATTs (replaces \code{\link{effect}});
     \code{"aptt"} returns the average proportional treatment effect on
-    the treated (Chen and Roth 2024 QJE); \code{"log.att"} returns the
-    mean log-scale treatment effect. SEs and CIs need the replicate
+    the treated (Chen and Roth 2024 QJE; a ratio of weighted means for a
+    weighted fit); \code{"log.att"} returns the mean log-scale treatment
+    effect (a weighted mean for a weighted fit). SEs and CIs need the replicate
     draws saved with \code{keep.sims = TRUE} at fit time, except for
     \code{"att"} with \code{by = "event.time"} and default arguments and
     \code{"att.cumu"} with \code{by = "overall"}, which use the
@@ -65,9 +67,13 @@ estimand(
     Accepts \code{NULL} (default), a logical vector, or a one-sided
     formula. See \code{\link{imputed_outcomes}}.}
 
-  \item{weights}{Aggregation-weight handling. \code{NULL} (default) uses
-    \code{fit$W.agg} if the fit was built with \code{W} or \code{W.agg};
-    otherwise uniform.}
+  \item{weights}{Must be \code{NULL} (the default). \code{estimand()}
+    aggregates with the fit's own weights: those given in \code{W} or
+    \code{W.agg} at fit time (stored in \code{fit$W.agg}), in the estimate
+    and in every replicate; a fit made without them, or with \code{W.est}
+    only, gets equal weights. Other values stop. For other weights,
+    aggregate the rows of \code{imputed_outcomes(fit)}, which reports each
+    treated cell's effect (\code{eff}) and weight (\code{W.agg}).}
 
   \item{window}{Optional event-time window \code{c(L, R)}; convenience
     sugar for \code{cells = ~ event.time >= L & event.time <= R}. It
@@ -107,9 +113,9 @@ estimand(
     interval comes from \code{\link{att.cumu}} (\code{by = "overall"})
     or \code{\link{effect}} (\code{by = "event.time"}), whatever
     \code{ci.method} is: bootstrap percentiles for bootstrap fits, and
-    for parametric fits the estimate plus or minus a critical value
-    (normal for \code{"overall"}, t for \code{"event.time"}) times
-    the SE. \code{NULL} still resolves to \code{"basic"} there, so
+    for parametric and jackknife fits the estimate plus or minus the
+    normal critical value times the SE (the jackknife SE for jackknife
+    fits). \code{NULL} still resolves to \code{"basic"} there, so
     \code{estimand()} warns about tail quantiles when \code{nboots} is
     below 1000, and a jackknife fit needs \code{ci.method = "normal"}.
     For \code{"att"} with \code{by = "event.time"} and no test, only
@@ -130,11 +136,12 @@ estimand(
   \code{fit$est.att}, when default arguments are used. This invariant
   is asserted by package tests.
 
-  \code{estimand(fit, "att", "overall")$se} equals the SE in
-  \code{fit$est.avg} for unweighted bootstrap and parametric fits,
-  whatever the
-  order of the treated units in the panel: every replicate is read
-  through its own units (\code{fit$colnames.boot}).
+  \code{estimand(fit, "att", "overall")} returns \code{fit$att.avg} as
+  its \code{estimate}, and its \code{se} equals the SE in
+  \code{fit$est.avg}, for bootstrap, parametric and jackknife fits,
+  weighted or not, whatever the order of the treated units in the panel:
+  every replicate is read through its own units
+  (\code{fit$colnames.boot}).
 }
 
 \seealso{

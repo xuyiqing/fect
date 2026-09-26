@@ -24,17 +24,20 @@ fect_mspe(
 \arguments{
   \item{out.fect}{A fitted \code{fect} object or a named list of fitted \code{fect} objects to compare.}
   \item{seed}{Optional integer; random seed for reproducibility.}
-  \item{cv.method}{Character; cross-validation masking strategy. One of \code{"rolling"} (default), \code{"block"} (random scattered anchors with contiguous-block masking), or \code{"loo"}. Legacy aliases \code{"all_units"} (= \code{"block"}) and \code{"treated_units"} are still accepted but emit a deprecation message.}
+  \item{cv.method}{Character; cross-validation masking strategy. One of \code{"rolling"} (default) or \code{"block"} (random scattered anchors with contiguous-block masking). Legacy aliases \code{"all_units"} (= \code{"block"}) and \code{"treated_units"} are still accepted but emit a deprecation message.}
   \item{cv.nobs}{Integer; number of observations to mask per unit per fold. Default is 3.}
   \item{cv.donut}{Integer; number of periods around treatment onset to exclude from masking. Used by block CV. Default is 1.}
   \item{cv.buffer}{Integer; number of past-side cells masked from training (but not scored) before each rolling-window holdout. Used only by \code{cv.method = "rolling"}. Default is 1.}
-  \item{cv.prop}{Numeric; for block CV, proportion of observations to mask per round; for rolling CV, fraction of eligible units sampled per fold. Default is 0.2.}
+  \item{cv.prop}{Numeric; for block CV, proportion of observations to mask per round; for rolling CV, fraction of eligible units sampled per fold. Default is 0.1.}
   \item{min.T0}{Integer; minimum number of pre-treatment periods required. Default is 5.}
-  \item{k}{Integer; number of cross-validation folds. Default is 5.}
+  \item{k}{Integer; number of cross-validation folds. Default is 20.}
   \item{criterion}{Character; scoring criterion. One of \code{"mspe"}, \code{"wmspe"}, \code{"gmspe"}, \code{"wgmspe"}, \code{"mad"}, \code{"moment"}, \code{"gmoment"}. Default is \code{"mspe"}.}
   \item{W}{Optional TT x N observation weight matrix. Default is \code{NULL}.}
   \item{norm.para}{Optional normalization vector. Default is \code{NULL}.}
   \item{proportion}{Numeric; proportion cutoff for count.T.cv (same as fect_cv). Default is 0.}
+}
+\details{
+Each fit is refitted with the function that made it (\code{fect()}, or \code{gsynth()} for a fit made by \pkg{gsynth}), with its own arguments, the number of factors it used (\code{r.cv}), \code{CV = FALSE} and \code{se = FALSE}, on the data with the held-out cells hidden. The data and the arguments named in the fit's call are looked up where \code{fect_mspe()} is called, and for a fit made with a formula also where the formula was written; a \pkg{gsynth} fit uses the data stored in it. Call \code{fect_mspe()} where those objects are visible.
 }
 \value{
 A list containing:
