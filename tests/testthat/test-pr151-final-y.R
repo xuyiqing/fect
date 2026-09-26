@@ -130,3 +130,38 @@ test_that("S4: fect_mspe() finds data and variables of the caller for fits made 
   expect_identical(.pfy_quiet(fect::fect_mspe(fo, seed = 1, k = 3))$summary$MSPE,
                    m[2])
 })
+
+
+## -- S5  interFE(): covariates absorbed by the model, for every force --------
+
+test_that("S5: interFE() stops with the reason for every force value", {
+  d <- withr::with_seed(7, {
+    N <- 30
+    TT <- 10
+    d <- expand.grid(time = seq_len(TT), id = seq_len(N))
+    a <- stats::rnorm(N)
+    g <- stats::rnorm(TT)
+    d$X1 <- stats::rnorm(nrow(d))
+    d$Zu <- a[d$id]              # constant over time within units
+    d$Zc <- 1.5                  # constant everywhere
+    d$Zut <- a[d$id] + g[d$time] # unit-level plus period-level
+    d$Y <- 1 + 0.5 * d$X1 + a[d$id] + g[d$time] + stats::rnorm(nrow(d))
+    d
+  })
+  fit <- function(f, force) {
+    fect::interFE(f, data = d, index = c("id", "time"), force = force, r = 0)
+  }
+  ## b1dded6: an NaN coefficient, without a message
+  expect_error(fit(Y ~ X1 + Zc, "none"),
+               "Variable \"Zc\" does not vary (it is absorbed by the intercept). Remove it.",
+               fixed = TRUE)
+  expect_error(fit(Y ~ X1 + Zut, "two-way"),
+               "Variable \"Zut\" is the sum of a unit-level and a period-level variable (it is absorbed by the unit and time fixed effects). Remove it.",
+               fixed = TRUE)
+  ## estimable under the other fixed effects: unchanged
+  expect_true(all(is.finite(fit(Y ~ X1 + Zut, "unit")$beta)))
+  expect_true(all(is.finite(fit(Y ~ X1 + Zu, "none")$beta)))
+  expect_error(fit(Y ~ X1 + Zu, "two-way"),
+               "Variable \"Zu\" does not vary over time within units (it is absorbed by the unit fixed effects). Remove it.",
+               fixed = TRUE)
+})

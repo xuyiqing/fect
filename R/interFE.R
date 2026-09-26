@@ -207,6 +207,31 @@ interFE.default <- function(formula = NULL, data, # a data frame
                 stop(paste("Variable \"", Xname[i], "\" does not vary across units within periods (it is absorbed by the time fixed effects). Remove it.", sep = ""),
                      call. = FALSE)
             }
+            ## Without fixed effects the model still has an intercept (the
+            ## grand mean), which absorbs a covariate that does not vary; with
+            ## unit and time effects, so is the sum of a unit-level and a
+            ## period-level variable. Before 2.4.7 both got an NaN coefficient
+            ## without a message. Same tolerances as fect()'s covariate check,
+            ## which also skips a covariate with infinite values.
+            x.i <- matrix(as.numeric(data[, Xname[i]]), ncol = 1L)
+            finite.i <- all(is.finite(x.i))
+            c0.i <- sqrt(sum(.fect_cov_demean(x.i, list())^2))
+            if (finite.i && force == 0 &&
+                c0.i <= .FECT_COV_NOVAR_TOL * max(1, sqrt(sum(x.i^2)))) {
+                stop(paste("Variable \"", Xname[i], "\" does not vary (it is absorbed by the intercept). Remove it.", sep = ""),
+                     call. = FALSE)
+            }
+            if (finite.i && force == 3) {
+                ## if the demeaning fails, the check is skipped
+                x.dm <- tryCatch(
+                    .fect_cov_demean(x.i, list(unit = data[, id], time = data[, time])),
+                    error = function(e) NULL)
+                if (!is.null(x.dm) &&
+                    sqrt(sum(x.dm^2)) <= .FECT_COV_ABSORB_TOL * c0.i) {
+                    stop(paste("Variable \"", Xname[i], "\" is the sum of a unit-level and a period-level variable (it is absorbed by the unit and time fixed effects). Remove it.", sep = ""),
+                         call. = FALSE)
+                }
+            }
         }
     }
 
