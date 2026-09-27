@@ -231,6 +231,14 @@ estimand(fit, "att", "overall", window = c(1, 5))
 
 The result is a single overall ATT averaged over treated cells with event time between one and five. Use this when the question is "what is the average ATT for the first five post-treatment years?" and you do not need a per-event-time series. The answer is one number with one confidence interval, so a series plot is not relevant; if you want to compare multiple windows, build a small data frame of `(window_label, estimate, ci.lo, ci.hi)` and pass it to `esplot()` with `Period = "window_label"`.
 
+`window` and `cells` work only with `by = "overall"`. For `"att"`, they choose the treated cells to average. For `"att.cumu"`, use `window`: it sets the range of event times whose per-period ATTs are summed. A `cells` filter stops there, because the cumulative ATT is a sum over event times, not an average over chosen cells (before v2.4.7 it was ignored without a message). `"aptt"` and `"log.att"` take neither. The table lists what each type takes in this release; `by = "cohort"` and `by = "calendar.time"` are not available yet, and they stop with a message that names the values that work.
+
+| `type` | `by = "event.time"` | `by = "overall"` | `cells` or `window` |
+|---|---|---|---|
+| `"att"` | yes | yes | with `by = "overall"` |
+| `"att.cumu"` | yes | yes | `window` only, with `by = "overall"` |
+| `"aptt"`, `"log.att"` | yes | no | no |
+
 ## Custom estimands
 
 If the summary you need is not one of the four built-in types, you can compute it yourself from the cell-level data:

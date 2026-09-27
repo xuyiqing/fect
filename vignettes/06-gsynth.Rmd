@@ -171,7 +171,7 @@ fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
 fit$r.cv     # selected r --- use this for downstream inference
 ```
 
-CV behavior is identical across `method = "ife"` (IFE-EM, internal `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC, internal `time.component.from = "nevertreated"`); both populate `Y.ct.full` at masked positions, so the rolling design scores MSPE uniformly. The full parameter reference for all CV methods lives in the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv).
+CV behavior is identical across `method = "ife"` (IFE-EM, internal `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC, internal `time.component.from = "nevertreated"`); both score each held-out cell with the model's full prediction there (the intercept, the unit and time effects, the covariates times their coefficients and the factors). The full parameter reference for all CV methods lives in the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv).
 
 ### Visualizing Results
 
@@ -691,7 +691,7 @@ mspe.comp <- fect_mspe(list(gsynth_r2 = out.gsynth.comp,
 print(mspe.comp$summary[, c("Model", "MSPE", "RMSE", "MAD")])
 ```
 
-Since `sim_gsynth` follows a pure IFE data generating process with two factors, Models 1 and 2 should produce identical MSPE --- confirming that CFE with `time.component.from = "nevertreated"` and no additional structure is numerically equivalent to gsynth. Model 3, which adds unnecessary linear trends, should produce similar or slightly worse MSPE because the extra parameters add noise without benefit when the true DGP has no unit-specific trends.
+`sim_gsynth` follows a pure IFE data generating process with two factors. Models 1 and 2 fit that model on the never-treated units, and their scores are close: an MSPE of 2.36 and 2.31, and almost the same MAD (0.563 and 0.564). They differ slightly because the two estimators fit the model with different iterative algorithms, which stop at slightly different solutions; on the full data their ATTs agree to four decimals (5.5433). Model 3, which adds unit-specific linear trends that the data do not have, scores clearly worse: an MSPE of 8.87, almost four times that of Model 2. In the rolling design, the trend of each held-out unit is fitted to that unit's periods before the held-out block and then extrapolated, so the extra parameters add prediction error. `fect_mspe()` scores the model's full prediction at each held-out cell: the intercept, the unit and time effects, the covariates times their coefficients, the factors and the other CFE terms. Before version 2.4.7 it scored these never-treated fits with only the factor part of the prediction (gsynth) or with 0 (CFE), so the two CFE models both scored 110.33, whatever their specification.
 
 
 ## Inference
