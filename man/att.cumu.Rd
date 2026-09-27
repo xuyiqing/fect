@@ -40,9 +40,11 @@ att.cumu(x, period = NULL, weighted = FALSE, alpha = 0.05, type = "on", plot = F
   effect and centred near zero. For jackknife fits, \code{S.E.} is the
   jackknife standard error of the leave-one-unit-out estimates (the
   formula of the fit's own jackknife SEs), with the normal interval and
-  p-value. The first row repeats the one-period estimate from
-  \code{x$est.att}. With \code{plot = TRUE} the cumulative
-  effects are also plotted.
+  p-value. Every row follows this rule, the first row included (before
+  version 2.4.7 the first row repeated the one-period estimate from
+  \code{x$est.att}). A window of one event time, \code{period = c(k, k)},
+  gives one row. With \code{plot = TRUE} the cumulative effects are also
+  plotted.
 }
 \author{
   Licheng Liu, Ye Wang, and Yiqing Xu

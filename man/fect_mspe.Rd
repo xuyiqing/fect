@@ -2,7 +2,7 @@
 \alias{fect_mspe}
 \title{Mean Squared Prediction Error Evaluation for fect Objects}
 \description{
-Evaluates the prediction accuracy of one or more \code{fect} model fits by hiding a subset of control observations and comparing counterfactual predictions against actual values.
+Evaluates the prediction accuracy of one or more \code{fect} model fits by hiding a subset of untreated observations, refitting, and comparing the model's predictions there with the actual values.
 }
 \usage{
 fect_mspe(
@@ -37,7 +37,9 @@ fect_mspe(
   \item{proportion}{Numeric; proportion cutoff for count.T.cv (same as fect_cv). Default is 0.}
 }
 \details{
-Each fit is refitted with the function that made it (\code{fect()}, or \code{gsynth()} for a fit made by \pkg{gsynth}), with its own arguments, the number of factors it used (\code{r.cv}), \code{CV = FALSE} and \code{se = FALSE}, on the data with the held-out cells hidden. The data and the arguments named in the fit's call are looked up where \code{fect_mspe()} is called, and for a fit made with a formula also where the formula was written; a \pkg{gsynth} fit uses the data stored in it. Call \code{fect_mspe()} where those objects are visible.
+Each fit is refitted with the function that made it (\code{fect()}, or \code{gsynth()} for a fit made by \pkg{gsynth}), with its own arguments, the number of factors it used (\code{r.cv}), \code{CV = FALSE} and \code{se = FALSE}, on the data with the held-out cells hidden. The data and the arguments named in the fit's call are looked up where \code{fect_mspe()} is called, and for a fit made with a formula also where the formula was written; for the data, a value of that name that is not a data frame (such as the function \code{df}) is skipped. A \pkg{gsynth} fit uses the data stored in it. Call \code{fect_mspe()} where those objects are visible.
+
+Each held-out cell is scored with the refit's full prediction there: the intercept, the unit and time effects, the cell's covariates times their coefficients, the factors and, for \code{method = "cfe"}, the other CFE terms. (Before version 2.4.7 the scores left out the covariates, and for never-treated fits also the intercept and the fixed effects.) A held-out cell whose covariates are missing in the data is not scored. For CFE fits with extra fixed effects in \code{index}, the refit cannot place a held-out cell in its group, so the prediction there uses the effect of the group of hidden cells instead of the cell's own group. A never-treated CFE fit with \code{Z}, \code{Q} or extra fixed effects in \code{index} does not store those terms for treated units, so it is not scored at held-out cells of treated units (such cells are held out only when a not-yet-treated fit comes first in the list).
 }
 \value{
 A list containing:

@@ -576,10 +576,12 @@ imputed_outcomes <- function(fit,
 #'   arguments and \code{"att.cumu"} with \code{by = "overall"}, which use
 #'   the pre-aggregated draws that every \code{se = TRUE} fit keeps.
 #'   Without them, the other calls stop.
-#' @param by Grouping axis. One of \code{"event.time"} (default;
-#'   per-event-time series), \code{"cohort"}, \code{"calendar.time"},
-#'   \code{"overall"} (one row), or any column name resolvable in the
-#'   fit's panel data.
+#' @param by Grouping axis. \code{"event.time"} (default; one row per
+#'   event time) or \code{"overall"} (one row) for \code{"att"} and
+#'   \code{"att.cumu"}; \code{"aptt"} and \code{"log.att"} take only
+#'   \code{"event.time"}. \code{"cohort"} and \code{"calendar.time"} are
+#'   not available in this release: they, and any other value, stop with a
+#'   message that names the values that work.
 #' @param test Selects which subset of cells to aggregate over (v2.4.3+).
 #'   \code{"none"} (default) uses standard treated post-treatment
 #'   cells. \code{"placebo"} restricts to pre-treatment cells in
@@ -593,7 +595,11 @@ imputed_outcomes <- function(fit,
 #'   \code{type = "att.cumu"}.
 #' @param cells Optional filter on which treated cells to include.
 #'   Accepts \code{NULL} (default; all treated cells), a logical vector,
-#'   or a one-sided formula. See \code{\link{imputed_outcomes}}.
+#'   or a one-sided formula. See \code{\link{imputed_outcomes}}. It is
+#'   used by \code{type = "att"} with \code{by = "overall"}; other calls
+#'   stop when it is given. For \code{"att.cumu"}, which sums the
+#'   per-period ATTs over a range of event times, choose the range with
+#'   \code{window}.
 #' @param weights Must be \code{NULL} (the default). \code{estimand()}
 #'   aggregates with the fit's own weights: those given in \code{W} or
 #'   \code{W.agg} at fit time (stored in \code{fit$W.agg}), in the estimate
@@ -604,9 +610,15 @@ imputed_outcomes <- function(fit,
 #' @param window Optional event-time window \code{c(L, R)}; convenience
 #'   sugar for \code{cells = ~ event.time >= L & event.time <= R}. It
 #'   works only with \code{by = "overall"}; the event-time series stop
-#'   when it is given.
+#'   when it is given. For \code{"att"} it keeps the treated cells in the
+#'   window; for \code{"att.cumu"} it sets the range of event times whose
+#'   per-period ATTs are summed. \code{"aptt"} and \code{"log.att"} do not
+#'   take it.
 #' @param direction Either \code{"on"} (default) or \code{"off"}; see
-#'   \code{\link{imputed_outcomes}}.
+#'   \code{\link{imputed_outcomes}}. For \code{type = "att"} with
+#'   \code{test = "none"}, \code{"off"} needs \code{by = "overall"}:
+#'   \code{estimand(fit, "att", "event.time")} returns \code{fit$est.att}
+#'   as it is and stops. \code{"att.cumu"} takes only \code{"on"}.
 #' @param vartype \code{"bootstrap"} (default), \code{"jackknife"},
 #'   \code{"parametric"}, or \code{"none"}. Selects which variance method
 #'   to source replicates from. The output \code{vartype} column reports
@@ -626,16 +638,18 @@ imputed_outcomes <- function(fit,
 #'   \code{"att"} -> \code{"normal"} (matches what \code{fit$est.att}
 #'   already uses), \code{"aptt"} -> \code{"bca"} and \code{"log.att"} ->
 #'   \code{"bca"} (ratio / log estimators benefit from bias correction
-#'   when the bootstrap distribution is skewed). Pass an explicit value to
-#'   override. For \code{"att.cumu"} the interval comes from
+#'   when the bootstrap distribution is skewed). For a jackknife fit the
+#'   default is \code{"normal"} for every type, the only method jackknife
+#'   fits support. Pass an explicit value to override. For
+#'   \code{"att.cumu"} the interval comes from
 #'   \code{\link{att.cumu}} (\code{by = "overall"}) or \code{\link{effect}}
 #'   (\code{by = "event.time"}), whatever \code{ci.method} is: bootstrap
 #'   percentiles for bootstrap fits, and for parametric and jackknife fits
 #'   the estimate plus or minus the normal critical value times the SE (the
-#'   jackknife SE for jackknife fits). \code{NULL} still resolves to
-#'   \code{"basic"} there, so \code{estimand()} warns about tail quantiles
-#'   when \code{nboots} is below 1000, and a jackknife fit needs
-#'   \code{ci.method = "normal"}. For \code{"att"} with
+#'   jackknife SE for jackknife fits). For bootstrap and parametric fits
+#'   \code{NULL} still resolves to \code{"basic"} there, so
+#'   \code{estimand()} warns about tail quantiles when \code{nboots} is
+#'   below 1000. For \code{"att"} with
 #'   \code{by = "event.time"} and no test, only the default is available
 #'   (it returns \code{fit$est.att}); other values stop, so use
 #'   \code{by = "overall"}.

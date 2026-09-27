@@ -23,7 +23,7 @@
   \item{seed}{random seed.}
   \item{tol}{tolerance for EM algorithm.}
   \item{max_iteration}{max number of EM iterations.}
-  \item{binary}{logical flag for a probit link (not fully supported here).}
+  \item{binary}{Not supported in this version: \code{binary = TRUE} stops with a message. Leave it at \code{FALSE} (the default).}
   \item{QR}{logical flag for QR-based factor analysis in probit model (not fully supported).}
   \item{normalize}{logical; if \code{TRUE}, scales outcome/covariates.}
 }

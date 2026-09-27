@@ -82,7 +82,7 @@ When both are given, \code{W.est} and \code{W.agg} must name the same column; di
   (\code{cv.rule} does not apply). Under \code{"pc"}, the IFE
   cross-validation table (\code{CV.out.ife}) has the columns \code{r},
   \code{sigma2}, \code{IC}, \code{PC}, \code{MSPTATT} and \code{MSE}.}
-\item{binary}{This version doesn't support this option.}
+\item{binary}{Not supported in this version: \code{binary = TRUE} stops with a message. Leave it at \code{FALSE} (the default).}
 \item{QR}{This version doesn't support this option.}
 \item{method}{a string specifying which imputation algorithm will be used.
   \code{"fe"}, \code{"ife"}, \code{"mc"},
@@ -138,11 +138,13 @@ becomes the CIs reported in fect's \code{est.*} slots. Two values:
 \eqn{[2\hat\theta - q_{1-\alpha/2},\, 2\hat\theta - q_{\alpha/2}]}, the
 literature-standard "percentile" CI per Davison & Hinkley (1997, §5.2.1)
 and what \code{boot::boot.ci(type = "basic")} returns). With
-\code{"basic"}, the p-values of the effects come from the replicates: for
-bootstrap fits, twice the smaller share of the replicates on either side of
-zero; for parametric fits, whose replicates are simulated with no effect,
-twice the smaller of the shares of the centered replicates at or above the
-estimate and at or below it. For
+\code{"basic"}, the p-values come from the replicates. For bootstrap fits
+each p-value goes with the basic interval: it is below \eqn{\alpha} exactly
+when the \eqn{1 - \alpha} basic interval excludes zero, at every
+\eqn{\alpha}, for the effects and for the coefficients (\code{est.beta}).
+For parametric fits, whose replicates are simulated with no effect, the
+p-value of an effect is twice the smaller of the shares of the centered
+replicates at or above the estimate and at or below it. For
 \code{"percentile"}, \code{"bc"}, or \code{"bca"} CIs (typically wanted
 on alternative estimands like \code{aptt} and \code{log.att}), call
 \code{\link{estimand}} after fitting.}
@@ -239,7 +241,7 @@ double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
 \eqn{g}.}
 \item{permute}{a logical flag indicating whether to run a permutation test.}
 \item{m}{an integer specifying the block length for permutation tests. Default \code{2}.}
-\item{normalize}{a logical flag indicating whether to scale outcome and covariates.}
+\item{normalize}{a logical flag indicating whether to divide the outcome and covariates by the standard deviation of the outcome during estimation. Default \code{FALSE}. The effects, the counterfactual outcomes, \code{Y.dat}, \code{est.cm} and the covariates stored in the fit are reported on the outcome's scale (before version 2.4.7, \code{Y.dat}, \code{est.cm} and the stored covariates stayed divided by it).}
 \item{keep.sims}{a logical flag indicating whether to save unit-time level bootstrap effects (\code{eff.boot}, with \code{D.boot}, \code{I.boot} and \code{colnames.boot}; see Value). Default \code{keep.sims = FALSE}. If \code{se = FALSE}, this argument is ignored. \code{\link{effect}}, \code{imputed_outcomes(replicates = TRUE)} and most \code{\link{estimand}} calls need these draws.}
 \item{cm}{a logical flag indicating whether to enable causal moderation analysis. When \code{TRUE}, the estimator decomposes the treatment effect into effect modification and causal moderation components. Currently available for \code{method = "fe"} and \code{method = "ife"} with \code{time.component.from = "notyettreated"}. The fit then carries \code{est.cm}, the model of the treated outcomes fitted on the treated cells, which \code{\link{fect_iden}} and \code{plot(type = "hte", cm = TRUE)} use; it is stored with or without standard errors and after cross-validation. Default is \code{FALSE}.}
 \item{loading.bound}{a string controlling whether treated-unit factor loadings are bounded inside the convex hull of control loadings. \code{"none"} (default) reproduces standard GSC behavior. \code{"simplex"} constrains each treated unit's loading to be a non-negative convex combination of control loadings via an entropy-regularized simplex projection, ensuring the imputed counterfactual lies pointwise in the convex hull of factor-implied control outcomes. Currently applies only to \code{method = "ife"} or \code{method = "gsynth"} (equivalent forms), and requires \code{time.component.from = "nevertreated"}. The bound applies wherever the model is fitted: with or without cross-validation, with or without \code{se}, in the bootstrap and parametric-bootstrap replicates, and in the \code{loo} refits. If the selected number of factors is 0, a message says that the bound has no effect.}
@@ -305,7 +307,7 @@ Ignored when \code{CV = FALSE}.}
   \item{pre.sd}{by-period residual standard deviations for pre-treatment ATT.}
   \item{att.avg}{overall average treatment effect on the treated.}
   \item{att.avg.W}{weighted ATT.}
-  \item{att.avg.unit}{by-unit average treatment effect on the treated.}
+  \item{att.avg.unit}{average over treated units of each treated unit's average effect over its observed treated cells ("Tr units equally weighted" in \code{print()}).}
   \item{time}{time index for switch-on treatment effect.}
   \item{count}{count of observations for each switch-on effect time.}
   \item{att}{switch-on treatment effect.}
@@ -341,7 +343,7 @@ Ignored when \code{CV = FALSE}.}
   \item{est.balance.placebo}{inference for balanced sample placebo.}
   \item{est.avg.W}{inference for \code{att.avg.W}.}
   \item{est.beta}{inference for \code{beta} (\code{NA} rows for dropped covariates).}
-  \item{est.group.att}{inference for group-specific ATT.}
+  \item{est.group.att}{inference for group-specific ATT; its interval and p-value follow \code{ci.method}.}
   \item{est.group.output}{inference for group output.}
   \item{att.avg.boot}{bootstrap draws for \code{att.avg}.}
   \item{att.avg.unit.boot}{bootstrap draws for \code{att.avg.unit}.}
