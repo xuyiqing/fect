@@ -124,7 +124,8 @@ Each bullet names the fits whose numbers change.
   another `min.T0` or leave out the weights (on `simgsynth`, a fit with
   `method = "ife"`, `r = 2` and `min.T0 = min.T0`, where `min.T0` is 7,
   scored with `fect_mspe(fit, k = 3, seed = 1)`: an MSPE of 2.48 instead of
-  2.24; with `W = W` instead, 2.48 instead of 2.38). A data frame
+  2.24; with `W = W` instead, 2.48 instead of 2.38; all four scored with
+  the full prediction of the bullet above). A data frame
   local to a function was not found, and an argument such as
   `min.T0 = k + 3` could take `fect_mspe()`'s own `k`. A formula fit made
   inside a function can now be scored outside it.

@@ -305,16 +305,13 @@ Ignored when \code{CV = FALSE}.}
   \item{eff.pre}{effects for treated units in pre-treatment periods.}
   \item{eff.pre.equiv}{pre-treatment effects under baseline (two-way FE) model.}
   \item{pre.sd}{by-period residual standard deviations for pre-treatment ATT.}
-  \item{att.avg}{overall average treatment effect on the treated.}
-  \item{att.avg.W}{weighted ATT.}
+  \item{att.avg}{overall average treatment effect on the treated. With \code{W} (or \code{W.agg}), \code{att.avg}, \code{att}, \code{att.off} and their inference slots (\code{est.avg}, \code{est.att}, \code{est.att.off}) hold the weighted estimates; a fit has no separate weighted slots.}
   \item{att.avg.unit}{average over treated units of each treated unit's average effect over its observed treated cells ("Tr units equally weighted" in \code{print()}).}
   \item{time}{time index for switch-on treatment effect.}
   \item{count}{count of observations for each switch-on effect time.}
   \item{att}{switch-on treatment effect.}
-  \item{att.on.W}{weighted switch-on effect.}
   \item{time.off}{time index for switch-off treatment effect.}
   \item{att.off}{switch-off treatment effect.}
-  \item{att.off.W}{weighted switch-off effect.}
   \item{count.off}{count for each switch-off period.}
   \item{att.placebo}{ATT for placebo periods.}
   \item{att.carryover}{ATT for carryover periods.}
@@ -331,9 +328,7 @@ Ignored when \code{CV = FALSE}.}
   \item{est.avg}{inference for \code{att.avg}.}
   \item{est.avg.unit}{inference for \code{att.avg.unit}.}
   \item{est.att}{inference for \code{att}.}
-  \item{est.att.W}{inference for weighted \code{att}.}
   \item{est.att.off}{inference for switch-off.}
-  \item{est.att.off.W}{inference for weighted switch-off.}
   \item{est.placebo}{inference for placebo ATT.}
   \item{est.carryover}{inference for carryover ATT.}
   \item{est.eff.calendar}{inference for \code{eff.calendar}.}
@@ -341,7 +336,6 @@ Ignored when \code{CV = FALSE}.}
   \item{est.balance.att}{inference for balanced sample switch-on.}
   \item{est.balance.avg}{inference for balanced sample average ATT.}
   \item{est.balance.placebo}{inference for balanced sample placebo.}
-  \item{est.avg.W}{inference for \code{att.avg.W}.}
   \item{est.beta}{inference for \code{beta} (\code{NA} rows for dropped covariates).}
   \item{est.group.att}{inference for group-specific ATT; its interval and p-value follow \code{ci.method}.}
   \item{est.group.output}{inference for group output.}
