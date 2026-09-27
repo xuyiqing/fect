@@ -106,6 +106,14 @@ fect <- function(
     gamma.loading.grid = NULL,        # optional grid for gamma CV
     cv.rule = "1se"                   # CV selection rule: "1se", "min", "1pct"
 ) {
+    ## binary outcome (probit) models are not supported in this version:
+    ## stop before any work (before 2.4.7 the fit failed later with errors
+    ## that did not say so)
+    if (isTRUE(binary == TRUE)) {
+        stop("binary = TRUE is not supported in this version of fect: ",
+             "binary outcome (probit) models cannot be fitted. ",
+             "Leave binary = FALSE (the default).", call. = FALSE)
+    }
     UseMethod("fect")
 }
 

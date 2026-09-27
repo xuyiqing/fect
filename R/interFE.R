@@ -20,6 +20,12 @@ interFE <- function(formula = NULL,
                     binary = FALSE,
                     QR = FALSE,
                     normalize = FALSE) {
+    ## binary outcome (probit) models are not supported in this version
+    if (isTRUE(binary == TRUE)) {
+        stop("binary = TRUE is not supported in this version of fect: ",
+             "binary outcome (probit) models cannot be fitted. ",
+             "Leave binary = FALSE (the default).", call. = FALSE)
+    }
     UseMethod("interFE")
 }
 
