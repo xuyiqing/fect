@@ -974,11 +974,82 @@ plot.fect <- function(
     placeboTest <- FALSE
   }
 
+  ## Gap plot of chosen units (fect #162). With `id`, the gap plot draws the
+  ## effects of the chosen treated units, x$eff, by time relative to the
+  ## treatment onset, x$T.on (the relative time of the default gap plot). At
+  ## each relative time it averages the chosen units' cells (unweighted, as
+  ## the counterfactual plot averages several units). Point estimates only:
+  ## no interval, test statistics or equivalence bounds.
+  unit.gap <- type == "gap" && !is.null(id)
+  if (unit.gap) {
+    if (loo == 1) {
+      stop("\"loo\" and \"dloo\" can't be used with \"id\" in the gap plot: ",
+           "leave-one-out estimates are stored for the average effect only.",
+           call. = FALSE)
+    }
+    if (!is.null(show.group)) {
+      stop("\"show.group\" can't be used with \"id\" in the gap plot.",
+           call. = FALSE)
+    }
+    unit.gap.id <- unique(as.character(id))
+    unit.gap.pos <- match(unit.gap.id, as.character(x$id))
+    if (anyNA(unit.gap.pos)) {
+      bad <- unit.gap.id[is.na(unit.gap.pos)]
+      removed <- bad[bad %in% as.character(x$remove.id)]
+      unknown <- setdiff(bad, removed)
+      stop(paste0(
+        if (length(unknown) > 0) {
+          paste0("Unit(s) in \"id\" not in the data: ",
+                 paste(unknown, collapse = ", "), ".")
+        },
+        if (length(unknown) > 0 && length(removed) > 0) " ",
+        if (length(removed) > 0) {
+          paste0("Unit(s) in \"id\" removed from the fit (see fit$remove.id): ",
+                 paste(removed, collapse = ", "), ".")
+        }
+      ), call. = FALSE)
+    }
+    not.treated <- !(unit.gap.pos %in% x$tr)
+    if (any(not.treated)) {
+      stop("Unit(s) in \"id\" never treated (control units): ",
+           paste(unit.gap.id[not.treated], collapse = ", "),
+           ". The gap plot with \"id\" shows treated units only.",
+           call. = FALSE)
+    }
+    unit.gap.T.on <- as.matrix(x$T.on)[, unit.gap.pos, drop = FALSE]
+    unit.gap.eff <- as.matrix(x$eff)[, unit.gap.pos, drop = FALSE]
+    unit.gap.ok <- !is.na(unit.gap.T.on) & !is.na(unit.gap.eff)
+    no.cell <- colSums(unit.gap.ok) == 0
+    if (any(no.cell)) {
+      stop("Unit(s) in \"id\" with no estimated effect at a period that has ",
+           "a time relative to the treatment onset: ",
+           paste(unit.gap.id[no.cell], collapse = ", "), ".",
+           call. = FALSE)
+    }
+    unit.gap.rel <- unit.gap.T.on[unit.gap.ok]
+    unit.gap.val <- unit.gap.eff[unit.gap.ok]
+    unit.gap.time <- sort(unique(unit.gap.rel))
+    unit.gap.att <- as.numeric(tapply(unit.gap.val, unit.gap.rel, mean))
+    unit.gap.count <- as.numeric(table(unit.gap.rel))
+    if (is.null(main)) {
+      main <- if (length(unit.gap.pos) == 1) {
+        paste(x$index[1], "=", unit.gap.id)
+      } else {
+        paste0("Average over ", length(unit.gap.pos), " units")
+      }
+    }
+    ## count bars: the number of chosen cells at each relative time; for one
+    ## unit they would all be 1, so they are not drawn
+    if (length(unit.gap.pos) == 1) {
+      show.count <- FALSE
+    }
+  }
+
   if (!is.null(plot.ci)) {
     if (!plot.ci %in% c("0.9", "0.95", "none")) {
       stop("\"plot.ci\" must be one of \"0.95\", \"0.9\" or \"none\".")
     }
-    if (plot.ci %in% c("0.90", "0.95") && is.null(x$est.att)) {
+    if (plot.ci %in% c("0.90", "0.95") && is.null(x$est.att) && !unit.gap) {
       stop("No uncertainty estimates.")
     }
     if (plot.ci == "0.90" && type %in% c("gap", "exit")) {
@@ -1003,12 +1074,15 @@ plot.fect <- function(
   if (plot.ci == "0.9") {
     plot.ci <- "90"
   }
+  if (unit.gap) {
+    plot.ci <- "none" # the gap plot of chosen units draws no interval
+  }
 
   if (type == "equiv" && plot.ci == "none") {
     stop("No uncertainty estimates. Can't perform equivalence tests.\n")
   }
 
-  if ((placeboTest | carryoverTest) && plot.ci == "none" && type != "status") {
+  if ((placeboTest | carryoverTest) && plot.ci == "none" && type != "status" && !unit.gap) {
     stop("No uncertainty estimates. Can't perform placebo test or carryover test.\n")
   }
 
@@ -1064,6 +1138,9 @@ plot.fect <- function(
     } else {
       bound <- "none"
     }
+  }
+  if (unit.gap) {
+    bound <- "none" # no equivalence bounds in the gap plot of chosen units
   }
 
   if (is.null(xlim) == FALSE) {
@@ -1144,6 +1221,9 @@ plot.fect <- function(
     } else {
       stats <- "none"
     }
+  }
+  if (unit.gap) {
+    stats <- "none" # no test statistics in the gap plot of chosen units
   }
 
   if (type == "calendar") {
@@ -1403,6 +1483,14 @@ plot.fect <- function(
   ## est.placebo, est.carryover, and off variants) already carry W-weighted
   ## values. No swap needed here.
   use.weight <- !is.null(x$W)
+
+  ## gap plot of chosen units: their own series replaces the average one
+  ## (after the balance swap above, which does not apply to it)
+  if (unit.gap) {
+    x$time <- unit.gap.time
+    x$att <- unit.gap.att
+    x$count <- unit.gap.count
+  }
 
 
   if (!is.null(x$est.att)) { # have uncertainty estimation
@@ -2869,7 +2957,14 @@ plot.fect <- function(
     att.avg.use <- x$att.avg
 
     if (CI == FALSE) {
-      message("Uncertainty estimates not available.\n")
+      if (unit.gap) {
+        message("Unit-level uncertainty is not shown: the gap plot with \"id\" ",
+                "draws point estimates only. For an interval around a unit's ",
+                "counterfactual, use type = \"counterfactual\" on a fit made with ",
+                "keep.sims = TRUE and vartype = \"parametric\".")
+      } else {
+        message("Uncertainty estimates not available.\n")
+      }
       if (length(ylim) != 0) {
         rect.length <- (ylim[2] - ylim[1]) / 5
         rect.min <- ylim[1]
@@ -2912,7 +3007,7 @@ plot.fect <- function(
     if (highlight == FALSE) {
       classic <- 1
     }
-    if (placeboTest == TRUE && length(placebo.period) == 1 && plot.ci %in% c("90", "95")) {
+    if (placeboTest == TRUE && length(placebo.period) == 1 && (plot.ci %in% c("90", "95") || unit.gap)) {
       classic <- 1
     }
     if (carryoverTest == TRUE && length(carryover.period) == 1 && plot.ci %in% c("90", "95")) {
