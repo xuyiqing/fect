@@ -63,14 +63,19 @@ att.cumu <- function(x, ## a fect object
         colnames(cumu.att) <- c("start", "end", "catt")
     }
     else if (se == 1) {
+        ## every row, the first included, from att.cumu.sub(), so all rows
+        ## follow one interval rule (the one effect() uses). Before 2.4.7
+        ## row 1 was copied from est.att, whose interval follows the fit's
+        ## ci.method (normal by default), while the other rows of a
+        ## bootstrap fit use the percentiles of the draws.
         cumu.att <- matrix(NA, pl, 7)
-        cumu.att[1, c(1,2)] <- p.start
-        cumu.att[1, 3] <- att[which(time == p.start)]
-        cumu.att[1, 4:7] <- est.att[which(time == p.start), c("S.E.", "CI.lower", "CI.upper", "p.value")]
         colnames(cumu.att) <- c("start", "end", "catt", "S.E.", "CI.lower", "CI.upper", "p.value")
     }
 
-    for(i in 2:pl) {
+    ## seq_len(pl): a one-period window (pl = 1) has only row 1 (before
+    ## 2.4.7, 2:pl ran over 2 and 1 and stopped).
+    for (i in seq_len(pl)) {
+        if (se == 0 && i == 1) next
         cumu.att[i, ] <- att.cumu.sub(x, c(p.start, p.start + i - 1), weighted, alpha, type)
     }
 
@@ -166,8 +171,11 @@ att.cumu.sub <- function(x, ## a fect object
 
 
     if (se == 1) {
-        att.boot <- as.matrix(att.boot[att.pos,])
-        count.boot <- as.matrix(count.boot[att.pos,])
+        ## drop = FALSE: a one-period window keeps its 1 x nboots shape
+        ## (as.matrix() of the dropped row made it nboots x 1, so the
+        ## replicate "sum" was the sum of all draws)
+        att.boot <- att.boot[att.pos, , drop = FALSE]
+        count.boot <- count.boot[att.pos, , drop = FALSE]
         
         nboots <- dim(att.boot)[2]
         catt.boot <- rep(NA, nboots)
