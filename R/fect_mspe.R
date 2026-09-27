@@ -48,14 +48,28 @@ fect_mspe <- function(
         }
         envs
     }
-    .eval_call_arg <- function(expr, envs, what) {
+    ## `accept`: for the data, a value that is not a data frame (e.g. the
+    ## function stats::df or utils::data found under the name `df` or
+    ## `data` where fect_mspe() is called) is skipped and the next
+    ## environment is tried.
+    .eval_call_arg <- function(expr, envs, what, accept = NULL) {
         res <- list(ok = FALSE, msg = "")
         for (e in envs) {
             res <- tryCatch(list(ok = TRUE, value = eval(expr, envir = e)),
                             error = function(cond) {
                                 list(ok = FALSE, msg = conditionMessage(cond))
                             })
-            if (isTRUE(res$ok)) return(res$value)
+            if (isTRUE(res$ok)) {
+                if (is.null(accept) || isTRUE(accept(res$value))) {
+                    return(res$value)
+                }
+                res <- list(ok = FALSE, msg = paste0(
+                    "`", paste(deparse(expr), collapse = " "),
+                    "` is not a data frame (it is ",
+                    if (is.function(res$value)) "a function" else
+                        paste0("of class \"", class(res$value)[1], "\""),
+                    ")"))
+            }
         }
         stop("fect_mspe() cannot evaluate `", what, "` of the fit's call: ",
              res$msg, ". Call fect_mspe() where the objects that the call ",
@@ -292,7 +306,8 @@ fect_mspe <- function(
             ## the data: the data frame a gsynth() fit stores, else the call's
             data_i <- out_i[["data", exact = TRUE]]
             if (!is.data.frame(data_i)) {
-                data_i <- .eval_call_arg(out_i$call$data, envs_i, "data")
+                data_i <- .eval_call_arg(out_i$call$data, envs_i, "data",
+                                         accept = is.data.frame)
             }
             idx_i <- .eval_call_arg(out_i$call$index, envs_i, "index")
             formula_obj_i <- tryCatch(
