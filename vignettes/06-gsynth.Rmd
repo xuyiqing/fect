@@ -628,13 +628,14 @@ The result is a different counterfactual representation. The pseudo-inverse is d
 
 #### Reading the comparison
 
-`sim_gsynth` follows an IFE data generating process. In the unbounded fit, four of the five treated units have loadings inside the convex hull of the control loadings, and one lies outside it. The two fits give ATTs of 4.64 (unbounded) and 5.10 (bounded); the true ATT in `sim_gsynth`, the mean of its `eff` column over the treated cells, is 5.46. The gap between the two fits, 0.46, is about half of either fit's standard error (0.8 to 1.0, depending on the bootstrap draws). The *weight* representations differ much more than the estimates, which is informative on its own: the bounded weights are non-negative and concentrate on fewer donors. Real datasets with sparse donor pools (few treated units alongside controls with disparate factor loadings) typically show larger ATT gaps; in those settings, the simplex bound corrects the extrapolation that pure least-squares performs and provides a more honest synthetic-control counterfactual.
+`sim_gsynth` follows an IFE data generating process. In the unbounded fit, four of the five treated units have loadings inside the convex hull of the control loadings, and one lies outside it. The two fits give ATTs of 4.64 (unbounded) and 5.10 (bounded); the true ATT in `sim_gsynth`, the mean of its `eff` column over the treated cells, is 5.46. The gap between the two fits, 0.46, is about half of either fit's standard error (about 0.75 to 1.05, depending on the bootstrap draws). The *weight* representations differ much more than the estimates, which is informative on its own: the bounded weights are non-negative and concentrate on fewer donors. Real datasets with sparse donor pools (few treated units alongside controls with disparate factor loadings) typically show larger ATT gaps; in those settings, the simplex bound corrects the extrapolation that pure least-squares performs and provides a more honest synthetic-control counterfactual.
 
 ### Caveats
 
 - Currently restricted to `method = "ife"` or `"gsynth"` (equivalently, `time.component.from = "nevertreated"`).
 - Percentile-bootstrap intervals may under-cover when the simplex constraint binds (true treated loading on the boundary of $\mathrm{conv}(\Lambda_{co})$). Detect via `loading.proj.resid`. Boundary-corrected inference is deferred to a later release.
 - The unit fixed-effect scalar $\alpha_i$ is *not* bounded; under `force %in% c("unit", "two-way")` it is computed as the residual mean per treated unit.
+- Before version 2.4.7 the bound was dropped without a message in cross-validation (`CV = TRUE`), in `method = "gsynth"` fits without standard errors, in the parametric bootstrap replicates and in the `loo = TRUE` refits. The estimates, standard errors and selected `r` of such fits can differ from those of earlier versions.
 
 ## CFE with GSynth
 

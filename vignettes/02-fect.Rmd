@@ -52,6 +52,12 @@ We estimate the average treatment effect on the treated (ATT) using the followin
 
 The first variable on the right hand side of the formula is the treatment indicator $D$; the rest of the right-hand-side variables serve as controls. The `index` option specifies the unit and time indicators. The `force` option ("none", "unit", "time", and "two-way") specifies the additive component(s) of the fixed effects included in the model. The default option is "two-way" (including both unit and time fixed effects).
 
+::: {.callout-note appearance="simple"}
+### Changed in 2.4.7
+
+The formula takes bare column names only. Terms such as `log(Y)`, `factor(g)`, `X1:X2` or `I(X^2)` stop with an error; create the column first and put its name in the formula. Covariates must be numeric: a factor, character or Date covariate stops, so convert it to numeric columns first, such as dummy columns for a factor (a logical covariate is used as 0/1). Give the covariates either in the formula or in `X`, not both. A covariate that is a linear combination of other covariates, or that the fixed effects absorb, is dropped with a warning and gets an `NA` coefficient; before 2.4.7 such covariates could change the estimates without a message. A factor time index is used in the order of its levels, with a warning when the levels are numbers out of numeric order, and a character time index must hold numbers. Before 2.4.7 both were sorted as text ("1", "10", "2", ...), which scrambled event time.
+:::
+
 ```{r simdata_fect_nose, eval=TRUE, cache = TRUE, message = FALSE, results = 'hide'}
 out.fect <- fect(Y ~ D + X1 + X2, data = sim_base, index = c("id","time"),
                  method = "fe", force = "two-way")
@@ -97,7 +103,7 @@ When `parallel = TRUE`, CV parallelism auto-engages only on panels above a metho
 **Clustering.**
 
 -   By default, `fect()` uses cluster-bootstrap at the `unit` level when `se = TRUE`, that is `vartype = "bootstrap"`. The uncertainty estimates thus account for arbitrary serial correlation within a unit over time---commonly understood as being "clustered" at the unit level. In the example above, the unit is `id`, hence, by default, `cl = "id"`.
--   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option.
+-   To cluster standard errors at a different, usually higher, level, users can specify the clustering variable using the `cl` option. `cl` must name one column. For the cluster bootstrap it must be constant within each unit and take at least two values. Since 2.4.7 a `cl` that varies within a unit or has only one value stops with an error; before, it gave `NA` or zero standard errors.
 -   Alternatively, users can obtain uncertainty estimates using the cluster-jackknife method by specifying `vartype = "jackknife"`, also at the unit level (`cl`, if different from `unit`, will be ignored). In this case, the algorithm calculates standard errors by iteratively dropping one unit (i.e., the entire time series) from the dataset. This can be particularly useful when the number of treated units is small.
 :::
 
@@ -245,7 +251,7 @@ Under staggered adoption, @li2025benchmarking show that the in-sample placebo ha
 ::: {.callout-note appearance="simple"}
 ### When `dloo` applies
 
-`dloo` requires additive two-way fixed effects (`method = "fe"`), staggered adoption with no treatment reversal, and a balanced pre-treatment panel (post-treatment cells may be missing). Standard errors come from the package's own bootstrap or jackknife (`vartype = "bootstrap"` or `"jackknife"`). It cannot be combined with `loo`, `placeboTest`, `carryoverTest`, `permute`, or `binary`. The datasets shipped with the package either allow reversal or have a single cohort, so the example below simulates a small staggered panel.
+`dloo` requires additive two-way fixed effects (`method = "fe"`), staggered adoption with no treatment reversal, and a balanced pre-treatment panel (post-treatment cells may be missing). Standard errors come from the package's own bootstrap or jackknife (`vartype = "bootstrap"` or `"jackknife"`). It cannot be combined with `loo`, `placeboTest`, `carryoverTest` or `permute`. The datasets shipped with the package either allow reversal or have a single cohort, so the example below simulates a small staggered panel.
 :::
 
 We simulate three adoption cohorts (periods 8, 12, and 16) plus a never-treated group, with unit and time fixed effects, a constant treatment effect of 1.5, and no violation of parallel trends.

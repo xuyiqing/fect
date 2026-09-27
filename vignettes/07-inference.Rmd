@@ -220,16 +220,18 @@ We conduct a minimal coverage test using $K = 200$ replications in three scenari
 
 The full DGP and estimator settings are in [`tests/coverage-study/results/README.md`](https://github.com/xuyiqing/fect/blob/main/tests/coverage-study/results/README.md). The coverage target is the realized average treated-post effect within each replication for A and B, and the population $\mathrm{ATT} = 3$ for C.
 
+A and B fit `method = "ife"` with two factors, `time.component.from = "nevertreated"` and `CV = FALSE`. Before version 2.4.7, such a fit with `se = TRUE` estimated the not-yet-treated model instead. The A and B rows below come from the never-treated model of version 2.4.7; they differ from the earlier results by at most 0.005 in coverage.
+
 ### `fect()` ci.method surface
 
 `fit$est.avg` coverage at $K = 200$, $\mathrm{nboots} = 200$:
 
 | scenario | ci.method | coverage | Monte Carlo SE | mean width |
 |---|---|---:|---:|---:|
-| A | normal | 0.960 | 0.014 | 0.800 |
+| A | normal | 0.955 | 0.015 | 0.800 |
 | A | basic  | 0.960 | 0.014 | 0.780 |
-| B | normal | 0.960 | 0.014 | 1.724 |
-| B | basic  | 0.950 | 0.015 | 1.690 |
+| B | normal | 0.960 | 0.014 | 1.721 |
+| B | basic  | 0.950 | 0.015 | 1.686 |
 | C₁ | normal | 0.945 | 0.016 | 0.583 |
 | C₁ | basic  | 0.935 | 0.017 | 0.571 |
 | C₂ | normal | 0.930 | 0.018 | 0.605 |
@@ -242,16 +244,16 @@ Same fits, post-hoc `estimand(fit, "att", "overall", ci.method)` at $\mathrm{nbo
 
 | scenario | ci.method | coverage | Monte Carlo SE | mean width |
 |---|---|---:|---:|---:|
-| A | normal     | 0.960 | 0.014 | 0.800 |
+| A | normal     | 0.955 | 0.015 | 0.800 |
 | A | basic      | 0.960 | 0.014 | 0.780 |
 | A | percentile | 0.935 | 0.017 | 0.780 |
-| A | bc         | 0.935 | 0.017 | 0.786 |
-| A | bca        | 0.940 | 0.017 | 0.786 |
-| B | normal     | 0.960 | 0.014 | 1.724 |
-| B | basic      | 0.950 | 0.015 | 1.690 |
-| B | percentile | 0.960 | 0.014 | 1.690 |
-| B | bc         | 0.960 | 0.014 | 1.694 |
-| B | bca        | 0.960 | 0.014 | 1.694 |
+| A | bc         | 0.935 | 0.017 | 0.785 |
+| A | bca        | 0.935 | 0.017 | 0.785 |
+| B | normal     | 0.960 | 0.014 | 1.721 |
+| B | basic      | 0.950 | 0.015 | 1.686 |
+| B | percentile | 0.960 | 0.014 | 1.686 |
+| B | bc         | 0.960 | 0.014 | 1.691 |
+| B | bca        | 0.960 | 0.014 | 1.691 |
 | C₁ | normal     | 0.945 | 0.016 | 0.583 |
 | C₁ | basic      | 0.935 | 0.017 | 0.571 |
 | C₁ | percentile | 0.925 | 0.019 | 0.571 |

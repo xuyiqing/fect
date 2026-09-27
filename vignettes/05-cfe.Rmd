@@ -370,6 +370,8 @@ The placebo test passes, confirming that the CFE model with one observed loading
 
 ::: {.callout-note appearance="simple"}
 `fect_mspe()` compares out-of-sample prediction accuracy across different model specifications. A lower MSPE indicates better counterfactual prediction. This is useful for selecting among CFE configurations when the true model is unknown.
+
+Since version 2.4.7, `fect_mspe()` scores the model's full prediction at each held-out cell, including the covariates. Earlier versions left the covariates out, so the scores of models with covariates, such as the four above, differ from those of earlier versions.
 :::
 
 ------------------------------------------------------------------------
