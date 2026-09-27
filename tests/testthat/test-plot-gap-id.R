@@ -214,7 +214,7 @@ test_that("G4: placebo fits: the gap plot for an id marks the placebo periods, s
   expect_equal(.gi_xy(p1)$y, as.numeric(fit_se$eff[, j]), tolerance = 1e-12)
   ## a one-period placebo window without SEs: the unit's effects, no triangles
   fit_one <- suppressMessages(do.call(fect::fect,
-    c(args[setdiff(names(args), "placebo.period")],
+    c(args[names(args) != "placebo.period"],
       list(placebo.period = 0, se = FALSE))))
   r1 <- .gi_plot(plot(fit_one, type = "gap", id = 101))
   expect_equal(.gi_xy(r1$p)$y, as.numeric(fit_one$eff[, j]), tolerance = 1e-12)
