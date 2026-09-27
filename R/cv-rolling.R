@@ -341,14 +341,20 @@ r.cv.rolling <- function(formula,
             year_ord_int <- suppressWarnings(as.integer(year_ord))
             unit_match <- if (any(is.na(unit_ord_int))) unit_ord else unit_ord_int
             year_match <- if (any(is.na(year_ord_int))) year_ord else year_ord_int
-            Y_pred <- numeric(length(score_rows))
-            for (kk in seq_along(score_rows)) {
-                rr <- score_rows[kk]
-                ui <- match(data[[index[1L]]][rr], unit_match)
-                ti <- match(data[[index[2L]]][rr], year_match)
-                Y_pred[kk] <- if (!is.na(ui) && !is.na(ti)) {
-                    fit$Y.ct.full[ti, ui]
-                } else NA_real_
+            ## The model's full prediction at the held-out cells, with
+            ## their covariates from `data` (see .fect_heldout_pred()).
+            ## Before 2.4.7 this read fit$Y.ct.full, which leaves out X
+            ## times beta there and, for method = "gsynth", the fixed
+            ## effects.
+            ui <- match(data[[index[1L]]][score_rows], unit_match)
+            ti <- match(data[[index[2L]]][score_rows], year_match)
+            ok <- !is.na(ui) & !is.na(ti)
+            Y_pred <- rep(NA_real_, length(score_rows))
+            if (any(ok)) {
+                Y_pred[ok] <- .fect_heldout_pred(
+                    fit, ti[ok], ui[ok],
+                    data[score_rows[ok], , drop = FALSE]
+                )
             }
             e2 <- (Y_obs_score - Y_pred)^2
             e2 <- e2[is.finite(e2)]

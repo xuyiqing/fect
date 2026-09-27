@@ -382,9 +382,21 @@ fect_mspe <- function(
                     valid_map <- !is.na(rr_new) & !is.na(cc_new)
 
                     pred_vals <- rep(NA_real_, length(est_pos))
-                    ## Use Y.ct.full if available, fall back to Y.ct
-                    yct_new <- if (!is.null(out_new$Y.ct.full)) out_new$Y.ct.full else out_new$Y.ct
-                    pred_vals[valid_map] <- yct_new[cbind(rr_new[valid_map], cc_new[valid_map])]
+                    ## The model's full prediction at the hidden cells,
+                    ## with their covariates from data_i (see
+                    ## .fect_heldout_pred()). Before 2.4.7 this read the
+                    ## refit's Y.ct.full, which leaves out X times beta
+                    ## there and, on the never-treated path, the fixed
+                    ## effects.
+                    if (any(valid_map)) {
+                        pos_i <- rr_i + (cc_i - 1L) * TT
+                        est_data_rows <- match(est_pos[valid_map], pos_i)
+                        pred_vals[valid_map] <- .fect_heldout_pred(
+                            out_new,
+                            rr_new[valid_map], cc_new[valid_map],
+                            data_i[est_data_rows, , drop = FALSE]
+                        )
+                    }
                     ## y_true_i uses the original coordinate system (always TT x N)
                     actual_vals <- y_true_i[cbind(est_row, est_col)]
                     valid_score <- valid_map & !is.na(pred_vals) & !is.na(actual_vals)
