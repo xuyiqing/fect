@@ -1021,8 +1021,9 @@ plot.fect <- function(
     unit.gap.ok <- !is.na(unit.gap.T.on) & !is.na(unit.gap.eff)
     no.cell <- colSums(unit.gap.ok) == 0
     if (any(no.cell)) {
-      stop("Unit(s) in \"id\" with no estimated effect at a period that has ",
-           "a time relative to the treatment onset: ",
+      stop("Unit(s) in \"id\" have no period with both an estimated effect ",
+           "and a time relative to the treatment onset (for example, a unit ",
+           "treated from its first period): ",
            paste(unit.gap.id[no.cell], collapse = ", "), ".",
            call. = FALSE)
     }

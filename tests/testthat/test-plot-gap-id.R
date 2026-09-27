@@ -96,6 +96,10 @@ test_that("G1: the gap plot with one treated id draws that unit's own effects", 
   expect_identical(pm$labels$title, "Unit 101")
   ## the default type is the gap plot
   expect_equal(.gi_points(suppressMessages(plot(fit, id = 101))), pts)
+  ## an explicit plot.ci on a fit without SEs does not stop for an id
+  ## (the average gap plot stops there: "No uncertainty estimates")
+  expect_equal(.gi_points(suppressMessages(
+    plot(fit, type = "gap", id = 101, plot.ci = "0.95"))), pts)
   ## id = NULL: the average effect over all treated units, as before
   r0 <- .gi_plot(plot(fit, type = "gap"))
   expect_equal(.gi_points(r0$p)$y, as.numeric(fit$att), tolerance = 1e-12)
@@ -208,6 +212,13 @@ test_that("G4: placebo fits: the gap plot for an id marks the placebo periods, s
   p1 <- suppressMessages(plot(fit_se, type = "gap", id = 101))
   expect_true(all(.gi_text(p1) == ""))
   expect_equal(.gi_xy(p1)$y, as.numeric(fit_se$eff[, j]), tolerance = 1e-12)
+  ## a one-period placebo window without SEs: the unit's effects, no triangles
+  fit_one <- suppressMessages(do.call(fect::fect,
+    c(args[setdiff(names(args), "placebo.period")],
+      list(placebo.period = 0, se = FALSE))))
+  r1 <- .gi_plot(plot(fit_one, type = "gap", id = 101))
+  expect_equal(.gi_xy(r1$p)$y, as.numeric(fit_one$eff[, j]), tolerance = 1e-12)
+  expect_false("GeomPoint" %in% .gi_geoms(r1$p))
 })
 
 
