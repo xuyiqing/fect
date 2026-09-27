@@ -205,6 +205,28 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
             est.fect$fit <- est.fect$fit * norm.para[1]
             est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
         }
+        ## the treated-outcome model of cm = TRUE (stored as est.cm), put
+        ## back on the outcome's scale the same way (before 2.4.7 it stayed
+        ## on the normalized scale)
+        if (cm == TRUE) {
+            sigma2.cm <- est.best.cm$sigma2 * (norm.para[1]^2)
+            est.best.cm$IC <- est.best.cm$IC - log(est.best.cm$sigma2) + log(sigma2.cm)
+            est.best.cm$PC <- est.best.cm$PC * (norm.para[1]^2)
+            est.best.cm$sigma2 <- sigma2.cm
+            est.best.cm$mu <- est.best.cm$mu * norm.para[1]
+            if (r.cv > 0) {
+                est.best.cm$lambda <- est.best.cm$lambda * norm.para[1]
+                est.best.cm$VNT <- est.best.cm$VNT * norm.para[1]
+            }
+            if (force %in% c(1, 3)) {
+                est.best.cm$alpha <- est.best.cm$alpha * norm.para[1]
+            }
+            if (force %in% c(2, 3)) {
+                est.best.cm$xi <- est.best.cm$xi * norm.para[1]
+            }
+            est.best.cm$residuals <- est.best.cm$residuals * norm.para[1]
+            est.best.cm$fit <- est.best.cm$fit * norm.para[1]
+        }
     }
 
     ## 0. relevant parameters

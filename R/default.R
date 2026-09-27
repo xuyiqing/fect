@@ -3896,9 +3896,18 @@ fect.default <- function(
         tost.threshold <- 0.36 * sqrt(out$sigma2.fect)
     }
 
+    ## the covariate array the estimator stores (the fit's second `X`) on
+    ## the covariates' own scale: with normalize = TRUE they were divided by
+    ## sd(Y) for fitting (before 2.4.7 it stayed divided)
+    if (!is.null(norm.para) && is.numeric(out[["X", exact = TRUE]])) {
+        out[["X"]] <- out[["X"]] * norm.para[1]
+    }
+
     output <- c(
         list(
-            Y.dat = Y,
+            ## on the outcome's scale: with normalize = TRUE, Y was divided
+            ## by sd(Y) for fitting (before 2.4.7 Y.dat stayed divided)
+            Y.dat = if (is.null(norm.para)) Y else Y * norm.para[1],
             D.dat = D,
             I.dat = I,
             Y = Yname,
