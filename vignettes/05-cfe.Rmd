@@ -183,7 +183,7 @@ plot(out.cfe.z,
      main = "CFE with Z = L1 — Placebo Test")
 ```
 
-By allowing $L_1$'s coefficient to vary across time periods, CFE approximates the true interactive structure $L_{1,i} \cdot F_{1,t}$. The placebo test shows improvement. However, there is still a second latent factor $L_2 \cdot F_2$ that is not captured --- we will address this in Section 4.5.
+By allowing $L_1$'s coefficient to vary across time periods, CFE approximates the true interactive structure $L_{1,i} \cdot F_{1,t}$. The placebo test shows improvement. However, there is still a second latent factor $L_2 \cdot F_2$ that is not captured --- we will address this in @sec-cfe-factors.
 
 ::: {.callout-note appearance="simple"}
 The `Z` argument takes a character vector of column names for time-invariant covariates. The `gamma` argument specifies a column that defines the time grouping for the $Z$ coefficients. Using `time` as the gamma variable gives the most flexible specification; coarser groupings (e.g., early/middle/late) reduce the number of parameters.
@@ -291,7 +291,7 @@ The `Q.type` argument accepts `"linear"`, `"quadratic"`, `"cubic"`, or `"bspline
 
 ------------------------------------------------------------------------
 
-## CFE with factors
+## CFE with factors {#sec-cfe-factors}
 
 Sometimes the data contains both observed structure (known covariates whose effects vary over time) and unobserved latent factors. The CFE estimator can combine $Z'\gamma$ and interactive fixed effects $\lambda' f$ in a single model.
 
