@@ -737,10 +737,7 @@ estimand <- function(fit,
         }
         if (!(by %in% by_canon)) {
             ## Future: resolve as user column on fit's panel data.
-            stop("user-column `by` not yet supported in this release; ",
-                 "use one of: ",
-                 paste(shQuote(by_canon), collapse = ", "),
-                 ".", call. = FALSE)
+            .estimand_by_stop(type, by)
         }
     }
 
@@ -814,6 +811,21 @@ estimand <- function(fit,
 }
 
 
+## Internal: the `by` values estimand() computes in this release, per type,
+## and the stop for any other value (a column name, "cohort",
+## "calendar.time", or "overall" for "aptt" and "log.att").
+.estimand_by_stop <- function(type, by) {
+    ok <- if (type %in% c("att", "att.cumu")) {
+        c("event.time", "overall")
+    } else {
+        "event.time"
+    }
+    stop("estimand(type = \"", type, "\") with by = \"", by, "\" is not ",
+         "available in this release. Use by = ",
+         paste0("\"", ok, "\"", collapse = " or "), ".", call. = FALSE)
+}
+
+
 ## Internal: type = "att" dispatcher.
 .estimand_att <- function(fit, by, cells, weights, direction,
                           vartype, conf.level, ci.method, test = "none") {
@@ -852,11 +864,21 @@ estimand <- function(fit,
                                      test))
     }
 
-    stop("estimand(type = \"att\") with by = \"", by, "\" is part of ",
-         "the v2.4.0 API surface but is not yet implemented at this ",
-         "commit. Default form estimand(fit, \"att\", \"event.time\") ",
-         "and estimand(fit, \"att\", \"overall\", window = ...) work.",
-         call. = FALSE)
+    if (by == "event.time") {
+        ## not the fast path: name the argument(s) that ruled it out
+        given <- c(
+            if (!is.null(cells)) "`cells` or `window`",
+            if (direction != "on") "direction = \"off\"",
+            if (abs(conf.level - 0.95) >= 1e-12) "a conf.level other than 0.95",
+            if (ci.method != "normal") paste0("ci.method = \"", ci.method, "\"")
+        )
+        stop("estimand(type = \"att\", by = \"event.time\") returns ",
+             "fit$est.att as it is, so it does not take ",
+             paste(given, collapse = ", "), ". For the ATT over chosen ",
+             "cells, use by = \"overall\" with `cells` or `window`.",
+             call. = FALSE)
+    }
+    .estimand_by_stop("att", by)
 }
 
 
@@ -868,7 +890,7 @@ estimand <- function(fit,
 
     if (!is.null(cells)) {
         stop("estimand(\"att\", \"event.time\", test = \"", test, "\") ",
-             "with `cells` filter is not yet supported.",
+             "does not take `cells` or `window`.",
              call. = FALSE)
     }
 
@@ -1075,9 +1097,10 @@ estimand <- function(fit,
 
     if (vartype != "none") {
         if (is.null(fit$eff.boot)) {
-            stop("estimand(\"att\", \"overall\") with non-default ",
-                 "filter requires keep.sims = TRUE in fect() so the ",
-                 "per-cell bootstrap surface is available.",
+            stop("estimand(fit, \"att\", \"overall\") needs keep.sims = TRUE ",
+                 "in fect() for its standard error: it reads each ",
+                 "replicate's cell effects. Refit with keep.sims = TRUE, or ",
+                 "use vartype = \"none\" for the estimate alone.",
                  call. = FALSE)
         }
 
@@ -1304,11 +1327,19 @@ estimand <- function(fit,
              "supported (cumulative effects are defined relative to ",
              "treatment onset).", call. = FALSE)
     }
-    if (!is.null(cells) && by != "overall") {
-        stop("estimand(\"att.cumu\") with `cells` is supported only when ",
-             "by = \"overall\". For event-time series, use ",
-             "by = \"event.time\" with no cells filter.",
+    ## `cells` here is the user's own filter when `window` is NULL (estimand()
+    ## turns `window` into `cells`). The cumulative ATT is a sum of
+    ## per-period ATTs over a range of event times, so only `window` applies
+    ## (before 2.4.7 `cells` was silently ignored with by = "overall").
+    if (!is.null(cells) && is.null(window)) {
+        stop("estimand(\"att.cumu\") does not take `cells`: the cumulative ",
+             "ATT sums the per-period ATTs over a range of event times. ",
+             "Use by = \"overall\" with `window = c(L, R)` to choose the range.",
              call. = FALSE)
+    }
+    if (!is.null(window) && by != "overall") {
+        stop("estimand(\"att.cumu\") takes `window` only with ",
+             "by = \"overall\".", call. = FALSE)
     }
 
     ## Implementation strategy: derive the cumulative bootstrap
@@ -1338,9 +1369,7 @@ estimand <- function(fit,
                                          ci.method, vartype))
     }
 
-    stop("estimand(\"att.cumu\") with by = \"", by, "\" is not yet ",
-         "supported in v2.4.0. Use by = \"event.time\" or ",
-         "by = \"overall\".", call. = FALSE)
+    .estimand_by_stop("att.cumu", by)
 }
 
 
@@ -1436,8 +1465,8 @@ estimand <- function(fit,
                            vartype, conf.level, ci.method, test = "none") {
 
     if (!is.null(cells)) {
-        stop("estimand(\"aptt\") with `cells` filter is not yet ",
-             "supported in v2.4.0.", call. = FALSE)
+        stop("estimand(\"aptt\") does not take `cells` or `window` in this ",
+             "release.", call. = FALSE)
     }
     if (is.null(fit$eff.boot) && vartype != "none") {
         stop("No bootstrap/jackknife results available. ",
@@ -1450,9 +1479,7 @@ estimand <- function(fit,
                                         vartype, direction, test))
     }
 
-    stop("estimand(\"aptt\") with by = \"", by, "\" is not yet ",
-         "supported in v2.4.0. Use by = \"event.time\".",
-         call. = FALSE)
+    .estimand_by_stop("aptt", by)
 }
 
 
@@ -1617,8 +1644,8 @@ estimand <- function(fit,
                               test = "none") {
 
     if (!is.null(cells)) {
-        stop("estimand(\"log.att\") with `cells` filter is not yet ",
-             "supported in v2.4.0.", call. = FALSE)
+        stop("estimand(\"log.att\") does not take `cells` or `window` in ",
+             "this release.", call. = FALSE)
     }
     if (is.null(fit$eff.boot) && vartype != "none") {
         stop("No bootstrap/jackknife results available. ",
@@ -1653,9 +1680,7 @@ estimand <- function(fit,
                                            vartype, direction, test))
     }
 
-    stop("estimand(\"log.att\") with by = \"", by, "\" is not yet ",
-         "supported in v2.4.0. Use by = \"event.time\".",
-         call. = FALSE)
+    .estimand_by_stop("log.att", by)
 }
 
 
