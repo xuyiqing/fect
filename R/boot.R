@@ -4585,7 +4585,9 @@ fect_boot <- function(
       se.group.att <- apply(group.att.boot, 1, function(vec) {
         sd(vec, na.rm = TRUE)
       })
-      if (quantile.CI == TRUE) {
+      ## normal interval under ci.method = "normal" (quantile.CI FALSE), as
+      ## in every other slot (the test was inverted before 2.4.7)
+      if (quantile.CI == FALSE) {
         CI.group.att <- cbind(
           c(out$group.att) - se.group.att * qnorm(1 - alpha / 2),
           c(out$group.att) + se.group.att * qnorm(1 - alpha / 2)
