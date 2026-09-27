@@ -16,6 +16,15 @@
 > `effect()`), S2 and S4 (`fect_mspe()` refits), S3 (`est.cm`), S5 (`interFE()`) and P1 (p-values of
 > parametric fits with `ci.method = "basic"`), and sets the version to 2.4.7 (2.4.6 was a development
 > version on GitHub, never on CRAN). Rows, nodes and notes marked "final" describe them.
+>
+> Updated on 2026-09-27 for the follow-up batch on PR #151 (run `2026-09-26-pr151-followups`), which
+> fixes fect #152-#161 and #163: the data lookup of `fect_mspe()` (#152), the first row of `att.cumu()`
+> (#153), the weighted jackknife placebo and carryover slots (#154), `est.group.att` under `ci.method`
+> (#155), `att.avg.unit` on panels with missing cells (#156), the slots of `normalize = TRUE` fits
+> (#157), the basic p-values of bootstrap fits (#158), `estimand()` on jackknife fits (#159),
+> `binary = TRUE` (#160), `estimand()`'s stops (#161), and the prediction that `fect_mspe()` and
+> `r.cv.rolling()` score (#163, new file `R/heldout-pred.R`). Rows, nodes and notes that cite these
+> issue numbers describe them; blue nodes include them.
 
 ## Overview
 
@@ -59,9 +68,10 @@ graph TD
         E5["dloo.R: dloo overlay"]
     end
 
-    subgraph CV["Cross-Validation"]
+    subgraph CV["Cross-Validation and Scoring"]
         K1["cv.R: fect_cv()"]
         K2["cv-rolling + cv rules"]
+        H1["heldout-pred.R (new)"]
     end
 
     subgraph Inf["Inference"]
@@ -99,6 +109,8 @@ graph TD
     K1 --> E2
     K1 --> E4
     K2 --> E1
+    K2 --> H1
+    A3 --> H1
     I1 --> K1
     I1 --> E1
     I1 --> E2
@@ -122,8 +134,14 @@ graph TD
     style A3 fill:#1e90ff,stroke:#1565c0,color:#fff
     style V1 fill:#1e90ff,stroke:#1565c0,color:#fff
     style V2 fill:#1e90ff,stroke:#1565c0,color:#fff
+    style E1 fill:#1e90ff,stroke:#1565c0,color:#fff
+    style E2 fill:#1e90ff,stroke:#1565c0,color:#fff
+    style E3 fill:#1e90ff,stroke:#1565c0,color:#fff
     style E4 fill:#1e90ff,stroke:#1565c0,color:#fff
+    style E5 fill:#1e90ff,stroke:#1565c0,color:#fff
     style K1 fill:#1e90ff,stroke:#1565c0,color:#fff
+    style K2 fill:#1e90ff,stroke:#1565c0,color:#fff
+    style H1 fill:#1e90ff,stroke:#1565c0,color:#fff
     style I1 fill:#1e90ff,stroke:#1565c0,color:#fff
     style I2 fill:#1e90ff,stroke:#1565c0,color:#fff
     style P1 fill:#1e90ff,stroke:#1565c0,color:#fff
@@ -137,23 +155,26 @@ graph TD
 > One unified diagram. The "Input Validation" layer is a set of helpers inside `R/default.R` (new in
 > this run, except the older `index`/`W`/`group.fe` checks). `O2` is blue because `print.R` changed;
 > `esplot.R` did not. `A3` is blue for the follow-up M1 and the final S2 and S4 (`fect_mspe.R`); `did_wrapper.R` did not
-> change.
+> change. Follow-up batch: `H1` (`R/heldout-pred.R`) is new, called by `fect_mspe()` (in `A3`) and
+> `r.cv.rolling()` (in `K2`) to build the prediction they score (#163); `E1`-`E3` are blue for #156
+> (and `fe.R` for #157), `E5` (`dloo.R`) for #158.
 
 ### Module Reference
 
 | Module / File | Layer | Purpose | Key Exports | Changed in this run |
 | --- | --- | --- | --- | --- |
-| `R/default.R` (4,168 lines) | API + Validation | `fect()` generic, formula and default methods: input checks, reshaping to T x N matrices, CV / fit / bootstrap routing, diagnostics, output assembly | `fect()` | yes: A2 (stores `vartype`), A6 (`cl` checks, parametric warning), B5 (`wgt.implied` dimnames), B7, B8, B8b-d (loo refit arguments), B9, C1-C6, C4b; follow-up: B10-cfe (`dloo` with never-treated fitting stops in the argument checks), B13 (stores the `W.agg` matrix); final: S3 (`cm` reaches the fit without SEs; the `cm` model is fitted after cross-validation; `cm` with never-treated controls stops) |
-| `R/interFE.R` (564) | API | Standalone interactive fixed effects estimator | `interFE()` | yes: C1, C2 (formula parser, `X` with formula), C6 (absorbed-covariate labels); final: S5 (stops for a covariate absorbed by the intercept, or by the unit and time effects together) |
-| `R/did_wrapper.R` (659), `R/fect_mspe.R` (441) | API | DID estimator wrappers; MSPE model comparison | `did_wrapper()`, `fect_mspe()` | follow-up: M1 (`fect_mspe()` refits no longer pass the call's `Y`, `D`, `X`; the rebuilt formula carries them); final: S2 (each fit is refitted with the function that made it, e.g. `gsynth()`), S4 (the call's data and arguments are evaluated where `fect_mspe()` is called, then in the formula's environment) |
-| `R/po-estimands.R` (2,290) | Post-hoc | `imputed_outcomes()` long-form accessor and `estimand()` dispatcher; replicate alignment helpers | `estimand()`, `imputed_outcomes()` | yes: A1 (`.po_replicate_cells()`, `.po_replicate_att()`, `cells` scoping), A6 (slot contract allows padded arrays); follow-up: B13 (`.po_agg_weights()`); final: W1 (`.po_agg_weights_or_null()`, `.po_wmean()`: every cell-based estimand of a weighted fit is weighted by `fit$W.agg`; one `weights` check in `estimand()`), J2 (jackknife overall SE from `att.avg.boot`) |
-| `R/effect.R` (450), `R/cumu.R` (264) | Post-hoc | Cumulative / subgroup effects (soft-deprecated) | `effect()`, `att.cumu()` | yes: A2 (stored `vartype`, `drop = FALSE`, parametric normal CI in `att.cumu()`), A6 (replicate width); follow-up: B11 (running sum of the per-period ATTs); final: J1 (`.jackknife_se()` in both), S1 (`effect()`: normal intervals for parametric and jackknife fits), W1 (`getEffect()` weights) |
-| `R/fe.R` (959), `R/mc.R` (809), `R/cfe.R` (1,175) | Estimation | IFE / FE, matrix completion, complex FE fits | internal | no |
-| `R/fect_nevertreated.R` (3,592) | Estimation | Never-treated estimators (gsynth, IFE and CFE with `time.component.from = "nevertreated"`), their CV, implied weights | internal | yes: A7 (degenerate solves stop), B1 (`"pc"`), B2 (CV cap), B3 (skip messages), B4 (`W.cvfit`), B5 (`.fect_nt_implied_weights()`); follow-up: B12 (one treated unit in the CFE branch) |
-| `R/dloo.R` (711) | Estimation | Double leave-one-out pre-trend overlay (closed form, no refits) | internal | no |
-| `R/cv.R` (2,067) | CV | `fect_cv()`: selection of `r` / `lambda`; delegates never-treated CV to `fect_nevertreated()` | internal | yes: B1 (`"pc"` table), B4 (`W.in.fit` forwarded), B8 (`loading.bound` arguments) |
-| `R/cv-rolling.R` (403), `R/cv-rule-helpers.R` (127), `R/cv-helpers.R` (554), `R/cv_binary.R` (441) | CV | Rolling CV, 1se / min / 1pct rules, fold helpers, binary CV | `r.cv.rolling()` | no |
-| `R/boot.R` (5,022) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing); follow-up: B10-cfe (cfe + never-treated replicates); final: P1 (`.pvalue.basic()`: effect p-values of parametric fits with `ci.method = "basic"`) |
+| `R/default.R` (4,185 lines) | API + Validation | `fect()` generic, formula and default methods: input checks, reshaping to T x N matrices, CV / fit / bootstrap routing, diagnostics, output assembly | `fect()` | yes: A2 (stores `vartype`), A6 (`cl` checks, parametric warning), B5 (`wgt.implied` dimnames), B7, B8, B8b-d (loo refit arguments), B9, C1-C6, C4b; follow-up: B10-cfe (`dloo` with never-treated fitting stops in the argument checks), B13 (stores the `W.agg` matrix); final: S3 (`cm` reaches the fit without SEs; the `cm` model is fitted after cross-validation; `cm` with never-treated controls stops); follow-up batch: #157 (`Y.dat` and the stored covariate array on the outcome's scale under `normalize = TRUE`), #160 (`binary = TRUE` stops in the `fect()` generic) |
+| `R/interFE.R` (570) | API | Standalone interactive fixed effects estimator | `interFE()` | yes: C1, C2 (formula parser, `X` with formula), C6 (absorbed-covariate labels); final: S5 (stops for a covariate absorbed by the intercept, or by the unit and time effects together); #160 (`binary = TRUE` stops in the `interFE()` generic; the file keeps CRLF line endings) |
+| `R/did_wrapper.R` (659), `R/fect_mspe.R` (468) | API | DID estimator wrappers; MSPE model comparison | `did_wrapper()`, `fect_mspe()` | follow-up: M1 (`fect_mspe()` refits no longer pass the call's `Y`, `D`, `X`; the rebuilt formula carries them); final: S2 (each fit is refitted with the function that made it, e.g. `gsynth()`), S4 (the call's data and arguments are evaluated where `fect_mspe()` is called, then in the formula's environment); #152 (the data lookup accepts only a data frame, so a function named like the data is skipped), #163 (scores the model's full prediction at the held-out cells through `.fect_heldout_pred()`) |
+| `R/po-estimands.R` (2,334) | Post-hoc | `imputed_outcomes()` long-form accessor and `estimand()` dispatcher; replicate alignment helpers | `estimand()`, `imputed_outcomes()` | yes: A1 (`.po_replicate_cells()`, `.po_replicate_att()`, `cells` scoping), A6 (slot contract allows padded arrays); follow-up: B13 (`.po_agg_weights()`); final: W1 (`.po_agg_weights_or_null()`, `.po_wmean()`: every cell-based estimand of a weighted fit is weighted by `fit$W.agg`; one `weights` check in `estimand()`), J2 (jackknife overall SE from `att.avg.boot`); #159 (jackknife fits default to `ci.method = "normal"` for every type), #161 (`.estimand_by_stop()`; `cells` with `"att.cumu"` stops; the stop messages name the cause) |
+| `R/effect.R` (450), `R/cumu.R` (272) | Post-hoc | Cumulative / subgroup effects (soft-deprecated) | `effect()`, `att.cumu()` | yes: A2 (stored `vartype`, `drop = FALSE`, parametric normal CI in `att.cumu()`), A6 (replicate width); follow-up: B11 (running sum of the per-period ATTs); final: J1 (`.jackknife_se()` in both), S1 (`effect()`: normal intervals for parametric and jackknife fits), W1 (`getEffect()` weights); #153 (`att.cumu()` fills every row from `att.cumu.sub()`, the first included; a window of one event time keeps a matrix) |
+| `R/fe.R` (985), `R/mc.R` (813), `R/cfe.R` (1,179) | Estimation | IFE / FE, matrix completion, complex FE fits | internal | follow-up batch: #156 (per-unit ATT over each unit's observed treated cells, in all three), #157 (`fe.R`: `est.cm` rescaled like `est` under `normalize = TRUE`) |
+| `R/fect_nevertreated.R` (3,601) | Estimation | Never-treated estimators (gsynth, IFE and CFE with `time.component.from = "nevertreated"`), their CV, implied weights | internal | yes: A7 (degenerate solves stop), B1 (`"pc"`), B2 (CV cap), B3 (skip messages), B4 (`W.cvfit`), B5 (`.fect_nt_implied_weights()`); follow-up: B12 (one treated unit in the CFE branch); #156 (per-unit ATT over observed cells) |
+| `R/dloo.R` (719) | Estimation | Double leave-one-out pre-trend overlay (closed form, no refits) | internal | #158 (basic p-values of `pre.est.att` through `.pvalue_basic_dual()`, as `loo` gets them from `fect_boot()`) |
+| `R/cv.R` (2,076) | CV | `fect_cv()`: selection of `r` / `lambda`; delegates never-treated CV to `fect_nevertreated()` | internal | yes: B1 (`"pc"` table), B4 (`W.in.fit` forwarded), B8 (`loading.bound` arguments); #156 (per-unit ATT over observed cells) |
+| `R/cv-rolling.R` (417), `R/cv-rule-helpers.R` (127), `R/cv-helpers.R` (554), `R/cv_binary.R` (441) | CV | Rolling CV, 1se / min / 1pct rules, fold helpers, binary CV | `r.cv.rolling()` | #163 (`cv-rolling.R`: each held-out block is scored with `.fect_heldout_pred()`, not `Y.ct.full`) |
+| `R/heldout-pred.R` (102) | CV / scoring | The model's full prediction at held-out cells, for `fect_mspe()` and `r.cv.rolling()` | internal | new (#163) |
+| `R/boot.R` (5,094) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing); follow-up: B10-cfe (cfe + never-treated replicates); final: P1 (`.pvalue.basic()`: effect p-values of parametric fits with `ci.method = "basic"`); follow-up batch: #154 (90% bounds in the weighted jackknife placebo and carryover slots), #155 (the `est.group.att` branch follows `ci.method`), #158 (`.pvalue_basic_dual()`: basic p-values of bootstrap fits, coefficients included, go with the basic interval; subgroup switch-off effects get the normal p-value under `"normal"`) |
 | `R/impute_Y0.R` (246) | Inference | Y(0) imputer used by the parametric bootstrap | internal | yes: A4 (`W.in.fit`), B8 (`loading.bound` arguments) |
 | `R/valid_controls.R` (34), `R/permutation.R` (264) | Inference | Control screening for the parametric bootstrap; permutation test | internal | no |
 | `R/diagtest.R` (233), `R/fittest.R` (636), `R/fect_sens.R` (232), `R/fect_iden.R` (224) | Diagnostics | Pre-trend / placebo / carryover / equivalence tests; sensitivity; identification | `fect_sens()`, `fect_iden()` | no |
@@ -375,18 +396,21 @@ graph TD
 > Final (W1): `ET`, `AP` and `LA` also call `.po_wmean()` and `.po_agg_weights_or_null()`; the edges
 > are left out to keep the graph readable.
 
-### 4. Model comparison: `fect_mspe()` refits (final S2, S4)
+### 4. Model comparison and rolling CV: refits and held-out predictions (final S2, S4; #152, #163)
 
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
 graph TD
     MS["fect_mspe()"]
+    RC["r.cv.rolling()"]
     MK["CV masks (rolling / block)"]
     CE[".call_envs()"]
     EA[".eval_call_arg()"]
     RF[".refit_fun()"]
     BR[".build_rerun_args()"]
     FT["refit: fect() or gsynth()"]
+    HP[".fect_heldout_pred()"]
+    XB[".fect_heldout_xbeta()"]
     SR[".score_residuals()"]
 
     MS --> MK
@@ -397,20 +421,32 @@ graph TD
     BR --> EA
     EA --> CE
     MS --> FT
+    MS --> HP
     MS --> SR
+    RC --> FT
+    RC --> HP
+    HP --> XB
 
     style MS fill:#1e90ff,stroke:#1565c0,color:#fff
+    style RC fill:#1e90ff,stroke:#1565c0,color:#fff
     style CE fill:#1e90ff,stroke:#1565c0,color:#fff
     style EA fill:#1e90ff,stroke:#1565c0,color:#fff
     style RF fill:#1e90ff,stroke:#1565c0,color:#fff
     style BR fill:#1e90ff,stroke:#1565c0,color:#fff
+    style HP fill:#1e90ff,stroke:#1565c0,color:#fff
+    style XB fill:#1e90ff,stroke:#1565c0,color:#fff
 ```
+
+> `r.cv.rolling()` refits with `fect()` only and scores its per-fold MSPE itself; `fect_mspe()` passes
+> the predictions to `.score_residuals()`. Both call `.fect_heldout_pred()` only at cells that were
+> hidden in the refit (#163).
 
 ### Function Reference
 
 | Function | Defined In | Called By | Calls | Changed | Purpose |
 | --- | --- | --- | --- | --- | --- |
-| `fect()` | `R/default.R` | user | `fect.formula()`, `fect.default()` | no | S3 generic |
+| `fect()` | `R/default.R` | user | `fect.formula()`, `fect.default()` | yes (#160) | S3 generic; `binary = TRUE` stops before dispatch, with a message that binary outcome models are not supported in this version (#160) |
+| `interFE()` | `R/interFE.R` | user | `interFE.formula()`, `interFE.default()` | yes (#160) | S3 generic; the same `binary = TRUE` stop (#160) |
 | `fect.formula()` | `R/default.R` | `fect()` | `.fect_formula_names()`, `fect.default()` | yes (C1, C2) | Parses the formula (bare names only); stops when `X` is also given |
 | `.fect_formula_names()` | `R/default.R` | `fect.formula()`, `interFE.formula()` | — | new (C1) | Returns outcome and right-hand-side names; accepts and ignores intercept terms; names every bad term |
 | `fect.default()` | `R/default.R` | `fect()`, `fect.formula()` | checks below, `fect_cv()`, estimators, `fect_boot()`, `diagtest()` | yes (final S3) | Workhorse; see Data Flow for the order of checks. Final S3: stops for `cm = TRUE` with never-treated controls; passes `cm` and `II.cm` to `fect_fe()` without SEs; after cross-validation fits the `cm` model with `r.cv` |
@@ -425,13 +461,16 @@ graph TD
 | `.fect_nt_r_max()`, `.fect_nt_cap_message()`, `.fect_nt_no_cv_message()` | `R/fect_nevertreated.R` | `fect_nevertreated()` | — | new (B2, B3) | Cap and messages for the searched range of `r` |
 | `.fect_nt_implied_weights()` | `R/fect_nevertreated.R` | `fect_nevertreated()` | `MASS::ginv()` | new (B5) | `ginv(t(Lco)) %*% t(Ltr)` (Nco x Ntr), NULL on failure |
 | `fect_boot()` | `R/boot.R` | `fect.default()` (se = TRUE, loo refits) | `fect_cv()`, `one.nonpara()`, `draw.error()`, collector, `.pvalue.basic()` | yes (A3-A7, B8, B8e; follow-up B10-cfe; final P1) | Replicates, collector, `boot.rm`, SEs / CIs; p-values of the effects under `ci.method = "basic"` through `.pvalue.basic()` (final P1) |
-| `.pvalue.basic()` | `R/boot.R` (inside `fect_boot()`) | the `ci.method = "basic"` branches of the effect slots (22 sites, among them `est.group.att`, whose branches are swapped) | `get.pvalue()` | new (final P1) | Bootstrap draws (centered at the estimate): `get.pvalue(draws)`, as before. Parametric draws (simulated with no effect): `get.pvalue(draws - mean(draws) - estimate)`, twice the smaller of the shares of the centered draws at or above and at or below the estimate, the test inversion of the shifted basic interval. Coefficient p-values do not use it |
+| `.pvalue.basic()` | `R/boot.R` (inside `fect_boot()`) | the `ci.method = "basic"` branches of the effect slots (22 sites, among them `est.group.att`, whose branches follow `ci.method` since #155), and the coefficient p-values of bootstrap fits (#158) | `get.pvalue()`, `.pvalue_basic_dual()` | new (final P1; #158) | Bootstrap draws: `.pvalue_basic_dual()` (#158; it was `get.pvalue(draws)`, the percentile p-value). Parametric draws (simulated with no effect): `get.pvalue(draws - mean(draws) - estimate)`, twice the smaller of the shares of the centered draws at or above and at or below the estimate, the test inversion of the shifted basic interval up to the resolution of the draws. Coefficient p-values of parametric fits still use `get.pvalue()` |
+| `.pvalue_basic_dual()` | `R/boot.R` (file level) | `.pvalue.basic()`, `R/dloo.R` `.assemble()` | none | new (#158) | Two-sided p-value dual to the basic interval: with the draws sorted (NA dropped) and the type-7 quantile line through ((j - 1)/(n - 1), x[j]), it finds where the line crosses twice the estimate and doubles the smaller tail; below alpha exactly when the (1 - alpha) basic interval excludes 0, at every alpha; NA with fewer than two draws |
 | `one.nonpara()` (binary parametric, parametric, nonparametric) | `R/boot.R` (closures) | serial loop, parallel `foreach` | `.fect_resample()`, `impute_Y0()`, estimators, `.fect_boot_result_ok()` | yes (A3, A4, A5, A7, B8; follow-up B10-cfe) | One replicate; parametric: `Y.boot / norm.para[1]` before refit (A3), `W[, id.boot]` (A4); nonparametric: cfe + never-treated replicates refit `fect_nevertreated(method = "cfe")`, like the point fit (B10-cfe) |
 | `.fect_resample()` | `R/boot.R` | replicate functions, `draw.error()` | `sample.int()` | new (A5) | `x[sample.int(length(x), size, replace)]`: same draws as `sample()` for length > 1, literal for length 1 |
 | `.fect_boot_result_ok()` | `R/boot.R` | replicate functions | — | new (A7) | Rejects replicate results of the wrong shape (counted as failed) |
 | `.fect_store_slice()` | `R/boot.R` | collector loop | — | new (A6) | Stores a T x w replicate in a T x W x B array, padding with NA and widening when w > W |
 | `impute_Y0()` | `R/impute_Y0.R` | `fect_boot()` (parametric) | `fect_nevertreated()`, `fect_fe()`, `fect_cfe()` | yes (A4, B8) | Forwards `W.in.fit`, `loading.bound`, `gamma.loading`, `gamma.loading.grid` |
-| `estimand()` | `R/po-estimands.R` | user | `.estimand_*()` / `.compute_*()` | yes (A1; final W1) | Typed dispatcher; replicate paths read through `.po_replicate_cells()`; one check at the top: `weights` must be NULL (final W1) |
+| `estimand()` | `R/po-estimands.R` | user | `.estimand_*()` / `.compute_*()`, `.estimand_by_stop()` | yes (A1; final W1; #159, #161) | Typed dispatcher; replicate paths read through `.po_replicate_cells()`; one check at the top: `weights` must be NULL (final W1). `ci.method = NULL` resolves to `"normal"` for every type on a jackknife fit (#159). A `by` value outside the four names stops through `.estimand_by_stop()` (#161) |
+| `.estimand_by_stop()` | `R/po-estimands.R` | `estimand()`, `.estimand_att()`, `.estimand_att_cumu()`, `.estimand_aptt()`, `.estimand_log_att()` | none | new (#161) | Stop for a `by` value that is not available in this release; names the values that work (`"event.time"` or `"overall"` for `"att"` and `"att.cumu"`, `"event.time"` for `"aptt"` and `"log.att"`) |
+| `.estimand_att_cumu()` | `R/po-estimands.R` | `estimand()` | `.compute_att_cumu_event_time()`, `.compute_att_cumu_overall()` | yes (#161) | `cells` given without `window` stops and points to `window` (it was ignored with `by = "overall"`); `window` needs `by = "overall"` |
 | `.estimand_att_overall()`, `.estimand_att_event_time()` (placebo / carryover), `.estimand_att_event_time_jackknife()` | `R/po-estimands.R` | `.estimand_att()` | `.po_wmean()`, `.po_replicate_att()`, `.compute_ci()` | yes (final W1) | Weighted estimate and replicates for a weighted fit; weighted `.cell_jackknife()` for BCa |
 | `.estimand_att_overall_jackknife()` | `R/po-estimands.R` | `.estimand_att_overall()` | `.po_wmean()` | yes (final J2, W1) | Tukey SE from `att.avg.boot`, each leave-one-out fit's overall ATT (was `att.avg.unit.boot`, the average of unit-level ATTs); with a `cells` filter, recomputes each replicate with the weights `W[, -j]` |
 | `.compute_aptt_event_time()`, `.compute_log_att_event_time()` | `R/po-estimands.R` | `.estimand_aptt()`, `.estimand_log_att()` | `.po_replicate_cells()`, `.po_wmean()` | yes (final W1) | Weighted numerator and denominator (APTT) and weighted mean log difference, in the estimate and in every replicate |
@@ -446,11 +485,14 @@ graph TD
 | `.po_wmean()` | `R/po-estimands.R` | estimand paths, `.po_replicate_att()` | none | new (final W1) | `mean(v, na.rm = TRUE)` when `w` is NULL; else `sum(w v) / sum(w)` over entries where both are present; NA when none is left or the weights sum to 0 |
 | `effect()` | `R/effect.R` | user, `.compute_att_cumu_event_time()` | `getEffect()`, `.jackknife_se()`, `.po_agg_weights_or_null()` | yes (A2, A6; follow-up B11; final S1, J1, W1) | Reads `x$vartype`; slices each replicate to its real width; `getEffect()` builds the cumulative series as the running sum of the per-period means, NA from an event time with no treated cell on. Final: jackknife SE by `.jackknife_se()` row by row (J1); normal interval and p-value for parametric and jackknife fits (S1); the weights, mapped through `colnames.boot` for each replicate, go to `getEffect()` (W1) |
 | `getEffect()` | `R/effect.R` | `effect()` | none | yes (follow-up B11; final W1) | Per-period means over the selected treated cells, weighted by `W` when given, and their running sum |
-| `att.cumu()` / `att.cumu.sub()` | `R/cumu.R` | user, `.compute_att_cumu_overall()` | `.jackknife_se()` | yes (A2; follow-up B11; final J1) | Parametric fits: normal CI and p-value; jackknife fits: `.jackknife_se()` with a normal CI and p-value (final J1); `weighted = FALSE` (default): running sum, and a replicate missing an event time of the window is dropped; `weighted = TRUE`: the count-weighted number, identical to 5afa708; works on fits without SEs |
+| `att.cumu()` / `att.cumu.sub()` | `R/cumu.R` | user, `.compute_att_cumu_overall()` | `.jackknife_se()` | yes (A2; follow-up B11; final J1) | Parametric fits: normal CI and p-value; jackknife fits: `.jackknife_se()` with a normal CI and p-value (final J1); `weighted = FALSE` (default): running sum, and a replicate missing an event time of the window is dropped; `weighted = TRUE`: the count-weighted number, identical to 5afa708; works on fits without SEs. #153: with SEs every row, the first included, comes from `att.cumu.sub()` (the first row copied `fit$est.att`); `att.cumu.sub()` subsets the replicate matrices with `drop = FALSE`, so a window of one event time works |
 | `.jackknife_se()` | `R/cumu.R` | `att.cumu.sub()`, `effect()` | `stats::var()` | new (final J1) | Tukey jackknife SE from leave-one-unit-out replicates, as `jackknifed()` in `R/boot.R`: pseudo-values `B * est - (B - 1) * reps` over the finite replicates, `sqrt(var(pseudo) / n)`; NA with fewer than two |
 | `.build_rerun_args()` | `R/fect_mspe.R` (inside `fect_mspe()`) | `fect_mspe()` | `.eval_call_arg()` | yes (follow-up M1; final S4) | Arguments of each refit: the rebuilt formula plus the call's other arguments, without `Y`, `D`, `X` (#151's C2 stops on `X` given with a formula); final: each argument is evaluated by `.eval_call_arg()` |
-| `fect_mspe()` | `R/fect_mspe.R` | user | `.call_envs()`, `.eval_call_arg()`, `.refit_fun()`, `.build_rerun_args()`, CV mask builders, `.score_residuals()` | yes (follow-up M1; final S2, S4) | Hides held-out cells, refits each model with its own function, scores the predictions; data: the data frame a gsynth fit stores (`fit[["data", exact = TRUE]]`), else the call's `data` |
-| `.call_envs()`, `.eval_call_arg()` | `R/fect_mspe.R` (inside `fect_mspe()`) | `fect_mspe()`, `.build_rerun_args()` | `eval()` | new (final S4) | Where the stored call is evaluated: the frame `fect_mspe()` was called from, then the environment of `fit$formula`; the first that evaluates wins, else a stop that names the argument |
+| `fect_mspe()` | `R/fect_mspe.R` | user | `.call_envs()`, `.eval_call_arg()`, `.refit_fun()`, `.build_rerun_args()`, CV mask builders, `.fect_heldout_pred()`, `.score_residuals()` | yes (follow-up M1; final S2, S4; #152, #163) | Hides held-out cells, refits each model with its own function, scores the model's full prediction at the held-out cells (#163; it read the refit's `Y.ct.full`); data: the data frame a gsynth fit stores (`fit[["data", exact = TRUE]]`), else the call's `data` |
+| `.call_envs()`, `.eval_call_arg()` | `R/fect_mspe.R` (inside `fect_mspe()`) | `fect_mspe()`, `.build_rerun_args()` | `eval()` | new (final S4); #152 | Where the stored call is evaluated: the frame `fect_mspe()` was called from, then the environment of `fit$formula`; the first that evaluates wins, else a stop that names the argument. #152: `.eval_call_arg(expr, envs, what, accept = NULL)`; the data call passes `accept = is.data.frame`, so a value that is not a data frame (the function `df`) is skipped and the next environment tried; the stop then says the name is not a data frame |
+| `r.cv.rolling()` | `R/cv-rolling.R` | user | `fect()`, `.fect_heldout_pred()`, cv rules | yes (#163) | Rolling-window CV of `r`; each fold's held-out block is scored with `.fect_heldout_pred()` (it read `fit$Y.ct.full`); a cell with no prediction (NA) is left out |
+| `.fect_heldout_pred()` | `R/heldout-pred.R` | `fect_mspe()`, `r.cv.rolling()` | `.fect_heldout_xbeta()` | new (#163) | Prediction at hidden cells, `base + X beta`. `base`: `Y.ct.full` (or `Y.ct`) on not-yet-treated paths; on the never-treated path, `est$fit` for control units and `mu + alpha.tr + xi + F lambda.tr` for treated units (NA for a treated unit of a cfe fit with Z, Q or extra index fixed effects, whose terms the fit does not store). The fit is not changed |
+| `.fect_heldout_xbeta()` | `R/heldout-pred.R` | `.fect_heldout_pred()` | none | new (#163) | The covariates `fit$X` of the cells, read with `[[` from the scorer's data rows (data.frame, tibble and data.table alike), times `fit$beta`; an NA coefficient adds 0; a missing covariate gives NA, so the cell is not scored |
 | `.refit_fun()` | `R/fect_mspe.R` (inside `fect_mspe()`) | `fect_mspe()` | `get0(mode = "function")` | new (final S2) | `fect` for calls to `fect`, `fect.formula`, `fect.default`; otherwise the function named in the stored call (a gsynth fit stores gsynth's), found from the caller's frame; else a stop |
 | `plot.fect()` | `R/plot.R` | user | ggplot2 | yes (B6) | `identical(x$vartype, "parametric")`; factors-plot label positions |
 | `print.fect()` | `R/print.R` | user | — | yes (A6) | No "Cluster SE" line for parametric and jackknife fits (they ignore `cl`) |
@@ -466,6 +508,8 @@ graph TD
 %%{init: {'theme': 'neutral'}}%%
 graph TD
     IN["fect(formula or Y, D, X)"]
+    BQ{"binary = TRUE?"}
+    BS["stop (#160)"]
     FQ{"formula given?"}
     PF["parse: bare names only"]
     PX["check X names"]
@@ -484,7 +528,9 @@ graph TD
     AS["assemble output"]
     PH["plot, effect, estimand"]
 
-    IN --> FQ
+    IN --> BQ
+    BQ -- yes --> BS
+    BQ -- no --> FQ
     FQ -- yes --> PF
     FQ -- no --> PX
     PF --> TI
@@ -505,6 +551,8 @@ graph TD
     DG --> AS
     AS --> PH
 
+    style BQ fill:#1e90ff,stroke:#1565c0,color:#fff
+    style BS fill:#1e90ff,stroke:#1565c0,color:#fff
     style PF fill:#1e90ff,stroke:#1565c0,color:#fff
     style PX fill:#1e90ff,stroke:#1565c0,color:#fff
     style TI fill:#1e90ff,stroke:#1565c0,color:#fff
@@ -521,6 +569,7 @@ graph TD
 
 | Step | Where | What happens (2.4.7) |
 | --- | --- | --- |
+| binary | `fect()` and `interFE()` generics | `binary = TRUE` stops before dispatch; the probit code stays in place, unreachable (#160) |
 | parse | `fect.formula()`, `.fect_formula_names()` | Outcome, treatment, covariates from bare names; `X` with a formula stops (C1, C2) |
 | check X names | `fect.default()` | Duplicates, `X` naming Y or D, missing columns stop (C2) |
 | time index | `fect.default()` right after `time <- index[2]` | Factor: increasing numeric levels become numbers, other levels become positions with `time.labels`, with a warning when the levels are numbers out of numeric order (C4b); character must parse as numbers (C4) |
@@ -529,10 +578,10 @@ graph TD
 | drop periods | `fect.default()` step 2 | Periods with no control are dropped; if no treated cell is left, stop (B7) |
 | rank check | `fect.default()` step 7b | `.fect_check_covariates()` on the estimation cells; dropped covariates leave `X` before every later fit (C5, C6) |
 | select r / lambda | `fect_cv()` / `fect_nevertreated()` | `"pc"` rule, CV cap, `W.agg` kept out, bounds honoured (B1-B4, B8); serial seed as `se = FALSE` (B9) |
-| replicates | `fect_boot()` | Routing (B8e), replicate checks (A7), resampling (A5), parametric scale and weights (A3, A4), collector with padding (A6), count message; cfe + never-treated replicates use the never-treated model (follow-up B10-cfe); p-values of the effects of parametric fits under `ci.method = "basic"` (final P1) |
+| replicates | `fect_boot()` | Routing (B8e), replicate checks (A7), resampling (A5), parametric scale and weights (A3, A4), collector with padding (A6), count message; cfe + never-treated replicates use the never-treated model (follow-up B10-cfe); p-values of the effects of parametric fits under `ci.method = "basic"` (final P1); per-unit ATT over observed cells (#156); 90% bounds in the weighted jackknife placebo and carryover slots (#154); `est.group.att` follows `ci.method` (#155); basic p-values of bootstrap fits go with the basic interval, subgroup switch-off p-values under `"normal"` are normal (#158) |
 | loo refits | `fect.default()` loo block | Refits keep `loading.bound`, `time.component.from`, `para.error` (B8b-d); their replicates follow the routing above (follow-up B10-cfe) |
-| assemble | `fect.default()` output | NA rows for dropped covariates, `wgt.implied` dimnames, `remove.id`, `vartype`, labelled `rawtime` / `data.long`; the `W.agg` matrix when `W` or `W.agg` weights the aggregation (follow-up B13); `est.cm` for `cm = TRUE` fits without SEs or after cross-validation (final S3; `cm` with never-treated controls stops in the argument checks) |
-| post-hoc | `po-estimands.R`, `effect.R`, `cumu.R`, `plot.R`, `fect_mspe.R` | Replicates read through `colnames.boot` (A1, A6); stored `vartype` (A2); NULL-safe plots (B6); cumulative ATT as a running sum (follow-up B11); weights of weighted fits in `estimand()` and `effect()` (final W1); jackknife SEs and normal intervals (final J1, J2, S1); `fect_mspe()` refits with the fit's own function, evaluating its call where it is called (final S2, S4) |
+| assemble | `fect.default()` output | NA rows for dropped covariates, `wgt.implied` dimnames, `remove.id`, `vartype`, labelled `rawtime` / `data.long`; the `W.agg` matrix when `W` or `W.agg` weights the aggregation (follow-up B13); `est.cm` for `cm = TRUE` fits without SEs or after cross-validation (final S3; `cm` with never-treated controls stops in the argument checks); with `normalize = TRUE`, `Y.dat`, `est.cm` and the stored covariate array on the outcome's scale (#157) |
+| post-hoc | `po-estimands.R`, `effect.R`, `cumu.R`, `plot.R`, `fect_mspe.R` | Replicates read through `colnames.boot` (A1, A6); stored `vartype` (A2); NULL-safe plots (B6); cumulative ATT as a running sum (follow-up B11); weights of weighted fits in `estimand()` and `effect()` (final W1); jackknife SEs and normal intervals (final J1, J2, S1); `fect_mspe()` refits with the fit's own function, evaluating its call where it is called (final S2, S4); the data lookup skips values that are not data frames (#152); `fect_mspe()` and `r.cv.rolling()` score the model's full prediction at held-out cells (#163); every row of `att.cumu()` by one rule (#153); `estimand()` defaults on jackknife fits and its stops (#159, #161) |
 
 ---
 
@@ -654,8 +703,10 @@ window's treated cells) with its old replicate rescaling, identical to 5afa708 i
 Final J1 and S1: for jackknife fits both functions use `.jackknife_se()` (the Tukey SE of
 `jackknifed()`, also with `weighted = TRUE`) with a normal interval and p-value, and for parametric
 fits both use the normal interval. So `att.cumu()` and `effect()` agree in S.E., interval and
-p-value for every variance type, except the first row of a bootstrap fit, which `att.cumu()` copies
-from `fit$est.att` (normal interval by default) while `effect()` takes quantiles.
+p-value for every variance type and in every row: since #153 `att.cumu()` builds its first row with
+`att.cumu.sub()` too (it copied `fit$est.att`, the normal interval by default, while `effect()` took
+quantiles), and `att.cumu.sub()` keeps the replicate matrices as matrices (`drop = FALSE`) for a window
+of one event time.
 
 ### Aggregation weights `fit$W.agg` (follow-up B13)
 
@@ -686,6 +737,10 @@ match `data.long`), else the call's `data`. fect code never names gsynth. A fit 
 formula inside one function and scored from another cannot be refitted; the error names the
 argument. Nothing new is stored on fits.
 
+#152: the data call is evaluated with `accept = is.data.frame`, so a function found under the data's
+name (`df`, `data`) is skipped and the next environment is tried. #163: the refit is scored with
+`.fect_heldout_pred()` (below), not with its `Y.ct.full`.
+
 ### Causal moderation model `est.cm` (final S3)
 
 With `cm = TRUE`, `fect_fe()` fits a second model on the treated cells (`II.cm`) with the same `r`,
@@ -694,6 +749,42 @@ With `cm = TRUE`, `fect_fe()` fits a second model on the treated cells (`II.cm`)
 too, and when the main model came from `fect_cv()`, which has no cm model, it fits the cm model once
 more with `r.cv` and `boot = 0`. No replicate fits this model. `cm = TRUE` with
 `time.component.from = "nevertreated"` stops in the argument checks.
+
+### Contracts changed in the follow-up batch (fect #152-#161, #163)
+
+- **Held-out prediction (#163).** `fect_mspe()` and `r.cv.rolling()` hide a cell by setting its outcome
+  to NA and refitting. `fect()` drops that row and stores 0 for its covariates, and on the
+  never-treated path `Y.ct.full` holds only the factor part (gsynth) or 0 (cfe) at control cells. Both
+  scorers now call `.fect_heldout_pred(fit, rr, cc, newdata)` at the hidden cells only: the refit's
+  fitted value with the covariates at 0 (`Y.ct.full`; never-treated path: `est$fit` for control units,
+  `mu + alpha.tr + xi + F lambda.tr` for treated units) plus the cells' covariates from the scorer's
+  data times `fit$beta`. No slot of any fit changes; scores and rolling-CV choices do. Limits: a CFE fit
+  with extra `index` fixed effects puts a hidden cell in the pooled group of missing cells, so its
+  prediction uses that group's effect; a never-treated cfe fit with Z, Q or extra fixed effects gets NA
+  (not scored) at treated units' cells; a cell with a missing covariate gets NA (not scored).
+- **Basic p-values of bootstrap fits (#158).** Under `ci.method = "basic"` every effect slot and
+  `est.beta` of a bootstrap fit take `.pvalue_basic_dual()`, the p-value dual to the basic interval on
+  the same type-7 quantiles, so `p < alpha` exactly when the `1 - alpha` interval excludes 0. `dloo`'s
+  `pre.est.att` uses it too. Parametric fits keep `.pvalue.basic()`'s counting rule; `"normal"` slots
+  keep the normal p-value, now also the subgroup switch-off effects.
+- **`est.group.att` (#155).** Its interval and p-value follow `ci.method` like every other slot (the
+  branches were swapped since v1.0.5).
+- **Per-unit ATT (#156).** `att.avg.unit` (and its replicates, so `est.avg.unit`) averages each treated
+  unit's effects over its observed treated cells, in `fe.R`, `cfe.R`, `mc.R`, `fect_nevertreated.R`
+  and `cv.R`; a unit with no observed treated cell is NA and dropped from the mean.
+- **`normalize = TRUE` (#157).** `fit$Y.dat`, `fit$est.cm` and the covariate array the estimator returns
+  (the fit's second `X` element) are rescaled by `norm.para[1]` before output. The local `Y` and `X`
+  stay normalized for the dloo overlay and the cm refit. Other normalized slots are unchanged (see
+  Notes).
+- **Weighted jackknife tests (#154).** `est.placebo` and `est.carryover` of weighted jackknife fits have
+  the same 7 columns as unweighted fits (90% bounds from the jackknife SE).
+- **Cumulative ATT rows (#153).** See "Cumulative ATT" above.
+- **`estimand()` (#159, #161).** `ci.method = NULL` resolves to `"normal"` on a jackknife fit, whatever
+  the type. `by` takes `"event.time"` and `"overall"` for `"att"` and `"att.cumu"`, `"event.time"` for
+  `"aptt"` and `"log.att"`; other values stop through `.estimand_by_stop()`. `cells` works for `"att"`
+  with `by = "overall"`; `"att.cumu"` takes `window` only (with `by = "overall"`) and stops on `cells`.
+- **`binary = TRUE` (#160).** Stops in the `fect()` and `interFE()` generics.
+- **`fect_mspe()` data lookup (#152).** See "`fect_mspe()` refits" above.
 
 ---
 
@@ -742,7 +833,8 @@ more with `r.cv` and `boot = 0`. No replicate fits this model. `cm = TRUE` with
 - `dloo` (R/dloo.R, 2.4.7) is a closed-form overlay on the in-sample fit; it is not part of this run's
   changes but uses the reduced covariate set after the rank check.
 - Binary (probit) fits do not run on 412d7ae or on this branch (`BiInitialFit()` predicts from a
-  NULL model); the binary branches of the rank check and B8e routing are untested end to end.
+  NULL model); the binary branches of the rank check and B8e routing are untested end to end. Since
+  #160, `binary = TRUE` stops in the `fect()` and `interFE()` generics, so this code is unreachable.
 - `beta_iter()` (`src/ife_sub.cpp`) is the covariate loop of `inter_fe()`, the factor-model core
   for complete panels (never-treated fits such as gsynth when the control panel has no missing
   cell, and `interFE()`). It stops when the absolute change in beta falls below the tolerance. When
@@ -754,13 +846,18 @@ more with `r.cv` and `boot = 0`. No replicate fits this model. `cm = TRUE` with
   this problem.
 - `boot.R` (5,022 lines), `plot.R` (5,312) and `default.R` (4,168) remain the largest files; the
   shared collector loop removed one of `boot.R`'s duplicated blocks.
-- Found in the final batch and not changed: `fit$att.avg.unit` is NaN on panels with missing cells
-  (fe and gsynth; cause not traced; `estimand()` no longer reads it); with `normalize = TRUE`,
-  `est.cm` stays on the normalized scale; the first row of `att.cumu()` for a bootstrap fit is
-  `fit$est.att`'s (normal interval by default) while `effect()`'s is a quantile interval; the two
-  `ci.method` branches of `est.group.att` (cohort effects with `group`) are swapped since v1.0.5
-  (`"normal"` prints the basic interval), so P1 changes its default p-values for parametric fits;
-  swapping the branches back would change every fit with `group` and SEs (a follow-up).
+- Found in the final batch and fixed in the follow-up batch: `fit$att.avg.unit` NaN on panels with
+  missing cells (#156); `est.cm` on the normalized scale with `normalize = TRUE` (#157); the first row
+  of `att.cumu()` (#153); the swapped `ci.method` branches of `est.group.att` (#155).
+- Open after the follow-up batch: (1) the CFE C++ core reads Z and the kappa groups from the first
+  period, and Q and the gamma groups from the first unit (`src/cfe_sub.cpp`, about L367-420), so a
+  missing cell there zeroes them in unbalanced fits; this predates the batch, and fixing it moves
+  estimates. (2) With `normalize = TRUE`, other slots stay on the normalized scale (gsynth
+  `sigma2.fect`, `tost.threshold`, `VNT`, IC, mc `lambda.norm`). (3) `r.cv.rolling()` at its default
+  `min.T0 = 5` chooses r = 0 on `sim_gsynth` (`force = "two-way"`, `seed = 1`), where r = 2 is true:
+  held-out units with few training periods get noisy loadings; `min.T0 = 10` chooses 2. The default is
+  unchanged and documented. (4) Basic p-values of parametric fits keep `.pvalue.basic()`'s counting
+  rule, dual to the interval only up to the resolution of the draws.
 - Vignettes are a Quarto book under `vignettes/` (build-ignored in the package tarball); chapters
   01-11 plus cheatsheet, changelog (`bb-updates.Rmd`) and references.
 - Ten bundled datasets (`simdata`, `simgsynth`, `sim_base`, `sim_gsynth`, `sim_linear`, `sim_region`,
