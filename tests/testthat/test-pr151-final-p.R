@@ -64,16 +64,24 @@ test_that("P1: parametric p-values with ci.method = 'basic' compare the estimate
   clear <- pb$est.att[as.character(2:10), , drop = FALSE]
   expect_true(all(clear[, "p.value"] < 0.05))
   expect_true(all(clear[, "CI.lower"] > 0))
-  ## unchanged: coefficients (their draws are centered at the estimate),
-  ## the normal p-values, and bootstrap fits
+  ## unchanged: coefficients (their draws are centered at the estimate)
+  ## and the normal p-values
   expect_equal(unname(pb$est.beta[, "p.value"]),
                apply(pb$beta.boot, 1, .pfp_pct_p))
   pn <- fit("parametric", "normal")
   expect_equal(unname(pn$est.att[, "p.value"]),
                unname((1 - stats::pnorm(abs(pn$est.att[, "ATT"] /
                                              pn$est.att[, "S.E."]))) * 2))
+  ## bootstrap fits (2.4.7, #158): the p-value goes with the basic interval,
+  ## below alpha exactly when the (1 - alpha) basic interval excludes zero
   bb <- fit("bootstrap", "basic")
   rows_b <- which(!is.na(bb$att))
-  expect_equal(unname(bb$est.att[rows_b, "p.value"]),
-               apply(bb$att.boot[rows_b, , drop = FALSE], 1, .pfp_pct_p))
+  for (i in rows_b) {
+    for (a in c(0.01, 0.05, 0.1, 0.5)) {
+      q <- stats::quantile(bb$att.boot[i, ], c(1 - a / 2, a / 2),
+                           na.rm = TRUE, names = FALSE)
+      expect_identical(unname(bb$est.att[i, "p.value"] < a),
+                       2 * bb$att[i] - q[1] > 0 || 2 * bb$att[i] - q[2] < 0)
+    }
+  }
 })

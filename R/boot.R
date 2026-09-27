@@ -60,6 +60,47 @@ basic_ci_alpha <- function(theta, boots, alpha) {
     2 * theta - unname(qs[2]))
 }
 
+## p-value dual to the basic interval of case-bootstrap draws (ci.method =
+## "basic" on a bootstrap fit). The basic interval at level 1 - a is
+## [2 * theta - Q(1 - a / 2), 2 * theta - Q(a / 2)], with Q the quantile
+## function that quantile() uses by default (type 7) on the finite draws:
+## with the draws sorted, x[1] <= ... <= x[n], Q is the line through the
+## points ((j - 1) / (n - 1), x[j]), so it is continuous and nondecreasing.
+## The interval excludes 0 when Q(1 - a / 2) < c or Q(a / 2) > c, c = 2 *
+## theta. With u = sup{v : Q(v) < c} and l = inf{v : Q(v) > c}, that is
+## a > 2 * (1 - u) or a > 2 * l, so the p-value min(1, 2 * min(1 - u, l))
+## is below a exactly when the interval excludes 0, at every level a.
+## u and l are where the line crosses c. The draws are those the interval
+## uses (NA dropped); NA with fewer than two of them (the interval of a
+## row is NA then too).
+.pvalue_basic_dual <- function(theta, boots) {
+  x <- sort(boots[!is.na(boots)])
+  n <- length(x)
+  if (n < 2L || !is.finite(theta)) {
+    return(NA_real_)
+  }
+  cc <- 2 * theta
+  ## upper side: 1 - u, the share of the line at or above c
+  if (x[1] >= cc) {
+    hi <- 1
+  } else if (x[n] < cc) {
+    hi <- 0
+  } else {
+    j <- max(which(x < cc))                    # x[j] < c <= x[j + 1]
+    hi <- 1 - ((j - 1) + (cc - x[j]) / (x[j + 1] - x[j])) / (n - 1)
+  }
+  ## lower side: l, the share of the line at or below c
+  if (x[n] <= cc) {
+    lo <- 1
+  } else if (x[1] > cc) {
+    lo <- 0
+  } else {
+    k <- min(which(x > cc))                    # x[k - 1] <= c < x[k]
+    lo <- ((k - 2) + (cc - x[k - 1]) / (x[k] - x[k - 1])) / (n - 1)
+  }
+  min(1, 2 * min(hi, lo))
+}
+
 # Reduce closure payload before parallel export by keeping only symbols
 # that the function body actually references from its local frame.
 trim_closure_env <- function(fun) {
@@ -3830,8 +3871,12 @@ fect_boot <- function(
 
     ## p-values for ci.method = "basic", one per row of `boots` (or one for a
     ## vector), to go with the basic intervals. Case-bootstrap draws are
-    ## centered at the estimate: get.pvalue() is twice the smaller share of
-    ## the draws on either side of zero. Parametric draws of a treatment
+    ## centered at the estimate: the p-value is the one dual to the basic
+    ## interval, .pvalue_basic_dual() (top of this file): p < alpha exactly
+    ## when 0 is outside the (1 - alpha) basic interval. (Before 2.4.7 it
+    ## was get.pvalue(), the percentile rule, which goes with the
+    ## percentile interval and can disagree with the basic interval printed
+    ## beside it.) Parametric draws of a treatment
     ## effect are simulated with no effect, so they are centered at zero,
     ## not at the estimate: the p-value is twice the smaller share of the
     ## centered draws (the draws minus their mean) at or beyond the estimate,
@@ -3841,13 +3886,16 @@ fect_boot <- function(
     ## interval excludes zero, up to the resolution of the draws. (Before
     ## 2.4.7 get.pvalue() was applied to the parametric draws as they are,
     ## which gives about 1 whatever the estimate.) Coefficient draws are
-    ## centered at the estimate in both schemes and keep get.pvalue().
+    ## centered at the estimate in both schemes: a bootstrap fit uses
+    ## .pvalue_basic_dual() for them too; a parametric fit keeps get.pvalue().
     .pvalue.basic <- function(theta, boots) {
       if (!.is_param) {
         if (is.matrix(boots)) {
-          return(apply(boots, 1, get.pvalue))
+          return(vapply(seq_len(nrow(boots)), function(k) {
+            .pvalue_basic_dual(theta[k], boots[k, ])
+          }, numeric(1)))
         }
-        return(get.pvalue(boots))
+        return(.pvalue_basic_dual(theta, boots))
       }
       null.p <- function(th, b) get.pvalue(b - mean(b, na.rm = TRUE) - th)
       if (is.matrix(boots)) {
@@ -4474,7 +4522,11 @@ fect_boot <- function(
         pvalue.beta <- (1 - pnorm(abs(beta / se.beta))) * 2
       } else {
         CI.beta <- .basic_ci_shifted(c(beta), beta.boot, alpha, .is_param)
-        pvalue.beta <- apply(beta.boot, 1, get.pvalue)
+        pvalue.beta <- if (.is_param) {
+          apply(beta.boot, 1, get.pvalue)
+        } else {
+          .pvalue.basic(c(beta), beta.boot)
+        }
       }
       est.beta <- cbind(c(beta), se.beta, CI.beta, pvalue.beta)
       colnames(est.beta) <- c("Coef", "S.E.", "CI.lower", "CI.upper", "p.value")
@@ -4681,11 +4733,11 @@ fect_boot <- function(
                 subgroup.atts.off - subgroup.se.att.off * qnorm(1 - alpha / 2),
                 subgroup.atts.off + subgroup.se.att.off * qnorm(1 - alpha / 2)
               )
-              subgroup.pvalue.att.off <- apply(
-                subgroup.atts.off.boot,
-                1,
-                get.pvalue
-              )
+              ## the normal p-value, as in the other normal branches
+              ## (before 2.4.7 the percentile rule, get.pvalue())
+              subgroup.pvalue.att.off <- (1 -
+                pnorm(abs(subgroup.atts.off / subgroup.se.att.off))) *
+                2
               subgroup.att.off.bound <- cbind(
                 subgroup.atts.off - subgroup.se.att.off * qnorm(1 - alpha),
                 subgroup.atts.off + subgroup.se.att.off * qnorm(1 - alpha)
