@@ -711,8 +711,14 @@ estimand <- function(fit,
 
     ## ci.method = NULL triggers per-type defaults (v2.4.2+).
     ## See statsclaw-workspace/fect/ref/v242-vartype-cimethod-design.md.
+    ## A jackknife fit supports only "normal" (see
+    ## .check_jackknife_ci_method()), so that is its default for every type
+    ## (before 2.4.7 the per-type default stopped for "att.cumu", "aptt" and
+    ## "log.att" on jackknife fits).
     if (is.null(ci.method)) {
-        ci.method <- switch(type,
+        ci.method <- if (is.list(fit) && isTRUE(fit$vartype == "jackknife")) {
+            "normal"
+        } else switch(type,
             "att"      = "normal",      ## matches what fit$est.att uses (Wald: theta +- z*SE)
             "att.cumu" = "basic",       ## reflected pivot CI (Davison-Hinkley 1997 §5.2.1; boot::boot.ci(type = "basic"))
             "aptt"     = "bca",         ## ratio: bootstrap-bias + skew -> BCa (Efron 1987)
