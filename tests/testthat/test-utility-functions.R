@@ -243,7 +243,7 @@ test_that("att.cumu and effect produce valid cumulative ATT", {
 
 test_that("effect(plot = TRUE) draws without warnings", {
   ## ggplot2 3.4.0 deprecated `size` for lines; effect() used it for the
-  ## interval lines and the count bars' borders until 2.4.6 (seen as a
+  ## interval lines and the count bars' borders until 2.4.7 (seen as a
   ## warning in gsynth's test suite).
   ## (The deprecation reaches testthat as a warning but does not fail
   ## expect_no_warning(), so warnings are collected by hand.)

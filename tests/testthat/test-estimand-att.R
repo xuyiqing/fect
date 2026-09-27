@@ -90,8 +90,8 @@ test_that("A.4: invalid by raises a useful error", {
   fit <- .fit_canonical()
   expect_error(
     fect::estimand(fit, "att", "nope"),
-    "user-column",
-    fixed = FALSE
+    "with by = \"nope\" is not available in this release",
+    fixed = TRUE
   )
 })
 

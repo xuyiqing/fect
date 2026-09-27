@@ -10,10 +10,10 @@
          binary = FALSE, QR = FALSE, normalize = FALSE)
 }
 \arguments{
-  \item{formula}{an object of class "formula": a symbolic description of the model to be fitted.}
+  \item{formula}{an object of class "formula" naming the outcome and the covariates, e.g. \code{Y ~ X1 + X2}. Every term must be a bare column name of \code{data}; other terms, such as \code{log(Y)}, \code{factor(g)} or \code{D:time}, stop with a message that names them. Create such variables as columns first. Intercept terms (\code{+ 0}, \code{- 1}) are accepted and ignored. With a formula, give the covariates in the formula; also passing \code{X} stops.}
   \item{data}{a data frame.}
   \item{Y}{outcome variable.}
-  \item{X}{time-varying covariates.}
+  \item{X}{time-varying covariates: a character vector of column names, used when no \code{formula} is given. A covariate absorbed by the model stops with a message that says what absorbs it: one that does not vary over time within units (with unit fixed effects), one that does not vary across units within periods (with time fixed effects), one that does not vary at all (without fixed effects; it is absorbed by the intercept), or one that is the sum of a unit-level and a period-level variable (with unit and time fixed effects).}
   \item{W}{weights.}
   \item{index}{a two-element string vector specifying the unit (group) and time indicators.}
   \item{r}{an integer specifying the number of factors.}
@@ -23,7 +23,7 @@
   \item{seed}{random seed.}
   \item{tol}{tolerance for EM algorithm.}
   \item{max_iteration}{max number of EM iterations.}
-  \item{binary}{logical flag for a probit link (not fully supported here).}
+  \item{binary}{Not supported in this version: \code{binary = TRUE} stops with a message. Leave it at \code{FALSE} (the default).}
   \item{QR}{logical flag for QR-based factor analysis in probit model (not fully supported).}
   \item{normalize}{logical; if \code{TRUE}, scales outcome/covariates.}
 }

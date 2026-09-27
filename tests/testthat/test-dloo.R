@@ -450,7 +450,7 @@ test_that("dloo is invariant to how the time index is typed", {
 ## ---- covariates -------------------------------------------------------------
 ## With covariates the unit and time effects still cancel in the DiD, but
 ## X beta does not. The overlay re-estimates beta for each (cohort, tested
-## period) on the pool the re-fit uses (R/dloo.R). Before 2.4.6 it used the
+## period) on the pool the re-fit uses (R/dloo.R). Before 2.4.7 it used the
 ## full-sample beta, so a control cell in a late period (outside every pool)
 ## moved the pre-treatment placebos.
 

@@ -44,7 +44,10 @@ print.fect <- function(x,
                          x$group.fe)
     cat("\nEstimator:    ", x$method, "\n", sep = "")
     cat("Fixed effects: ", fe.line, "\n", sep = "")
-    if (!is.null(x$cl.label)) {
+    ## The parametric bootstrap and the jackknife ignore cl, so the SEs of
+    ## such fits are not clustered; say so only when they are.
+    if (!is.null(x$cl.label) &&
+        !isTRUE(x$vartype %in% c("parametric", "jackknife"))) {
         cat("Cluster SE:   ", x$cl.label, "\n", sep = "")
     }
 

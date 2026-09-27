@@ -653,7 +653,15 @@
             } else {
                 cm <- .basic_ci_shifted(att, boot, alpha, is_param)
                 ci.lower <- cm[, 1]; ci.upper <- cm[, 2]
-                p.value  <- apply(boot, 1, .boot_pvalue)
+                ## bootstrap: the p-value dual to the basic interval, as
+                ## fect_boot() gives est.att (2.4.7)
+                p.value  <- if (is_param) {
+                    apply(boot, 1, .boot_pvalue)
+                } else {
+                    vapply(seq_along(att), function(k) {
+                        .pvalue_basic_dual(att[k], boot[k, ])
+                    }, numeric(1))
+                }
                 bm <- .basic_ci_shifted(att, boot, 2 * alpha, is_param)
                 bd.lower <- bm[, 1]; bd.upper <- bm[, 2]
             }

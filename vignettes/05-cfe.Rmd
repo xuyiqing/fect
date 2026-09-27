@@ -183,7 +183,7 @@ plot(out.cfe.z,
      main = "CFE with Z = L1 — Placebo Test")
 ```
 
-By allowing $L_1$'s coefficient to vary across time periods, CFE approximates the true interactive structure $L_{1,i} \cdot F_{1,t}$. The placebo test shows improvement. However, there is still a second latent factor $L_2 \cdot F_2$ that is not captured --- we will address this in Section 4.5.
+By allowing $L_1$'s coefficient to vary across time periods, CFE approximates the true interactive structure $L_{1,i} \cdot F_{1,t}$. The placebo test shows improvement. However, there is still a second latent factor $L_2 \cdot F_2$ that is not captured --- we will address this in @sec-cfe-factors.
 
 ::: {.callout-note appearance="simple"}
 The `Z` argument takes a character vector of column names for time-invariant covariates. The `gamma` argument specifies a column that defines the time grouping for the $Z$ coefficients. Using `time` as the gamma variable gives the most flexible specification; coarser groupings (e.g., early/middle/late) reduce the number of parameters.
@@ -291,7 +291,7 @@ The `Q.type` argument accepts `"linear"`, `"quadratic"`, `"cubic"`, or `"bspline
 
 ------------------------------------------------------------------------
 
-## CFE with factors
+## CFE with factors {#sec-cfe-factors}
 
 Sometimes the data contains both observed structure (known covariates whose effects vary over time) and unobserved latent factors. The CFE estimator can combine $Z'\gamma$ and interactive fixed effects $\lambda' f$ in a single model.
 
@@ -301,7 +301,7 @@ We use `simdata`, which has two latent factors ($L_1, F_1$ and $L_2, F_2$). We p
 simdata$gamma_t <- simdata$time
 ```
 
-### Model comparison via `fect_mspe`
+### Model comparison via `fect_mspe` {#sec-cfe-mspe}
 
 We fit four models and compare their out-of-sample prediction accuracy:
 
@@ -370,6 +370,8 @@ The placebo test passes, confirming that the CFE model with one observed loading
 
 ::: {.callout-note appearance="simple"}
 `fect_mspe()` compares out-of-sample prediction accuracy across different model specifications. A lower MSPE indicates better counterfactual prediction. This is useful for selecting among CFE configurations when the true model is unknown.
+
+Since version 2.4.7, `fect_mspe()` scores the model's full prediction at each held-out cell, including the covariates. Earlier versions left the covariates out, so the scores of models with covariates, such as the four above, differ from those of earlier versions.
 :::
 
 ------------------------------------------------------------------------
@@ -454,4 +456,4 @@ Block CV (`cv.method = "block"`) is also available as a drop-in replacement; see
 | `r` | integer or vector | Number of latent factors; use `c(0, 5)` with `CV = TRUE` to select |
 | `force` | character | Additive FE: `"none"`, `"unit"`, `"time"`, `"two-way"` |
 
-The CFE estimator combines all these components into a single unified model. Each component relaxes a specific assumption about the data-generating process. In practice, researchers should use `fect_mspe()` (Section 4.5) to compare specifications and placebo tests to validate the chosen model.
+The CFE estimator combines all these components into a single unified model. Each component relaxes a specific assumption about the data-generating process. In practice, researchers should use `fect_mspe()` (@sec-cfe-mspe) to compare specifications and placebo tests to validate the chosen model.

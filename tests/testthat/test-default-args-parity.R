@@ -2,7 +2,7 @@
 ## every argument on to fect.default(). A call that names the variables as
 ## strings (Y = "y", D = "d", ...) goes straight to fect.default(), and
 ## UseMethod() does not carry the generic's defaults along. So fect.default()
-## must declare the same defaults itself. Before 2.4.6 it did not: cv.method was
+## must declare the same defaults itself. Before 2.4.7 it did not: cv.method was
 ## "all_units" (block CV) instead of "rolling" (the default since v2.3.0), and
 ## nlambda was 0 instead of 10, so method = "mc" without lambda stopped with
 ## '"nlambda" option misspecified.'
@@ -18,7 +18,7 @@ skip_on_cran()
 
 ## Two factors (the second one weaker), one covariate, staggered adoption.
 ## With seed = 10, block CV selects r = 1 and rolling CV selects r = 2 (as of
-## 2.4.6), so a call that silently fell back to block CV changes r.cv.
+## 2.4.7), so a call that silently fell back to block CV changes r.cv.
 .parity_panel <- function(seed = 10, N = 30, TT = 16, Ntr = 10, T0 = 10) {
     set.seed(seed)
     alpha <- rnorm(N)
@@ -43,7 +43,7 @@ test_that("fect(), fect.formula() and fect.default() declare the same defaults",
 test_that("formula and non-formula calls use the same CV method and select the same r", {
     d <- .parity_panel()
     ## Seed the session right before each call so both calls draw the same CV
-    ## folds. (Passing seed = 1 does the same since 2.4.6; set.seed() keeps
+    ## folds. (Passing seed = 1 does the same since 2.4.7; set.seed() keeps
     ## this test about calling styles only.)
     set.seed(1)
     out_formula <- suppressMessages(fect(

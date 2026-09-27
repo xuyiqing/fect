@@ -22,9 +22,9 @@ effect(
 \arguments{
   \item{x}{A \code{fect} object containing treatment effect estimates and bootstrap results.}
 
-  \item{cumu}{Logical. If \code{TRUE} (default), calculates cumulative treatment effects. If \code{FALSE}, calculates period-specific average treatment effects.}
+  \item{cumu}{Logical. If \code{TRUE} (default), calculates cumulative treatment effects: the running sum of the per-period average effects. If \code{FALSE}, calculates period-specific average treatment effects.}
 
-  \item{id}{Character vector or NULL. Unit identifiers to include in the analysis. If \code{NULL} (default), all treated units are included.}
+  \item{id}{Character vector or NULL. Unit identifiers to include in the analysis; one unit is fine. If \code{NULL} (default), all treated units are included.}
 
   \item{period}{Numeric vector of length 2 specifying the time window \code{c(start, end)} for effect calculation. If \code{NULL}, uses the maximum possible window based on the data.}
 
@@ -46,19 +46,19 @@ effect(
 
   2. Calculates relative time to treatment for each unit.
 
-  3. If \code{cumu = TRUE}, computes cumulative effects by summing average effects up to each period.
+  3. If \code{cumu = TRUE}, computes cumulative effects by summing average effects up to each period. Each period's average effect is the mean over the selected treated units' cells at that event time, so the cumulative effect at event time \eqn{k} is the sum of these averages from \code{period[1]} to \eqn{k}. For a fit made with \code{W} or \code{W.agg}, each period's average effect, with or without \code{cumu}, is weighted by those weights, as \code{x$att} is. \code{att.cumu(x, weighted = TRUE)} gives the count-weighted version that \code{fect} used before version 2.4.7; it differs when the number of treated cells changes across event times.
 
-  4. Performs bootstrap analysis to estimate uncertainty (standard errors, confidence intervals, and p-values).
+  4. Uses the replicates (bootstrap, parametric or jackknife) to estimate uncertainty (standard errors, confidence intervals, and p-values).
 
-  The function supports different inference methods (bootstrap, jackknife, parametric) and adjusts calculations accordingly.
+  The function supports different inference methods (bootstrap, jackknife, parametric) and adjusts calculations accordingly. The method is read from the fitted object (\code{x$vartype}), not from the call. For bootstrap fits, the confidence interval is formed by the 2.5\% and 97.5\% quantiles of the replicate estimates and the p-value from the share of replicates on each side of zero. For parametric and jackknife fits, the interval is the estimate plus or minus the normal critical value times the SE, with the two-sided normal p-value. The jackknife SE is the jackknife standard error of the \eqn{N} leave-one-unit-out estimates \eqn{\theta_j}, \eqn{\sqrt{(N-1)/N \sum_j (\theta_j - \bar\theta)^2}}{sqrt((N - 1)/N * sum((theta_j - mean(theta))^2))}, as for the fit's own SEs. Parametric replicates are simulated under no treatment effect, so their quantiles are not an interval for the estimate.
 
-  Note: The function requires bootstrap results in the input \code{fect} object (\code{keep.sims = TRUE} must be set when fitting the model).
+  Note: The function requires bootstrap results in the input \code{fect} object (\code{keep.sims = TRUE} must be set when fitting the model). It returns \code{NULL}, with a warning, for panels with treatment reversals.
 }
 
 \value{
-  Returns a list containing:
-  \item{eff}{Vector of point estimates for cumulative or average treatment effects.}
-  \item{est.eff}{Matrix containing the following columns:
+  Returns the input \code{fect} object with two added elements:
+  \item{effect.est.avg}{Vector of point estimates for cumulative or average treatment effects, one per period in \code{period}.}
+  \item{effect.est.att}{Matrix with one row per period and the following columns:
     \itemize{
       \item ATT: Point estimates
       \item S.E.: Standard errors
@@ -73,27 +73,27 @@ effect(
   The function will stop with an error if:
   \itemize{
     \item No bootstrap results are available in the input object
-    \item The panel contains treatment reversals
     \item The specified ending period exceeds the maximum available period
   }
+  For a panel with treatment reversals it warns and returns \code{NULL}.
 }
 
 \examples{
 \donttest{
 library(fect)
-data(simdata)
-fit <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+data(simgsynth) # no treatment reversals
+fit <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"),
             method = "fe", force = "two-way", se = TRUE, nboots = 50,
             parallel = FALSE, keep.sims = TRUE)
 
 # Cumulative effects for all treated units
 results <- effect(fit)
-head(results$est.catt)
+head(results$effect.est.att)
 
 # Period-specific effects for two treated units over event times 1 to 4
-ids <- head(unique(simdata$id[simdata$D == 1]), 2)
+ids <- head(unique(simgsynth$id[simgsynth$D == 1]), 2)
 results_specific <- effect(fit, cumu = FALSE, id = ids, period = c(1, 4))
-head(results_specific$est.catt)
+results_specific$effect.est.att
 }
 }
 

@@ -182,6 +182,8 @@ Rolling CV imposes essentially no penalty in the no-leakage regime and recovers 
 
 The standalone `r.cv.rolling()` helper exists for users who want the per-fold MSPE matrix and other diagnostics returned in addition to `r.cv` --- but for normal use, the dispatcher path above is the recommended entry point.
 
+Since v2.4.7, `r.cv.rolling()` and `fect_mspe()` score the model's full prediction at each held-out cell: the intercept, the fixed effects, the covariates and the factors. Their scores, and the `r` that `r.cv.rolling()` selects, can differ from earlier versions. A held-out unit with few periods before the held-out block adds large errors, so a larger `min.T0` (for example 10 instead of the default 5) gives a steadier choice.
+
 ## Utility Functions
 
 In addition to the main `fect()` function, the package provides several utility functions:
@@ -199,7 +201,7 @@ In addition to the main `fect()` function, the package provides several utility 
 
 ## Notes
 
--   Most methods share core inputs (`Y`, `D`, `X`, `data`, `index`).
+-   Most methods share core inputs (`Y`, `D`, `X`, `data`, `index`). Give the variables either in a formula such as `Y ~ D + X1 + X2`, which takes bare column names only, or as column names in `Y`, `D` and `X`, not both. Covariates must be numeric (see [Chapter @sec-fect]).
 
 -   Method `cfe` allows either "jackknife" or "bootstrap" for uncertainty estimates.
 

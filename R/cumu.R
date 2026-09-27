@@ -3,7 +3,7 @@
 ##---------------------------------------##
 att.cumu <- function(x, ## a fect object
                      period = NULL, ## range, length = 2
-                     weighted = TRUE, ## weighted cumulative effect
+                     weighted = FALSE, ## FALSE: running sum of the per-period ATTs; TRUE: count-weighted (pre-2.4.7)
                      alpha = 0.05,
                      type = "on", ## switch on or switch off
                      plot = FALSE
@@ -28,13 +28,17 @@ att.cumu <- function(x, ## a fect object
         stop("period[1] should be smaller than period[2].\n")
     }
 
+    if (!is.logical(weighted) || length(weighted) != 1L || is.na(weighted)) {
+        stop("\"weighted\" must be TRUE or FALSE.", call. = FALSE)
+    }
+
     ## start point
     se <- 0
     time <- x$time
     att <- x$att
     est.att <- x$est.att
 
-    if (!is.null(est.att) & sum(abs(c(x$att.boot)),na.rm = TRUE) != 0) {
+    if (!is.null(est.att) && sum(abs(c(x$att.boot)),na.rm = TRUE) != 0) {
         se <- 1
     }
 
@@ -59,14 +63,19 @@ att.cumu <- function(x, ## a fect object
         colnames(cumu.att) <- c("start", "end", "catt")
     }
     else if (se == 1) {
+        ## every row, the first included, from att.cumu.sub(), so all rows
+        ## follow one interval rule (the one effect() uses). Before 2.4.7
+        ## row 1 was copied from est.att, whose interval follows the fit's
+        ## ci.method (normal by default), while the other rows of a
+        ## bootstrap fit use the percentiles of the draws.
         cumu.att <- matrix(NA, pl, 7)
-        cumu.att[1, c(1,2)] <- p.start
-        cumu.att[1, 3] <- att[which(time == p.start)]
-        cumu.att[1, 4:7] <- est.att[which(time == p.start), c("S.E.", "CI.lower", "CI.upper", "p.value")]
         colnames(cumu.att) <- c("start", "end", "catt", "S.E.", "CI.lower", "CI.upper", "p.value")
     }
 
-    for(i in 2:pl) {
+    ## seq_len(pl): a one-period window (pl = 1) has only row 1 (before
+    ## 2.4.7, 2:pl ran over 2 and 1 and stopped).
+    for (i in seq_len(pl)) {
+        if (se == 0 && i == 1) next
         cumu.att[i, ] <- att.cumu.sub(x, c(p.start, p.start + i - 1), weighted, alpha, type)
     }
 
@@ -101,7 +110,7 @@ att.cumu <- function(x, ## a fect object
 
 att.cumu.sub <- function(x, ## a fect object
                          period, ## range, length = 2
-                         weighted = TRUE, ## weighted cumulative effect
+                         weighted = FALSE, ## see att.cumu()
                          alpha = 0.05, 
                          type = "on" ## switch on or switch off
                         ) {
@@ -144,23 +153,41 @@ att.cumu.sub <- function(x, ## a fect object
     att.pos <- which(time>=period[1]&time<=period[2])
     att <- att[att.pos]
     count <- count[att.pos]
+    ok <- !is.na(att) & !is.na(count)   ## event times that enter the estimate
     rm.pos1 <- which(is.na(att))
     rm.pos2 <- which(is.na(count))
     if (NA %in% att | NA %in% count) {
         att <- att[-c(rm.pos1, rm.pos2)]
         count <- count[-c(rm.pos1, rm.pos2)]
     }
-    catt <- sum(att*count*(length(count)/sum(count)))
+    if (weighted) {
+        ## count-weighted: L times the mean over all treated cells of the
+        ## window's L event times (fect's cumulative ATT before 2.4.7)
+        catt <- sum(att*count*(length(count)/sum(count)))
+    } else {
+        ## running sum of the per-period ATTs
+        catt <- sum(att)
+    }
 
 
     if (se == 1) {
-        att.boot <- as.matrix(att.boot[att.pos,])
-        count.boot <- as.matrix(count.boot[att.pos,])
+        ## drop = FALSE: a one-period window keeps its 1 x nboots shape
+        ## (as.matrix() of the dropped row made it nboots x 1, so the
+        ## replicate "sum" was the sum of all draws)
+        att.boot <- att.boot[att.pos, , drop = FALSE]
+        count.boot <- count.boot[att.pos, , drop = FALSE]
         
         nboots <- dim(att.boot)[2]
         catt.boot <- rep(NA, nboots)
         
         for (i in 1:nboots) {
+            if (!weighted) {
+                ## this replicate's running sum over the same event times;
+                ## NA when it has no treated cell at one of them (dropped
+                ## by the na.rm below)
+                catt.boot[i] <- sum(att.boot[ok, i])
+                next
+            }
             att.sub <- att.boot[,i]
             count.sub <- count.boot[,i]
             rm.pos1 <- which(is.na(att.sub))
@@ -172,9 +199,27 @@ att.cumu.sub <- function(x, ## a fect object
             catt.boot[i] <- sum(att.sub*count.sub*(length(count.sub)/sum(count.sub)))*(pl)/(length(count.sub))
         }
 
-        catt.se <- sd(catt.boot, na.rm = TRUE)
-        catt.ci <- quantile(catt.boot, c(alpha/2, 1 - alpha/2), na.rm = TRUE)
-        catt.p <- get.pvalue(catt.boot)
+        if (isTRUE(x$vartype == "jackknife")) {
+            ## Jackknife replicates are leave-one-unit-out estimates, not
+            ## draws from the sampling distribution: their spread understates
+            ## the SE about sqrt(N - 1)-fold, and their quantiles and signs
+            ## are not a CI or a p-value. Use the jackknife SE (as for the
+            ## fit's own SEs) with the normal approximation.
+            catt.se <- .jackknife_se(catt, catt.boot)
+            catt.ci <- catt + c(-1, 1) * stats::qnorm(1 - alpha / 2) * catt.se
+            catt.p <- 2 * stats::pnorm(-abs(catt / catt.se))
+        } else if (isTRUE(x$vartype == "parametric")) {
+            ## Parametric draws are centred at 0 (simulated under no effect),
+            ## so their quantiles are not a CI for catt and their signs are
+            ## not a p-value. Use the normal approximation with their SE.
+            catt.se <- sd(catt.boot, na.rm = TRUE)
+            catt.ci <- catt + c(-1, 1) * stats::qnorm(1 - alpha / 2) * catt.se
+            catt.p <- 2 * stats::pnorm(-abs(catt / catt.se))
+        } else {
+            catt.se <- sd(catt.boot, na.rm = TRUE)
+            catt.ci <- quantile(catt.boot, c(alpha/2, 1 - alpha/2), na.rm = TRUE)
+            catt.p <- get.pvalue(catt.boot)
+        }
     }
   
     if (se == 0) {
@@ -187,6 +232,21 @@ att.cumu.sub <- function(x, ## a fect object
   
     return(result)
 } 
+
+## Jackknife standard error of `est` from its leave-one-unit-out replicates
+## `reps` (Tukey's formula, as in jackknifed() in R/boot.R, which gives the
+## fit's own jackknife SEs): the pseudo-values B * est - (B - 1) * reps over
+## the finite replicates, B = length(reps); SE = sqrt(var(pseudo) / n), n the
+## number of finite replicates. NA with fewer than two finite replicates.
+.jackknife_se <- function(est, reps) {
+    B <- length(reps)
+    ok <- is.finite(reps)
+    if (sum(ok) < 2L || !is.finite(est)) {
+        return(NA_real_)
+    }
+    pseudo <- B * est - (B - 1) * reps[ok]
+    sqrt(stats::var(pseudo) / sum(ok))
+}
 
 ##############################
 ##   equivalence test       ##

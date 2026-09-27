@@ -38,9 +38,11 @@ extra grouping fixed-effect columns forwarded to the inner
 `time.component.from = "notyettreated"`), `"gsynth"` (GSC,
 internally `time.component.from = "nevertreated"`), or `"cfe"`
 (Complex Fixed Effects, internally
-`time.component.from = "notyettreated"`). All three paths populate
-`Y.ct.full` at masked positions, so MSPE scoring works uniformly.
-For CFE, rolling CV picks `r` only; CFE-specific arguments
+`time.component.from = "notyettreated"`). MSPE is scored with the
+model's full prediction at the held-out cells (the intercept, unit
+and time effects, covariates times their coefficients, factors and
+CFE terms); a held-out cell whose covariates are missing in `data` is
+not scored. For CFE, rolling CV picks `r` only; CFE-specific arguments
 (`Z`, `gamma`, `Q`, `Q.type`, `kappa`, extra index columns) are
 forwarded via `...` and held fixed at their user-supplied values.}
 
@@ -77,7 +79,10 @@ with `cv.prop * n_eligible * cv.nobs`.}
 (default), `"min"`, or `"1pct"`.}
 
 \item{min.T0}{Minimum observations required strictly before the
-anchor. Sets the lower bound on valid anchor positions. Default 5.}
+anchor. Sets the lower bound on valid anchor positions. Default 5.
+A held-out unit's loadings are fitted to its observations before the
+held-out block; with few of them the predictions are noisy, and a
+larger `min.T0` gives a steadier choice of `r`.}
 
 \item{force}{One of `"none"`, `"unit"`, `"time"`, `"two-way"`. Default
 `"unit"`.}
@@ -114,8 +119,8 @@ fold's training set excludes `t* - cv.buffer, ..., t* - 1` (buffer),
 `t*, ..., t* + cv.nobs - 1` (the held-out, scored block), and
 `t* + cv.nobs, ..., end_of_eligible(t)` (rolling-window future drop;
 for treated units, `end_of_eligible` is the cell strictly before
-treatment onset). MSPE is scored at the held-out block only and
-averaged across folds.
+treatment onset). MSPE is scored at the held-out block only, with the
+model's full prediction there, and averaged across folds.
 }
 \details{
 Per-fold unit sampling is required: masking every eligible unit at

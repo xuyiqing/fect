@@ -31,19 +31,99 @@ fect_mspe <- function(
     use_rolling <- (cv.method == "rolling")
     .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
-    ## ---- helper functions (unchanged) ---- ##
+    ## ---- helper functions ---- ##
+    ## Where the expressions of a fit's stored call (data, index, formula
+    ## and the other arguments) are evaluated: the frame fect_mspe() was
+    ## called from, then, for a fit made with a formula, the formula's
+    ## environment (where the fit was made). Before 2.4.7 a fit made
+    ## without a formula had them evaluated inside fect_mspe(): a data frame
+    ## local to the caller's function was not found, and a name such as `k`
+    ## took fect_mspe()'s own value.
+    .call_envs <- function(out_obj) {
+        envs <- list(caller_env)
+        fo <- out_obj[["formula", exact = TRUE]]
+        if (inherits(fo, "formula") && is.environment(environment(fo)) &&
+            !identical(environment(fo), caller_env)) {
+            envs <- c(envs, list(environment(fo)))
+        }
+        envs
+    }
+    ## `accept`: for the data, a value that is not a data frame (e.g. the
+    ## function stats::df or utils::data found under the name `df` or
+    ## `data` where fect_mspe() is called) is skipped and the next
+    ## environment is tried.
+    .eval_call_arg <- function(expr, envs, what, accept = NULL) {
+        res <- list(ok = FALSE, msg = "")
+        for (e in envs) {
+            res <- tryCatch(list(ok = TRUE, value = eval(expr, envir = e)),
+                            error = function(cond) {
+                                list(ok = FALSE, msg = conditionMessage(cond))
+                            })
+            if (isTRUE(res$ok)) {
+                if (is.null(accept) || isTRUE(accept(res$value))) {
+                    return(res$value)
+                }
+                res <- list(ok = FALSE, msg = paste0(
+                    "`", paste(deparse(expr), collapse = " "),
+                    "` is not a data frame (it is ",
+                    if (is.function(res$value)) "a function" else
+                        paste0("of class \"", class(res$value)[1], "\""),
+                    ")"))
+            }
+        }
+        stop("fect_mspe() cannot evaluate `", what, "` of the fit's call: ",
+             res$msg, ". Call fect_mspe() where the objects that the call ",
+             "names are visible.", call. = FALSE)
+    }
+    ## The function that refits the model: fect() for a fit made by fect();
+    ## for a fit made by another function that stores its own call (gsynth()
+    ## does), that function, so the refit is the fit's own model, with that
+    ## function's defaults and argument names. Before 2.4.7 such a call was
+    ## replayed into fect(): a default gsynth() fit was refitted with fect's
+    ## default method = "fe", and gsynth-only arguments (e.g. `inference`)
+    ## stopped the refit.
+    .refit_fun <- function(out_obj) {
+        fn <- out_obj$call[[1]]
+        nm <- if (is.name(fn)) {
+            as.character(fn)
+        } else if (is.call(fn) && length(fn) == 3L &&
+                   as.character(fn[[1]]) %in% c("::", ":::")) {
+            as.character(fn[[3]])
+        } else {
+            ""
+        }
+        if (nm %in% c("fect", "fect.formula", "fect.default")) {
+            return(fect)
+        }
+        f <- if (is.name(fn)) {
+            get0(as.character(fn), envir = caller_env, mode = "function")
+        } else {
+            tryCatch(eval(fn, envir = caller_env), error = function(e) NULL)
+        }
+        if (!is.function(f)) {
+            stop("fect_mspe() refits each model with the function that made ",
+                 "it", if (nzchar(nm)) paste0(", ", nm, "(),") else "",
+                 " which cannot be found here. Load its package and try ",
+                 "again.", call. = FALSE)
+        }
+        f
+    }
     .build_rerun_args <- function(out_obj, formula_obj, data_obj, index_obj, caller_env) {
-        formula_env <- environment(out_obj$call$formula)
-        if (is.null(formula_env)) formula_env <- caller_env
+        envs <- .call_envs(out_obj)
         call_args <- as.list(out_obj$call)[-1]
         rerun_args <- list(
             formula = formula_obj,
             data = data_obj,
             index = index_obj
         )
-        arg_names <- setdiff(names(call_args), c("", "formula", "data", "index"))
+        ## The refit always passes a formula, which carries Y, D and the
+        ## covariates, so the call's own Y/D/X are not forwarded: fect()
+        ## stops when X is given together with a formula (a fit made with
+        ## Y = , D = , X = strings has all three in its call).
+        arg_names <- setdiff(names(call_args),
+                             c("", "formula", "data", "index", "Y", "D", "X"))
         for (nm in arg_names) {
-            rerun_args[[nm]] <- eval(call_args[[nm]], envir = formula_env, enclos = caller_env)
+            rerun_args[[nm]] <- .eval_call_arg(call_args[[nm]], envs, nm)
         }
         rerun_args
     }
@@ -221,12 +301,17 @@ fect_mspe <- function(
                 stop("Each out.fect must provide Y and D matrices.")
             }
 
-            formula_env_i <- environment(out_i$call$formula)
-            if (is.null(formula_env_i)) formula_env_i <- caller_env
-            data_i <- eval(out_i$call$data, envir = formula_env_i, enclos = caller_env)
-            idx_i <- eval(out_i$call$index, envir = formula_env_i, enclos = caller_env)
+            envs_i <- .call_envs(out_i)
+            refit_i <- .refit_fun(out_i)
+            ## the data: the data frame a gsynth() fit stores, else the call's
+            data_i <- out_i[["data", exact = TRUE]]
+            if (!is.data.frame(data_i)) {
+                data_i <- .eval_call_arg(out_i$call$data, envs_i, "data",
+                                         accept = is.data.frame)
+            }
+            idx_i <- .eval_call_arg(out_i$call$index, envs_i, "index")
             formula_obj_i <- tryCatch(
-                eval(out_i$call$formula, envir = formula_env_i, enclos = caller_env),
+                .eval_call_arg(out_i$call$formula, envs_i, "formula"),
                 error = function(e) NULL
             )
             if (!inherits(formula_obj_i, "formula")) {
@@ -275,7 +360,7 @@ fect_mspe <- function(
                     ## already fired when the user fit the original
                     ## model; emitting them once per model x fold
                     ## (= up to N_models * k times) is noise.
-                    out_new <- suppressMessages(do.call(fect, rerun_args))
+                    out_new <- suppressMessages(do.call(refit_i, rerun_args))
 
                     ## collect residuals at estCV positions
                     ## est_pos are flat column-major indices into the
@@ -297,9 +382,21 @@ fect_mspe <- function(
                     valid_map <- !is.na(rr_new) & !is.na(cc_new)
 
                     pred_vals <- rep(NA_real_, length(est_pos))
-                    ## Use Y.ct.full if available, fall back to Y.ct
-                    yct_new <- if (!is.null(out_new$Y.ct.full)) out_new$Y.ct.full else out_new$Y.ct
-                    pred_vals[valid_map] <- yct_new[cbind(rr_new[valid_map], cc_new[valid_map])]
+                    ## The model's full prediction at the hidden cells,
+                    ## with their covariates from data_i (see
+                    ## .fect_heldout_pred()). Before 2.4.7 this read the
+                    ## refit's Y.ct.full, which leaves out X times beta
+                    ## there and, on the never-treated path, the fixed
+                    ## effects.
+                    if (any(valid_map)) {
+                        pos_i <- rr_i + (cc_i - 1L) * TT
+                        est_data_rows <- match(est_pos[valid_map], pos_i)
+                        pred_vals[valid_map] <- .fect_heldout_pred(
+                            out_new,
+                            rr_new[valid_map], cc_new[valid_map],
+                            data_i[est_data_rows, , drop = FALSE]
+                        )
+                    }
                     ## y_true_i uses the original coordinate system (always TT x N)
                     actual_vals <- y_true_i[cbind(est_row, est_col)]
                     valid_score <- valid_map & !is.na(pred_vals) & !is.na(actual_vals)

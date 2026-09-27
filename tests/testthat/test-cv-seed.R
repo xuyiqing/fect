@@ -1,4 +1,4 @@
-## `seed` controls the cross-validation fold draws (fixed in 2.4.6).
+## `seed` controls the cross-validation fold draws (fixed in 2.4.7).
 ## Before the fix, fect.default() called set.seed(seed) only when se = TRUE or
 ## permute = TRUE. With se = FALSE the folds came from the session RNG, so two
 ## identical calls with the same seed could give different CV tables, and on

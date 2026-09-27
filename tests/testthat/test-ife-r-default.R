@@ -1,7 +1,7 @@
-## `r` defaults to NULL (since 2.4.6). For method = "ife" / "gsynth" a missing r
+## `r` defaults to NULL (since 2.4.7). For method = "ife" / "gsynth" a missing r
 ## means: cross-validate the number of factors over 0:5, as method = "mc" does
 ## for a missing lambda. With CV = FALSE and no r, fall back to r = 0 (FEct)
-## with a message. An explicit r = 0 is honoured silently. Before 2.4.6 the
+## with a message. An explicit r = 0 is honoured silently. Before 2.4.7 the
 ## default was r = 0, so method = "ife" without r silently ran the two-way FE
 ## model: the manual's own LOO example did (reader report, 2026-09-21).
 

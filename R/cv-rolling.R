@@ -16,8 +16,11 @@
 ## For treated units, eligible times are the pre-treatment observations
 ## only (post-treatment is the imputation target, never masked).
 ## Refits fect with the masked panel for each candidate `r`, scores
-## MSPE at the held-out positions via `fit$Y.ct.full`, and aggregates
-## across folds. Applies the requested `cv.rule` to pick `r.cv`.
+## MSPE at the held-out positions with the model's full prediction
+## (.fect_heldout_pred() in R/heldout-pred.R: intercept, unit and time
+## effects, covariates times their coefficients, factors and CFE terms),
+## and aggregates across folds. Applies the requested `cv.rule` to pick
+## `r.cv`.
 ##
 ## Closes the forward-leakage channel that the existing
 ## `cv.method = "all_units" / "treated_units"` (random contiguous-block
@@ -28,8 +31,8 @@
 ## Supports method = "ife" (IFE-EM, time.component.from = "notyettreated"),
 ## method = "gsynth" (GSC, time.component.from = "nevertreated"), and
 ## method = "cfe" (Complex Fixed Effects, time.component.from =
-## "notyettreated"). All three paths populate Y.ct.full at masked
-## positions, so MSPE scoring works uniformly. CFE-specific arguments
+## "notyettreated"). On all three paths MSPE is scored with the model's
+## full prediction at the held-out cells. CFE-specific arguments
 ## (Z, gamma, Q, Q.type, kappa, extra index columns) are forwarded to
 ## the inner fect() call via `...`. CFE rolling CV picks `r` only;
 ## the user holds non-`r` CFE components fixed at their spec.
@@ -46,8 +49,8 @@
 #' `t*, ..., t* + cv.nobs - 1` (the held-out, scored block), and
 #' `t* + cv.nobs, ..., end_of_eligible(t)` (rolling-window future drop;
 #' for treated units, `end_of_eligible` is the cell strictly before
-#' treatment onset). MSPE is scored at the held-out block only and
-#' averaged across folds.
+#' treatment onset). MSPE is scored at the held-out block only, with the
+#' model's full prediction there, and averaged across folds.
 #'
 #' Per-fold unit sampling is required: masking every eligible unit at
 #' the same time leaves no donor data at the masked time points and
@@ -71,9 +74,11 @@
 #'   `time.component.from = "notyettreated"`), `"gsynth"` (GSC,
 #'   internally `time.component.from = "nevertreated"`), or `"cfe"`
 #'   (Complex Fixed Effects, internally
-#'   `time.component.from = "notyettreated"`). All three paths populate
-#'   `Y.ct.full` at masked positions, so MSPE scoring works uniformly.
-#'   For CFE, rolling CV picks `r` only; CFE-specific arguments
+#'   `time.component.from = "notyettreated"`). MSPE is scored with the
+#'   model's full prediction at the held-out cells (the intercept, unit
+#'   and time effects, covariates times their coefficients, factors and
+#'   CFE terms); a held-out cell whose covariates are missing in `data` is
+#'   not scored. For CFE, rolling CV picks `r` only; CFE-specific arguments
 #'   (`Z`, `gamma`, `Q`, `Q.type`, `kappa`, extra index columns) are
 #'   forwarded via `...` and held fixed at their user-supplied values.
 #' @param r.max Largest candidate rank to evaluate. CV is run over
@@ -104,6 +109,9 @@
 #'   (default), `"min"`, or `"1pct"`.
 #' @param min.T0 Minimum observations required strictly before the
 #'   anchor. Sets the lower bound on valid anchor positions. Default 5.
+#'   A held-out unit's loadings are fitted to its observations before the
+#'   held-out block; with few of them the predictions are noisy, and a
+#'   larger `min.T0` gives a steadier choice of `r`.
 #' @param force One of `"none"`, `"unit"`, `"time"`, `"two-way"`. Default
 #'   `"unit"`.
 #' @param seed Optional integer base seed; per-fold seeds derive from
@@ -158,9 +166,9 @@ r.cv.rolling <- function(formula,
     cv.rule <- match.arg(cv.rule)
     method  <- match.arg(method)
     fect_method <- method
-    ## CFE on the notyettreated path also populates Y.ct.full at masked
-    ## cells, so MSPE scoring works uniformly. Only "gsynth" uses
-    ## the nevertreated factor estimation sample.
+    ## Only "gsynth" uses the nevertreated factor estimation sample;
+    ## "ife" and "cfe" use notyettreated. On every path the held-out cells
+    ## are scored with the full prediction (.fect_heldout_pred()).
     fect_tcf <- if (identical(method, "gsynth")) "nevertreated" else "notyettreated"
 
     r.max     <- as.integer(r.max);     if (r.max     < 0L) stop("r.max must be >= 0.")
@@ -341,14 +349,20 @@ r.cv.rolling <- function(formula,
             year_ord_int <- suppressWarnings(as.integer(year_ord))
             unit_match <- if (any(is.na(unit_ord_int))) unit_ord else unit_ord_int
             year_match <- if (any(is.na(year_ord_int))) year_ord else year_ord_int
-            Y_pred <- numeric(length(score_rows))
-            for (kk in seq_along(score_rows)) {
-                rr <- score_rows[kk]
-                ui <- match(data[[index[1L]]][rr], unit_match)
-                ti <- match(data[[index[2L]]][rr], year_match)
-                Y_pred[kk] <- if (!is.na(ui) && !is.na(ti)) {
-                    fit$Y.ct.full[ti, ui]
-                } else NA_real_
+            ## The model's full prediction at the held-out cells, with
+            ## their covariates from `data` (see .fect_heldout_pred()).
+            ## Before 2.4.7 this read fit$Y.ct.full, which leaves out X
+            ## times beta there and, for method = "gsynth", the fixed
+            ## effects.
+            ui <- match(data[[index[1L]]][score_rows], unit_match)
+            ti <- match(data[[index[2L]]][score_rows], year_match)
+            ok <- !is.na(ui) & !is.na(ti)
+            Y_pred <- rep(NA_real_, length(score_rows))
+            if (any(ok)) {
+                Y_pred[ok] <- .fect_heldout_pred(
+                    fit, ti[ok], ui[ok],
+                    data[score_rows[ok], , drop = FALSE]
+                )
             }
             e2 <- (Y_obs_score - Y_pred)^2
             e2 <- e2[is.finite(e2)]

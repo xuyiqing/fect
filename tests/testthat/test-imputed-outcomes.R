@@ -100,9 +100,13 @@ test_that("I.4: cells = formula subsets correctly", {
 })
 
 
-## -- I.5  replicates = TRUE expands by nboots -----------------------
+## -- I.5  replicates = TRUE returns each replicate's own cells ------
+## (2.4.7: replicate b's rows are the copies of the treated cells that the
+## resampled panel of replicate b contains, read through colnames.boot. Under
+## the case bootstrap a unit drawn twice appears twice and an undrawn unit
+## not at all, so the row count varies by replicate.)
 
-test_that("I.5: replicates = TRUE expands by nboots and adds replicate column", {
+test_that("I.5: replicates = TRUE returns each replicate's cells with a replicate column", {
 
   skip_on_cran()
 
@@ -110,17 +114,28 @@ test_that("I.5: replicates = TRUE expands by nboots and adds replicate column", 
   po  <- fect::imputed_outcomes(fit)
   po_b <- fect::imputed_outcomes(fit, replicates = TRUE)
 
-  expect_equal(nrow(po_b), nrow(po) * 25)
   expect_true("replicate" %in% names(po_b))
   expect_setequal(unique(po_b$replicate), seq_len(25))
+  expect_identical(names(po_b), c(names(po), "replicate"))
 
-  ## Every group of nboots rows shares the same (id, time, Y_obs, W.agg)
-  one_cell <- po_b[po_b$id == po_b$id[1] & po_b$time == po_b$time[1], ]
-  expect_equal(nrow(one_cell), 25)
+  ## Averaging eff within a replicate gives that replicate's att.avg
+  ## (unweighted fit, all treated cells).
+  rep_mean <- c(tapply(po_b$eff, po_b$replicate, mean))
+  expect_equal(unname(rep_mean), unname(c(fit$att.avg.boot)),
+               tolerance = 1e-10)
+
+  ## Every row is a treated cell of the point surface, and Y0_hat = Y_obs - eff
+  expect_true(all(paste(po_b$id, po_b$time) %in% paste(po$id, po$time)))
+  expect_equal(po_b$Y0_hat, po_b$Y_obs - po_b$eff)
+
+  ## Copies of one cell share (id, time, Y_obs, W.agg); Y0_hat varies
+  ## across replicates.
+  key <- paste(po_b$id, po_b$time)
+  busiest <- names(which.max(table(key)))
+  one_cell <- po_b[key == busiest, ]
+  expect_gt(length(unique(one_cell$replicate)), 1)
   expect_equal(length(unique(one_cell$Y_obs)), 1)
   expect_equal(length(unique(one_cell$W.agg)), 1)
-
-  ## Y0_hat varies across replicates
   expect_gt(length(unique(one_cell$Y0_hat)), 1)
 })
 
