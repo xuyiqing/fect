@@ -4,7 +4,8 @@
 Development version, not yet on CRAN.
 
 Version 2.4.6 was a development version on GitHub and was not released on
-CRAN.
+CRAN. Its changes are listed under fect 2.4.6 below and are part of this
+release.
 
 ## Changes that affect results
 
@@ -385,7 +386,9 @@ says what to do.
   the basic p-values and the other slots as they now are, and the
   estimands chapter lists which `by` values and filters each type takes.
 
-## New features and other changes
+# fect 2.4.6
+
+Development version on GitHub, not released on CRAN. Its changes are part of 2.4.7.
 
 Several of these also change results; each bullet says which calls.
 
@@ -458,9 +461,7 @@ Several of these also change results; each bullet says which calls.
   that set `seed` with `se = FALSE`. To reproduce an earlier result that
   relied on a `set.seed()` call before `fect()`, keep that call and drop
   `seed`. Calls without `seed`, and calls with `se = TRUE` or
-  `permute = TRUE`, give the same results as before, except serial
-  (`parallel = FALSE`) ones that cross-validate (see "Changes that affect
-  results").
+  `permute = TRUE`, give the same results as before.
 * Cross-validation now uses the settings passed to `fect()` in two cases
   where it silently used defaults. With `se = TRUE`, it ignored `cv.rule`,
   `cv.buffer`, `cv.donut`, `min.T0` and `proportion` and ran with `"1se"`,

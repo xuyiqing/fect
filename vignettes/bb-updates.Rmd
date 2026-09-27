@@ -4,7 +4,7 @@
 
 [Development version, not yet on CRAN.]{.text-muted}
 
-Version 2.4.6 was a development version on GitHub and was not released on CRAN.
+Version 2.4.6 was a development version on GitHub and was not released on CRAN; its changes are listed under v2.4.6 below and are part of this release.
 
 **Correctness fixes that change results** (the full list, with issue numbers, is in `NEWS.md`):
 
@@ -40,7 +40,9 @@ Version 2.4.6 was a development version on GitHub and was not released on CRAN.
 
 **Other fixes.** The cluster bootstrap works with clusters of unequal size and `keep.sims = TRUE`; failed bootstrap replicates are dropped and counted instead of stopping the run; cross-validation of `r` no longer crashes when `r` exceeds the number of never-treated units; counterfactual plots work without SEs; `effect()` works for one unit; `method = "cfe"` with never-treated fitting works with one treated unit; `att.cumu()` works without SEs; `imputed_outcomes()` reports the aggregation weights of weighted fits, one row per treated cell; `fect_mspe()` keeps working on fits made with `Y`, `D` and `X` column names; `dloo` with never-treated fitting stops at once, with a message that says why; clearer messages when cross-validation is skipped or no treated observation is left; `cm = TRUE` stores `est.cm` also without SEs and after cross-validation; `fect_mspe()` finds a fit's data and arguments where it is called, so a data frame local to a function works, and a data frame named like a function (such as `df`) too; `att.cumu()` and `estimand("att.cumu")` work on a window of one event time; weighted jackknife fits with placebo or carryover tests no longer stop when the model has covariates; on jackknife fits, `estimand()` uses `ci.method = "normal"` by default for every type instead of stopping; `estimand()` messages name the cause of a stop; `vartype = "parametric"` warns that `cl` is ignored, and `print()` no longer shows "Cluster SE" for parametric and jackknife fits; a `cells` formula in `estimand()` and `imputed_outcomes()` can use variables of the function where it was written; `plot(type = "factors")` works with a Date or character time index; `fit$remove.id` lists the removed units whenever units are removed; the IFE cross-validation table under `criterion = "pc"` labels its columns correctly; `interFE()` names the fixed effect that absorbs a covariate.
 
-**Earlier changes (on GitHub as 2.4.6):**
+## v2.4.6
+
+[Development version on GitHub, not released on CRAN. Its changes are part of 2.4.7.]{.text-muted}
 
 * New `dloo` and `dloo.adjust` flags on `fect()`, contributed by Anton Strezhnev: double leave-one-out pre-trend placebos, computed without re-fitting. With covariates, the covariate coefficients are re-estimated on each cohort's pre-treatment comparison sample. They require staggered adoption, a balanced pre-treatment panel, `method = "fe"`, and the default `time.component.from = "notyettreated"`. `dloo.adjust = TRUE` applies Ziyi Liu's correction.
 * `r` now defaults to `NULL`. For `method = "ife"` or `"gsynth"`, leaving out `r` now selects the number of factors by cross-validation over 0 to 5, instead of fitting zero factors.
