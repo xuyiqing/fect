@@ -1641,9 +1641,18 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
     ## att.avg.unit
     tr.pos <- which(apply(D, 2, sum) > 0)
     att.unit <- sapply(1:length(tr.pos), function(vec) {
-        return(sum(eff[, tr.pos[vec]] * D[, tr.pos[vec]]) / sum(D[, tr.pos[vec]]))
+        ## the unit's observed cells only: eff is NA where the outcome is
+        ## missing (before 2.4.7 one such cell made the unit NA, so it was
+        ## left out, and att.avg.unit was NaN when every treated unit had one)
+        ok <- !is.na(eff[, tr.pos[vec]])
+        d <- sum(D[ok, tr.pos[vec]])
+        if (d > 0) {
+            return(sum(eff[ok, tr.pos[vec]] * D[ok, tr.pos[vec]]) / d)
+        } else {
+            return(NA)
+        }
     })
-    att.avg.unit <- mean(att.unit)
+    att.avg.unit <- mean(att.unit, na.rm = TRUE)
 
     eff.equiv <- Y - est.fect$fit
     equiv.att.avg <- sum(eff.equiv * D) / (sum(D))
