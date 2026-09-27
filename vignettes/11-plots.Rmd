@@ -245,6 +245,17 @@ plot(out,
      main = "Line Customization")
 ```
 
+### Effects of chosen units {#sec-gap-id}
+
+With `id`, the gap plot shows the chosen treated units' own effects, by time relative to each unit's treatment onset. With several units, it shows their unweighted average at each relative time, and the default `proportion = 0.3` can hide relative times at which few of them are observed (`proportion = 0` shows them all). The plot draws point estimates only. For an interval around one unit's counterfactual, use `type = "counterfactual"` on a fit made with `keep.sims = TRUE` and `vartype = "parametric"`.
+
+```{r gap-id}
+out.sim <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+                method = "fe", force = "two-way", se = FALSE)
+plot(out.sim, type = "gap", id = 101)
+plot(out.sim, type = "gap", id = c(101, 130, 213))
+```
+
 ------------------------------------------------------------------------
 
 ## Counterfactual plot
@@ -721,7 +732,7 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 | `est.lwidth` / `est.pointsize` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | Yes |
 | `gridOff` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
 | `highlight.periods` / `highlight.shapes` | --- | --- | --- | --- | --- | --- | --- | --- | --- | Yes |
-| `id` | --- | --- | --- | --- | --- | Yes | Yes | --- | --- | --- |
+| `id` | Yes | --- | --- | --- | --- | Yes | Yes | --- | --- | --- |
 | `include.FE` | --- | --- | --- | --- | --- | --- | --- | Yes | Yes | --- |
 | `lcolor` / `lwidth` / `ltype` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
 | `legendOff` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | Yes |
