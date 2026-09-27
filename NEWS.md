@@ -375,7 +375,8 @@ says what to do.
 * `?plot.fect`: `id` applies to the counterfactual and status plots only, and
   `nfactors` to the loadings plot only.
 * `?fect` (`ci.method`, `normalize`, `binary`, the `att.avg.unit` and
-  `est.group.att` values), `?estimand` (`by`, `cells`, `window`,
+  `est.group.att` values, and the names of `est.avg` and `est.avg.unit`,
+  which it gave as `est.att.avg` and `est.att.avg.unit`), `?estimand` (`by`, `cells`, `window`,
   `direction`, `ci.method`), `?att.cumu`, `?fect_mspe`, `?r.cv.rolling`
   (`method`, `min.T0`) and `?interFE` (`binary`) describe the changes
   above. User manual: the comparison of gsynth and CFE in the gsynth

@@ -328,8 +328,8 @@ Ignored when \code{CV = FALSE}.}
   \item{balance.att.placebo}{ATT for placebo period in balanced sample.}
   \item{group.att}{ATT for different groups.}
   \item{group.output}{list of switch-on treatment effects by group.}
-  \item{est.att.avg}{inference for \code{att.avg}.}
-  \item{est.att.avg.unit}{inference for \code{att.avg.unit}.}
+  \item{est.avg}{inference for \code{att.avg}.}
+  \item{est.avg.unit}{inference for \code{att.avg.unit}.}
   \item{est.att}{inference for \code{att}.}
   \item{est.att.W}{inference for weighted \code{att}.}
   \item{est.att.off}{inference for switch-off.}
