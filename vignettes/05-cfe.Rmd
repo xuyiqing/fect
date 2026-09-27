@@ -301,7 +301,7 @@ We use `simdata`, which has two latent factors ($L_1, F_1$ and $L_2, F_2$). We p
 simdata$gamma_t <- simdata$time
 ```
 
-### Model comparison via `fect_mspe`
+### Model comparison via `fect_mspe` {#sec-cfe-mspe}
 
 We fit four models and compare their out-of-sample prediction accuracy:
 
@@ -456,4 +456,4 @@ Block CV (`cv.method = "block"`) is also available as a drop-in replacement; see
 | `r` | integer or vector | Number of latent factors; use `c(0, 5)` with `CV = TRUE` to select |
 | `force` | character | Additive FE: `"none"`, `"unit"`, `"time"`, `"two-way"` |
 
-The CFE estimator combines all these components into a single unified model. Each component relaxes a specific assumption about the data-generating process. In practice, researchers should use `fect_mspe()` (Section 4.5) to compare specifications and placebo tests to validate the chosen model.
+The CFE estimator combines all these components into a single unified model. Each component relaxes a specific assumption about the data-generating process. In practice, researchers should use `fect_mspe()` (@sec-cfe-mspe) to compare specifications and placebo tests to validate the chosen model.
