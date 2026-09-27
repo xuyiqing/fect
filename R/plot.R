@@ -2960,8 +2960,9 @@ plot.fect <- function(
       if (unit.gap) {
         message("Unit-level uncertainty is not shown: the gap plot with \"id\" ",
                 "draws point estimates only. For an interval around a unit's ",
-                "counterfactual, use type = \"counterfactual\" on a fit made with ",
-                "keep.sims = TRUE and vartype = \"parametric\".")
+                "counterfactual, use type = \"counterfactual\" on a fit with ",
+                "parametric bootstrap draws (in fect: keep.sims = TRUE and ",
+                "vartype = \"parametric\").")
       } else {
         message("Uncertainty estimates not available.\n")
       }
