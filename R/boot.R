@@ -3400,19 +3400,29 @@ fect_boot <- function(
           alpha,
           quantile.CI = quantile.CI
         )
+        ## the 90% bounds, as for the unweighted jackknife slot (before
+        ## 2.4.7 this slot had 5 columns, and a fit with covariates
+        ## stopped when fect() named its 7)
+        att.placebo.W.bound <- c(
+          att.placebo.W + qnorm(alpha) * att.placebo.W.j$se,
+          att.placebo.W + qnorm(1 - alpha) * att.placebo.W.j$se
+        )
         est.placebo.W <- t(as.matrix(c(
           att.placebo.W,
           att.placebo.W.j$se,
           att.placebo.W.j$CI.l,
           att.placebo.W.j$CI.u,
-          att.placebo.W.j$P
+          att.placebo.W.j$P,
+          att.placebo.W.bound
         )))
         colnames(est.placebo.W) <- c(
           "ATT.placebo",
           "S.E.",
           "CI.lower",
           "CI.upper",
-          "p.value"
+          "p.value",
+          "CI.lower(90%)",
+          "CI.upper(90%)"
         )
       }
       if (hasRevs == 1) {
@@ -3454,19 +3464,27 @@ fect_boot <- function(
             alpha,
             quantile.CI = quantile.CI
           )
+          ## the 90% bounds, as for the unweighted jackknife slot
+          att.carryover.W.bound <- c(
+            att.carryover.W + qnorm(alpha) * att.carryover.W.j$se,
+            att.carryover.W + qnorm(1 - alpha) * att.carryover.W.j$se
+          )
           est.carryover.W <- t(as.matrix(c(
             att.carryover.W,
             att.carryover.W.j$se,
             att.carryover.W.j$CI.l,
             att.carryover.W.j$CI.u,
-            att.carryover.W.j$P
+            att.carryover.W.j$P,
+            att.carryover.W.bound
           )))
           colnames(est.carryover.W) <- c(
             "ATT.carryover",
             "S.E.",
             "CI.lower",
             "CI.upper",
-            "p.value"
+            "p.value",
+            "CI.lower(90%)",
+            "CI.upper(90%)"
           )
         }
       }
