@@ -212,10 +212,10 @@ cluster at the unit level instead, pass \code{cl = index[1]} (e.g.,
 bootstrap always resamples units regardless of \code{cl}), and
 \code{cl = FALSE} is rejected with a guiding error.}
 \item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
-\item{Z}{a vector specifying the time-invariant covariates for the Z matrix.}
-\item{gamma}{a vector specifying the time-varying covariates for the gamma matrix.}
-\item{Q}{a vector specifying the time-varying covariates for the Q matrix.}
-\item{kappa}{a vector specifying the time-invariant covariates for the kappa matrix.}
+\item{Z}{a vector of column names: time-invariant unit covariates whose coefficients vary by period (grouped by \code{gamma}). Each must be the same in every period of a unit; a value that varies within a unit stops with a message.}
+\item{gamma}{a column name giving each period's group for the coefficients on \code{Z}; it must be the same for every unit in a period. Default: one group per period.}
+\item{Q}{a vector of column names: known time trends whose loadings vary by unit (grouped by \code{kappa}). Each must be the same for every unit in a period; a value that varies within a period stops with a message. See also \code{Q.type}.}
+\item{kappa}{a column name giving each unit's group for the loadings on \code{Q}; it must be the same in every period of a unit. Default: one group per unit.}
 \item{Q.type}{a vector specifying the type of Q matrix.}
 \item{Q.bspline.degree}{an integer specifying the degree used when \code{Q.type} includes \code{"bspline"} in \code{method="cfe"}. If NULL, a default degree is chosen based on the number of distinct time values.}
 \item{Z.param}{a list specifying the parameters for the Z matrix.}

@@ -301,11 +301,16 @@ says what to do.
   unbalanced panels with `Z`, `Q`, `gamma` or `kappa` change, and so can the
   CFE scores of `fect_mspe()` and `r.cv.rolling()` (on `sim_linear` with
   `Q.type = "linear"` and the period-20 row of unit 1 removed: an ATT of
-  1.0063 instead of 1.0959; on `simdata` with `Z = "L1"` and the
-  first-period row of unit 101 removed: 3.0768 instead of 3.1322).
+  1.0062 instead of 1.0959, with 1.0064 on the full data; on `simdata`
+  with `Z = "L1"` and the first-period row of unit 101 removed: 3.0740
+  instead of 3.1322, with 3.0759 on the full data).
   Relabeling the units no longer changes any estimate. `Z` or `kappa` that
   vary within a unit, or `Q` or `gamma` that vary within a period, now stop
   with a message naming the unit or period; they were read from one row.
+  Group labels (`gamma`, `kappa`) are now coded by their sorted unique
+  values in R, so character, factor, non-integer and negative labels work
+  on unbalanced panels too (they were cast to unsigned integers in C++);
+  a missing label, or a non-numeric `Z` or `Q`, stops with a message.
   Balanced panels are unchanged (fect #168).
 * With `normalize = TRUE`, the default equivalence-test threshold
   (`fit$tost.threshold`, `0.36 * sqrt(sigma2.fect)`) of `method = "gsynth"`
