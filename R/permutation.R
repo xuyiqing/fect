@@ -243,6 +243,10 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
         } else if (method == "ife") {
             est <- inter_fe_ub(YY, Y0, X, II, beta0, r.cv, force = force, tol)
         } else if (method == "mc") {
+            ## lambda.cv is on the outcome's scale (see fect_mc)
+            if (!is.null(norm.para)) {
+                lambda.cv <- lambda.cv / norm.para[1]
+            }
             est <- inter_fe_mc(YY, Y0, X, II, beta0, 1, lambda.cv, force, tol)
         }
 

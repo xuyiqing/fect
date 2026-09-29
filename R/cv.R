@@ -969,6 +969,15 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         if (method %in% c("mc", "both")) {
             message("Matrix completion method...\n")
             eigen.all <- NULL
+            ## a user grid is on the outcome's scale; with normalize = TRUE
+            ## the fit runs on Y / sd(Y), so it is divided by sd(Y) (the grid
+            ## built from the normalized outcome below is on that scale
+            ## already). lambda.cv, lambda.seq and eigen.all are put back on
+            ## the outcome's scale at the end (before 2.4.7 they were
+            ## reported on the normalized scale).
+            if (!is.null(norm.para) && !is.null(lambda) && length(lambda) > 1) {
+                lambda <- lambda / norm.para[1]
+            }
             if (is.null(lambda) || length(lambda) == 1) {
                 ## create the hyper-parameter sequence
                 ## biggest candidate lambda
@@ -1561,6 +1570,13 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
     ## we first adjustment for normalization
     if (!is.null(norm.para)) {
         Y <- Y * norm.para[1]
+        if (method == "mc") {
+            ## the penalty grid, the chosen penalty and the singular values
+            ## on the outcome's scale (lambda.norm, their ratio, is unchanged)
+            lambda <- lambda * norm.para[1]
+            lambda.cv <- lambda.cv * norm.para[1]
+            eigen.all <- eigen.all * norm.para[1]
+        }
         if (method == "ife") {
             ## variance of the error term
             sigma2 <- est.best$sigma2 * (norm.para[1]^2)
