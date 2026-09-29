@@ -291,21 +291,23 @@ says what to do.
 
 ## New features
 
-* `plot(fit, type = "gap", id = ...)` now draws the effects of the chosen
-  treated units. Before, it ignored `id` and drew the average over all
-  treated units. With one unit, the plot shows the unit's own effect
-  (`fit$eff`) in each period by time relative to its treatment onset, as
-  gsynth 1.2.x did. With several units, it shows their unweighted average at
-  each relative time. A control unit, or an id not in the data, stops with a
-  message naming it. On a fit with parametric bootstrap draws
-  (`vartype = "parametric"` and `keep.sims = TRUE`), the plot draws a band
-  for the chosen units' effects, formed from their draws with the fit's
-  `ci.method` and `alpha`, as gsynth 1.2.x did for one unit; fits with
-  another variance type show point estimates only, with a message saying
-  why. For the band, fits now record `ci.method` and `ci.alpha`. The plot
-  shows no test statistics, and `return.test = TRUE` returns none for it. On
-  `simgsynth` (`Y ~ D + X1 + X2`, `method = "ife"`, `r = 2`,
-  `CV = FALSE`), the plot with `id = 101` now shows unit 101's effect in its
+* `plot(fit, type = "gap", id = ...)` now draws the gaps of the chosen
+  treated units, each unit's observed outcome minus its predicted untreated
+  outcome (`fit$eff`). Before, it ignored `id` and drew the average over all
+  treated units. With one unit, the plot shows the unit's gap in each period
+  by time relative to its treatment onset, as gsynth 1.2.x did. With several
+  units, it shows their unweighted average at each relative time. A control
+  unit, or an id not in the data, stops with a message naming it. On a fit
+  with parametric bootstrap draws (`vartype = "parametric"` and
+  `keep.sims = TRUE`), the plot draws a band around the gaps, formed from
+  their draws with the fit's `ci.method` and `alpha`, as gsynth 1.2.x did
+  for one unit; fits with another variance type show point estimates only,
+  with a message saying why. `?plot.fect` and the user manual explain that
+  one unit's gap in one period is a noisy estimate of its effect, which is
+  not identified. For the band, fits now record `ci.method` and `ci.alpha`.
+  The plot shows no test statistics, and `return.test = TRUE` returns none
+  for it. On `simgsynth` (`Y ~ D + X1 + X2`, `method = "ife"`, `r = 2`,
+  `CV = FALSE`), the plot with `id = 101` now shows unit 101's gap in its
   first treated period, 0.338; before, it showed the average over the five
   treated units, 1.277 (fect #162; gsynth #106).
 
