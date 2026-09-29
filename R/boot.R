@@ -3870,40 +3870,40 @@ fect_boot <- function(
     .is_param <- isTRUE(vartype == "parametric")
 
     ## p-values for ci.method = "basic", one per row of `boots` (or one for a
-    ## vector), to go with the basic intervals. Case-bootstrap draws are
-    ## centered at the estimate: the p-value is the one dual to the basic
-    ## interval, .pvalue_basic_dual() (top of this file): p < alpha exactly
-    ## when 0 is outside the (1 - alpha) basic interval. (Before 2.4.7 it
-    ## was get.pvalue(), the percentile rule, which goes with the
-    ## percentile interval and can disagree with the basic interval printed
-    ## beside it.) Parametric draws of a treatment
-    ## effect are simulated with no effect, so they are centered at zero,
-    ## not at the estimate: the p-value is twice the smaller share of the
-    ## centered draws (the draws minus their mean) at or beyond the estimate,
-    ## on either side. That is the normal p-value, 2 * min(F(est), 1 - F(est))
-    ## with F the distribution of the estimate under no effect, with the
-    ## draws in place of N(0, SE^2). It is below alpha when the basic
-    ## interval excludes zero, up to the resolution of the draws. (Before
-    ## 2.4.7 get.pvalue() was applied to the parametric draws as they are,
-    ## which gives about 1 whatever the estimate.) Coefficient draws are
-    ## centered at the estimate in both schemes: a bootstrap fit uses
-    ## .pvalue_basic_dual() for them too; a parametric fit keeps get.pvalue().
+    ## vector), to go with the basic intervals. Each is the p-value dual to
+    ## the basic interval of the row's draws, .pvalue_basic_dual() (top of
+    ## this file): p < alpha exactly when 0 is outside the (1 - alpha) basic
+    ## interval, at every alpha. The rule sees the draws the interval uses.
+    ## Case-bootstrap draws are centered at the estimate and go in as they
+    ## are. Parametric draws of a treatment effect are simulated with no
+    ## effect, so they are centered at zero: .basic_ci_shifted() recenters
+    ## them at the estimate (the draws minus their mean, plus the estimate)
+    ## before reflecting, and the p-value applies the dual rule to the draws
+    ## recentered the same way. Coefficient draws of a parametric fit are
+    ## simulated at the estimated coefficients, so the recentering barely
+    ## moves them; it is applied all the same, to the interval and to the
+    ## p-value. History: before 2.4.7 every basic p-value was get.pvalue(),
+    ## the percentile rule, which goes with the percentile interval and can
+    ## disagree with the basic interval printed beside it (on zero-centered
+    ## parametric draws it gave about 1 whatever the estimate). #158 gave
+    ## bootstrap fits the dual rule. Parametric fits then used a counting
+    ## rule, twice the smaller share of the centered draws at or beyond the
+    ## estimate, which agrees with the interval only up to the resolution
+    ## 2 / nboots of the draws, so a row could print p = 0.05 beside a 95%
+    ## interval that excludes 0; #169 gave them the dual rule on the shifted
+    ## draws, and their coefficients too (those had kept get.pvalue()).
     .pvalue.basic <- function(theta, boots) {
-      if (!.is_param) {
-        if (is.matrix(boots)) {
-          return(vapply(seq_len(nrow(boots)), function(k) {
-            .pvalue_basic_dual(theta[k], boots[k, ])
-          }, numeric(1)))
-        }
-        return(.pvalue_basic_dual(theta, boots))
+      one <- if (.is_param) {
+        function(th, b) .pvalue_basic_dual(th, b - mean(b, na.rm = TRUE) + th)
+      } else {
+        .pvalue_basic_dual
       }
-      null.p <- function(th, b) get.pvalue(b - mean(b, na.rm = TRUE) - th)
       if (is.matrix(boots)) {
         return(vapply(seq_len(nrow(boots)), function(k) {
-          null.p(theta[k], boots[k, ])
+          one(theta[k], boots[k, ])
         }, numeric(1)))
       }
-      null.p(theta, boots)
+      one(theta, boots)
     }
 
     se.att <- apply(att.boot, 1, function(vec) sd(vec, na.rm = TRUE))
@@ -4521,12 +4521,11 @@ fect_boot <- function(
         )
         pvalue.beta <- (1 - pnorm(abs(beta / se.beta))) * 2
       } else {
+        ## interval and p-value from the same draws, recentered at the
+        ## estimate for a parametric fit (#169; before, the coefficients of
+        ## a parametric fit kept the percentile p-value get.pvalue())
         CI.beta <- .basic_ci_shifted(c(beta), beta.boot, alpha, .is_param)
-        pvalue.beta <- if (.is_param) {
-          apply(beta.boot, 1, get.pvalue)
-        } else {
-          .pvalue.basic(c(beta), beta.boot)
-        }
+        pvalue.beta <- .pvalue.basic(c(beta), beta.boot)
       }
       est.beta <- cbind(c(beta), se.beta, CI.beta, pvalue.beta)
       colnames(est.beta) <- c("Coef", "S.E.", "CI.lower", "CI.upper", "p.value")
