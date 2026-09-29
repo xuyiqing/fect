@@ -978,8 +978,9 @@ plot.fect <- function(
   ## effects of the chosen treated units, x$eff, by time relative to the
   ## treatment onset, x$T.on (the relative time of the default gap plot). At
   ## each relative time it averages the chosen units' cells (unweighted, as
-  ## the counterfactual plot averages several units). Point estimates only:
-  ## no interval, test statistics or equivalence bounds.
+  ## the counterfactual plot averages several units). It draws a band when
+  ## the fit kept parametric bootstrap draws (see below), and no test
+  ## statistics or equivalence bounds.
   unit.gap <- type == "gap" && !is.null(id)
   if (unit.gap) {
     if (loo == 1) {
@@ -1032,6 +1033,67 @@ plot.fect <- function(
     unit.gap.time <- sort(unique(unit.gap.rel))
     unit.gap.att <- as.numeric(tapply(unit.gap.val, unit.gap.rel, mean))
     unit.gap.count <- as.numeric(table(unit.gap.rel))
+    ## Band. The parametric bootstrap simulates a unit's prediction error (a
+    ## control unit plays the treated unit), so its draws measure the chosen
+    ## units' own noise; with keep.sims = TRUE (gsynth always keeps them) they
+    ## are in x$eff.boot, the treated units first, in x$tr order, centered at
+    ## 0. At each relative time the chosen cells' draws are averaged within
+    ## each replication, and the interval follows the fit's ci.method and
+    ## level, as the average's interval does. The case bootstrap and the
+    ## jackknife keep each unit's own outcomes fixed, so they cannot measure
+    ## its noise: those fits draw the estimates only, with a message.
+    unit.gap.est <- unit.gap.bound <- unit.gap.note <- NULL
+    unit.gap.boot <- x[["eff.boot"]]
+    if (is.null(x[["est.att"]])) {
+      unit.gap.note <- "Uncertainty estimates not available.\n"
+    } else if (!identical(x[["vartype"]], "parametric")) {
+      unit.gap.note <- paste0(
+        "The gap plot with \"id\" draws the chosen units' estimates without ",
+        "a band: a band needs parametric bootstrap draws (in fect: ",
+        "vartype = \"parametric\" and keep.sims = TRUE; in gsynth: ",
+        "inference = \"parametric\"). The bootstrap over units and the ",
+        "jackknife keep each unit's own outcomes fixed, so they cannot ",
+        "measure its own noise.")
+    } else if (is.null(unit.gap.boot) || length(dim(unit.gap.boot)) != 3L) {
+      unit.gap.note <- paste0(
+        "The gap plot with \"id\" draws the chosen units' estimates without ",
+        "a band: the fit did not keep its bootstrap draws. Refit with ",
+        "keep.sims = TRUE for a band.")
+    } else {
+      nb <- dim(unit.gap.boot)[3]
+      unit.gap.col <- match(unit.gap.pos, x$tr)
+      unit.gap.draws <- t(matrix(vapply(unit.gap.time, function(s) {
+        cells <- which(unit.gap.ok & unit.gap.T.on == s, arr.ind = TRUE)
+        v <- unit.gap.boot[cbind(rep(cells[, 1], times = nb),
+                                 rep(unit.gap.col[cells[, 2]], times = nb),
+                                 rep(seq_len(nb), each = nrow(cells)))]
+        colMeans(matrix(v, nrow = nrow(cells)), na.rm = TRUE)
+      }, numeric(nb)), nrow = nb))
+      unit.gap.alpha <- x[["ci.alpha"]]
+      if (!is.numeric(unit.gap.alpha) || length(unit.gap.alpha) != 1L ||
+          is.na(unit.gap.alpha)) {
+        unit.gap.alpha <- 0.05 # fits made before fect 2.4.7 do not record it
+      }
+      unit.gap.se <- apply(unit.gap.draws, 1, function(v) sd(v, na.rm = TRUE))
+      if (identical(x[["ci.method"]], "basic")) {
+        ci <- .basic_ci_shifted(unit.gap.att, unit.gap.draws,
+                                unit.gap.alpha, shift = TRUE)
+        ci90 <- .basic_ci_shifted(unit.gap.att, unit.gap.draws,
+                                  2 * unit.gap.alpha, shift = TRUE)
+      } else {
+        ci <- cbind(unit.gap.att - unit.gap.se * qnorm(1 - unit.gap.alpha / 2),
+                    unit.gap.att + unit.gap.se * qnorm(1 - unit.gap.alpha / 2))
+        ci90 <- cbind(unit.gap.att - unit.gap.se * qnorm(1 - unit.gap.alpha),
+                      unit.gap.att + unit.gap.se * qnorm(1 - unit.gap.alpha))
+      }
+      unit.gap.est <- cbind(unit.gap.att, unit.gap.se, ci, NA_real_,
+                            unit.gap.count)
+      colnames(unit.gap.est) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                  "p.value", "count")
+      unit.gap.bound <- ci90
+      colnames(unit.gap.bound) <- c("CI.lower", "CI.upper")
+      rownames(unit.gap.est) <- rownames(unit.gap.bound) <- unit.gap.time
+    }
     if (is.null(main)) {
       main <- if (length(unit.gap.pos) == 1) {
         paste(x$index[1], "=", unit.gap.id)
@@ -1075,8 +1137,8 @@ plot.fect <- function(
   if (plot.ci == "0.9") {
     plot.ci <- "90"
   }
-  if (unit.gap) {
-    plot.ci <- "none" # the gap plot of chosen units draws no interval
+  if (unit.gap && is.null(unit.gap.est)) {
+    plot.ci <- "none" # no band for the chosen units (see unit.gap.note)
   }
 
   if (type == "equiv" && plot.ci == "none") {
@@ -1485,12 +1547,18 @@ plot.fect <- function(
   ## values. No swap needed here.
   use.weight <- !is.null(x$W)
 
-  ## gap plot of chosen units: their own series replaces the average one
-  ## (after the balance swap above, which does not apply to it)
+  ## gap plot of chosen units: their own series and band replace the average
+  ## ones (after the balance swap above, which does not apply to them)
   if (unit.gap) {
     x$time <- unit.gap.time
     x$att <- unit.gap.att
     x$count <- unit.gap.count
+    ## without a band, plot.ci is "none" and the average's est.att stays
+    ## (removing it would let x$est.att partially match est.att90)
+    if (!is.null(unit.gap.est)) {
+      x$est.att <- unit.gap.est
+      x$att.bound <- unit.gap.bound
+    }
   }
 
 
@@ -2959,11 +3027,11 @@ plot.fect <- function(
 
     if (CI == FALSE) {
       if (unit.gap) {
-        message("Unit-level uncertainty is not shown: the gap plot with \"id\" ",
-                "draws point estimates only. For an interval around a unit's ",
-                "counterfactual, use type = \"counterfactual\" on a fit with ",
-                "parametric bootstrap draws (in fect: keep.sims = TRUE and ",
-                "vartype = \"parametric\").")
+        ## the note is NULL when the fit has a band and the user chose
+        ## plot.ci = "none"
+        if (!is.null(unit.gap.note)) {
+          message(unit.gap.note)
+        }
       } else {
         message("Uncertainty estimates not available.\n")
       }

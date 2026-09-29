@@ -1,8 +1,9 @@
 ## ---------------------------------------------------------------
 ## fect 2.4.7: plot(type = "gap", id = ...) draws the chosen treated units'
-## own effects (fect #162). Before, `id` was ignored and the gap plot showed
-## the average effect over all treated units. Each block fails on f39791c
-## and passes after the change. Self-contained: helpers prefixed .gi_.
+## own effects (fect #162), with a band when the fit kept parametric
+## bootstrap draws. Before, `id` was ignored and the gap plot showed the
+## average effect over all treated units. Each block fails on f39791c and
+## passes after the change. Self-contained: helpers prefixed .gi_.
 ## ---------------------------------------------------------------
 
 ## One of fect's datasets, loaded into a local environment.
@@ -87,9 +88,8 @@ test_that("G1: the gap plot with one treated id draws that unit's own effects", 
   expect_identical(r$p$labels$title, "id = 101")
   ## no count bars for one unit
   expect_false("GeomRect" %in% .gi_geoms(r$p))
-  expect_length(r$messages, 1)
-  expect_match(r$messages, "Unit-level uncertainty is not shown", fixed = TRUE)
-  expect_match(r$messages, "type = \"counterfactual\"", fixed = TRUE)
+  ## a fit without SEs: the same message as the average gap plot
+  expect_identical(r$messages, "Uncertainty estimates not available.\n\n")
   ## a character id gives the same plot; a user title wins
   expect_equal(.gi_points(.gi_plot(plot(fit, type = "gap", id = "101"))$p), pts)
   pm <- suppressMessages(plot(fit, type = "gap", id = 101, main = "Unit 101"))
@@ -144,9 +144,9 @@ test_that("G2: several ids draw the average of their effects at each relative ti
 })
 
 
-## -- G3  a fit with SEs: estimates only ------------------------------------
+## -- G3  a bootstrap fit: estimates only ---------------------------------
 
-test_that("G3: with a fit that has SEs, the gap plot for an id draws no interval, statistics or bounds", {
+test_that("G3: with a bootstrap fit, the gap plot for an id draws no interval, statistics or bounds, and says why", {
   skip_on_cran()
   simgsynth <- .gi_data("simgsynth")
   fit <- suppressMessages(fect::fect(
@@ -167,6 +167,10 @@ test_that("G3: with a fit that has SEs, the gap plot for an id draws no interval
     expect_false("GeomLine" %in% .gi_geoms(r$p)) # no bound lines
     expect_true(all(.gi_text(r$p) == ""))        # no test statistics
     expect_length(r$messages, 1)
+    expect_match(r$messages, "a band needs parametric bootstrap draws",
+                 fixed = TRUE)
+    expect_match(r$messages, "keep each unit's own outcomes fixed",
+                 fixed = TRUE)
   }
   ## connected style: the ribbons carry no interval
   pc <- suppressMessages(plot(fit, type = "gap", id = 102, connected = TRUE))
@@ -316,4 +320,184 @@ test_that("G7: start0, xlim and return.data apply to the gap plot for an id; loo
                fixed = TRUE)
   expect_equal(.gi_points(suppressMessages(plot(fit_loo, type = "gap", id = 104)))$y,
                as.numeric(fit_loo$eff[, j]), tolerance = 1e-12)
+})
+
+
+## -- G8-G12  the band from parametric bootstrap draws -----------------------
+
+## By hand from the fit: at each relative time, the chosen cells' draws
+## (fit$eff.boot keeps the treated units first, in fit$tr order) averaged
+## within each replication, and the band with total tail probability `a`:
+## the estimate -/+ qnorm(1 - a / 2) times the draws' sd ("normal"), or the
+## basic interval of the draws shifted to the estimate ("basic").
+.gi_band_by_hand <- function(fit, ids, a = 0.05, rule = "normal") {
+  ref <- .gi_by_hand(fit, ids)
+  j <- match(as.character(ids), as.character(fit$id))
+  k <- match(j, fit$tr)
+  rel <- fit$T.on[, j, drop = FALSE]
+  eff <- fit$eff[, j, drop = FALSE]
+  draws <- t(vapply(ref$x, function(s) {
+    cells <- which(!is.na(rel) & !is.na(eff) & rel == s, arr.ind = TRUE)
+    apply(fit$eff.boot, 3, function(b) mean(b[cbind(cells[, 1], k[cells[, 2]])]))
+  }, numeric(dim(fit$eff.boot)[3])))
+  if (rule == "normal") {
+    h <- qnorm(1 - a / 2) * apply(draws, 1, sd)
+    lo <- ref$y - h
+    hi <- ref$y + h
+  } else {
+    q <- apply(draws - rowMeans(draws) + ref$y, 1, quantile,
+               probs = c(a / 2, 1 - a / 2))
+    lo <- 2 * ref$y - q[2, ]
+    hi <- 2 * ref$y - q[1, ]
+  }
+  data.frame(x = ref$x, y = ref$y, ymin = lo, ymax = hi)
+}
+
+.gi_param_fit <- function(data, ...) {
+  suppressWarnings(suppressMessages(fect::fect(
+    Y ~ D + X1 + X2, data = data, index = c("id", "time"),
+    method = "gsynth", r = 2, CV = FALSE, se = TRUE, vartype = "parametric",
+    nboots = 50, keep.sims = TRUE, parallel = FALSE, seed = 1, ...)))
+}
+
+test_that("G8: with parametric draws, the gap plot for an id draws a band from the chosen units' draws", {
+  skip_on_cran()
+  fit <- .gi_param_fit(.gi_data("simgsynth"))
+  expect_identical(fit$ci.method, "normal")
+  expect_identical(fit$ci.alpha, 0.05)
+  ## one unit: its effects and a band from its own draws, with no message
+  r <- .gi_plot(plot(fit, type = "gap", id = 102))
+  expect_length(r$messages, 0)
+  pts <- .gi_points(r$p)
+  ref <- .gi_band_by_hand(fit, 102)
+  expect_equal(pts, ref, tolerance = 1e-10)
+  expect_true(all(is.finite(pts$ymin)) && all(is.finite(pts$ymax)))
+  ## one unit's band is wider than the band of the average
+  p0 <- suppressMessages(plot(fit, type = "gap"))
+  post <- pts$x >= 1
+  expect_gt(mean((pts$ymax - pts$ymin)[post]),
+            1.5 * mean((.gi_points(p0)$ymax - .gi_points(p0)$ymin)[post]))
+  ## still no test statistics or bounds
+  for (args in list(list(stats = "F.p"), list(bound = "equiv"))) {
+    p <- suppressMessages(do.call(plot, c(list(fit, type = "gap", id = 102), args)))
+    expect_true(all(.gi_text(p) == ""))
+    expect_false("GeomLine" %in% .gi_geoms(p))
+  }
+  ## plot.ci = "0.9": the 90% band; "none": no band and no message
+  p90 <- suppressMessages(plot(fit, type = "gap", id = 102, plot.ci = "0.9"))
+  expect_equal(.gi_points(p90), .gi_band_by_hand(fit, 102, a = 0.1), tolerance = 1e-10)
+  rn <- .gi_plot(plot(fit, type = "gap", id = 102, plot.ci = "none"))
+  expect_true(all(is.na(.gi_points(rn$p)$ymin)))
+  expect_length(rn$messages, 0)
+  ## several ids: the chosen cells' draws averaged within each replication
+  ids <- c(101, 102, 103)
+  p3 <- suppressMessages(plot(fit, type = "gap", id = ids))
+  expect_equal(.gi_points(p3), .gi_band_by_hand(fit, ids), tolerance = 1e-10)
+  ## every treated unit: the default gap plot, band included (unweighted fit)
+  pall <- suppressMessages(plot(fit, type = "gap", id = fit$id[fit$tr]))
+  expect_equal(.gi_points(pall), .gi_points(p0), tolerance = 1e-10)
+  ## return.data carries the band
+  out <- suppressMessages(plot(fit, type = "gap", id = 102, return.data = TRUE))
+  expect_equal(out$data$estimate$CI.lower, ref$ymin, tolerance = 1e-10)
+  expect_equal(out$data$estimate$CI.upper, ref$ymax, tolerance = 1e-10)
+  ## the connected style draws the band as ribbons
+  pc <- suppressMessages(plot(fit, type = "gap", id = 102, connected = TRUE))
+  rib <- which(.gi_geoms(pc) == "GeomRibbon")
+  expect_true(any(vapply(rib, function(i)
+    any(is.finite(ggplot2::layer_data(pc, i)$ymin)), TRUE)))
+  ## a fit object from before fect 2.4.7, without ci.method and ci.alpha:
+  ## the normal 95% band
+  old <- fit
+  old$ci.method <- NULL
+  old$ci.alpha <- NULL
+  expect_equal(.gi_points(suppressMessages(plot(old, type = "gap", id = 102))),
+               pts, tolerance = 1e-12)
+})
+
+test_that("G9: the band follows the fit's ci.method and alpha", {
+  skip_on_cran()
+  fit <- .gi_param_fit(.gi_data("simgsynth"), ci.method = "basic", alpha = 0.1)
+  expect_identical(fit$ci.method, "basic")
+  expect_identical(fit$ci.alpha, 0.1)
+  ## plot.ci = "0.95" draws the fit's own level, 1 - alpha, as the default
+  ## gap plot does; "0.9" the one-sided bound, 1 - 2 * alpha
+  pts <- .gi_points(suppressMessages(plot(fit, type = "gap", id = 102)))
+  expect_equal(pts, .gi_band_by_hand(fit, 102, a = 0.1, rule = "basic"),
+               tolerance = 1e-10)
+  p90 <- .gi_points(suppressMessages(plot(fit, type = "gap", id = 102, plot.ci = "0.9")))
+  expect_equal(p90, .gi_band_by_hand(fit, 102, a = 0.2, rule = "basic"),
+               tolerance = 1e-10)
+  pall <- suppressMessages(plot(fit, type = "gap", id = fit$id[fit$tr]))
+  expect_equal(.gi_points(pall), .gi_points(suppressMessages(plot(fit, type = "gap"))),
+               tolerance = 1e-10)
+})
+
+test_that("G10: the band reads the chosen units' draws when the treated units come after the controls", {
+  skip_on_cran()
+  simgsynth <- .gi_data("simgsynth")
+  ## treated units 101-105 renamed 901-905, so they sort after the controls:
+  ## fit$tr is 46:50, while fit$eff.boot keeps the treated units first
+  tr <- unique(simgsynth$id[simgsynth$D == 1])
+  simgsynth$id[simgsynth$id %in% tr] <- simgsynth$id[simgsynth$id %in% tr] + 800
+  fit <- .gi_param_fit(simgsynth)
+  expect_equal(fit$tr, 46:50)
+  pts <- .gi_points(suppressMessages(plot(fit, type = "gap", id = 902)))
+  expect_equal(pts, .gi_band_by_hand(fit, 902), tolerance = 1e-10)
+  ## the draws at the unit's position in the panel belong to a control unit
+  j <- which(fit$id == 902)
+  wrong <- fit$eff[, j] - qnorm(0.975) * apply(fit$eff.boot[, j, ], 1, sd)
+  expect_gt(max(abs(pts$ymin - wrong)), 0.1)
+  pall <- suppressMessages(plot(fit, type = "gap", id = fit$id[fit$tr]))
+  expect_equal(.gi_points(pall), .gi_points(suppressMessages(plot(fit, type = "gap"))),
+               tolerance = 1e-10)
+})
+
+test_that("G11: without kept parametric draws, the gap plot for an id draws estimates and says how to get a band", {
+  skip_on_cran()
+  simgsynth <- .gi_data("simgsynth")
+  args <- list(Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"),
+               method = "gsynth", r = 2, CV = FALSE, se = TRUE,
+               parallel = FALSE, seed = 1)
+  ## parametric draws not kept
+  fit <- suppressMessages(do.call(fect::fect, c(args, list(vartype = "parametric",
+                                                           nboots = 20))))
+  j <- which(fit$id == 102)
+  r <- .gi_plot(plot(fit, type = "gap", id = 102))
+  pts <- .gi_points(r$p)
+  expect_equal(pts$y, as.numeric(fit$eff[, j]), tolerance = 1e-12)
+  expect_true(all(is.na(pts$ymin)))
+  expect_length(r$messages, 1)
+  expect_match(r$messages, "did not keep its bootstrap draws", fixed = TRUE)
+  expect_match(r$messages, "keep.sims = TRUE", fixed = TRUE)
+  ## the jackknife, draws kept
+  fit_j <- suppressMessages(do.call(fect::fect, c(args, list(vartype = "jackknife",
+                                                             keep.sims = TRUE))))
+  r <- .gi_plot(plot(fit_j, type = "gap", id = 102))
+  expect_true(all(is.na(.gi_points(r$p)$ymin)))
+  expect_length(r$messages, 1)
+  expect_match(r$messages, "a band needs parametric bootstrap draws", fixed = TRUE)
+  ## the average gap plot of these fits keeps its interval
+  expect_true(all(is.finite(.gi_points(suppressMessages(
+    plot(fit_j, type = "gap")))$ymin)))
+})
+
+test_that("G12: a placebo fit with parametric draws: the band covers the placebo periods, with no p-value", {
+  skip_on_cran()
+  fit <- .gi_param_fit(.gi_data("simgsynth"), placeboTest = TRUE,
+                       placebo.period = c(-2, 0))
+  r <- .gi_plot(plot(fit, type = "gap", id = 101))
+  expect_length(r$messages, 0)
+  expect_true(all(.gi_text(r$p) == "")) # the placebo p-value is the average's
+  ref <- .gi_band_by_hand(fit, 101)
+  pl <- ref$x %in% c(-2, -1, 0)
+  ## the placebo periods: triangles with line ranges; the others: point ranges
+  lr <- which(.gi_geoms(r$p) == "GeomLinerange")
+  band_pl <- do.call(rbind, lapply(lr, function(i)
+    ggplot2::layer_data(r$p, i)[, c("x", "ymin", "ymax")]))
+  band_pl <- band_pl[order(band_pl$x), ]
+  expect_equal(band_pl$x, c(-2, -1, 0))
+  expect_equal(band_pl$ymin, ref$ymin[pl], tolerance = 1e-10)
+  expect_equal(band_pl$ymax, ref$ymax[pl], tolerance = 1e-10)
+  pts <- .gi_points(r$p)
+  expect_equal(pts$ymin, ref$ymin[!pl], tolerance = 1e-10)
 })

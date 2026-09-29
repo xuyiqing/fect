@@ -4112,6 +4112,14 @@ fect.default <- function(
     if (se == TRUE && is.null(output[["vartype"]])) {
         output$vartype <- vartype
     }
+    ## The interval rule and level of the fit's intervals, so that plots
+    ## forming intervals from the stored draws (the gap plot with `id`) use
+    ## the same ones. "ci.alpha", not "alpha": some fits store the unit fixed
+    ## effects as "alpha".
+    if (se == TRUE) {
+        output$ci.method <- ci.method
+        output$ci.alpha <- alpha
+    }
 
     ## The aggregation weights as a TT x N matrix on the fit's panel (like
     ## Y.dat), when W or W.agg weights the ATT aggregation. imputed_outcomes()
