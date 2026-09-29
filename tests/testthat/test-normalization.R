@@ -314,7 +314,11 @@ test_that("normalize = TRUE: mc with CV = TRUE reports lambda on the outcome's s
   expect_equal(fits[[2]]$eigen.all, fits[[1]]$eigen.all, tolerance = 1e-8)
   expect_equal(fits[[2]]$CV.out.mc, fits[[1]]$CV.out.mc, tolerance = 1e-8)
   ## refitting without normalize at the reported lambda.cv gives the CV fit
-  refit <- .n166_fit(FALSE, method = "mc", lambda = fits[[2]]$lambda.cv, CV = FALSE, se = FALSE)
+  ## (fect_cv's fits stop at cv_tol = max(tol, 1e-3), so the refit uses that
+  ## tolerance; before the fix lambda.cv was on the normalized scale and the
+  ## refit gave 5.385 instead of 5.238)
+  refit <- .n166_fit(FALSE, method = "mc", lambda = fits[[2]]$lambda.cv, CV = FALSE, se = FALSE,
+                     tol = 1e-3)
   expect_equal(refit$att.avg, fits[[2]]$att.avg, tolerance = 1e-6)
   ## a user-supplied grid is on the outcome's scale too
   grid <- c(0.05, 0.01, 0.002)
@@ -326,8 +330,13 @@ test_that("normalize = TRUE: mc with CV = TRUE reports lambda on the outcome's s
 test_that("normalize = TRUE: the equivalence test of a parametric fit", {
   skip_on_cran()
   data("sim_gsynth", package = "fect")
+  ## tol = 1e-10: the parametric replicates refit the balanced control panel,
+  ## whose solver starts from feols() values that depend on the covariates'
+  ## scale (normalize divides X by sd(Y)) and stops on an absolute change of
+  ## beta; at the default tol the replicates differ by about 1e-5 between the
+  ## two legs, at 1e-10 by about 1e-10
   fits <- .n166_expect_same(method = "gsynth", r = 2, CV = FALSE, se = TRUE,
-                            nboots = 20, vartype = "parametric", seed = 1)
+                            nboots = 20, vartype = "parametric", seed = 1, tol = 1e-10)
   ## the default threshold 0.36 * sqrt(sigma2.fect): 0.489 both ways (it was
   ## 0.202 with normalize = TRUE, and the TOST p-value moved with it)
   expect_equal(fits[[2]]$tost.threshold, fits[[1]]$tost.threshold, tolerance = 1e-8)

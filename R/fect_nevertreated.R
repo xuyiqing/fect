@@ -2653,8 +2653,12 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             xi <- est.co.best$xi <- est.co.best$xi * norm.para[1]
         }
         est.co.best$residuals <- est.co.best$residuals * norm.para[1]
-        est.co.best$fit <- est.co.best$fit * norm.para[1]
-        if (boot == FALSE) {
+        ## the balanced control solver returns no fit; NULL * sd(Y) would
+        ## add an empty one (before 2.4.7 est$fit was numeric(0) then)
+        if (!is.null(est.co.best$fit)) {
+            est.co.best$fit <- est.co.best$fit * norm.para[1]
+        }
+        if (boot == FALSE && !is.null(est.co.fect$fit)) {
             est.co.fect$fit <- est.co.fect$fit * norm.para[1]
         }
         ## a variance (before 2.4.7 multiplied by sd(Y) once, so the default

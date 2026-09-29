@@ -31,6 +31,11 @@
 ## the iteration counts are left out, and the CV tables, whose fold fits
 ## stop at cv_tol = max(tol, 1e-3), are checked at that precision, which
 ## still tells a wrong power (a factor 100 or 10000) from the right one.
+## fect_cv() also returns the fit made in its loop at cv_tol, and the mc
+## grid comes from the starting fit's residual singular values (feols
+## precision, about 1e-7), so the estimates of a CV = TRUE mc fit carry
+## about 1e-5 across scales: that block is checked at 1e-4. Rows a CV loop
+## never visited keep their sentinel (1e10 or 1e20) and are skipped.
 ## ---------------------------------------------------------------
 
 ## every numeric slot of a fit, named by its path; matrices are kept whole
@@ -113,6 +118,10 @@
 .si_compare <- function(u, v, k, c, tol) {
   u <- as.numeric(u)
   v <- as.numeric(v)
+  ## sentinel rows of a CV table (never visited): not results
+  sentinel <- (is.finite(u) & abs(u) >= 1e9) | (is.finite(v) & abs(v) >= 1e9)
+  u[sentinel] <- NA
+  v[sentinel] <- NA
   if (!identical(is.finite(u), is.finite(v))) return("(NA or Inf pattern)")
   ok <- is.finite(u)
   if (!any(ok)) return(NULL)
@@ -266,20 +275,27 @@ test_that("scale invariance: mc with a given lambda and with CV = TRUE", {
   skip_on_cran()
   fits <- .si_expect_homogeneous(method = "mc", lambda = 0.01, CV = FALSE, se = FALSE,
                                  scaled = "lambda")
+  ## eigen.all (the starting fit's residual singular values) has feols
+  ## precision, about 1e-7
   for (f in fits) {
     expect_equal(f[[2]]$lambda.cv, 100 * f[[1]]$lambda.cv)
-    expect_equal(f[[2]]$lambda.norm, f[[1]]$lambda.norm, tolerance = 1e-8)
-    expect_equal(f[[2]]$eigen.all[1], 100 * f[[1]]$eigen.all[1], tolerance = 1e-8)
+    expect_equal(f[[2]]$lambda.norm, f[[1]]$lambda.norm, tolerance = 1e-6)
+    expect_equal(f[[2]]$eigen.all[1], 100 * f[[1]]$eigen.all[1], tolerance = 1e-6)
   }
-  fits <- .si_expect_homogeneous(method = "mc", CV = TRUE, seed = 1, se = FALSE)
+  ## the estimates of a CV = TRUE mc fit carry about 1e-5 across scales
+  ## (see the note above)
+  fits <- .si_expect_homogeneous(method = "mc", CV = TRUE, seed = 1, se = FALSE, tol = 1e-4)
   for (f in fits) {
     expect_equal(which(f[[2]]$lambda.seq == f[[2]]$lambda.cv),
                  which(f[[1]]$lambda.seq == f[[1]]$lambda.cv))
-    expect_equal(f[[2]]$lambda.cv, 100 * f[[1]]$lambda.cv, tolerance = 1e-8)
-    expect_equal(f[[2]]$lambda.seq, 100 * f[[1]]$lambda.seq, tolerance = 1e-8)
-    expect_equal(f[[2]]$lambda.norm, f[[1]]$lambda.norm, tolerance = 1e-8)
-    expect_equal(f[[2]]$CV.out.mc[, "lambda.norm"], f[[1]]$CV.out.mc[, "lambda.norm"], tolerance = 1e-8)
-    expect_equal(f[[2]]$CV.out.mc[, "MSPE"], 100^2 * f[[1]]$CV.out.mc[, "MSPE"], tolerance = .si_cv_tol)
+    expect_equal(f[[2]]$lambda.cv, 100 * f[[1]]$lambda.cv, tolerance = 1e-6)
+    expect_equal(f[[2]]$lambda.seq, 100 * f[[1]]$lambda.seq, tolerance = 1e-6)
+    expect_equal(f[[2]]$lambda.norm, f[[1]]$lambda.norm, tolerance = 1e-6)
+    expect_equal(f[[2]]$CV.out.mc[, "lambda.norm"], f[[1]]$CV.out.mc[, "lambda.norm"], tolerance = 1e-6)
+    visited <- which(f[[1]]$CV.out.mc[, "MSPE"] < 1e9)
+    expect_gte(length(visited), 3L)
+    expect_equal(f[[2]]$CV.out.mc[visited, "MSPE"], 100^2 * f[[1]]$CV.out.mc[visited, "MSPE"],
+                 tolerance = .si_cv_tol)
   }
 })
 
