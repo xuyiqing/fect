@@ -108,6 +108,9 @@
   if (!is.null(col) && col %in% names(.si_col_power)) return(.si_col_power[[col]])
   leaf <- sub(".*\\$", "", path)
   if (grepl("^\\$(estCV|rmCV)\\$", path)) return(0)   # fold indices
+  ## the CFE coefficients on Z (gamma) and loadings on Q (kappa) are lists
+  ## of matrices on the outcome's scale (Z and Q are not divided by sd(Y))
+  if (grepl("\\$(gamma|kappa)(\\$?\\[\\[[0-9]+\\]\\])?$", path)) return(1)
   if (leaf %in% names(.si_leaf_power)) return(.si_leaf_power[[leaf]])
   NA
 }
@@ -242,6 +245,24 @@ test_that("scale invariance: ife and cfe with r = 2", {
   fits <- .si_expect_homogeneous(method = "cfe", r = 2, CV = FALSE, se = FALSE)
   f <- fits[["normalize.TRUE"]]
   expect_equal(f[[2]]$est$VNT, 100^2 * f[[1]]$est$VNT, tolerance = 1e-8)
+})
+
+test_that("scale invariance: cfe with Z and with Q.type = \"linear\" (gamma, kappa)", {
+  skip_on_cran()
+  ## Z and Q are not divided by sd(Y), so gamma and kappa come out of the
+  ## solver on the Y / sd(Y) scale under normalize = TRUE; the fit must put
+  ## them back (found in the review of #166). Tolerance 1e-4: the CFE
+  ## solver with Z or Q stops on an absolute change, so where it stops
+  ## depends on the scale (alpha, xi, gamma and kappa differ by about 1e-5
+  ## relative between Y and 100 Y); a wrong power would be a factor 100.
+  fits <- .si_expect_homogeneous(method = "cfe", Z = "L1", CV = FALSE, se = FALSE, tol = 1e-4)
+  f <- fits[["normalize.TRUE"]]
+  expect_equal(f[[2]]$gamma[[1]], 100 * f[[1]]$gamma[[1]], tolerance = 1e-4)
+  expect_equal(f[[2]]$est$gamma[[1]], 100 * f[[1]]$est$gamma[[1]], tolerance = 1e-4)
+  fits <- .si_expect_homogeneous(method = "cfe", Q.type = "linear", CV = FALSE, se = FALSE, tol = 1e-4)
+  f <- fits[["normalize.TRUE"]]
+  expect_equal(f[[2]]$kappa[[1]], 100 * f[[1]]$kappa[[1]], tolerance = 1e-4)
+  expect_equal(f[[2]]$est$kappa[[1]], 100 * f[[1]]$est$kappa[[1]], tolerance = 1e-4)
 })
 
 test_that("scale invariance: ife with CV = TRUE", {

@@ -2653,6 +2653,15 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             xi <- est.co.best$xi <- est.co.best$xi * norm.para[1]
         }
         est.co.best$residuals <- est.co.best$residuals * norm.para[1]
+        ## gamma (coefficients on Z) and kappa (loadings on Q): Z and Q are
+        ## not divided by sd(Y), so the fit returns them on the Y / sd(Y)
+        ## scale
+        if (length(est.co.best$gamma) > 0) {
+            est.co.best$gamma <- lapply(est.co.best$gamma, function(g) g * norm.para[1])
+        }
+        if (length(est.co.best$kappa) > 0) {
+            est.co.best$kappa <- lapply(est.co.best$kappa, function(k) k * norm.para[1])
+        }
         ## the balanced control solver returns no fit; NULL * sd(Y) would
         ## add an empty one (before 2.4.7 est$fit was numeric(0) then)
         if (!is.null(est.co.best$fit)) {

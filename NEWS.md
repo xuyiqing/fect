@@ -310,7 +310,8 @@ says what to do.
   Group labels (`gamma`, `kappa`) are now coded by their sorted unique
   values in R, so character, factor, non-integer and negative labels work
   on unbalanced panels too (they were cast to unsigned integers in C++);
-  a missing label, or a non-numeric `Z` or `Q`, stops with a message.
+  a non-numeric `Z` or `Q` stops with a message (a row with a missing
+  label is dropped like any row with a missing value).
   Balanced panels are unchanged (fect #168).
 * With `normalize = TRUE`, the default equivalence-test threshold
   (`fit$tost.threshold`, `0.36 * sqrt(sigma2.fect)`) of `method = "gsynth"`
@@ -327,7 +328,9 @@ says what to do.
   whole low-rank part). `fit$data.long`, which `panelview(fit)` draws, is
   now on the outcome's scale for every method, as are `est$VNT`, gsynth's
   `IC`, and the cross-validation tables and messages (each score by its own
-  power of sd(Y)); those slots only report, so nothing else changes.
+  power of sd(Y)), and so are the CFE coefficients on `Z` (`gamma`) and
+  loadings on `Q` (`kappa`); those slots only report, so nothing else
+  changes.
   The fold standard errors that the 1-SE rule compares are on the same
   scale as the fold means (Moment, GMoment and Bias were not). An outcome
   whose standard deviation is zero or not finite now stops with a message

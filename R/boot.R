@@ -3135,20 +3135,6 @@ fect_boot <- function(
   ####################################
 
   ## function to get two-sided p-values
-  get.pvalue <- function(vec) {
-    if (NaN %in% vec | NA %in% vec) {
-      nan.pos <- is.nan(vec)
-      na.pos <- is.na(vec)
-      pos <- c(which(nan.pos), which(na.pos))
-      vec.a <- vec[-pos]
-      a <- sum(vec.a >= 0) / (length(vec) - sum(nan.pos | na.pos)) * 2
-      b <- sum(vec.a <= 0) / (length(vec) - sum(nan.pos | na.pos)) * 2
-    } else {
-      a <- sum(vec >= 0) / length(vec) * 2
-      b <- sum(vec <= 0) / length(vec) * 2
-    }
-    return(min(as.numeric(min(a, b)), 1))
-  }
 
   ## ATT estimates
   if (vartype == "jackknife") {

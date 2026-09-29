@@ -271,6 +271,15 @@ fect_cfe <- function(
         est.best$residuals <- est.best$residuals * norm.para[1]
         est.best$fit <- est.best$fit * norm.para[1]
         ## ini.res <- ini.res * norm.para[1]
+        ## gamma (coefficients on Z) and kappa (loadings on Q): Z and Q are
+        ## not divided by sd(Y), so the fit returns them on the Y / sd(Y)
+        ## scale
+        if (length(est.best$gamma) > 0) {
+            est.best$gamma <- lapply(est.best$gamma, function(g) g * norm.para[1])
+        }
+        if (length(est.best$kappa) > 0) {
+            est.best$kappa <- lapply(est.best$kappa, function(k) k * norm.para[1])
+        }
         if (boot == FALSE) {
             est.fect$fit <- est.fect$fit * norm.para[1]
             est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)

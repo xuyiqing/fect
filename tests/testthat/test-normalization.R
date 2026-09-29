@@ -270,6 +270,17 @@ test_that("normalize = TRUE: ife and cfe with r = 2", {
   expect_equal(fits[[2]]$est$VNT, fits[[1]]$est$VNT, tolerance = 1e-8)
 })
 
+test_that("normalize = TRUE: cfe with Z and with Q.type = \"linear\" (gamma, kappa)", {
+  skip_on_cran()
+  data("sim_gsynth", package = "fect")
+  ## Z and Q are not divided by sd(Y): gamma and kappa must be put back on
+  ## the outcome's scale (found in the review of #166)
+  fits <- .n166_expect_same(method = "cfe", Z = "L1", CV = FALSE, se = FALSE)
+  expect_equal(fits[[2]]$gamma[[1]], fits[[1]]$gamma[[1]], tolerance = 1e-8)
+  fits <- .n166_expect_same(method = "cfe", Q.type = "linear", CV = FALSE, se = FALSE)
+  expect_equal(fits[[2]]$kappa[[1]], fits[[1]]$kappa[[1]], tolerance = 1e-8)
+})
+
 test_that("normalize = TRUE: ife with CV = TRUE", {
   skip_on_cran()
   data("sim_gsynth", package = "fect")
