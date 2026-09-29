@@ -577,7 +577,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         fold_list   = fold_scores[task_idx],
                         count.T.cv  = count.T.cv,
                         use_weight  = use_weight,
-                        norm.para   = NULL
+                        norm.para   = norm.para
                     )
                     scores <- agg$pooled
                     MSPE    <- scores["MSPE"]
@@ -590,11 +590,6 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
 
                     ## Store per-fold SEs in CV.out.ife.se
                     se_v <- agg$se
-                    if (!is.null(norm.para)) {
-                        se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] <-
-                            se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] *
-                            (norm.para[1]^2)
-                    }
                     for (cn in c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")) {
                         if (cn %in% colnames(CV.out.ife.se)) {
                             CV.out.ife.se[i, cn] <- se_v[cn]
@@ -613,16 +608,15 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     MSE <- sum(eff.v.cv^2) / length(eff.v.cv)
 
                     if (!is.null(norm.para)) {
-                        MSPE    <- MSPE    * (norm.para[1]^2)
-                        WMSPE   <- WMSPE   * (norm.para[1]^2)
-                        GMSPE   <- GMSPE   * (norm.para[1]^2)
-                        WGMSPE  <- WGMSPE  * (norm.para[1]^2)
-                        MAD     <- MAD     * (norm.para[1]^2)
-                        moment  <- moment  * (norm.para[1]^2)
-                        gmoment <- gmoment * (norm.para[1]^2)
+                        ## the fold scores come back on the outcome's scale
+                        ## from .score_residuals(); sigma2, PC, MSPTATT and
+                        ## MSE are variances (before 2.4.7 MSPTATT and MSE
+                        ## stayed on the normalized scale)
                         sigma2 <- sigma2 * (norm.para[1]^2)
                         IC <- est.cv$IC - log(est.cv$sigma2) + log(sigma2)
                         PC <- PC * (norm.para[1]^2)
+                        MSPTATT <- MSPTATT * (norm.para[1]^2)
+                        MSE <- MSE * (norm.para[1]^2)
                     }
 
                     if (criterion == "mspe") {
@@ -714,7 +708,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         fold_list   = fold_list,
                         count.T.cv  = count.T.cv,
                         use_weight  = use_weight,
-                        norm.para   = NULL
+                        norm.para   = norm.para
                     )
                     scores <- agg$pooled
                     MSPE    <- scores["MSPE"]
@@ -727,11 +721,6 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
 
                     ## Store per-fold SEs in CV.out.ife.se for end-of-loop rule
                     se_v <- agg$se
-                    if (!is.null(norm.para)) {
-                        se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] <-
-                            se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] *
-                            (norm.para[1]^2)
-                    }
                     for (cn in c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")) {
                         if (cn %in% colnames(CV.out.ife.se)) {
                             CV.out.ife.se[i, cn] <- se_v[cn]
@@ -761,18 +750,15 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 MSE <- sum(eff.v.cv^2) / length(eff.v.cv)
 
                 if (!is.null(norm.para)) {
-                    if (criterion %in% c("mspe", "wmspe", "gmspe", "wgmspe", "mad", "moment", "gmoment")) {
-                        MSPE <- MSPE * (norm.para[1]^2)
-                        WMSPE <- WMSPE * (norm.para[1]^2)
-                        GMSPE <- GMSPE * (norm.para[1]^2)
-                        WGMSPE <- WGMSPE * (norm.para[1]^2)
-                        MAD <- MAD * (norm.para[1]^2)
-                        moment <- moment * (norm.para[1]^2)
-                        gmoment <- gmoment * (norm.para[1]^2)
-                    }
+                    ## the fold scores come back on the outcome's scale from
+                    ## .score_residuals(); sigma2, PC, MSPTATT and MSE are
+                    ## variances (before 2.4.7 MSPTATT and MSE stayed on the
+                    ## normalized scale)
                     sigma2 <- sigma2 * (norm.para[1]^2)
                     IC <- est.cv$IC - log(est.cv$sigma2) + log(sigma2)
                     PC <- PC * (norm.para[1]^2)
+                    MSPTATT <- MSPTATT * (norm.para[1]^2)
+                    MSE <- MSE * (norm.para[1]^2)
                 }
 
                 if (criterion == "mspe") {
@@ -969,6 +955,15 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         if (method %in% c("mc", "both")) {
             message("Matrix completion method...\n")
             eigen.all <- NULL
+            ## a user grid is on the outcome's scale; with normalize = TRUE
+            ## the fit runs on Y / sd(Y), so it is divided by sd(Y) (the grid
+            ## built from the normalized outcome below is on that scale
+            ## already). lambda.cv, lambda.seq and eigen.all are put back on
+            ## the outcome's scale at the end (before 2.4.7 they were
+            ## reported on the normalized scale).
+            if (!is.null(norm.para) && !is.null(lambda) && length(lambda) > 1) {
+                lambda <- lambda / norm.para[1]
+            }
             if (is.null(lambda) || length(lambda) == 1) {
                 ## create the hyper-parameter sequence
                 ## biggest candidate lambda
@@ -1098,7 +1093,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         fold_list   = fold_scores[task_idx],
                         count.T.cv  = count.T.cv,
                         use_weight  = use_weight,
-                        norm.para   = NULL
+                        norm.para   = norm.para
                     )
                     scores <- agg$pooled
                     MSPE    <- scores["MSPE"]
@@ -1122,22 +1117,16 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     MSE <- sum(eff.v.cv^2) / length(eff.v.cv)
 
                     if (!is.null(norm.para)) {
-                        MSPE   <- MSPE   * (norm.para[1]^2)
-                        WMSPE  <- WMSPE  * (norm.para[1]^2)
-                        GMSPE  <- GMSPE  * (norm.para[1]^2)
-                        WGMSPE <- WGMSPE * (norm.para[1]^2)
-                        MAD    <- MAD    * (norm.para[1]^2)
-                        moment <- moment * (norm.para[1]^2)
-                        gmoment <- gmoment * (norm.para[1]^2)
+                        ## the fold scores come back on the outcome's scale
+                        ## from .score_residuals(); MSPTATT and MSE are
+                        ## variances (before 2.4.7 they stayed on the
+                        ## normalized scale)
+                        MSPTATT <- MSPTATT * (norm.para[1]^2)
+                        MSE <- MSE * (norm.para[1]^2)
                     }
 
                     ## Persist per-fold SEs in CV.out.mc.se for end-of-block rule
                     se_v <- agg$se
-                    if (!is.null(norm.para)) {
-                        se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] <-
-                            se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] *
-                            (norm.para[1]^2)
-                    }
                     for (cn in c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")) {
                         if (cn %in% colnames(CV.out.mc.se)) {
                             CV.out.mc.se[i, cn] <- se_v[cn]
@@ -1218,7 +1207,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     fold_list   = fold_list,
                     count.T.cv  = count.T.cv,
                     use_weight  = use_weight,
-                    norm.para   = NULL
+                    norm.para   = norm.para
                 )
                 scores <- agg_mc$pooled
                 MSPE    <- scores["MSPE"]
@@ -1241,23 +1230,16 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 MSE <- sum(eff.v.cv^2) / length(eff.v.cv)
 
                 if (!is.null(norm.para)) {
-                    MSPE <- MSPE * (norm.para[1]^2)
-                    WMSPE <- WMSPE * (norm.para[1]^2)
-                    GMSPE <- GMSPE * (norm.para[1]^2)
-                    WGMSPE <- WGMSPE * (norm.para[1]^2)
-                    MAD <- MAD * (norm.para[1]^2)
-                    moment <- moment * (norm.para[1]^2)
-                    gmoment <- gmoment * (norm.para[1]^2)
+                    ## the fold scores come back on the outcome's scale from
+                    ## .score_residuals(); MSPTATT and MSE are variances
+                    ## (before 2.4.7 they stayed on the normalized scale)
+                    MSPTATT <- MSPTATT * (norm.para[1]^2)
+                    MSE <- MSE * (norm.para[1]^2)
                 }
 
                 ## Persist per-fold SEs in CV.out.mc.se (added v2.3.0)
                 {
                     se_v <- agg_mc$se
-                    if (!is.null(norm.para)) {
-                        se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] <-
-                            se_v[c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")] *
-                            (norm.para[1]^2)
-                    }
                     for (cn in c("MSPE","WMSPE","GMSPE","WGMSPE","MAD","Moment","GMoment")) {
                         if (cn %in% colnames(CV.out.mc.se)) {
                             CV.out.mc.se[i, cn] <- se_v[cn]
@@ -1561,6 +1543,13 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
     ## we first adjustment for normalization
     if (!is.null(norm.para)) {
         Y <- Y * norm.para[1]
+        if (method == "mc") {
+            ## the penalty grid, the chosen penalty and the singular values
+            ## on the outcome's scale (lambda.norm, their ratio, is unchanged)
+            lambda <- lambda * norm.para[1]
+            lambda.cv <- lambda.cv * norm.para[1]
+            eigen.all <- eigen.all * norm.para[1]
+        }
         if (method == "ife") {
             ## variance of the error term
             sigma2 <- est.best$sigma2 * (norm.para[1]^2)
@@ -1575,7 +1564,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         est.best$mu <- est.best$mu * norm.para[1]
         if (method == "ife" && r.cv > 0) {
             est.best$lambda <- est.best$lambda * norm.para[1]
-            est.best$VNT <- est.best$VNT * norm.para[1]
+            ## singular values of E E' / (N T): the square of the scale
+            ## (before 2.4.7 multiplied by sd(Y) once)
+            est.best$VNT <- est.best$VNT * (norm.para[1]^2)
         }
         if (force %in% c(1, 3)) {
             est.best$alpha <- est.best$alpha * norm.para[1]
@@ -1589,7 +1580,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         est.best$residuals <- est.best$residuals * norm.para[1]
         est.best$fit <- est.best$fit * norm.para[1]
         est.fect$fit <- est.fect$fit * norm.para[1]
-        est.fect$sigma2 <- est.fect$sigma2 * norm.para[1]
+        ## a variance (before 2.4.7 multiplied by sd(Y) once, so the default
+        ## equivalence threshold 0.36 * sqrt(sigma2.fect) was too small by
+        ## sqrt(sd(Y)))
+        est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
     }
 
     ## 0. revelant parameters

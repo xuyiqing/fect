@@ -99,10 +99,19 @@ List complex_fe_ub(
   } else {
     invXX = XXinv(XX); // compute (X'X)^{-1}, outside beta iteration
   }
+
+  /* Z and the kappa labels are unit-level, Q and the gamma labels
+   * period-level (#168): read each once, from arrays R fills so that they
+   * do not vary along the other dimension (checked). */
+  arma::mat Z = cfe_unit_level(X_Z, "X_Z");                 // N x p_z
+  arma::mat kappa_labels = cfe_unit_level(X_kappa, "X_kappa"); // N x p_kappa
+  arma::mat Q = cfe_period_level(X_Q, "X_Q").t();           // p_q x T
+  arma::mat gamma_labels = cfe_period_level(X_gamma, "X_gamma"); // T x p_gamma
+
   List cfe =
-      cfe_iter(XX, invXX, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id,
-                kappaQ_id, YY, Y0, I, W, beta0, force, r, tol, max_iter,
-                fit_init);
+      cfe_iter(XX, invXX, X_extra_FE, Z, Q, gamma_labels, kappa_labels,
+                Zgamma_id, kappaQ_id, YY, Y0, I, W, beta0, force, r, tol,
+                max_iter, fit_init);
 
   mu = as<double>(cfe["mu"]);
   beta = as<arma::mat>(cfe["beta"]);

@@ -535,7 +535,9 @@ interFE.default <- function(formula = NULL, data, # a data frame
         }
         if (r > 0) {
             out$lambda <- out$lambda * norm.para[1]
-            out$VNT <- out$VNT * norm.para[1]
+            ## singular values of E E' / (N T): the square of the scale
+            ## (before 2.4.7 multiplied by sd(Y) once)
+            out$VNT <- out$VNT * (norm.para[1]^2)
         }
         if (force %in% c(1, 3)) {
             out$alpha <- out$alpha * norm.para[1]

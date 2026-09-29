@@ -138,13 +138,13 @@ becomes the CIs reported in fect's \code{est.*} slots. Two values:
 \eqn{[2\hat\theta - q_{1-\alpha/2},\, 2\hat\theta - q_{\alpha/2}]}, the
 literature-standard "percentile" CI per Davison & Hinkley (1997, §5.2.1)
 and what \code{boot::boot.ci(type = "basic")} returns). With
-\code{"basic"}, the p-values come from the replicates. For bootstrap fits
-each p-value goes with the basic interval: it is below \eqn{\alpha} exactly
-when the \eqn{1 - \alpha} basic interval excludes zero, at every
-\eqn{\alpha}, for the effects and for the coefficients (\code{est.beta}).
-For parametric fits, whose replicates are simulated with no effect, the
-p-value of an effect is twice the smaller of the shares of the centered
-replicates at or above the estimate and at or below it. For
+\code{"basic"}, the p-values come from the replicates. Each p-value goes
+with the basic interval: it is below \eqn{\alpha} exactly when the
+\eqn{1 - \alpha} basic interval excludes zero, at every \eqn{\alpha}, for
+the effects and for the coefficients (\code{est.beta}). For parametric
+fits, whose replicates are simulated with no effect, the replicates are
+first recentered at the estimate, the same shift the basic interval uses,
+and the p-value is the one dual to that interval. For
 \code{"percentile"}, \code{"bc"}, or \code{"bca"} CIs (typically wanted
 on alternative estimands like \code{aptt} and \code{log.att}), call
 \code{\link{estimand}} after fitting.}
@@ -212,10 +212,10 @@ cluster at the unit level instead, pass \code{cl = index[1]} (e.g.,
 bootstrap always resamples units regardless of \code{cl}), and
 \code{cl = FALSE} is rejected with a guiding error.}
 \item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
-\item{Z}{a vector specifying the time-invariant covariates for the Z matrix.}
-\item{gamma}{a vector specifying the time-varying covariates for the gamma matrix.}
-\item{Q}{a vector specifying the time-varying covariates for the Q matrix.}
-\item{kappa}{a vector specifying the time-invariant covariates for the kappa matrix.}
+\item{Z}{a vector of column names: time-invariant unit covariates whose coefficients vary by period (grouped by \code{gamma}). Each must be the same in every period of a unit; a value that varies within a unit stops with a message.}
+\item{gamma}{a column name giving each period's group for the coefficients on \code{Z}; it must be the same for every unit in a period. Default: one group per period.}
+\item{Q}{a vector of column names: known time trends whose loadings vary by unit (grouped by \code{kappa}). Each must be the same for every unit in a period; a value that varies within a period stops with a message. See also \code{Q.type}.}
+\item{kappa}{a column name giving each unit's group for the loadings on \code{Q}; it must be the same in every period of a unit. Default: one group per unit.}
 \item{Q.type}{a vector specifying the type of Q matrix.}
 \item{Q.bspline.degree}{an integer specifying the degree used when \code{Q.type} includes \code{"bspline"} in \code{method="cfe"}. If NULL, a default degree is chosen based on the number of distinct time values.}
 \item{Z.param}{a list specifying the parameters for the Z matrix.}
@@ -241,7 +241,7 @@ double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
 \eqn{g}.}
 \item{permute}{a logical flag indicating whether to run a permutation test.}
 \item{m}{an integer specifying the block length for permutation tests. Default \code{2}.}
-\item{normalize}{a logical flag indicating whether to divide the outcome and covariates by the standard deviation of the outcome during estimation. Default \code{FALSE}. The effects, the counterfactual outcomes, \code{Y.dat}, \code{est.cm} and the covariates stored in the fit are reported on the outcome's scale (before version 2.4.7, \code{Y.dat}, \code{est.cm} and the stored covariates stayed divided by it).}
+\item{normalize}{a logical flag indicating whether to divide the outcome and covariates by the standard deviation of the outcome during estimation. Default \code{FALSE}. Every slot of the fit is reported on the outcome's scale, so the option changes only the speed of estimation, and a given \code{lambda} (\code{method = "mc"}) is on the outcome's scale too. Before version 2.4.7, \code{Y.dat}, \code{est.cm}, the stored covariates, \code{data.long}, \code{sigma2.fect} (and so the default equivalence threshold), \code{est$VNT}, the gsynth \code{IC}, the cross-validation tables and the mc \code{lambda} slots were on the normalized scale or put back with the wrong power of sd(Y).}
 \item{keep.sims}{a logical flag indicating whether to save unit-time level bootstrap effects (\code{eff.boot}, with \code{D.boot}, \code{I.boot} and \code{colnames.boot}; see Value). Default \code{keep.sims = FALSE}. If \code{se = FALSE}, this argument is ignored. \code{\link{effect}}, \code{imputed_outcomes(replicates = TRUE)} and most \code{\link{estimand}} calls need these draws.}
 \item{cm}{a logical flag indicating whether to enable causal moderation analysis. When \code{TRUE}, the estimator decomposes the treatment effect into effect modification and causal moderation components. Currently available for \code{method = "fe"} and \code{method = "ife"} with \code{time.component.from = "notyettreated"}. The fit then carries \code{est.cm}, the model of the treated outcomes fitted on the treated cells, which \code{\link{fect_iden}} and \code{plot(type = "hte", cm = TRUE)} use; it is stored with or without standard errors and after cross-validation. Default is \code{FALSE}.}
 \item{loading.bound}{a string controlling whether treated-unit factor loadings are bounded inside the convex hull of control loadings. \code{"none"} (default) reproduces standard GSC behavior. \code{"simplex"} constrains each treated unit's loading to be a non-negative convex combination of control loadings via an entropy-regularized simplex projection, ensuring the imputed counterfactual lies pointwise in the convex hull of factor-implied control outcomes. Currently applies only to \code{method = "ife"} or \code{method = "gsynth"} (equivalent forms), and requires \code{time.component.from = "nevertreated"}. The bound applies wherever the model is fitted: with or without cross-validation, with or without \code{se}, in the bootstrap and parametric-bootstrap replicates, and in the \code{loo} refits. If the selected number of factors is 0, a message says that the bound has no effect.}

@@ -489,18 +489,18 @@ BEGIN_RCPP
 END_RCPP
 }
 // cfe_iter
-List cfe_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::cube& X_extra_FE, const arma::cube& X_Z, const arma::cube& X_Q, const arma::cube& X_gamma, const arma::cube& X_kappa, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, const arma::mat& beta0, int force, int r, double tolerate, int max_iter, Rcpp::Nullable<Rcpp::NumericMatrix> fit_init);
-RcppExport SEXP _fect_cfe_iter(SEXP XXSEXP, SEXP xxinvSEXP, SEXP X_extra_FESEXP, SEXP X_ZSEXP, SEXP X_QSEXP, SEXP X_gammaSEXP, SEXP X_kappaSEXP, SEXP Zgamma_idSEXP, SEXP kappaQ_idSEXP, SEXP YSEXP, SEXP Y0SEXP, SEXP ISEXP, SEXP WSEXP, SEXP beta0SEXP, SEXP forceSEXP, SEXP rSEXP, SEXP tolerateSEXP, SEXP max_iterSEXP, SEXP fit_initSEXP) {
+List cfe_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::cube& X_extra_FE, const arma::mat& Z, const arma::mat& Q, const arma::mat& gamma_labels, const arma::mat& kappa_labels, Rcpp::List Zgamma_id, Rcpp::List kappaQ_id, const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, const arma::mat& W, const arma::mat& beta0, int force, int r, double tolerate, int max_iter, Rcpp::Nullable<Rcpp::NumericMatrix> fit_init);
+RcppExport SEXP _fect_cfe_iter(SEXP XXSEXP, SEXP xxinvSEXP, SEXP X_extra_FESEXP, SEXP ZSEXP, SEXP QSEXP, SEXP gamma_labelsSEXP, SEXP kappa_labelsSEXP, SEXP Zgamma_idSEXP, SEXP kappaQ_idSEXP, SEXP YSEXP, SEXP Y0SEXP, SEXP ISEXP, SEXP WSEXP, SEXP beta0SEXP, SEXP forceSEXP, SEXP rSEXP, SEXP tolerateSEXP, SEXP max_iterSEXP, SEXP fit_initSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::cube& >::type XX(XXSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type xxinv(xxinvSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type X_extra_FE(X_extra_FESEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type X_Z(X_ZSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type X_Q(X_QSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type X_gamma(X_gammaSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type X_kappa(X_kappaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Q(QSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type gamma_labels(gamma_labelsSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type kappa_labels(kappa_labelsSEXP);
     Rcpp::traits::input_parameter< Rcpp::List >::type Zgamma_id(Zgamma_idSEXP);
     Rcpp::traits::input_parameter< Rcpp::List >::type kappaQ_id(kappaQ_idSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type Y(YSEXP);
@@ -513,7 +513,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type tolerate(tolerateSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
     Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericMatrix> >::type fit_init(fit_initSEXP);
-    rcpp_result_gen = Rcpp::wrap(cfe_iter(XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter, fit_init));
+    rcpp_result_gen = Rcpp::wrap(cfe_iter(XX, xxinv, X_extra_FE, Z, Q, gamma_labels, kappa_labels, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter, fit_init));
     return rcpp_result_gen;
 END_RCPP
 }

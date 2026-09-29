@@ -289,6 +289,64 @@ says what to do.
   that an id not in the data stopped with "Some specified units are not in
   the data." (fect #162).
 
+* `method = "cfe"` now takes each unit's `Z` and `kappa` label from that
+  unit's own rows, and each period's `Q` and `gamma` label from that
+  period's own rows. It read `Z` and `kappa` from the first period and `Q`
+  and `gamma` from the first unit of the filled panel, where an absent row
+  holds 0, so one missing row in the first unit or the first period changed
+  the model: with `Q.type = "linear"`, the trend was 0 in every period the
+  first unit lacked; a unit without a first-period row had `Z = 0`
+  throughout; units missing the first period shared one `kappa` group, and
+  periods the first unit lacked shared one `gamma` group. Estimates on
+  unbalanced panels with `Z`, `Q`, `gamma` or `kappa` change, and so can the
+  CFE scores of `fect_mspe()` and `r.cv.rolling()` (on `sim_linear` with
+  `Q.type = "linear"` and the period-20 row of unit 1 removed: an ATT of
+  1.0062 instead of 1.0959, with 1.0064 on the full data; on `simdata`
+  with `Z = "L1"` and the first-period row of unit 101 removed: 3.0740
+  instead of 3.1322, with 3.0759 on the full data).
+  Relabeling the units no longer changes any estimate. `Z` or `kappa` that
+  vary within a unit, or `Q` or `gamma` that vary within a period, now stop
+  with a message naming the unit or period; they were read from one row.
+  Group labels (`gamma`, `kappa`) are now coded by their sorted unique
+  values in R, so character, factor, non-integer and negative labels work
+  on unbalanced panels too (they were cast to unsigned integers in C++);
+  a non-numeric `Z` or `Q` stops with a message (a row with a missing
+  label is dropped like any row with a missing value).
+  Balanced panels are unchanged (fect #168).
+* With `normalize = TRUE`, the default equivalence-test threshold
+  (`fit$tost.threshold`, `0.36 * sqrt(sigma2.fect)`) of `method = "gsynth"`
+  fits and of `CV = TRUE` fits was too small by a factor sqrt(sd(Y)):
+  `sigma2.fect` was multiplied by sd(Y) once instead of squared. The
+  threshold, `test.out$tost.equiv.p` and `plot(type = "equiv")` change (on
+  `sim_gsynth`, `method = "gsynth"`, `r = 2`: a threshold of 0.489 instead
+  of 0.202, and an equivalence p-value of 0.954 instead of 0.998). And a
+  `lambda` given to `method = "mc"` now means the same model with or
+  without `normalize`: it is divided by sd(Y) before the fit, and
+  `lambda.cv`, `lambda.seq` and `eigen.all` are reported on the outcome's
+  scale (on `sim_gsynth` with `lambda = 0.01`: an ATT of 5.118 instead of
+  5.085, the two-way fixed effects ATT, because the penalty removed the
+  whole low-rank part). `fit$data.long`, which `panelview(fit)` draws, is
+  now on the outcome's scale for every method, as are `est$VNT`, gsynth's
+  `IC`, and the cross-validation tables and messages (each score by its own
+  power of sd(Y)), and so are the CFE coefficients on `Z` (`gamma`) and
+  loadings on `Q` (`kappa`); those slots only report, so nothing else
+  changes.
+  The fold standard errors that the 1-SE rule compares are on the same
+  scale as the fold means (Moment, GMoment and Bias were not). An outcome
+  whose standard deviation is zero or not finite now stops with a message
+  under `normalize = TRUE`; it silently made the outcome `NaN` (fect #166).
+* For parametric fits (`vartype = "parametric"`, gsynth's default) with
+  `ci.method = "basic"`, every p-value of the effects and of the
+  coefficients (`est.beta`) is now the p-value that goes with the basic
+  interval, as for bootstrap fits since #158: below alpha exactly when the
+  (1 - alpha) interval excludes 0. It was a counting rule that agreed with
+  the interval only up to the resolution of the draws (2 / `nboots`), so a
+  row could print a 95% interval that excludes 0 beside p = 0.05, and for
+  the coefficients the percentile rule. P-values move by at most about one
+  step (on `sim_gsynth`, `method = "gsynth"`, `r = 2`, `nboots = 200`,
+  `seed = 11`: 0.042 instead of 0.05 at event time 1, where the 95%
+  interval is [0.055, 2.709]). Intervals do not change (fect #169).
+
 ## New features
 
 * `plot(fit, type = "gap", id = ...)` now draws the gaps of the chosen
