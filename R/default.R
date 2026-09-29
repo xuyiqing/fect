@@ -199,6 +199,81 @@ fect <- function(
     d
 }
 
+## Z and the kappa labels belong to a unit, Q and the gamma labels to a
+## period (#168). Read them from the long data, one value per unit or
+## period, and stop when a variable varies within a unit or a period.
+## data: the long data, one row per observed unit-period, holding `cols`
+## and `by` (the id or the time column). levels: the sorted unique values
+## of `by`, in the order of the panel's units (columns) or periods (rows);
+## labels: what to call them in messages. Values (numeric = TRUE: Z, Q)
+## are compared with a relative tolerance and rows with a missing value
+## are skipped; labels (gamma, kappa) are compared as given and returned
+## as 1-based codes in their sorted order (the C++ maps labels to groups
+## by sorted unique value, so the codes give the same groups as the raw
+## labels). Returns a length(levels) x length(cols) numeric matrix.
+.cfe_by_level <- function(data, cols, by, levels, what, level.name,
+                          labels = levels, numeric = TRUE, tol = 1e-8) {
+    g <- match(data[[by]], levels)
+    out <- matrix(0, length(levels), length(cols))
+    same <- if (level.name == "unit") {
+        "in every period of a unit"
+    } else {
+        "for every unit in a period"
+    }
+    for (j in seq_along(cols)) {
+        x <- data[[cols[j]]]
+        if (numeric) {
+            if (is.logical(x)) {
+                x <- as.numeric(x)
+            }
+            if (!is.numeric(x)) {
+                stop(sprintf("\"%s\" (%s) must be numeric.", cols[j], what),
+                     call. = FALSE)
+            }
+            ok <- !is.na(x)
+            first <- match(seq_along(levels), g[ok])
+            if (anyNA(first)) {
+                stop(sprintf("\"%s\" (%s) is missing in every row of %s %s.",
+                             cols[j], what, level.name,
+                             labels[which(is.na(first))[1]]),
+                     call. = FALSE)
+            }
+            ref <- x[ok][first]
+            diff <- abs(x[ok] - ref[g[ok]])
+            scale <- abs(ref[g[ok]])
+            rel <- ifelse(scale > tol, diff / scale, diff)
+            if (any(rel > tol)) {
+                stop(sprintf(
+                    "\"%s\" (%s) varies within %s %s; it must be the same %s.",
+                    cols[j], what, level.name,
+                    labels[g[ok][which(rel > tol)[1]]], same
+                ), call. = FALSE)
+            }
+            out[, j] <- ref
+        } else {
+            if (is.factor(x)) {
+                x <- as.character(x)
+            }
+            if (anyNA(x)) {
+                stop(sprintf("\"%s\" (%s) has missing values (%s %s).",
+                             cols[j], what, level.name,
+                             labels[g[which(is.na(x))[1]]]),
+                     call. = FALSE)
+            }
+            ref <- x[match(seq_along(levels), g)]
+            bad <- which(x != ref[g])
+            if (length(bad) > 0) {
+                stop(sprintf(
+                    "\"%s\" (%s) varies within %s %s; it must be the same %s.",
+                    cols[j], what, level.name, labels[g[bad[1]]], same
+                ), call. = FALSE)
+            }
+            out[, j] <- match(ref, sort(unique(ref)))
+        }
+    }
+    out
+}
+
 ## Tolerances of .fect_check_covariates()
 .FECT_COV_NOVAR_TOL <- 1e-12  # centred norm / max(1, norm): no variation
 .FECT_COV_ABSORB_TOL <- 1e-8  # norm after removing the FE / centred norm
@@ -2027,6 +2102,14 @@ fect.default <- function(
         stop(paste("Missing values in variable \"", time, "\".", sep = ""))
     }
 
+    ## the long data the CFE unit- and period-level inputs are read from
+    ## (see .cfe_by_level()); the panel filled below holds 0 at absent
+    ## rows and, when unbalanced, index codes in place of the id and time
+    cfe.long <- NULL
+    if (method == "cfe") {
+        cfe.long <- data[, unique(c(id, time, Z, Q, gamma, kappa)), drop = FALSE]
+    }
+
     ## check balanced panel and fill unbalanced panel
     if (dim(data)[1] < TT * N) {
         data[, time] <- as.numeric(as.factor(data[, time]))
@@ -2052,19 +2135,10 @@ fect.default <- function(
             variable <- c(variable, Wname)
         }
 
-        if (method == "cfe") {
-            if (length(index) > 2) {
-                variable <- unique(c(
-                    index[3:length(index)],
-                    Z,
-                    Q,
-                    gamma,
-                    kappa,
-                    variable
-                ))
-            } else {
-                variable <- unique(c(Z, Q, gamma, kappa, variable))
-            }
+        ## (Z, Q, gamma and kappa are read from cfe.long, not from the
+        ## filled panel)
+        if (method == "cfe" && length(index) > 2) {
+            variable <- unique(c(index[3:length(index)], variable))
         }
 
         if (!is.null(cl)) {
@@ -2277,46 +2351,44 @@ fect.default <- function(
             }
         }
 
+        ## Z and kappa belong to a unit, Q and gamma to a period (#168).
+        ## Read each once per unit or period from the long data, and fill
+        ## the arrays so that Z and kappa are the same in every period and
+        ## Q and gamma the same for every unit; complex_fe_ub() reads them
+        ## back that way. (Before 2.4.7 they were read from the filled
+        ## panel, where an absent row held 0, and the C++ took Z and kappa
+        ## from the first period and Q and gamma from the first unit.)
+        time.lab <- .time_label(time.uni)
         if (!is.null(Z)) {
-            for (i in 1:length(Z)) {
-                X.Z[,, i] <- matrix(data[, Z[i]], TT, N)
+            Z.unit <- .cfe_by_level(cfe.long, Z, id, id.series, "Z", "unit")
+            for (i in seq_along(Z)) {
+                X.Z[, , i] <- matrix(Z.unit[, i], TT, N, byrow = TRUE)
             }
         }
 
         if (!is.null(Q)) {
-            for (i in 1:length(Q)) {
-                X.Q[,, i] <- matrix(data[, Q[i]], TT, N)
+            Q.period <- .cfe_by_level(cfe.long, Q, time, time.uni, "Q", "period",
+                                      labels = time.lab)
+            for (i in seq_along(Q)) {
+                X.Q[, , i] <- matrix(Q.period[, i], TT, N)
             }
         }
 
-        if (length(gamma) > 1) {
-            for (i in 1:length(gamma)) {
-                X.gamma[,, i] <- matrix(data[, gamma[i]], TT, N)
+        if (length(gamma) > 0) {
+            gamma.period <- .cfe_by_level(cfe.long, gamma, time, time.uni, "gamma",
+                                          "period", labels = time.lab,
+                                          numeric = FALSE)
+            for (i in seq_along(gamma)) {
+                X.gamma[, , i] <- matrix(gamma.period[, i], TT, N)
             }
-        } else if (length(gamma) == 1) {
-            X.gamma[,, 1] <- matrix(data[, gamma], TT, N)
         }
 
-        if (length(kappa) > 1) {
+        if (length(kappa) > 0) {
+            kappa.unit <- .cfe_by_level(cfe.long, kappa, id, id.series, "kappa",
+                                        "unit", numeric = FALSE)
             for (i in seq_along(kappa)) {
-                kappa.val <- data[, kappa[i]]
-                if (!is.numeric(kappa.val)) {
-                    kappa.val <- suppressWarnings(as.numeric(as.character(kappa.val)))
-                    if (all(is.na(kappa.val))) {
-                        kappa.val <- as.numeric(factor(data[, kappa[i]]))
-                    }
-                }
-                X.kappa[,, i] <- matrix(kappa.val, TT, N)
+                X.kappa[, , i] <- matrix(kappa.unit[, i], TT, N, byrow = TRUE)
             }
-        } else if (length(kappa) == 1) {
-            kappa.val <- data[, kappa]
-            if (!is.numeric(kappa.val)) {
-                kappa.val <- suppressWarnings(as.numeric(as.character(kappa.val)))
-                if (all(is.na(kappa.val))) {
-                    kappa.val <- as.numeric(factor(data[, kappa]))
-                }
-            }
-            X.kappa[,, 1] <- matrix(kappa.val, TT, N)
         }
 
         Zgamma.id <- list()
