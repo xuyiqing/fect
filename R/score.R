@@ -85,6 +85,14 @@
     }
 
     ## ---- Step 5: normalization ---- ##
+    ## The residuals are on the normalized scale (divided by sd(Y)); each
+    ## score is put back with its own power of sd(Y): the squared-error
+    ## scores and MAD (the median absolute deviation of the squared
+    ## residuals) with the square; Moment, GMoment and Bias (means of
+    ## residuals or of their absolute values) with sd(Y) itself (before
+    ## 2.4.7 Moment and GMoment were multiplied by the square and Bias was
+    ## left on the normalized scale; fect #166).
+    Bias <- mean(resid)
     if (!is.null(norm.para)) {
         scale <- norm.para[1]^2
         MSPE    <- MSPE * scale
@@ -92,13 +100,13 @@
         GMSPE   <- GMSPE * scale
         WGMSPE  <- WGMSPE * scale
         MAD     <- MAD * scale
-        Moment  <- Moment * scale
-        GMoment <- GMoment * scale
+        Moment  <- Moment * norm.para[1]
+        GMoment <- GMoment * norm.para[1]
+        Bias    <- Bias * norm.para[1]
     }
 
     ## ---- Step 6: convenience scores and return ---- ##
     RMSE <- sqrt(MSPE)
-    Bias <- mean(resid)
     c(MSPE = MSPE, WMSPE = WMSPE, GMSPE = GMSPE, WGMSPE = WGMSPE,
       MAD = MAD, Moment = Moment, GMoment = GMoment,
       RMSE = RMSE, Bias = Bias)

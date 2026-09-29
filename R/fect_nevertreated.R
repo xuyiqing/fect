@@ -682,7 +682,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                             fold_list  = fold_scores_ife[task_idx],
                             count.T.cv = count.T.cv,
                             use_weight = as.integer(!is.null(W.cvfit)),
-                            norm.para  = NULL
+                            norm.para  = norm.para
                         )
                         scores <- agg$pooled
                         se_v   <- agg$se
@@ -926,7 +926,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         fold_list  = fold_results,
                         count.T.cv = count.T.cv,
                         use_weight = as.integer(!is.null(W.cvfit)),
-                        norm.para  = NULL
+                        norm.para  = norm.para
                     )
                     scores <- agg$pooled
                     se_v   <- agg$se
@@ -1778,7 +1778,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
                     ## Aggregate fold scores for this rank
                     task_idx <- which(vapply(tasks_cfe, function(t) t$ri == i, logical(1)))
-                    agg    <- .cfe_fold_scores(fold_scores_cfe[task_idx], !is.null(W.cvfit), NULL)
+                    agg    <- .cfe_fold_scores(fold_scores_cfe[task_idx], !is.null(W.cvfit), norm.para)
                     scores <- agg$pooled
                     se_v   <- agg$se
 
@@ -2045,7 +2045,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         max.iteration   = max.iteration
                     )
                 })
-                agg    <- .cfe_fold_scores(fold_results, !is.null(W.cvfit), NULL)
+                agg    <- .cfe_fold_scores(fold_results, !is.null(W.cvfit), norm.para)
                 scores <- agg$pooled
                 se_v   <- agg$se
 
