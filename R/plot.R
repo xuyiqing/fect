@@ -1046,6 +1046,11 @@ plot.fect <- function(
     unit.gap.boot <- x[["eff.boot"]]
     if (is.null(x[["est.att"]])) {
       unit.gap.note <- "Uncertainty estimates not available.\n"
+    } else if (is.null(x[["vartype"]])) {
+      unit.gap.note <- paste0(
+        "The gap plot with \"id\" draws the chosen units' estimates without ",
+        "a band: the fit does not record its variance type, as fits made ",
+        "with older versions of fect do. Refit with this version for a band.")
     } else if (!identical(x[["vartype"]], "parametric")) {
       unit.gap.note <- paste0(
         "The gap plot with \"id\" draws the chosen units' estimates without ",
@@ -1094,6 +1099,12 @@ plot.fect <- function(
       colnames(unit.gap.bound) <- c("CI.lower", "CI.upper")
       rownames(unit.gap.est) <- rownames(unit.gap.bound) <- unit.gap.time
     }
+    if (identical(plot.ci, "none")) {
+      unit.gap.note <- NULL # the user asked for no interval
+    }
+    ## the fit's tests are about the average; this plot shows none, so
+    ## return.test = TRUE returns NULL for it
+    test.out <- NULL
     if (is.null(main)) {
       main <- if (length(unit.gap.pos) == 1) {
         paste(x$index[1], "=", unit.gap.id)
@@ -3027,8 +3038,7 @@ plot.fect <- function(
 
     if (CI == FALSE) {
       if (unit.gap) {
-        ## the note is NULL when the fit has a band and the user chose
-        ## plot.ci = "none"
+        ## the note is NULL when the user chose plot.ci = "none"
         if (!is.null(unit.gap.note)) {
           message(unit.gap.note)
         }

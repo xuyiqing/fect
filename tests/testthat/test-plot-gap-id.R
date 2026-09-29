@@ -172,6 +172,12 @@ test_that("G3: with a bootstrap fit, the gap plot for an id draws no interval, s
     expect_match(r$messages, "keep each unit's own outcomes fixed",
                  fixed = TRUE)
   }
+  ## return.test: the fit's tests are about the average, so the unit plot,
+  ## which shows none, returns none
+  expect_false(is.null(suppressMessages(
+    plot(fit, type = "gap", return.test = TRUE))$test.out))
+  expect_null(suppressMessages(
+    plot(fit, type = "gap", id = 102, return.test = TRUE))$test.out)
   ## connected style: the ribbons carry no interval
   pc <- suppressMessages(plot(fit, type = "gap", id = 102, connected = TRUE))
   rib <- which(.gi_geoms(pc) == "GeomRibbon")
@@ -405,6 +411,14 @@ test_that("G8: with parametric draws, the gap plot for an id draws a band from t
   rib <- which(.gi_geoms(pc) == "GeomRibbon")
   expect_true(any(vapply(rib, function(i)
     any(is.finite(ggplot2::layer_data(pc, i)$ymin)), TRUE)))
+  ## the normal rule at another level: the band uses the fit's ci.alpha
+  a10 <- fit
+  a10$ci.alpha <- 0.1
+  expect_equal(.gi_points(suppressMessages(plot(a10, type = "gap", id = 102))),
+               .gi_band_by_hand(fit, 102, a = 0.1), tolerance = 1e-10)
+  expect_equal(.gi_points(suppressMessages(plot(a10, type = "gap", id = 102,
+                                                plot.ci = "0.9"))),
+               .gi_band_by_hand(fit, 102, a = 0.2), tolerance = 1e-10)
   ## a fit object from before fect 2.4.7, without ci.method and ci.alpha:
   ## the normal 95% band
   old <- fit
@@ -412,6 +426,14 @@ test_that("G8: with parametric draws, the gap plot for an id draws a band from t
   old$ci.alpha <- NULL
   expect_equal(.gi_points(suppressMessages(plot(old, type = "gap", id = 102))),
                pts, tolerance = 1e-12)
+  ## an older fit that does not record its variance type: no band, and a
+  ## message that says so
+  nov <- fit
+  nov$vartype <- NULL
+  r <- .gi_plot(plot(nov, type = "gap", id = 102))
+  expect_true(all(is.na(.gi_points(r$p)$ymin)))
+  expect_length(r$messages, 1)
+  expect_match(r$messages, "does not record its variance type", fixed = TRUE)
 })
 
 test_that("G9: the band follows the fit's ci.method and alpha", {
@@ -476,6 +498,11 @@ test_that("G11: without kept parametric draws, the gap plot for an id draws esti
   expect_true(all(is.na(.gi_points(r$p)$ymin)))
   expect_length(r$messages, 1)
   expect_match(r$messages, "a band needs parametric bootstrap draws", fixed = TRUE)
+  ## with plot.ci = "none" the user asked for no interval: no message
+  expect_length(.gi_plot(plot(fit, type = "gap", id = 102,
+                              plot.ci = "none"))$messages, 0)
+  expect_length(.gi_plot(plot(fit_j, type = "gap", id = 102,
+                              plot.ci = "none"))$messages, 0)
   ## the average gap plot of these fits keeps its interval
   expect_true(all(is.finite(.gi_points(suppressMessages(
     plot(fit_j, type = "gap")))$ymin)))

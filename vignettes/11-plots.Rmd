@@ -256,7 +256,7 @@ plot(out.sim, type = "gap", id = 101)
 plot(out.sim, type = "gap", id = c(101, 130, 213))
 ```
 
-With parametric bootstrap draws, the plot adds a band for the chosen units' effects. The fit needs `vartype = "parametric"` and `keep.sims = TRUE` (gsynth keeps the draws when its inference is parametric). At each relative time, the chosen units' draws are averaged within each replication, and the band uses the fit's `ci.method` and `alpha`, as the default gap plot does. A band for one unit is wider than the band for the average over all treated units. It assumes that the unit's errors look like the control units' errors, which the parametric bootstrap resamples. With the bootstrap over units or the jackknife, the plot shows point estimates only, with a message: those methods keep each unit's own outcomes fixed, so they cannot measure its noise.
+With parametric bootstrap draws, the plot adds a band for the chosen units' effects. The fit needs `vartype = "parametric"` and `keep.sims = TRUE` (gsynth keeps the draws when its inference is parametric). At each relative time, the chosen units' draws are averaged within each replication, and the band uses the fit's `ci.method` and `alpha`, as the default gap plot does. A band for one unit is usually wider than the band for the average over all treated units. It assumes that the unit's errors look like the control units' errors, which the parametric bootstrap resamples. With the bootstrap over units or the jackknife, the plot shows point estimates only, with a message: those methods keep each unit's own outcomes fixed, so they cannot measure its noise.
 
 ```{r gap-id-band}
 data(simgsynth)

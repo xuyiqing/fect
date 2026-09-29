@@ -302,7 +302,8 @@ says what to do.
   for the chosen units' effects, formed from their draws with the fit's
   `ci.method` and `alpha`, as gsynth 1.2.x did for one unit; fits with
   another variance type show point estimates only, with a message saying
-  why. For the band, fits now record `ci.method` and `ci.alpha`. On
+  why. For the band, fits now record `ci.method` and `ci.alpha`. The plot
+  shows no test statistics, and `return.test = TRUE` returns none for it. On
   `simgsynth` (`Y ~ D + X1 + X2`, `method = "ife"`, `r = 2`,
   `CV = FALSE`), the plot with `id = 101` now shows unit 101's effect in its
   first treated period, 0.338; before, it showed the average over the five

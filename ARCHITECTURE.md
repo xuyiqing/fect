@@ -178,7 +178,7 @@ graph TD
 | `R/impute_Y0.R` (246) | Inference | Y(0) imputer used by the parametric bootstrap | internal | yes: A4 (`W.in.fit`), B8 (`loading.bound` arguments) |
 | `R/valid_controls.R` (34), `R/permutation.R` (264) | Inference | Control screening for the parametric bootstrap; permutation test | internal | no |
 | `R/diagtest.R` (233), `R/fittest.R` (636), `R/fect_sens.R` (232), `R/fect_iden.R` (224) | Diagnostics | Pre-trend / placebo / carryover / equivalence tests; sensitivity; identification | `fect_sens()`, `fect_iden()` | no |
-| `R/plot.R` (5,472) | Output | `plot.fect()`, 14+ plot types; the gap plot draws the chosen treated units' effects when `id` is given, with a band from parametric bootstrap draws (#162) | `plot.fect()` | yes: B6 (NULL-safe `vartype` tests, factors-plot labels); #162 (gap plot with `id`) |
+| `R/plot.R` (5,487) | Output | `plot.fect()`, 14+ plot types; the gap plot draws the chosen treated units' effects when `id` is given, with a band from parametric bootstrap draws (#162) | `plot.fect()` | yes: B6 (NULL-safe `vartype` tests, factors-plot labels); #162 (gap plot with `id`) |
 | `R/print.R` (147) | Output | S3 print methods | `print.fect()` | yes: A6 (no "Cluster SE" line for parametric and jackknife fits) |
 | `R/esplot.R` (1,229), `R/theme-helpers.R` (42), `R/plot_return.R` (9) | Output | Event-study plots, theme, plot-return class | `esplot()` | no |
 | `R/support.R` (733), `R/score.R` (105), `R/getcohort.R` (264), `R/loading_bound.R` (318), `R/state.R` (7), `R/RcppExports.R` (191) | Utilities | Initial fits, scores, cohorts, simplex projection of loadings, session state, Rcpp bindings | `get.cohort()` | no |
