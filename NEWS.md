@@ -327,8 +327,11 @@ says what to do.
   whole low-rank part). `fit$data.long`, which `panelview(fit)` draws, is
   now on the outcome's scale for every method, as are `est$VNT`, gsynth's
   `IC`, and the cross-validation tables and messages (each score by its own
-  power of sd(Y)); those slots only report, so nothing else changes
-  (fect #166).
+  power of sd(Y)); those slots only report, so nothing else changes.
+  The fold standard errors that the 1-SE rule compares are on the same
+  scale as the fold means (Moment, GMoment and Bias were not). An outcome
+  whose standard deviation is zero or not finite now stops with a message
+  under `normalize = TRUE`; it silently made the outcome `NaN` (fect #166).
 * For parametric fits (`vartype = "parametric"`, gsynth's default) with
   `ci.method = "basic"`, every p-value of the effects and of the
   coefficients (`est.beta`) is now the p-value that goes with the basic
