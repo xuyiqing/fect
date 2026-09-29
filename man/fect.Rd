@@ -138,13 +138,13 @@ becomes the CIs reported in fect's \code{est.*} slots. Two values:
 \eqn{[2\hat\theta - q_{1-\alpha/2},\, 2\hat\theta - q_{\alpha/2}]}, the
 literature-standard "percentile" CI per Davison & Hinkley (1997, §5.2.1)
 and what \code{boot::boot.ci(type = "basic")} returns). With
-\code{"basic"}, the p-values come from the replicates. For bootstrap fits
-each p-value goes with the basic interval: it is below \eqn{\alpha} exactly
-when the \eqn{1 - \alpha} basic interval excludes zero, at every
-\eqn{\alpha}, for the effects and for the coefficients (\code{est.beta}).
-For parametric fits, whose replicates are simulated with no effect, the
-p-value of an effect is twice the smaller of the shares of the centered
-replicates at or above the estimate and at or below it. For
+\code{"basic"}, the p-values come from the replicates. Each p-value goes
+with the basic interval: it is below \eqn{\alpha} exactly when the
+\eqn{1 - \alpha} basic interval excludes zero, at every \eqn{\alpha}, for
+the effects and for the coefficients (\code{est.beta}). For parametric
+fits, whose replicates are simulated with no effect, the replicates are
+first recentered at the estimate, the same shift the basic interval uses,
+and the p-value is the one dual to that interval. For
 \code{"percentile"}, \code{"bc"}, or \code{"bca"} CIs (typically wanted
 on alternative estimands like \code{aptt} and \code{log.att}), call
 \code{\link{estimand}} after fitting.}
