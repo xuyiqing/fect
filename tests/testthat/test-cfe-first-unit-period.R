@@ -113,7 +113,9 @@ test_that("kappa groups: two units missing their first-period row keep separate 
     dkc$kap[dkc$id == 2] <- 1
     fkc <- cfe_fit(dkc, Q.type = "linear", kappa = "kap")
     expect_equal(max(abs(fkc$kappa[[1]][, 1] - fkc$kappa[[1]][, 2])), 0)
-    expect_gt(abs(fk$att.avg - fkc$att.avg), 1e-8)
+    ## (att.avg is the same in both: the shared loading is the mean of the
+    ## two, and the two units have the same post-treatment periods)
+    expect_gt(max(abs(fk$eff - fkc$eff), na.rm = TRUE), 1e-3)
 })
 
 test_that("gamma groups: the first unit missing periods 5 and 10 does not merge those periods' Z coefficients", {
@@ -137,10 +139,14 @@ test_that("gamma groups: the first unit missing periods 5 and 10 does not merge 
     expect_equal(max(abs(zg1c$gamma[[1]][5, ] - zg1c$gamma[[1]][10, ])), 0)
     expect_gt(abs(zg1$att.avg - zg1c$att.avg), 1e-8)
 
-    ## the second unit missing the same periods gives a comparable ATT
-    ## (fad9f72: 3.081148 for unit 101 vs 3.075868 for unit 102)
-    zg2 <- cfe_fit_Z(drop_rows(s, 102, c(5, 10)))
-    expect_lt(abs(zg1$att.avg - zg2$att.avg), 2e-3)
+    ## relabeling units 101 and 102 does not change the fit (on fad9f72 it
+    ## did: the first unit's missing periods set the gamma groups)
+    g1s <- g1 <- drop_rows(s, 101, c(5, 10))
+    g1s$id <- ifelse(g1$id == 101, 102L, ifelse(g1$id == 102, 101L, g1$id))
+    zg1s <- cfe_fit_Z(g1s)
+    expect_equal(zg1s$att.avg, zg1$att.avg, tolerance = 1e-6)
+    eff.s <- zg1s$eff[, c(2L, 1L, seq_len(ncol(zg1s$eff))[-(1:2)])]
+    expect_equal(unname(eff.s), unname(zg1$eff), tolerance = 1e-6)
 })
 
 test_that("Z, Q, gamma and kappa that vary within a unit or a period stop with a message", {
@@ -174,18 +180,25 @@ test_that("Z, Q, gamma and kappa that vary within a unit or a period stop with a
     d.k$kap[d.k$id == 4 & d.k$time == 2] <- 5
     expect_error(cfe_fit(d.k, Q.type = "linear", kappa = "kap"), "kap.*unit 4")
 
-    ## Z missing in every row of unit 107. With the default na.rm = FALSE
-    ## the rows with a missing Z are dropped first and the unit leaves the
-    ## panel with fect's usual message, so this needs na.rm = TRUE.
-    s.na <- s
-    s.na$L1[s.na$id == 107] <- NA
-    expect_error(cfe_fit_Z(s.na, na.rm = TRUE), "L1.*unit 107")
+    ## Z missing in every row of a unit. Through fect() the rows with a
+    ## missing Z are dropped by na.omit() first (with either na.rm), so
+    ## such a unit leaves the panel before this check; the helper stops.
+    long <- data.frame(id = rep(1:3, each = 2), time = rep(1:2, 3),
+                       z = c(1, 1, NA, NA, 3, 3))
+    expect_error(fect:::.cfe_by_level(long, "z", "id", 1:3, "Z", "unit"),
+                 "z.*unit 2")
+    ## and takes a unit's value from the rows that have one
+    long$z[3] <- 2
+    expect_equal(fect:::.cfe_by_level(long, "z", "id", 1:3, "Z", "unit"),
+                 matrix(c(1, 2, 3), 3, 1))
 
-    ## a Z that is missing in some rows of a unit is taken from the others
+    ## through fect(), a unit with Z missing in some rows loses those rows
+    ## and keeps its Z: the same fit as with the rows removed
     s.some <- s
     s.some$L1[s.some$id == 107 & s.some$time %in% c(1, 2)] <- NA
-    expect_silent(fit.some <- cfe_fit_Z(s.some, na.rm = TRUE))
-    expect_true(is.finite(fit.some$att.avg))
+    f.some <- cfe_fit_Z(s.some, na.rm = TRUE)
+    f.drop <- cfe_fit_Z(drop_rows(s, 107, c(1, 2)))
+    expect_equal(f.some$att.avg, f.drop$att.avg, tolerance = 1e-8)
 })
 
 test_that("fect_mspe() with CFE: a hidden cell in unit 1 scores like a hidden cell in unit 2", {
@@ -202,7 +215,9 @@ test_that("fect_mspe() with CFE: a hidden cell in unit 1 scores like a hidden ce
 
     ## the same folds (same seed and dimensions) for both fits; the refits
     ## drop the hidden cells, which on fad9f72 zeroed the trend in period 20
-    ## whenever a hidden cell was in unit 1 (MSPE 1.4205 vs 1.3735)
+    ## whenever a hidden cell was in unit 1 (MSPE 1.4205 vs 1.3735). The
+    ## suppressed warnings are the rolling-fold refits reaching
+    ## max.iteration = 5000, as they do on fad9f72.
     m1 <- suppressWarnings(fect::fect_mspe(f.na1, seed = 168, cv.method = "rolling", k = 5))
     m2 <- suppressWarnings(fect::fect_mspe(f.na2, seed = 168, cv.method = "rolling", k = 5))
     mspe1 <- m1$scores[["MSPE"]]
