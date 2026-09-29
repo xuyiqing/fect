@@ -2628,8 +2628,12 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     if (!is.null(norm.para)) {
         Y <- Y * norm.para[1]
         ## variance of the error term
-        sigma2 <- est.co.best$sigma2 <- est.co.best$sigma2 * (norm.para[1]^2)
+        ## the IC from the normalized sigma2, before it is overwritten
+        ## (before 2.4.7 the two logs cancelled: the IC stayed on the
+        ## normalized scale)
+        sigma2 <- est.co.best$sigma2 * (norm.para[1]^2)
         IC <- est.co.best$IC <- est.co.best$IC - log(est.co.best$sigma2) + log(sigma2)
+        est.co.best$sigma2 <- sigma2
         PC <- est.co.best$PC <- est.co.best$PC * (norm.para[1]^2)
 
         ## output of estimates
@@ -2637,7 +2641,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         if (r.cv > 0) {
             est.co.best$lambda <- est.co.best$lambda * norm.para[1]
             lambda.tr <- lambda.tr * norm.para[1]
-            est.co.best$VNT <- est.co.best$VNT * norm.para[1]
+            ## singular values of E E' / (N T): the square of the scale
+            ## (before 2.4.7 multiplied by sd(Y) once)
+            est.co.best$VNT <- est.co.best$VNT * (norm.para[1]^2)
         }
         if (force %in% c(1, 3)) {
             est.co.best$alpha <- est.co.best$alpha * norm.para[1]
@@ -2651,7 +2657,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         if (boot == FALSE) {
             est.co.fect$fit <- est.co.fect$fit * norm.para[1]
         }
-        est.co.fect$sigma2 <- est.co.fect$sigma2 * norm.para[1]
+        ## a variance (before 2.4.7 multiplied by sd(Y) once, so the default
+        ## equivalence threshold 0.36 * sqrt(sigma2.fect) was too small by
+        ## sqrt(sd(Y)))
+        est.co.fect$sigma2 <- est.co.fect$sigma2 * (norm.para[1]^2)
 
         # estimated counterfactual
         Y.tr <- Y.tr * norm.para[1]

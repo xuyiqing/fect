@@ -1575,7 +1575,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         est.best$mu <- est.best$mu * norm.para[1]
         if (method == "ife" && r.cv > 0) {
             est.best$lambda <- est.best$lambda * norm.para[1]
-            est.best$VNT <- est.best$VNT * norm.para[1]
+            ## singular values of E E' / (N T): the square of the scale
+            ## (before 2.4.7 multiplied by sd(Y) once)
+            est.best$VNT <- est.best$VNT * (norm.para[1]^2)
         }
         if (force %in% c(1, 3)) {
             est.best$alpha <- est.best$alpha * norm.para[1]
@@ -1589,7 +1591,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         est.best$residuals <- est.best$residuals * norm.para[1]
         est.best$fit <- est.best$fit * norm.para[1]
         est.fect$fit <- est.fect$fit * norm.para[1]
-        est.fect$sigma2 <- est.fect$sigma2 * norm.para[1]
+        ## a variance (before 2.4.7 multiplied by sd(Y) once, so the default
+        ## equivalence threshold 0.36 * sqrt(sigma2.fect) was too small by
+        ## sqrt(sd(Y)))
+        est.fect$sigma2 <- est.fect$sigma2 * (norm.para[1]^2)
     }
 
     ## 0. revelant parameters
