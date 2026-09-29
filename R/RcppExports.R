@@ -129,8 +129,8 @@ ife_part <- function(E, r) {
     .Call(`_fect_ife_part`, E, r)
 }
 
-cfe_iter <- function(XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter, fit_init = NULL) {
-    .Call(`_fect_cfe_iter`, XX, xxinv, X_extra_FE, X_Z, X_Q, X_gamma, X_kappa, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter, fit_init)
+cfe_iter <- function(XX, xxinv, X_extra_FE, Z, Q, gamma_labels, kappa_labels, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter, fit_init = NULL) {
+    .Call(`_fect_cfe_iter`, XX, xxinv, X_extra_FE, Z, Q, gamma_labels, kappa_labels, Zgamma_id, kappaQ_id, Y, Y0, I, W, beta0, force, r, tolerate, max_iter, fit_init)
 }
 
 Y_demean <- function(Y, force) {

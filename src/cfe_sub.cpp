@@ -262,7 +262,58 @@ List ife_part(arma::mat E, int r) {
   return (result);
 }
 
+/* Unit-level and period-level CFE inputs (#168).
+ *
+ * R carries Z, Q and the gamma and kappa labels as T x N x p arrays and
+ * fills them so that a unit-level input (Z, kappa) is the same in every
+ * period and a period-level input (Q, gamma) the same for every unit.
+ * These read them back as an N x p or a T x p matrix and stop if the
+ * array is not filled that way, so that no fit can again depend on the
+ * first period or the first unit.
+ */
+arma::mat cfe_unit_level(const arma::cube& X, const char* name) {
+  arma::mat out(X.n_cols, X.n_slices, arma::fill::zeros);
+  for (arma::uword k = 0; k < X.n_slices; ++k) {
+    const arma::mat& S = X.slice(k);
+    arma::rowvec first = S.row(0);
+    for (arma::uword t = 1; t < S.n_rows; ++t) {
+      if (arma::any(S.row(t) != first)) {
+        Rcpp::stop("internal error in fect: %s (slice %d) differs across "
+                   "periods within a unit; please report this at "
+                   "https://github.com/xuyiqing/fect/issues",
+                   name, static_cast<int>(k) + 1);
+      }
+    }
+    out.col(k) = first.t();
+  }
+  return out;
+}
+
+arma::mat cfe_period_level(const arma::cube& X, const char* name) {
+  arma::mat out(X.n_rows, X.n_slices, arma::fill::zeros);
+  for (arma::uword k = 0; k < X.n_slices; ++k) {
+    const arma::mat& S = X.slice(k);
+    arma::colvec first = S.col(0);
+    for (arma::uword i = 1; i < S.n_cols; ++i) {
+      if (arma::any(S.col(i) != first)) {
+        Rcpp::stop("internal error in fect: %s (slice %d) differs across "
+                   "units within a period; please report this at "
+                   "https://github.com/xuyiqing/fect/issues",
+                   name, static_cast<int>(k) + 1);
+      }
+    }
+    out.col(k) = first;
+  }
+  return out;
+}
+
 /* Obtain cfe;
+ *
+ * Z: N x p_z, one row per unit (time-invariant covariates); Q: p_q x T, one
+ *   column per period (time trends); gamma_labels: T x p_gamma, the group
+ *   label of each period for each gamma; kappa_labels: N x p_kappa, the
+ *   group label of each unit for each kappa. Labels are mapped to 0-based
+ *   groups in the order of their sorted unique values.
  *
  * fit_init: optional warm-start matrix (TT x N) to seed the EM loop.
  *   When non-null and shape matches Y, replaces the default `fit = Y0`
@@ -274,9 +325,9 @@ List ife_part(arma::mat E, int r) {
  */
 // [[Rcpp::export]]
 List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
-              const arma::cube& X_extra_FE, const arma::cube& X_Z,
-              const arma::cube& X_Q, const arma::cube& X_gamma,
-              const arma::cube& X_kappa, Rcpp::List Zgamma_id,
+              const arma::cube& X_extra_FE, const arma::mat& Z,
+              const arma::mat& Q, const arma::mat& gamma_labels,
+              const arma::mat& kappa_labels, Rcpp::List Zgamma_id,
               Rcpp::List kappaQ_id, const arma::mat& Y, const arma::mat& Y0,
               const arma::mat& I, const arma::mat& W, const arma::mat& beta0,
               int force, int r, double tolerate, int max_iter,
@@ -284,8 +335,8 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
   int T = Y.n_rows;
   int N = Y.n_cols;
   int p = XX.n_slices;
-  int p_gamma = X_gamma.n_slices;
-  int p_kappa = X_kappa.n_slices;
+  int p_gamma = gamma_labels.n_cols;
+  int p_kappa = kappa_labels.n_cols;
   double dif = 1.0;
   double dif1 = 1.0;
   double dif2 = 1.0;
@@ -364,20 +415,13 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
 
   FE = fit - fit1 - fit2sum - fit3sum; // fit4 + fit5
 
-  int N_time_inv = X_Z.n_cols;
-  int p_time_inv = X_Z.n_slices;
-  arma::mat Z(N_time_inv, p_time_inv, arma::fill::zeros);
-  for (int k = 0; k < p_time_inv; ++k) {
-    Z.col(k) = X_Z.slice(k).row(0).t();
-  }
-
   std::vector<arma::uvec> gamma_t_group(p_gamma);
   std::vector<arma::uvec> Zgamma_id_raw(p_gamma);
   std::vector<arma::mat> zzinv(p_gamma);
   for (int k = 0; k < p_gamma; ++k) {
     arma::uvec raw_labels(T);
     for (int t = 0; t < T; ++t) {
-      raw_labels(t) = static_cast<unsigned int>(X_gamma(t, 0, k));
+      raw_labels(t) = static_cast<unsigned int>(gamma_labels(t, k));
     }
 
     arma::uvec uniq = arma::unique(raw_labels);
@@ -399,20 +443,13 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
                                Z.cols(Zgamma_id_raw[k]));
   }
 
-  int T_time_trend = X_Q.n_rows;
-  int p_time_trend = X_Q.n_slices;
-  arma::mat Q(p_time_trend, T_time_trend, arma::fill::zeros);
-  for (int k = 0; k < p_time_trend; ++k) {
-    Q.row(k) = X_Q.slice(k).col(0).t();
-  }
-
   std::vector<arma::uvec> kappa_i_group(p_kappa);
   std::vector<arma::uvec> kappaQ_id_raw(p_kappa);
   std::vector<arma::mat> qqinv(p_kappa);
   for (int k = 0; k < p_kappa; ++k) {
     arma::uvec raw_labels(N);
     for (int i = 0; i < N; ++i) {
-      raw_labels(i) = static_cast<unsigned int>(X_kappa(0, i, k));
+      raw_labels(i) = static_cast<unsigned int>(kappa_labels(i, k));
     }
 
     arma::uvec uniq = arma::unique(raw_labels);
