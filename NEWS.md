@@ -297,14 +297,16 @@ says what to do.
   (`fit$eff`) in each period by time relative to its treatment onset, as
   gsynth 1.2.x did. With several units, it shows their unweighted average at
   each relative time. A control unit, or an id not in the data, stops with a
-  message naming it. The plot shows point estimates only, and a message says
-  so. For an interval around one unit's counterfactual, use
-  `type = "counterfactual"` on a fit made with `keep.sims = TRUE` and
-  `vartype = "parametric"`. On `simgsynth` (`Y ~ D + X1 + X2`,
-  `method = "ife"`, `r = 2`, `CV = FALSE`), the plot with `id = 101` now
-  shows unit 101's effect in its first treated period, 0.338; before, it
-  showed the average over the five treated units, 1.277
-  (fect #162; gsynth #106).
+  message naming it. On a fit with parametric bootstrap draws
+  (`vartype = "parametric"` and `keep.sims = TRUE`), the plot draws a band
+  for the chosen units' effects, formed from their draws with the fit's
+  `ci.method` and `alpha`, as gsynth 1.2.x did for one unit; fits with
+  another variance type show point estimates only, with a message saying
+  why. For the band, fits now record `ci.method` and `ci.alpha`. On
+  `simgsynth` (`Y ~ D + X1 + X2`, `method = "ife"`, `r = 2`,
+  `CV = FALSE`), the plot with `id = 101` now shows unit 101's effect in its
+  first treated period, 0.338; before, it showed the average over the five
+  treated units, 1.277 (fect #162; gsynth #106).
 
 ## Bug fixes
 
