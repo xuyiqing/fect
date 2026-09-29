@@ -351,6 +351,7 @@ Ignored when \code{CV = FALSE}.}
   \item{att.off.bound}{equivalence confidence interval for switch-off.}
   \item{beta.boot}{bootstrap draws for \code{beta} (\code{NA} rows for dropped covariates).}
   \item{vartype}{the variance estimator used (\code{se = TRUE} only): \code{"bootstrap"}, \code{"jackknife"} or \code{"parametric"}.}
+  \item{ci.method, ci.alpha}{the interval rule (\code{"normal"} or \code{"basic"}) and the significance level of the fit's intervals (\code{se = TRUE} only). The gap plot with \code{id} uses them for the band of the chosen units; see \code{\link{plot.fect}}.}
   \item{eff.boot}{with \code{keep.sims = TRUE}, the cell-level treatment effects of each replicate, a T-by-W-by-B array (B = number of replicates kept). Slice \code{b} holds the units \code{colnames.boot[[b]]}, in that order: under the case bootstrap a unit drawn twice appears twice and an undrawn unit not at all; under the parametric bootstrap the treated units come first. W = N, except for the cluster bootstrap (\code{cl}), whose replicates differ in size and are padded with \code{NA} to the widest one, and the jackknife (W = N - 1, B = N).}
   \item{D.boot, I.boot}{with \code{keep.sims = TRUE}, the treatment and observation indicators of each replicate, laid out as \code{eff.boot}.}
   \item{colnames.boot}{with \code{keep.sims = TRUE}, a list with one element per replicate: the column positions, in the original panel, of the replicate's units; its length is the replicate's width.}

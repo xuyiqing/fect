@@ -283,6 +283,33 @@ says what to do.
   `method = "fe"`: 50.85 for any `cells`). The cumulative ATT sums the
   per-period ATTs over a range of event times, so use
   `window = c(L, R)` to choose the range (fect #161).
+* `plot(type = "gap")` with an `id` that is a control unit or not in the
+  data stops with a message naming the unit. So does `id` together with
+  `loo`, `dloo` or `show.group`. Before, the gap plot ignored `id`, except
+  that an id not in the data stopped with "Some specified units are not in
+  the data." (fect #162).
+
+## New features
+
+* `plot(fit, type = "gap", id = ...)` now draws the gaps of the chosen
+  treated units, each unit's observed outcome minus its predicted untreated
+  outcome (`fit$eff`). Before, it ignored `id` and drew the average over all
+  treated units. With one unit, the plot shows the unit's gap in each period
+  by time relative to its treatment onset, as gsynth 1.2.x did. With several
+  units, it shows their unweighted average at each relative time. A control
+  unit, or an id not in the data, stops with a message naming it. On a fit
+  with parametric bootstrap draws (`vartype = "parametric"` and
+  `keep.sims = TRUE`), the plot draws a band around the gaps, formed from
+  their draws with the fit's `ci.method` and `alpha`, as gsynth 1.2.x did
+  for one unit; fits with another variance type show point estimates only,
+  with a message saying why. `?plot.fect` and the user manual explain that
+  one unit's gap in one period is a noisy estimate of its effect, which is
+  not identified. For the band, fits now record `ci.method` and `ci.alpha`.
+  The plot shows no test statistics, and `return.test = TRUE` returns none
+  for it. On `simgsynth` (`Y ~ D + X1 + X2`, `method = "ife"`, `r = 2`,
+  `CV = FALSE`), the plot with `id = 101` now shows unit 101's gap in its
+  first treated period, 0.338; before, it showed the average over the five
+  treated units, 1.277 (fect #162; gsynth #106).
 
 ## Bug fixes
 
@@ -374,8 +401,9 @@ says what to do.
 * `?fect`: `seed` is needed for reproducible parallel bootstrap draws, since
   `set.seed()` does not fix them; `formula`, `X`, `index`, `cl`, `W.agg`,
   `criterion`, `loading.bound` and the returned `wgt.implied` are updated.
-* `?plot.fect`: `id` applies to the counterfactual and status plots only, and
-  `nfactors` to the loadings plot only.
+* `?plot.fect`: `id` applies to the gap, counterfactual and status plots
+  only, and `nfactors` to the loadings plot only. The plot chapter of the
+  user manual shows the gap plot of chosen units.
 * `?fect` (`ci.method`, `normalize`, `binary`, the `att.avg.unit` and
   `est.group.att` values, and the names of `est.avg` and `est.avg.unit`,
   which it gave as `est.att.avg` and `est.att.avg.unit`), `?estimand` (`by`, `cells`, `window`,

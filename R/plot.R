@@ -974,11 +974,156 @@ plot.fect <- function(
     placeboTest <- FALSE
   }
 
+  ## Gap plot of chosen units (fect #162). With `id`, the gap plot draws the
+  ## effects of the chosen treated units, x$eff, by time relative to the
+  ## treatment onset, x$T.on (the relative time of the default gap plot). At
+  ## each relative time it averages the chosen units' cells (unweighted, as
+  ## the counterfactual plot averages several units). It draws a band when
+  ## the fit kept parametric bootstrap draws (see below), and no test
+  ## statistics or equivalence bounds.
+  unit.gap <- type == "gap" && !is.null(id)
+  if (unit.gap) {
+    if (loo == 1) {
+      stop("\"loo\" and \"dloo\" can't be used with \"id\" in the gap plot: ",
+           "leave-one-out estimates are stored for the average effect only.",
+           call. = FALSE)
+    }
+    if (!is.null(show.group)) {
+      stop("\"show.group\" can't be used with \"id\" in the gap plot.",
+           call. = FALSE)
+    }
+    unit.gap.id <- unique(as.character(id))
+    unit.gap.pos <- match(unit.gap.id, as.character(x$id))
+    if (anyNA(unit.gap.pos)) {
+      bad <- unit.gap.id[is.na(unit.gap.pos)]
+      removed <- bad[bad %in% as.character(x$remove.id)]
+      unknown <- setdiff(bad, removed)
+      stop(paste0(
+        if (length(unknown) > 0) {
+          paste0("Unit(s) in \"id\" not in the data: ",
+                 paste(unknown, collapse = ", "), ".")
+        },
+        if (length(unknown) > 0 && length(removed) > 0) " ",
+        if (length(removed) > 0) {
+          paste0("Unit(s) in \"id\" removed from the fit (see fit$remove.id): ",
+                 paste(removed, collapse = ", "), ".")
+        }
+      ), call. = FALSE)
+    }
+    not.treated <- !(unit.gap.pos %in% x$tr)
+    if (any(not.treated)) {
+      stop("Unit(s) in \"id\" never treated (control units): ",
+           paste(unit.gap.id[not.treated], collapse = ", "),
+           ". The gap plot with \"id\" shows treated units only.",
+           call. = FALSE)
+    }
+    unit.gap.T.on <- as.matrix(x$T.on)[, unit.gap.pos, drop = FALSE]
+    unit.gap.eff <- as.matrix(x$eff)[, unit.gap.pos, drop = FALSE]
+    unit.gap.ok <- !is.na(unit.gap.T.on) & !is.na(unit.gap.eff)
+    no.cell <- colSums(unit.gap.ok) == 0
+    if (any(no.cell)) {
+      stop("Unit(s) in \"id\" have no period with both an estimated effect ",
+           "and a time relative to the treatment onset (for example, a unit ",
+           "treated from its first period): ",
+           paste(unit.gap.id[no.cell], collapse = ", "), ".",
+           call. = FALSE)
+    }
+    unit.gap.rel <- unit.gap.T.on[unit.gap.ok]
+    unit.gap.val <- unit.gap.eff[unit.gap.ok]
+    unit.gap.time <- sort(unique(unit.gap.rel))
+    unit.gap.att <- as.numeric(tapply(unit.gap.val, unit.gap.rel, mean))
+    unit.gap.count <- as.numeric(table(unit.gap.rel))
+    ## Band. The parametric bootstrap simulates a unit's prediction error (a
+    ## control unit plays the treated unit), so its draws measure the chosen
+    ## units' own noise; with keep.sims = TRUE (gsynth always keeps them) they
+    ## are in x$eff.boot, the treated units first, in x$tr order, centered at
+    ## 0. At each relative time the chosen cells' draws are averaged within
+    ## each replication, and the interval follows the fit's ci.method and
+    ## level, as the average's interval does. The case bootstrap and the
+    ## jackknife keep each unit's own outcomes fixed, so they cannot measure
+    ## its noise: those fits draw the estimates only, with a message.
+    unit.gap.est <- unit.gap.bound <- unit.gap.note <- NULL
+    unit.gap.boot <- x[["eff.boot"]]
+    if (is.null(x[["est.att"]])) {
+      unit.gap.note <- "Uncertainty estimates not available.\n"
+    } else if (is.null(x[["vartype"]])) {
+      unit.gap.note <- paste0(
+        "The gap plot with \"id\" draws the chosen units' estimates without ",
+        "a band: the fit does not record its variance type, as fits made ",
+        "with older versions of fect do. Refit with this version for a band.")
+    } else if (!identical(x[["vartype"]], "parametric")) {
+      unit.gap.note <- paste0(
+        "The gap plot with \"id\" draws the chosen units' estimates without ",
+        "a band: a band needs parametric bootstrap draws (in fect: ",
+        "vartype = \"parametric\" and keep.sims = TRUE; in gsynth: ",
+        "inference = \"parametric\"). The bootstrap over units and the ",
+        "jackknife keep each unit's own outcomes fixed, so they cannot ",
+        "measure its own noise.")
+    } else if (is.null(unit.gap.boot) || length(dim(unit.gap.boot)) != 3L) {
+      unit.gap.note <- paste0(
+        "The gap plot with \"id\" draws the chosen units' estimates without ",
+        "a band: the fit did not keep its bootstrap draws. Refit with ",
+        "keep.sims = TRUE for a band.")
+    } else {
+      nb <- dim(unit.gap.boot)[3]
+      unit.gap.col <- match(unit.gap.pos, x$tr)
+      unit.gap.draws <- t(matrix(vapply(unit.gap.time, function(s) {
+        cells <- which(unit.gap.ok & unit.gap.T.on == s, arr.ind = TRUE)
+        v <- unit.gap.boot[cbind(rep(cells[, 1], times = nb),
+                                 rep(unit.gap.col[cells[, 2]], times = nb),
+                                 rep(seq_len(nb), each = nrow(cells)))]
+        colMeans(matrix(v, nrow = nrow(cells)), na.rm = TRUE)
+      }, numeric(nb)), nrow = nb))
+      unit.gap.alpha <- x[["ci.alpha"]]
+      if (!is.numeric(unit.gap.alpha) || length(unit.gap.alpha) != 1L ||
+          is.na(unit.gap.alpha)) {
+        unit.gap.alpha <- 0.05 # fits made before fect 2.4.7 do not record it
+      }
+      unit.gap.se <- apply(unit.gap.draws, 1, function(v) sd(v, na.rm = TRUE))
+      if (identical(x[["ci.method"]], "basic")) {
+        ci <- .basic_ci_shifted(unit.gap.att, unit.gap.draws,
+                                unit.gap.alpha, shift = TRUE)
+        ci90 <- .basic_ci_shifted(unit.gap.att, unit.gap.draws,
+                                  2 * unit.gap.alpha, shift = TRUE)
+      } else {
+        ci <- cbind(unit.gap.att - unit.gap.se * qnorm(1 - unit.gap.alpha / 2),
+                    unit.gap.att + unit.gap.se * qnorm(1 - unit.gap.alpha / 2))
+        ci90 <- cbind(unit.gap.att - unit.gap.se * qnorm(1 - unit.gap.alpha),
+                      unit.gap.att + unit.gap.se * qnorm(1 - unit.gap.alpha))
+      }
+      unit.gap.est <- cbind(unit.gap.att, unit.gap.se, ci, NA_real_,
+                            unit.gap.count)
+      colnames(unit.gap.est) <- c("ATT", "S.E.", "CI.lower", "CI.upper",
+                                  "p.value", "count")
+      unit.gap.bound <- ci90
+      colnames(unit.gap.bound) <- c("CI.lower", "CI.upper")
+      rownames(unit.gap.est) <- rownames(unit.gap.bound) <- unit.gap.time
+    }
+    if (identical(plot.ci, "none")) {
+      unit.gap.note <- NULL # the user asked for no interval
+    }
+    ## the fit's tests are about the average; this plot shows none, so
+    ## return.test = TRUE returns NULL for it
+    test.out <- NULL
+    if (is.null(main)) {
+      main <- if (length(unit.gap.pos) == 1) {
+        paste(x$index[1], "=", unit.gap.id)
+      } else {
+        paste0("Average over ", length(unit.gap.pos), " units")
+      }
+    }
+    ## count bars: the number of chosen cells at each relative time; for one
+    ## unit they would all be 1, so they are not drawn
+    if (length(unit.gap.pos) == 1) {
+      show.count <- FALSE
+    }
+  }
+
   if (!is.null(plot.ci)) {
     if (!plot.ci %in% c("0.9", "0.95", "none")) {
       stop("\"plot.ci\" must be one of \"0.95\", \"0.9\" or \"none\".")
     }
-    if (plot.ci %in% c("0.90", "0.95") && is.null(x$est.att)) {
+    if (plot.ci %in% c("0.90", "0.95") && is.null(x$est.att) && !unit.gap) {
       stop("No uncertainty estimates.")
     }
     if (plot.ci == "0.90" && type %in% c("gap", "exit")) {
@@ -1003,12 +1148,15 @@ plot.fect <- function(
   if (plot.ci == "0.9") {
     plot.ci <- "90"
   }
+  if (unit.gap && is.null(unit.gap.est)) {
+    plot.ci <- "none" # no band for the chosen units (see unit.gap.note)
+  }
 
   if (type == "equiv" && plot.ci == "none") {
     stop("No uncertainty estimates. Can't perform equivalence tests.\n")
   }
 
-  if ((placeboTest | carryoverTest) && plot.ci == "none" && type != "status") {
+  if ((placeboTest | carryoverTest) && plot.ci == "none" && type != "status" && !unit.gap) {
     stop("No uncertainty estimates. Can't perform placebo test or carryover test.\n")
   }
 
@@ -1064,6 +1212,9 @@ plot.fect <- function(
     } else {
       bound <- "none"
     }
+  }
+  if (unit.gap) {
+    bound <- "none" # no equivalence bounds in the gap plot of chosen units
   }
 
   if (is.null(xlim) == FALSE) {
@@ -1144,6 +1295,9 @@ plot.fect <- function(
     } else {
       stats <- "none"
     }
+  }
+  if (unit.gap) {
+    stats <- "none" # no test statistics in the gap plot of chosen units
   }
 
   if (type == "calendar") {
@@ -1403,6 +1557,20 @@ plot.fect <- function(
   ## est.placebo, est.carryover, and off variants) already carry W-weighted
   ## values. No swap needed here.
   use.weight <- !is.null(x$W)
+
+  ## gap plot of chosen units: their own series and band replace the average
+  ## ones (after the balance swap above, which does not apply to them)
+  if (unit.gap) {
+    x$time <- unit.gap.time
+    x$att <- unit.gap.att
+    x$count <- unit.gap.count
+    ## without a band, plot.ci is "none" and the average's est.att stays
+    ## (removing it would let x$est.att partially match est.att90)
+    if (!is.null(unit.gap.est)) {
+      x$est.att <- unit.gap.est
+      x$att.bound <- unit.gap.bound
+    }
+  }
 
 
   if (!is.null(x$est.att)) { # have uncertainty estimation
@@ -2869,7 +3037,14 @@ plot.fect <- function(
     att.avg.use <- x$att.avg
 
     if (CI == FALSE) {
-      message("Uncertainty estimates not available.\n")
+      if (unit.gap) {
+        ## the note is NULL when the user chose plot.ci = "none"
+        if (!is.null(unit.gap.note)) {
+          message(unit.gap.note)
+        }
+      } else {
+        message("Uncertainty estimates not available.\n")
+      }
       if (length(ylim) != 0) {
         rect.length <- (ylim[2] - ylim[1]) / 5
         rect.min <- ylim[1]
@@ -2912,7 +3087,7 @@ plot.fect <- function(
     if (highlight == FALSE) {
       classic <- 1
     }
-    if (placeboTest == TRUE && length(placebo.period) == 1 && plot.ci %in% c("90", "95")) {
+    if (placeboTest == TRUE && length(placebo.period) == 1 && (plot.ci %in% c("90", "95") || unit.gap)) {
       classic <- 1
     }
     if (carryoverTest == TRUE && length(carryover.period) == 1 && plot.ci %in% c("90", "95")) {

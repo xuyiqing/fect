@@ -245,6 +245,34 @@ plot(out,
      main = "Line Customization")
 ```
 
+### Gaps of chosen units {#sec-gap-id}
+
+With `id`, the gap plot shows the gaps of the chosen treated units, by time relative to each unit's treatment onset. A unit's gap in a period is its observed outcome minus the outcome that the model predicts for it without treatment. With several units, the plot shows their unweighted average at each relative time, and the default `proportion = 0.3` hides relative times at which fewer than 30% as many of them are observed as at the best-covered relative time (`proportion = 0` shows them all).
+
+A unit's gap in one period is a noisy estimate of its treatment effect in that period. Under the model, the gap equals the effect plus two errors. The first comes from estimating the model and shrinks as the data grow. The second is the unit's idiosyncratic error in that period, the part of its outcome that the model cannot explain, and more data do not remove it. For instance, if a unit's outcome jumps in one period for reasons unrelated to the treatment, its gap jumps with it. The data cannot separate the effect of one unit in one period from that period's idiosyncratic error, so this effect is not identified unless we assume that the model explains the untreated outcome exactly. Averages over many treated observations, such as the ATT, are identified because the idiosyncratic errors average out. Researchers should not read a single gap as a unit's effect in that period. The gaps of single units show how each unit departs from its prediction, which helps to spot units that the model fits poorly.
+
+The fit below has no standard errors, so the plots show point estimates only.
+
+```{r gap-id}
+out.sim <- fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+                method = "fe", force = "two-way", se = FALSE)
+plot(out.sim, type = "gap", id = 101)
+plot(out.sim, type = "gap", id = c(101, 130, 213))
+```
+
+With parametric bootstrap draws, the plot adds a band around the gaps. The band shows how far a unit's idiosyncratic errors can move its gap away from its effect, and it works like a prediction interval for that effect. As in @Xu2017, it treats each unit's effects as fixed and its idiosyncratic errors as random, and the parametric bootstrap draws these errors from the prediction errors of control units, each control in turn playing the role of a treated unit. The band covers a unit's effect at the stated rate only if the unit's errors are distributed like those of the control units, independent across units and with the same spread. Even under that assumption, the band does not make the effect identified. Because the band is pointwise, about one 95% band in twenty can exclude zero before treatment even when the model is correct.
+
+To draw the band, fit the model with `vartype = "parametric"` and `keep.sims = TRUE`; gsynth keeps the draws when its inference is parametric. At each relative time, the plot averages the chosen units' draws within each replication and forms the band with the fit's `ci.method` and `alpha`, as the default gap plot does. The band for one unit is usually wider than the band for the average over all treated units. With the nonparametric bootstrap (`vartype = "bootstrap"`) or the jackknife, the plot shows point estimates only and prints a message, because those methods keep each unit's own outcomes fixed and so cannot measure its idiosyncratic errors.
+
+```{r gap-id-band}
+data(simgsynth)
+out.gs <- fect(Y ~ D + X1 + X2, data = simgsynth, index = c("id", "time"),
+               method = "gsynth", r = 2, CV = FALSE, se = TRUE,
+               vartype = "parametric", nboots = 200, keep.sims = TRUE,
+               seed = 1)
+plot(out.gs, type = "gap", id = 101)
+```
+
 ------------------------------------------------------------------------
 
 ## Counterfactual plot
@@ -721,7 +749,7 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 | `est.lwidth` / `est.pointsize` | Yes | Yes | Yes | --- | --- | --- | --- | --- | --- | Yes |
 | `gridOff` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
 | `highlight.periods` / `highlight.shapes` | --- | --- | --- | --- | --- | --- | --- | --- | --- | Yes |
-| `id` | --- | --- | --- | --- | --- | Yes | Yes | --- | --- | --- |
+| `id` | Yes | --- | --- | --- | --- | Yes | Yes | --- | --- | --- |
 | `include.FE` | --- | --- | --- | --- | --- | --- | --- | Yes | Yes | --- |
 | `lcolor` / `lwidth` / `ltype` | Yes | Yes | Yes | Yes | Yes | Yes | --- | Yes | --- | Yes |
 | `legendOff` | Yes | Yes | Yes | --- | --- | Yes | --- | --- | --- | Yes |
