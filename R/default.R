@@ -1459,18 +1459,21 @@ fect.default <- function(
         )
     }
     ## ci.method = "basic" on vartype = "parametric" is supported via a
-    ## location-shift fix in the CI computation downstream (R/boot.R, around
-    ## line 3590): the parametric path stores eff.boot centered at 0 (under
-    ## H0), and the reflected pivot CI 2*theta_hat - quantile(boot) collapses
-    ## around 2*theta_hat without a shift.  fect() applies the same shift
-    ## that R/po-estimands.R applies inside estimand() (commit b4e9fbf), so
+    ## location shift in the CI computation downstream (R/boot.R, the
+    ## .basic_ci_shifted() / .basic_ci_shifted_one() helpers near the top
+    ## of the file): the parametric path stores eff.boot centered at 0
+    ## (under H0), and the reflected pivot CI 2*theta_hat - quantile(boot)
+    ## collapses around 2*theta_hat without a shift. The helpers recenter
+    ## the draws at the estimate first, the same shift that
+    ## R/po-estimands.R applies inside estimand() (commit b4e9fbf), so
     ## fit$est.avg with ci.method = "basic" on a parametric fit matches
-    ## estimand(fit, "att", ci.method = "basic") byte-equally for the
-    ## avg-level + per-event-time CIs.  The shift is currently applied at
-    ## those two slots only; for other slots (calendar, cohort, subgroup,
-    ## balanced, by-W, placebo, carryover), basic on parametric is not
-    ## yet patched and may produce 0% coverage CIs --- call estimand() for
-    ## those slots.
+    ## estimand(fit, "att", ci.method = "basic") byte-equally. Every
+    ## interval slot of fect_boot() goes through the helpers with the shift
+    ## flag (average, event time, calendar, cohort, subgroup, balanced,
+    ## by-W, placebo, carryover, coefficients), and the p-value beside each
+    ## interval is the rule dual to it, .pvalue_basic_dual() on the same
+    ## shifted draws (#169): p < alpha exactly when the interval at level
+    ## 1 - alpha excludes 0.
     ## Bridge to the existing internal dispatch in fect_boot, which is gated by
     ## a logical `quantile.CI`. After this resolution, .quantile.CI.bool is the
     ## single source of truth for the bootstrap-CI branch downstream.

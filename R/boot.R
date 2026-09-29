@@ -33,8 +33,9 @@ basic_ci_alpha <- function(theta, boots, alpha) {
 ## computing the basic interval [2*theta - q_high, 2*theta - q_low]. The
 ## shift is variance-preserving, so the SE computed elsewhere on the
 ## unshifted boot is unaffected. The matching p-values are computed in
-## fect_boot() by .pvalue.basic(), which compares the estimate with the
-## zero-centered draws.
+## fect_boot() by .pvalue.basic(), which applies .pvalue_basic_dual() to
+## the same shifted draws (#169), so p < alpha exactly when the interval
+## at level 1 - alpha excludes 0.
 ##
 ## - theta: vector of point estimates (length p)
 ## - boots: p x B matrix of bootstrap draws
@@ -60,8 +61,10 @@ basic_ci_alpha <- function(theta, boots, alpha) {
     2 * theta - unname(qs[2]))
 }
 
-## p-value dual to the basic interval of case-bootstrap draws (ci.method =
-## "basic" on a bootstrap fit). The basic interval at level 1 - a is
+## p-value dual to the basic interval of a row of draws (ci.method =
+## "basic"): the draws of a bootstrap fit as they are, those of a
+## parametric fit after the shift .basic_ci_shifted() applies (#169).
+## The basic interval at level 1 - a is
 ## [2 * theta - Q(1 - a / 2), 2 * theta - Q(a / 2)], with Q the quantile
 ## function that quantile() uses by default (type 7) on the finite draws:
 ## with the draws sorted, x[1] <= ... <= x[n], Q is the line through the
