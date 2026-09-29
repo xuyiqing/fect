@@ -120,12 +120,22 @@ test_that("S1.4: With norm.para", {
   resid <- c(1.0, -2.0, 3.0, -1.0, 2.0)
   result <- score_fn(resid, norm.para = c(2.0))
 
-  # All 7 scores multiplied by 4.0 (norm.para[1]^2)
+  # squared-error scores multiplied by 4.0 (norm.para[1]^2)
   expect_equal(result[["MSPE"]], 3.8 * 4.0, tolerance = 1e-10)
   expect_equal(result[["RMSE"]], sqrt(3.8 * 4.0), tolerance = 1e-10)
 
-  # Bias unchanged
-  expect_equal(result[["Bias"]], 0.6, tolerance = 1e-10)
+  # Bias (a mean residual) by norm.para[1] itself (before 2.4.7 it stayed
+  # on the normalized scale; fect #166)
+  expect_equal(result[["Bias"]], 0.6 * 2.0, tolerance = 1e-10)
+
+  # Moment and GMoment (mean absolute residuals by period) by norm.para[1]
+  # itself (before 2.4.7 by its square); MAD, of the squared residuals, by
+  # the square
+  r0 <- score_fn(resid, time_index = c(1, 1, 2, 2, 2))
+  r1 <- score_fn(resid, time_index = c(1, 1, 2, 2, 2), norm.para = c(2.0))
+  expect_equal(r1[["Moment"]], 2.0 * r0[["Moment"]], tolerance = 1e-10)
+  expect_equal(r1[["GMoment"]], 2.0 * r0[["GMoment"]], tolerance = 1e-10)
+  expect_equal(r1[["MAD"]], 4.0 * r0[["MAD"]], tolerance = 1e-10)
 })
 
 test_that("S1.5: Edge case - single residual", {

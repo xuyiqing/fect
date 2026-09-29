@@ -1966,11 +1966,14 @@ fect.default <- function(
         }
     }
 
-    ## normalize
+    ## normalize: sd(Y) over the input rows; the division is applied
+    ## below, once data.old (which data.long is built from) has been taken
     norm.para <- NULL
     if (normalize == TRUE) {
         sd.Y <- sd(as.matrix(data[, Yname]), na.rm = TRUE)
-        data[, c(Yname, Xname)] <- data[, c(Yname, Xname)] / sd.Y
+        if (!is.finite(sd.Y) || sd.Y <= 0) {
+            stop("\"normalize\" requires an outcome with positive variance.")
+        }
         norm.para <- sd.Y ## normalized parameter
     }
 
@@ -2052,6 +2055,15 @@ fect.default <- function(
             rm.na.time <- NULL
         }
         # here the size of data.full should be smaller than TT*N, larger than length(data)
+    }
+
+    ## normalize: divide the outcome and the covariates by sd(Y) for
+    ## fitting. data.old keeps them as given, so data.long (which
+    ## panelview(fit) draws) is on the outcome's scale (before 2.4.7 it was
+    ## divided too when na.rm = FALSE, since data.old was copied after the
+    ## division)
+    if (!is.null(norm.para)) {
+        data[, c(Yname, Xname)] <- data[, c(Yname, Xname)] / norm.para[1]
     }
 
     ## max.missing

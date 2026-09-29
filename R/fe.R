@@ -187,7 +187,9 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         est.best$mu <- est.best$mu * norm.para[1]
         if (r.cv > 0) {
             est.best$lambda <- est.best$lambda * norm.para[1]
-            est.best$VNT <- est.best$VNT * norm.para[1]
+            ## singular values of E E' / (N T): the square of the scale
+            ## (before 2.4.7 multiplied by sd(Y) once)
+            est.best$VNT <- est.best$VNT * (norm.para[1]^2)
         }
         if (force %in% c(1, 3)) {
             est.best$alpha <- est.best$alpha * norm.para[1]
@@ -216,7 +218,7 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
             est.best.cm$mu <- est.best.cm$mu * norm.para[1]
             if (r.cv > 0) {
                 est.best.cm$lambda <- est.best.cm$lambda * norm.para[1]
-                est.best.cm$VNT <- est.best.cm$VNT * norm.para[1]
+                est.best.cm$VNT <- est.best.cm$VNT * (norm.para[1]^2)
             }
             if (force %in% c(1, 3)) {
                 est.best.cm$alpha <- est.best.cm$alpha * norm.para[1]

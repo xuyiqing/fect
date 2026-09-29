@@ -93,17 +93,27 @@ fect_mc <- function(Y, # Outcome variable, (T*N) matrix
     ## ----------- Main Algorithm ----------- ##
     ## -------------------------------##
 
+    ## lambda.cv is on the outcome's scale. With normalize = TRUE the fit
+    ## runs on Y / sd(Y), whose singular values (what the penalty is
+    ## compared with) are divided by sd(Y), so the penalty is divided too:
+    ## the same lambda then means the same model (before 2.4.7 a given
+    ## lambda penalized the normalized outcome and the estimates moved).
+    ## eigen.all and lambda.norm are reported on the outcome's scale.
+    lambda.fit <- if (is.null(norm.para)) lambda.cv else lambda.cv / norm.para[1]
     lambda.norm <- eigen.all <- NULL
     if (boot == FALSE) {
         Y.lambda <- YY - Y0
         Y.lambda[which(II == 0)] <- 0
         eigen.all <- svd(Y.lambda / (TT * N))$d
+        if (!is.null(norm.para)) {
+            eigen.all <- eigen.all * norm.para[1]
+        }
         lambda.norm <- lambda.cv / max(eigen.all)
     }
 
     validX <- 1 ## no multi-colinearity
     ## matrix completion
-    est.best <- inter_fe_mc(YY, Y0, X, II, W.use, beta0, hasF, lambda.cv, force, tol, max.iteration,
+    est.best <- inter_fe_mc(YY, Y0, X, II, W.use, beta0, hasF, lambda.fit, force, tol, max.iteration,
                             fit_init = fit.init)
     validX <- est.best$validX
     validF <- est.best$validF
