@@ -35,7 +35,7 @@
 ## grid comes from the starting fit's residual singular values (feols
 ## precision, about 1e-7), so the estimates of a CV = TRUE mc fit carry
 ## about 1e-5 across scales: that block is checked at 1e-4. Rows a CV loop
-## never visited keep their sentinel (1e10 or 1e20) and are skipped.
+## never visited are NA and are skipped.
 ## ---------------------------------------------------------------
 
 ## every numeric slot of a fit, named by its path; matrices are kept whole
@@ -121,10 +121,6 @@
 .si_compare <- function(u, v, k, c, tol) {
   u <- as.numeric(u)
   v <- as.numeric(v)
-  ## sentinel rows of a CV table (never visited): not results
-  sentinel <- (is.finite(u) & abs(u) >= 1e9) | (is.finite(v) & abs(v) >= 1e9)
-  u[sentinel] <- NA
-  v[sentinel] <- NA
   if (!identical(is.finite(u), is.finite(v))) return("(NA or Inf pattern)")
   ok <- is.finite(u)
   if (!any(ok)) return(NULL)
@@ -313,7 +309,7 @@ test_that("scale invariance: mc with a given lambda and with CV = TRUE", {
     expect_equal(f[[2]]$lambda.seq, 100 * f[[1]]$lambda.seq, tolerance = 1e-6)
     expect_equal(f[[2]]$lambda.norm, f[[1]]$lambda.norm, tolerance = 1e-6)
     expect_equal(f[[2]]$CV.out.mc[, "lambda.norm"], f[[1]]$CV.out.mc[, "lambda.norm"], tolerance = 1e-6)
-    visited <- which(f[[1]]$CV.out.mc[, "MSPE"] < 1e9)
+    visited <- which(is.finite(f[[1]]$CV.out.mc[, "MSPE"]))
     expect_gte(length(visited), 3L)
     expect_equal(f[[2]]$CV.out.mc[visited, "MSPE"], 100^2 * f[[1]]$CV.out.mc[visited, "MSPE"],
                  tolerance = .si_cv_tol)

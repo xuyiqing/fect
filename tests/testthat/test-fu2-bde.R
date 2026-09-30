@@ -88,3 +88,53 @@ test_that("#174: the permutation fit is the estimator called with the current ar
   expect_equal(att, abs(plain$att.avg), tolerance = 1e-8)
 })
 
+## -- #175 -------------------------------------------------------------------
+
+test_that("#175: the gsynth CV rule chooses the same r for Y and Y * 1e5", {
+  f1 <- .bde_fit(.bde_data(1),   method = "gsynth", CV = TRUE, r = c(0, 3), seed = 1)
+  f2 <- .bde_fit(.bde_data(1e5), method = "gsynth", CV = TRUE, r = c(0, 3), seed = 1)
+  expect_equal(unname(f1$r.cv), unname(f2$r.cv))
+  expect_gt(f1$r.cv, 0)
+  expect_true(all(is.finite(f1$CV.out[, "MSPE"])))
+  expect_true(all(is.finite(f2$CV.out[, "MSPE"])))
+  expect_gt(max(f2$CV.out[, "MSPE"]), 1e9)
+  expect_equal(f2$CV.out[, "MSPE"], 1e10 * f1$CV.out[, "MSPE"], tolerance = 1e-6)
+  expect_equal(f2$att.avg, 1e5 * f1$att.avg, tolerance = 1e-6)
+})
+
+test_that("#175: an ife fit with CV = TRUE chooses the same r for Y and Y * 1e5", {
+  f1 <- .bde_fit(.bde_data(1),   method = "ife", CV = TRUE, r = c(0, 3), seed = 1)
+  f2 <- .bde_fit(.bde_data(1e5), method = "ife", CV = TRUE, r = c(0, 3), seed = 1)
+  expect_equal(unname(f1$r.cv), unname(f2$r.cv))
+  expect_gt(max(f2$CV.out.ife[, "MSPE"]), 1e9)
+  expect_equal(f2$CV.out.ife[, "MSPE"], 1e10 * f1$CV.out.ife[, "MSPE"], tolerance = 1e-6)
+})
+
+test_that("#175: rows the mc loop never scored are NA and lambda.cv is a scored row", {
+  f <- .bde_fit(method = "mc", CV = TRUE, seed = 1, nlambda = 12)
+  tab <- f$CV.out.mc
+  expect_false(any(is.finite(tab) & abs(tab) >= 1e9))
+  scored <- is.finite(tab[, "MSPE"])
+  expect_true(any(scored))
+  expect_true(all(is.na(tab[!scored, "MSPE"])))
+  expect_true(scored[which(f$lambda.seq == f$lambda.cv)])
+})
+
+test_that("#175: the in-loop rule and the selection rules read NA as unscored", {
+  improves <- fect:::.fect_cv_improves
+  best     <- fect:::.fect_cv_best
+  expect_equal(best(c(NA_real_, NA_real_)), Inf)
+  expect_equal(best(c(NA_real_, 4, 5)), 4)
+  expect_true(improves(c(NA_real_, NA_real_), 5e12))    # first scored row wins
+  expect_true(improves(c(NA_real_, 4), 3.9))           # more than 1% better
+  expect_false(improves(c(NA_real_, 4), 3.97))         # within 1%
+  expect_false(improves(c(NA_real_, 4), NaN))          # a failed row never wins
+  expect_false(improves(c(NA_real_, 4), Inf))
+  ## a failed row (NA) in the table: the rules select among the finite rows
+  means <- c(NA_real_, 2, 1.5, 1.6)
+  ses   <- c(NA_real_, 0.1, 0.2, 0.1)
+  expect_equal(fect:::.fect_apply_cv_rule(means, ses, rule = "min"), 3L)
+  expect_equal(fect:::.fect_apply_cv_rule(means, ses, rule = "1se"), 3L)
+  expect_equal(fect:::.fect_apply_cv_rule(means, ses, rule = "1pct"), 3L)
+  expect_equal(fect:::.fect_apply_cv_rule(c(NA_real_, 1e12, 1e12 * 0.9), NULL, rule = "min"), 3L)
+})

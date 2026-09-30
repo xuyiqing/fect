@@ -365,6 +365,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                                         fit_init = fit.init.co)
         } else {
             r.old <- r ## save the minimal number of factors
+            r.cv <- r.old ## until a row scores (#175)
 
             message("Cross-validating ...", "\r")
             score_names <- c("MSPE", "WMSPE", "GMSPE", "WGMSPE",
@@ -372,8 +373,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             CV.out <- matrix(NA, (r.max - r.old + 1), 4 + length(score_names))
             colnames(CV.out) <- c("r", "sigma2", "IC", "PC", score_names)
             CV.out[, "r"] <- c(r.old:r.max)
-            CV.out[, score_names] <- 1e10
-            CV.out[, "PC"] <- 1e10
+            ## unscored rows hold NA (before 2.4.7 the sentinel 1e10, #175)
+            CV.out[, score_names] <- NA_real_
+            CV.out[, "PC"] <- NA_real_
             r.pc <- est.co.pc.best <- NULL
 
             ## Per-fold SE matrix parallel to CV.out (added v2.3.0). Populated
@@ -689,13 +691,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     }
 
                     ## 1% rule — identical logic to serial path
-                    if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                    if (.fect_cv_improves(CV.out[, crit_col], scores[crit_col])) {
                         est.co.best <- est.co
                         r.cv <- r
                     } else {
                         if (r == r.cv + 1) message("*")
                     }
-                    if (PC < min(CV.out[, "PC"])) {
+                    if (PC < .fect_cv_best(CV.out[, "PC"])) {
                         r.pc <- r
                         est.co.pc.best <- est.co
                     }
@@ -990,7 +992,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
               } ## end cv.method branching
 
-                if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                if (.fect_cv_improves(CV.out[, crit_col], scores[crit_col])) {
                     ## at least 1% improvement for selected criterion
                     est.co.best <- est.co ## interFE result with the best r
                     r.cv <- r
@@ -998,7 +1000,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     if (r == r.cv + 1) message("*")
                 }
 
-                if (PC < min(CV.out[, "PC"])) {
+                if (PC < .fect_cv_best(CV.out[, "PC"])) {
                     r.pc <- r
                     est.co.pc.best <- est.co
                 }
@@ -1023,7 +1025,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             } ## end SERIAL BRANCH (IFE)
 
-            MSPE.best <- min(CV.out[, "MSPE"])
+            MSPE.best <- .fect_cv_best(CV.out[, "MSPE"])
 
             ## --- Apply cv.rule (added v2.3.0) -----------------------------
             ## Override r.cv based on the user-selected rule. The default "1se"
@@ -1033,8 +1035,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
                 means <- CV.out[, crit_col]
                 ses   <- CV.out.se[, crit_col]
-                ## Treat sentinels (1e10, Inf, NA) as missing for selection.
-                means[!is.finite(means) | means >= 1e9] <- NA_real_
+                ## unscored or failed rows are NA (before 2.4.7 the sentinel 1e10)
+                means[!is.finite(means)] <- NA_real_
                 i_pick <- .fect_apply_cv_rule(means, ses, rule = cv.rule)
                 if (!is.na(i_pick) && i_pick >= 1L && i_pick <= nrow(CV.out)) {
                     new_r_cv <- unname(CV.out[i_pick, "r"])
@@ -1474,14 +1476,16 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 fit_init = fit.init.co)
         } else {
             r.old <- r
+            r.cv <- r.old ## until a row scores (#175)
             message("Cross-validating ...", "\r")
             score_names <- c("MSPE", "WMSPE", "GMSPE", "WGMSPE",
                              "MAD", "Moment", "GMoment", "RMSE", "Bias")
             CV.out <- matrix(NA, (r.max - r.old + 1), 4 + length(score_names))
             colnames(CV.out) <- c("r", "sigma2", "IC", "PC", score_names)
             CV.out[, "r"] <- c(r.old:r.max)
-            CV.out[, score_names] <- 1e10
-            CV.out[, "PC"] <- 1e10
+            ## unscored rows hold NA (before 2.4.7 the sentinel 1e10, #175)
+            CV.out[, score_names] <- NA_real_
+            CV.out[, "PC"] <- NA_real_
             r.pc <- est.co.pc.best <- NULL
 
             ## Per-fold SEs parallel to CV.out, for applying `cv.rule` after the
@@ -1783,13 +1787,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     se_v   <- agg$se
 
                     ## 1% rule — identical logic to serial path
-                    if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                    if (.fect_cv_improves(CV.out[, crit_col], scores[crit_col])) {
                         est.co.best <- est.co
                         r.cv <- r
                     } else {
                         if (r == r.cv + 1) message("*")
                     }
-                    if (PC < min(CV.out[, "PC"])) {
+                    if (PC < .fect_cv_best(CV.out[, "PC"])) {
                         r.pc <- r
                         est.co.pc.best <- est.co
                     }
@@ -2118,14 +2122,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
               } ## end cv.method branching
 
-                if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                if (.fect_cv_improves(CV.out[, crit_col], scores[crit_col])) {
                     est.co.best <- est.co
                     r.cv <- r
                 } else {
                     if (r == r.cv + 1) message("*")
                 }
 
-                if (PC < min(CV.out[, "PC"])) {
+                if (PC < .fect_cv_best(CV.out[, "PC"])) {
                     r.pc <- r
                     est.co.pc.best <- est.co
                 }
@@ -2154,8 +2158,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
                 means <- CV.out[, crit_col]
                 ses   <- CV.out.se[, crit_col]
-                ## Treat sentinels (1e10, Inf, NA) as missing for selection.
-                means[!is.finite(means) | means >= 1e9] <- NA_real_
+                ## unscored or failed rows are NA (before 2.4.7 the sentinel 1e10)
+                means[!is.finite(means)] <- NA_real_
                 i_pick <- .fect_apply_cv_rule(means, ses, rule = cv.rule)
                 if (!is.na(i_pick) && i_pick >= 1L && i_pick <= nrow(CV.out)) {
                     new_r_cv <- unname(CV.out[i_pick, "r"])
@@ -2181,7 +2185,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 r.cv <- r.pc
             }
 
-            MSPE.best <- min(CV.out[, "MSPE"])
+            MSPE.best <- .fect_cv_best(CV.out[, "MSPE"])
             if (r > (T0.min - 1)) {
                 message(" (r hits maximum)")
             }

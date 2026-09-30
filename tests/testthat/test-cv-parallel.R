@@ -1048,10 +1048,10 @@ test_that("M.1: MC notyettreated serial == parallel (lambda.cv and CV.out.mc wit
   expect_equal(fit_seq$lambda.cv, fit_par$lambda.cv, tolerance = 1e-10)
 
   ## CV.out.mc: parallel computes all lambdas; serial may break_check early, leaving some
-  ## rows at the 1e20 sentinel. Compare only the rows both paths computed (MSPE < 1e19).
+  ## rows unscored (NA). Compare only the rows both paths computed (finite MSPE).
   ## The optimal lambda (lambda.cv) is selected from the rows both paths evaluated,
   ## so numerical identity of that selection is the key correctness property.
-  both_computed <- fit_seq$CV.out.mc[, "MSPE"] < 1e19 & fit_par$CV.out.mc[, "MSPE"] < 1e19
+  both_computed <- is.finite(fit_seq$CV.out.mc[, "MSPE"]) & is.finite(fit_par$CV.out.mc[, "MSPE"])
   if (any(both_computed)) {
     cv_diff <- max(abs(
       fit_seq$CV.out.mc[both_computed, ] - fit_par$CV.out.mc[both_computed, ]

@@ -125,3 +125,27 @@
     }
     cv.rule
 }
+
+
+## The in-loop 1% rule of the CV loops. A row a loop has not scored yet, or
+## whose fit failed, holds NA (before 2.4.7 a large number, 1e10 or 1e20,
+## which a score at or above 1e9, an outcome on a large scale, was mistaken
+## for; #175).
+##
+## .fect_cv_best: the smallest scored value of a CV column, Inf when none
+## is scored yet.
+## .fect_cv_improves: TRUE when `score` beats the best scored value by more
+## than 1%, or when nothing has been scored yet. A score that is not finite
+## (a failed fit) never wins.
+.fect_cv_best <- function(x) {
+    x <- x[is.finite(x)]
+    if (length(x) == 0L) return(Inf)
+    min(x)
+}
+
+.fect_cv_improves <- function(x, score) {
+    if (length(score) != 1L || !is.finite(score)) return(FALSE)
+    best <- .fect_cv_best(x)
+    if (!is.finite(best)) return(TRUE)
+    (best - score) > 0.01 * best
+}
