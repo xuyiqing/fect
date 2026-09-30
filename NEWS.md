@@ -417,6 +417,21 @@ says what to do.
 
 ## Bug fixes
 
+* `method = "cfe"` now warns, before iterating, when a `Q` column is not
+  identified from the untreated periods: a unit-specific trend column whose
+  mass lies almost entirely in a kappa group's treated or missing periods
+  leaves that group's loading fit from imputed cells, and the EM then
+  contracts along that direction at the missing-information rate (the
+  largest eigenvalue of I - (Q'Q)^-1 Q_obs'Q_obs). The warning names the
+  column, the observed share of its mass, the rate, the iteration count the
+  tolerance needs, and a remedy (a trend identified from the pre-treatment
+  periods, e.g. `Q.type = c("linear", "quadratic")`, or a supplied `Q`); the
+  `max.iteration` warning repeats the cause. On `sim_trend` the default
+  `Q.type = "bspline"` has its fifth basis function on periods 35 to 50
+  while treatment starts at 41, so `tol = 1e-5` needs about 28,000
+  iterations and the converged counterfactual is an extrapolation; the
+  book's example now uses `Q.type = c("linear", "quadratic")`. No estimate
+  changes (fect #173).
 * `permute = TRUE` now runs for `method = "fe"`, `"ife"` and `"mc"`. The
   permutation refits were called with an outdated argument list, so every
   permutation stopped with "Not a matrix", was dropped, and the p-value
