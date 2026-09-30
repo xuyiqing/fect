@@ -3807,6 +3807,7 @@ fect.default <- function(
             force = force,
             tol = tol,
             norm.para = norm.para,
+            max.iteration = max.iteration,
             nboots = nboots,
             parallel = parallel,
             cores = cores

@@ -55,3 +55,36 @@ test_that("#172: with tol at or above 1e-3 the CV fit is unchanged", {
   expect_equal(cv$att.avg, plain$att.avg, tolerance = 1e-10)
 })
 
+## -- #174 -------------------------------------------------------------------
+
+test_that("#174: permute = TRUE runs for method = 'mc', 'fe' and 'ife'", {
+  for (m in c("mc", "fe", "ife")) {
+    args <- list(method = m, CV = FALSE, permute = TRUE, nboots = 10, seed = 1)
+    if (m == "mc")  args$lambda <- 0.05
+    if (m == "ife") args$r <- 2
+    perm  <- do.call(.bde_fit, args)
+    plain <- do.call(.bde_fit, args[c("method", "CV", "lambda", "r")[
+      c("method", "CV", "lambda", "r") %in% names(args)]])
+    info <- paste("method =", m)
+    expect_equal(perm$att.avg, plain$att.avg, info = info)
+    expect_type(perm$permute, "list")
+    expect_length(perm$permute$permute.att.avg, 10)
+    expect_true(all(is.finite(perm$permute$permute.att.avg)), info = info)
+    expect_true(perm$permute$p >= 0 && perm$permute$p <= 1, info = info)
+  }
+})
+
+test_that("#174: the permutation fit is the estimator called with the current arguments", {
+  ## one.permu() with no shuffling reproduces the plain fit's ATT.
+  d <- .bde_data()
+  plain <- .bde_fit(d, formula = Y ~ D, method = "mc", CV = FALSE, lambda = 0.05)
+  Y <- matrix(d$Y, 30, 50); D <- matrix(d$D, 30, 50); I <- matrix(1, 30, 50)
+  att <- fect:::one.permu(Y, NULL, D, I, r.cv = 0, lambda.cv = 0.05, method = "mc",
+                          force = 3, tol = 1e-5, norm.para = NULL)
+  expect_equal(att, abs(plain$att.avg), tolerance = 1e-8)
+  att <- fect:::one.permu(Y, NULL, D, I, r.cv = 2, lambda.cv = 0.05, method = "ife",
+                          force = 3, tol = 1e-5, norm.para = NULL)
+  plain <- .bde_fit(d, formula = Y ~ D, method = "ife", CV = FALSE, r = 2)
+  expect_equal(att, abs(plain$att.avg), tolerance = 1e-8)
+})
+
