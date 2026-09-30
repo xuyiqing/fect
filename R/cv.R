@@ -45,7 +45,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     cores = NULL,
                     do_parallel_cv   = FALSE,   ## pre-computed flag from default.R
                     do_parallel_boot = FALSE,    ## threaded through; not used in cv.R
-                    cv.rule = "1se",             ## "1se" (default), "min", or "1pct" (legacy)
+                    cv.rule = "min",             ## "min" (default since 2.4.7), "1se", or "1pct" (legacy)
                     W.in.fit = TRUE,             ## whether W enters the outcome-model fit
                     loading.bound = "none",      ## bounded treated loadings (gsynth and
                     gamma.loading = NULL,        ## ife + nevertreated delegations only;
@@ -160,6 +160,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
 
     validX <- 1 ## no multi-colinearity
     CV.out.ife <- CV.out.mc <- NULL
+    CV.out.ife.se <- CV.out.mc.se <- NULL
 
     ## ----------------------------------------------------##
     ##         Cross-validation of r and lambda           ##
@@ -319,10 +320,15 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         ## sampling (unsampled units stay fully observed).
         rolling_folds <- NULL
         if (use_rolling) {
+            ## The training floor (#167) is set by r.max, the largest rank
+            ## the r loop evaluates (max(r) of the call; 5 at the default
+            ## r = c(0, 5)). The same masks serve the lambda loop under
+            ## method = "mc" and "both", so mc's floor is the same.
             rolling_folds <- .build_cv_mask_rolling(
                 II = II, D = D, k = k,
                 cv.nobs = cv.nobs, cv.buffer = cv.buffer,
-                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                cv.prop = cv.prop, min.T0 = min.T0, r.max = r.max,
+                seed = NULL
             )
         }
 
@@ -888,7 +894,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     if (!is.null(new_r_cv) && is.finite(new_r_cv)) {
                         if (new_r_cv != as.integer(unname(r.cv))) {
                             message(sprintf(
-                                "  [cv.rule = %s] r.cv adjusted from %d to %d (1-SE band)\n",
+                                "  [cv.rule = %s] r.cv adjusted from %d to %d\n",
                                 cv.rule,
                                 as.integer(unname(r.cv)),
                                 as.integer(new_r_cv)
@@ -1406,7 +1412,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     new_lambda_cv <- lambda[i_pick_mc]
                     if (!identical(new_lambda_cv, lambda.cv)) {
                         message(sprintf(
-                            "  [cv.rule = %s] lambda.cv adjusted (1-SE band)",
+                            "  [cv.rule = %s] lambda.cv adjusted",
                             cv.rule
                         ))
                         est.best <- inter_fe_mc(
@@ -2069,13 +2075,28 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         ))
     }
 
-    ## CV results
+    ## CV results, each with the fold standard errors the cv.rule used
+    ## (CV.out.ife.se, CV.out.mc.se; #167)
     if (!is.null(CV.out.ife)) {
-        out <- c(out, list(CV.out.ife = CV.out.ife))
+        out <- c(out, list(CV.out.ife = CV.out.ife,
+                           CV.out.ife.se = .fect_cv_se_table(CV.out.ife.se)))
     }
 
     if (!is.null(CV.out.mc)) {
-        out <- c(out, list(CV.out.mc = CV.out.mc))
+        out <- c(out, list(CV.out.mc = CV.out.mc,
+                           CV.out.mc.se = .fect_cv_se_table(CV.out.mc.se)))
+    }
+
+    ## CV.out and CV.out.se: the tables of the method fitted, so fit$CV.out
+    ## and fit$CV.out.se read the same way for every method. Before 2.4.7
+    ## fit$CV.out reached CV.out.ife or CV.out.mc through R's partial
+    ## matching of names; the .se tables would make that match ambiguous.
+    if (identical(method, "ife") && !is.null(CV.out.ife)) {
+        out <- c(out, list(CV.out = CV.out.ife,
+                           CV.out.se = .fect_cv_se_table(CV.out.ife.se)))
+    } else if (identical(method, "mc") && !is.null(CV.out.mc)) {
+        out <- c(out, list(CV.out = CV.out.mc,
+                           CV.out.se = .fect_cv_se_table(CV.out.mc.se)))
     }
 
     if (!is.null(group)) {

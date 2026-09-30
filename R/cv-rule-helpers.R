@@ -7,10 +7,12 @@
 ##
 ## v2.3.0 introduces the 1-SE rule (Breiman, Friedman, Olshen & Stone 1984;
 ## Hastie, Tibshirani & Friedman 2009 §7.10): pick the smallest r whose mean
-## CV criterion is within one fold-SE of the best. Default `cv.rule = "1se"`.
-## The 1% rule is preserved as `cv.rule = "1pct"` for byte-identical
-## reproducibility of pre-2.3.0 fits. A pure-min rule is also available as
-## `cv.rule = "min"`.
+## CV criterion is within one fold-SE of the best (`cv.rule = "1se"`, the
+## default from 2.3.0 to 2.4.6). The 1% rule is preserved as
+## `cv.rule = "1pct"` for byte-identical reproducibility of pre-2.3.0 fits.
+## Since 2.4.7 the default is the pure-min rule, `cv.rule = "min"` (#167):
+## the fold errors are heavy-tailed, which inflates the fold SE, and in the
+## anchor study the 1-SE rule under-selected r in every cell.
 ##
 ## The fold SE is computed from per-fold criterion values:
 ##     SE_r = sd(score_per_fold_r) / sqrt(K)
@@ -84,11 +86,11 @@
 ## means: numeric vector indexed by row (one per candidate hyper-param value).
 ##        NAs and Inf are treated as missing (excluded from selection).
 ## ses:   numeric vector of SE per row, OR NULL (used only when rule == "1se").
-## rule:  one of "1se" (default), "min", "1pct".
+## rule:  one of "min" (default), "1se", "1pct".
 ##
 ## Returns the row index (integer). Uses the smallest index among ties
 ## consistent with bias-toward-parsimony.
-.fect_apply_cv_rule <- function(means, ses = NULL, rule = c("1se", "min", "1pct")) {
+.fect_apply_cv_rule <- function(means, ses = NULL, rule = c("min", "1se", "1pct")) {
     rule <- match.arg(rule)
     valid <- is.finite(means)
     if (!any(valid)) return(NA_integer_)
@@ -112,15 +114,27 @@
 }
 
 
+## The fold-SE table returned with a fit (CV.out.se, CV.out.ife.se,
+## CV.out.mc.se; added 2.4.7, #167): the rows of the CV table and its
+## score columns, with the r or lambda.norm column kept as the row key.
+## The columns that never carry a fold SE (sigma2, IC, PC, MSPTATT, MSE)
+## are dropped.
+.fect_cv_se_table <- function(se_mat) {
+    if (is.null(se_mat)) return(NULL)
+    keep <- setdiff(colnames(se_mat), c("sigma2", "IC", "PC", "MSPTATT", "MSE"))
+    se_mat[, keep, drop = FALSE]
+}
+
+
 ## Validate user-supplied cv.rule argument and return a single canonical string.
 .fect_validate_cv_rule <- function(cv.rule) {
-    if (is.null(cv.rule)) return("1se")
+    if (is.null(cv.rule)) return("min")
     if (!is.character(cv.rule) || length(cv.rule) != 1L) {
         stop("'cv.rule' must be a single character string: ",
-             "'1se' (default), 'min', or '1pct'.")
+             "'min' (default), '1se', or '1pct'.")
     }
-    if (!cv.rule %in% c("1se", "min", "1pct")) {
-        stop("'cv.rule' must be one of '1se', 'min', '1pct'. Got: '",
+    if (!cv.rule %in% c("min", "1se", "1pct")) {
+        stop("'cv.rule' must be one of 'min', '1se', '1pct'. Got: '",
              cv.rule, "'.")
     }
     cv.rule

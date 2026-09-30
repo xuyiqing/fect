@@ -265,7 +265,7 @@ fect_boot <- function(
   cv.buffer = 1,
   cv.donut = 1,
   min.T0 = 5,
-  cv.rule = "1se",
+  cv.rule = "min",
   proportion = 0,          # CV settings for the fect_cv() call below; before 2.4.7
                            # they were not passed, so se = TRUE ran CV on defaults
   dloo = FALSE,            # apply the dloo pre-trend overlay to each replicate

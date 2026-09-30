@@ -148,10 +148,13 @@ fect_binary_cv <- function(Y, # Outcome variable, (T*N) matrix
         ## ---- rolling-window pre-computation (cv.method = "rolling") ---- ##
         rolling_folds <- NULL
         if (use_rolling) {
+            ## r.max (min(TT, max(r))) is the largest rank this CV
+            ## evaluates; it sets the training floor (#167).
             rolling_folds <- .build_cv_mask_rolling(
                 II = II, D = D, k = k,
                 cv.nobs = cv.nobs, cv.buffer = cv.buffer,
-                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                cv.prop = cv.prop, min.T0 = min.T0, r.max = r.max,
+                seed = NULL
             )
         }
 

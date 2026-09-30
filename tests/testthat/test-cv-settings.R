@@ -14,9 +14,11 @@
 skip_on_cran()
 
 ## N = 30, T = 16, 10 treated units adopting at t = 11..13, two factors with
-## the second one weak (loadings scaled by w = 0.3), one covariate. On these
-## panels cv.rule "min" and "1se" pick different r: panel 1 for ife
-## (0 vs 1), panel 2 for gsynth (1 vs 2), with set.seed(1) before the call.
+## the second one weak (loadings scaled by w = 0.3), one covariate. On panel
+## 5 cv.rule "min" and "1se" pick different r (1 vs 0) for ife, gsynth and
+## cfe, with set.seed(1) before the call. (Panels 1 and 2 did so before
+## 2.4.7; the training floor of #167 moved the anchors, and on them the two
+## rules now agree.)
 .rule_panel <- function(panel) {
   withr::with_seed(panel, {
     N <- 30; TT <- 16; Ntr <- 10
@@ -70,9 +72,11 @@ test_that("se = TRUE cross-validates with the user's cv.buffer, cv.donut, min.T0
   }
 })
 
+## The default cv.rule became "min" in 2.4.7 (#167), so the "1se" fits below
+## ask for it by name.
 test_that("se = TRUE applies cv.rule", {
-  d <- .rule_panel(1)
-  nose_1se <- .fit_cv(d, session = 1, method = "ife")
+  d <- .rule_panel(5)
+  nose_1se <- .fit_cv(d, session = 1, method = "ife", cv.rule = "1se")
   nose_min <- .fit_cv(d, session = 1, method = "ife", cv.rule = "min")
   skip_if(nose_1se$r.cv == nose_min$r.cv, "this panel no longer separates the rules")
   boot_min <- .fit_boot(d, seed = 1, method = "ife", cv.rule = "min")
@@ -80,8 +84,8 @@ test_that("se = TRUE applies cv.rule", {
 })
 
 test_that("gsynth applies cv.rule, with and without se", {
-  d <- .rule_panel(2)
-  g_1se <- .fit_cv(d, session = 1, method = "gsynth")
+  d <- .rule_panel(5)
+  g_1se <- .fit_cv(d, session = 1, method = "gsynth", cv.rule = "1se")
   g_min <- .fit_cv(d, session = 1, method = "gsynth", cv.rule = "min")
   r_argmin <- unname(g_min$CV.out[which.min(g_min$CV.out[, "MSPE"]), "r"])
   skip_if(r_argmin == g_1se$r.cv, "this panel no longer separates the rules")
@@ -97,11 +101,12 @@ test_that("gsynth applies cv.rule, with and without se", {
 })
 
 ## CFE with never-treated factors kept its own in-loop 1% rule whatever
-## cv.rule was (fixed in 2.4.7). On panel 2 the lowest CV MSPE is at r = 2 and
-## the 1-SE rule picks r = 1; before the fix every rule returned r = 2.
+## cv.rule was (fixed in 2.4.7). On panel 5 the lowest CV MSPE is at r = 1 and
+## the 1-SE rule picks r = 0; before the fix every rule returned the argmin.
 test_that("cfe with never-treated factors applies cv.rule, with and without se", {
-  d <- .rule_panel(2)
-  c_1se <- .fit_cv(d, session = 1, method = "cfe", time.component.from = "nevertreated")
+  d <- .rule_panel(5)
+  c_1se <- .fit_cv(d, session = 1, method = "cfe", time.component.from = "nevertreated",
+                   cv.rule = "1se")
   c_min <- .fit_cv(d, session = 1, method = "cfe", time.component.from = "nevertreated",
                    cv.rule = "min")
   r_argmin <- unname(c_min$CV.out[which.min(c_min$CV.out[, "MSPE"]), "r"])

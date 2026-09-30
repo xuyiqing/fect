@@ -183,7 +183,10 @@
   )))
 }
 
-.si_cv_tables <- c("$CV.out", "$CV.out.ife", "$CV.out.mc")
+## the CV tables and, since 2.4.7 (#167), the fold standard errors returned
+## with them, all at the fold fits' precision
+.si_cv_tables <- c("$CV.out", "$CV.out.ife", "$CV.out.mc",
+                   "$CV.out.se", "$CV.out.ife.se", "$CV.out.mc.se")
 .si_cv_tol <- 1e-3
 
 ## one specification, fitted on sim_gsynth and on sim_gsynth with the

@@ -356,18 +356,25 @@ says what to do.
   by the inner fit and left unscored. Before, a unit could keep 4 or 5
   training periods, its loadings then followed the noise, and one such unit
   set a fold's error; on `sim_gsynth` (two factors) `r.cv.rolling()` picked
-  r = 0 at the defaults and now picks r = 2. In a simulation study (48
-  designs, 50 replications each) the floor raised the share of runs picking
-  the true rank from 0.43 to 0.57 and lowered the ATT error in every design.
-  When a panel is too short for the floor it is lowered to what the data
-  allow, with a message naming the floor used. The fold standard errors the
-  selection rule compares are now returned as `CV.out.se` (fect #167).
+  r = 0 at the defaults (MSPE 2.019 at r = 0 against 2.043 at r = 2, with 12
+  of 300 held-out cells unscored) and now picks r = 2 (1.922 against 1.613,
+  all 300 scored). In a simulation study (48 designs, 50 replications each)
+  the floor raised the share of runs picking the true rank from 0.43 to 0.57
+  and lowered the ATT error in every design. When no unit can meet the floor
+  it is lowered to what the data allow, never below `min.T0`, with a message
+  naming the floor used and the ranks it can judge. The fold standard errors
+  the selection rule compares are returned as `CV.out.se`, and `fect_cv`
+  fits (`method = "ife"`, `"mc"`) now carry `CV.out` under that exact name
+  (it was found only through partial matching of `CV.out.ife`) (fect #167).
 * The default `cv.rule` is now `"min"` (the rank or penalty with the lowest
   cross-validated error), not `"1se"`. Fold errors are heavy-tailed, so the
   one-standard-error rule under-selects factors: in the study above it lost
   to `"min"` in every design, by 10 to 15 points of rank recovery and 0.02 to
-  0.05 of ATT error, with no sign of over-fitting. `"1se"` and `"1pct"` are
-  still available. The chosen `r` or `lambda` of fits with `CV = TRUE` can
+  0.05 of ATT error, with no sign of over-fitting; for mc's `lambda` the two
+  rules differ little (ATT RMSE 0.478 against 0.488 in one design), and
+  `"1se"` sometimes picked the pure fixed-effects fit. `"1se"` and `"1pct"`
+  are still available; `cv.rule = "1se"` restores the old rule but not the
+  old anchors. The chosen `r` or `lambda` of fits with `CV = TRUE` can
   change (fect #167).
 * `fect(CV = TRUE)` with `method = "ife"` or `"mc"` now returns the chosen
   model refit at `tol`. It returned the fit made inside the cross-validation

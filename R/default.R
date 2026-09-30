@@ -104,7 +104,7 @@ fect <- function(
     loading.bound = "none",           # simplex projection of treated loadings
     gamma.loading = NULL,             # scalar gamma for simplex; NULL = CV
     gamma.loading.grid = NULL,        # optional grid for gamma CV
-    cv.rule = "1se"                   # CV selection rule: "1se", "min", "1pct"
+    cv.rule = "min"                   # CV selection rule: "min" (default since 2.4.7, #167), "1se", "1pct"
 ) {
     ## binary outcome (probit) models are not supported in this version:
     ## stop before any work (before 2.4.7 the fit failed later with errors
@@ -526,7 +526,7 @@ fect.formula <- function(
     loading.bound = "none",
     gamma.loading = NULL,
     gamma.loading.grid = NULL,
-    cv.rule = "1se"
+    cv.rule = "min"
 ) {
     ## Covariates come from the formula. Before 2.4.7 an `X` given with a
     ## formula was silently ignored. `X = NULL` (what gsynth's wrapper
@@ -751,7 +751,7 @@ fect.default <- function(
     loading.bound = "none",
     gamma.loading = NULL,
     gamma.loading.grid = NULL,
-    cv.rule = "1se"
+    cv.rule = "min"
 ) {
     ## -------------------------------##
     ## Checking Parameters
