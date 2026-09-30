@@ -2454,6 +2454,16 @@ fect.default <- function(
             }
             kappaQ.id[[which(kappa == key)]] <- value
         }
+
+        ## names for the Q-identification diagnostic (#173): the Q
+        ## columns, and the units and kappa variables; the C++ ignores
+        ## dimnames and unit subsets below carry them along
+        if (length(Q) > 0) {
+            dimnames(X.Q) <- list(NULL, NULL, Q)
+        }
+        if (length(kappa) > 0) {
+            dimnames(X.kappa) <- list(NULL, as.character(id.series), kappa)
+        }
     } else {
         Zgamma.id <- list()
         kappaQ.id <- list()

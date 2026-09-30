@@ -277,8 +277,14 @@ test_that("balanced panels: CFE fits equal fect 2.4.7 at fad9f72", {
         sigma2 = 0.997109733055106
     ))
 
-    ## sim_trend, Q.type = "bspline" (kappa = unit). This fit reaches
-    ## max.iteration = 5000 on fad9f72 as well; the warnings are that.
+    ## sim_trend, Q.type = "bspline" (kappa = unit). The fifth B-spline
+    ## column is supported only on periods 35-50 and treatment starts in
+    ## 41, so each treated unit's loading on it is identified only from
+    ## imputed cells and the EM contracts at 0.9996 per iteration (#173).
+    ## The fit stops at max.iteration = 5000 on fad9f72 as well; the
+    ## literals are the 5,001-iteration values of that computation, and
+    ## the suppressed warnings are the #173 diagnostic and the
+    ## max.iteration notes (asserted in test-cfe-q-identification.R).
     data("sim_trend", package = "fect")
     f.bs <- suppressWarnings(cfe_fit(sim_trend, Q.type = "bspline"))
     check_ref(f.bs, list(

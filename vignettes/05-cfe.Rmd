@@ -266,24 +266,26 @@ plot(out.fe.trend,
      main = "FE Only (Sin Trend DGP) — Placebo Test")
 ```
 
-Now we use `Q.type = "bspline"`, which generates a B-spline basis that can approximate smooth nonlinear functions:
+Now we combine a linear and a quadratic term, `Q.type = c("linear", "quadratic")`, which approximates a half-cycle sinusoid well over the panel. Each unit gets its own loading on both terms, and both terms vary across the pre-treatment periods, so the loadings are identified from observed data:
 
-```{r cfe-44-sin-bspline, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
-out.cfe.bs <- fect(Y ~ D, data = sim_trend,
+```{r cfe-44-sin-quad, eval = TRUE, cache = TRUE, message = FALSE, warning = FALSE, results = 'hide'}
+out.cfe.quad <- fect(Y ~ D, data = sim_trend,
   index = c("id", "time"),
   method = "cfe", force = "two-way",
-  Q.type = "bspline",
+  Q.type = c("linear", "quadratic"),
   se = TRUE, parallel = TRUE, cores = 16, nboots = 200,
   placeboTest = TRUE, placebo.period = c(-2, 0))
 ```
 
-```{r cfe-44-sin-bspline-plot, fig.width = 6, fig.height = 4.5}
-plot(out.cfe.bs, 
+```{r cfe-44-sin-quad-plot, fig.width = 6, fig.height = 4.5}
+plot(out.cfe.quad, 
      stats = c("placebo.p", "equiv.p"),
-     main = "CFE with B-spline Trend — Placebo Test")
+     main = "CFE with Quadratic Trend — Placebo Test")
 ```
 
-The B-spline specification should pass or nearly pass the placebo test. Some bias may remain because B-splines approximate the true sinusoidal trend rather than matching it exactly.
+The quadratic specification converges in about a hundred iterations and should pass or nearly pass the placebo test. Some bias may remain because a quadratic approximates the true sinusoidal trend rather than matching it exactly.
+
+An earlier version of this example used `Q.type = "bspline"`. On this panel the last of the five default basis functions lives only in periods 35 to 50, while treatment starts in period 41, so a treated unit's loading on it is not identified from its pre-treatment periods: the EM creeps for tens of thousands of iterations and its counterfactual is an extrapolation. `fect` now warns before iterating when a `Q` column is nearly unobserved in the untreated periods. With `Q.type = "bspline"`, check that every basis function has most of its mass before treatment.
 
 ::: {.callout-note appearance="simple"}
 The `Q.type` argument accepts `"linear"`, `"quadratic"`, `"cubic"`, or `"bspline"`. Multiple types can be combined: `Q.type = c("linear", "quadratic")`. For B-splines, `Q.bspline.degree` controls the polynomial degree (default chosen automatically based on the number of time periods).
