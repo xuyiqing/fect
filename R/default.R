@@ -274,6 +274,33 @@ fect <- function(
     out
 }
 
+## An extra fixed-effect label (index[3:], group.fe) belongs to a cell
+## (#171). Return the periods x units matrix of the labels of `col`, read
+## from the long data `data` (one row per observed unit-period, with the
+## id column `id` and the time column `time`). An absent cell takes the
+## unit's label when every observed cell of the unit has the same one (a
+## grouping nested in the units, as group.fe requires; the EM step then
+## imputes the cell with its group effect, and the fit is the least
+## squares fit of the observed cells) and is NA otherwise (cfe_iter()
+## puts it in no group). The labels are the codes fect.default() made
+## from the column.
+.cfe_by_cell <- function(data, col, id, time, id.series, time.uni) {
+    out <- matrix(NA_real_, length(time.uni), length(id.series))
+    out[cbind(match(data[[time]], time.uni), match(data[[id]], id.series))] <-
+        data[[col]]
+    absent <- is.na(out)
+    if (any(absent)) {
+        unit.label <- apply(out, 2, function(v) {
+            u <- unique(v[!is.na(v)])
+            if (length(u) == 1L) u else NA_real_
+        })
+        fill <- matrix(unit.label, nrow(out), ncol(out), byrow = TRUE)
+        take <- absent & !is.na(fill)
+        out[take] <- fill[take]
+    }
+    out
+}
+
 ## Tolerances of .fect_check_covariates()
 .FECT_COV_NOVAR_TOL <- 1e-12  # centred norm / max(1, norm): no variation
 .FECT_COV_ABSORB_TOL <- 1e-8  # norm after removing the FE / centred norm
@@ -2114,12 +2141,15 @@ fect.default <- function(
         stop(paste("Missing values in variable \"", time, "\".", sep = ""))
     }
 
-    ## the long data the CFE unit- and period-level inputs are read from
-    ## (see .cfe_by_level()); the panel filled below holds 0 at absent
-    ## rows and, when unbalanced, index codes in place of the id and time
+    ## the long data the CFE unit-, period- and cell-level inputs are read
+    ## from (see .cfe_by_level() and .cfe_by_cell()); the panel filled
+    ## below holds 0 at absent rows and, when unbalanced, index codes in
+    ## place of the id and time
     cfe.long <- NULL
     if (method == "cfe") {
-        cfe.long <- data[, unique(c(id, time, Z, Q, gamma, kappa)), drop = FALSE]
+        extra.fe <- if (length(index) > 2) index[3:length(index)] else NULL
+        cfe.long <- data[, unique(c(id, time, Z, Q, gamma, kappa, extra.fe)),
+                         drop = FALSE]
     }
 
     ## check balanced panel and fill unbalanced panel
@@ -2147,11 +2177,8 @@ fect.default <- function(
             variable <- c(variable, Wname)
         }
 
-        ## (Z, Q, gamma and kappa are read from cfe.long, not from the
-        ## filled panel)
-        if (method == "cfe" && length(index) > 2) {
-            variable <- unique(c(index[3:length(index)], variable))
-        }
+        ## (Z, Q, gamma, kappa and the extra fixed-effect labels are read
+        ## from cfe.long, not from the filled panel)
 
         if (!is.null(cl)) {
             variable <- unique(c(variable, cl))
@@ -2358,8 +2385,15 @@ fect.default <- function(
 
     if (method == "cfe") {
         if (length(index) > 2) {
+            ## An extra fixed-effect label belongs to a cell (a unit may
+            ## change groups). Read the labels per cell from the long
+            ## data; an absent cell takes the unit's label when the unit
+            ## has one, and NA otherwise (see .cfe_by_cell()). (Before
+            ## 2.4.7 the labels came from the filled panel, where an
+            ## absent cell held 0 and so joined a phantom group; #171.)
             for (i in 1:(length(index) - 2)) {
-                X.extra.FE[,, i] <- matrix(data[, index[i + 2]], TT, N)
+                X.extra.FE[, , i] <- .cfe_by_cell(cfe.long, index[i + 2], id,
+                                                  time, id.series, time.uni)
             }
         }
 

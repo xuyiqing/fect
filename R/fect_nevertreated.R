@@ -163,8 +163,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         if (n_extra > 0) {
             fe_type <- character(n_extra)
             for (k in 1:n_extra) {
-                co_levels <- unique(X.extra.FE[1, co, k])
-                tr_levels <- unique(X.extra.FE[1, tr, k])
+                ## the labels of the observed cells (NA at absent cells;
+                ## a unit may change groups) (#171)
+                co_levels <- unique(stats::na.omit(c(X.extra.FE.co[, , k])))
+                tr_levels <- unique(stats::na.omit(c(X.extra.FE.tr[, , k])))
                 overlap <- intersect(co_levels, tr_levels)
                 if (length(overlap) == 0) {
                     fe_type[k] <- "A"
@@ -2363,20 +2365,16 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         fe_fit <- matrix(0, TT, Ntr)
         if (length(typeA_idx) == 0) return(fe_fit)
         for (k_a in typeA_idx) {
-            labels.tr <- X.extra.FE.tr[1, , k_a]
-            unique_levels <- sort(unique(labels.tr))
+            ## per cell: a level's effect is the mean pre-treatment
+            ## residual of the cells with that label, applied to every
+            ## cell with that label (#171)
+            labels.tr <- matrix(X.extra.FE.tr[, , k_a], TT, Ntr)
+            unique_levels <- sort(unique(stats::na.omit(c(labels.tr))))
             for (g in unique_levels) {
-                units_in_level <- which(labels.tr == g)
-                pre_vals <- c()
-                for (ii in units_in_level) {
-                    pre_t <- which(pre[, ii])
-                    pre_vals <- c(pre_vals, U.cur[pre_t, ii])
-                }
+                in_level <- !is.na(labels.tr) & labels.tr == g
+                pre_vals <- U.cur[in_level & pre]
                 if (length(pre_vals) > 0) {
-                    fe_mean <- mean(pre_vals)
-                    for (ii in units_in_level) {
-                        fe_fit[, ii] <- fe_fit[, ii] + fe_mean
-                    }
+                    fe_fit[in_level] <- fe_fit[in_level] + mean(pre_vals)
                 }
             }
         }
@@ -3604,18 +3602,21 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
     ## For each Type-B FE dimension, compute group means and apply to treated
     typeB.fit.tr <- matrix(0, TT, Ntr)
+    ## per cell: a level's effect is the mean of the control cells with
+    ## that label, applied to every treated cell with that label (NA at
+    ## absent cells; #171)
     for (k_b_idx in seq_along(typeB_idx)) {
         k <- typeB_idx[k_b_idx]
-        labels.co <- X.extra.FE.co.B[1, , k_b_idx]
-        labels.tr <- X.extra.FE.tr[1, , k]
-        levels.all <- sort(unique(labels.co))
+        labels.co <- matrix(X.extra.FE.co.B[, , k_b_idx], TT, Nco)
+        labels.tr <- matrix(X.extra.FE.tr[, , k], TT, Ntr)
+        levels.all <- sort(unique(stats::na.omit(c(labels.co))))
 
         for (g in levels.all) {
-            co_mask <- which(labels.co == g)
-            tr_mask <- which(labels.tr == g)
-            if (length(tr_mask) > 0 && length(co_mask) > 0) {
-                fe_val <- mean(fe_fit.co[, co_mask])
-                typeB.fit.tr[, tr_mask] <- typeB.fit.tr[, tr_mask] + fe_val
+            co_mask <- !is.na(labels.co) & labels.co == g
+            tr_mask <- !is.na(labels.tr) & labels.tr == g
+            if (any(tr_mask) && any(co_mask)) {
+                fe_val <- mean(fe_fit.co[co_mask])
+                typeB.fit.tr[tr_mask] <- typeB.fit.tr[tr_mask] + fe_val
             }
         }
     }
