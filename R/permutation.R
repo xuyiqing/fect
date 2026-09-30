@@ -260,6 +260,9 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
             }
             est <- inter_fe_mc(YY, Y0, X, II, W.use, beta0, 1, lambda.cv, force, tol, max.iteration)
         }
+        if (is.null(est)) {
+            stop("one.permu: no estimator for method = \"", method, "\".")
+        }
 
         if (!is.null(norm.para)) {
             est$fit <- est$fit * norm.para[1]

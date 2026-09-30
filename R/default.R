@@ -3834,6 +3834,12 @@ fect.default <- function(
 
     ## permutation test
     if (permute == TRUE) {
+        if (!out$method %in% c("fe", "ife", "mc")) {
+            stop("permute = TRUE is implemented for method = \"fe\", \"ife\" and \"mc\" ",
+                 "(the fit's method is \"", out$method, "\"). one.permu() has no ",
+                 "estimator for it, so every permuted ATT would be 0 and the ",
+                 "p-value 0.", call. = FALSE)
+        }
         message("Permuting under sharp null hypothesis ... ")
 
         out.permute <- fect_permu(

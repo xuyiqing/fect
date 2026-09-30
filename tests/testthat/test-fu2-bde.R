@@ -88,6 +88,20 @@ test_that("#174: the permutation fit is the estimator called with the current ar
   expect_equal(att, abs(plain$att.avg), tolerance = 1e-8)
 })
 
+test_that("#174: permute = TRUE stops for a method one.permu() has no estimator for", {
+  ## gsynth (and cfe, ife + nevertreated) fell through the estimator branch:
+  ## every permuted ATT was 0 and the p-value 0.
+  expect_error(
+    .bde_fit(method = "gsynth", CV = FALSE, r = 2, permute = TRUE, nboots = 5, seed = 1),
+    regexp = "permute = TRUE is implemented for method = \"fe\", \"ife\" and \"mc\" \\(the fit's method is \"gsynth\"\\)")
+  d <- .bde_data()
+  Y <- matrix(d$Y, 30, 50); D <- matrix(d$D, 30, 50); I <- matrix(1, 30, 50)
+  expect_error(
+    fect:::one.permu(Y, NULL, D, I, r.cv = 2, lambda.cv = NULL, method = "gsynth",
+                     force = 3, tol = 1e-5, norm.para = NULL),
+    regexp = "no estimator for method = \"gsynth\"")
+})
+
 ## -- #175 -------------------------------------------------------------------
 
 test_that("#175: the gsynth CV rule chooses the same r for Y and Y * 1e5", {
