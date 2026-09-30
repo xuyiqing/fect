@@ -78,11 +78,10 @@ with `cv.prop * n_eligible * cv.nobs`.}
 \item{cv.rule}{Rule for picking `r` from the MSPE curve: `"1se"`
 (default), `"min"`, or `"1pct"`.}
 
-\item{min.T0}{Minimum observations required strictly before the
-anchor. Sets the lower bound on valid anchor positions. Default 5.
-A held-out unit's loadings are fitted to its observations before the
-held-out block; with few of them the predictions are noisy, and a
-larger `min.T0` gives a steadier choice of `r`.}
+\item{min.T0}{Passed to the inner `fect()` fits, and the lower bound
+of the training floor (see Details). Default 5. The anchors start
+after `max(min.T0, 2 * (r.max + 1))` observations, so a `min.T0`
+above `2 * (r.max + 1)` moves them later.}
 
 \item{force}{One of `"none"`, `"unit"`, `"time"`, `"two-way"`. Default
 `"unit"`.}
@@ -103,9 +102,12 @@ List with components:
   - `r.cv`: chosen rank.
   - `cv.rule`: rule applied.
   - `mspe`: data.frame of per-r MSPE (averaged across folds), SE
-    across folds, and held-out cell counts.
+    across folds, the number of held-out cells scored (`n_holdout`),
+    the number held out but not scored because an inner fit failed
+    (`n_unscored`; a message reports these), and the folds used.
   - `mspe.per.fold`: r-by-k matrix of per-fold MSPE.
   - `k`, `cv.nobs`, `cv.buffer`, `cv.prop`: parameters used.
+  - `floor`: the training floor used (see Details).
   - `n.units.masked`: distinct units that contributed to at least
     one fold's holdout.
 }
@@ -123,6 +125,18 @@ treatment onset). MSPE is scored at the held-out block only, with the
 model's full prediction there, and averaged across folds.
 }
 \details{
+Every held-out unit keeps at least `floor = max(min.T0, 2 * (r.max + 1))`
+observed periods before the buffer and the held-out block (8 at the
+defaults with `r.max = 3`): a unit's loadings are fitted on those
+periods alone, and with fewer of them the fold errors at larger `r`
+are wild and the rule leans to `r = 0`. A unit is eligible only with
+`floor + cv.buffer + cv.nobs` observed pre-treatment periods, and the
+anchors start after the floor, so the inner fits keep every held-out
+unit and every held-out cell is scored. When no unit can meet the
+floor it is lowered to what the data allow, never below `min.T0`, with
+a message naming the floor used and the largest rank it can judge.
+`fect(CV = TRUE)` applies the same floor with `r.max = max(r)`.
+
 Per-fold unit sampling is required: masking every eligible unit at
 the same time leaves no donor data at the masked time points and
 breaks factor identification. Sampling `cv.prop` of units per fold

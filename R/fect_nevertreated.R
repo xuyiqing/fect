@@ -431,10 +431,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         ## per-fold unit sampling.
                         rolling_folds <- NULL
                         if (cv.method == "rolling") {
+                            ## r.max: the largest rank this CV evaluates
+                            ## (max(r), capped by the panel), which sets
+                            ## the training floor (#167).
                             rolling_folds <- .build_cv_mask_rolling(
                                 II = II.co, D = D.co.fake, k = k,
                                 cv.nobs = cv.nobs, cv.buffer = cv.buffer,
-                                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                                cv.prop = cv.prop, min.T0 = min.T0,
+                                r.max = r.max, seed = NULL
                             )
                         }
 
@@ -1535,10 +1539,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         ## ---- rolling-window pre-computation (CFE) ---- ##
                         rolling_folds <- NULL
                         if (cv.method == "rolling") {
+                            ## r.max: the largest rank this CV evaluates
+                            ## (max(r), capped by the panel), which sets
+                            ## the training floor (#167).
                             rolling_folds <- .build_cv_mask_rolling(
                                 II = II.co, D = D.co.fake, k = k,
                                 cv.nobs = cv.nobs, cv.buffer = cv.buffer,
-                                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                                cv.prop = cv.prop, min.T0 = min.T0,
+                                r.max = r.max, seed = NULL
                             )
                         }
 

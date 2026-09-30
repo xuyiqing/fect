@@ -218,10 +218,19 @@ fect_mspe <- function(
         ## ---- rolling-window pre-computation (cv.method = "rolling") ---- ##
         rolling_folds <- NULL
         if (use_rolling) {
+            ## Each model is refitted at its own r.cv, so the largest r.cv
+            ## among the models compared is the largest rank these masks
+            ## must let a held-out unit support: it sets the training floor
+            ## (#167). Models without factors (fe, mc) count as r = 0.
+            r_max_models <- max(vapply(out_list, function(o) {
+                r_o <- suppressWarnings(as.integer(unname(o[["r.cv"]])))
+                if (length(r_o) != 1L || is.na(r_o)) 0L else r_o
+            }, integer(1)))
             rolling_folds <- .build_cv_mask_rolling(
                 II = II_mat, D = D_mat, k = k,
                 cv.nobs = cv.nobs, cv.buffer = cv.buffer,
-                cv.prop = cv.prop, min.T0 = min.T0, seed = seed
+                cv.prop = cv.prop, min.T0 = min.T0, r.max = r_max_models,
+                seed = seed
             )
         }
 

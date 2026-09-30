@@ -319,10 +319,15 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         ## sampling (unsampled units stay fully observed).
         rolling_folds <- NULL
         if (use_rolling) {
+            ## The training floor (#167) is set by r.max, the largest rank
+            ## the r loop evaluates (max(r) of the call; 5 at the default
+            ## r = c(0, 5)). The same masks serve the lambda loop under
+            ## method = "mc" and "both", so mc's floor is the same.
             rolling_folds <- .build_cv_mask_rolling(
                 II = II, D = D, k = k,
                 cv.nobs = cv.nobs, cv.buffer = cv.buffer,
-                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                cv.prop = cv.prop, min.T0 = min.T0, r.max = r.max,
+                seed = NULL
             )
         }
 
