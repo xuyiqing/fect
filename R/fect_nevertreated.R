@@ -378,7 +378,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             ## Per-fold SE matrix parallel to CV.out (added v2.3.0). Populated
             ## below in both parallel and serial CV branches; consumed at the
-            ## end of the IFE CV block to apply `cv.rule` (default "1se").
+            ## end of the IFE CV block to apply `cv.rule` (default "min").
             CV.out.se <- matrix(NA_real_, nrow(CV.out), ncol(CV.out))
             colnames(CV.out.se) <- colnames(CV.out)
             CV.out.se[, "r"] <- CV.out[, "r"]
@@ -1030,10 +1030,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             MSPE.best <- min(CV.out[, "MSPE"])
 
             ## --- Apply cv.rule (added v2.3.0) -----------------------------
-            ## Override r.cv based on the user-selected rule. The default "1se"
-            ## picks the smallest r within one fold-SE of the minimum-CV-error r;
-            ## "min" picks the argmin; "1pct" preserves the legacy 1% rule from
-            ## the in-loop assignments above.
+            ## Override r.cv based on the user-selected rule. The default "min"
+            ## (since 2.4.7, #167) picks the argmin; "1se" the smallest r within
+            ## one fold-SE of the minimum-CV-error r; "1pct" preserves the legacy
+            ## 1% rule from the in-loop assignments above.
             if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
                 means <- CV.out[, crit_col]
                 ses   <- CV.out.se[, crit_col]
@@ -3319,9 +3319,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             off.sd = off.sd
         ))
     }
-    ## Include CV.out in the return list when cross-validation was performed
+    ## Include CV.out in the return list when cross-validation was performed,
+    ## with the fold standard errors the cv.rule used (CV.out.se; #167).
     if (exists("CV.out", inherits = FALSE)) {
         out <- c(out, list(CV.out = CV.out))
+        if (exists("CV.out.se", inherits = FALSE)) {
+            out <- c(out, list(CV.out.se = .fect_cv_se_table(CV.out.se)))
+        }
     }
 
     if (r.cv > 0) {

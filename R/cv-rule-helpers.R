@@ -112,15 +112,27 @@
 }
 
 
+## The fold-SE table returned with a fit (CV.out.se, CV.out.ife.se,
+## CV.out.mc.se; added 2.4.7, #167): the rows of the CV table and its
+## score columns, with the r or lambda.norm column kept as the row key.
+## The columns that never carry a fold SE (sigma2, IC, PC, MSPTATT, MSE)
+## are dropped.
+.fect_cv_se_table <- function(se_mat) {
+    if (is.null(se_mat)) return(NULL)
+    keep <- setdiff(colnames(se_mat), c("sigma2", "IC", "PC", "MSPTATT", "MSE"))
+    se_mat[, keep, drop = FALSE]
+}
+
+
 ## Validate user-supplied cv.rule argument and return a single canonical string.
 .fect_validate_cv_rule <- function(cv.rule) {
-    if (is.null(cv.rule)) return("1se")
+    if (is.null(cv.rule)) return("min")
     if (!is.character(cv.rule) || length(cv.rule) != 1L) {
         stop("'cv.rule' must be a single character string: ",
-             "'1se' (default), 'min', or '1pct'.")
+             "'min' (default), '1se', or '1pct'.")
     }
-    if (!cv.rule %in% c("1se", "min", "1pct")) {
-        stop("'cv.rule' must be one of '1se', 'min', '1pct'. Got: '",
+    if (!cv.rule %in% c("min", "1se", "1pct")) {
+        stop("'cv.rule' must be one of 'min', '1se', '1pct'. Got: '",
              cv.rule, "'.")
     }
     cv.rule

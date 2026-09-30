@@ -160,6 +160,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
 
     validX <- 1 ## no multi-colinearity
     CV.out.ife <- CV.out.mc <- NULL
+    CV.out.ife.se <- CV.out.mc.se <- NULL
 
     ## ----------------------------------------------------##
     ##         Cross-validation of r and lambda           ##
@@ -2052,13 +2053,16 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         ))
     }
 
-    ## CV results
+    ## CV results, each with the fold standard errors the cv.rule used
+    ## (CV.out.ife.se, CV.out.mc.se; #167)
     if (!is.null(CV.out.ife)) {
-        out <- c(out, list(CV.out.ife = CV.out.ife))
+        out <- c(out, list(CV.out.ife = CV.out.ife,
+                           CV.out.ife.se = .fect_cv_se_table(CV.out.ife.se)))
     }
 
     if (!is.null(CV.out.mc)) {
-        out <- c(out, list(CV.out.mc = CV.out.mc))
+        out <- c(out, list(CV.out.mc = CV.out.mc,
+                           CV.out.mc.se = .fect_cv_se_table(CV.out.mc.se)))
     }
 
     if (!is.null(group)) {
