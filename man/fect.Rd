@@ -281,8 +281,8 @@ Ignored when \code{CV = FALSE}.}
   \item{est}{results of the fitted model.}
   \item{est.cm}{with \code{cm = TRUE}: the fitted model of the treated outcomes (see \code{cm}).}
   \item{MSPE}{mean squared prediction error from cross-validation.}
-  \item{CV.out}{results of the cross-validation procedure.}
-  \item{CV.out.se}{the fold standard errors of the scores in \code{CV.out} (one row per candidate \code{r}, the score columns), the ones \code{cv.rule} reads; the fits made through \code{fect_cv} carry them as \code{CV.out.ife.se} and \code{CV.out.mc.se} beside \code{CV.out.ife} and \code{CV.out.mc}.}
+  \item{CV.out}{results of the cross-validation procedure: one row per candidate \code{r} (or \code{lambda}), the scores of each. With \code{method = "ife"}, \code{"mc"} or \code{"both"} the tables of the two methods are also kept as \code{CV.out.ife} and \code{CV.out.mc}, and \code{CV.out} is the one of the method fitted.}
+  \item{CV.out.se}{the fold standard errors of the scores in \code{CV.out} (same rows, the score columns), the ones \code{cv.rule} reads; with \code{CV.out.ife} and \code{CV.out.mc} come \code{CV.out.ife.se} and \code{CV.out.mc.se}.}
   \item{niter}{number of iterations.}
   \item{factor}{estimated time-varying factors.}
   \item{lambda}{estimated loadings.}

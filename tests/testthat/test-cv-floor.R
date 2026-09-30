@@ -139,15 +139,16 @@ test_that("(c) the mask builder keeps the floor and fect(CV = TRUE) returns CV.o
   d <- .sg()
   ids <- sort(unique(d$id)); tt <- sort(unique(d$time))
   TT <- length(tt); N <- length(ids)
-  II <- matrix(1L, TT, N)
   D <- matrix(0, TT, N)
   D[cbind(match(d$time, tt), match(d$id, ids))] <- d$D
+  II <- matrix(1L, TT, N)
+  II[D == 1] <- 0L                           # as fect builds II: untreated observed cells
   folds <- fect:::.build_cv_mask_rolling(
     II = II, D = D, k = 20L, cv.nobs = 3L, cv.buffer = 1L, cv.prop = 0.1,
     min.T0 = 5L, r.max = 3L, seed = 1L)
   expect_length(folds, 20L)
   expect_equal(attr(folds, "floor"), 8L)
-  n_pre <- colSums(II) - colSums(D)          # observed periods before treatment
+  n_pre <- colSums(II)                       # observed periods before treatment
   for (f in folds) {
     II.cv <- II
     II.cv[f$cv.id] <- 0L
@@ -185,15 +186,27 @@ test_that("(c) the mask builder keeps the floor and fect(CV = TRUE) returns CV.o
   expect_equal(nrow(fit_ife$CV.out.ife.se), nrow(fit_ife$CV.out.ife))
   expect_equal(fit_ife$CV.out.ife.se[, "r"], fit_ife$CV.out.ife[, "r"])
   expect_true(all(is.finite(fit_ife$CV.out.ife.se[, "MSPE"])))
+  ## and, for the method fitted, as CV.out and CV.out.se (exact names: the
+  ## .se tables make a partial match of fit$CV.out ambiguous)
+  expect_identical(fit_ife$CV.out, fit_ife$CV.out.ife)
+  expect_identical(fit_ife$CV.out.se, fit_ife$CV.out.ife.se)
+  fit_mc <- suppressMessages(suppressWarnings(fect(
+    Y ~ D + X1 + X2, data = e$simdata, index = c("id", "time"),
+    method = "mc", CV = TRUE, k = 5, se = FALSE, parallel = FALSE, seed = 1)))
+  expect_identical(fit_mc$CV.out, fit_mc$CV.out.mc)
+  expect_identical(fit_mc$CV.out.se, fit_mc$CV.out.mc.se)
+  expect_equal(nrow(fit_mc$CV.out.se), nrow(fit_mc$CV.out))
+  expect_true("lambda.norm" %in% colnames(fit_mc$CV.out.se))
 })
 
 test_that("(d) a panel too short for the floor lowers it with a message", {
   d <- .short_panel()
   ids <- sort(unique(d$id)); tt <- sort(unique(d$time))
   TT <- length(tt); N <- length(ids)
-  II <- matrix(1L, TT, N)
   D <- matrix(0, TT, N)
   D[cbind(match(d$time, tt), match(d$id, ids))] <- d$D
+  II <- matrix(1L, TT, N)
+  II[D == 1] <- 0L
   ## r.max = 5: floor 12, a unit needs 12 + 1 + 3 = 16 periods; the
   ## controls have 14, so the floor drops to 14 - 1 - 3 = 10, which can
   ## judge ranks up to 10 / 2 - 1 = 4.

@@ -2065,6 +2065,18 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                            CV.out.mc.se = .fect_cv_se_table(CV.out.mc.se)))
     }
 
+    ## CV.out and CV.out.se: the tables of the method fitted, so fit$CV.out
+    ## and fit$CV.out.se read the same way for every method. Before 2.4.7
+    ## fit$CV.out reached CV.out.ife or CV.out.mc through R's partial
+    ## matching of names; the .se tables would make that match ambiguous.
+    if (identical(method, "ife") && !is.null(CV.out.ife)) {
+        out <- c(out, list(CV.out = CV.out.ife,
+                           CV.out.se = .fect_cv_se_table(CV.out.ife.se)))
+    } else if (identical(method, "mc") && !is.null(CV.out.mc)) {
+        out <- c(out, list(CV.out = CV.out.mc,
+                           CV.out.se = .fect_cv_se_table(CV.out.mc.se)))
+    }
+
     if (!is.null(group)) {
         out <- c(out, list(
             group.att = group.att,
