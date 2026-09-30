@@ -162,6 +162,20 @@ fect_cfe <- function(
         W.use[which(II == 0)] <- 0
     }
 
+    ## Q identification (#173): once, before iterating, and not in the
+    ## bootstrap replicates. When a Q column is nearly unobserved in a
+    ## kappa group's untreated periods, the EM crawls along that
+    ## direction and its answer is an extrapolation; say so now.
+    q.ident <- NULL
+    if (!boot) {
+        q.ident <- .cfe_q_identification(X.Q, X.kappa, kappaQ.id, II, force)
+        if (!is.null(q.ident) && q.ident$rate > 0.9) {
+            warning(.cfe_q_identification_message(q.ident, tol), call. = FALSE)
+        } else {
+            q.ident <- NULL
+        }
+    }
+
     est.best <- complex_fe_ub(
         YY,
         Y0,
@@ -185,10 +199,23 @@ fect_cfe <- function(
 
     ## Convergence check for est.best
     if (!is.null(est.best$niter) && est.best$niter >= max.iteration) {
+        if (is.null(q.ident)) {
+            advice <- "Consider increasing max.iteration or checking data quality."
+        } else {
+            advice <- paste0(
+                "The loading on Q column",
+                if (length(q.ident$flagged) > 1) "s " else " ",
+                paste0("\"", q.ident$flagged, "\"", collapse = ", "),
+                " is nearly unidentified from the observed untreated periods",
+                " (EM rate ", sprintf("%.4f", q.ident$rate),
+                " per iteration; see the warning above). Use a trend",
+                " identified from the pre-treatment periods rather than",
+                " raising max.iteration."
+            )
+        }
         warning(paste0(
             "CFE optimization did not converge within ", max.iteration,
-            " iterations. Results may be unreliable. ",
-            "Consider increasing max.iteration or checking data quality."
+            " iterations. Results may be unreliable. ", advice
         ))
     }
 
@@ -1188,3 +1215,146 @@ fect_cfe <- function(
     }
     return(out)
 } ## fe functions ends.
+
+
+## ---------------------------------------------------------------- ##
+## Q identification diagnostic (#173)
+## ---------------------------------------------------------------- ##
+## In the kappa step (Kappa() in src/cfe_sub.cpp) each kappa group's
+## mean residual is regressed on Q over all T periods, with the cells
+## fect does not observe (II == 0: treated, missing, placebo) filled by
+## the current fit. A Q column whose mass lies almost entirely in a
+## group's unobserved periods leaves that group's loading identified
+## only from imputed cells. The EM then contracts along that direction
+## at the missing-information rate, the largest eigenvalue of
+##   I - (Q'Q)^{-1} Qobs'Qobs,
+## where Qobs'Qobs is averaged over the group's units on their observed
+## periods (the largest eigenvalue of (Q'Q)^{-1} Qmis'Qmis). A rate r
+## needs about log(tol) / log(r) iterations to reach tol, and the
+## converged counterfactual is an extrapolation from the few observed
+## values. When force has unit effects the unit intercept, also fit per
+## unit, is added to Q for the rate; it is never reported as a column.
+##
+## X.Q: T x N x p_q (the same for every unit, #168); X.kappa: T x N x
+## p_kappa group labels (the same in every period); kappaQ.id: the Q
+## columns each kappa loads on; II: T x N, 1 at observed untreated
+## cells; force: 0 none, 1 unit, 2 time, 3 two-way. Cost: N x p_q^2 x T.
+##
+## Returns NULL without Q, else the worst group: rate, kappa (index and
+## name), units, observed (each Q column's share of squared mass that
+## falls in the group's observed periods, averaged over its units), and
+## flagged (the columns with under 10% observed, or the least observed).
+.cfe_q_identification <- function(X.Q, X.kappa, kappaQ.id, II, force) {
+    if (is.null(X.Q) || is.null(X.kappa) || length(dim(X.Q)) != 3 ||
+        length(dim(X.kappa)) != 3) {
+        return(NULL)
+    }
+    p.q <- dim(X.Q)[3]
+    p.kappa <- dim(X.kappa)[3]
+    if (p.q == 0 || p.kappa == 0) {
+        return(NULL)
+    }
+    TT <- dim(X.Q)[1]
+    N <- dim(X.Q)[2]
+    Q <- matrix(X.Q[, 1, ], TT, p.q)
+    q.names <- dimnames(X.Q)[[3]]
+    if (is.null(q.names)) {
+        q.names <- paste0("Q", seq_len(p.q))
+    }
+    unit.names <- dimnames(X.kappa)[[2]]
+    if (is.null(unit.names)) {
+        unit.names <- as.character(seq_len(N))
+    }
+    kappa.names <- dimnames(X.kappa)[[3]]
+    if (is.null(kappa.names)) {
+        kappa.names <- paste0("kappa", seq_len(p.kappa))
+    }
+    obs <- matrix(as.numeric(II == 1), TT, N)
+    has.intercept <- force %in% c(1, 3)
+
+    worst <- NULL
+    for (k in seq_len(p.kappa)) {
+        cols <- kappaQ.id[[k]]
+        if (length(cols) == 0) {
+            next
+        }
+        Qk <- Q[, cols, drop = FALSE]
+        if (has.intercept) {
+            Qk <- cbind(Qk, 1)
+        }
+        p <- ncol(Qk)
+        QtQ <- crossprod(Qk)
+        QtQ.inv <- tryCatch(solve(QtQ), error = function(e) NULL)
+        if (is.null(QtQ.inv)) {
+            return(NULL)
+        }
+        ## Qobs'Qobs for every unit at once: row i of A is the p x p
+        ## matrix sum_t II[t, i] Qk[t, ] Qk[t, ]', stored column-major
+        QQ <- Qk[, rep(seq_len(p), times = p), drop = FALSE] *
+            Qk[, rep(seq_len(p), each = p), drop = FALSE]
+        A <- crossprod(obs, QQ)
+        groups <- split(seq_len(N), X.kappa[1, , k])
+        for (g in groups) {
+            Ag <- matrix(colMeans(A[g, , drop = FALSE]), p, p)
+            M <- diag(p) - QtQ.inv %*% Ag
+            rate <- max(Re(eigen(M, only.values = TRUE)$values))
+            if (is.null(worst) || rate > worst$rate) {
+                share <- (diag(Ag) / diag(QtQ))[seq_along(cols)]
+                names(share) <- q.names[cols]
+                worst <- list(rate = rate, kappa = k,
+                              kappa.name = kappa.names[k],
+                              units = unit.names[g], observed = share)
+            }
+        }
+    }
+    if (is.null(worst)) {
+        return(NULL)
+    }
+    flagged <- names(worst$observed)[worst$observed < 0.1]
+    if (length(flagged) == 0) {
+        flagged <- names(worst$observed)[which.min(worst$observed)]
+    }
+    worst$flagged <- flagged
+    worst
+}
+
+## The warning for .cfe_q_identification()'s result at tolerance tol.
+.cfe_q_identification_message <- function(diag, tol) {
+    ## the loop stops when the relative change per iteration, about
+    ## (1 - rate) times the distance to the fixed point, is below tol
+    gap <- 1 - diag$rate
+    iters <- if (gap > 0 && tol < gap) log(tol / gap) / log(diag$rate) else if (gap > 0) 0 else Inf
+    iter.txt <- if (is.finite(iters) && iters > 0) {
+        paste0("about ", format(signif(iters, 2), big.mark = ",",
+                                scientific = FALSE), " iterations")
+    } else if (is.finite(iters)) {
+        paste0("no iterations at all: the change per iteration is already ",
+               "below tol, so the loop stops far from the fixed point")
+    } else {
+        "an unbounded number of iterations"
+    }
+    n.flag <- length(diag$flagged)
+    col.txt <- paste0("\"", diag$flagged, "\"", collapse = ", ")
+    share.txt <- paste0(sprintf("%.1f%%", 100 * diag$observed[diag$flagged]),
+                        collapse = ", ")
+    n.u <- length(diag$units)
+    unit.txt <- if (n.u == 1) {
+        paste0("unit ", diag$units)
+    } else {
+        paste0("the ", diag$kappa.name, " group of units ",
+               paste(diag$units[seq_len(min(3L, n.u))], collapse = ", "),
+               if (n.u > 3) sprintf(" (and %d more)", n.u - 3) else "")
+    }
+    paste0(
+        "CFE: the loading (kappa) on Q column", if (n.flag > 1) "s " else " ",
+        col.txt, " is nearly unidentified for ", unit.txt, ": only ",
+        share.txt, " of the column's squared mass falls in ",
+        if (n.u == 1) "its" else "their", " observed untreated periods, ",
+        "so the loading is fit from imputed cells. The EM contracts by ",
+        sprintf("%.4f", diag$rate), " per iteration along that direction; ",
+        "tol = ", format(tol), " needs ", iter.txt, ", and the ",
+        "counterfactual for those cells is an extrapolation from a few ",
+        "observed values. Use a trend identified from the pre-treatment ",
+        "periods, e.g. Q.type = c(\"linear\", \"quadratic\"), or supply Q."
+    )
+}

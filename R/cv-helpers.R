@@ -437,14 +437,27 @@
 ##        list(cv.id  = integer,   ## flat column-major indices to mask
 ##             est.id = integer)   ## flat column-major indices to score
 ##
+##    Training floor (issue #167, 2.4.7): every held-out unit keeps at
+##    least floor = max(min.T0, 2 * (r.max + 1)) observed periods before
+##    its buffer and held-out block, where r.max is the largest rank the
+##    cross-validation evaluates (.fect_cv_training_floor()). Before 2.4.7
+##    the anchors started right after min.T0 observations, so with the
+##    buffer a held-out unit could keep min.T0 - cv.buffer training
+##    periods (4 at the defaults): the inner fit then dropped the unit
+##    (its held-out cells silently unscored) or fitted its loadings on a
+##    handful of points, and the wild fold errors pushed the rule to r = 0.
+##    When no unit can meet the floor it is lowered to what the data
+##    allow, never below min.T0, with a message (.fect_cv_fit_floor()).
+##    The returned list carries the floor used as attr(, "floor").
+##
 ##    Per fold (uses set.seed(seed + fold_id) when `seed` is supplied):
 ##      1. Sample max(1L, round(cv.prop * n_eligible)) units from the
 ##         eligible pool. Eligible = controls (all observed times) +
 ##         treated (observed times strictly before treatment onset).
-##         A unit is eligible only if it has at least min.T0 + cv.nobs
-##         observations in its eligible window.
+##         A unit is eligible only if it has at least
+##         floor + cv.buffer + cv.nobs observations in its eligible window.
 ##      2. For each sampled unit, draw a random anchor index a_idx in
-##         seq.int(min.T0 + 1L, n_obs - cv.nobs + 1L). The mask
+##         seq.int(floor + cv.buffer + 1L, n_obs - cv.nobs + 1L). The mask
 ##         partitions cells into:
 ##           - holdout: obs_t[a_idx:(a_idx + cv.nobs - 1L)]
 ##                      -> added to BOTH cv.id (masked) and est.id (scored)
@@ -456,11 +469,12 @@
 ##
 ##    (t, j) is mapped to vec(II) position via (j - 1L) * TT + t.
 ##
-##    II : TT x N indicator matrix (II[t, j] = 1 means unit j observed at t)
-##    D  : TT x N treatment indicator (used to derive treatment-onset times)
+##    II    : TT x N indicator matrix (II[t, j] = 1 means unit j observed at t)
+##    D     : TT x N treatment indicator (used to derive treatment-onset times)
+##    r.max : largest rank the cross-validation evaluates; sets the floor
 ## --------------------------------------------------------------------------
 .build_cv_mask_rolling <- function(II, D, k, cv.nobs, cv.buffer, cv.prop,
-                                    min.T0, seed = NULL) {
+                                    min.T0, r.max, seed = NULL) {
     II <- as.matrix(II)
     D  <- as.matrix(D)
     if (!all(dim(II) == dim(D))) {
@@ -474,6 +488,10 @@
     min.T0    <- as.integer(min.T0);    if (min.T0    < 1L) stop("min.T0 must be >= 1.")
     if (!is.finite(cv.prop) || cv.prop <= 0 || cv.prop > 1) {
         stop(".build_cv_mask_rolling: cv.prop must satisfy 0 < cv.prop <= 1.")
+    }
+    r.max <- as.integer(r.max)
+    if (length(r.max) != 1L || is.na(r.max) || r.max < 0L) {
+        stop(".build_cv_mask_rolling: r.max must be a single integer >= 0.")
     }
 
     ## Per-unit treatment-onset time (NA when never treated).
@@ -493,15 +511,23 @@
         elig_times[[j]] <- obs_t
     }
 
-    ## Filter to units with enough eligible observations.
+    ## Filter to units with enough eligible observations: the training
+    ## floor, the buffer and the held-out block.
     elig_lengths <- vapply(elig_times, length, integer(1))
-    eligible_units <- which(elig_lengths >= (min.T0 + cv.nobs))
+    train_floor <- .fect_cv_fit_floor(
+        train_floor = .fect_cv_training_floor(min.T0, r.max), min.T0 = min.T0,
+        elig_lengths = elig_lengths, cv.buffer = cv.buffer, cv.nobs = cv.nobs,
+        r.max = r.max)
+    eligible_units <- which(elig_lengths >= (train_floor + cv.buffer + cv.nobs))
     n_eligible <- length(eligible_units)
 
     if (n_eligible == 0L) {
         stop(".build_cv_mask_rolling: no eligible units have enough ",
-             "observations (need >= min.T0 + cv.nobs = ",
-             min.T0 + cv.nobs, ").")
+             "observations (need >= floor + cv.buffer + cv.nobs = ",
+             train_floor + cv.buffer + cv.nobs, ", with a training floor of ",
+             train_floor, "). Lower min.T0, cv.buffer or cv.nobs, or set ",
+             "CV = FALSE. (Before 2.4.7 such a panel ran with min.T0 - ",
+             "cv.buffer training periods per held-out unit.)")
     }
 
     n_sample_per_fold <- max(1L, as.integer(round(cv.prop * n_eligible)))
@@ -522,8 +548,10 @@
         for (j in sampled) {
             obs_t <- elig_times[[j]]
             n_obs <- length(obs_t)
-            valid <- seq.int(min.T0 + 1L, n_obs - cv.nobs + 1L)
-            if (length(valid) == 0L) next
+            ## a_idx - 1 - cv.buffer >= floor training periods stay observed
+            lo <- train_floor + cv.buffer + 1L; hi <- n_obs - cv.nobs + 1L
+            if (hi < lo) next
+            valid <- seq.int(lo, hi)
             a_idx <- valid[sample.int(length(valid), 1L)]
 
             holdout_t <- obs_t[a_idx:(a_idx + cv.nobs - 1L)]
@@ -550,5 +578,51 @@
         )
     }
 
+    attr(folds, "floor") <- train_floor
+    attr(folds, "r.max") <- r.max
+    attr(folds, "n.eligible") <- n_eligible
     folds
+}
+
+
+## --------------------------------------------------------------------------
+## 4. Training floor for the rolling masks (issue #167)
+##    Shared by .build_cv_mask_rolling() and r.cv.rolling().
+## --------------------------------------------------------------------------
+
+## The floor: max(min.T0, 2 * (r.max + 1)) observed periods before the
+## buffer and the held-out block. A unit's r loadings are fitted on its
+## training periods alone, so judging a rank r needs a few more than r + 1
+## of them; two per parameter is the rule used here (8 for r.max = 3, 12
+## for fect()'s default r = c(0, 5)). min.T0 keeps its meaning for the fit
+## itself and is the floor's lower bound.
+.fect_cv_training_floor <- function(min.T0, r.max) {
+    min.T0 <- as.integer(min.T0)
+    r.max  <- as.integer(r.max)
+    if (length(r.max) != 1L || is.na(r.max) || r.max < 0L) r.max <- 0L
+    max(min.T0, 2L * (r.max + 1L))
+}
+
+## The floor the data allow. When at least one unit has floor + cv.buffer +
+## cv.nobs eligible periods the floor stands. Otherwise it is lowered to
+## the most any unit can give (its eligible periods minus the buffer and
+## the block), never below min.T0, and a message names the floor used and
+## the largest rank it can judge (floor / 2 - 1). If even min.T0 cannot be
+## met the floor is returned as min.T0 and the caller stops with its "no
+## eligible units" error. Returns the floor as an integer.
+.fect_cv_fit_floor <- function(train_floor, min.T0, elig_lengths, cv.buffer, cv.nobs,
+                               r.max, what = "rolling CV") {
+    train_floor  <- as.integer(train_floor)
+    min.T0 <- as.integer(min.T0)
+    need   <- train_floor + cv.buffer + cv.nobs
+    if (length(elig_lengths) == 0L) return(min.T0)
+    if (any(elig_lengths >= need)) return(train_floor)
+    capacity <- as.integer(max(elig_lengths)) - as.integer(cv.buffer) - as.integer(cv.nobs)
+    if (capacity < min.T0) return(min.T0)
+    message(sprintf(paste0(
+        "%s: no unit has the %d observed pre-treatment periods that the ",
+        "training floor of %d (for r up to %d) needs; using a floor of %d ",
+        "periods, which can judge ranks up to about %d."),
+        what, need, train_floor, r.max, capacity, max(capacity %/% 2L - 1L, 0L)))
+    capacity
 }

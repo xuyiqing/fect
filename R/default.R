@@ -104,7 +104,7 @@ fect <- function(
     loading.bound = "none",           # simplex projection of treated loadings
     gamma.loading = NULL,             # scalar gamma for simplex; NULL = CV
     gamma.loading.grid = NULL,        # optional grid for gamma CV
-    cv.rule = "1se"                   # CV selection rule: "1se", "min", "1pct"
+    cv.rule = "min"                   # CV selection rule: "min" (default since 2.4.7, #167), "1se", "1pct"
 ) {
     ## binary outcome (probit) models are not supported in this version:
     ## stop before any work (before 2.4.7 the fit failed later with errors
@@ -270,6 +270,33 @@ fect <- function(
             }
             out[, j] <- match(ref, sort(unique(ref)))
         }
+    }
+    out
+}
+
+## An extra fixed-effect label (index[3:], group.fe) belongs to a cell
+## (#171). Return the periods x units matrix of the labels of `col`, read
+## from the long data `data` (one row per observed unit-period, with the
+## id column `id` and the time column `time`). An absent cell takes the
+## unit's label when every observed cell of the unit has the same one (a
+## grouping nested in the units, as group.fe requires; the EM step then
+## imputes the cell with its group effect, and the fit is the least
+## squares fit of the observed cells) and is NA otherwise (cfe_iter()
+## puts it in no group). The labels are the codes fect.default() made
+## from the column.
+.cfe_by_cell <- function(data, col, id, time, id.series, time.uni) {
+    out <- matrix(NA_real_, length(time.uni), length(id.series))
+    out[cbind(match(data[[time]], time.uni), match(data[[id]], id.series))] <-
+        data[[col]]
+    absent <- is.na(out)
+    if (any(absent)) {
+        unit.label <- apply(out, 2, function(v) {
+            u <- unique(v[!is.na(v)])
+            if (length(u) == 1L) u else NA_real_
+        })
+        fill <- matrix(unit.label, nrow(out), ncol(out), byrow = TRUE)
+        take <- absent & !is.na(fill)
+        out[take] <- fill[take]
     }
     out
 }
@@ -499,7 +526,7 @@ fect.formula <- function(
     loading.bound = "none",
     gamma.loading = NULL,
     gamma.loading.grid = NULL,
-    cv.rule = "1se"
+    cv.rule = "min"
 ) {
     ## Covariates come from the formula. Before 2.4.7 an `X` given with a
     ## formula was silently ignored. `X = NULL` (what gsynth's wrapper
@@ -724,7 +751,7 @@ fect.default <- function(
     loading.bound = "none",
     gamma.loading = NULL,
     gamma.loading.grid = NULL,
-    cv.rule = "1se"
+    cv.rule = "min"
 ) {
     ## -------------------------------##
     ## Checking Parameters
@@ -2114,12 +2141,15 @@ fect.default <- function(
         stop(paste("Missing values in variable \"", time, "\".", sep = ""))
     }
 
-    ## the long data the CFE unit- and period-level inputs are read from
-    ## (see .cfe_by_level()); the panel filled below holds 0 at absent
-    ## rows and, when unbalanced, index codes in place of the id and time
+    ## the long data the CFE unit-, period- and cell-level inputs are read
+    ## from (see .cfe_by_level() and .cfe_by_cell()); the panel filled
+    ## below holds 0 at absent rows and, when unbalanced, index codes in
+    ## place of the id and time
     cfe.long <- NULL
     if (method == "cfe") {
-        cfe.long <- data[, unique(c(id, time, Z, Q, gamma, kappa)), drop = FALSE]
+        extra.fe <- if (length(index) > 2) index[3:length(index)] else NULL
+        cfe.long <- data[, unique(c(id, time, Z, Q, gamma, kappa, extra.fe)),
+                         drop = FALSE]
     }
 
     ## check balanced panel and fill unbalanced panel
@@ -2147,11 +2177,8 @@ fect.default <- function(
             variable <- c(variable, Wname)
         }
 
-        ## (Z, Q, gamma and kappa are read from cfe.long, not from the
-        ## filled panel)
-        if (method == "cfe" && length(index) > 2) {
-            variable <- unique(c(index[3:length(index)], variable))
-        }
+        ## (Z, Q, gamma, kappa and the extra fixed-effect labels are read
+        ## from cfe.long, not from the filled panel)
 
         if (!is.null(cl)) {
             variable <- unique(c(variable, cl))
@@ -2358,8 +2385,15 @@ fect.default <- function(
 
     if (method == "cfe") {
         if (length(index) > 2) {
+            ## An extra fixed-effect label belongs to a cell (a unit may
+            ## change groups). Read the labels per cell from the long
+            ## data; an absent cell takes the unit's label when the unit
+            ## has one, and NA otherwise (see .cfe_by_cell()). (Before
+            ## 2.4.7 the labels came from the filled panel, where an
+            ## absent cell held 0 and so joined a phantom group; #171.)
             for (i in 1:(length(index) - 2)) {
-                X.extra.FE[,, i] <- matrix(data[, index[i + 2]], TT, N)
+                X.extra.FE[, , i] <- .cfe_by_cell(cfe.long, index[i + 2], id,
+                                                  time, id.series, time.uni)
             }
         }
 
@@ -2419,6 +2453,16 @@ fect.default <- function(
                 value <- c(value, which(Q == kappaQ[[key]][i]))
             }
             kappaQ.id[[which(kappa == key)]] <- value
+        }
+
+        ## names for the Q-identification diagnostic (#173): the Q
+        ## columns, and the units and kappa variables; the C++ ignores
+        ## dimnames and unit subsets below carry them along
+        if (length(Q) > 0) {
+            dimnames(X.Q) <- list(NULL, NULL, Q)
+        }
+        if (length(kappa) > 0) {
+            dimnames(X.kappa) <- list(NULL, as.character(id.series), kappa)
         }
     } else {
         Zgamma.id <- list()
@@ -3790,6 +3834,12 @@ fect.default <- function(
 
     ## permutation test
     if (permute == TRUE) {
+        if (!out$method %in% c("fe", "ife", "mc")) {
+            stop("permute = TRUE is implemented for method = \"fe\", \"ife\" and \"mc\" ",
+                 "(the fit's method is \"", out$method, "\"). one.permu() has no ",
+                 "estimator for it, so every permuted ATT would be 0 and the ",
+                 "p-value 0.", call. = FALSE)
+        }
         message("Permuting under sharp null hypothesis ... ")
 
         out.permute <- fect_permu(
@@ -3807,6 +3857,7 @@ fect.default <- function(
             force = force,
             tol = tol,
             norm.para = norm.para,
+            max.iteration = max.iteration,
             nboots = nboots,
             parallel = parallel,
             cores = cores

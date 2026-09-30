@@ -325,12 +325,11 @@ test_that("normalize = TRUE: mc with CV = TRUE reports lambda on the outcome's s
   expect_equal(fits[[2]]$eigen.all, fits[[1]]$eigen.all, tolerance = 1e-8)
   expect_equal(fits[[2]]$CV.out.mc, fits[[1]]$CV.out.mc, tolerance = 1e-8)
   ## refitting without normalize at the reported lambda.cv gives the CV fit
-  ## (fect_cv's fits stop at cv_tol = max(tol, 1e-3), so the refit uses that
-  ## tolerance; before the fix lambda.cv was on the normalized scale and the
-  ## refit gave 5.385 instead of 5.238)
-  refit <- .n166_fit(FALSE, method = "mc", lambda = fits[[2]]$lambda.cv, CV = FALSE, se = FALSE,
-                     tol = 1e-3)
-  expect_equal(refit$att.avg, fits[[2]]$att.avg, tolerance = 1e-6)
+  ## (before the fix lambda.cv was on the normalized scale and the refit gave
+  ## 5.385 instead of 5.238; since #172 the CV fit is the chosen model refit
+  ## at tol, 5.196, so the refit uses the default tol too)
+  refit <- .n166_fit(FALSE, method = "mc", lambda = fits[[2]]$lambda.cv, CV = FALSE, se = FALSE)
+  expect_equal(refit$att.avg, fits[[2]]$att.avg, tolerance = 1e-8)
   ## a user-supplied grid is on the outcome's scale too
   grid <- c(0.05, 0.01, 0.002)
   fits <- .n166_expect_same(method = "mc", lambda = grid, CV = TRUE, seed = 1, se = FALSE)

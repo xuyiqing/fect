@@ -39,7 +39,7 @@ assumptions.}
             cm = FALSE,
             loading.bound = "none", gamma.loading = NULL,
             gamma.loading.grid = NULL,
-            cv.rule = "1se")}
+            cv.rule = "min")}
 \arguments{
 \item{formula}{an object of class "formula" naming the outcome, the treatment and the covariates, e.g. \code{Y ~ D + X1 + X2}: the outcome on the left, the treatment first on the right, then the covariates. Every term must be a bare column name of \code{data}. Other terms stop with a message that names them: transformations such as \code{log(Y)} or \code{I(X1^2)}, \code{factor(g)}, and interactions such as \code{X1:X2} or \code{X1 * X2}. Create such variables as columns first (e.g. \code{data$logY <- log(data$Y)}; dummy columns with \code{model.matrix()}). Intercept terms (\code{+ 0}, \code{- 1}, \code{+ 1}) are accepted and ignored, because \code{fect} always includes its own fixed effects. With a formula, give the covariates in the formula; also passing \code{X} stops.}
 \item{data}{a data frame, can be a balanced or unbalanced panel data.}
@@ -58,7 +58,7 @@ When both are given, \code{W.est} and \code{W.agg} must name the same column; di
 
 \item{group}{the group indicator. If specified, the group-wise ATT will be estimated.}
 \item{na.rm}{a logical flag indicating whether to list-wise delete missing observations. Default to FALSE. If \code{na.rm = FALSE}, it allows the situation when Y is missing but D is not missing for some observations. If \code{na.rm = TRUE}, it will list-wise delete observations whose Y, D, or X is missing.}
-\item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Every observation should be uniquely defined by the pair of the unit and time indicator. The time indicator can be numeric, a \code{Date}, a factor, or character. A factor is used in its level order: if its levels are increasing numbers, \code{fect} uses those numbers; otherwise it uses the level positions and keeps the levels as labels (in \code{rawtime}, the row names of \code{eff}, and \code{data.long}). If the levels are numbers but not in increasing order (e.g. \code{"1", "10", "2"}, as \code{factor(as.character(time))} gives for 1, 2, ..., 10), \code{fect} warns and still uses the level order; pass a numeric index or reorder the levels if that is not the time order. A character time indicator must hold numbers (e.g. \code{"2001"}), which are used as numbers; other values stop with a message (convert them to numbers, a \code{Date}, or a factor whose levels are in time order).}
+\item{index}{a character vector specifying the unit (first element) and time (second element) indicators. For most methods, must be of length 2. For \code{method = "cfe"}, additional elements (third, fourth, etc.) specify extra fixed-effect grouping variables. Each label belongs to a unit-period, so a unit may change groups; on an unbalanced panel, a unit whose observed rows all carry one label keeps it at its absent periods. Every observation should be uniquely defined by the pair of the unit and time indicator. The time indicator can be numeric, a \code{Date}, a factor, or character. A factor is used in its level order: if its levels are increasing numbers, \code{fect} uses those numbers; otherwise it uses the level positions and keeps the levels as labels (in \code{rawtime}, the row names of \code{eff}, and \code{data.long}). If the levels are numbers but not in increasing order (e.g. \code{"1", "10", "2"}, as \code{factor(as.character(time))} gives for 1, 2, ..., 10), \code{fect} warns and still uses the level order; pass a numeric index or reorder the levels if that is not the time order. A character time indicator must hold numbers (e.g. \code{"2001"}), which are used as numbers; other values stop with a message (convert them to numbers, a \code{Date}, or a factor whose levels are in time order).}
 \item{force}{a string indicating whether unit or time or both fixed effects will be imposed. Must be one of the following, "none", "unit", "time", or "two-way". The default is "two-way".}
 \item{time.component.from}{Controls which units provide the time-varying model components (time fixed effects, factor structure, temporal dynamics). Options are \code{"notyettreated"} (default) --- all units contribute during their pre-treatment periods, or \code{"nevertreated"} --- only never-treated units estimate the time components, which are then projected onto treated units. With \code{"nevertreated"}, \code{method = "ife"} fits the same model as \code{method = "gsynth"}, with or without \code{se}, and the fit reports \code{method = "gsynth"}.}
 \item{em}{a logical flag indicating whether to use the EM algorithm for missing data in the estimation sample. Default is \code{TRUE}. Setting \code{em = FALSE} requires a complete estimation sample and is only compatible with \code{time.component.from = "nevertreated"}.}
@@ -177,7 +177,7 @@ results but may compute a few extra lambda values compared to the serial
 path. Use \code{parallel = FALSE} to preserve the short-circuit behavior.}
 \item{cores}{an integer indicating the number of cores for parallel computing.}
 \item{tol}{a positive number indicating the relative tolerance for the
-EM update check (\code{||fit_new - fit_old||_F / ||fit_old||_F < tol}).
+EM update check (\code{||fit_new - fit_old||_F / ||fit_old||_F < tol}). With \code{CV = TRUE} the cross-validation folds use \code{max(tol, 1e-3)} and the chosen model is then refit at \code{tol}.
 Default tightened from \code{1e-3} to \code{1e-5} in v2.4.3 because the
 older default produced under-converged IFE/CFE point estimates that
 shifted up to 40\% relative to the converged value (inference was
@@ -249,8 +249,8 @@ double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
 \item{gamma.loading.grid}{a numeric vector of candidate \code{gamma.loading} values for cross-validation. \code{NULL} (default) uses \code{10^seq(-2, 2, length.out = 9)}. Ignored when \code{loading.bound = "none"} or when \code{gamma.loading} is supplied.}
 \item{cv.rule}{a string selecting the cross-validation rule for choosing the number of factors \code{r} (or matrix-completion penalty \code{lambda}). One of:
 \describe{
-  \item{\code{"1se"} (default)}{The 1-SE rule (Breiman, Friedman, Olshen and Stone 1984; Hastie, Tibshirani and Friedman 2009, Section 7.10): pick the smallest \code{r} whose mean CV criterion is within one fold-SE of the minimum-CV-error \code{r}. Biases toward parsimony in a fold-aware way --- when CV is precise, it allows larger \code{r}; when CV is noisy, it gravitates to simpler models.}
-  \item{\code{"min"}}{Pick the \code{r} that minimizes the mean CV criterion (no tolerance).}
+  \item{\code{"min"} (default)}{Pick the \code{r} that minimizes the mean CV criterion (no tolerance). The default since 2.4.7: the fold errors are heavy-tailed, which inflates the fold SE, so the 1-SE rule under-selects \code{r} (in a simulation study across 48 panel designs it picked the true \code{r} 10 to 15 points less often than the min rule and gave a larger ATT error in every design). Fits made with 2.3.0 to 2.4.6 used \code{"1se"}.}
+  \item{\code{"1se"}}{The 1-SE rule (Breiman, Friedman, Olshen and Stone 1984; Hastie, Tibshirani and Friedman 2009, Section 7.10): pick the smallest \code{r} whose mean CV criterion is within one fold-SE of the minimum-CV-error \code{r}. Biases toward parsimony in a fold-aware way --- when CV is precise, it allows larger \code{r}; when CV is noisy, it gravitates to simpler models.}
   \item{\code{"1pct"}}{Legacy pre-2.3.0 heuristic: pick the smallest \code{r} within 1\% relative tolerance of the best mean CV criterion. Use this for byte-identical reproducibility of pre-2.3.0 fits.}
 }
 Ignored when \code{CV = FALSE}.}
@@ -281,7 +281,8 @@ Ignored when \code{CV = FALSE}.}
   \item{est}{results of the fitted model.}
   \item{est.cm}{with \code{cm = TRUE}: the fitted model of the treated outcomes (see \code{cm}).}
   \item{MSPE}{mean squared prediction error from cross-validation.}
-  \item{CV.out}{results of the cross-validation procedure.}
+  \item{CV.out}{results of the cross-validation procedure: one row per candidate \code{r} (or \code{lambda}), the scores of each; a row the loop did not score holds \code{NA}. An \code{ife} fit also keeps its table as \code{CV.out.ife}, an \code{mc} fit as \code{CV.out.mc}, and a \code{"both"} fit keeps both tables; \code{CV.out} is the one of the method fitted.}
+  \item{CV.out.se}{the fold standard errors of the scores in \code{CV.out} (same rows, the score columns), the ones \code{cv.rule} reads; with \code{CV.out.ife} and \code{CV.out.mc} come \code{CV.out.ife.se} and \code{CV.out.mc.se}.}
   \item{niter}{number of iterations.}
   \item{factor}{estimated time-varying factors.}
   \item{lambda}{estimated loadings.}

@@ -15,6 +15,10 @@
 ##         the held-out block)
 ## For treated units, eligible times are the pre-treatment observations
 ## only (post-treatment is the imputation target, never masked).
+## Every held-out unit keeps at least floor = max(min.T0, 2 * (r.max + 1))
+## training periods (issue #167; the floor and its fallback live in
+## R/cv-helpers.R next to the shared mask builder, which applies the same
+## rule for fect(CV = TRUE)).
 ## Refits fect with the masked panel for each candidate `r`, scores
 ## MSPE at the held-out positions with the model's full prediction
 ## (.fect_heldout_pred() in R/heldout-pred.R: intercept, unit and time
@@ -51,6 +55,18 @@
 #' for treated units, `end_of_eligible` is the cell strictly before
 #' treatment onset). MSPE is scored at the held-out block only, with the
 #' model's full prediction there, and averaged across folds.
+#'
+#' Every held-out unit keeps at least `floor = max(min.T0, 2 * (r.max + 1))`
+#' observed periods before the buffer and the held-out block (8 at the
+#' defaults with `r.max = 3`): a unit's loadings are fitted on those
+#' periods alone, and with fewer of them the fold errors at larger `r`
+#' are wild and the rule leans to `r = 0`. A unit is eligible only with
+#' `floor + cv.buffer + cv.nobs` observed pre-treatment periods, and the
+#' anchors start after the floor, so the inner fits keep every held-out
+#' unit and every held-out cell is scored. When no unit can meet the
+#' floor it is lowered to what the data allow, never below `min.T0`, with
+#' a message naming the floor used and the largest rank it can judge.
+#' `fect(CV = TRUE)` applies the same floor with `r.max = max(r)`.
 #'
 #' Per-fold unit sampling is required: masking every eligible unit at
 #' the same time leaves no donor data at the masked time points and
@@ -105,13 +121,14 @@
 #'   satisfy `0 < cv.prop <= 1`. On small panels (n_eligible < 30)
 #'   consider raising further, since per-fold MSPE precision scales
 #'   with `cv.prop * n_eligible * cv.nobs`.
-#' @param cv.rule Rule for picking `r` from the MSPE curve: `"1se"`
-#'   (default), `"min"`, or `"1pct"`.
-#' @param min.T0 Minimum observations required strictly before the
-#'   anchor. Sets the lower bound on valid anchor positions. Default 5.
-#'   A held-out unit's loadings are fitted to its observations before the
-#'   held-out block; with few of them the predictions are noisy, and a
-#'   larger `min.T0` gives a steadier choice of `r`.
+#' @param cv.rule Rule for picking `r` from the MSPE curve: `"min"`
+#'   (default since 2.4.7), `"1se"`, or `"1pct"`. The fold errors are
+#'   heavy-tailed, which inflates the fold SE, so the 1-SE rule
+#'   under-selects `r` (see `?fect`).
+#' @param min.T0 Passed to the inner `fect()` fits, and the lower bound
+#'   of the training floor (see Details). Default 5. The anchors start
+#'   after `max(min.T0, 2 * (r.max + 1))` observations, so a `min.T0`
+#'   above `2 * (r.max + 1)` moves them later.
 #' @param force One of `"none"`, `"unit"`, `"time"`, `"two-way"`. Default
 #'   `"unit"`.
 #' @param seed Optional integer base seed; per-fold seeds derive from
@@ -127,11 +144,16 @@
 #'   - `r.cv`: chosen rank.
 #'   - `cv.rule`: rule applied.
 #'   - `mspe`: data.frame of per-r MSPE (averaged across folds), SE
-#'     across folds, and held-out cell counts.
+#'     across folds, the number of held-out cells scored (`n_holdout`),
+#'     the number held out but not scored because an inner fit failed
+#'     (`n_unscored`; a message reports these), and the folds used.
 #'   - `mspe.per.fold`: r-by-k matrix of per-fold MSPE.
 #'   - `k`, `cv.nobs`, `cv.buffer`, `cv.prop`: parameters used.
+#'   - `floor`: the training floor used (see Details).
 #'   - `n.units.masked`: distinct units that contributed to at least
 #'     one fold's holdout.
+#'   - `n.eligible`: units with at least `floor + cv.buffer + cv.nobs`
+#'     eligible periods, the pool the folds sample from.
 #'
 #' @examples
 #' \dontrun{
@@ -157,7 +179,7 @@ r.cv.rolling <- function(formula,
                           cv.buffer = 1L,
                           k = 20L,
                           cv.prop = 0.1,
-                          cv.rule = c("1se", "min", "1pct"),
+                          cv.rule = c("min", "1se", "1pct"),
                           min.T0 = 5L,
                           force = "unit",
                           seed = NULL,
@@ -225,22 +247,29 @@ r.cv.rolling <- function(formula,
         if (!is.null(treat_onset[[u]])) t_all[t_all < treat_onset[[u]]]
         else                            t_all
     })
-    ## Eligible: at least min.T0 + cv.nobs observations.
-    eligible <- vapply(elig_obs_times, length,
-                       integer(1)) >= (min.T0 + cv.nobs)
+    ## Eligible: the training floor, the buffer and the held-out block.
+    elig_lengths <- vapply(elig_obs_times, length, integer(1))
+    train_floor <- .fect_cv_fit_floor(
+        train_floor = .fect_cv_training_floor(min.T0, r.max), min.T0 = min.T0,
+        elig_lengths = elig_lengths, cv.buffer = cv.buffer, cv.nobs = cv.nobs,
+        r.max = r.max, what = "r.cv.rolling")
+    eligible <- elig_lengths >= (train_floor + cv.buffer + cv.nobs)
     elig_obs_times <- elig_obs_times[eligible]
     if (length(elig_obs_times) == 0L) {
         stop("r.cv.rolling: no eligible units have enough pre-treatment ",
-             "observations (need >= min.T0 + cv.nobs = ",
-             min.T0 + cv.nobs, ").")
+             "observations (need >= floor + cv.buffer + cv.nobs = ",
+             train_floor + cv.buffer + cv.nobs, ", with a training floor of ",
+             train_floor, "). Lower min.T0, cv.buffer or cv.nobs, or set ",
+             "CV = FALSE. (Before 2.4.7 such a panel ran with min.T0 - ",
+             "cv.buffer training periods per held-out unit.)")
     }
 
     n_eligible_units <- length(elig_obs_times)
     n_sample_per_fold <- max(1L, as.integer(round(cv.prop * n_eligible_units)))
     if (isTRUE(verbose)) {
         message(sprintf(
-            "r.cv.rolling: %d eligible units (controls + treated pre-treatment); k = %d folds; cv.nobs = %d, cv.buffer = %d, cv.prop = %.3g (-> %d units sampled per fold).",
-            n_eligible_units, k, cv.nobs, cv.buffer, cv.prop, n_sample_per_fold
+            "r.cv.rolling: %d eligible units (controls + treated pre-treatment); k = %d folds; cv.nobs = %d, cv.buffer = %d, cv.prop = %.3g (-> %d units sampled per fold); training floor %d periods.",
+            n_eligible_units, k, cv.nobs, cv.buffer, cv.prop, n_sample_per_fold, train_floor
         ))
     }
 
@@ -253,6 +282,7 @@ r.cv.rolling <- function(formula,
                                         paste0("fold", seq_len(k))))
     fold_n    <- matrix(0L, nrow = length(r.grid), ncol = k,
                         dimnames = dimnames(fold_mspe))
+    fold_expected <- integer(k)   # held-out cells per fold (scored or not)
     units_seen <- character(0)
     data_keys  <- paste(data[[index[1L]]], data[[index[2L]]], sep = "_")
 
@@ -271,13 +301,14 @@ r.cv.rolling <- function(formula,
             obs_t <- elig_obs_times[[u]]
             n_obs <- length(obs_t)
             ## Anchor index in obs_t such that:
-            ##   - >= min.T0 obs before  -> a_idx >= min.T0 + 1
-            ##   - >= cv.nobs obs from a -> a_idx <= n_obs - cv.nobs + 1
+            ##   - >= floor obs before the buffer -> a_idx >= floor + cv.buffer + 1
+            ##   - >= cv.nobs obs from a          -> a_idx <= n_obs - cv.nobs + 1
             ## For treated units, obs_t already excludes post-treatment
             ## cells, so the holdout block is guaranteed to stay in the
             ## pre-treatment window.
-            valid <- seq.int(min.T0 + 1L, n_obs - cv.nobs + 1L)
-            if (length(valid) == 0L) return(NULL)
+            lo <- train_floor + cv.buffer + 1L; hi <- n_obs - cv.nobs + 1L
+            if (hi < lo) return(NULL)
+            valid <- seq.int(lo, hi)
             a_idx <- valid[sample.int(length(valid), 1L)]
             holdout_t <- obs_t[a_idx:(a_idx + cv.nobs - 1L)]
             buf_t <- if (cv.buffer > 0L) {
@@ -321,6 +352,7 @@ r.cv.rolling <- function(formula,
         ## Score positions and observed Y.
         score_rows <- which(data_keys %in% scored_keys)
         Y_obs_score <- data[[Yname]][score_rows]
+        fold_expected[fold_id] <- length(score_rows)
 
         ## Per-r fits for this fold.
         for (idx in seq_along(r.grid)) {
@@ -387,6 +419,16 @@ r.cv.rolling <- function(formula,
         else stats::sd(x) / sqrt(length(x))
     }, numeric(1))
     n_per_r <- rowSums(fold_n)
+    ## Held-out cells that no fit scored (an inner fit failed, or dropped
+    ## the unit). With the training floor none is expected; say so if any.
+    n_unscored_r <- sum(fold_expected) - n_per_r
+    if (any(n_unscored_r > 0L)) {
+        message(sprintf(
+            "r.cv.rolling: %d of %d held-out cells were not scored at some r (an inner fit failed or dropped the unit): %s.",
+            max(n_unscored_r), sum(fold_expected),
+            paste(sprintf("r = %d: %d", r.grid[n_unscored_r > 0L],
+                          n_unscored_r[n_unscored_r > 0L]), collapse = ", ")))
+    }
 
     chosen_idx <- .fect_apply_cv_rule(mspe_per_r, ses = se_per_r,
                                       rule = cv.rule)
@@ -407,11 +449,14 @@ r.cv.rolling <- function(formula,
                                     mspe = mspe_per_r,
                                     se = se_per_r,
                                     n_holdout = n_per_r,
+                                    n_unscored = as.integer(n_unscored_r),
                                     n_folds_used = n_folds_used),
          mspe.per.fold = fold_mspe,
          k             = k,
          cv.nobs       = cv.nobs,
          cv.buffer     = cv.buffer,
          cv.prop       = cv.prop,
-         n.units.masked = length(units_seen))
+         floor         = as.integer(train_floor),
+         n.units.masked = length(units_seen),
+         n.eligible     = n_eligible_units)
 }

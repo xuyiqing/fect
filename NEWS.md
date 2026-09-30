@@ -347,6 +347,62 @@ says what to do.
   `seed = 11`: 0.042 instead of 0.05 at event time 1, where the 95%
   interval is [0.055, 2.709]). Intervals do not change (fect #169).
 
+* Cross-validation of the number of factors now keeps a training floor for
+  every held-out unit: with the rolling scheme (`cv.method = "rolling"`, in
+  `fect(CV = TRUE)`, `gsynth()` and `r.cv.rolling()`), anchors start after
+  `max(min.T0, 2 * (r.max + 1))` observed periods, where `r.max` is the
+  largest rank on the grid, so no held-out unit trains its fixed effect and
+  loadings on fewer than two observations per parameter, and none is dropped
+  by the inner fit and left unscored. Before, a unit could keep 4 or 5
+  training periods, its loadings then followed the noise, and one such unit
+  set a fold's error; on `sim_gsynth` (two factors) `r.cv.rolling()` picked
+  r = 0 at the defaults (MSPE 2.019 at r = 0 against 2.043 at r = 2, with 12
+  of 300 held-out cells unscored) and now picks r = 2 (1.922 against 1.613,
+  all 300 scored). In a simulation study (48 designs, 50 replications each)
+  the floor raised the share of runs picking the true rank from 0.43 to 0.57
+  and lowered the ATT error in every design. When no unit can meet the floor
+  it is lowered to what the data allow, never below `min.T0`, with a message
+  naming the floor used and the ranks it can judge. The fold standard errors
+  the selection rule compares are returned as `CV.out.se`, and `fect_cv`
+  fits (`method = "ife"`, `"mc"`) now carry `CV.out` under that exact name
+  (it was found only through partial matching of `CV.out.ife`). A panel in
+  which no unit has `min.T0 + cv.buffer + cv.nobs` observed pre-treatment
+  periods now stops with a message; it ran before, training on `min.T0 -
+  cv.buffer` periods (fect #167).
+* The default `cv.rule` is now `"min"` (the rank or penalty with the lowest
+  cross-validated error), not `"1se"`. Fold errors are heavy-tailed, so the
+  one-standard-error rule under-selects factors: in the study above it lost
+  to `"min"` in every design, by 10 to 15 points of rank recovery and 0.02 to
+  0.05 of ATT error, with no sign of over-fitting; for mc's `lambda` the two
+  rules differ little (ATT RMSE 0.478 against 0.488 in one design), and
+  `"1se"` sometimes picked the pure fixed-effects fit. `"1se"` and `"1pct"`
+  are still available; `cv.rule = "1se"` restores the old rule but not the
+  old anchors. The chosen `r` or `lambda` of fits with `CV = TRUE` can
+  change (fect #167).
+* `fect(CV = TRUE)` with `method = "ife"` or `"mc"` now returns the chosen
+  model refit at `tol`. It returned the fit made inside the cross-validation
+  loop at `max(tol, 1e-3)`, so its estimates differed from a `CV = FALSE`
+  fit at the chosen `r` or `lambda` (on `sim_gsynth`, `method = "mc"`: an ATT
+  of 5.196 instead of 5.238) (fect #172).
+* Extra fixed-effect labels (`index[3:]`, `group.fe`) are now read per
+  unit-period from the data. On an unbalanced panel an absent row no longer
+  forms a phantom group with label 0: with `time.component.from =
+  "nevertreated"`, a treated unit missing period 1 no longer stops with
+  "levels in treated units not found in controls: 0" (on `sim_linear` with
+  `grp = id %% 5`: an ATT of 2.2891, against 2.2898 for a period-2 drop), and a label
+  that varies within a unit is applied to the periods that carry it (the
+  period-1 label was applied to every period). A grouping nested in the
+  units now gives the least-squares fit of the observed rows. Balanced
+  panels with labels constant within units are unchanged (fect #171).
+* Rows of a cross-validation table (`CV.out`, `CV.out.ife`, `CV.out.mc`)
+  that the loop did not score are now `NA`, and the selection rules read
+  `NA` as missing. They held 1e10 or 1e20, and a score at or above 1e9 (an
+  outcome with a standard deviation of about 30,000 or more) was read as
+  missing too: `method = "gsynth"` then stopped with "object 'r.cv' not
+  found", and the chosen `r` could depend on the outcome's scale. On
+  `sim_gsynth` with the outcome times 1e5, `r = c(0, 3)` now chooses r = 2,
+  as for the outcome itself (fect #175).
+
 ## New features
 
 * `plot(fit, type = "gap", id = ...)` now draws the gaps of the chosen
@@ -370,6 +426,29 @@ says what to do.
   treated units, 1.277 (fect #162; gsynth #106).
 
 ## Bug fixes
+
+* `method = "cfe"` now warns, before iterating, when a `Q` column is not
+  identified from the untreated periods: a unit-specific trend column whose
+  mass lies almost entirely in a kappa group's treated or missing periods
+  leaves that group's loading fit from imputed cells, and the EM then
+  contracts along that direction at the missing-information rate (the
+  largest eigenvalue of I - (Q'Q)^-1 Q_obs'Q_obs). The warning names the
+  column, the observed share of its mass, the rate, the iteration count the
+  tolerance needs, and a remedy (a trend identified from the pre-treatment
+  periods, e.g. `Q.type = c("linear", "quadratic")`, or a supplied `Q`); the
+  `max.iteration` warning repeats the cause. On `sim_trend` the default
+  `Q.type = "bspline"` has its fifth basis function on periods 35 to 50
+  while treatment starts at 41, so `tol = 1e-5` needs about 9,000
+  iterations (and at `tol = 1e-3` it stops after a few hundred, far from
+  the fixed point) and the converged counterfactual is an extrapolation;
+  the book's example now uses `Q.type = c("linear", "quadratic")`. No
+  estimate changes (fect #173).
+* `permute = TRUE` now runs for `method = "fe"`, `"ife"` and `"mc"`. The
+  permutation refits were called with an outdated argument list, so every
+  permutation stopped with "Not a matrix", was dropped, and the p-value
+  was `NaN` with the message "0 permutes". For `method = "gsynth"` and
+  `"cfe"`, which have no permutation estimator, `permute = TRUE` now stops
+  with a message; it reported p = 0 from all-zero permuted ATTs (fect #174).
 
 * Weights (`W`, `W.est`, `W.agg`) now work with `vartype = "parametric"`
   (fect #73, #150; gsynth #101).

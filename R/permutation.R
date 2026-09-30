@@ -15,6 +15,7 @@ fect_permu <- function(Y,
                        force,
                        tol,
                        norm.para,
+                       max.iteration = 1000,
                        nboots,
                        parallel = TRUE,
                        cores = NULL) {
@@ -54,7 +55,8 @@ fect_permu <- function(Y,
                 knots,
                 force,
                 tol,
-                norm.para
+                norm.para,
+                max.iteration
             ), silent = TRUE)
 
 
@@ -93,7 +95,8 @@ fect_permu <- function(Y,
                 knots,
                 force,
                 tol,
-                norm.para
+                norm.para,
+                max.iteration
             ), silent = TRUE)
 
 
@@ -156,7 +159,8 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
                       knots = NULL,
                       force,
                       tol, # tolerance level
-                      norm.para = NULL) {
+                      norm.para = NULL,
+                      max.iteration = 1000) {
     ## -------------------------------##
     ## Parsing data
     ## -------------------------------##
@@ -237,17 +241,27 @@ one.permu <- function(Y, # Outcome variable, (T*N) matrix
         ## ----------- Main Algorithm ----------- ##
         ## -------------------------------##
 
+        ## The estimators take a weight matrix after the mask (as.matrix(0)
+        ## when there are no weights, as in fect_mc()) and the iteration cap.
+        ## Before 2.4.7 the calls left the weight matrix out, so every
+        ## argument after the mask was shifted one place and each
+        ## permutation errored (dropped by try(), leaving "0 permutes" and a
+        ## p-value of NaN; #174).
+        W.use <- as.matrix(0)
         est <- NULL
         if (method == "fe") {
-            est <- inter_fe_ub(YY, Y0, X, II, beta0, 0, force = force, tol)
+            est <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, 0, force, tol, max.iteration)
         } else if (method == "ife") {
-            est <- inter_fe_ub(YY, Y0, X, II, beta0, r.cv, force = force, tol)
+            est <- inter_fe_ub(YY, Y0, X, II, W.use, beta0, r.cv, force, tol, max.iteration)
         } else if (method == "mc") {
             ## lambda.cv is on the outcome's scale (see fect_mc)
             if (!is.null(norm.para)) {
                 lambda.cv <- lambda.cv / norm.para[1]
             }
-            est <- inter_fe_mc(YY, Y0, X, II, beta0, 1, lambda.cv, force, tol)
+            est <- inter_fe_mc(YY, Y0, X, II, W.use, beta0, 1, lambda.cv, force, tol, max.iteration)
+        }
+        if (is.null(est)) {
+            stop("one.permu: no estimator for method = \"", method, "\".")
         }
 
         if (!is.null(norm.para)) {

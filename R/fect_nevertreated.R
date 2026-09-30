@@ -59,7 +59,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         loading.bound = "none",
                         gamma.loading = NULL,
                         gamma.loading.grid = NULL,
-                        cv.rule = "1se",
+                        cv.rule = "min",
                         W.in.fit = TRUE,
                         fit.init = NULL ## warm-start aux surface (T x N_boot); v2.4.3+
                         ) {
@@ -163,8 +163,10 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         if (n_extra > 0) {
             fe_type <- character(n_extra)
             for (k in 1:n_extra) {
-                co_levels <- unique(X.extra.FE[1, co, k])
-                tr_levels <- unique(X.extra.FE[1, tr, k])
+                ## the labels of the observed cells (NA at absent cells;
+                ## a unit may change groups) (#171)
+                co_levels <- unique(stats::na.omit(c(X.extra.FE.co[, , k])))
+                tr_levels <- unique(stats::na.omit(c(X.extra.FE.tr[, , k])))
                 overlap <- intersect(co_levels, tr_levels)
                 if (length(overlap) == 0) {
                     fe_type[k] <- "A"
@@ -365,6 +367,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                                         fit_init = fit.init.co)
         } else {
             r.old <- r ## save the minimal number of factors
+            r.cv <- r.old ## until a row scores (#175)
 
             message("Cross-validating ...", "\r")
             score_names <- c("MSPE", "WMSPE", "GMSPE", "WGMSPE",
@@ -372,13 +375,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             CV.out <- matrix(NA, (r.max - r.old + 1), 4 + length(score_names))
             colnames(CV.out) <- c("r", "sigma2", "IC", "PC", score_names)
             CV.out[, "r"] <- c(r.old:r.max)
-            CV.out[, score_names] <- 1e10
-            CV.out[, "PC"] <- 1e10
+            ## unscored rows hold NA (before 2.4.7 the sentinel 1e10, #175)
+            CV.out[, score_names] <- NA_real_
+            CV.out[, "PC"] <- NA_real_
             r.pc <- est.co.pc.best <- NULL
 
             ## Per-fold SE matrix parallel to CV.out (added v2.3.0). Populated
             ## below in both parallel and serial CV branches; consumed at the
-            ## end of the IFE CV block to apply `cv.rule` (default "1se").
+            ## end of the IFE CV block to apply `cv.rule` (default "min").
             CV.out.se <- matrix(NA_real_, nrow(CV.out), ncol(CV.out))
             colnames(CV.out.se) <- colnames(CV.out)
             CV.out.se[, "r"] <- CV.out[, "r"]
@@ -431,10 +435,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         ## per-fold unit sampling.
                         rolling_folds <- NULL
                         if (cv.method == "rolling") {
+                            ## r.max: the largest rank this CV evaluates
+                            ## (max(r), capped by the panel), which sets
+                            ## the training floor (#167).
                             rolling_folds <- .build_cv_mask_rolling(
                                 II = II.co, D = D.co.fake, k = k,
                                 cv.nobs = cv.nobs, cv.buffer = cv.buffer,
-                                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                                cv.prop = cv.prop, min.T0 = min.T0,
+                                r.max = r.max, seed = NULL
                             )
                         }
 
@@ -689,13 +697,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     }
 
                     ## 1% rule — identical logic to serial path
-                    if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                    if (.fect_cv_improves(CV.out[, crit_col], scores[crit_col])) {
                         est.co.best <- est.co
                         r.cv <- r
                     } else {
                         if (r == r.cv + 1) message("*")
                     }
-                    if (PC < min(CV.out[, "PC"])) {
+                    if (PC < .fect_cv_best(CV.out[, "PC"])) {
                         r.pc <- r
                         est.co.pc.best <- est.co
                     }
@@ -990,7 +998,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
               } ## end cv.method branching
 
-                if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                if (.fect_cv_improves(CV.out[, crit_col], scores[crit_col])) {
                     ## at least 1% improvement for selected criterion
                     est.co.best <- est.co ## interFE result with the best r
                     r.cv <- r
@@ -998,7 +1006,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     if (r == r.cv + 1) message("*")
                 }
 
-                if (PC < min(CV.out[, "PC"])) {
+                if (PC < .fect_cv_best(CV.out[, "PC"])) {
                     r.pc <- r
                     est.co.pc.best <- est.co
                 }
@@ -1023,25 +1031,25 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             } ## end SERIAL BRANCH (IFE)
 
-            MSPE.best <- min(CV.out[, "MSPE"])
+            MSPE.best <- .fect_cv_best(CV.out[, "MSPE"])
 
             ## --- Apply cv.rule (added v2.3.0) -----------------------------
-            ## Override r.cv based on the user-selected rule. The default "1se"
-            ## picks the smallest r within one fold-SE of the minimum-CV-error r;
-            ## "min" picks the argmin; "1pct" preserves the legacy 1% rule from
-            ## the in-loop assignments above.
+            ## Override r.cv based on the user-selected rule. The default "min"
+            ## (since 2.4.7, #167) picks the argmin; "1se" the smallest r within
+            ## one fold-SE of the minimum-CV-error r; "1pct" preserves the legacy
+            ## 1% rule from the in-loop assignments above.
             if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
                 means <- CV.out[, crit_col]
                 ses   <- CV.out.se[, crit_col]
-                ## Treat sentinels (1e10, Inf, NA) as missing for selection.
-                means[!is.finite(means) | means >= 1e9] <- NA_real_
+                ## unscored or failed rows are NA (before 2.4.7 the sentinel 1e10)
+                means[!is.finite(means)] <- NA_real_
                 i_pick <- .fect_apply_cv_rule(means, ses, rule = cv.rule)
                 if (!is.na(i_pick) && i_pick >= 1L && i_pick <= nrow(CV.out)) {
                     new_r_cv <- unname(CV.out[i_pick, "r"])
                     if (!is.null(new_r_cv) && is.finite(new_r_cv)) {
                         if (new_r_cv != as.integer(unname(r.cv))) {
                             message(sprintf(
-                                "  [cv.rule = %s] r.cv adjusted from %d to %d (1-SE band)",
+                                "  [cv.rule = %s] r.cv adjusted from %d to %d",
                                 cv.rule,
                                 as.integer(unname(r.cv)),
                                 as.integer(new_r_cv)
@@ -1474,14 +1482,16 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 fit_init = fit.init.co)
         } else {
             r.old <- r
+            r.cv <- r.old ## until a row scores (#175)
             message("Cross-validating ...", "\r")
             score_names <- c("MSPE", "WMSPE", "GMSPE", "WGMSPE",
                              "MAD", "Moment", "GMoment", "RMSE", "Bias")
             CV.out <- matrix(NA, (r.max - r.old + 1), 4 + length(score_names))
             colnames(CV.out) <- c("r", "sigma2", "IC", "PC", score_names)
             CV.out[, "r"] <- c(r.old:r.max)
-            CV.out[, score_names] <- 1e10
-            CV.out[, "PC"] <- 1e10
+            ## unscored rows hold NA (before 2.4.7 the sentinel 1e10, #175)
+            CV.out[, score_names] <- NA_real_
+            CV.out[, "PC"] <- NA_real_
             r.pc <- est.co.pc.best <- NULL
 
             ## Per-fold SEs parallel to CV.out, for applying `cv.rule` after the
@@ -1535,10 +1545,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         ## ---- rolling-window pre-computation (CFE) ---- ##
                         rolling_folds <- NULL
                         if (cv.method == "rolling") {
+                            ## r.max: the largest rank this CV evaluates
+                            ## (max(r), capped by the panel), which sets
+                            ## the training floor (#167).
                             rolling_folds <- .build_cv_mask_rolling(
                                 II = II.co, D = D.co.fake, k = k,
                                 cv.nobs = cv.nobs, cv.buffer = cv.buffer,
-                                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                                cv.prop = cv.prop, min.T0 = min.T0,
+                                r.max = r.max, seed = NULL
                             )
                         }
 
@@ -1783,13 +1797,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     se_v   <- agg$se
 
                     ## 1% rule — identical logic to serial path
-                    if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                    if (.fect_cv_improves(CV.out[, crit_col], scores[crit_col])) {
                         est.co.best <- est.co
                         r.cv <- r
                     } else {
                         if (r == r.cv + 1) message("*")
                     }
-                    if (PC < min(CV.out[, "PC"])) {
+                    if (PC < .fect_cv_best(CV.out[, "PC"])) {
                         r.pc <- r
                         est.co.pc.best <- est.co
                     }
@@ -2118,14 +2132,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
               } ## end cv.method branching
 
-                if ((min(CV.out[, crit_col]) - scores[crit_col]) > 0.01 * min(CV.out[, crit_col])) {
+                if (.fect_cv_improves(CV.out[, crit_col], scores[crit_col])) {
                     est.co.best <- est.co
                     r.cv <- r
                 } else {
                     if (r == r.cv + 1) message("*")
                 }
 
-                if (PC < min(CV.out[, "PC"])) {
+                if (PC < .fect_cv_best(CV.out[, "PC"])) {
                     r.pc <- r
                     est.co.pc.best <- est.co
                 }
@@ -2149,13 +2163,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             ## --- Apply cv.rule ----------------------------------------------
             ## As in the IFE block above: the in-loop assignments use the legacy
-            ## 1% rule; override r.cv with the user's rule (default "1se"). The
+            ## 1% rule; override r.cv with the user's rule (default "min"). The
             ## final fit below re-estimates the model at r.cv.
             if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
                 means <- CV.out[, crit_col]
                 ses   <- CV.out.se[, crit_col]
-                ## Treat sentinels (1e10, Inf, NA) as missing for selection.
-                means[!is.finite(means) | means >= 1e9] <- NA_real_
+                ## unscored or failed rows are NA (before 2.4.7 the sentinel 1e10)
+                means[!is.finite(means)] <- NA_real_
                 i_pick <- .fect_apply_cv_rule(means, ses, rule = cv.rule)
                 if (!is.na(i_pick) && i_pick >= 1L && i_pick <= nrow(CV.out)) {
                     new_r_cv <- unname(CV.out[i_pick, "r"])
@@ -2181,7 +2195,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 r.cv <- r.pc
             }
 
-            MSPE.best <- min(CV.out[, "MSPE"])
+            MSPE.best <- .fect_cv_best(CV.out[, "MSPE"])
             if (r > (T0.min - 1)) {
                 message(" (r hits maximum)")
             }
@@ -2363,20 +2377,16 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         fe_fit <- matrix(0, TT, Ntr)
         if (length(typeA_idx) == 0) return(fe_fit)
         for (k_a in typeA_idx) {
-            labels.tr <- X.extra.FE.tr[1, , k_a]
-            unique_levels <- sort(unique(labels.tr))
+            ## per cell: a level's effect is the mean pre-treatment
+            ## residual of the cells with that label, applied to every
+            ## cell with that label (#171)
+            labels.tr <- matrix(X.extra.FE.tr[, , k_a], TT, Ntr)
+            unique_levels <- sort(unique(stats::na.omit(c(labels.tr))))
             for (g in unique_levels) {
-                units_in_level <- which(labels.tr == g)
-                pre_vals <- c()
-                for (ii in units_in_level) {
-                    pre_t <- which(pre[, ii])
-                    pre_vals <- c(pre_vals, U.cur[pre_t, ii])
-                }
+                in_level <- !is.na(labels.tr) & labels.tr == g
+                pre_vals <- U.cur[in_level & pre]
                 if (length(pre_vals) > 0) {
-                    fe_mean <- mean(pre_vals)
-                    for (ii in units_in_level) {
-                        fe_fit[, ii] <- fe_fit[, ii] + fe_mean
-                    }
+                    fe_fit[in_level] <- fe_fit[in_level] + mean(pre_vals)
                 }
             }
         }
@@ -3311,9 +3321,13 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             off.sd = off.sd
         ))
     }
-    ## Include CV.out in the return list when cross-validation was performed
+    ## Include CV.out in the return list when cross-validation was performed,
+    ## with the fold standard errors the cv.rule used (CV.out.se; #167).
     if (exists("CV.out", inherits = FALSE)) {
         out <- c(out, list(CV.out = CV.out))
+        if (exists("CV.out.se", inherits = FALSE)) {
+            out <- c(out, list(CV.out.se = .fect_cv_se_table(CV.out.se)))
+        }
     }
 
     if (r.cv > 0) {
@@ -3604,18 +3618,21 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
     ## For each Type-B FE dimension, compute group means and apply to treated
     typeB.fit.tr <- matrix(0, TT, Ntr)
+    ## per cell: a level's effect is the mean of the control cells with
+    ## that label, applied to every treated cell with that label (NA at
+    ## absent cells; #171)
     for (k_b_idx in seq_along(typeB_idx)) {
         k <- typeB_idx[k_b_idx]
-        labels.co <- X.extra.FE.co.B[1, , k_b_idx]
-        labels.tr <- X.extra.FE.tr[1, , k]
-        levels.all <- sort(unique(labels.co))
+        labels.co <- matrix(X.extra.FE.co.B[, , k_b_idx], TT, Nco)
+        labels.tr <- matrix(X.extra.FE.tr[, , k], TT, Ntr)
+        levels.all <- sort(unique(stats::na.omit(c(labels.co))))
 
         for (g in levels.all) {
-            co_mask <- which(labels.co == g)
-            tr_mask <- which(labels.tr == g)
-            if (length(tr_mask) > 0 && length(co_mask) > 0) {
-                fe_val <- mean(fe_fit.co[, co_mask])
-                typeB.fit.tr[, tr_mask] <- typeB.fit.tr[, tr_mask] + fe_val
+            co_mask <- !is.na(labels.co) & labels.co == g
+            tr_mask <- !is.na(labels.tr) & labels.tr == g
+            if (any(tr_mask) && any(co_mask)) {
+                fe_val <- mean(fe_fit.co[co_mask])
+                typeB.fit.tr[tr_mask] <- typeB.fit.tr[tr_mask] + fe_val
             }
         }
     }

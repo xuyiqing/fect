@@ -148,10 +148,13 @@ fect_binary_cv <- function(Y, # Outcome variable, (T*N) matrix
         ## ---- rolling-window pre-computation (cv.method = "rolling") ---- ##
         rolling_folds <- NULL
         if (use_rolling) {
+            ## r.max (min(TT, max(r))) is the largest rank this CV
+            ## evaluates; it sets the training floor (#167).
             rolling_folds <- .build_cv_mask_rolling(
                 II = II, D = D, k = k,
                 cv.nobs = cv.nobs, cv.buffer = cv.buffer,
-                cv.prop = cv.prop, min.T0 = min.T0, seed = NULL
+                cv.prop = cv.prop, min.T0 = min.T0, r.max = r.max,
+                seed = NULL
             )
         }
 
@@ -204,7 +207,7 @@ fect_binary_cv <- function(Y, # Outcome variable, (T*N) matrix
         CV.out <- matrix(NA, (r.max - r.old + 1), 4)
         colnames(CV.out) <- c("r", "IC", "Log-likelihood", "MSPE")
         CV.out[,"r"] <- c(r.old:r.max)
-        CV.out[,"MSPE"] <- 1e20
+        CV.out[,"MSPE"] <- NA_real_ ## unscored rows (before 2.4.7 the sentinel 1e20, #175)
 
         CVinitialOut <- fit.cv <- Y0.cv <- FE0.cv <- xi0.cv <- factor0.cv <- NULL
                     
@@ -255,7 +258,7 @@ fect_binary_cv <- function(Y, # Outcome variable, (T*N) matrix
             IC <- est.cv$IC
             Loglikelihood <- est.cv$loglikelihood
 
-            if (min(CV.out[,"MSPE"]) > MSPE) {
+            if (MSPE < .fect_cv_best(CV.out[,"MSPE"])) {
                 ## at least 10% improvement for MPSE
                 MSPE.best <- MSPE
                 est.best <- est.cv  

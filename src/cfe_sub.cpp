@@ -478,8 +478,12 @@ List cfe_iter(const arma::cube& XX, const arma::mat& xxinv,
 
   if (p_extra_FE > 0) {
     for (int i = 0; i < p_extra_FE; i++) {
+      // each cell belongs to the group its label names; a cell without a
+      // label (NA in R: an absent cell of an unbalanced panel) is in no
+      // group (#171)
       arma::mat lab = X_extra_FE.slice(i);
-      arma::vec uniq = arma::unique(arma::vectorise(lab));
+      arma::vec lab_v = arma::vectorise(lab);
+      arma::vec uniq = arma::unique(lab_v.elem(arma::find_finite(lab_v)));
       std::vector<arma::uvec> idx_list;
       idx_list.reserve(uniq.n_elem);
       for (unsigned int g = 0; g < uniq.n_elem; g++) {
