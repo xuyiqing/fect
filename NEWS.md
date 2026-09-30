@@ -374,6 +374,16 @@ says what to do.
   loop at `max(tol, 1e-3)`, so its estimates differed from a `CV = FALSE`
   fit at the chosen `r` or `lambda` (on `sim_gsynth`, `method = "mc"`: an ATT
   of 5.196 instead of 5.238) (fect #172).
+* Extra fixed-effect labels (`index[3:]`, `group.fe`) are now read per
+  unit-period from the data. On an unbalanced panel an absent row no longer
+  forms a phantom group with label 0: with `time.component.from =
+  "nevertreated"`, a treated unit missing period 1 no longer stops with
+  "levels in treated units not found in controls: 0" (on `sim_linear` with
+  `grp = id %% 5`: an ATT of 2.2898, as for a period-2 drop), and a label
+  that varies within a unit is applied to the periods that carry it (the
+  period-1 label was applied to every period). A grouping nested in the
+  units now gives the least-squares fit of the observed rows. Balanced
+  panels with labels constant within units are unchanged (fect #171).
 * The cross-validation tables mark a failed fit with `NA`, not a sentinel
   of 1e10 or 1e20, and the selection rule reads scores of any size. Scores of
   1e9 or more, which an outcome with a standard deviation of about 30,000
