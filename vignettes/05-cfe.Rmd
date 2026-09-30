@@ -285,7 +285,7 @@ plot(out.cfe.quad,
 
 The quadratic specification converges in about a hundred iterations and should pass or nearly pass the placebo test. Some bias may remain because a quadratic approximates the true sinusoidal trend rather than matching it exactly.
 
-An earlier version of this example used `Q.type = "bspline"`. On this panel the last of the five default basis functions lives only in periods 35 to 50, while treatment starts in period 41, so a treated unit's loading on it is not identified from its pre-treatment periods: the EM creeps for tens of thousands of iterations and its counterfactual is an extrapolation. `fect` now warns before iterating when a `Q` column is nearly unobserved in the untreated periods. With `Q.type = "bspline"`, check that every basis function has most of its mass before treatment.
+An earlier version of this example used `Q.type = "bspline"`. On this panel the last of the five default basis functions lives only in periods 35 to 50, while treatment starts in period 41, so a treated unit's loading on it is not identified from its pre-treatment periods: the EM creeps for thousands of iterations and its counterfactual is an extrapolation. `fect` now warns before iterating when a `Q` column is nearly unobserved in the untreated periods. With `Q.type = "bspline"`, check that every basis function has most of its mass before treatment.
 
 ::: {.callout-note appearance="simple"}
 The `Q.type` argument accepts `"linear"`, `"quadratic"`, `"cubic"`, or `"bspline"`. Multiple types can be combined: `Q.type = c("linear", "quadratic")`. For B-splines, `Q.bspline.degree` controls the polynomial degree (default chosen automatically based on the number of time periods).

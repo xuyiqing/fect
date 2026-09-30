@@ -6,8 +6,11 @@
 ## 1 - (share of the column observed), so on sim_trend with the
 ## default B-spline basis (knots at the tertiles of the long time
 ## vector, 17 and 34; the fifth basis function is supported on periods
-## 35-50 and treatment starts in 41) the rate is 0.9996: tol = 1e-5
-## needs about 28,000 iterations and the answer is an extrapolation.
+## 35-50 and treatment starts in 41) the rate is 0.9996: the loop stops
+## when the relative change per iteration, about (1 - rate) times the
+## distance to the fixed point, is below tol, so tol = 1e-5 needs about
+## 9,100 iterations (9,228 observed) and the answer is an extrapolation;
+## at tol = 1e-3 it stops after a few hundred, far from the fixed point.
 ##
 ## The fix is a diagnostic before the first iteration: for each kappa
 ## group, the largest eigenvalue of I - (Q'Q)^{-1} Q_obs' Q_obs, where
@@ -105,8 +108,25 @@ test_that(".cfe_q_identification(): sim_trend with the default B-spline has rate
     msg <- fect:::.cfe_q_identification_message(d, tol = 1e-5)
     expect_match(msg, "time.bs5")
     expect_match(msg, "0.9996")
-    expect_match(msg, "28,000 iterations")
+    expect_match(msg, "9,100 iterations")
     expect_match(msg, "Q.type = c\\(\"linear\", \"quadratic\"\\)")
+    ## tol at or above 1 - rate: the loop stops at once
+    msg3 <- fect:::.cfe_q_identification_message(d, tol = 1e-3)
+    expect_match(msg3, "no iterations at all")
+    expect_false(grepl("about [0-9,]+ iterations", msg3))
+})
+
+test_that("sim_trend, Q.type = 'bspline': the converged fit at tol = 1e-5 takes the predicted number of iterations", {
+
+  skip_on_cran()
+
+    ## the message predicts about 9,100 iterations from the rate; the loop
+    ## takes 9,228 and lands on an ATT of 0.21 (0.75 at tol = 1e-3)
+    data("sim_trend", package = "fect")
+    f <- suppressWarnings(cfe_fit(sim_trend, Q.type = "bspline", tol = 1e-5,
+                                  max.iteration = 20000))
+    expect_equal(f$niter, 9228)
+    expect_equal(f$att.avg, 0.2085219, tolerance = 1e-6)
 })
 
 test_that("sim_trend, Q.type = 'bspline': fect warns before iterating and the max.iteration warning names the cause", {
@@ -118,7 +138,7 @@ test_that("sim_trend, Q.type = 'bspline': fect warns before iterating and the ma
                                   max.iteration = 50))
     w <- r$warnings
     pre <- grepl("nearly unidentified", w) & grepl("time.bs5", w) &
-        grepl("0.9996", w) & grepl("28,000 iterations", w)
+        grepl("0.9996", w) & grepl("9,100 iterations", w)
     expect_equal(sum(pre), 1L)
     ## the diagnostic comes before the convergence warnings
     expect_equal(which(pre), 1L)

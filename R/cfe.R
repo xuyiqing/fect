@@ -1320,10 +1320,16 @@ fect_cfe <- function(
 
 ## The warning for .cfe_q_identification()'s result at tolerance tol.
 .cfe_q_identification_message <- function(diag, tol) {
-    iters <- if (diag$rate < 1) log(tol) / log(diag$rate) else Inf
-    iter.txt <- if (is.finite(iters)) {
+    ## the loop stops when the relative change per iteration, about
+    ## (1 - rate) times the distance to the fixed point, is below tol
+    gap <- 1 - diag$rate
+    iters <- if (gap > 0 && tol < gap) log(tol / gap) / log(diag$rate) else if (gap > 0) 0 else Inf
+    iter.txt <- if (is.finite(iters) && iters > 0) {
         paste0("about ", format(signif(iters, 2), big.mark = ",",
                                 scientific = FALSE), " iterations")
+    } else if (is.finite(iters)) {
+        paste0("no iterations at all: the change per iteration is already ",
+               "below tol, so the loop stops far from the fixed point")
     } else {
         "an unbounded number of iterations"
     }
