@@ -121,8 +121,10 @@
 #'   satisfy `0 < cv.prop <= 1`. On small panels (n_eligible < 30)
 #'   consider raising further, since per-fold MSPE precision scales
 #'   with `cv.prop * n_eligible * cv.nobs`.
-#' @param cv.rule Rule for picking `r` from the MSPE curve: `"1se"`
-#'   (default), `"min"`, or `"1pct"`.
+#' @param cv.rule Rule for picking `r` from the MSPE curve: `"min"`
+#'   (default since 2.4.7), `"1se"`, or `"1pct"`. The fold errors are
+#'   heavy-tailed, which inflates the fold SE, so the 1-SE rule
+#'   under-selects `r` (see `?fect`).
 #' @param min.T0 Passed to the inner `fect()` fits, and the lower bound
 #'   of the training floor (see Details). Default 5. The anchors start
 #'   after `max(min.T0, 2 * (r.max + 1))` observations, so a `min.T0`
@@ -175,7 +177,7 @@ r.cv.rolling <- function(formula,
                           cv.buffer = 1L,
                           k = 20L,
                           cv.prop = 0.1,
-                          cv.rule = c("1se", "min", "1pct"),
+                          cv.rule = c("min", "1se", "1pct"),
                           min.T0 = 5L,
                           force = "unit",
                           seed = NULL,

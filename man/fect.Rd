@@ -39,7 +39,7 @@ assumptions.}
             cm = FALSE,
             loading.bound = "none", gamma.loading = NULL,
             gamma.loading.grid = NULL,
-            cv.rule = "1se")}
+            cv.rule = "min")}
 \arguments{
 \item{formula}{an object of class "formula" naming the outcome, the treatment and the covariates, e.g. \code{Y ~ D + X1 + X2}: the outcome on the left, the treatment first on the right, then the covariates. Every term must be a bare column name of \code{data}. Other terms stop with a message that names them: transformations such as \code{log(Y)} or \code{I(X1^2)}, \code{factor(g)}, and interactions such as \code{X1:X2} or \code{X1 * X2}. Create such variables as columns first (e.g. \code{data$logY <- log(data$Y)}; dummy columns with \code{model.matrix()}). Intercept terms (\code{+ 0}, \code{- 1}, \code{+ 1}) are accepted and ignored, because \code{fect} always includes its own fixed effects. With a formula, give the covariates in the formula; also passing \code{X} stops.}
 \item{data}{a data frame, can be a balanced or unbalanced panel data.}
@@ -249,8 +249,8 @@ double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
 \item{gamma.loading.grid}{a numeric vector of candidate \code{gamma.loading} values for cross-validation. \code{NULL} (default) uses \code{10^seq(-2, 2, length.out = 9)}. Ignored when \code{loading.bound = "none"} or when \code{gamma.loading} is supplied.}
 \item{cv.rule}{a string selecting the cross-validation rule for choosing the number of factors \code{r} (or matrix-completion penalty \code{lambda}). One of:
 \describe{
-  \item{\code{"1se"} (default)}{The 1-SE rule (Breiman, Friedman, Olshen and Stone 1984; Hastie, Tibshirani and Friedman 2009, Section 7.10): pick the smallest \code{r} whose mean CV criterion is within one fold-SE of the minimum-CV-error \code{r}. Biases toward parsimony in a fold-aware way --- when CV is precise, it allows larger \code{r}; when CV is noisy, it gravitates to simpler models.}
-  \item{\code{"min"}}{Pick the \code{r} that minimizes the mean CV criterion (no tolerance).}
+  \item{\code{"min"} (default)}{Pick the \code{r} that minimizes the mean CV criterion (no tolerance). The default since 2.4.7: the fold errors are heavy-tailed, which inflates the fold SE, so the 1-SE rule under-selects \code{r} (in a simulation study across 48 panel designs it picked the true \code{r} 10 to 15 points less often than the min rule and gave a larger ATT error in every design). Fits made with 2.3.0 to 2.4.6 used \code{"1se"}.}
+  \item{\code{"1se"}}{The 1-SE rule (Breiman, Friedman, Olshen and Stone 1984; Hastie, Tibshirani and Friedman 2009, Section 7.10): pick the smallest \code{r} whose mean CV criterion is within one fold-SE of the minimum-CV-error \code{r}. Biases toward parsimony in a fold-aware way --- when CV is precise, it allows larger \code{r}; when CV is noisy, it gravitates to simpler models.}
   \item{\code{"1pct"}}{Legacy pre-2.3.0 heuristic: pick the smallest \code{r} within 1\% relative tolerance of the best mean CV criterion. Use this for byte-identical reproducibility of pre-2.3.0 fits.}
 }
 Ignored when \code{CV = FALSE}.}

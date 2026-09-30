@@ -45,7 +45,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     cores = NULL,
                     do_parallel_cv   = FALSE,   ## pre-computed flag from default.R
                     do_parallel_boot = FALSE,    ## threaded through; not used in cv.R
-                    cv.rule = "1se",             ## "1se" (default), "min", or "1pct" (legacy)
+                    cv.rule = "min",             ## "min" (default since 2.4.7), "1se", or "1pct" (legacy)
                     W.in.fit = TRUE,             ## whether W enters the outcome-model fit
                     loading.bound = "none",      ## bounded treated loadings (gsynth and
                     gamma.loading = NULL,        ## ife + nevertreated delegations only;
@@ -893,7 +893,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     if (!is.null(new_r_cv) && is.finite(new_r_cv)) {
                         if (new_r_cv != as.integer(unname(r.cv))) {
                             message(sprintf(
-                                "  [cv.rule = %s] r.cv adjusted from %d to %d (1-SE band)\n",
+                                "  [cv.rule = %s] r.cv adjusted from %d to %d\n",
                                 cv.rule,
                                 as.integer(unname(r.cv)),
                                 as.integer(new_r_cv)
@@ -1409,7 +1409,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     new_lambda_cv <- lambda[i_pick_mc]
                     if (!identical(new_lambda_cv, lambda.cv)) {
                         message(sprintf(
-                            "  [cv.rule = %s] lambda.cv adjusted (1-SE band)",
+                            "  [cv.rule = %s] lambda.cv adjusted",
                             cv.rule
                         ))
                         est.best <- inter_fe_mc(

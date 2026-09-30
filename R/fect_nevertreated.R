@@ -59,7 +59,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                         loading.bound = "none",
                         gamma.loading = NULL,
                         gamma.loading.grid = NULL,
-                        cv.rule = "1se",
+                        cv.rule = "min",
                         W.in.fit = TRUE,
                         fit.init = NULL ## warm-start aux surface (T x N_boot); v2.4.3+
                         ) {
@@ -1045,7 +1045,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     if (!is.null(new_r_cv) && is.finite(new_r_cv)) {
                         if (new_r_cv != as.integer(unname(r.cv))) {
                             message(sprintf(
-                                "  [cv.rule = %s] r.cv adjusted from %d to %d (1-SE band)",
+                                "  [cv.rule = %s] r.cv adjusted from %d to %d",
                                 cv.rule,
                                 as.integer(unname(r.cv)),
                                 as.integer(new_r_cv)
@@ -2157,7 +2157,7 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             ## --- Apply cv.rule ----------------------------------------------
             ## As in the IFE block above: the in-loop assignments use the legacy
-            ## 1% rule; override r.cv with the user's rule (default "1se"). The
+            ## 1% rule; override r.cv with the user's rule (default "min"). The
             ## final fit below re-estimates the model at r.cv.
             if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
                 means <- CV.out[, crit_col]
