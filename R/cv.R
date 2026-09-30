@@ -1518,6 +1518,25 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         message("\n Recommended method through cross-validation: ", method, sep = "")
         message("\n")
     }
+    ## The CV loop fits at cv_tol = max(tol, 1e-3) for speed. The returned
+    ## fit is the chosen model refit at the user's tol, as the gsynth path
+    ## does, so it equals the CV = FALSE fit at r.cv or lambda.cv (before
+    ## 2.4.7 the loop's fit was returned, #172).
+    if (cv_tol != tol) {
+        if (method == "ife") {
+            est.best <- inter_fe_ub(
+                YY, Y0, X, II, W.use, beta0,
+                as.integer(unname(r.cv)), force, tol, max.iteration
+            )
+        } else {
+            est.best <- inter_fe_mc(
+                YY, Y0, X, II, W.use, beta0,
+                1, lambda.cv, force, tol, max.iteration
+            )
+            validF <- est.best$validF
+        }
+    }
+
     validX <- est.best$validX
 
     ## ------------------------------##
