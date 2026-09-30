@@ -347,6 +347,39 @@ says what to do.
   `seed = 11`: 0.042 instead of 0.05 at event time 1, where the 95%
   interval is [0.055, 2.709]). Intervals do not change (fect #169).
 
+* Cross-validation of the number of factors now keeps a training floor for
+  every held-out unit: with the rolling scheme (`cv.method = "rolling"`, in
+  `fect(CV = TRUE)`, `gsynth()` and `r.cv.rolling()`), anchors start after
+  `max(min.T0, 2 * (r.max + 1))` observed periods, where `r.max` is the
+  largest rank on the grid, so no held-out unit trains its fixed effect and
+  loadings on fewer than two observations per parameter, and none is dropped
+  by the inner fit and left unscored. Before, a unit could keep 4 or 5
+  training periods, its loadings then followed the noise, and one such unit
+  set a fold's error; on `sim_gsynth` (two factors) `r.cv.rolling()` picked
+  r = 0 at the defaults and now picks r = 2. In a simulation study (48
+  designs, 50 replications each) the floor raised the share of runs picking
+  the true rank from 0.43 to 0.57 and lowered the ATT error in every design.
+  When a panel is too short for the floor it is lowered to what the data
+  allow, with a message naming the floor used. The fold standard errors the
+  selection rule compares are now returned as `CV.out.se` (fect #167).
+* The default `cv.rule` is now `"min"` (the rank or penalty with the lowest
+  cross-validated error), not `"1se"`. Fold errors are heavy-tailed, so the
+  one-standard-error rule under-selects factors: in the study above it lost
+  to `"min"` in every design, by 10 to 15 points of rank recovery and 0.02 to
+  0.05 of ATT error, with no sign of over-fitting. `"1se"` and `"1pct"` are
+  still available. The chosen `r` or `lambda` of fits with `CV = TRUE` can
+  change (fect #167).
+* `fect(CV = TRUE)` with `method = "ife"` or `"mc"` now returns the chosen
+  model refit at `tol`. It returned the fit made inside the cross-validation
+  loop at `max(tol, 1e-3)`, so its estimates differed from a `CV = FALSE`
+  fit at the chosen `r` or `lambda` (on `sim_gsynth`, `method = "mc"`: an ATT
+  of 5.196 instead of 5.238) (fect #172).
+* The cross-validation tables mark a failed fit with `NA`, not a sentinel
+  of 1e10 or 1e20, and the selection rule reads scores of any size. Scores of
+  1e9 or more, which an outcome with a standard deviation of about 30,000
+  or more produces, were read as failures, so the rule fell back to the
+  1% rule without a message (fect #175).
+
 ## New features
 
 * `plot(fit, type = "gap", id = ...)` now draws the gaps of the chosen
@@ -370,6 +403,10 @@ says what to do.
   treated units, 1.277 (fect #162; gsynth #106).
 
 ## Bug fixes
+
+* `permute = TRUE` with `method = "mc"` now runs: the permutation refit
+  called the matrix-completion solver with an outdated argument list (every
+  argument after the observation mask shifted one place) (fect #174).
 
 * Weights (`W`, `W.est`, `W.agg`) now work with `vartype = "parametric"`
   (fect #73, #150; gsynth #101).
