@@ -365,7 +365,10 @@ says what to do.
   naming the floor used and the ranks it can judge. The fold standard errors
   the selection rule compares are returned as `CV.out.se`, and `fect_cv`
   fits (`method = "ife"`, `"mc"`) now carry `CV.out` under that exact name
-  (it was found only through partial matching of `CV.out.ife`) (fect #167).
+  (it was found only through partial matching of `CV.out.ife`). A panel in
+  which no unit has `min.T0 + cv.buffer + cv.nobs` observed pre-treatment
+  periods now stops with a message; it ran before, training on `min.T0 -
+  cv.buffer` periods (fect #167).
 * The default `cv.rule` is now `"min"` (the rank or penalty with the lowest
   cross-validated error), not `"1se"`. Fold errors are heavy-tailed, so the
   one-standard-error rule under-selects factors: in the study above it lost
@@ -386,7 +389,7 @@ says what to do.
   forms a phantom group with label 0: with `time.component.from =
   "nevertreated"`, a treated unit missing period 1 no longer stops with
   "levels in treated units not found in controls: 0" (on `sim_linear` with
-  `grp = id %% 5`: an ATT of 2.2898, as for a period-2 drop), and a label
+  `grp = id %% 5`: an ATT of 2.2891, against 2.2898 for a period-2 drop), and a label
   that varies within a unit is applied to the periods that carry it (the
   period-1 label was applied to every period). A grouping nested in the
   units now gives the least-squares fit of the observed rows. Balanced
@@ -435,14 +438,17 @@ says what to do.
   periods, e.g. `Q.type = c("linear", "quadratic")`, or a supplied `Q`); the
   `max.iteration` warning repeats the cause. On `sim_trend` the default
   `Q.type = "bspline"` has its fifth basis function on periods 35 to 50
-  while treatment starts at 41, so `tol = 1e-5` needs about 28,000
-  iterations and the converged counterfactual is an extrapolation; the
-  book's example now uses `Q.type = c("linear", "quadratic")`. No estimate
-  changes (fect #173).
+  while treatment starts at 41, so `tol = 1e-5` needs about 9,000
+  iterations (and at `tol = 1e-3` it stops after a few hundred, far from
+  the fixed point) and the converged counterfactual is an extrapolation;
+  the book's example now uses `Q.type = c("linear", "quadratic")`. No
+  estimate changes (fect #173).
 * `permute = TRUE` now runs for `method = "fe"`, `"ife"` and `"mc"`. The
   permutation refits were called with an outdated argument list, so every
   permutation stopped with "Not a matrix", was dropped, and the p-value
-  was `NaN` with the message "0 permutes" (fect #174).
+  was `NaN` with the message "0 permutes". For `method = "gsynth"` and
+  `"cfe"`, which have no permutation estimator, `permute = TRUE` now stops
+  with a message; it reported p = 0 from all-zero permuted ATTs (fect #174).
 
 * Weights (`W`, `W.est`, `W.agg`) now work with `vartype = "parametric"`
   (fect #73, #150; gsynth #101).
