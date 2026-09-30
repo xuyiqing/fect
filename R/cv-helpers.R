@@ -525,7 +525,9 @@
         stop(".build_cv_mask_rolling: no eligible units have enough ",
              "observations (need >= floor + cv.buffer + cv.nobs = ",
              train_floor + cv.buffer + cv.nobs, ", with a training floor of ",
-             train_floor, ").")
+             train_floor, "). Lower min.T0, cv.buffer or cv.nobs, or set ",
+             "CV = FALSE. (Before 2.4.7 such a panel ran with min.T0 - ",
+             "cv.buffer training periods per held-out unit.)")
     }
 
     n_sample_per_fold <- max(1L, as.integer(round(cv.prop * n_eligible)))
@@ -547,8 +549,9 @@
             obs_t <- elig_times[[j]]
             n_obs <- length(obs_t)
             ## a_idx - 1 - cv.buffer >= floor training periods stay observed
-            valid <- seq.int(train_floor + cv.buffer + 1L, n_obs - cv.nobs + 1L)
-            if (length(valid) == 0L) next
+            lo <- train_floor + cv.buffer + 1L; hi <- n_obs - cv.nobs + 1L
+            if (hi < lo) next
+            valid <- seq.int(lo, hi)
             a_idx <- valid[sample.int(length(valid), 1L)]
 
             holdout_t <- obs_t[a_idx:(a_idx + cv.nobs - 1L)]

@@ -216,6 +216,8 @@ test_that("(d) a panel too short for the floor lowers it with a message", {
       min.T0 = 5L, r.max = 5L, seed = 1L),
     regexp = "floor of 10 .*ranks up to about 4")
   expect_equal(attr(folds, "floor"), 10L)
+  ## the five treated units (12 pre-periods) cannot meet 10 + 1 + 3
+  expect_equal(attr(folds, "n.eligible"), 45L)
   for (f in folds) {
     II.cv <- II
     II.cv[f$cv.id] <- 0L
@@ -242,6 +244,53 @@ test_that("(d) a panel too short for the floor lowers it with a message", {
                         seed = 1, verbose = FALSE, parallel = FALSE),
     regexp = "floor of 10 .*ranks up to about 4")
   expect_equal(res$floor, 10L)
+  expect_equal(res$n.eligible, 45L)
+  expect_true(all(res$mspe$n_unscored == 0L))
+})
+
+## sim_gsynth cut to 14 periods, with the five treated units treated from
+## period 12 (they keep 11 pre-treatment periods; controls have 14).
+.short_panel_11 <- function() {
+  d <- .sg()
+  treated <- unique(d$id[d$D == 1])
+  d <- d[d$time <= 14, ]
+  d$D <- as.integer(d$id %in% treated & d$time >= 12)
+  d
+}
+
+test_that("(f) a unit one period short of floor + cv.buffer + cv.nobs is not eligible", {
+  ## r.max = 3: floor 8, so a unit needs 8 + 1 + 3 = 12 periods. The
+  ## treated units have 11, one short, so only the 45 controls are
+  ## eligible. An eligibility rule of min.T0 + cv.buffer + cv.nobs (= 9)
+  ## would admit them, in the mask builder and in r.cv.rolling() alike.
+  d <- .short_panel_11()
+  ids <- sort(unique(d$id)); tt <- sort(unique(d$time))
+  TT <- length(tt); N <- length(ids)
+  D <- matrix(0, TT, N)
+  D[cbind(match(d$time, tt), match(d$id, ids))] <- d$D
+  II <- matrix(1L, TT, N)
+  II[D == 1] <- 0L
+  treated_cols <- which(colSums(D) > 0)
+  expect_length(treated_cols, 5L)
+  expect_true(all(colSums(II)[treated_cols] == 11L))
+  folds <- fect:::.build_cv_mask_rolling(
+    II = II, D = D, k = 3L, cv.nobs = 3L, cv.buffer = 1L, cv.prop = 1,
+    min.T0 = 5L, r.max = 3L, seed = 1L)
+  expect_equal(attr(folds, "floor"), 8L)
+  expect_equal(attr(folds, "n.eligible"), 45L)
+  for (f in folds) {
+    masked_units <- unique((f$cv.id - 1L) %/% TT + 1L)
+    expect_false(any(treated_cols %in% masked_units))
+    II.cv <- II
+    II.cv[f$cv.id] <- 0L
+    expect_true(all(colSums(II.cv)[masked_units] >= 8L))
+  }
+  res <- suppressMessages(r.cv.rolling(
+    Y ~ D + X1 + X2, data = d, index = c("id", "time"),
+    method = "gsynth", r.max = 3, k = 2, force = "two-way", seed = 1,
+    verbose = FALSE, parallel = FALSE))
+  expect_equal(res$floor, 8L)
+  expect_equal(res$n.eligible, 45L)
   expect_true(all(res$mspe$n_unscored == 0L))
 })
 

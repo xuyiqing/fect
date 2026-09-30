@@ -152,6 +152,8 @@
 #'   - `floor`: the training floor used (see Details).
 #'   - `n.units.masked`: distinct units that contributed to at least
 #'     one fold's holdout.
+#'   - `n.eligible`: units with at least `floor + cv.buffer + cv.nobs`
+#'     eligible periods, the pool the folds sample from.
 #'
 #' @examples
 #' \dontrun{
@@ -257,7 +259,9 @@ r.cv.rolling <- function(formula,
         stop("r.cv.rolling: no eligible units have enough pre-treatment ",
              "observations (need >= floor + cv.buffer + cv.nobs = ",
              train_floor + cv.buffer + cv.nobs, ", with a training floor of ",
-             train_floor, ").")
+             train_floor, "). Lower min.T0, cv.buffer or cv.nobs, or set ",
+             "CV = FALSE. (Before 2.4.7 such a panel ran with min.T0 - ",
+             "cv.buffer training periods per held-out unit.)")
     }
 
     n_eligible_units <- length(elig_obs_times)
@@ -302,8 +306,9 @@ r.cv.rolling <- function(formula,
             ## For treated units, obs_t already excludes post-treatment
             ## cells, so the holdout block is guaranteed to stay in the
             ## pre-treatment window.
-            valid <- seq.int(train_floor + cv.buffer + 1L, n_obs - cv.nobs + 1L)
-            if (length(valid) == 0L) return(NULL)
+            lo <- train_floor + cv.buffer + 1L; hi <- n_obs - cv.nobs + 1L
+            if (hi < lo) return(NULL)
+            valid <- seq.int(lo, hi)
             a_idx <- valid[sample.int(length(valid), 1L)]
             holdout_t <- obs_t[a_idx:(a_idx + cv.nobs - 1L)]
             buf_t <- if (cv.buffer > 0L) {
@@ -452,5 +457,6 @@ r.cv.rolling <- function(formula,
          cv.buffer     = cv.buffer,
          cv.prop       = cv.prop,
          floor         = as.integer(train_floor),
-         n.units.masked = length(units_seen))
+         n.units.masked = length(units_seen),
+         n.eligible     = n_eligible_units)
 }

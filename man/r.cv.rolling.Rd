@@ -112,6 +112,8 @@ List with components:
   - `floor`: the training floor used (see Details).
   - `n.units.masked`: distinct units that contributed to at least
     one fold's holdout.
+  - `n.eligible`: units with at least `floor + cv.buffer + cv.nobs`
+    eligible periods, the pool the folds sample from.
 }
 \description{
 Picks the number of factors `r` for an interactive-fixed-effects
