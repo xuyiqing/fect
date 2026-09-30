@@ -384,11 +384,14 @@ says what to do.
   period-1 label was applied to every period). A grouping nested in the
   units now gives the least-squares fit of the observed rows. Balanced
   panels with labels constant within units are unchanged (fect #171).
-* The cross-validation tables mark a failed fit with `NA`, not a sentinel
-  of 1e10 or 1e20, and the selection rule reads scores of any size. Scores of
-  1e9 or more, which an outcome with a standard deviation of about 30,000
-  or more produces, were read as failures, so the rule fell back to the
-  1% rule without a message (fect #175).
+* Rows of a cross-validation table (`CV.out`, `CV.out.ife`, `CV.out.mc`)
+  that the loop did not score are now `NA`, and the selection rules read
+  `NA` as missing. They held 1e10 or 1e20, and a score at or above 1e9 (an
+  outcome with a standard deviation of about 30,000 or more) was read as
+  missing too: `method = "gsynth"` then stopped with "object 'r.cv' not
+  found", and the chosen `r` could depend on the outcome's scale. On
+  `sim_gsynth` with the outcome times 1e5, `r = c(0, 3)` now chooses r = 2,
+  as for the outcome itself (fect #175).
 
 ## New features
 
@@ -414,9 +417,10 @@ says what to do.
 
 ## Bug fixes
 
-* `permute = TRUE` with `method = "mc"` now runs: the permutation refit
-  called the matrix-completion solver with an outdated argument list (every
-  argument after the observation mask shifted one place) (fect #174).
+* `permute = TRUE` now runs for `method = "fe"`, `"ife"` and `"mc"`. The
+  permutation refits were called with an outdated argument list, so every
+  permutation stopped with "Not a matrix", was dropped, and the p-value
+  was `NaN` with the message "0 permutes" (fect #174).
 
 * Weights (`W`, `W.est`, `W.agg`) now work with `vartype = "parametric"`
   (fect #73, #150; gsynth #101).

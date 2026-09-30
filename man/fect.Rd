@@ -177,7 +177,7 @@ results but may compute a few extra lambda values compared to the serial
 path. Use \code{parallel = FALSE} to preserve the short-circuit behavior.}
 \item{cores}{an integer indicating the number of cores for parallel computing.}
 \item{tol}{a positive number indicating the relative tolerance for the
-EM update check (\code{||fit_new - fit_old||_F / ||fit_old||_F < tol}).
+EM update check (\code{||fit_new - fit_old||_F / ||fit_old||_F < tol}). With \code{CV = TRUE} the cross-validation folds use \code{max(tol, 1e-3)} and the chosen model is then refit at \code{tol}.
 Default tightened from \code{1e-3} to \code{1e-5} in v2.4.3 because the
 older default produced under-converged IFE/CFE point estimates that
 shifted up to 40\% relative to the converged value (inference was
@@ -281,7 +281,7 @@ Ignored when \code{CV = FALSE}.}
   \item{est}{results of the fitted model.}
   \item{est.cm}{with \code{cm = TRUE}: the fitted model of the treated outcomes (see \code{cm}).}
   \item{MSPE}{mean squared prediction error from cross-validation.}
-  \item{CV.out}{results of the cross-validation procedure.}
+  \item{CV.out}{results of the cross-validation procedure; a row the loop did not score holds \code{NA}.}
   \item{niter}{number of iterations.}
   \item{factor}{estimated time-varying factors.}
   \item{lambda}{estimated loadings.}
