@@ -481,7 +481,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 c("PC", "GMoment", "Moment", "MAD", "MSPE", "WMSPE", "GMSPE", "WGMSPE"),
                 colnames(CV.out.ife)
             )
-            CV.out.ife[, sentinel.cols] <- 1e20
+            ## unscored rows hold NA (before 2.4.7 the sentinel 1e20, #175)
+            CV.out.ife[, sentinel.cols] <- NA_real_
 
             ## Per-fold SE matrix parallel to CV.out.ife. Populated below in
             ## both parallel and serial branches; consumed at the end of the
@@ -620,43 +621,43 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                     }
 
                     if (criterion == "mspe") {
-                        if ((min(CV.out.ife[, "MSPE"]) - MSPE) > 0.01 * min(CV.out.ife[, "MSPE"])) {
+                        if (.fect_cv_improves(CV.out.ife[, "MSPE"], MSPE)) {
                             MSPE.best <- MSPE; est.best <- est.cv; r.cv <- r
                         } else {
                             if (r == r.cv + 1) message("*")
                         }
                     } else if (criterion == "wmspe") {
-                        if ((min(CV.out.ife[, "WMSPE"]) - WMSPE) > 0.01 * min(CV.out.ife[, "WMSPE"])) {
+                        if (.fect_cv_improves(CV.out.ife[, "WMSPE"], WMSPE)) {
                             WMSPE.best <- WMSPE; est.best <- est.cv; r.cv <- r
                         } else {
                             if (r == r.cv + 1) message("*")
                         }
                     } else if (criterion == "gmspe") {
-                        if ((min(CV.out.ife[, "GMSPE"]) - GMSPE) > 0.01 * min(CV.out.ife[, "GMSPE"])) {
+                        if (.fect_cv_improves(CV.out.ife[, "GMSPE"], GMSPE)) {
                             GMSPE.best <- GMSPE; est.best <- est.cv; r.cv <- r
                         } else {
                             if (r == r.cv + 1) message("*")
                         }
                     } else if (criterion == "wgmspe") {
-                        if ((min(CV.out.ife[, "WGMSPE"]) - WGMSPE) > 0.01 * min(CV.out.ife[, "WGMSPE"])) {
+                        if (.fect_cv_improves(CV.out.ife[, "WGMSPE"], WGMSPE)) {
                             WGMSPE.best <- WGMSPE; est.best <- est.cv; r.cv <- r
                         } else {
                             if (r == r.cv + 1) message("*")
                         }
                     } else if (criterion == "mad") {
-                        if ((min(CV.out.ife[, "MAD"]) - MAD) > 0.01 * min(CV.out.ife[, "MAD"])) {
+                        if (.fect_cv_improves(CV.out.ife[, "MAD"], MAD)) {
                             MAD.best <- MAD; est.best <- est.cv; r.cv <- r
                         } else {
                             if (r == r.cv + 1) message("*")
                         }
                     } else if (criterion == "moment") {
-                        if ((min(CV.out.ife[, "Moment"]) - moment) > 0.01 * min(CV.out.ife[, "Moment"])) {
+                        if (.fect_cv_improves(CV.out.ife[, "Moment"], moment)) {
                             moment.best <- moment; est.best <- est.cv; r.cv <- r
                         } else {
                             if (r == r.cv + 1) message("*")
                         }
                     } else if (criterion == "gmoment") {
-                        if ((min(CV.out.ife[, "GMoment"]) - gmoment) > 0.01 * min(CV.out.ife[, "GMoment"])) {
+                        if (.fect_cv_improves(CV.out.ife[, "GMoment"], gmoment)) {
                             gmoment.best <- gmoment; est.best <- est.cv; r.cv <- r
                         } else {
                             if (r == r.cv + 1) message("*")
@@ -762,7 +763,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
                 if (criterion == "mspe") {
-                    if ((min(CV.out.ife[, "MSPE"]) - MSPE) > 0.01 * min(CV.out.ife[, "MSPE"])) {
+                    if (.fect_cv_improves(CV.out.ife[, "MSPE"], MSPE)) {
                         ## at least 1% improvement for MPSE
                         MSPE.best <- MSPE
                         est.best <- est.cv
@@ -771,7 +772,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         if (r == r.cv + 1) message("*")
                     }
                 } else if (criterion == "wmspe") {
-                    if ((min(CV.out.ife[, "WMSPE"]) - WMSPE) > 0.01 * min(CV.out.ife[, "WMSPE"])) {
+                    if (.fect_cv_improves(CV.out.ife[, "WMSPE"], WMSPE)) {
                         ## at least 1% improvement for MPSE
                         WMSPE.best <- WMSPE
                         est.best <- est.cv
@@ -780,7 +781,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         if (r == r.cv + 1) message("*")
                     }
                 } else if (criterion == "gmspe") {
-                    if ((min(CV.out.ife[, "GMSPE"]) - GMSPE) > 0.01 * min(CV.out.ife[, "GMSPE"])) {
+                    if (.fect_cv_improves(CV.out.ife[, "GMSPE"], GMSPE)) {
                         ## at least 1% improvement for MPSE
                         GMSPE.best <- GMSPE
                         est.best <- est.cv
@@ -789,7 +790,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         if (r == r.cv + 1) message("*")
                     }
                 } else if (criterion == "wgmspe") {
-                    if ((min(CV.out.ife[, "WGMSPE"]) - WGMSPE) > 0.01 * min(CV.out.ife[, "WGMSPE"])) {
+                    if (.fect_cv_improves(CV.out.ife[, "WGMSPE"], WGMSPE)) {
                         ## at least 1% improvement for MPSE
                         WGMSPE.best <- WGMSPE
                         est.best <- est.cv
@@ -798,7 +799,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         if (r == r.cv + 1) message("*")
                     }
                 } else if (criterion == "mad") {
-                    if ((min(CV.out.ife[, "MAD"]) - MAD) > 0.01 * min(CV.out.ife[, "MAD"])) {
+                    if (.fect_cv_improves(CV.out.ife[, "MAD"], MAD)) {
                         MAD.best <- MAD
                         est.best <- est.cv
                         r.cv <- r
@@ -806,7 +807,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         if (r == r.cv + 1) message("*")
                     }
                 } else if (criterion == "moment") {
-                    if ((min(CV.out.ife[, "Moment"]) - moment) > 0.01 * min(CV.out.ife[, "Moment"])) {
+                    if (.fect_cv_improves(CV.out.ife[, "Moment"], moment)) {
                         moment.best <- moment
                         est.best <- est.cv
                         r.cv <- r
@@ -814,7 +815,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         if (r == r.cv + 1) message("*")
                     }
                 } else if (criterion == "gmoment") {
-                    if ((min(CV.out.ife[, "GMoment"]) - gmoment) > 0.01 * min(CV.out.ife[, "GMoment"])) {
+                    if (.fect_cv_improves(CV.out.ife[, "GMoment"], gmoment)) {
                         gmoment.best <- gmoment
                         est.best <- est.cv
                         r.cv <- r
@@ -822,7 +823,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         if (r == r.cv + 1) message("*")
                     }
                 } else if (criterion == "pc") {
-                    if (PC < min(CV.out.ife[, "PC"])) {
+                    if (PC < .fect_cv_best(CV.out.ife[, "PC"])) {
                         est.pc.best <- est.cv
                         r.pc <- r
                     }
@@ -879,8 +880,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 crit_col <- crit_col_map[[criterion]]
                 means <- CV.out.ife[, crit_col]
                 ses   <- CV.out.ife.se[, crit_col]
-                ## Treat the loop sentinel value (1e20) as missing for selection.
-                means[!is.finite(means) | means >= 1e19] <- NA_real_
+                ## unscored or failed rows are NA (before 2.4.7 the sentinel 1e20)
+                means[!is.finite(means)] <- NA_real_
                 i_pick <- .fect_apply_cv_rule(means, ses, rule = cv.rule)
                 if (!is.na(i_pick) && i_pick >= 1L && i_pick <= nrow(CV.out.ife)) {
                     new_r_cv <- unname(CV.out.ife[i_pick, "r"])
@@ -1003,7 +1004,9 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             CV.out.mc.se <- matrix(NA_real_, length(lambda), 10)
             colnames(CV.out.mc.se) <- colnames(CV.out.mc)
             CV.out.mc.se[, "lambda.norm"] <- CV.out.mc[, "lambda.norm"]
-            CV.out.mc[, "GMoment"] <- CV.out.mc[, "Moment"] <- CV.out.mc[, "MAD"] <- CV.out.mc[, "WGMSPE"] <- CV.out.mc[, "WGMSPE"] <- CV.out.mc[, "GMSPE"] <- CV.out.mc[, "WMSPE"] <- CV.out.mc[, "MSPE"] <- 1e20
+            ## rows the loop does not score (it may stop early) hold NA
+            ## (before 2.4.7 the sentinel 1e20, #175)
+            CV.out.mc[, c("MSPE", "WMSPE", "GMSPE", "WGMSPE", "MAD", "Moment", "GMoment")] <- NA_real_
 
             ## ---- Parallel CV setup (MC, notyettreated) ---- ##
             ## do_parallel_cv is TRUE when user said parallel=TRUE (auto mode) or parallel="cv" (explicit override).
@@ -1135,31 +1138,31 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
 
                     ## 1% rule — identical logic to serial path, but no break_check
                     if (criterion == "mspe") {
-                        if ((min(CV.out.mc[, "MSPE"]) - MSPE) > 0.01 * min(CV.out.mc[, "MSPE"])) {
+                        if (.fect_cv_improves(CV.out.mc[, "MSPE"], MSPE)) {
                             MSPE.best <- MSPE; est.best <- est.cv; lambda.cv <- lambda[i]
                         }
                     } else if (criterion == "wmspe") {
-                        if ((min(CV.out.mc[, "WMSPE"]) - WMSPE) > 0.01 * min(CV.out.mc[, "WMSPE"])) {
+                        if (.fect_cv_improves(CV.out.mc[, "WMSPE"], WMSPE)) {
                             WMSPE.best <- WMSPE; est.best <- est.cv; lambda.cv <- lambda[i]
                         }
                     } else if (criterion == "gmspe") {
-                        if ((min(CV.out.mc[, "GMSPE"]) - GMSPE) > 0.01 * min(CV.out.mc[, "GMSPE"])) {
+                        if (.fect_cv_improves(CV.out.mc[, "GMSPE"], GMSPE)) {
                             GMSPE.best <- GMSPE; est.best <- est.cv; lambda.cv <- lambda[i]
                         }
                     } else if (criterion == "wgmspe") {
-                        if ((min(CV.out.mc[, "WGMSPE"]) - WGMSPE) > 0.01 * min(CV.out.mc[, "WGMSPE"])) {
+                        if (.fect_cv_improves(CV.out.mc[, "WGMSPE"], WGMSPE)) {
                             WGMSPE.best <- WGMSPE; est.best <- est.cv; lambda.cv <- lambda[i]
                         }
                     } else if (criterion == "mad") {
-                        if ((min(CV.out.mc[, "MAD"]) - MAD) > 0.01 * min(CV.out.mc[, "MAD"])) {
+                        if (.fect_cv_improves(CV.out.mc[, "MAD"], MAD)) {
                             MAD.best <- MAD; est.best <- est.cv; lambda.cv <- lambda[i]
                         }
                     } else if (criterion == "moment") {
-                        if ((min(CV.out.mc[, "Moment"]) - moment) > 0.01 * min(CV.out.mc[, "Moment"])) {
+                        if (.fect_cv_improves(CV.out.mc[, "Moment"], moment)) {
                             moment.best <- moment; est.best <- est.cv; lambda.cv <- lambda[i]
                         }
                     } else if (criterion == "gmoment") {
-                        if ((min(CV.out.mc[, "GMoment"]) - gmoment) > 0.01 * min(CV.out.mc[, "GMoment"])) {
+                        if (.fect_cv_improves(CV.out.mc[, "GMoment"], gmoment)) {
                             gmoment.best <- gmoment; est.best <- est.cv; lambda.cv <- lambda[i]
                         }
                     }
@@ -1248,7 +1251,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 }
 
                 if (criterion == "mspe") {
-                    if ((min(CV.out.mc[, "MSPE"]) - MSPE) > 0.01 * min(CV.out.mc[, "MSPE"])) {
+                    if (.fect_cv_improves(CV.out.mc[, "MSPE"], MSPE)) {
                         ## at least 1% improvement for MPSE
                         MSPE.best <- MSPE
                         est.best <- est.cv
@@ -1265,7 +1268,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         }
                     }
                 } else if (criterion == "wmspe") {
-                    if ((min(CV.out.mc[, "WMSPE"]) - WMSPE) > 0.01 * min(CV.out.mc[, "WMSPE"])) {
+                    if (.fect_cv_improves(CV.out.mc[, "WMSPE"], WMSPE)) {
                         ## at least 1% improvement for MPSE
                         WMSPE.best <- WMSPE
                         est.best <- est.cv
@@ -1282,7 +1285,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         }
                     }
                 } else if (criterion == "gmspe") {
-                    if ((min(CV.out.mc[, "GMSPE"]) - GMSPE) > 0.01 * min(CV.out.mc[, "GMSPE"])) {
+                    if (.fect_cv_improves(CV.out.mc[, "GMSPE"], GMSPE)) {
                         ## at least 1% improvement for MPSE
                         GMSPE.best <- GMSPE
                         est.best <- est.cv
@@ -1299,7 +1302,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         }
                     }
                 } else if (criterion == "wgmspe") {
-                    if ((min(CV.out.mc[, "WGMSPE"]) - WGMSPE) > 0.01 * min(CV.out.mc[, "WGMSPE"])) {
+                    if (.fect_cv_improves(CV.out.mc[, "WGMSPE"], WGMSPE)) {
                         ## at least 1% improvement for MPSE
                         WGMSPE.best <- WGMSPE
                         est.best <- est.cv
@@ -1316,7 +1319,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         }
                     }
                 } else if (criterion == "mad") {
-                    if ((min(CV.out.mc[, "MAD"]) - MAD) > 0.01 * min(CV.out.mc[, "MAD"])) {
+                    if (.fect_cv_improves(CV.out.mc[, "MAD"], MAD)) {
                         ## at least 1% improvement for MPSE
                         MAD.best <- MAD
                         est.best <- est.cv
@@ -1333,7 +1336,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         }
                     }
                 } else if (criterion == "moment") {
-                    if ((min(CV.out.mc[, "Moment"]) - moment) > 0.01 * min(CV.out.mc[, "Moment"])) {
+                    if (.fect_cv_improves(CV.out.mc[, "Moment"], moment)) {
                         ## at least 1% improvement for MPSE
                         moment.best <- moment
                         est.best <- est.cv
@@ -1350,7 +1353,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                         }
                     }
                 } else if (criterion == "gmoment") {
-                    if ((min(CV.out.mc[, "GMoment"]) - gmoment) > 0.01 * min(CV.out.mc[, "GMoment"])) {
+                    if (.fect_cv_improves(CV.out.mc[, "GMoment"], gmoment)) {
                         ## at least 1% improvement for MPSE
                         gmoment.best <- gmoment
                         est.best <- est.cv
@@ -1518,6 +1521,25 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         message("\n Recommended method through cross-validation: ", method, sep = "")
         message("\n")
     }
+    ## The CV loop fits at cv_tol = max(tol, 1e-3) for speed. The returned
+    ## fit is the chosen model refit at the user's tol, as the gsynth path
+    ## does, so it equals the CV = FALSE fit at r.cv or lambda.cv (before
+    ## 2.4.7 the loop's fit was returned, #172).
+    if (cv_tol != tol) {
+        if (method == "ife") {
+            est.best <- inter_fe_ub(
+                YY, Y0, X, II, W.use, beta0,
+                as.integer(unname(r.cv)), force, tol, max.iteration
+            )
+        } else {
+            est.best <- inter_fe_mc(
+                YY, Y0, X, II, W.use, beta0,
+                1, lambda.cv, force, tol, max.iteration
+            )
+            validF <- est.best$validF
+        }
+    }
+
     validX <- est.best$validX
 
     ## ------------------------------##

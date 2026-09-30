@@ -71,7 +71,6 @@ test_that("B1: fect's IFE CV table under criterion = 'pc' has the right columns"
   expect_identical(colnames(tab), c("r", "sigma2", "IC", "PC", "MSPTATT", "MSE"))
   ## every row holds its own statistics (no sentinel or NA left behind)
   expect_true(all(is.finite(tab)))
-  expect_true(all(tab[, "PC"] < 1e19))
   expect_equal(unname(fit$r.cv), unname(tab[which.min(tab[, "PC"]), "r"]))
 })
 

@@ -32,10 +32,9 @@ test_that("S2.1: IFE method CV - r.cv and CV.out snapshot", {
   # CV.out should exist and have MSPE column with finite positive values
   expect_true(!is.null(cv_out$CV.out))
   mspe_col <- cv_out$CV.out[, "MSPE"]
-  # At least some entries should be less than 1e20 (the init value)
-  expect_true(any(mspe_col < 1e19))
-  expect_true(all(is.finite(mspe_col[mspe_col < 1e19])))
-  expect_true(all(mspe_col[mspe_col < 1e19] > 0))
+  expect_true(any(is.finite(mspe_col)))
+  expect_true(all(is.finite(mspe_col[is.finite(mspe_col)])))
+  expect_true(all(mspe_col[is.finite(mspe_col)] > 0))
 })
 
 test_that("S2.2: MC method CV - lambda.cv selection", {
@@ -77,14 +76,14 @@ test_that("S2.3: GMoment column correctly populated (IFE)", {
 
   # GMoment values should be finite and positive where computed
   gm_col <- cv_out$CV.out[, "GMoment"]
-  computed <- gm_col[gm_col < 1e19]
+  computed <- gm_col[is.finite(gm_col)]
   if (length(computed) > 0) {
     expect_true(all(is.finite(computed)))
     expect_true(all(computed > 0))
 
     # GMoment should generally differ from MSPTATT
     msptatt_col <- cv_out$CV.out[, "MSPTATT"]
-    msptatt_computed <- msptatt_col[gm_col < 1e19]
+    msptatt_computed <- msptatt_col[is.finite(gm_col)]
     if (length(msptatt_computed) > 0) {
       if (length(computed) > 1) {
         expect_false(
@@ -122,7 +121,7 @@ test_that("CV1: cv.method='all_units' selects r.cv", {
   # CV.out exists with MSPE column
   expect_true(!is.null(cv_out$CV.out))
   mspe_col <- cv_out$CV.out[, "MSPE"]
-  computed <- mspe_col[mspe_col < 1e19]
+  computed <- mspe_col[is.finite(mspe_col)]
   expect_true(all(is.finite(computed)))
   expect_true(all(computed > 0))
 })
@@ -148,7 +147,7 @@ test_that("CV2: cv.method='treated_units' selects r.cv", {
   # CV.out exists
   expect_true(!is.null(cv_out$CV.out))
   mspe_col <- cv_out$CV.out[, "MSPE"]
-  computed <- mspe_col[mspe_col < 1e19]
+  computed <- mspe_col[is.finite(mspe_col)]
   expect_true(all(is.finite(computed)))
   expect_true(all(computed > 0))
 })

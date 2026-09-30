@@ -32,7 +32,7 @@ test_that("NT1: fect_nevertreated cv.method='loo' selects r.cv (IFE)", {
   expect_true(nt_out$r.cv >= 0 && nt_out$r.cv <= 3)
   expect_true(!is.null(nt_out$CV.out))
   mspe_col <- nt_out$CV.out[, "MSPE"]
-  computed <- mspe_col[mspe_col < 1e19]
+  computed <- mspe_col[is.finite(mspe_col)]
   if (length(computed) > 0) {
     expect_true(all(is.finite(computed)))
   }
@@ -439,7 +439,7 @@ test_that("NTCV1: cv.method='all_units' IFE produces valid output", {
   # CV.out exists with proper structure
   expect_true(!is.null(out_au$CV.out))
   mspe_col <- out_au$CV.out[, "MSPE"]
-  computed <- mspe_col[mspe_col < 1e19]
+  computed <- mspe_col[is.finite(mspe_col)]
   if (length(computed) > 0) {
     expect_true(all(is.finite(computed)))
     expect_true(all(computed > 0))
@@ -606,7 +606,7 @@ test_that("NTCV6: r-selection validity across all cv.methods (IFE)", {
 
     # Score columns in CV.out: check MSPE for evaluated rows
     mspe_col <- out$CV.out[, "MSPE"]
-    computed <- mspe_col[mspe_col < 1e19]
+    computed <- mspe_col[is.finite(mspe_col)]
     if (length(computed) > 0) {
       expect_true(all(is.finite(computed)),
                   info = paste("cv.method =", cm, ": non-finite MSPE"))
@@ -678,7 +678,7 @@ test_that("NTCV-Edge1: r=c(0,0) with all cv.methods", {
                  info = paste("cv.method =", cm, ": r.cv should be 0 when r=c(0,0)"))
     # Scores should still be finite
     mspe_col <- out$CV.out[, "MSPE"]
-    computed <- mspe_col[mspe_col < 1e19]
+    computed <- mspe_col[is.finite(mspe_col)]
     if (length(computed) > 0) {
       expect_true(all(is.finite(computed)),
                   info = paste("cv.method =", cm, ": non-finite MSPE with r=0"))
@@ -787,7 +787,7 @@ test_that("NTCV-P1: Score non-negativity in CV.out", {
     for (sc in score_cols) {
       if (sc %in% colnames(out$CV.out)) {
         vals <- out$CV.out[, sc]
-        computed <- vals[vals < 1e19]
+        computed <- vals[is.finite(vals)]
         if (length(computed) > 0) {
           expect_true(all(computed >= 0),
                       info = paste("cv.method =", cm, ", score =", sc, ": negative value"))
