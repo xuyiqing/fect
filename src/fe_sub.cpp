@@ -131,6 +131,30 @@ List fe_add(const arma::mat& alpha_Y, const arma::mat& xi_Y, double mu_Y, int T,
   return (result);
 }
 
+/* SVD that stops with a clear message instead of returning empty factors.
+   arma::svd() returns false when LAPACK's divide-and-conquer routine (the
+   default, "dc") fails to converge, and leaves U, s and V empty; the callers
+   then failed later in head_cols() or s(i) with "size out of bounds" / "index
+   out of bounds". This happens on very unbalanced panels, where the EM
+   imputation of missing cells can leave an ill-conditioned matrix. Retry with
+   the standard routine ("std"), as the Armadillo documentation advises. */
+void svd_checked(arma::mat& U, arma::vec& s, arma::mat& V, const arma::mat& X) {
+  if (!X.is_finite()) {
+    Rcpp::stop("Factor estimation failed: the matrix to decompose has non-finite "
+               "values (the EM imputation of missing cells diverged). Try a "
+               "smaller r or lambda, or a larger min.T0.");
+  }
+  if (arma::svd(U, s, V, X)) {
+    return;
+  }
+  if (arma::svd(U, s, V, X, "std")) {
+    return;
+  }
+  Rcpp::stop("Factor estimation failed: the singular value decomposition did "
+             "not converge (an ill-conditioned matrix, often from a very "
+             "unbalanced panel). Try a smaller r or lambda, or a larger min.T0.");
+}
+
 /* Obtain factors and loading given error */
 // [[Rcpp::export]]
 List panel_factor(const arma::mat& E, int r) {
@@ -165,7 +189,7 @@ List panel_factor(const arma::mat& E, int r) {
     lambda = E.t() * factor/T ;
     VNT = diagmat(s.tail_rows(r)) ;*/
     arma::mat EE = E * E.t() / (N * T);
-    arma::svd(U, s, V, EE);
+    svd_checked(U, s, V, EE);
     factor = U.head_cols(r_use) * sqrt(double(T));
     lambda = E.t() * factor / T;
     VNT = diagmat(s.head_rows(r_use));
@@ -176,7 +200,7 @@ List panel_factor(const arma::mat& E, int r) {
     factor = E * lambda / N ;
     VNT = diagmat(s.tail_rows(r)) ;*/
     arma::mat EE = E.t() * E / (N * T);
-    svd(U, s, V, EE);
+    svd_checked(U, s, V, EE);
     lambda = U.head_cols(r_use) * sqrt(double(N));
     factor = E * lambda / N;
     VNT = diagmat(s.head_rows(r_use));
@@ -205,7 +229,7 @@ arma::mat panel_FE(const arma::mat& E, double lambda, int hard) {
   arma::mat U;
   arma::vec s;
   arma::mat V;
-  arma::svd(U, s, V, E / (T * N));
+  svd_checked(U, s, V, E / (T * N));
 
   for (int i = 0; i < r; i++) {
     if (s(i) > lambda) {
