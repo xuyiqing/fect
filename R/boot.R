@@ -679,6 +679,21 @@ fect_boot <- function(
   fit.out <- out$Y.ct
   N_unit <- dim(out$res)[2]
 
+  ## ---- vartype = "conformal": pooled information-matched Jackknife+ -------
+  ## No resampling: the intervals come from leave-one-control-out fold fits
+  ## with the point fit's tuning (R/conformal.R). The est.* slots are filled
+  ## so print() and plot() work; S.E. is NA. fect.default() has already
+  ## restricted the options (method, absorbing treatment, no weights, ...).
+  if (vartype == "conformal") {
+    cf <- conformal_jplus(
+      Y = Y, X = X, D = D, I = I, II = II, T.on = T.on, out = out,
+      method = method, force = force, tol = tol,
+      max.iteration = max.iteration, alpha = alpha, norm.para = norm.para,
+      parallel = do_parallel_boot, keep.sims = keep.sims
+    )
+    return(c(out, cf))
+  }
+
   if (!is.null(group)) {
     group.output.origin <- out$group.output
     group.output.name <- names(out$group.output)

@@ -1078,11 +1078,48 @@ fect.default <- function(
     method_arg <- method
 
     if (se == 1) {
-        if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
+        if (!vartype %in% c("bootstrap", "jackknife", "parametric", "conformal")) {
             stop(
-                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", or \"parametric\".",
+                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", \"parametric\", or \"conformal\".",
                 call. = FALSE
             )
+        }
+        ## vartype = "conformal": the pooled information-matched Jackknife+
+        ## (R/conformal.R). It is defined for the pooled estimators with
+        ## never-treated controls as the calibration pool; the options below
+        ## have no conformal version yet.
+        if (vartype == "conformal") {
+            .cf_stop <- function(what) {
+                stop("vartype = \"conformal\" does not support ", what,
+                     ". Use vartype = \"bootstrap\", \"jackknife\" or ",
+                     "\"parametric\" for that.", call. = FALSE)
+            }
+            if (!method_arg %in% c("gsynth", "ife", "mc")) {
+                stop("vartype = \"conformal\" is available for method = ",
+                     "\"gsynth\", \"ife\" or \"mc\" only; got method = \"",
+                     method_arg, "\".",
+                     if (identical(method_arg, "fe"))
+                         " For the two-way fixed-effects model use method = \"ife\" with r = 0.",
+                     call. = FALSE)
+            }
+            if (isTRUE(binary)) .cf_stop("binary (probit) models")
+            if (!is.null(W) || !is.null(W.est) || !is.null(W.agg)) .cf_stop("weights")
+            if (!is.null(group)) .cf_stop("group-level (cohort) estimates (group)")
+            if (!is.null(balance.period)) .cf_stop("balance.period")
+            if (isTRUE(placeboTest)) .cf_stop("placebo tests (placeboTest)")
+            if (isTRUE(carryoverTest)) .cf_stop("carryover tests (carryoverTest)")
+            if (isTRUE(loo)) .cf_stop("the leave-one-period-out test (loo)")
+            if (isTRUE(permute)) .cf_stop("the permutation test (permute)")
+            if (isTRUE(cm)) .cf_stop("causal moderation (cm)")
+            if (!is.null(cfe) || !is.null(group.fe) || length(index) > 2) {
+                .cf_stop("extra fixed effects (cfe, group.fe, index[3:])")
+            }
+            if (!identical(loading.bound, "none")) .cf_stop("loading.bound")
+            if (!is.null(cl)) {
+                warning("vartype = \"conformal\" with cl = ... : the cl ",
+                        "argument is ignored; the conformal intervals do not ",
+                        "cluster.", call. = FALSE)
+            }
         }
         if (vartype == "parametric" && method %in% c("mc", "both")) {
             stop(
@@ -2730,6 +2767,12 @@ fect.default <- function(
     if (hasRevs == TRUE & method == "gsynth") {
         stop("Gsynth can't be used when treatments have reversals.")
     }
+    if (se == 1 && vartype == "conformal" && hasRevs == TRUE) {
+        stop("vartype = \"conformal\" requires an absorbing treatment ",
+             "(no reversals): the controls' query windows mimic a treated ",
+             "unit's pre-treatment history and post-treatment block.",
+             call. = FALSE)
+    }
     if (se == 1 && vartype == "parametric" && hasRevs == TRUE) {
         stop(
             "Parametric bootstrap is not valid when treatment reversal is present. ",
@@ -4002,6 +4045,23 @@ fect.default <- function(
     }
     colnames(out$eff) <- iname
     rownames(out$eff) <- tname
+    ## conformal intervals per treated unit and date: column positions to
+    ## the unit and time labels
+    if (!is.null(out$conformal$unit)) {
+        cu <- out$conformal$unit
+        cu$unit <- iname[cu$unit]
+        cu$time <- tname[cu$time]
+        out$conformal$unit <- cu
+        if (!is.null(out$conformal$folds)) {
+            cf.cell <- out$conformal$folds$cell
+            cf.cell$unit <- iname[cf.cell$unit]
+            cf.cell$time <- tname[cf.cell$time]
+            out$conformal$folds$cell <- cf.cell
+            out$conformal$folds$control <- iname[out$conformal$folds$control]
+            colnames(out$conformal$folds$M0) <- out$conformal$folds$control
+            colnames(out$conformal$folds$E) <- out$conformal$folds$control
+        }
+    }
     ## implied weights: rows = control units, columns = treated units
     if (is.matrix(out$wgt.implied) &&
         nrow(out$wgt.implied) == length(out$co) &&
@@ -4192,7 +4252,9 @@ fect.default <- function(
         output$loo <- FALSE
     }
 
-    if (se == 1) {
+    ## conformal fits have no bootstrap draws, so the bootstrap-based F and
+    ## equivalence tests (diagtest) do not apply
+    if (se == 1 && vartype != "conformal") {
         suppressWarnings(
             test.out <- diagtest(
                 output,

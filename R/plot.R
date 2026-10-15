@@ -507,6 +507,14 @@ plot.fect <- function(
   if (!is.null(x$effect.est.att)) {
     type <- "cumul"
   }
+  ## vartype = "conformal" fits have date-specific Jackknife+ intervals for
+  ## post-treatment effects only: no pre-treatment intervals, no bootstrap
+  ## equivalence test, no draws
+  if (identical(x[["vartype"]], "conformal") && type == "equiv") {
+    stop("The equivalence plot needs pre-treatment intervals and the ",
+         "bootstrap equivalence test; a conformal fit (vartype = ",
+         "\"conformal\") has neither. Use type = \"gap\".", call. = FALSE)
+  }
 
   ## Override pre/post colors based on plot type and LOO status
   ## Gap plot + LOO: all points are out-of-sample, no pre/post distinction needed
@@ -1051,6 +1059,11 @@ plot.fect <- function(
         "The gap plot with \"id\" draws the chosen units' estimates without ",
         "a band: the fit does not record its variance type, as fits made ",
         "with older versions of fect do. Refit with this version for a band.")
+    } else if (identical(x[["vartype"]], "conformal")) {
+      unit.gap.note <- paste0(
+        "The gap plot with \"id\" draws the chosen units' estimates without ",
+        "a band. A conformal fit's intervals for each treated unit and date ",
+        "are in fit$conformal$unit.")
     } else if (!identical(x[["vartype"]], "parametric")) {
       unit.gap.note <- paste0(
         "The gap plot with \"id\" draws the chosen units' estimates without ",
@@ -1301,6 +1314,11 @@ plot.fect <- function(
   }
 
   if (type == "calendar") {
+    if (identical(x[["vartype"]], "conformal")) {
+      ## no conformal band for the smoothed calendar-time curve
+      x$est.eff.calendar.fit <- NULL
+      x$est.eff.calendar.fit.group <- NULL
+    }
     if (!use_loess) {
       x$eff.calendar.fit <- NULL
       x$est.eff.calendar.fit <- NULL

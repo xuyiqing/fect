@@ -50,6 +50,15 @@ print.fect <- function(x,
         !isTRUE(x$vartype %in% c("parametric", "jackknife"))) {
         cat("Cluster SE:   ", x$cl.label, "\n", sep = "")
     }
+    if (identical(x$vartype, "conformal") && !is.null(x$conformal)) {
+        cf <- x$conformal
+        cat("Inference:     conformal, pooled information-matched Jackknife+ ",
+            "(", round(100 * cf$level, 1), "% level; ", cf$n.controls,
+            " never-treated controls; no S.E.)\n", sep = "")
+        if (!identical(cf$status, "ok")) {
+            cat("Conformal:     ", cf$status, "\n", sep = "")
+        }
+    }
 
     if (switch.on == TRUE) {
         if (!is.null(time.on.lim)) {
