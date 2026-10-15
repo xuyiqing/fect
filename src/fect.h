@@ -33,6 +33,7 @@ List Y_demean(const arma::mat& Y, int force);
 List Y_wdemean(const arma::mat& Y, const arma::mat& W, int force);
 List fe_add(const arma::mat& alpha_Y, const arma::mat& xi_Y, double mu_Y, int T, int N, int force);
 arma::mat panel_est(const arma::cube& X, const arma::mat& Y, const arma::mat& MF);
+void svd_checked(arma::mat& U, arma::vec& s, arma::mat& V, const arma::mat& X);
 List panel_factor(const arma::mat& E, int r);
 arma::mat panel_FE(const arma::mat& E, double lambda, int hard);
 List ife(const arma::mat& E, int force, int mc, int r, int hard, double lambda);

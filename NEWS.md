@@ -427,6 +427,18 @@ says what to do.
 
 ## Bug fixes
 
+* `method = "ife"` and `method = "mc"` no longer stop with the Armadillo
+  errors `Mat::head_cols(): size out of bounds` (IFE) or
+  `Mat::operator(): index out of bounds` (MC) when a singular value
+  decomposition fails to converge. LAPACK's default divide-and-conquer
+  routine can fail on the ill-conditioned matrices that the EM imputation
+  produces on very unbalanced panels; `arma::svd()` then returned empty
+  factors, which the code did not check. The decomposition now retries with
+  the standard routine and, if that also fails or the matrix has non-finite
+  values, stops with a message that names the cause. Fits whose
+  decompositions converge are unchanged. Seen in cross-validation on a
+  panel of 328 units and 183 periods with 31% of cells missing, where
+  both FECT-IFE and FECT-MC failed and now run.
 * `method = "cfe"` now warns, before iterating, when a `Q` column is not
   identified from the untreated periods: a unit-specific trend column whose
   mass lies almost entirely in a kappa group's treated or missing periods
