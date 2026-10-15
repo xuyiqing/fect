@@ -427,6 +427,15 @@ says what to do.
 
 ## Bug fixes
 
+* `did_wrapper(method = "cs_never")` and `"cs_notyet"` now need did 2.5.1 or
+  later and stop with a message on an older version. On unbalanced panels, did
+  before 2.5.1 reports a (cohort, period) cell it cannot estimate (no treated
+  rows in that period) as an effect of 0, which `aggte()` then averages in, so
+  the overall and event-time effects shrink toward zero; it can also segfault
+  when a cell's comparison group has rows in only one of the cell's two
+  periods. did 2.5.1 returns `NA` for such cells and drops them from the
+  averages. On a simulated unbalanced panel with a true effect of 1, the
+  overall effect was 0.331 with did 2.3.0 and 0.992 with did 2.5.1.
 * `method = "ife"` and `method = "mc"` no longer stop with the Armadillo
   errors `Mat::head_cols(): size out of bounds` (IFE) or
   `Mat::operator(): index out of bounds` (MC) when a singular value
