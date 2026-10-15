@@ -1,4 +1,35 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.7.9000
+
+Development version.
+
+## New features
+
+* `vartype = "conformal"` gives conformal intervals by the pooled
+  information-matched Jackknife+ of Ziyi Liu's write-up "Unit-Level
+  Conformal Inference for Panel Counterfactuals" (v2), for
+  `method = "gsynth"`, `"ife"` and `"mc"` with an absorbing treatment and
+  never-treated controls. Each never-treated control j in turn is predicted
+  over a treated unit's window, with only that unit's pre-treatment dates
+  shown, against the other controls; the treated unit is predicted against
+  the same controls. The tuning (number of factors, `lambda`, covariates,
+  convergence settings) is that of the original fit. The interval is
+  date-specific: one for each treated unit and post-treatment date, in
+  `fit$conformal$unit`, with the number of controls used. With fewer than
+  1 / `alpha` units the interval is the whole real line. Point estimates
+  are the ordinary fit's; the S.E. column is `NA`; the p-value is the one
+  dual to the interval.
+* The intervals for the ATT by event time (`est.att`), the average ATT
+  (`est.avg`, `est.avg.unit`) and the calendar-time ATT are an extension
+  beyond the v2 write-up, not yet reviewed by its author: in each fold the
+  treated units' predictions and the control's errors are averaged with the
+  same weights (cohort sizes under staggered adoption). They are
+  conservative when many units are treated, because one control's error
+  does not average down as the average of many treated units does.
+* A coverage study is in `tests/coverage-study/conformal_v2_coverage.R`
+  (gsynth, one treated unit; results in
+  `tests/coverage-study/results/conformal_v2_coverage.md`).
+
 # fect 2.4.7
 
 Development version, not yet on CRAN.

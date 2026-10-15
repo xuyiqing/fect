@@ -103,7 +103,51 @@ When both are given, \code{W.est} and \code{W.agg} must name the same column; di
   \code{cl} (with a warning).
   For all other settings, \code{vartype = "bootstrap"} is recommended.
   The variance type used is stored in the fit as \code{vartype}, which
-  \code{\link{effect}} and \code{\link{att.cumu}} read.}
+  \code{\link{effect}} and \code{\link{att.cumu}} read.
+
+  \code{vartype = "conformal"} (development version) gives conformal
+  intervals instead of a variance estimate: the pooled
+  information-matched Jackknife+ of Liu, "Unit-Level Conformal Inference
+  for Panel Counterfactuals" (write-up v2). It is available for
+  \code{method = "gsynth"}, \code{"ife"} and \code{"mc"} with an
+  absorbing treatment, and it uses the never-treated units as the
+  calibration pool. For each never-treated control j, the other controls
+  (the background) keep their complete panels; the treated unit and
+  control j expose only the treated unit's pre-treatment history and are
+  predicted separately against the background (\code{"gsynth"}: one
+  factor estimation on the background, then each unit's loading
+  projection; \code{"ife"} and \code{"mc"}: one fit per predicted unit).
+  The number of factors \code{r}, \code{lambda}, \code{force}, the
+  covariates and the convergence settings are those of the original fit;
+  there is no cross-validation inside these fits. With N the number of
+  controls used plus one, the interval at miscoverage \code{alpha} takes
+  the q-th smallest lower endpoint and the (N - q)-th smallest upper
+  endpoint, with q the largest integer in 0, ..., floor(N/2) such that
+  (2q - 1)/N <= \code{alpha}; if q = 0 (fewer than 1/\code{alpha}
+  units) the interval is the whole real line. Coverage is date-specific
+  (each treated unit and post-treatment date), not simultaneous. The
+  p-value is the one dual to the interval at zero effect. The point
+  estimates are those of the ordinary fit; \code{S.E.} is \code{NA}.
+  Controls not observed at all of a treated unit's pre-treatment dates
+  are not used for it, and a control not observed at a date is not used
+  at that date; the number used is reported. The intervals for each
+  treated unit and date are in \code{conformal$unit}.
+
+  The intervals in \code{est.att} (by event time), \code{est.avg},
+  \code{est.avg.unit} and \code{est.eff.calendar} are an EXTENSION beyond
+  the write-up, which covers one treated unit and one date, and await the
+  author's review: in each fold the treated units' predictions and the
+  control's signed errors are averaged with the same cell weights (with
+  staggered adoption the control is predicted over each cohort's window and
+  its errors are weighted by cohort size). With many treated units these
+  intervals are conservative, since a single control's error does not
+  average down as the treated average does. Pre-treatment event times have
+  no interval. \code{vartype = "conformal"} does not support weights,
+  \code{group}, \code{balance.period}, placebo, carryover, \code{loo}
+  or permutation tests, \code{cm}, extra fixed effects, binary outcomes or
+  \code{loading.bound}; \code{cl} is ignored. The equivalence plot,
+  \code{\link{estimand}}, \code{\link{att.cumu}}, \code{\link{effect}}
+  and \code{\link{fect_sens}} need draws and stop for these fits.}
 \item{para.error}{a string specifying the residual-error model used by
   the parametric bootstrap path; sub-option of \code{vartype = "parametric"}
   (silently ignored otherwise). One of \code{"auto"}, \code{"ar"},
@@ -351,7 +395,8 @@ Ignored when \code{CV = FALSE}.}
   \item{att.bound}{equivalence confidence interval for pre-trend.}
   \item{att.off.bound}{equivalence confidence interval for switch-off.}
   \item{beta.boot}{bootstrap draws for \code{beta} (\code{NA} rows for dropped covariates).}
-  \item{vartype}{the variance estimator used (\code{se = TRUE} only): \code{"bootstrap"}, \code{"jackknife"} or \code{"parametric"}.}
+  \item{vartype}{the variance estimator used (\code{se = TRUE} only): \code{"bootstrap"}, \code{"jackknife"}, \code{"parametric"} or \code{"conformal"}.}
+  \item{conformal}{with \code{vartype = "conformal"}, a list: \code{level} (1 - \code{alpha}), \code{status} (\code{"ok"}, or a note when some or all intervals are the whole real line), \code{r} and \code{lambda} (the tuning held fixed), \code{n.controls} (never-treated controls), \code{n.controls.ineligible} (controls usable for no treated unit), \code{n.failed.fits}, \code{unit} (a data frame with one row per treated unit and post-treatment date: \code{Y}, \code{Y.ct}, \code{eff}, \code{CI.lower}, \code{CI.upper}, \code{p.value}, \code{N} and \code{q}), \code{att} and \code{avg} (N and q of the aggregated intervals) and, with \code{keep.sims = TRUE}, \code{folds} (the treated fold predictions \code{M0} and the controls' signed errors \code{E}, one row per treated post-treatment cell and one column per control).}
   \item{ci.method, ci.alpha}{the interval rule (\code{"normal"} or \code{"basic"}) and the significance level of the fit's intervals (\code{se = TRUE} only). The gap plot with \code{id} uses them for the band of the chosen units; see \code{\link{plot.fect}}.}
   \item{eff.boot}{with \code{keep.sims = TRUE}, the cell-level treatment effects of each replicate, a T-by-W-by-B array (B = number of replicates kept). Slice \code{b} holds the units \code{colnames.boot[[b]]}, in that order: under the case bootstrap a unit drawn twice appears twice and an undrawn unit not at all; under the parametric bootstrap the treated units come first. W = N, except for the cluster bootstrap (\code{cl}), whose replicates differ in size and are padded with \code{NA} to the widest one, and the jackknife (W = N - 1, B = N).}
   \item{D.boot, I.boot}{with \code{keep.sims = TRUE}, the treatment and observation indicators of each replicate, laid out as \code{eff.boot}.}
