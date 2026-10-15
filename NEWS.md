@@ -545,6 +545,13 @@ says what to do.
   `time.component.from = "notyettreated"`; with `"nevertreated"`, `fect()`
   stops at once, with a message that names `time.component.from`.
 
+* The F test for no pre-trend (`fit$test.out`, `plot(type = "equiv")`) no
+  longer stops the fit with "missing value where TRUE/FALSE needed" when the
+  pre-treatment window has a single treated unit. Its small-sample factor
+  (N_bar - q) / ((N_bar - 1) q) is 0/0 when N_bar = 1; the test now reports
+  `NA`, with the message it already gave for too few treated units. Seen on a
+  replication panel with one treated unit that is treated in one period.
+
 ## Documentation
 
 * `?fect`: `seed` is needed for reproducible parallel bootstrap draws, since
