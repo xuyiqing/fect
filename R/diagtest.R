@@ -94,7 +94,7 @@ diagtest <- function(
             scale <- (N_bar - length(pre.pos)) / ((N_bar - 1) * length(pre.pos))
             ## F statistic
 
-            if (scale <= 0) {
+            if (!is.finite(scale) || scale <= 0) {
                 message("Can't calculate the F statistic because of insufficient treated units.\n")
                 f.stat <- NA
                 f.p <- NA
@@ -179,7 +179,7 @@ diagtest <- function(
         } else {
             scale <- (N_bar - length(pre.pos)) / ((N_bar - 1) * length(pre.pos))
             ## F statistic
-            if (scale <= 0) {
+            if (!is.finite(scale) || scale <= 0) {
                 message("Can't calculate the F statistic because of insufficient treated units.\n")
                 f.stat <- NA
                 f.p <- NA
