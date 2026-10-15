@@ -44,7 +44,7 @@ Imports:
 Suggests:
     panelView,
     testthat (>= 3.0.0),
-    did,
+    did (>= 2.5.1),
     DIDmultiplegtDYN,
     ggrepel,
     HonestDiDFEct,
