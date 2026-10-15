@@ -232,6 +232,31 @@ test_that("unsupported methods and options stop with a message", {
   dr <- df
   dr$D[dr$id == 1 & dr$time == 20] <- 0
   expect_error(.cf_fit(dr, method = "ife", r = 1), "absorbing")
+  ## no never-treated units (ife with not-yet-treated controls still fits)
+  dn <- .cf_sim(J = 1, Ntr = 6, TT = 20, seed = 10,
+                adopt = c(8, 9, 10, 11, 12, 13))
+  expect_error(.cf_fit(dn, method = "ife", r = 0), "never-treated")
+})
+
+test_that("covariates and cross-validated r are held fixed in the folds", {
+  df <- .cf_sim(J = 25, seed = 13)
+  set.seed(13)
+  df$x <- rnorm(nrow(df))
+  df$Y <- df$Y + 0.5 * df$x
+  for (m in c("gsynth", "ife")) {
+    fit <- suppressMessages(fect(Y ~ D + x, data = df, index = c("id", "time"),
+                                 method = m, r = 1, CV = FALSE, se = TRUE,
+                                 vartype = "conformal", parallel = FALSE))
+    expect_true(all(is.finite(fit$conformal$unit$CI.lower)))
+    expect_true(is.na(fit$est.beta[1, "S.E."]))
+    expect_equal(unname(fit$est.beta[1, "Coef"]), unname(fit$beta[1, 1]))
+  }
+  cv <- suppressMessages(fect(Y ~ D, data = df, index = c("id", "time"),
+                              method = "gsynth", r = c(0, 3), CV = TRUE,
+                              se = TRUE, vartype = "conformal",
+                              parallel = FALSE, seed = 1))
+  expect_equal(cv$conformal$r, as.numeric(cv$r.cv))
+  expect_true(all(is.finite(cv$conformal$unit$CI.lower)))
 })
 
 ## ---- print, plot and post-fit functions ---------------------------------------

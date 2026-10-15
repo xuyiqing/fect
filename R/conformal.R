@@ -250,8 +250,12 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
   co <- which(colSums(D) == 0)
   Ntr <- length(tr)
   Nco <- length(co)
+  if (Nco < 2) {
+    stop("vartype = \"conformal\" needs at least two never-treated units ",
+         "(the calibration pool); this panel has ", Nco, ".", call. = FALSE)
+  }
 
-  r <- if (!is.null(out$r.cv)) as.numeric(out$r.cv[1]) else 0
+  r <-if (!is.null(out$r.cv)) as.numeric(out$r.cv[1]) else 0
   ## lambda.cv is on the outcome's scale; the component fits run on the
   ## (possibly normalized) Y without norm.para, so divide as fect_mc() does
   lambda <- if (is.null(out$lambda.cv)) NULL else out$lambda.cv / scale
