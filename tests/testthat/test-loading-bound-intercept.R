@@ -14,6 +14,8 @@
 ##   T4  no change for loading.bound = "none" and force "none"/"time"
 ##   T5  the bound still binds (hull); the intercept is not bounded
 ##   T6  bootstrap replicates run and carry the invariance
+##   T7  extreme gamma and short pretreatment windows: finite, in the hull,
+##       still shift-invariant
 ##
 ## Every panel is built from a fixed seed. Nothing here is tuned to pass.
 
@@ -475,4 +477,37 @@ test_that("T6: bootstrap replicates run and are shift-invariant", {
                      paste(lab, "replicate draws"))
         expect_lt(abs(f1$est.avg[1, "S.E."] / f0$est.avg[1, "S.E."] - 1), 1e-3)
     }
+})
+
+## ---------------------------------------------------------------------------
+## T7. Extreme gamma and short pretreatment windows
+## ---------------------------------------------------------------------------
+
+## Property: over a wide range of gamma (1e-3 to 1e6) and with the shortest
+## usable pretreatment window (r + 2 = 4 periods), the bounded fit has no
+## missing values, keeps the weights on the simplex and the factor component
+## inside the controls' range, and is still invariant to a constant added to
+## a treated unit's outcome (units 1 and 2 shifted by 10 and -3).
+test_that("T7: gamma from 1e-3 to 1e6 and a 4-period pretreatment window", {
+    skip_on_cran()
+    sh <- list("1" = 10, "2" = -3)
+    chk <- function(d, fo, g, lab, ...) {
+        f0 <- lbi_fit(d, fo, g, ...)
+        f1 <- lbi_fit(lbi_shift(d, sh), fo, g, ...)
+        expect_true(all(is.finite(f0$lambda.tr)) && all(is.finite(f0$alpha.tr)) &&
+                    all(is.finite(f0$wgt.implied)) && is.finite(f0$att.avg),
+                    label = paste(lab, "finite estimates"))
+        lbi_check_bound(f0, lab)
+        lbi_check_shift(f0, f1, sh, label = lab)
+    }
+    gam <- c(1e-3, 1e-2, 1e2, 1e4, 1e6)
+    for (shape in c("balanced", "missing")) {
+        d <- lbi_panel(shape)
+        for (fo in c("unit", "two-way")) for (g in gam)
+            chk(d, fo, g, paste(shape, fo, "gamma", g))
+    }
+    d4 <- lbi_panel("balanced", TT = 10)
+    d4$D <- as.integer(d4$id <= 3 & d4$time > 4)
+    for (fo in c("unit", "two-way")) for (g in c(1e-3, 1, 1e6))
+        chk(d4, fo, g, paste("T0 = 4", fo, "gamma", g), min.T0 = 3)
 })
