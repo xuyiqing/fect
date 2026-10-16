@@ -217,12 +217,80 @@
 }
 
 ## -----------------------------------------------------------------------------
+## .solve_bounded_loading_int
+##
+## Wrapper around .solve_bounded_loading() that optionally fits the unit's free
+## intercept jointly with the simplex-constrained loadings (fect 2.4.8).
+##
+## With intercept = TRUE the joint problem
+##
+##   min_{alpha, w}  (1/gamma) KL(w || q) + || u - alpha * 1 - F lambda(w) ||^2
+##
+## is solved exactly by profiling alpha out: for fixed w the minimiser is
+## alpha*(w) = mean(u - F lambda(w)), and the profiled objective is the
+## unchanged solver's objective evaluated at the centred data
+## (u_c = u - mean(u), F_c = F minus its column means). Centring is over the
+## rows passed in, i.e. the unit's own training periods. gamma is not rescaled.
+##
+## With intercept = FALSE nothing is centred; the solver is called exactly as in
+## fect 2.4.7 and alpha is NA.
+##
+## Returns the solver's list plus alpha (intercept; NA_real_ if intercept =
+## FALSE) and resid_norm (L2 norm of the joint-fit residual).
+## -----------------------------------------------------------------------------
+
+.solve_bounded_loading_int <- function(
+    u_pre,
+    F_pre,
+    Lambda_co,
+    gamma,
+    intercept = FALSE,
+    ...
+) {
+    u_pre <- as.numeric(u_pre)
+    F_pre <- as.matrix(F_pre)
+
+    if (!isTRUE(intercept)) {
+        sol <- .solve_bounded_loading(
+            u_pre     = u_pre,
+            F_pre     = F_pre,
+            Lambda_co = Lambda_co,
+            gamma     = gamma,
+            ...
+        )
+        sol$alpha <- NA_real_
+        sol$resid_norm <- sqrt(sum((u_pre - F_pre %*% sol$lambda_hat)^2))
+        return(sol)
+    }
+
+    u_bar <- mean(u_pre)
+    F_bar <- colMeans(F_pre)
+    u_c   <- u_pre - u_bar
+    F_c   <- sweep(F_pre, 2L, F_bar, "-")
+    sol <- .solve_bounded_loading(
+        u_pre     = u_c,
+        F_pre     = F_c,
+        Lambda_co = Lambda_co,
+        gamma     = gamma,
+        ...
+    )
+    sol$alpha <- u_bar - sum(F_bar * sol$lambda_hat)
+    sol$resid_norm <- sqrt(sum((u_c - F_c %*% sol$lambda_hat)^2))
+    sol
+}
+
+## -----------------------------------------------------------------------------
 ## .cv_gamma_loading
 ##
 ## Selects gamma by 5-fold CV over pre-treatment periods. Folds are constructed
 ## across pre-treatment time indices (shared across treated units); per-fold
 ## score is the mean squared prediction error of the bounded projection on the
 ## held-out pre-treatment observations.
+##
+## intercept = TRUE (unit effect in the model): each training fold is fitted with
+## the unit's intercept (centred within the training fold, see
+## .solve_bounded_loading_int) and the held-out periods are predicted with
+## F_te %*% lambda_hat + alpha_train. intercept = FALSE reproduces fect 2.4.7.
 ## -----------------------------------------------------------------------------
 
 .cv_gamma_loading <- function(
@@ -232,10 +300,13 @@
     gamma_grid,      # positive numeric vector
     cv_k        = 5L,
     tol         = 1e-8,
-    max_iter    = 200L
+    max_iter    = 200L,
+    intercept   = FALSE
 ) {
     Lambda_co <- as.matrix(Lambda_co)
     stopifnot(all(gamma_grid > 0))
+    ## Smallest training-fold size: r periods without an intercept, r + 1 with.
+    min_extra <- if (isTRUE(intercept)) 1L else 0L
 
     is_balanced <- is.matrix(U_tr_pre) && is.matrix(F_hat_pre)
 
@@ -258,21 +329,24 @@
             for (ii in seq_len(cv_k)) {
                 tr_idx <- which(fold_id != ii)
                 te_idx <- which(fold_id == ii)
-                if (length(tr_idx) < ncol(F_hat_pre) || length(te_idx) == 0L) next
+                if (length(tr_idx) < ncol(F_hat_pre) + min_extra ||
+                    length(te_idx) == 0L) next
                 F_tr <- F_hat_pre[tr_idx, , drop = FALSE]
                 F_te <- F_hat_pre[te_idx, , drop = FALSE]
                 for (i in seq_len(Ntr)) {
                     u_tr <- U_tr_pre[tr_idx, i]
                     u_te <- U_tr_pre[te_idx, i]
-                    sol <- .solve_bounded_loading(
+                    sol <- .solve_bounded_loading_int(
                         u_pre     = u_tr,
                         F_pre     = F_tr,
                         Lambda_co = Lambda_co,
                         gamma     = gamma_i,
+                        intercept = intercept,
                         tol       = tol,
                         max_iter  = max_iter
                     )
                     pred <- as.numeric(F_te %*% sol$lambda_hat)
+                    if (isTRUE(intercept)) pred <- pred + sol$alpha
                     sq_err <- sq_err + sum((u_te - pred)^2)
                     n_obs  <- n_obs + length(u_te)
                 }
@@ -287,16 +361,19 @@
                 for (ii in seq_len(cv_k)) {
                     tr_idx <- which(fold_i != ii)
                     te_idx <- which(fold_i == ii)
-                    if (length(tr_idx) < ncol(F_i) || length(te_idx) == 0L) next
-                    sol <- .solve_bounded_loading(
+                    if (length(tr_idx) < ncol(F_i) + min_extra ||
+                        length(te_idx) == 0L) next
+                    sol <- .solve_bounded_loading_int(
                         u_pre     = u_i[tr_idx],
                         F_pre     = F_i[tr_idx, , drop = FALSE],
                         Lambda_co = Lambda_co,
                         gamma     = gamma_i,
+                        intercept = intercept,
                         tol       = tol,
                         max_iter  = max_iter
                     )
                     pred <- as.numeric(F_i[te_idx, , drop = FALSE] %*% sol$lambda_hat)
+                    if (isTRUE(intercept)) pred <- pred + sol$alpha
                     sq_err <- sq_err + sum((u_i[te_idx] - pred)^2)
                     n_obs  <- n_obs + length(te_idx)
                 }
