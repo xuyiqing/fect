@@ -25,6 +25,14 @@
 > `binary = TRUE` (#160), `estimand()`'s stops (#161), and the prediction that `fect_mspe()` and
 > `r.cv.rolling()` score (#163, new file `R/heldout-pred.R`). Rows, nodes and notes that cite these
 > issue numbers describe them; blue nodes include them.
+>
+> Updated on 2026-10-16 for branch `fix/248-combined` (run `2026-10-16-fect-248-combined`), which sets
+> the version to 2.4.8 and holds three fixes: the joint fit of each treated unit's intercept under
+> `loading.bound = "simplex"` (`R/loading_bound.R`, `R/fect_nevertreated.R`), `did_wrapper()` needing
+> did 2.5.1 or later for the Callaway-Sant'Anna methods (#178), and the F test returning `NA` instead of
+> stopping when its pre-treatment window has one treated unit or one period (#179). Rows, nodes and
+> notes marked "2.4.8" describe them; blue nodes include them. Call graph 5 and the section "Contracts
+> introduced in 2.4.8" are new.
 
 ## Overview
 
@@ -32,7 +40,7 @@ fect is an R package for causal panel analysis with binary treatments under para
 (Fixed Effects Counterfactual Estimators). Its core abstraction is counterfactual imputation: fit an
 outcome model on untreated cells, impute the missing potential outcomes Y(0) of treated cells, and
 average the gaps Y - Y(0) into the ATT and its by-period, by-cohort and cumulative summaries. The
-package is an R/C++ hybrid: R (`R/`, 36 files, about 34,900 lines) does input handling, data
+package is an R/C++ hybrid: R (`R/`, 37 files, about 36,300 lines) does input handling, data
 reshaping, cross-validation, inference and output; C++ via Rcpp and RcppArmadillo (`src/`, 11 files
 plus a header, about 5,000 lines) does the linear algebra (SVD, EM iterations, demeaning, factor
 extraction). Estimators: two-way FE, interactive fixed effects (IFE, and gsynth, its never-treated
@@ -40,7 +48,7 @@ form), matrix completion (MC) and complex fixed effects (CFE). Inference: unit (
 jackknife, and a parametric bootstrap for the gsynth setting. Post-hoc estimands (cumulative ATT,
 APTT, log-ATT) are computed from the saved replicate draws. Key dependencies: fixest (initial
 fits, covariate demeaning), MASS (`ginv`), future / doFuture / doRNG / foreach (parallel
-bootstrap), ggplot2 and GGally (plots), mvtnorm (parametric errors). Version 2.4.7 (unreleased).
+bootstrap), ggplot2 and GGally (plots), mvtnorm (parametric errors). Version 2.4.8 (unreleased; 2.4.7 was a development version and is part of it).
 
 ---
 
@@ -66,6 +74,7 @@ graph TD
         E3["cfe.R: fect_cfe()"]
         E4["fect_nevertreated.R"]
         E5["dloo.R: dloo overlay"]
+        E6["loading_bound.R: simplex solver"]
     end
 
     subgraph CV["Cross-Validation and Scoring"]
@@ -105,6 +114,7 @@ graph TD
     A1 --> E4
     A1 --> E5
     A1 --> I1
+    E4 --> E6
     K1 --> E1
     K1 --> E2
     K1 --> E4
@@ -139,6 +149,7 @@ graph TD
     style E3 fill:#1e90ff,stroke:#1565c0,color:#fff
     style E4 fill:#1e90ff,stroke:#1565c0,color:#fff
     style E5 fill:#1e90ff,stroke:#1565c0,color:#fff
+    style E6 fill:#1e90ff,stroke:#1565c0,color:#fff
     style K1 fill:#1e90ff,stroke:#1565c0,color:#fff
     style K2 fill:#1e90ff,stroke:#1565c0,color:#fff
     style H1 fill:#1e90ff,stroke:#1565c0,color:#fff
@@ -157,7 +168,9 @@ graph TD
 > `esplot.R` did not. `A3` is blue for the follow-up M1 and the final S2 and S4 (`fect_mspe.R`); `did_wrapper.R` did not
 > change. Follow-up batch: `H1` (`R/heldout-pred.R`) is new, called by `fect_mspe()` (in `A3`) and
 > `r.cv.rolling()` (in `K2`) to build the prediction they score (#163); `E1`-`E3` are blue for #156
-> (and `fe.R` for #157), `E5` (`dloo.R`) for #158.
+> (and `fe.R` for #157), `E5` (`dloo.R`) for #158. `E6` (`R/loading_bound.R`, the bounded-loading
+> solver) is shown for 2.4.8: `fect_nevertreated()` (`E4`) is its only caller, and `fect_cv()`, `fect_boot()`
+> and `impute_Y0()` reach it through `E4`.
 
 ### Module Reference
 
@@ -165,11 +178,11 @@ graph TD
 | --- | --- | --- | --- | --- |
 | `R/default.R` (4,185 lines) | API + Validation | `fect()` generic, formula and default methods: input checks, reshaping to T x N matrices, CV / fit / bootstrap routing, diagnostics, output assembly | `fect()` | yes: A2 (stores `vartype`), A6 (`cl` checks, parametric warning), B5 (`wgt.implied` dimnames), B7, B8, B8b-d (loo refit arguments), B9, C1-C6, C4b; follow-up: B10-cfe (`dloo` with never-treated fitting stops in the argument checks), B13 (stores the `W.agg` matrix); final: S3 (`cm` reaches the fit without SEs; the `cm` model is fitted after cross-validation; `cm` with never-treated controls stops); follow-up batch: #157 (`Y.dat` and the stored covariate array on the outcome's scale under `normalize = TRUE`), #160 (`binary = TRUE` stops in the `fect()` generic) |
 | `R/interFE.R` (570) | API | Standalone interactive fixed effects estimator | `interFE()` | yes: C1, C2 (formula parser, `X` with formula), C6 (absorbed-covariate labels); final: S5 (stops for a covariate absorbed by the intercept, or by the unit and time effects together); #160 (`binary = TRUE` stops in the `interFE()` generic; the file keeps CRLF line endings) |
-| `R/did_wrapper.R` (659), `R/fect_mspe.R` (468) | API | DID estimator wrappers; MSPE model comparison | `did_wrapper()`, `fect_mspe()` | follow-up: M1 (`fect_mspe()` refits no longer pass the call's `Y`, `D`, `X`; the rebuilt formula carries them); final: S2 (each fit is refitted with the function that made it, e.g. `gsynth()`), S4 (the call's data and arguments are evaluated where `fect_mspe()` is called, then in the formula's environment); #152 (the data lookup accepts only a data frame, so a function named like the data is skipped), #163 (scores the model's full prediction at the held-out cells through `.fect_heldout_pred()`) |
+| `R/did_wrapper.R` (674), `R/fect_mspe.R` (468) | API | DID estimator wrappers; MSPE model comparison | `did_wrapper()`, `fect_mspe()` | follow-up: M1 (`fect_mspe()` refits no longer pass the call's `Y`, `D`, `X`; the rebuilt formula carries them); final: S2 (each fit is refitted with the function that made it, e.g. `gsynth()`), S4 (the call's data and arguments are evaluated where `fect_mspe()` is called, then in the formula's environment); #152 (the data lookup accepts only a data frame, so a function named like the data is skipped), #163 (scores the model's full prediction at the held-out cells through `.fect_heldout_pred()`); 2.4.8, #178 (`did_wrapper(method = "cs_never")` and `"cs_notyet"` stop with a message when did is older than 2.5.1, which reported unestimable cohort-period cells as 0 on unbalanced panels) |
 | `R/po-estimands.R` (2,334) | Post-hoc | `imputed_outcomes()` long-form accessor and `estimand()` dispatcher; replicate alignment helpers | `estimand()`, `imputed_outcomes()` | yes: A1 (`.po_replicate_cells()`, `.po_replicate_att()`, `cells` scoping), A6 (slot contract allows padded arrays); follow-up: B13 (`.po_agg_weights()`); final: W1 (`.po_agg_weights_or_null()`, `.po_wmean()`: every cell-based estimand of a weighted fit is weighted by `fit$W.agg`; one `weights` check in `estimand()`), J2 (jackknife overall SE from `att.avg.boot`); #159 (jackknife fits default to `ci.method = "normal"` for every type), #161 (`.estimand_by_stop()`; `cells` with `"att.cumu"` stops; the stop messages name the cause) |
 | `R/effect.R` (450), `R/cumu.R` (272) | Post-hoc | Cumulative / subgroup effects (soft-deprecated) | `effect()`, `att.cumu()` | yes: A2 (stored `vartype`, `drop = FALSE`, parametric normal CI in `att.cumu()`), A6 (replicate width); follow-up: B11 (running sum of the per-period ATTs); final: J1 (`.jackknife_se()` in both), S1 (`effect()`: normal intervals for parametric and jackknife fits), W1 (`getEffect()` weights); #153 (`att.cumu()` fills every row from `att.cumu.sub()`, the first included; a window of one event time keeps a matrix) |
 | `R/fe.R` (985), `R/mc.R` (813), `R/cfe.R` (1,179) | Estimation | IFE / FE, matrix completion, complex FE fits | internal | follow-up batch: #156 (per-unit ATT over each unit's observed treated cells, in all three), #157 (`fe.R`: `est.cm` rescaled like `est` under `normalize = TRUE`) |
-| `R/fect_nevertreated.R` (3,601) | Estimation | Never-treated estimators (gsynth, IFE and CFE with `time.component.from = "nevertreated"`), their CV, implied weights | internal | yes: A7 (degenerate solves stop), B1 (`"pc"`), B2 (CV cap), B3 (skip messages), B4 (`W.cvfit`), B5 (`.fect_nt_implied_weights()`); follow-up: B12 (one treated unit in the CFE branch); #156 (per-unit ATT over observed cells) |
+| `R/fect_nevertreated.R` (3,642) | Estimation | Never-treated estimators (gsynth, IFE and CFE with `time.component.from = "nevertreated"`), their CV, implied weights | internal | yes: A7 (degenerate solves stop), B1 (`"pc"`), B2 (CV cap), B3 (skip messages), B4 (`W.cvfit`), B5 (`.fect_nt_implied_weights()`); follow-up: B12 (one treated unit in the CFE branch); #156 (per-unit ATT over observed cells); 2.4.8: the bounded-loading block (`use_bounded`) fits each treated unit's intercept jointly with its loadings in all three branches and in the gamma CV, through `.solve_bounded_loading_int()` |
 | `R/dloo.R` (719) | Estimation | Double leave-one-out pre-trend overlay (closed form, no refits) | internal | #158 (basic p-values of `pre.est.att` through `.pvalue_basic_dual()`, as `loo` gets them from `fect_boot()`) |
 | `R/cv.R` (2,076) | CV | `fect_cv()`: selection of `r` / `lambda`; delegates never-treated CV to `fect_nevertreated()` | internal | yes: B1 (`"pc"` table), B4 (`W.in.fit` forwarded), B8 (`loading.bound` arguments); #156 (per-unit ATT over observed cells) |
 | `R/cv-rolling.R` (417), `R/cv-rule-helpers.R` (127), `R/cv-helpers.R` (554), `R/cv_binary.R` (441) | CV | Rolling CV, 1se / min / 1pct rules, fold helpers, binary CV | `r.cv.rolling()` | #163 (`cv-rolling.R`: each held-out block is scored with `.fect_heldout_pred()`, not `Y.ct.full`) |
@@ -177,11 +190,12 @@ graph TD
 | `R/boot.R` (5,094) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing); follow-up: B10-cfe (cfe + never-treated replicates); final: P1 (`.pvalue.basic()`: effect p-values of parametric fits with `ci.method = "basic"`); follow-up batch: #154 (90% bounds in the weighted jackknife placebo and carryover slots), #155 (the `est.group.att` branch follows `ci.method`), #158 (`.pvalue_basic_dual()`: basic p-values of bootstrap fits, coefficients included, go with the basic interval; subgroup switch-off effects get the normal p-value under `"normal"`) |
 | `R/impute_Y0.R` (246) | Inference | Y(0) imputer used by the parametric bootstrap | internal | yes: A4 (`W.in.fit`), B8 (`loading.bound` arguments) |
 | `R/valid_controls.R` (34), `R/permutation.R` (264) | Inference | Control screening for the parametric bootstrap; permutation test | internal | no |
-| `R/diagtest.R` (233), `R/fittest.R` (636), `R/fect_sens.R` (232), `R/fect_iden.R` (224) | Diagnostics | Pre-trend / placebo / carryover / equivalence tests; sensitivity; identification | `fect_sens()`, `fect_iden()` | no |
+| `R/diagtest.R` (233), `R/fittest.R` (636), `R/fect_sens.R` (232), `R/fect_iden.R` (224) | Diagnostics | Pre-trend / placebo / carryover / equivalence tests; sensitivity; identification | `fect_sens()`, `fect_iden()` | 2.4.8, #179: `diagtest.R` (the F test's small-sample factor `(N_bar - q) / ((N_bar - 1) q)` is 0/0 or infinite when `N_bar = 1`, including a one-period window; both branches now test `!is.finite(scale) \|\| scale <= 0` and report `NA` with the existing message) |
 | `R/plot.R` (5,487) | Output | `plot.fect()`, 14+ plot types; the gap plot draws the chosen treated units' gaps when `id` is given, with a band from parametric bootstrap draws (#162) | `plot.fect()` | yes: B6 (NULL-safe `vartype` tests, factors-plot labels); #162 (gap plot with `id`) |
 | `R/print.R` (147) | Output | S3 print methods | `print.fect()` | yes: A6 (no "Cluster SE" line for parametric and jackknife fits) |
 | `R/esplot.R` (1,229), `R/theme-helpers.R` (42), `R/plot_return.R` (9) | Output | Event-study plots, theme, plot-return class | `esplot()` | no |
-| `R/support.R` (733), `R/score.R` (105), `R/getcohort.R` (264), `R/loading_bound.R` (318), `R/state.R` (7), `R/RcppExports.R` (191) | Utilities | Initial fits, scores, cohorts, simplex projection of loadings, session state, Rcpp bindings | `get.cohort()` | no |
+| `R/support.R` (733), `R/score.R` (105), `R/getcohort.R` (264), `R/state.R` (7), `R/RcppExports.R` (191) | Utilities | Initial fits, scores, cohorts, session state, Rcpp bindings | `get.cohort()` | no |
+| `R/loading_bound.R` (508) | Estimation helper | Simplex-constrained treated loadings (entropy-regularized), gamma cross-validation; 2.4.8 adds the joint intercept fit and a Newton solver for it | internal | 2.4.8: new `.solve_bounded_loading_int()`, `.newton_bounded_loading()`; `.cv_gamma_loading()` gets `intercept`; `.solve_bounded_loading()` gets `newton`; objective, gradient, mirror descent and the gamma grid are unchanged |
 | `src/fe_sub.cpp` (307) | C++ | `panel_factor()`, `panel_FE()`, `Y_demean()`, `panel_beta()` | internal | yes: B2 (`panel_factor()` clamps r at min(T, N)) |
 | `src/auxiliary.cpp` (455) | C++ | EM helpers, `XXinv()`, `wXXinv()` | internal | yes: C5, C5b (X'X that has full rank after scaling its columns to unit diagonal is inverted as before, whatever the covariates' units; otherwise a scaled generalized inverse instead of an error) |
 | `src/ife.cpp` (546), `src/ife_sub.cpp` (617), `src/mc.cpp` (230), `src/cfe.cpp` (210), `src/cfe_sub.cpp` (588), `src/binary_*.cpp` | C++ | IFE, MC, CFE and probit cores | internal | no |
@@ -441,6 +455,52 @@ graph TD
 > the predictions to `.score_residuals()`. Both call `.fect_heldout_pred()` only at cells that were
 > hidden in the refit (#163).
 
+### 5. Bounded loadings: the simplex solver and the joint intercept (2.4.8)
+
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+graph TD
+    NT["fect_nevertreated()"]
+    GG[".default_gamma_grid()"]
+    GC[".cv_gamma_loading()"]
+    SI[".solve_bounded_loading_int()"]
+    SB[".solve_bounded_loading()"]
+    NW[".newton_bounded_loading()"]
+    LB["optim L-BFGS-B"]
+    OG[".bounded_loading_obj / _grad"]
+    MD[".mirror_descent_bounded_loading()"]
+
+    NT --> GG
+    NT --> GC
+    NT --> SI
+    GC --> SI
+    SI --> SB
+    SB --> NW
+    SB -.->|"Newton fails"| LB
+    LB --> OG
+    LB -.->|"no convergence"| MD
+
+    style NT fill:#1e90ff,stroke:#1565c0,color:#fff
+    style GC fill:#1e90ff,stroke:#1565c0,color:#fff
+    style SI fill:#1e90ff,stroke:#1565c0,color:#fff
+    style SB fill:#1e90ff,stroke:#1565c0,color:#fff
+    style NW fill:#1e90ff,stroke:#1565c0,color:#fff
+```
+
+> With a unit effect (`force` 1 or 3) `.solve_bounded_loading_int(intercept = TRUE)` centres the unit's
+> outcome and the factors over the rows it is given, calls `.solve_bounded_loading(newton = TRUE)` on the
+> centred data, and adds the intercept. Without a unit effect (`force` 0 or 2) it calls the solver exactly
+> as 2.4.7 did and Newton is not used. `fect_boot()`, `fect_cv()` and `impute_Y0()` reach this path
+> only through `fect_nevertreated()`. The dashed edges are fallbacks: L-BFGS-B runs only when Newton
+> reports failure, and mirror descent only when L-BFGS-B does not converge.
+
+| Function | Defined In | Called By | Calls | Changed | Purpose |
+| --- | --- | --- | --- | --- | --- |
+| `.solve_bounded_loading_int()` | `R/loading_bound.R` | `fect_nevertreated()` (three branches), `.cv_gamma_loading()` | `.solve_bounded_loading()` | new (2.4.8) | `intercept = TRUE`: `u_c = u - mean(u)`, `F_c` = `F` minus its column means (over the rows passed in), solve the centred problem with the same `gamma`, return `alpha = mean(u) - colMeans(F) . lambda_hat` and `resid_norm` of the centred fit. `intercept = FALSE`: the 2.4.7 call, `alpha = NA`, `resid_norm = sqrt(sum((u - F lambda_hat)^2))` |
+| `.newton_bounded_loading()` | `R/loading_bound.R` | `.solve_bounded_loading()` (when `newton = TRUE`) | none | new (2.4.8) | Newton's method on the dual of the strictly convex problem: with `z` the fit residual and `w(z) = softmax(log q + 2 gamma Lambda_co F' z)`, solves `u - z - F Lambda_co' w(z) = 0` in `r` dimensions (Woodbury), halving steps until the gradient falls; stops at max abs gradient <= 1e-13 times max(1, max abs u); returns failure if it cannot reach 1e-9 |
+| `.solve_bounded_loading()` | `R/loading_bound.R` | `.solve_bounded_loading_int()` | `.newton_bounded_loading()`, `optim()`, `.mirror_descent_bounded_loading()` | yes (2.4.8: `newton = FALSE` argument) | Entropy-regularized simplex projection; `method` in the result reads `"newton"`, `"lbfgs"` or `"mirror-descent"` |
+| `.cv_gamma_loading()` | `R/loading_bound.R` | `fect_nevertreated()` | `.solve_bounded_loading_int()` | yes (2.4.8: `intercept = FALSE` argument) | 5-fold CV of `gamma` over pre-treatment periods. `intercept = TRUE`: each training fold is centred on its own periods, the held-out periods are predicted with `F_te lambda_hat + alpha_train`, a fold needs at least `ncol(F) + 1` training periods; the random draws are the same as in 2.4.7 |
+
 ### Function Reference
 
 | Function | Defined In | Called By | Calls | Changed | Purpose |
@@ -457,7 +517,7 @@ graph TD
 | `interFE.formula()` | `R/interFE.R` | `interFE()` | `.fect_formula_names()`, `interFE.default()` | yes (C1, C2) | Same parser; stops on `X` with a formula |
 | `interFE.default()` | `R/interFE.R` | `interFE()` | C++ `inter_fe()`, `.fect_cov_demean()` | yes (C6; final S5) | Stops on FE-absorbed covariates with correct labels, only for fixed effects in the model; final S5: also when the intercept (`force = "none"`) or the unit and time effects together (`force = "two-way"`) absorb a covariate, with the tolerances of `fect()`'s check; covariates with infinite values are not checked |
 | `fect_cv()` | `R/cv.R` | `fect.default()`, `fect_boot()` | `fect_fe()`, `fect_mc()`, `fect_nevertreated()` | yes (B1, B4, B8) | CV of `r` / `lambda`; forwards `W.in.fit` and `loading.bound` to never-treated CV |
-| `fect_nevertreated()` | `R/fect_nevertreated.R` | `fect.default()`, `fect_cv()`, `fect_boot()`, `impute_Y0()` | `panel_factor()`, `.fect_nt_*()` helpers, simplex projection | yes (A7, B1-B5; follow-up B12) | Never-treated IFE / CFE fits and CV; `r.cv <- r.pc` under `"pc"`; CV range capped at `Nco - 1`; `W.cvfit`; `stop()` instead of 3-field early returns; the CFE helper `.estimate_alpha()` keeps a one-column matrix (`drop = FALSE`), so one treated unit works |
+| `fect_nevertreated()` | `R/fect_nevertreated.R` | `fect.default()`, `fect_cv()`, `fect_boot()`, `impute_Y0()` | `panel_factor()`, `.fect_nt_*()` helpers, simplex projection (`.cv_gamma_loading()`, `.solve_bounded_loading_int()`) | yes (A7, B1-B5; follow-up B12; 2.4.8 joint intercept) | Never-treated IFE / CFE fits and CV; `r.cv <- r.pc` under `"pc"`; CV range capped at `Nco - 1`; `W.cvfit`; `stop()` instead of 3-field early returns; the CFE helper `.estimate_alpha()` keeps a one-column matrix (`drop = FALSE`), so one treated unit works |
 | `.fect_nt_r_max()`, `.fect_nt_cap_message()`, `.fect_nt_no_cv_message()` | `R/fect_nevertreated.R` | `fect_nevertreated()` | — | new (B2, B3) | Cap and messages for the searched range of `r` |
 | `.fect_nt_implied_weights()` | `R/fect_nevertreated.R` | `fect_nevertreated()` | `MASS::ginv()` | new (B5) | `ginv(t(Lco)) %*% t(Ltr)` (Nco x Ntr), NULL on failure |
 | `fect_boot()` | `R/boot.R` | `fect.default()` (se = TRUE, loo refits) | `fect_cv()`, `one.nonpara()`, `draw.error()`, collector, `.pvalue.basic()` | yes (A3-A7, B8, B8e; follow-up B10-cfe; final P1) | Replicates, collector, `boot.rm`, SEs / CIs; p-values of the effects under `ci.method = "basic"` through `.pvalue.basic()` (final P1) |
@@ -567,7 +627,7 @@ graph TD
     style PH fill:#1e90ff,stroke:#1565c0,color:#fff
 ```
 
-| Step | Where | What happens (2.4.7) |
+| Step | Where | What happens (2.4.7; 2.4.8 rows marked) |
 | --- | --- | --- |
 | binary | `fect()` and `interFE()` generics | `binary = TRUE` stops before dispatch; the probit code stays in place, unreachable (#160) |
 | parse | `fect.formula()`, `.fect_formula_names()` | Outcome, treatment, covariates from bare names; `X` with a formula stops (C1, C2) |
@@ -579,9 +639,55 @@ graph TD
 | rank check | `fect.default()` step 7b | `.fect_check_covariates()` on the estimation cells; dropped covariates leave `X` before every later fit (C5, C6) |
 | select r / lambda | `fect_cv()` / `fect_nevertreated()` | `"pc"` rule, CV cap, `W.agg` kept out, bounds honoured (B1-B4, B8); serial seed as `se = FALSE` (B9) |
 | replicates | `fect_boot()` | Routing (B8e), replicate checks (A7), resampling (A5), parametric scale and weights (A3, A4), collector with padding (A6), count message; cfe + never-treated replicates use the never-treated model (follow-up B10-cfe); p-values of the effects of parametric fits under `ci.method = "basic"` (final P1); per-unit ATT over observed cells (#156); 90% bounds in the weighted jackknife placebo and carryover slots (#154); `est.group.att` follows `ci.method` (#155); basic p-values of bootstrap fits go with the basic interval, subgroup switch-off p-values under `"normal"` are normal (#158) |
+| bounded loadings (2.4.8) | `fect_nevertreated()`, inside "select r / lambda" and "main fit" | With `loading.bound = "simplex"`, each treated unit's loadings are solved with its intercept fitted jointly when `force` has a unit effect (call graph 5); `gamma` is chosen by the same centred CV; bootstrap, parametric and loo refits inherit it |
 | loo refits | `fect.default()` loo block | Refits keep `loading.bound`, `time.component.from`, `para.error` (B8b-d); their replicates follow the routing above (follow-up B10-cfe) |
 | assemble | `fect.default()` output | NA rows for dropped covariates, `wgt.implied` dimnames, `remove.id`, `vartype`, labelled `rawtime` / `data.long`; the `W.agg` matrix when `W` or `W.agg` weights the aggregation (follow-up B13); `est.cm` for `cm = TRUE` fits without SEs or after cross-validation (final S3; `cm` with never-treated controls stops in the argument checks); with `normalize = TRUE`, `Y.dat`, `est.cm` and the stored covariate array on the outcome's scale (#157) |
 | post-hoc | `po-estimands.R`, `effect.R`, `cumu.R`, `plot.R`, `fect_mspe.R` | Replicates read through `colnames.boot` (A1, A6); stored `vartype` (A2); NULL-safe plots (B6); cumulative ATT as a running sum (follow-up B11); weights of weighted fits in `estimand()` and `effect()` (final W1); jackknife SEs and normal intervals (final J1, J2, S1); `fect_mspe()` refits with the fit's own function, evaluating its call where it is called (final S2, S4); the data lookup skips values that are not data frames (#152); `fect_mspe()` and `r.cv.rolling()` score the model's full prediction at held-out cells (#163); every row of `att.cumu()` by one rule (#153); `estimand()` defaults on jackknife fits and its stops (#159, #161) |
+
+---
+
+## Contracts introduced in 2.4.8
+
+### Bounded loadings and the intercept (`loading.bound = "simplex"`)
+
+- **Shift invariance.** Bounded fits are invariant to adding a constant to a treated unit's outcome
+  when `force` has a unit effect (`force = "unit"` or `"two-way"`): the loadings, the simplex
+  weights (`wgt.implied`), the CV-chosen `gamma.loading`, `loading.proj.resid` and the ATT do not
+  change, and that unit's `alpha.tr` moves by the constant. This holds to floating point (the tests
+  check 1e-8; the typical difference is below 1e-12). It does not hold without a unit effect
+  (`force = "none"` or `"time"`): there is no intercept to absorb the level.
+- **Joint minimiser.** For each treated unit the code returns the minimiser of
+  `(1/gamma) KL(w || q) + || u - alpha 1 - F Lambda_co' w ||^2` over `alpha` and the simplex weights
+  `w`, where `u` is the unit's residual after the grand mean, the covariates and the time effects,
+  `F` the estimated factors at the unit's training periods and `q` the uniform reference. `alpha` is
+  profiled out: the profiled problem is the 2.4.7 problem on `u` and `F` centred over the unit's own
+  training periods, with the same `gamma`. The intercept is not bounded.
+- **Which periods are centred.** Balanced panels: the common pre-treatment window. Unequal windows:
+  the unit's own window. Missing cells: the unit's observed pre-treatment periods
+  (`time.pre[[i]]`). In the gamma CV: the training folds only, never the held-out periods.
+- **Solver.** With an intercept the centred problem is solved by Newton's method on the dual, whose
+  answer does not depend on an iterative solver's stopping rule; L-BFGS-B (then mirror descent) is the
+  fallback when Newton does not converge. Known limit: in a test of 3,360 random problems, 4 at
+  `gamma = 1e6` used the fallback; they are never worse than 2.4.7's solution, and their loadings are
+  shift-invariant to 2.1e-8 at worst, above the 1e-8 target.
+- **Unchanged.** `loading.bound = "none"`, and `force = "none"` or `"time"` with `"simplex"`
+  (byte-identical to 2.4.7 for a fixed `gamma.loading` and for CV with the same seed).
+- **Outputs that change values with a unit effect.** `lambda.tr`, `alpha.tr`, `eff`, the ATT slots,
+  `wgt.implied`, `loading.proj.resid` (now the norm of the joint-fit residual), and the `gamma.loading`
+  that CV picks. The slot layout is unchanged.
+
+### F test with one treated unit or one period (#179)
+
+`diagtest()` computes the small-sample factor `scale = (N_bar - q) / ((N_bar - 1) q)` with `q` the
+number of periods in the window. It is 0/0 when `N_bar = 1`, and a one-period window (`pre.periods = 0`
+or `-1`) reaches the same case. Both branches now treat a non-finite or non-positive `scale` as too few
+treated units: `f.stat`, `f.p` and `f.equiv.p` are `NA`, with the message "Can't calculate the F
+statistic because of insufficient treated units." The fit continues.
+
+### did 2.5.1 gate (#178)
+
+`did_wrapper(method = "cs_never")` and `"cs_notyet"` stop with a message naming did 2.5.1 when an older
+did is installed. DESCRIPTION lists `did (>= 2.5.1)` under Suggests.
 
 ---
 
@@ -678,7 +784,9 @@ can be rewritten safely. Add any new per-replicate slot inside this loop.
 `.fect_nt_implied_weights()` computes `ginv(t(Lco)) %*% t(Ltr)` = `Lco (Lco'Lco)^-1 Ltr'` (Xu 2017),
 Nco x Ntr; the simplex path stores `t(W_tr)`, also Nco x Ntr. `fect.default()` sets dimnames
 (control ids x treated ids). `t(lambda.co) %*% wgt.implied == t(lambda.tr)`; with time fixed
-effects the unbounded columns sum to zero (control loadings are centred). NULL when r = 0.
+effects the unbounded columns sum to zero (control loadings are centred). NULL when r = 0. Since
+2.4.8 the simplex weights come from the joint fit of the intercept and the loadings when `force`
+has a unit effect (see "Contracts introduced in 2.4.8").
 
 ### cfe + never-treated replicates (follow-up B10-cfe)
 
@@ -858,6 +966,9 @@ more with `r.cv` and `boot = 0`. No replicate fits this model. `cm = TRUE` with
   held-out units with few training periods get noisy loadings; `min.T0 = 10` chooses 2. The default is
   unchanged and documented. (4) Basic p-values of parametric fits keep `.pvalue.basic()`'s counting
   rule, dual to the interval only up to the resolution of the draws.
+- 2.4.8: `R/loading_bound.R` has one known limit above its 1e-8 shift-invariance target (see "Contracts introduced in 2.4.8");
+  `vignettes/06-gsynth.Rmd` ("Bounded factor loadings") and `?fect` describe the joint intercept and
+  say that estimates with `force = "unit"` or `"two-way"` from earlier versions differ.
 - Vignettes are a Quarto book under `vignettes/` (build-ignored in the package tarball); chapters
   01-11 plus cheatsheet, changelog (`bb-updates.Rmd`) and references.
 - Ten bundled datasets (`simdata`, `simgsynth`, `sim_base`, `sim_gsynth`, `sim_linear`, `sim_region`,
