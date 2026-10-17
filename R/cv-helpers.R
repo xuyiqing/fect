@@ -115,7 +115,8 @@
                                       allowed = c("rolling", "block",
                                                   "all_units",
                                                   "treated_units",
-                                                  "loo")) {
+                                                  "loo",
+                                                  .FECT_CV_PRETREATMENT)) {
     cv.method <- match.arg(cv.method, allowed)
     if (cv.method == "all_units") {
         message('Note: cv.method = "all_units" is being deprecated; ',

@@ -202,6 +202,14 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         ## for gsynth, use the cross-validation function in fect_nevertreated
         if (method == "gsynth") {
             message("Interactive fixed effects model...\n")
+            ## The treated-unit rule fits the controls as an ordinary fit
+            ## does, so it takes the call's iteration cap; every other cv.method
+            ## keeps fect_nevertreated()'s own default, as before.
+            nt.max.iteration <- if (identical(cv.method, .FECT_CV_PRETREATMENT)) {
+                max.iteration
+            } else {
+                formals(fect_nevertreated)$max.iteration
+            }
             out <- fect_nevertreated(
                 Y = Y, D = D, X = X, W = W, W.in.fit = W.in.fit, I = I, II = II,
                 T.on = T.on, T.off = T.off,
@@ -209,7 +217,7 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
                 balance.period = balance.period,
                 r = r, r.end = r.end, CV = TRUE,
                 force = force, hasRevs = hasRevs,
-                tol = tol, boot = 0,
+                tol = tol, max.iteration = nt.max.iteration, boot = 0,
                 norm.para = norm.para,
                 group.level = group.level, group = group,
                 cv.method = cv.method, cv.nobs = cv.nobs,

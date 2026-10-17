@@ -104,7 +104,8 @@ fect <- function(
     loading.bound = "none",           # simplex projection of treated loadings
     gamma.loading = NULL,             # scalar gamma for simplex; NULL = CV
     gamma.loading.grid = NULL,        # optional grid for gamma CV
-    cv.rule = "min"                   # CV selection rule: "min" (default since 2.4.7, #167), "1se", "1pct"
+    cv.rule = "min",                  # CV selection rule: "min" (default since 2.4.7, #167), "1se", "1pct"
+    serial = c("none", "ar1")         # serial correlation in the errors: "ar1" filters the outcome (gsynth only)
 ) {
     ## binary outcome (probit) models are not supported in this version:
     ## stop before any work (before 2.4.7 the fit failed later with errors
@@ -526,7 +527,8 @@ fect.formula <- function(
     loading.bound = "none",
     gamma.loading = NULL,
     gamma.loading.grid = NULL,
-    cv.rule = "min"
+    cv.rule = "min",
+    serial = c("none", "ar1")
 ) {
     ## Covariates come from the formula. Before 2.4.7 an `X` given with a
     ## formula was silently ignored. `X = NULL` (what gsynth's wrapper
@@ -658,7 +660,8 @@ fect.formula <- function(
         loading.bound      = loading.bound,
         gamma.loading      = gamma.loading,
         gamma.loading.grid = gamma.loading.grid,
-        cv.rule            = cv.rule
+        cv.rule            = cv.rule,
+        serial             = serial
     )
 
     out$call <- match.call()
@@ -751,12 +754,77 @@ fect.default <- function(
     loading.bound = "none",
     gamma.loading = NULL,
     gamma.loading.grid = NULL,
-    cv.rule = "min"
+    cv.rule = "min",
+    serial = c("none", "ar1")
 ) {
     ## -------------------------------##
     ## Checking Parameters
     ## -------------------------------##
     cv.rule <- .fect_validate_cv_rule(cv.rule)
+
+    ## cv.method = "pretreatment" (the treated-unit rank rule, R/cv-treated.R)
+    ## belongs to the gsynth estimator alone. Stated here, before any dispatch,
+    ## so that no other CV entry point sees the value.
+    if (is.character(cv.method) && length(cv.method) == 1L &&
+        identical(pmatch(cv.method, c("rolling", "block", "all_units",
+                                      "treated_units", "loo",
+                                      .FECT_CV_PRETREATMENT)), 6L)) {
+        cv.method <- .FECT_CV_PRETREATMENT
+    }
+    if (identical(cv.method, .FECT_CV_PRETREATMENT)) {
+        cv.pre.err <- function(what) {
+            stop("cv.method = \"pretreatment\" ", what, call. = FALSE)
+        }
+        if (!identical(method, "gsynth")) {
+            cv.pre.err("is only available for method = \"gsynth\".")
+        }
+        if (!is.null(W) || !is.null(W.est) || !is.null(W.agg)) {
+            cv.pre.err("does not support weights (W, W.est, W.agg).")
+        }
+        if (!identical(loading.bound, "none")) {
+            cv.pre.err("does not support loading.bound.")
+        }
+        if (!identical(cv.rule, "min")) {
+            cv.pre.err(paste0("scores one pooled loss per rank (no folds); ",
+                              "use cv.rule = \"min\"."))
+        }
+        if (!identical(criterion, "mspe")) {
+            cv.pre.err(paste0("scores one pooled loss per rank; use ",
+                              "criterion = \"mspe\"."))
+        }
+    }
+
+    ## serial = "ar1": the gsynth estimator on an AR(1)-filtered panel
+    ## (R/ar1.R). Nothing below changes for serial = "none".
+    serial <- match.arg(serial)
+    if (identical(serial, .FECT_SERIAL_AR1)) {
+        return(.fect_ar1(
+            data = data, Y = if (missing(Y)) NULL else Y,
+            D = if (missing(D)) NULL else D, X = X,
+            index = if (missing(index)) NULL else index,
+            W = W, W.est = W.est, W.agg = W.agg, group = group,
+            na.rm = na.rm, force = force,
+            time.component.from = time.component.from, em = em, r = r,
+            lambda = lambda, CV = CV, cv.method = cv.method,
+            criterion = criterion, binary = binary, method = method,
+            se = se, vartype = vartype, para.error = para.error, cl = cl,
+            ci.method = ci.method, quantile.CI = quantile.CI,
+            nboots = nboots, alpha = alpha, parallel = parallel,
+            cores = cores, tol = tol, max.iteration = max.iteration,
+            seed = seed, min.T0 = min.T0, max.missing = max.missing,
+            group.fe = group.fe, cfe = cfe, Z = Z, gamma = gamma, Q = Q,
+            kappa = kappa, Z.param = Z.param, Q.param = Q.param,
+            Q.type = Q.type, balance.period = balance.period,
+            fill.missing = fill.missing, placeboTest = placeboTest,
+            carryoverTest = carryoverTest, carryover.rm = carryover.rm,
+            loo = loo, dloo = dloo, permute = permute,
+            normalize = normalize, keep.sims = keep.sims, cm = cm,
+            loading.bound = loading.bound, gamma.loading = gamma.loading,
+            gamma.loading.grid = gamma.loading.grid, cv.rule = cv.rule,
+            call = match.call()
+        ))
+    }
+
     placeboEquiv <- loo
     permu.dimension <- "time"
 

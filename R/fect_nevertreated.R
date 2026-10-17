@@ -208,8 +208,35 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
     ## ---- cv.method validation ---- ##
     cv.method <- .fect_normalize_cv_method(
         cv.method,
-        allowed = c("rolling", "block", "all_units", "treated_units", "loo")
+        allowed = c("rolling", "block", "all_units", "treated_units", "loo",
+                    .FECT_CV_PRETREATMENT)
     )
+    ## the treated-unit rule (R/cv-treated.R) is the gsynth estimator's alone:
+    ## it refits unconstrained loadings, scores one pooled loss per rank (no
+    ## folds) and uses no weights
+    cv.treated <- NULL
+    if (identical(cv.method, .FECT_CV_PRETREATMENT) && isTRUE(CV == TRUE)) {
+        if (!identical(method, "ife")) {
+            stop("cv.method = \"pretreatment\" is only available for ",
+                 "method = \"gsynth\".", call. = FALSE)
+        }
+        if (!is.null(W) && isTRUE(W.in.fit)) {
+            stop("cv.method = \"pretreatment\" does not support weights (W).",
+                 call. = FALSE)
+        }
+        if (!identical(loading.bound, "none")) {
+            stop("cv.method = \"pretreatment\" does not support ",
+                 "loading.bound.", call. = FALSE)
+        }
+        if (!identical(cv.rule, "min")) {
+            stop("cv.method = \"pretreatment\" scores one pooled loss per ",
+                 "rank (no folds); use cv.rule = \"min\".", call. = FALSE)
+        }
+        if (!identical(criterion, "mspe")) {
+            stop("cv.method = \"pretreatment\" scores one pooled loss per ",
+                 "rank; use criterion = \"mspe\".", call. = FALSE)
+        }
+    }
     if (isTRUE(CV == TRUE)) .fect_check_cv_donut(cv.donut, cv.nobs, cv.method)
 
     ## ---- W for treated units (scoring) ---- ##
@@ -390,6 +417,51 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             crit_col <- switch(criterion,
                 mspe = "MSPE", wmspe = "WMSPE", gmspe = "GMSPE", wgmspe = "WGMSPE",
                 mad = "MAD", moment = "Moment", gmoment = "GMoment", "MSPE")
+
+            ## ---- treated-unit rule (IFE; cv.method = "pretreatment") ---- ##
+            ## The rule needs the controls' fit at every candidate rank at once,
+            ## so all fits come first, at the user's tolerance (not cv_tol: the
+            ## scores equal those of an ordinary fit at that rank), then the
+            ## rule runs once; the loop below only fills CV.out from them.
+            treated.run <- NULL
+            if (identical(cv.method, .FECT_CV_PRETREATMENT)) {
+                pre.rule <- as.matrix(D[, tr] == 0 & I[, tr] == 1 &
+                                          II[, tr] == 1)
+                post.rule <- as.matrix(D[, tr] == 1 & I[, tr] == 1)
+                treated.run <- .fect_cv_treated_run(
+                    ranks = CV.out[, "r"],
+                    fit.rank = function(rr) {
+                        .estimate_co(YY.co, Y0.co, X.co, II.co, W.use, beta0,
+                                     rr, force, tol, max.iteration,
+                                     fit_init = fit.init.co)
+                    },
+                    Y.tr = Y.tr, X.tr = X.tr, p = p, force = force,
+                    pre = pre.rule, post = post.rule, ids = as.character(tr)
+                )
+                tr.res <- treated.run$rule
+                ## scores on the outcome's scale under normalize
+                tr.scale <- if (is.null(norm.para)) 1 else norm.para[1]^2
+                tr.res$table$loo <- tr.res$table$loo * tr.scale
+                tr.res$table$fwd <- tr.res$table$fwd * tr.scale
+                treated.run$rule <- tr.res
+                cv.treated <- tr.res
+                treated.run$score <- if (treated.run$window == "fwd") {
+                    tr.res$table$fwd
+                } else {
+                    tr.res$table$loo
+                }
+                treated.run$ranks.scored <- tr.res$table$r
+                treated.run$pick <- if (treated.run$window == "fwd") {
+                    tr.res$r_fwd
+                } else {
+                    tr.res$r_loo
+                }
+                if (is.na(treated.run$pick)) {
+                    stop("cv.method = \"pretreatment\": no rank has a finite ",
+                         "score; supply r or use another cv.method.",
+                         call. = FALSE)
+                }
+            }
 
             ## ---- cv.sample pre-computation (IFE) ---- ##
             if (cv.method != "loo" && r.max > 0) {
@@ -725,7 +797,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
 
             for (i in 1:dim(CV.out)[1]) {
                 r <- unname(CV.out[i, "r"])
-                est.co <- .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, r, force, cv_tol, max.iteration)
+                est.co <- if (!is.null(treated.run)) {
+                    treated.run$fits[[i]]  ## fitted above at the user's tol
+                } else {
+                    .estimate_co(YY.co, Y0.co, X.co, I.co, W.use, beta0, r, force, cv_tol, max.iteration)
+                }
 
                 if (p > 0) {
                     na.pos <- is.nan(est.co$beta)
@@ -743,7 +819,15 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     PC <- est.co$PC * (norm.para[1]^2)
                 }
 
-              if (cv.method == "loo") {
+              if (!is.null(treated.run)) {
+                ## ---- treated-unit rule: scores computed above ---- ##
+                ## ranks above Rbar and ranks with no finite score hold NA
+                sc <- treated.run$score[match(r, treated.run$ranks.scored)]
+                scores <- setNames(rep(NA_real_, length(score_names)), score_names)
+                if (length(sc) == 1L && is.finite(sc)) scores["MSPE"] <- sc
+                se_v <- setNames(rep(NA_real_, length(score_names)), score_names)
+
+              } else if (cv.method == "loo") {
                 ## ---- LOO CV (existing code) ---- ##
                 if (r != 0) {
                     F.hat <- as.matrix(est.co$factor)
@@ -1030,6 +1114,14 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             } ## end of while: search for r_star over
 
             } ## end SERIAL BRANCH (IFE)
+
+            ## treated-unit rule: the pick is the rule's, the fit it came from
+            ## the one made at the user's tolerance
+            if (!is.null(treated.run)) {
+                r.cv <- treated.run$pick
+                est.co.best <- treated.run$fits[[match(r.cv, CV.out[, "r"])]]
+                message("treated-unit rule: ", cv.treated$note)
+            }
 
             MSPE.best <- .fect_cv_best(CV.out[, "MSPE"])
 
@@ -3330,6 +3422,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         if (exists("CV.out.se", inherits = FALSE)) {
             out <- c(out, list(CV.out.se = .fect_cv_se_table(CV.out.se)))
         }
+    }
+
+    ## the treated-unit rule's table, picks and scored-unit counts
+    if (!is.null(cv.treated)) {
+        out <- c(out, list(cv.treated = cv.treated))
     }
 
     if (r.cv > 0) {
