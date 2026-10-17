@@ -568,7 +568,14 @@
     }
 
     tr <- inner$tr
-    Dm <- inner$D.dat
+    ## the treatment indicator as the data have it: a cell whose filtered row is
+    ## missing (its lag, or the cell itself, is absent) still has its own D
+    ## when the original row exists; a cell absent from the data carries the
+    ## previous D, as fect's own relative-period rule does
+    Dw <- wide(prep$data[[ctx$D]])[rows, , drop = FALSE]
+    ID.w <- !is.na(Dw)
+    Dw[!ID.w] <- 0
+    Dm <- Dw
     Vobs <- inner$I.dat == 1
     F <- if (!is.null(inner$factor)) as.matrix(inner$factor) else matrix(0, T1, 0)
     beta <- inner$beta
@@ -609,9 +616,15 @@
         }
     }
 
+    ## relative periods from the data's D (fect's get_term; the inner fit's own
+    ## T.on has the wrong clock after a cell dropped by the filter)
+    Ton <- inner$T.on
+    for (j in which(colSums(Dm != inner$D.dat) > 0)) {
+        if (any(ID.w[, j])) Ton[, j] <- get_term(Dm[, j], as.numeric(ID.w[, j]), type = "on")
+    }
+
     ## effects
     eff <- inner$eff
-    Dtr <- Dm[, tr, drop = FALSE]
     anchor <- rep(NA_integer_, length(tr))
     n.post <- integer(length(tr))
     Yhat <- matrix(NA_real_, T1, length(tr))
@@ -656,7 +669,6 @@
     att.avg.unit <- mean(att.unit, na.rm = TRUE)
 
     ## event-time ATT over all cells with a finite effect
-    Ton <- inner$T.on
     eff.v <- c(eff)
     t.on <- c(Ton)
     use <- !is.na(eff.v) & !is.na(t.on)
@@ -678,6 +690,7 @@
 
     list(
         eff = eff, Y.ct = Y.ct, Yo = Yo, obs = obs, Vhat = Vhat, Yhat = Yhat,
+        D = Dm, T.on = Ton,
         anchor = anchor, n.post = n.post, ok = ok, rows = rows,
         att.avg = att.avg, att.avg.unit = att.avg.unit,
         time = time.on, att = att.on, count = count.on,
@@ -699,6 +712,8 @@
     obsm <- matrix(as.numeric(rb$obs), T1, ncol(rb$obs))
     out$I.dat <- obsm
     out$I <- obsm
+    out$D.dat <- rb$D
+    out$T.on <- rb$T.on
     out$eff <- rb$eff
     out$eff.tr <- rb$eff[, tr, drop = FALSE]
     out$Y.ct <- rb$Y.ct
@@ -794,9 +809,9 @@
     }
 
     ## the draws' statistics, on the point fit's cells
-    D.tr <- inner$D.dat[, tr, drop = FALSE]
+    D.tr <- rb$D[, tr, drop = FALSE]
     d.v <- c(D.tr)
-    t.on <- match(c(inner$T.on[, tr, drop = FALSE]), out$time)
+    t.on <- match(c(rb$T.on[, tr, drop = FALSE]), out$time)
     L <- length(out$time)
     att.avg.boot <- matrix(NA_real_, 1L, B)
     att.avg.unit.boot <- matrix(NA_real_, 1L, B)

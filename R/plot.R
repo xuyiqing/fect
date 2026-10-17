@@ -526,6 +526,14 @@ plot.fect <- function(
                                if (isTRUE(dloo)) ", dloo = TRUE" else "",
                                if (isTRUE(cm)) ", cm = TRUE" else "", ")"))
     }
+    ## the cumulative plot reads the output of effect(); on an ar1 fit that
+    ## output is on the outcome scale (effect() uses the mapped draws), but the
+    ## fit itself holds no cumulative effects
+    if (identical(type, "cumul") && is.null(x$effect.est.att)) {
+      stop("plot(type = \"cumul\") with serial = \"ar1\" needs the output of ",
+           "effect(fit, cumu = TRUE): the fit itself holds no cumulative ",
+           "effects.", call. = FALSE)
+    }
   }
 
   ## Override pre/post colors based on plot type and LOO status

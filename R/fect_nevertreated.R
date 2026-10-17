@@ -363,13 +363,21 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         cv_tol <- max(tol, 1e-3)
 
         ## starting r
-        if ((r > (T0.min - 1) & force %in% c(0, 2)) | (r > (T0.min - 2) & force %in% c(1, 3))) {
+        ## The treated-unit rule (cv.method = "pretreatment") does not cap the
+        ## candidates by the shortest treated pretreatment window: the ranks run
+        ## up to r.end, and units with too few pretreatment periods for the
+        ## top rank are left out of the score (R/cv-treated.R).
+        pretreatment.rule <- identical(cv.method, .FECT_CV_PRETREATMENT)
+        if (!pretreatment.rule &&
+            ((r > (T0.min - 1) & force %in% c(0, 2)) | (r > (T0.min - 2) & force %in% c(1, 3)))) {
             message("r is too big compared with T0; reset to 0.")
             r <- 0
         }
 
         ## store all MSPE
-        if (force %in% c(0, 2)) {
+        if (pretreatment.rule) {
+            r.max <- max(r.end, 0)
+        } else if (force %in% c(0, 2)) {
             r.max <- max(min((T0.min - 1), r.end), 0)
         } else {
             r.max <- max(min((T0.min - 2), r.end), 0)

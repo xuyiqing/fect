@@ -141,7 +141,10 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
             r.end <- r.end - 1
         }
     }
-    if (r.end >= T0.min) {
+    ## the treated-unit rule (cv.method = "pretreatment") keeps the candidates
+    ## up to r.end: units with too few pretreatment periods are left out of
+    ## its score instead of capping the ranks (R/cv-treated.R)
+    if (r.end >= T0.min && !identical(cv.method, .FECT_CV_PRETREATMENT)) {
         if (method %in% c("both", "ife", "gsynth")) {
             message("Factor number should not be greater than ", T0.min - 1, "\n", sep = "")
         }
