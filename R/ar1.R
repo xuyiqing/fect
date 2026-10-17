@@ -300,6 +300,8 @@
     }
 
     out <- .fect_ar1_outer(inner, rb, ctx, x.k)
+    ## the final round's rule output, as on a levels fit (also in fit$ar1$rule)
+    if (!is.null(rule.last)) out$cv.treated <- rule.last
     out <- .fect_ar1_inference(out, inner, rb, x.k, se = se, alpha = alpha,
                                ci.method = ci.method, keep.sims = keep.sims)
     out$ar1 <- .fect_ar1_info(
