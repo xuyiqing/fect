@@ -16,6 +16,7 @@ release.
 * `serial = "ar1"` (`method = "gsynth"`) fits Gsynth to an AR(1)-filtered
   panel, chooses the filter coefficient and `r` jointly, and returns effects
   on the outcome scale with a parametric bootstrap; see `fit$ar1`.
+* `serial = "ar1"` settles a cycle of (x, rank) pairs by the lowest rank with a warning, passes over a rank whose EM fit does not converge, and treats x and the rank as known in its intervals; with no overlap and highly persistent errors the intervals are too narrow (`?fect`, `serial`).
 * Under `serial = "ar1"`, the pre-trend, placebo, carryover, equivalence and
   sensitivity tests, `loo`, `dloo`, `cm`, weights, `binary` and the plot types
   that read levels residuals stop with a message that names `serial = "ar1"`.

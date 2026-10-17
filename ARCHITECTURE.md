@@ -39,7 +39,9 @@
 > estimator, `serial = "ar1"` (new file `R/ar1.R`), with a parametric bootstrap conditional on the chosen
 > filter coefficient and rank. Call graph 6, the module diagram nodes `E7` and `K3`, and the section
 > "`serial = "ar1"` and the treated-unit rank rule" under "Contracts introduced in 2.4.8" are new. The
-> argument value `"pretreatment"` and the argument `serial` are provisional names (see Notes).
+> argument value `"pretreatment"` and the argument `serial` are provisional names (see Notes). Stage 2 (same
+> run, build `57bb66f`) adds the cycle rule of the alternation (`.fect_ar1_alternate()`), the handling of inner
+> EM fits that do not converge, no lag mask at `x` exactly 0, and the simulation findings in the contracts.
 
 ## Overview
 
@@ -47,7 +49,7 @@ fect is an R package for causal panel analysis with binary treatments under para
 (Fixed Effects Counterfactual Estimators). Its core abstraction is counterfactual imputation: fit an
 outcome model on untreated cells, impute the missing potential outcomes Y(0) of treated cells, and
 average the gaps Y - Y(0) into the ATT and its by-period, by-cohort and cumulative summaries. The
-package is an R/C++ hybrid: R (`R/`, 39 files, about 37,650 lines) does input handling, data
+package is an R/C++ hybrid: R (`R/`, 39 files, about 37,900 lines) does input handling, data
 reshaping, cross-validation, inference and output; C++ via Rcpp and RcppArmadillo (`src/`, 11 files
 plus a header, about 5,000 lines) does the linear algebra (SVD, EM iterations, demeaning, factor
 extraction). Estimators: two-way FE, interactive fixed effects (IFE, and gsynth, its never-treated
@@ -201,7 +203,7 @@ graph TD
 | `R/po-estimands.R` (2,334) | Post-hoc | `imputed_outcomes()` long-form accessor and `estimand()` dispatcher; replicate alignment helpers | `estimand()`, `imputed_outcomes()` | yes: A1 (`.po_replicate_cells()`, `.po_replicate_att()`, `cells` scoping), A6 (slot contract allows padded arrays); follow-up: B13 (`.po_agg_weights()`); final: W1 (`.po_agg_weights_or_null()`, `.po_wmean()`: every cell-based estimand of a weighted fit is weighted by `fit$W.agg`; one `weights` check in `estimand()`), J2 (jackknife overall SE from `att.avg.boot`); #159 (jackknife fits default to `ci.method = "normal"` for every type), #161 (`.estimand_by_stop()`; `cells` with `"att.cumu"` stops; the stop messages name the cause) |
 | `R/effect.R` (450), `R/cumu.R` (272) | Post-hoc | Cumulative / subgroup effects (soft-deprecated) | `effect()`, `att.cumu()` | yes: A2 (stored `vartype`, `drop = FALSE`, parametric normal CI in `att.cumu()`), A6 (replicate width); follow-up: B11 (running sum of the per-period ATTs); final: J1 (`.jackknife_se()` in both), S1 (`effect()`: normal intervals for parametric and jackknife fits), W1 (`getEffect()` weights); #153 (`att.cumu()` fills every row from `att.cumu.sub()`, the first included; a window of one event time keeps a matrix) |
 | `R/fe.R` (985), `R/mc.R` (813), `R/cfe.R` (1,179) | Estimation | IFE / FE, matrix completion, complex FE fits | internal | follow-up batch: #156 (per-unit ATT over each unit's observed treated cells, in all three), #157 (`fe.R`: `est.cm` rescaled like `est` under `normalize = TRUE`) |
-| `R/fect_nevertreated.R` (3,747) | Estimation | Never-treated estimators (gsynth, IFE and CFE with `time.component.from = "nevertreated"`), their CV, implied weights | internal | yes: A7 (degenerate solves stop), B1 (`"pc"`), B2 (CV cap), B3 (skip messages), B4 (`W.cvfit`), B5 (`.fect_nt_implied_weights()`); follow-up: B12 (one treated unit in the CFE branch); #156 (per-unit ATT over observed cells); 2.4.8: the bounded-loading block (`use_bounded`) fits each treated unit's intercept jointly with its loadings in all three branches and in the gamma CV, through `.solve_bounded_loading_int()`; 2.4.8, AR(1): `"pretreatment"` in `allowed`; with `cv.method = "pretreatment"` the candidate-rank fits are made first at the user's `tol`, `.fect_cv_treated_run()` scores them once, and the serial loop fills `CV.out[, "MSPE"]`, `r.cv` and `fit$cv.treated` from the table (ranks above `Rbar` are `NA`) |
+| `R/fect_nevertreated.R` (3,753) | Estimation | Never-treated estimators (gsynth, IFE and CFE with `time.component.from = "nevertreated"`), their CV, implied weights | internal | yes: A7 (degenerate solves stop), B1 (`"pc"`), B2 (CV cap), B3 (skip messages), B4 (`W.cvfit`), B5 (`.fect_nt_implied_weights()`); follow-up: B12 (one treated unit in the CFE branch); #156 (per-unit ATT over observed cells); 2.4.8: the bounded-loading block (`use_bounded`) fits each treated unit's intercept jointly with its loadings in all three branches and in the gamma CV, through `.solve_bounded_loading_int()`; 2.4.8, AR(1): `"pretreatment"` in `allowed`; with `cv.method = "pretreatment"` the candidate-rank fits are made first at the user's `tol`, `.fect_cv_treated_run()` scores them once, and the serial loop fills `CV.out[, "MSPE"]`, `r.cv` and `fit$cv.treated` from the table (ranks above `Rbar` are `NA`) |
 | `R/dloo.R` (719) | Estimation | Double leave-one-out pre-trend overlay (closed form, no refits) | internal | #158 (basic p-values of `pre.est.att` through `.pvalue_basic_dual()`, as `loo` gets them from `fect_boot()`) |
 | `R/cv.R` (2,124) | CV | `fect_cv()`: selection of `r` / `lambda`; delegates never-treated CV to `fect_nevertreated()` | internal | yes: B1 (`"pc"` table), B4 (`W.in.fit` forwarded), B8 (`loading.bound` arguments); #156 (per-unit ATT over observed cells); 2.4.8, AR(1): for `"pretreatment"` only, the gsynth delegation passes the call's `max.iteration` and the `r.end >= T0.min` cut is skipped |
 | `R/cv-rolling.R` (417), `R/cv-rule-helpers.R` (127), `R/cv-helpers.R` (554), `R/cv_binary.R` (441) | CV | Rolling CV, 1se / min / 1pct rules, fold helpers, binary CV | `r.cv.rolling()` | #163 (`cv-rolling.R`: each held-out block is scored with `.fect_heldout_pred()`, not `Y.ct.full`) |
@@ -215,8 +217,8 @@ graph TD
 | `R/esplot.R` (1,229), `R/theme-helpers.R` (42), `R/plot_return.R` (9) | Output | Event-study plots, theme, plot-return class | `esplot()` | no |
 | `R/support.R` (733), `R/score.R` (105), `R/getcohort.R` (264), `R/state.R` (7), `R/RcppExports.R` (191) | Utilities | Initial fits, scores, cohorts, session state, Rcpp bindings | `get.cohort()` | no |
 | `R/loading_bound.R` (508) | Estimation helper | Simplex-constrained treated loadings (entropy-regularized), gamma cross-validation; 2.4.8 adds the joint intercept fit and a Newton solver for it | internal | 2.4.8: new `.solve_bounded_loading_int()`, `.newton_bounded_loading()`; `.cv_gamma_loading()` gets `intercept`; `.solve_bounded_loading()` gets `newton`; objective, gradient, mirror descent and the gamma grid are unchanged |
-| `R/ar1.R` (974) | Estimation | `serial = "ar1"`: calendar-time filter, joint choice of the filter coefficient `x` and the rank `r`, rebuild of the outcome-scale counterfactual, conditional parametric bootstrap, the `fit$ar1` slot, `.fect_stop_ar1()` | `.fect_ar1()`, `.fect_stop_ar1()` (internal) | new (2.4.8) |
-| `R/cv-treated.R` (189) | CV | The treated-unit rank rule `cv.method = "pretreatment"`: leave-one-pretreatment-period-out tasks, units' losses weighted by their ATT share, candidate set and scored cells fixed before scoring; pure functions on matrices | internal | new (2.4.8) |
+| `R/ar1.R` (1,174) | Estimation | `serial = "ar1"`: calendar-time filter, joint choice of the filter coefficient `x` and the rank `r`, rebuild of the outcome-scale counterfactual, conditional parametric bootstrap, the `fit$ar1` slot, `.fect_stop_ar1()` | `.fect_ar1()`, `.fect_stop_ar1()` (internal) | new (2.4.8) |
+| `R/cv-treated.R` (229) | CV | The treated-unit rank rule `cv.method = "pretreatment"`: leave-one-pretreatment-period-out tasks, units' losses weighted by their ATT share, candidate set and scored cells fixed before scoring; pure functions on matrices | internal | new (2.4.8) |
 | `src/fe_sub.cpp` (307) | C++ | `panel_factor()`, `panel_FE()`, `Y_demean()`, `panel_beta()` | internal | yes: B2 (`panel_factor()` clamps r at min(T, N)) |
 | `src/auxiliary.cpp` (455) | C++ | EM helpers, `XXinv()`, `wXXinv()` | internal | yes: C5, C5b (X'X that has full rank after scaling its columns to unit diagonal is inverted as before, whatever the covariates' units; otherwise a scaled generalized inverse instead of an error) |
 | `src/ife.cpp` (546), `src/ife_sub.cpp` (617), `src/mc.cpp` (230), `src/cfe.cpp` (210), `src/cfe_sub.cpp` (588), `src/binary_*.cpp` | C++ | IFE, MC, CFE and probit cores | internal | no |
@@ -534,6 +536,7 @@ graph TD
     CK[".fect_ar1_check_args()"]
     PR[".fect_ar1_prep()"]
     FL[".fect_ar1_filter()"]
+    AL[".fect_ar1_alternate()"]
     XR["x_of_r(): grid + optimize"]
     RO["rule_on(): rank rule"]
     IN["inner fect.default(), gsynth"]
@@ -555,8 +558,9 @@ graph TD
     AR --> CK
     AR --> PR
     AR --> FL
-    AR --> XR
-    AR --> RO
+    AR --> AL
+    AL --> XR
+    AL --> RO
     AR --> RB
     AR --> OU
     AR --> BI
@@ -578,6 +582,7 @@ graph TD
     style CK fill:#1e90ff,stroke:#1565c0,color:#fff
     style PR fill:#1e90ff,stroke:#1565c0,color:#fff
     style FL fill:#1e90ff,stroke:#1565c0,color:#fff
+    style AL fill:#1e90ff,stroke:#1565c0,color:#fff
     style XR fill:#1e90ff,stroke:#1565c0,color:#fff
     style RO fill:#1e90ff,stroke:#1565c0,color:#fff
     style RB fill:#1e90ff,stroke:#1565c0,color:#fff
@@ -591,7 +596,8 @@ graph TD
     style CU fill:#1e90ff,stroke:#1565c0,color:#fff
 ```
 
-> `x_of_r()` and `rule_on()` are closures inside `.fect_ar1()`. Every inner fit is
+> `x_of_r()` and `rule_on()` are closures inside `.fect_ar1()`; `.fect_ar1_alternate()` is a pure function
+> (no data, no fits) that receives them as one `step(r)` callback and decides when to stop. Every inner fit is
 > `fect.default(method = "gsynth", serial = "none", ...)` on the filtered data, quiet; the rule is the inner call
 > with `CV = TRUE, cv.method = "pretreatment"`, which reaches `fect_nevertreated()` and then
 > `.fect_cv_treated_run()`. The same rule serves `serial = "none"` calls with `cv.method = "pretreatment"`: the
@@ -600,18 +606,19 @@ graph TD
 
 | Function | Defined In | Called By | Calls | Changed | Purpose |
 | --- | --- | --- | --- | --- | --- |
-| `.fect_ar1()` | `R/ar1.R` | `fect.default()` | `.fect_ar1_check_args()`, `.fect_ar1_prep()`, `.fect_ar1_filter()`, inner `fect.default()`, `.fect_ar1_rebuild()`, `.fect_ar1_outer()`, `.fect_ar1_inference()`, `.fect_ar1_info()` | new | Entry. Reads the internal options `fect.ar1.x` and `fect.ar1.rounds` once. Round 0: the rule on the unfiltered panel. Then for k = 1..5: `x_k = x_of_r(r_{k-1})`, `r_k = rule_on(V(x_k))`, stop when `r_k == r_{k-1}` (`converged`), else warn after five rounds. A single `r` fixes the rank and chooses `x` only |
+| `.fect_ar1()` | `R/ar1.R` | `fect.default()` | `.fect_ar1_check_args()`, `.fect_ar1_prep()`, `.fect_ar1_filter()`, `.fect_ar1_alternate()`, inner `fect.default()`, `.fect_ar1_rebuild()`, `.fect_ar1_outer()`, `.fect_ar1_inference()`, `.fect_ar1_info()` | new | Entry. Reads the five internal options (`fect.ar1.x`, `fect.ar1.rounds`, `fect.ar1.exclude.nonconverged`, `fect.ar1.mask.zero`, and `fect.cv.treated.window` in the rule) once. Round 0: the rule on the unfiltered panel. Then `.fect_ar1_alternate()` runs the rounds. A single `r` fixes the rank and chooses `x` only. Collects the non-convergence flags and issues the wrapper's own warnings; fect's "did not converge" warnings from search fits are muffled and counted |
+| `.fect_ar1_alternate()` | `R/ar1.R` | `.fect_ar1()` | the `step` callback | new (stage 2) | The decision logic of the alternation. For k = 1..K (K = 5): `step(r_{k-1})` returns `x_k` and `r_k`. Fixed point (`r_k == r_{k-1}`): `converged`. A rank seen before (not the previous one): `cycled`, `cycle` = the rounds in the cycle, `final` = the round with the lowest rank. Loop ends without either: `capped`. Returns `path`, `final`, `converged`, `cycled`, `cycle`, `capped`, `trace`; the fixed-point test comes before the cycle test |
 | `.fect_ar1_check_args()` | `R/ar1.R` | `.fect_ar1()` | none | new | Stops, with a message that contains `serial = "ar1"`, for `method != "gsynth"`, weights, `group`, `cfe`, `Z`, `Q`, `loading.bound`, `binary`, `fill.missing`, placebo, carryover, `loo`, `dloo`, `permute`, `vartype = "jackknife"`, and `cv.method` values other than `"pretreatment"` or the default |
-| `.fect_ar1_prep()`, `.fect_ar1_filter()` | `R/ar1.R` | `.fect_ar1()` | none | new | Position of each row on the sorted time grid; `V = v - x * v_lag` for the outcome and each covariate by `match()` on (unit, previous position); a filtered cell is `NA` when it or its lag is `NA`; the first position never exists; `D` is not lagged |
+| `.fect_ar1_prep()`, `.fect_ar1_filter()` | `R/ar1.R` | `.fect_ar1()` | none | new | Position of each row on the sorted time grid; `V = v - x * v_lag` for the outcome and each covariate by `match()` on (unit, previous position); a filtered cell is `NA` when it or its lag is `NA`; the first position never exists; `D` is not lagged. `mask = FALSE` (used by the rule, the final fit and the bootstrap when `x` is exactly 0) drops no cell for a missing lag |
 | `x_of_r()` | closure in `.fect_ar1()` | `.fect_ar1()` | inner `fect.default()` (via `ssr_at`) | new | Sum of squared control residuals of the rank-r fit to V(x) on a 0.05 grid over [0, 1], one `optimize()` in the bracket around the grid minimum, exact boundary; returns `x` and the profile of every evaluated point |
 | `rule_on()` | closure in `.fect_ar1()` | `.fect_ar1()` | inner `fect.default(CV = TRUE, cv.method = "pretreatment")` | new | Rank by the treated-unit rule on V(x) (or on the levels panel for round 0) |
-| `.fect_cv_treated_run()` | `R/cv-treated.R` | `fect_nevertreated()` | `.fect_cv_treated_parts()`, `.fect_cv_treated_rank()` | new | Fits the controls at every candidate rank at the user's `tol`, builds each treated unit's offset and pretreatment residuals, runs the rule once; option `fect.cv.treated.window` (`"loo"` or `"fwd"`) selects the window for `MSPE` and `r.cv` |
+| `.fect_cv_treated_run()` | `R/cv-treated.R` | `fect_nevertreated()` | `.fect_cv_treated_parts()`, `.fect_cv_treated_rank()` | new | With the optional `eligible` argument (set only by the ar1 inner call; default all eligible, output unchanged) a rank whose control fit did not converge cannot be picked; the list then carries `eligible` and `fallback`. Fits the controls at every candidate rank at the user's `tol`, builds each treated unit's offset and pretreatment residuals, runs the rule once; option `fect.cv.treated.window` (`"loo"` or `"fwd"`) selects the window for `MSPE` and `r.cv` |
 | `.fect_cv_treated_rank()` | `R/cv-treated.R` | `.fect_cv_treated_run()` | `.fect_cv_treated_unit_tasks()` | new | The rule on matrices: candidate set, `Rbar` (largest rank whose scorable units hold at least 80% of the ATT weight), scored units, scores for both windows, smallest minimizer; same output names as the prototype `treated_rank()` |
 | `.fect_cv_treated_parts()`, `.fect_cv_treated_unit_tasks()` | `R/cv-treated.R` | `.fect_cv_treated_rank()` | none | new | Per-unit pretreatment sets and the (train, score) tasks of one unit |
-| `.fect_ar1_rebuild()` | `R/ar1.R` | `.fect_ar1()` | none | new | Model prediction `Vhat` at every cell from the inner fit; consistency check against `inner$Y.ct` at 1e-8; anchor `s_i` (last observed pretreatment outcome, from the original `D`); recursion `Yhat_t = x * Yhat_{t-1} + Vhat_t` through unobserved cells; effects; units that cannot be rebuilt |
+| `.fect_ar1_rebuild()` | `R/ar1.R` | `.fect_ar1()` | none | new | Model prediction `Vhat` at every cell from the inner fit; consistency check against `inner$Y.ct` at 1e-8; anchor `s_i` (last observed pretreatment outcome, from the original `D`); recursion `Yhat_t = x * Yhat_{t-1} + Vhat_t` through unobserved cells (skipped at `x = 0`: `eff` is the inner effect, since `0 * NA` is `NA`); effects; units that cannot be rebuilt |
 | `.fect_ar1_outer()` | `R/ar1.R` | `.fect_ar1()` | none | new | Outcome-scale slots on the T-1 grid (`Y.dat`, `eff`, `Y.ct`, `att.avg`, `att`, `count`, ...); the filtered-scale slots stay and are listed in `fit$ar1$v.scale.slots` |
 | `.fect_ar1_inference()` | `R/ar1.R` | `.fect_ar1()` | inner `fect.default(se = TRUE, vartype = "parametric", keep.sims = TRUE)` | new | Maps each draw of `eff.boot` through `e_t = x * e_{t-1} + effV_t` from the anchor, recomputes the draw statistics, builds `est.avg`, `est.att` and the rest with fect's own interval rules (local copy of the `.pvalue.basic` wrapper; `.basic_ci_shifted*` and `.pvalue_basic_dual()` are the file-scope ones in `boot.R`) |
-| `.fect_ar1_info()` | `R/ar1.R` | `.fect_ar1()` | none | new | Builds `fit$ar1` (`x`, `x.fixed`, `r`, `path`, `converged`, `rounds`, `profile`, `profile.rank`, `rule`, `rule.levels`, `rebuilt`, `not.rebuilt`, `dropped`, `first.period`, `min.T0`, `pre.scale`, `v.scale.slots`, `x.bounds`) |
+| `.fect_ar1_info()` | `R/ar1.R` | `.fect_ar1()` | none | new | Builds `fit$ar1` (`x`, `x.fixed`, `r`, `path`, `converged`, `rounds`, `profile`, `profile.rank`, `rule`, `rule.levels`, `rebuilt`, `not.rebuilt`, `dropped`, `first.period`, `min.T0`, `pre.scale`, `v.scale.slots`, `x.bounds`; stage 2: `cycled`, `cycle`, `final.round`, `em.converged`, `niter`, `excluded`, `fallback.rounds`, `search.nonconverged`, `lag.mask`; `path` and `profile` gain `em.converged`) |
 | `.fect_stop_ar1()` | `R/ar1.R` | `diagtest()`, `fect_sens()`, `fect_iden()`, `fect_mspe()`, `estimand()`, `plot.fect()` | none | new | Returns silently unless `fit$serial == "ar1"`; otherwise stops with a message that names `serial = "ar1"` and the feature |
 
 ### Function Reference
@@ -769,7 +776,7 @@ graph TD
     XS["x(r): minimize control SSR"]
     FV["filter: V = Y - x lag(Y)"]
     RK["rank rule on V(x)"]
-    CV{"rank repeated?"}
+    CV{"rank repeated or cycle?"}
     FF["final inner gsynth fit on V"]
     RE["rebuild: Yhat = x Yhat_lag + Vhat"]
     EF["effects on outcome scale"]
@@ -783,7 +790,7 @@ graph TD
     FV --> RK
     RK --> CV
     CV -->|"no, round < 5"| XS
-    CV -->|"yes"| FF
+    CV -->|"yes: fixed point, or cycle (lowest rank)"| FF
     FF --> RE
     RE --> EF
     EF --> SQ
@@ -846,10 +853,15 @@ graph TD
   lag is missing, and the first position never exists. The missing pattern of V does not depend on `x`.
 - **Unit-effect invariance.** With a unit effect (`force` 1 or 3), adding a constant to one unit's outcome, treated
   or control, changes no `eff` (tested at 1e-8): the constant is absorbed by that unit's `alpha` in V.
-- **`x = 0` equals levels.** `x = 0` is gsynth in levels on the panel without its first period: `att.avg`, `eff`,
-  `est.avg`, `att.boot` and `eff.boot` equal those of `fect(serial = "none")` on that panel with the same seed
-  (checked to 4.4e-16 on balanced panels). Exact only when no lag is missing; with missing cells the filtered panel
-  also loses the cells whose lag is missing.
+- **`x = 0` equals levels.** `x = 0` is gsynth in levels on the panel without its first period, on every panel:
+  `att.avg`, `eff`, `est.avg`, `att.boot` and `eff.boot` equal those of `fect(serial = "none")` on that panel with
+  the same seed (4.4e-16 on balanced panels; to the EM tolerance with missing cells). At `x` exactly 0 the rule, the
+  final fit and the bootstrap use the panel with no cell dropped for a missing lag (`fit$ar1$lag.mask` is `FALSE`;
+  the internal option `fect.ar1.mask.zero = TRUE` restores the mask). For every `x > 0` a cell whose lag is missing
+  is missing in V, and the profile (the x-step, including its point at 0) always uses that common masked set, so SSR
+  is compared across `x` on one set of cells. The estimator is therefore discontinuous at `x = 0` on panels with
+  missing cells. Before stage 2 the mask applied at 0 as well, which lost cells for nothing and produced a runaway
+  fit in simulation cell H1 (RMSE ratio 1.76; 1.08 after).
 - **The recursion anchor.** For each treated unit, `s_i` is the last period with `D = 0` and the original `Y`
   observed, read from the original data and not from the inner fit (the inner fit shows `D = 0` at cells whose filtered row does not
   exist, which would move the anchor). `Yhat_{s_i} = Y_{s_i}`, and for every later period, observed or not,
@@ -862,11 +874,37 @@ graph TD
   residuals of a levels fit; `print` says so. Units that cannot be rebuilt have an all-`NA` `eff` column and are
   listed in `fit$ar1$not.rebuilt`.
 - **Scales.** `eff`, `Y.ct`, `att`, `att.avg`, `est.*` and the bootstrap statistics are on the outcome scale on a
-  T-1 grid. The slots in `fit$ar1$v.scale.slots` stay on the filtered scale; `beta` is valid for both. `fit$cv.treated`
-  is `NULL` on an `ar1` fit; the lists are in `fit$ar1$rule` and `fit$ar1$rule.levels`.
+  T-1 grid. The slots in `fit$ar1$v.scale.slots` stay on the filtered scale; `beta` is valid for both.
+  `fit$cv.treated` is the last round's rule list (identical to `fit$ar1$rule`; `fit$ar1$rule.levels` is round 0),
+  with the extra elements `eligible` and `fallback`.
+- **The alternation is a map on ranks.** For a rank r, G(r) is: x = x(r), then r' = rule(V(x)). The sequence r_0,
+  r_1 = G(r_0), ... is eventually periodic, so a repeated rank means every later round repeats. A fixed point
+  (r_k = r_{k-1}) is `converged`. A cycle stops at its first repeat, takes the pair with the lowest rank in the
+  cycle (scores of the rule at different x are on different scales, so the pairs cannot be ranked by score;
+  parsimony breaks the tie), keeps that pair as computed (no re-optimisation) and issues one warning; `cycled`,
+  `cycle` and `final.round` record it. A run that reaches the cap of 5 rounds warns and has `converged = FALSE`.
+  A fixed single `r` has no alternation (`converged` is `NA`).
+- **Inner EM fits that do not converge.** An inner fit is non-converged when its EM reached `max.iteration` (fect's
+  own condition). Inside the alternation's rule such a rank is ineligible (its scores are reported, it cannot be
+  picked); if every rank is ineligible the unrestricted pick is used and the round is in `fallback.rounds`. Round 0
+  and plain `cv.method = "pretreatment"` are unchanged (the 49-case picks include cases where fect's EM warning
+  fires). The profile is unchanged (it sums the squared residuals of whatever fit returned) and records
+  `em.converged` per point. A non-converged final fit warns (`fit$ar1$em.converged`, `niter`). The warnings of the
+  search fits are muffled and counted in `search.nonconverged`; nothing else is muffled. `fect.ar1.exclude.nonconverged
+  = FALSE` turns the exclusion off.
 - **Inference.** The parametric bootstrap runs on the filtered panel at the chosen `(x, r)` with the user's seed, and
-  each draw is mapped by `e_t = x * e_{t-1} + effV_t` from the anchor (`effV = 0` where V is unobserved). The
-  uncertainty in `x` and `r` is not included (the simulations, stage 2 of this run, report the coverage this gives).
+  each draw is mapped by `e_t = x * e_{t-1} + effV_t` from the anchor (`effV = 0` where V is unobserved; at `x = 0`
+  the map is the identity). The uncertainty in `x` and `r` is not included, and Phase 3c (re-estimating them per
+  draw) is not built in this PR.
+- **Simulation evidence** (internal study, 27 designs, folder `ar1-fect-validation-2026-10-16`). RMSE of the joint
+  ATT relative to the levels ATT: 0.72 to 0.99 at rho >= 0.6; 1.01 to 1.09 at rho = 0 (1.10 at 0.3); intervals
+  narrower (median width ratio 0.86). A 5% test rejects a true null in 2 to 9.3% of runs in 25 of 27 designs. The
+  exception is cell E2 (small panel, trend factors, no overlap, rho = 0.9, 1,200 runs): 12.3% joint, 8.3% default
+  with the rule, 5.9% default at the true rank, 6.1% joint with x and rank both fixed (the conditional bootstrap is
+  calibrated); about 4 points come from the rank rule and 2 from estimating x. The oracle x = rho gave 63.9%. The
+  gate G2 fails in E2, so the planner's verdict is 3c needed; the decision not to build it here (A21) and the
+  open options (re-estimate rank and x per draw; change the rule under no overlap; document only) are in
+  `spec.md` "Amendments 2". Cell J1 (shock before treatment): 13% under both pipelines.
 - **Rule.** The candidate ranks run from the lower to the upper end of `r`, capped only by `Nco - 1`. Units with too
   few pretreatment periods for the top rank leave the score when the units that can be scored hold at least 80% of
   the ATT weight; if no rank qualifies the fit stops. A task whose training design is rank deficient scores `Inf`.

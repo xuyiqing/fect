@@ -672,7 +672,7 @@ $$
 
 The roll-forward passes through any period where the outcome is not observed, and uses the model's prediction there. The effect is $Y_{it} - \hat Y_{it}(0)$, on the scale of the original outcome. The pretreatment event times of the gap plot are different in kind, because they are one-step-ahead prediction errors, $V_{it} - \hat V_{it}$, and not the in-sample residuals of the levels fit.
 
-Three properties are worth knowing. First, with a unit effect (the default `force`), adding a constant to one unit's outcome changes none of the effects. Second, $x = 0$ is the levels Gsynth fit on the panel without its first period, and the output equals that of `serial = "none"` on those data (exactly so when no lag is missing). Third, the first period is lost, so `fit$T` is one less than the number of periods in the data.
+Three properties are worth knowing. First, with a unit effect (the default `force`), adding a constant to one unit's outcome changes none of the effects. Second, $x = 0$ is the levels Gsynth fit on the panel without its first period, and the output equals that of `serial = "none"` on those data (to the EM tolerance when cells are missing). For any $x > 0$, a cell whose lag is missing is missing in the filtered panel, so a panel with missing cells loses more cells than at $x = 0$. Third, the first period is lost, so `fit$T` is one less than the number of periods in the data.
 
 ### Choosing x and r together
 
@@ -680,9 +680,9 @@ Both $x$ and the number of factors $r$ are chosen from the data, jointly.
 
 - For a given $r$, $x$ minimizes the sum of squared residuals of the never-treated units' filtered fit, over a grid of step 0.05 on $[0, 1]$ and then a local refinement. If the minimum is at 0 or 1, it is kept exactly.
 - For a given $x$, $r$ comes from `cv.method = "pretreatment"` (the treated-unit rank rule) applied to the filtered panel. For each candidate rank, each treated unit's pretreatment outcomes are regressed on the factors with one period left out, and the squared error at that period is scored. The rule picks the rank with the smallest average, weighted by each unit's share of the treated cells. It scores the treated units' own pretreatment cells, which is where the counterfactual is extrapolated from. The rule also works without the filter. When `cv.method = "pretreatment"` is used with `serial = "none"`, it ranks the levels fit.
-- The two steps alternate, starting from the rank of the unfiltered panel, until the rank repeats (at most five rounds). The path is in `fit$ar1$path`.
+- The two steps alternate, starting from the rank of the unfiltered panel, until the rank repeats (at most five rounds). The path is in `fit$ar1$path`. If the pairs $(x, r)$ cycle instead of settling, the search stops at the first repeat, uses the pair with the lowest rank in the cycle, and warns. `fit$ar1$cycled` and `fit$ar1$cycle` record the cycle. A rank whose EM fit does not converge is passed over in the search, and `fit$ar1$excluded` lists it. If the final fit does not converge, the fit warns and `fit$ar1$em.converged` is `FALSE`.
 
-The coefficient is never set from a first-stage regression and never supplied by the user. The reason is the signal-to-noise ratio of the factors. Filtering with $x$ close to the persistence $\rho$ of the errors whitens them, but it also rescales every factor. A trend factor's signal-to-noise ratio is multiplied by $(1 - \rho)/(1 + \rho)$ when $x = \rho$. The factor is 0.18 at $\rho = 0.7$ and 0.05 at $\rho = 0.9$. The trend factor then sits closer to the noise, the rank rule tends to pick too few factors, and the counterfactual can lose a component that the levels fit would have kept. A fast-moving factor goes the other way, up to $(1 + \rho)/(1 - \rho)$. A two-step estimate of $\rho$ pushes $x$ high, because it mixes the persistence of the factors with that of the errors, and a value assumed from outside the fit that is too high costs a trend factor in the same way. Choosing $x$ together with $r$, by the fit to the controls, did not do this in the earlier simulations behind the design: with a trend factor, the jointly chosen $x$ stayed near 0.25 where the oracle $x = \rho$ lost the factor.
+The coefficient is never set from a first-stage regression and never supplied by the user. The reason is the signal-to-noise ratio of the factors. Filtering with $x$ close to the persistence $\rho$ of the errors whitens them, but it also rescales every factor. A trend factor's signal-to-noise ratio is multiplied by $(1 - \rho)/(1 + \rho)$ when $x = \rho$. The factor is 0.18 at $\rho = 0.7$ and 0.05 at $\rho = 0.9$. The trend factor then sits closer to the noise, the rank rule tends to pick too few factors, and the counterfactual can lose a component that the levels fit would have kept. A fast-moving factor goes the other way, up to $(1 + \rho)/(1 - \rho)$. A two-step estimate of $\rho$ pushes $x$ high, because it mixes the persistence of the factors with that of the errors, and a value assumed from outside the fit that is too high costs a trend factor in the same way. Choosing $x$ together with $r$, by the fit to the controls, did not do this in an internal simulation study with trend factors: at $\rho$ of 0.6 or more the chosen $x$ averaged 0.22 to 0.59, well below $\rho$. In one design with $\rho = 0.9$, fixing $x = \rho$ at the true rank gave a bias of 1.0 and a 5% test that rejected a true null in 64% of runs. Do not read the chosen $x$ as an estimate of $\rho$.
 
 ### A worked example
 
@@ -735,7 +735,7 @@ The true effect is 2. The levels fit picks `r out.lev$r.cv` factors and estimate
 print(out.ar1)
 ```
 
-The alternation is stored in `fit$ar1$path`. Round 0 is the rank of the unfiltered panel, and the later rows are the pairs $(x, r)$ with the ATT at that pair.
+The alternation is stored in `fit$ar1$path`. Round 0 is the rank of the unfiltered panel, and the later rows are the pairs $(x, r)$ with the ATT at that pair and whether the EM fit at the pair converged.
 
 ```{r ar1-path}
 out.ar1$ar1$path
@@ -757,31 +757,23 @@ plot(out.ar1, type = "gap", xlim = c(-10, 4))
 
 ### Inference and what is not available
 
-The standard errors come from the parametric bootstrap of the filtered fit, with $x$ and $r$ held at their chosen values. Each draw is rolled forward by the same recursion, so intervals are on the outcome scale. They do not include the uncertainty in $x$ and $r$. `vartype = "bootstrap"` (the default value) is replaced by `"parametric"` with a message when `se = TRUE`, and `"jackknife"` stops.
+The standard errors come from the parametric bootstrap of the filtered fit, with $x$ and $r$ held at their chosen values. Each draw is rolled forward by the same recursion, so intervals are on the outcome scale. They treat $x$ and $r$ as known, so they do not include the uncertainty in either. `vartype = "bootstrap"` (the default value) is replaced by `"parametric"` with a message when `se = TRUE`, and `"jackknife"` stops.
 
 The filtered fit has no outcome-scale pretreatment residuals, so everything that tests or plots them stops with a message that names `serial = "ar1"`. These are `diagtest()`, the placebo and carryover tests, `loo`, `dloo`, `permute`, `fect_sens()`, `fect_iden()`, `fect_mspe()`, and the plot types `"equiv"`, `"exit"`, `"factors"`, `"calendar"`, `"box"`, `"counterfactual"` and `"sens"`. The weights `W`, `cfe`, `Z`, `Q`, `loading.bound`, `cm`, `binary` and `fill.missing = TRUE` also stop. `print`, the gap, status and loading plots, `att.cumu()`, `effect()`, `estimand()` for the ATT types and `imputed_outcomes()` work and read the outcome scale. Slots that describe the fit of the filtered outcome (`res`, `sigma2`, `factor`, `lambda.tr`, `alpha.tr` and others) are on the filtered scale; `fit$ar1$v.scale.slots` lists them.
 
 ### When to use it
 
-<!-- STAGE 2: rule of thumb from simulation -->
+The guidance below comes from an internal simulation study (27 designs, kept in the folder `ar1-fect-validation-2026-10-16` and not published). The designs vary the panel size, trend and AR factors, the persistence $\rho$ of the errors (0 to 0.95, and random walks), the length of the posttreatment window, staggered adoption, missing cells, a covariate and a shock before treatment. Each panel was fitted with `serial = "none"` and `serial = "ar1"`, both with the treated-unit rank rule and a parametric bootstrap of 200 draws. Most designs have 80 to 150 replications, so a difference of two or three points in a rejection rate is within the noise there, while one design has 1,200.
 
-::: {.callout-warning appearance="simple"}
-**Provisional.** The rule of thumb below is a draft built from a known-factor calculation and earlier simulations. It will be replaced by the results of the simulation study of this implementation before the release.
-:::
+- **Persistent errors ($\rho$ of 0.6 or more).** The RMSE of the filtered ATT, relative to the levels ATT, was 0.72 to 0.99, and below 0.95 in most designs. The filtered intervals were narrower, with a median width ratio of 0.86. The gains were larger with staggered adoption (0.72), a posttreatment window of 10 periods (0.74) and a large panel at $\rho = 0.6$ (0.83). They were smaller with a window of 2 periods (0.97), missing cells (0.98) and a large panel at $\rho = 0.9$ (0.99).
+- **Little or no persistence ($\rho$ of 0 or 0.3).** The ratio was 1.01 to 1.09 at $\rho = 0$ and 1.10 at $\rho = 0.3$, which means the filter costs up to about 10% in RMSE when there is little persistence to remove. The chosen $x$ was then 0.00 to 0.11. If the controls' residuals show little autocorrelation, use `serial = "none"`.
+- **Report both.** Report the filtered estimate next to the levels estimate, even if the two agree. When they differ by more than their standard errors, say so.
+- **Never plug in a value of $\rho$.** See "Choosing x and r together". The coefficient is only valid when it is chosen jointly with the rank.
 
-The filter can help most when the errors are persistent and the estimand is short-run. The table gives the best-case reduction in root mean squared error from filtering when the factors are known, for an ATT averaged over $q$ posttreatment periods and errors with persistence $\rho$. Realized gains with estimated factors are smaller.
+In 25 of the 27 designs, a 5% test rejected a true null in 2% to 9% of runs under the filter, which is close to the levels rate, with paired differences within about three points. The two exceptions are the next two bullets.
 
-| $\rho$ \ $q$ | 1 | 3 | 5 | 10 | 20 |
-|---|---|---|---|---|---|
-| 0.3 | 5% | 2% | 1% | 1% | 0% |
-| 0.5 | 13% | 7% | 4% | 2% | 1% |
-| 0.7 | 29% | 19% | 13% | 6% | 3% |
-| 0.8 | 40% | 30% | 23% | 13% | 6% |
-| 0.9 | 56% | 47% | 40% | 27% | 15% |
-
-- **Little to gain** when the persistence is moderate ($\rho$ below about 0.5), or when the effect is averaged over a long window ($q$ of 10 or more with $\rho$ up to 0.7). The best case is under about 10%, and levels Gsynth with the treated-unit rank rule is enough. Its extra factors absorb the dynamics, at some cost in precision.
-- **Worth fitting** when $\rho$ is high (0.7 or more) and the estimand is short-run ($q$ of 5 or fewer, or the early event-time effects). Report the filtered estimate next to the levels estimate.
-- **Not fixed by the filter.** When treatment follows a shock in the last pretreatment periods, the levels fit and the filtered fit were biased about equally in earlier simulations. Hiding the last pretreatment periods from the fit is a candidate remedy that has not been tested.
+- **Not fixed by the filter.** When treatment follows a shock in the last pretreatment periods, the levels fit and the filtered fit were biased about equally: the 5% test rejected a true null in 13% of runs under both. The RMSE was still lower under the filter (0.89). Hiding the last pretreatment periods from the fit is a candidate remedy that has not been tested.
+- **Known limitation.** When the treated units lie outside the range of the control units' loadings (no overlap) and the errors are highly persistent, the filtered interval is too narrow. In a small panel with trend factors, no overlap and $\rho = 0.9$, a 5% test rejected a true null in 12.3% of 1,200 runs under the filter, against 8.3% under `serial = "none"` with the same rank rule and 5.9% under `serial = "none"` when the true rank is known. About 4 points of the excess come from choosing the rank by cross-validation, and about 2 points from estimating $x$. The same design with $\rho = 0.6$ showed no excess (150 runs), and no other design was examined. In this setting, check the overlap with `plot(fit, type = "loading.overlap")`, since the excess appeared only in a design without overlap, report the `serial = "none"` estimate next to the `serial = "ar1"` estimate, and treat the filtered interval as optimistic.
 - **Cautions.** The residual AR(1) of the controls at the chosen rank understates $\rho$, because extra factors absorb persistence. The jointly chosen $x$ is biased toward zero in short panels, so a small $x$ does not show that the persistence is small when $T$ is small.
 
 ## CFE with GSynth
