@@ -196,6 +196,17 @@ trim_closure_env <- function(fun) {
   TRUE
 }
 
+## Per-draw panel hook of the parametric bootstrap (generic; set by a caller
+## around one fect_boot() call and reset on exit, NULL otherwise). A hook is a
+## function(Y, X, D, I, II, id, Ntr) called for each draw right after the
+## draw's panel is formed and before the outcome is divided by the
+## normalization constant. It returns list(Y, X, I, II, value) with arrays of
+## the same dimensions (the panel the refit uses and one number for the draw),
+## or NULL / an error when the draw cannot be made (the draw then fails like
+## a failed refit). With no hook nothing changes.
+.fect_boot_hooks <- new.env(parent = emptyenv())
+.fect_boot_hooks$panel <- NULL
+
 fect_boot <- function(
   Y,
   X,
@@ -275,6 +286,7 @@ fect_boot <- function(
   dloo.group.map = NULL    # rawgroup<->newgroup map for the per-group breakdown
 ) {
   do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
+  panel.hook <- .fect_boot_hooks$panel
   ## dloo overlay bookkeeping: the pre-trend draws are collected per replicate
   ## (like att.boot) so inference reuses the native resampling with no retained
   ## per-replicate panels. `dloo.pre.term` / `dloo.npre` / `dloo.ng` are filled
@@ -1245,6 +1257,26 @@ fect_boot <- function(
       I.boot <- out$I[, id.boot, drop = FALSE]
       II.boot <- out$II[, id.boot, drop = FALSE]
       II.cm.boot <- out$II.cm[, id.boot, drop = FALSE]
+      ## per-draw panel hook (generic): may replace the draw's panel; a draw
+      ## it cannot make fails like a failed refit
+      hook.value <- NULL
+      hook.failed <- FALSE
+      if (!is.null(panel.hook)) {
+        hk <- try(
+          panel.hook(Y = Y.boot, X = X.boot, D = D.boot, I = I.boot,
+                     II = II.boot, id = id.boot, Ntr = Ntr),
+          silent = TRUE
+        )
+        if (inherits(hk, "try-error") || !is.list(hk)) {
+          hook.failed <- TRUE
+        } else {
+          Y.boot <- hk$Y
+          X.boot <- hk$X
+          I.boot <- hk$I
+          II.boot <- hk$II
+          hook.value <- hk$value
+        }
+      }
       ## The weights follow the units of the replicate (treated units first,
       ## then the drawn controls), so att.avg.W / att.on.W exist for the
       ## collector. Before 2.4.7 W.boot was NULL and weighted parametric
@@ -1297,7 +1329,7 @@ fect_boot <- function(
         Y.boot <- Y.boot / norm.para[1]
       }
 
-      synth.out <- try(
+      synth.out <- if (hook.failed) NULL else try(
         impute_Y0(
           method     = method,
           predictive = time.component.from,
@@ -1346,7 +1378,7 @@ fect_boot <- function(
         silent = TRUE
       )
 
-      if ("try-error" %in% class(synth.out) ||
+      if (hook.failed || "try-error" %in% class(synth.out) ||
           !.fect_boot_result_ok(synth.out, length(time.on), TT, keep.sims,
                                 length(id.boot))) {
         boot0 <- list(
@@ -1383,9 +1415,11 @@ fect_boot <- function(
           I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
           boot.id = NULL
         )
+        if (!is.null(panel.hook)) boot0$hook.value <- NA_real_
         return(boot0)
       } else {
         synth.out$boot.id <- id.boot
+        if (!is.null(panel.hook)) synth.out$hook.value <- hook.value
         return(synth.out)
       }
     }
@@ -2121,6 +2155,10 @@ fect_boot <- function(
   ## as a failed parallel worker is, so that boot.rm drops it and the count
   ## message below reports it. keep.sims arrays go through .fect_store_slice(),
   ## which pads narrower replicates (cluster bootstrap) with NA columns.
+  hook.draws <- NULL
+  if (!is.null(panel.hook) && vartype == "parametric") {
+    hook.draws <- rep(NA_real_, nboots)
+  }
   for (j in 1:nboots) {
     if (inherits(boot.out[[j]], "error")) {
       warning(
@@ -2132,6 +2170,13 @@ fect_boot <- function(
       boot <- boot.out[[j]]
       stored <- tryCatch(
         {
+          if (!is.null(hook.draws)) {
+            hook.draws[j] <- if (length(boot$hook.value) == 1L) {
+              as.numeric(boot$hook.value)
+            } else {
+              NA_real_
+            }
+          }
           att.avg.boot[, j] <- boot$att.avg
           att.avg.unit.boot[, j] <- boot$att.avg.unit
           att.boot[, j] <- boot$att
@@ -2366,6 +2411,14 @@ fect_boot <- function(
         n.kept, nboots, rep.kind
       ), call. = FALSE)
     }
+  }
+  ## the per-draw numbers of a panel hook, in draw order, and which draws
+  ## survived the removal above
+  boot.hook <- NULL
+  if (!is.null(hook.draws)) {
+    hook.kept <- rep(TRUE, nboots)
+    if (n.fail > 0L) hook.kept[boot.rm] <- FALSE
+    boot.hook <- list(value = hook.draws, kept = hook.kept)
   }
   if (dis) {
     message(dim(att.boot)[2], " runs\n", sep = "")
@@ -4923,6 +4976,9 @@ fect_boot <- function(
     vartype = vartype,
     para.error = if (vartype == "parametric" && exists("para.error.resolved")) para.error.resolved else NULL
   )
+  if (!is.null(boot.hook)) {
+    result$boot.hook <- boot.hook
+  }
   if (keep.sims) {
     result = c(
       result,
