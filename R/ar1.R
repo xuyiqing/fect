@@ -737,7 +737,13 @@
     ## filtered covariates, on the inner grid
     Xf <- array(NA_real_, dim = c(T1, N1, p.all))
     for (k in seq_len(p.all)) {
-        Xf[, , k] <- Xfull[rows, , k] - x * Xfull[rows - 1L, , k]
+        ## x exactly 0 without the lag mask: V = X, the lag is not used
+        ## (0 * NA would be NA)
+        Xf[, , k] <- if (x == 0 && !isTRUE(ctx$mask.zero)) {
+            Xfull[rows, , k]
+        } else {
+            Xfull[rows, , k] - x * Xfull[rows - 1L, , k]
+        }
     }
 
     tr <- inner$tr
