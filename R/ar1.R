@@ -1159,6 +1159,108 @@
 }
 
 ## ----------------------------------------------------------------------
+## The x-search on a levels panel (also run inside every bootstrap draw)
+## ----------------------------------------------------------------------
+## Residual sum of squares of the rank-r control model on a panel `Yv` (T x N,
+## NA where unobserved) with covariates `Xv` (T x N x p): the lowest-level call
+## that reproduces what the front end's control fit gives (R/fect_nevertreated.R,
+## .estimate_co), so the profile is the same number without the front end.
+.fect_ar1_ssr <- function(Yv, Xv, r, force, tol, max.iteration) {
+    TT <- nrow(Yv)
+    N <- ncol(Yv)
+    p <- dim(Xv)[3]
+    obs <- is.finite(Yv)
+    I1 <- matrix(as.numeric(obs), TT, N)
+    YY <- Yv
+    YY[!obs] <- 0
+    if (p > 0L) {
+        for (k in seq_len(p)) {
+            xk <- Xv[, , k]
+            xk[!obs] <- 0
+            Xv[, , k] <- xk
+        }
+    }
+    r <- as.integer(min(r, TT, N))
+    force <- as.integer(force)
+    beta0 <- matrix(0, p, 1)
+    if (all(obs)) {
+        out <- inter_fe(YY, Xv, r, force, beta0, tol, as.integer(max.iteration))
+    } else {
+        data.ini <- matrix(NA_real_, N * TT, p + 3L)
+        data.ini[, 1] <- c(YY)
+        data.ini[, 2] <- rep(seq_len(N), each = TT)
+        data.ini[, 3] <- rep(seq_len(TT), N)
+        for (k in seq_len(p)) data.ini[, 3L + k] <- c(Xv[, , k])
+        ini <- initialFit(data = data.ini, force = force, oci = which(c(obs)))
+        Y0 <- ini$Y0
+        beta0 <- ini$beta0
+        if (p > 0L && anyNA(beta0)) beta0[is.na(beta0)] <- 0
+        ## centre as .estimate_co does for an unbalanced panel
+        mu.init <- sum(YY * I1) / sum(I1)
+        out <- inter_fe_ub(YY - mu.init * I1, Y0 - mu.init, Xv, I1, as.matrix(0),
+                           beta0, r, force, tol, as.integer(max.iteration),
+                           fit_init = NULL)
+    }
+    list(ssr = sum(out$residuals[obs]^2), niter = out$niter)
+}
+
+## x for a levels panel at rank r: the search of the main fit (grid, one
+## optimize() between the neighbours of the grid minimum, exact boundary).
+## Y: T x N levels (NA where unobserved), D: T x N, X: NULL or T x N x p, all on
+## the full time grid; the controls are the columns with no treated cell. The
+## lag mask is the same at every x (a cell is used iff it and its lag are
+## observed). Returns list(x, profile = data.frame(x, ssr)); x is NA when no
+## grid point can be fitted.
+.fect_ar1_search_x <- function(Y, D, X = NULL, r, force = 3L, tol = 1e-5,
+                               max.iteration = 5000, grid = .FECT_AR1_GRID) {
+    co <- which(colSums(D, na.rm = TRUE) == 0)
+    TT <- nrow(Y)
+    Y <- Y[, co, drop = FALSE]
+    X <- if (is.null(X)) {
+        array(0, dim = c(TT, length(co), 0L))
+    } else {
+        X[, co, , drop = FALSE]
+    }
+    p <- dim(X)[3]
+    fin <- is.finite(Y)
+    for (k in seq_len(p)) fin <- fin & is.finite(X[, , k])
+    Y[!fin] <- NA_real_
+    cur <- fin[-1L, , drop = FALSE] & fin[-TT, , drop = FALSE]
+    Y1 <- Y[-1L, , drop = FALSE]
+    Y0 <- Y[-TT, , drop = FALSE]
+    X1 <- X[-1L, , , drop = FALSE]
+    X0 <- X[-TT, , , drop = FALSE]
+    ssr_at <- function(x) {
+        Yv <- Y1 - x * Y0
+        Yv[!cur] <- NA_real_
+        Xv <- X1 - x * X0
+        v <- tryCatch(.fect_ar1_ssr(Yv, Xv, r, force, tol, max.iteration)$ssr,
+                      error = function(e) Inf)
+        if (!is.finite(v)) Inf else v
+    }
+    pts <- new.env(parent = emptyenv())
+    pts$x <- numeric(0)
+    pts$ssr <- numeric(0)
+    f <- function(x) {
+        v <- ssr_at(x)
+        pts$x <- c(pts$x, x)
+        pts$ssr <- c(pts$ssr, v)
+        v
+    }
+    g <- grid
+    s <- vapply(g, f, 0)
+    if (!any(is.finite(s))) {
+        return(list(x = NA_real_, profile = data.frame(x = g, ssr = s)))
+    }
+    k <- which.min(s)
+    bracket <- c(g[max(1L, k - 1L)], g[min(length(g), k + 1L)])
+    o <- stats::optimize(f, interval = bracket, tol = 1e-5)
+    xx <- if (is.finite(o$objective) && o$objective < s[k]) o$minimum else g[k]
+    o.ord <- order(pts$x)
+    list(x = xx, profile = data.frame(x = pts$x[o.ord], ssr = pts$ssr[o.ord]))
+}
+
+## ----------------------------------------------------------------------
 ## Features that cannot run on a serial = "ar1" fit
 ## ----------------------------------------------------------------------
 ## Returns silently for any other fit. Called at the top of each function that
