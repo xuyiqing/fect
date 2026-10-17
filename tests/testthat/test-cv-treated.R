@@ -44,12 +44,12 @@ expect_same_rule <- function(fit, rule, label) {
 test_that("R2: scores and picks equal the prototype's treated_rank (balanced panels)", {
   f1 <- pre_fit(P1)
   expect_same_rule(f1, ref$rules$P1, "P1")
-  ## pinned values (prototype simulation code rank_scores, sim/rank_rules.R; 7 decimals, so the
-  ## comparison is to the half unit of the last pinned digit, 5e-8; the 1e-10 gate is above)
-  pin_loo <- c(3.8173411, 2.2140731, 1.3159582, 1.2655395, 1.3447646, 1.4404983)
-  pin_fwd <- c(2.8473465, 2.1280840, 1.5709935, 1.7651250, 1.8985006, 3.3158237)
-  expect_close(f1$cv.treated$table$loo, pin_loo, 1e-7, "P1 pinned loo")
-  expect_close(f1$cv.treated$table$fwd, pin_fwd, 1e-7, "P1 pinned fwd")
+  ## pinned values (prototype treated_rank and simulation code rank_scores, which agree to 1e-15;
+  ## test-spec amendment 4: 15 significant digits, relative tolerance 1e-8)
+  pin_loo <- c(3.81734114141702, 2.21407309400062, 1.31595821309278, 1.26553950347434, 1.34476455369255, 1.44049830784233)
+  pin_fwd <- c(2.84734647127381, 2.12808394805313, 1.57099346192948, 1.76512502816633, 1.89850059990273, 3.31582367958158)
+  expect_close(f1$cv.treated$table$loo, pin_loo, 1e-8, "P1 pinned loo", rel = TRUE)
+  expect_close(f1$cv.treated$table$fwd, pin_fwd, 1e-8, "P1 pinned fwd", rel = TRUE)
   expect_identical(f1$cv.treated$r_loo, 3L); expect_identical(f1$cv.treated$r_fwd, 2L)
   expect_same_rule(pre_fit(ar1_P2()), ref$rules$P2, "P2")
 })
@@ -82,6 +82,8 @@ test_that("R5: candidate ranks are fixed before scoring", {
   expect_identical(ct$rbar, 5L)
   expect_identical(ct$n_tr, 9L); expect_identical(ct$n_loo, 8L)
   expect_gte(ct$share_loo, 0.8)
+  expect_close(ct$share_loo, 64 / 78, 1e-12, "R5a share_loo = 64/78")        # pinned instance (test-spec R5)
+  expect_true(all(is.finite(ct$table$loo))); expect_identical(ct$table$r, 0:5)
   expect_match(ct$note, "8 of 9")
   ## (b) units holding more than 20% of the weight are too short for rank 5: three units treated after
   ##     t = 6 (14 post cells each, 42 of 90 = 47%) support ranks up to 4 only.
@@ -181,19 +183,15 @@ test_that("R9: inference with the pretreatment rule", {
   expect_true(all(is.finite(f1$est.avg)) && all(is.finite(f2$est.avg)))
 })
 
+## R10 (amended): (a) the build's pick equals the prototype's leave-one-out pick on every one of the 40
+## draws (the gate; picks stored in ar1-reference.rds$r10); (b) r.cv never above rbar; (c) r.cv >= 2 on at
+## least 38 of 40 draws (the prototype itself: 40/40). The old requirement "share of r.cv == 2 >= 0.35" is
+## withdrawn by the planner (the prototype's share is 7/40).
 test_that("R10: on the motivating design the picks equal the prototype's", {
   picks <- vapply(1:40, function(s) {
     f <- pre_fit(ar1_mot_panel(s)); c(r = f$r.cv, rbar = f$cv.treated$rbar)
   }, c(r = 0, rbar = 0))
-  expect_identical(as.integer(picks["r", ]), as.integer(ref$r10$proto_pick))   # prototype's own rank_scores pick, every draw
-  expect_true(all(picks["r", ] <= picks["rbar", ]))
-})
-
-## Spec R10 as stated: at least 35% of 40 draws pick the true rank 2. The prototype's own picks on the
-## same draws give 7/40 = 17.5% (and 8/40 = 20% on its fixed design 20261017), so this threshold is not
-## met by the reference implementation either; kept as written so the discrepancy stays visible
-## (recorded in the run's audit.md for the planner).
-test_that("R10 [spec threshold]: the share of draws with r.cv == 2 is at least 0.35", {
-  picks <- vapply(1:40, function(s) pre_fit(ar1_mot_panel(s))$r.cv, 0)
-  expect_gte(mean(picks == 2), 0.35)
+  expect_identical(as.integer(picks["r", ]), as.integer(ref$r10$proto_pick))   # (a) every draw
+  expect_true(all(picks["r", ] <= picks["rbar", ]))                            # (b)
+  expect_gte(sum(picks["r", ] >= 2), 38)                                       # (c)
 })

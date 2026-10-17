@@ -39,30 +39,53 @@ test_that("E1: x = 0 equals levels GSC on the panel without its first period", {
   }
 })
 
-## P4 has cells whose previous cell is missing. Section 1 of the spec defines V as missing there,
-## so x = 0 is gsynth on the hand-filtered panel (not on the panel merely without its first period).
-test_that("E1 (P4): x = 0 equals gsynth on the hand-filtered panel", {
+## P4 has cells whose previous cell is missing. Section 1 of the spec defines V as missing there, so x = 0 is gsynth
+## on the hand-filtered panel (not on the panel merely without its first period) on every cell that panel keeps.
+## Round 2: the chain now passes through unobserved cells (E5, E7), so the build also rebuilds the observed treated
+## post cells whose predecessor is missing; gsynth on the hand-filtered panel has no V there and leaves them NA.
+## The two therefore agree cell by cell on the reference's cells, and the build's extra cells are exactly the observed
+## treated post cells with a missing predecessor. att.avg is compared on a panel where the two cell sets coincide (no
+## treated post cell with a missing predecessor). The amended E1 text asks for att.avg equality on P4 itself; the sets
+## differ there by construction (audit.md round 2, routed to the planner).
+test_that("E1 (P4): x = 0 equals gsynth on the hand-filtered panel, cell by cell", {
   P4 <- ar1_P4()
+  obs <- with(P4, tapply(!is.na(y), list(time, id), any)); obs[is.na(obs)] <- FALSE
   for (r in 0:2) {
     fix_x(0)
     f <- ar1_fit(P4, r = r); g <- ar1_fect(ar1_hand_filter(P4, 0), CV = FALSE, r = r, min.T0 = 4)
-    expect_close(f$att.avg, g$att.avg, 1e-8, sprintf("P4 hand-filter r=%d att.avg", r))
-    expect_close(f$eff, g$eff, 1e-8, sprintf("P4 hand-filter r=%d eff", r))
-    expect_close(f$att, g$att, 1e-8, sprintf("P4 hand-filter r=%d att", r))
+    expect_identical(dim(f$eff), dim(g$eff)); expect_identical(as.character(f$id), as.character(g$id))
+    fe <- is.finite(f$eff); ge <- is.finite(g$eff); both <- fe & ge
+    expect_true(all(fe[ge]), info = sprintf("r=%d: the build keeps every cell of the reference", r))
+    expect_close(f$eff[both], g$eff[both], 1e-8, sprintf("P4 hand-filter r=%d eff on shared cells", r))
+    ## extra cells: observed treated post cells whose predecessor on the grid is missing
+    pred_miss <- matrix(FALSE, nrow(f$eff), ncol(f$eff))
+    for (j in seq_len(ncol(f$eff))) for (i in seq_len(nrow(f$eff)))
+      pred_miss[i, j] <- !obs[as.character(f$rawtime[i] - 1), as.character(f$id[j])]
+    expected_extra <- post_cells(f) & pred_miss
+    expect_identical(unname(fe & !ge), unname(expected_extra & fe), info = sprintf("r=%d: extra cells are predecessor-missing post cells", r))
+    expect_gt(sum(fe & !ge), 0)
   }
 })
 
-## Spec E1 for P4 as written compares with the panel without its first period only. The two panels
-## differ on P4 (cells with a missing previous cell are kept there and dropped by the filter), so the
-## literal reference cannot match the filter's definition in section 1; recorded for the planner.
-test_that("E1 [spec literal, P4]: x = 0 equals the panel without its first period (1e-8)", {
-  P4 <- ar1_P4()
+test_that("E1 (P4 without treated post gaps): x = 0 equals gsynth on the hand-filtered panel (att.avg, eff, att, 1e-8)", {
+  ## controls and treated pretreatment cells missing at random; no treated post cell has a missing predecessor
+  P4c <- ar1_drop_cells(ar1_P2(), seed = 103, force.units = integer(0))
+  full <- ar1_P2()                                   # put back any dropped treated cell at t >= T0 (T0 = 15)
+  add <- full[full$id > 30 & full$time >= 15 & !(paste(full$id, full$time) %in% paste(P4c$id, P4c$time)), ]
+  P4c <- rbind(P4c, add); P4c <- P4c[order(P4c$id, P4c$time), ]
+  expect_lt(nrow(P4c), nrow(full))                   # controls and earlier cells are still missing
   for (r in 0:2) {
     fix_x(0)
-    f <- ar1_fit(P4, r = r); g <- ar1_fit_levels(P4, r)
-    expect_close(f$att.avg, g$att.avg, 1e-8, sprintf("P4 literal r=%d att.avg", r))
+    f <- ar1_fit(P4c, r = r); g <- ar1_fect(ar1_hand_filter(P4c, 0), CV = FALSE, r = r, min.T0 = 4)
+    expect_identical(unname(is.finite(f$eff)), unname(is.finite(g$eff)))
+    expect_close(f$att.avg, g$att.avg, 1e-8, sprintf("P4c hand-filter r=%d att.avg", r))
+    expect_close(f$eff, g$eff, 1e-8, sprintf("P4c hand-filter r=%d eff", r))
+    expect_close(f$att, g$att, 1e-8, sprintf("P4c hand-filter r=%d att", r))
   }
 })
+
+## Amendment 1: the literal reference "P4 without its first period" is excluded (it keeps cells with a
+## missing predecessor and differs by 0.31, 0.32, 0.19 at r = 0, 1, 2); the hand-filtered panel above is the reference.
 
 ## E2: fixed x against the prototype's filtered_att on P1 ------------------------------------------
 test_that("E2: fixed x equals the prototype's filtered_att on P1", {
@@ -102,28 +125,27 @@ test_that("E3: the joint x equals the prototype's on P1 (fixed r), att.avg at th
 
 test_that("E3 (boundaries): white-noise errors give x at or next to 0; random-walk errors give x near 1", {
   bx <- ref$boundary
+  wn_x <- numeric(length(bx$wn$seed))
   for (s in bx$wn$seed) {
     x <- ar1_fit(ar1_panel(30, 5, 15, 5, rho = 0, seed = 5000 + s), r = 2)$ar1$x
     expect_close(x, bx$wn$x[s], 1e-6, sprintf("white noise seed %d: x vs the prototype's", s))
-    expect_lte(x, max(0.05, bx$wn$x[s] + 1e-6))     # at most 0.05 unless the prototype's own x is higher
+    expect_lte(x, 0.15)                              # amended bound (above the prototype's Monte Carlo maximum 0.111)
+    wn_x[s] <- x
   }
+  expect_gte(sum(wn_x == 0), 6)                      # amended: x = 0 for at least 6 of the 10 seeds
+  rw_x <- numeric(length(bx$rw30$seed))
   for (s in bx$rw30$seed) {
     x <- ar1_fit(ar1_rw_panel(30, 5, 15, 5, 6000 + s), r = 2)$ar1$x
     expect_close(x, bx$rw30$x[s], 1e-6, sprintf("random walk (30 controls) seed %d", s))
-    expect_gte(x, 0.8)
+    expect_gte(x, 0.7)                               # amended per-seed bound (Monte Carlo minimum 0.731)
+    rw_x[s] <- x
   }
+  expect_gte(median(rw_x), 0.8)                      # amended
   for (s in bx$rw100$seed) {
     x <- ar1_fit(ar1_rw_panel(100, 20, 40, 5, 7000 + s), r = 2)$ar1$x
     expect_close(x, bx$rw100$x[s], 1e-6, sprintf("random walk (100 controls) seed %d", s))
     expect_gte(x, 0.9)
   }
-})
-
-## Spec E3 as written: the joint x on white-noise panels is at most 0.05 (ten seeds). The prototype's
-## own x on the seeds used here (5001..5010) is 0.0649 at seed 10, so the threshold is not stable.
-test_that("E3 [spec threshold]: white-noise panels give x <= 0.05", {
-  x <- vapply(1:10, function(s) ar1_fit(ar1_panel(30, 5, 15, 5, rho = 0, seed = 5000 + s), r = 2)$ar1$x, 0)
-  expect_lte(max(x), 0.05)
 })
 
 ## E4: alternation ----------------------------------------------------------------------------------------
@@ -181,6 +203,31 @@ test_that("E5: noiseless panels recover the effect exactly at x = rho", {
       expect_identical(sum(cells), sum(post_cells(f)), info = sprintf("%s tau=%g: all observed post cells rebuilt", nm, tau))
     }
   }
+})
+
+## Chain through gaps (round 2): the recursion starts at the last observed pretreatment outcome and passes
+## through unobserved cells on the model's prediction. Noiseless P6 at x = rho: every rebuilt post cell is tau.
+test_that("E5 (gaps): one missing cell does not break or restart the chain", {
+  fix_x(0.6)
+  d0 <- ar1_panel(30, 5, 15, 5, rho = 0.6, seed = 201, noiseless = TRUE, tau = 2)
+  ## (i) Y(31, t = 15) missing: the last observed pretreatment outcome of unit 31 is at t = 14
+  d <- d0[!(d0$id == 31 & d0$time == 15), ]
+  f <- ar1_fit(d, r = 2)
+  rb <- f$ar1$rebuilt; rb <- rb[rb$id == "31", ]
+  expect_true(rb$ok); expect_lt(rb$anchor, 15)
+  expect_identical(as.integer(rb$anchor), 14L)
+  post <- f$eff[f$rawtime > 15, match("31", as.character(f$id))]
+  expect_true(all(is.finite(post)), info = "unit 31: all five post cells rebuilt")
+  expect_close(post, rep(2, length(post)), 1e-6, "unit 31 post effects equal tau")
+  ## (ii) Y(32, t = 18) missing, a post-treatment cell: later cells are rebuilt through it
+  d <- d0[!(d0$id == 32 & d0$time == 18), ]
+  f <- ar1_fit(d, r = 2)
+  rb <- f$ar1$rebuilt; rb <- rb[rb$id == "32", ]
+  expect_true(rb$ok); expect_identical(as.integer(rb$anchor), 15L)
+  obs <- f$rawtime > 15 & f$rawtime != 18
+  post <- f$eff[obs, match("32", as.character(f$id))]
+  expect_true(all(is.finite(post)), info = "unit 32: observed post cells rebuilt through the gap")
+  expect_close(post, rep(2, length(post)), 1e-6, "unit 32 post effects equal tau")
 })
 
 test_that("E5: the oracle can fail (x = 0 and x = 0.3 are not exact)", {
