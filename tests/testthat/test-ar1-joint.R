@@ -708,9 +708,10 @@ test_that("M7: complete panels give identical results with and without the mask-
   }
 })
 
-## D2 (behavioural proxy): 3c is not built -- the draws come from one inner call at the final pair; x and the rank are not
-## re-estimated per draw, so the fit with intervals reports the same pair as the fit without.
-test_that("D2: inference does not re-estimate x or the rank (same pair with and without se)", {
+## D2 (Amendments 3): the "3c is not built" check is deleted. What stays is the part that is still true and
+## independent of 3c: the point estimate (x, rank, ATT) does not depend on whether intervals are requested. The
+## new bootstrap (T1-T11) is tested in test-ar1-boot-x.R.
+test_that("D2: the point estimate and the chosen pair do not depend on se", {
   P2 <- ar1_P2()
   a <- ar1_fit(P2, r = c(0, 5)); b <- ar1_boot(P2, r = c(0, 5))
   expect_identical(a$r.cv, b$r.cv); expect_close(a$ar1$x, b$ar1$x, 1e-12, "x with and without se")

@@ -177,3 +177,68 @@ ar1_note <- function(...) {
   lg <- Sys.getenv("AR1_TEST_LOG", "")
   if (nzchar(lg)) cat("NOTE\t", txt, "\n", sep = "", file = lg, append = TRUE)
 }
+
+## ---- Phase 3c (re-estimating x in every bootstrap draw): helpers for test-ar1-boot-x.R ----
+
+## T2 generator (test-spec Amendments 3, seed 11): N_co = 20, N_tr = 3, T = 14, treatment on the last 4 periods of the
+## treated units; x0 = 0.5; xi_t, alpha_i, f_t, lambda_i, Y_i1 ~ N(0, 1) (drawn in that order);
+## m_it = 0.3 + xi_t + alpha_i + lambda_i f_t; Y0_it = x0 Y0_i,t-1 + m_it (t >= 2); observed = Y0 + tau D (the effect is added
+## to the observed outcome only, not carried in the recursion). The filtered model at x0 is exactly rank 1 plus two-way
+## effects: there is no noise.
+ar1_noiseless_3c <- function(seed = 11, Nco = 20, Ntr = 3, T = 14, q = 4, x0 = 0.5, tau = 1) {
+  set.seed(seed); N <- Nco + Ntr
+  xi <- rnorm(T); alpha <- rnorm(N); f <- rnorm(T); lam <- rnorm(N); Y1 <- rnorm(N)
+  M <- 0.3 + outer(xi, rep(1, N)) + outer(rep(1, T), alpha) + outer(f, lam)
+  Y0 <- matrix(0, T, N); Y0[1, ] <- Y1
+  for (t in 2:T) Y0[t, ] <- x0 * Y0[t - 1, ] + M[t, ]
+  D <- matrix(0L, T, N); D[(T - q + 1):T, Nco + seq_len(Ntr)] <- 1L
+  Y <- Y0 + tau * D
+  data.frame(id = rep(seq_len(N), each = T), time = rep(seq_len(T), N), y = as.vector(Y), d = as.vector(D))
+}
+
+## Largest difference between two slots, relative to max(1, max |b|); Inf when the structure or the NA pattern differs.
+ar1_slot_diff <- function(a, b) {
+  if (is.null(a) || is.null(b)) return(if (is.null(a) && is.null(b)) 0 else Inf)
+  if (is.list(a)) {
+    if (!is.list(b) || length(a) != length(b)) return(Inf)
+    return(max(0, unlist(Map(ar1_slot_diff, a, b))))
+  }
+  if (is.numeric(a) || is.logical(a)) {
+    if (!(is.numeric(b) || is.logical(b)) || !identical(dim(a), dim(b)) || length(a) != length(b)) return(Inf)
+    if (!identical(is.na(a), is.na(b))) return(Inf)
+    k <- !is.na(a); if (!any(k)) return(0)
+    sc <- max(1, max(abs(as.numeric(b[k]))))
+    return(max(abs(as.numeric(a[k]) - as.numeric(b[k]))) / sc)
+  }
+  if (identical(a, b)) 0 else Inf
+}
+
+## Every slot but `call` equal with tolerance 0.
+ar1_fit_identical <- function(a, b) {
+  nm <- setdiff(union(names(a), names(b)), "call")
+  bad <- nm[!vapply(nm, function(s) isTRUE(all.equal(a[[s]], b[[s]], tolerance = 0)), NA)]
+  bad
+}
+
+## Log an evidence line (label, value, error, tolerance) when AR1_TEST_LOG is set.
+ar1_log <- function(label, value, err, tol) {
+  lg <- Sys.getenv("AR1_TEST_LOG", "")
+  if (nzchar(lg)) cat(sprintf("3c\t%s\t%s\t%.3e\t%.1e\tabs\n", label, value, err, tol), file = lg, append = TRUE)
+}
+
+## Levels matrices on the full time grid for the low-level search seam fect:::.fect_ar1_search_x (NA = unobserved).
+ar1_levels_arrays <- function(d, covar = FALSE) {
+  ids <- sort(unique(d$id)); tg <- sort(unique(d$time))
+  Y <- D <- matrix(NA_real_, length(tg), length(ids))
+  i <- match(d$time, tg); j <- match(d$id, ids)
+  Y[cbind(i, j)] <- d$y; D[cbind(i, j)] <- d$d
+  X <- NULL
+  if (covar) { X <- array(NA_real_, c(length(tg), length(ids), 1)); X[cbind(i, j, 1L)] <- d$x }
+  list(Y = Y, D = D, X = X)
+}
+
+## TRUE when the loaded fect is a source tree (load_all), not an installed library: parallel workers load the installed one.
+ar1_is_dev_load <- function() {
+  p <- tryCatch(getNamespaceInfo("fect", "path"), error = function(e) "")
+  nzchar(p) && length(list.files(file.path(p, "R"), pattern = "\\.R$")) > 0
+}
