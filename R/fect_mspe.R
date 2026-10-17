@@ -15,6 +15,7 @@ fect_mspe <- function(
     norm.para   = NULL,           # normalization vector, or NULL
     proportion  = 0               # proportion cutoff for count.T.cv (same as fect_cv)
 ) {
+    .fect_stop_ar1(out.fect, "fect_mspe()")
     if (!is.null(seed)) set.seed(seed)
     caller_env <- parent.frame()
 

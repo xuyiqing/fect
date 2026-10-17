@@ -28,6 +28,7 @@ fect_iden <- function(x,
                       covariates = NULL,
                       quadratic = TRUE,
                       interaction = TRUE) {
+    .fect_stop_ar1(x, "fect_iden()")
   if (is.null(x$est) || is.null(x$est$fit)) {
     stop("`x$est$fit` is required to compute g0.\n")
   }

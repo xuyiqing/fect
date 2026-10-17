@@ -129,6 +129,11 @@ plot.fect <- function(
     ## remove once you have re-rendered with the modern defaults.
     ...) {
 
+  if (isTRUE(loo) || isTRUE(dloo) || isTRUE(cm)) {
+    .fect_stop_ar1(x, paste0("plot(", if (isTRUE(loo)) "loo = TRUE" else
+                            if (isTRUE(dloo)) "dloo = TRUE" else "cm = TRUE", ")"))
+  }
+
   rbind_fill_fect_plot <- function(...) {
     dfs <- list(...)
     dfs <- dfs[!vapply(dfs, is.null, logical(1))]
@@ -490,6 +495,7 @@ plot.fect <- function(
     if (!type %in% c("status", "gap", "equiv", "exit", "factors", "loadings", "loading.overlap", "calendar", "box", "counterfactual", "sens", "sens_es", "cumul", "heterogeneous")) {
       stop("\"type\" option misspecified. Must be one of the following:\"status\",\"gap\",\"equiv\",\"exit\",\"calendar\",\"box\",\"counterfactual\",\"equiv\",\"sens\",\"sens_es\",\"cumul\",\"heterogeneous\",\"loadings\",\"loading.overlap\",\"factors\".")
     }
+    if (type == "exit") .fect_stop_ar1(x, "plot(type = \"exit\")")
     if (type == "exit" && is.null(x$att.off)) {
       stop("No exiting treatment effect to be plotted.")
     }
@@ -506,6 +512,20 @@ plot.fect <- function(
   }
   if (!is.null(x$effect.est.att)) {
     type <- "cumul"
+  }
+
+  ## serial = "ar1" fits: the gap, status, loadings and loading.overlap plots
+  ## read slots that are on the outcome scale (or are the model's own); every
+  ## other plot reads levels residuals or refits the model.
+  if (identical(x[["serial"]], "ar1")) {
+    if (type %in% c("equiv", "exit", "factors", "calendar", "box",
+                    "counterfactual", "sens", "sens_es", "heterogeneous") ||
+        isTRUE(loo) || isTRUE(dloo) || isTRUE(cm)) {
+      .fect_stop_ar1(x, paste0("plot(type = \"", type, "\"",
+                               if (isTRUE(loo)) ", loo = TRUE" else "",
+                               if (isTRUE(dloo)) ", dloo = TRUE" else "",
+                               if (isTRUE(cm)) ", cm = TRUE" else "", ")"))
+    }
   }
 
   ## Override pre/post colors based on plot type and LOO status

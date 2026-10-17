@@ -724,12 +724,185 @@
     out
 }
 
-## placeholder until the inference block is added
+## ----------------------------------------------------------------------
+## Inference: the parametric bootstrap of the filtered panel, draws mapped
+## through the recursion
+## ----------------------------------------------------------------------
+## The inner fit's parametric draws are V-scale treatment effects of pseudo
+## treated units simulated with no effect (centred at zero). For a treated unit
+## with anchor s, a draw's outcome-scale effect follows the same recursion as
+## the point estimate: e_s = 0 and e_t = x e_{t-1} + effV_t, effV_t = 0 where V
+## is unobserved (the draw has no error there); cells up to the anchor keep the
+## draw's V-scale value (a one-step-ahead error). The recursion is linear, so
+## the parametric H0 -> H1 location shift commutes with it. The draw statistics
+## are then recomputed on the cells of the point fit, and the intervals are
+## fect's own (normal, or basic with the parametric shift).
 .fect_ar1_inference <- function(out, inner, rb, x, se, alpha, ci.method,
                                 keep.sims) {
-    if (isTRUE(se)) {
-        stop("serial = \"ar1\" inference is not available in this build yet.",
+    ## the inner fit's V-scale inference slots never survive
+    for (nm in c("est.avg", "est.avg.unit", "est.att", "est.att90", "att.bound",
+                 "att.avg.boot", "att.avg.unit.boot", "att.boot",
+                 "att.boot.original", "att.count.boot", "att.vcov", "eff.boot",
+                 "D.boot", "I.boot", "colnames.boot")) {
+        if (nm %in% names(out)) out[nm] <- list(NULL)
+    }
+    if (!isTRUE(se)) return(out)
+
+    eb <- inner$eff.boot
+    if (is.null(eb) || length(dim(eb)) != 3L) {
+        stop("serial = \"ar1\": the parametric draws are not available.",
              call. = FALSE)
+    }
+    T1 <- dim(eb)[1]
+    B <- dim(eb)[3]
+    tr <- inner$tr
+    Ntr <- length(tr)
+    cn <- inner$colnames.boot
+    same.tr <- vapply(cn, function(v) {
+        identical(as.integer(v[seq_len(Ntr)]), as.integer(tr))
+    }, TRUE)
+    if (!all(same.tr)) {
+        stop("serial = \"ar1\": the treated columns of the parametric draws ",
+             "are not the fit's treated units.", call. = FALSE)
+    }
+
+    ## map each draw through the recursion
+    Vobs <- inner$I.dat[, tr, drop = FALSE] == 1
+    mapped <- eb
+    for (w in seq_len(Ntr)) {
+        j <- tr[w]
+        if (!rb$ok[w]) {
+            mapped[, w, ] <- NA_real_
+            next
+        }
+        s <- rb$anchor[w]
+        EV <- matrix(eb[, w, ], T1, B)
+        EV0 <- EV
+        EV0[!Vobs[, w], ] <- 0
+        E <- matrix(NA_real_, T1, B)
+        E[s, ] <- 0
+        if (s < T1) {
+            for (t in (s + 1L):T1) E[t, ] <- x * E[t - 1L, ] + EV0[t, ]
+        }
+        res <- matrix(NA_real_, T1, B)
+        fin <- is.finite(rb$eff[, j])
+        post <- which(seq_len(T1) > s & fin)
+        pre <- which(seq_len(T1) <= s & fin)
+        res[post, ] <- E[post, ]
+        res[pre, ] <- EV[pre, ]
+        mapped[, w, ] <- res
+    }
+
+    ## the draws' statistics, on the point fit's cells
+    D.tr <- inner$D.dat[, tr, drop = FALSE]
+    d.v <- c(D.tr)
+    t.on <- match(c(inner$T.on[, tr, drop = FALSE]), out$time)
+    L <- length(out$time)
+    att.avg.boot <- matrix(NA_real_, 1L, B)
+    att.avg.unit.boot <- matrix(NA_real_, 1L, B)
+    att.boot <- matrix(NA_real_, L, B)
+    att.count.boot <- matrix(NA_real_, L, B)
+    for (b in seq_len(B)) {
+        eb.b <- matrix(mapped[, seq_len(Ntr), b], T1, Ntr)
+        ev <- c(eb.b)
+        fin <- !is.na(ev)
+        if (any(fin)) {
+            att.avg.boot[1L, b] <- sum(ev[fin] * d.v[fin]) / sum(d.v[fin])
+        }
+        unit <- vapply(seq_len(Ntr), function(w) {
+            okc <- !is.na(eb.b[, w])
+            dd <- sum(D.tr[okc, w])
+            if (dd > 0) sum(eb.b[okc, w] * D.tr[okc, w]) / dd else NA_real_
+        }, 0)
+        if (any(!is.na(unit))) att.avg.unit.boot[1L, b] <- mean(unit, na.rm = TRUE)
+        use <- fin & !is.na(t.on)
+        if (any(use)) {
+            cnt <- tabulate(t.on[use], nbins = L)
+            sm <- numeric(L)
+            agg <- rowsum(ev[use], t.on[use])
+            sm[as.integer(rownames(agg))] <- agg[, 1]
+            att.boot[, b] <- ifelse(cnt > 0, sm / pmax(cnt, 1), NA_real_)
+            att.count.boot[, b] <- ifelse(cnt > 0, cnt, NA_real_)
+        }
+    }
+
+    ## intervals, with fect's own rules (R/boot.R)
+    basic <- identical(ci.method, "basic")
+    pval.basic <- function(theta, boots) {
+        one <- function(th, bb) {
+            .pvalue_basic_dual(th, bb - mean(bb, na.rm = TRUE) + th)
+        }
+        if (is.matrix(boots)) {
+            return(vapply(seq_len(nrow(boots)), function(k) {
+                one(theta[k], boots[k, ])
+            }, numeric(1)))
+        }
+        one(theta, boots)
+    }
+    z.half <- stats::qnorm(1 - alpha / 2)
+    one_ci <- function(est, boots) {
+        se1 <- stats::sd(boots, na.rm = TRUE)
+        if (!basic) {
+            list(se = se1, ci = c(est - se1 * z.half, est + se1 * z.half),
+                 p = (1 - stats::pnorm(abs(est / se1))) * 2)
+        } else {
+            list(se = se1, ci = .basic_ci_shifted_one(est, boots, alpha, TRUE),
+                 p = pval.basic(est, boots))
+        }
+    }
+    a <- one_ci(rb$att.avg, att.avg.boot)
+    est.avg <- t(as.matrix(c(rb$att.avg, a$se, a$ci, a$p)))
+    colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
+    u <- one_ci(rb$att.avg.unit, att.avg.unit.boot)
+    est.avg.unit <- t(as.matrix(c(rb$att.avg.unit, u$se, u$ci, u$p)))
+    colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper",
+                                "p.value")
+
+    att <- out$att
+    se.att <- apply(att.boot, 1, function(v) stats::sd(v, na.rm = TRUE))
+    if (!basic) {
+        CI.att <- cbind(att - se.att * z.half, att + se.att * z.half)
+        p.att <- (1 - stats::pnorm(abs(att / se.att))) * 2
+        att.bound <- cbind(att - se.att * stats::qnorm(1 - alpha),
+                           att + se.att * stats::qnorm(1 - alpha))
+    } else {
+        CI.att <- .basic_ci_shifted(att, att.boot, alpha, TRUE)
+        p.att <- pval.basic(att, att.boot)
+        att.bound <- .basic_ci_shifted(att, att.boot, 2 * alpha, TRUE)
+    }
+    colnames(att.bound) <- c("CI.lower", "CI.upper")
+    rownames(att.bound) <- out$time
+    est.att <- cbind(att, se.att, CI.att, p.att, out$count)
+    est.att90 <- cbind(att, se.att, att.bound, p.att, out$count)
+    cols <- c("ATT", "S.E.", "CI.lower", "CI.upper", "p.value", "count")
+    colnames(est.att) <- cols
+    colnames(est.att90) <- cols
+    rownames(est.att) <- out$time
+    rownames(est.att90) <- out$time
+    vcov.att <- tryCatch(
+        stats::cov(t(att.boot), use = "pairwise.complete.obs"),
+        error = function(e) NA
+    )
+
+    out$est.avg <- est.avg
+    out$att.avg.boot <- att.avg.boot
+    out$est.avg.unit <- est.avg.unit
+    out$att.avg.unit.boot <- att.avg.unit.boot
+    out$est.att <- est.att
+    out$est.att90 <- est.att90
+    out$att.bound <- att.bound
+    out$att.boot <- att.boot
+    out$att.vcov <- vcov.att
+    out$att.count.boot <- att.count.boot
+    if (isTRUE(keep.sims)) {
+        I.boot <- inner$I.boot
+        for (w in seq_len(Ntr)) {
+            I.boot[, w, ] <- as.numeric(rb$obs[, tr[w]])
+        }
+        out$eff.boot <- mapped
+        out$D.boot <- inner$D.boot
+        out$I.boot <- I.boot
+        out$colnames.boot <- inner$colnames.boot
     }
     out
 }

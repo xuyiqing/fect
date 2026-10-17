@@ -8,6 +8,7 @@ diagtest <- function(
     f.threshold = NULL,
     tost.threshold = NULL,
     N_bar = NULL) {
+    .fect_stop_ar1(x, "diagtest() (the F test and the equivalence test)")
     # get equivalence p values for two-one-sided-t tests
     tost <- function(coef, se, range) {
         z <- coef / se
