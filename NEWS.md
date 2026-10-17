@@ -7,6 +7,19 @@ Version 2.4.7 was a development version on GitHub and was not released on
 CRAN. Its changes are listed under fect 2.4.7 below and are part of this
 release.
 
+## New features
+
+* `cv.method = "pretreatment"` (`method = "gsynth"`) chooses `r` by how well
+  each treated unit's own pretreatment periods are predicted, leaving one
+  period out at a time (the treated-unit rank rule); the scores are in
+  `CV.out` and `fit$cv.treated`.
+* `serial = "ar1"` (`method = "gsynth"`) fits Gsynth to an AR(1)-filtered
+  panel, chooses the filter coefficient and `r` jointly, and returns effects
+  on the outcome scale with a parametric bootstrap; see `fit$ar1`.
+* Under `serial = "ar1"`, the pre-trend, placebo, carryover, equivalence and
+  sensitivity tests, `loo`, `dloo`, `cm`, weights, `binary` and the plot types
+  that read levels residuals stop with a message that names `serial = "ar1"`.
+
 ## Changes that affect results
 
 * `loading.bound = "simplex"` with `force = "unit"` or `"two-way"` now fits
@@ -51,6 +64,9 @@ release.
 * The "Bounded factor loadings" section of the gsynth chapter of the user
   manual describes the joint intercept fit and says how estimates from
   earlier versions differ; `?fect` (`loading.bound`) says the same.
+* The gsynth chapter has a new section, "Serial correlation: the AR(1) filter",
+  with a worked example; `?fect` documents `serial`, `cv.method = "pretreatment"`,
+  `fit$ar1` and `fit$cv.treated`.
 
 # fect 2.4.7
 

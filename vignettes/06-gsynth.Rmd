@@ -650,6 +650,140 @@ The result is a different counterfactual representation. The pseudo-inverse is d
 - Before version 2.4.7 the bound was dropped without a message in cross-validation (`CV = TRUE`), in `method = "gsynth"` fits without standard errors, in the parametric bootstrap replicates and in the `loo = TRUE` refits. The estimates, standard errors and selected `r` of such fits can differ from those of earlier versions.
 - Before version 2.4.8 the loadings were fitted without an intercept and the intercept was then set to the mean of the residual. With `force = "unit"` or `"two-way"` the estimated loadings, and so the ATT, then depended on the level of each treated unit (and the cross-validated `gamma.loading` could differ); estimates from earlier versions can therefore differ from those of 2.4.8, sometimes substantially. On `sim_gsynth`, the bounded ATT of the comparison above was 5.10 before version 2.4.8 and is 4.33 now. Fits with `force = "none"` or `"time"` are unchanged.
 
+## Serial correlation: the AR(1) filter
+
+Gsynth treats the errors of a unit as independent over time, or leaves any persistence to the extra factors. When the errors follow an AR(1) process, the last pretreatment errors of a treated unit carry over into the first posttreatment periods, and the effect estimate for those periods inherits them. The option `serial = "ar1"` (new in version 2.4.8, `method = "gsynth"` only) removes the persistence with a filter and then puts it back.
+
+::: {.callout-note appearance="simple"}
+The names `serial` and `cv.method = "pretreatment"` are provisional and may change before the release.
+:::
+
+### What the filter does
+
+Take a coefficient $x$ between 0 and 1. The fit has three steps.
+
+1. **Filter in calendar time.** Replace each outcome by $V_{it} = Y_{it} - x\, Y_{i,t-1}$, where $t-1$ is the previous period on the panel's time grid. The covariates are filtered the same way. Each unit loses its first period, because it has no lag, and a cell is missing whenever the outcome or its lag is missing.
+2. **Fit Gsynth to the filtered panel.** The factors and the covariate coefficients come from the never-treated units, and each treated unit's loadings from its own pretreatment periods, exactly as in the rest of this chapter. This gives a prediction $\hat V_{it}(0)$ for every treated cell.
+3. **Undo the filter.** For each treated unit, start at its last observed pretreatment outcome, $\hat Y_{is} = Y_{is}$, and roll forward with the recursion
+
+$$
+\hat Y_{it}(0) \;=\; x\, \hat Y_{i,t-1}(0) + \hat V_{it}(0), \qquad t > s .
+$$
+
+The roll-forward passes through any period where the outcome is not observed, and uses the model's prediction there. The effect is $Y_{it} - \hat Y_{it}(0)$, on the scale of the original outcome. The pretreatment event times of the gap plot are different in kind, because they are one-step-ahead prediction errors, $V_{it} - \hat V_{it}$, and not the in-sample residuals of the levels fit.
+
+Three properties are worth knowing. First, with a unit effect (the default `force`), adding a constant to one unit's outcome changes none of the effects. Second, $x = 0$ is the levels Gsynth fit on the panel without its first period, and the output equals that of `serial = "none"` on those data (exactly so when no lag is missing). Third, the first period is lost, so `fit$T` is one less than the number of periods in the data.
+
+### Choosing x and r together
+
+Both $x$ and the number of factors $r$ are chosen from the data, jointly.
+
+- For a given $r$, $x$ minimizes the sum of squared residuals of the never-treated units' filtered fit, over a grid of step 0.05 on $[0, 1]$ and then a local refinement. If the minimum is at 0 or 1, it is kept exactly.
+- For a given $x$, $r$ comes from `cv.method = "pretreatment"` (the treated-unit rank rule) applied to the filtered panel. For each candidate rank, each treated unit's pretreatment outcomes are regressed on the factors with one period left out, and the squared error at that period is scored. The rule picks the rank with the smallest average, weighted by each unit's share of the treated cells. It scores the treated units' own pretreatment cells, which is where the counterfactual is extrapolated from. The rule also works without the filter. When `cv.method = "pretreatment"` is used with `serial = "none"`, it ranks the levels fit.
+- The two steps alternate, starting from the rank of the unfiltered panel, until the rank repeats (at most five rounds). The path is in `fit$ar1$path`.
+
+The coefficient is never set from a first-stage regression and never supplied by the user. The reason is the signal-to-noise ratio of the factors. Filtering with $x$ close to the persistence $\rho$ of the errors whitens them, but it also rescales every factor. A trend factor's signal-to-noise ratio is multiplied by $(1 - \rho)/(1 + \rho)$ when $x = \rho$. The factor is 0.18 at $\rho = 0.7$ and 0.05 at $\rho = 0.9$. The trend factor then sits closer to the noise, the rank rule tends to pick too few factors, and the counterfactual can lose a component that the levels fit would have kept. A fast-moving factor goes the other way, up to $(1 + \rho)/(1 - \rho)$. A two-step estimate of $\rho$ pushes $x$ high, because it mixes the persistence of the factors with that of the errors, and a value assumed from outside the fit that is too high costs a trend factor in the same way. Choosing $x$ together with $r$, by the fit to the controls, did not do this in the earlier simulations behind the design: with a trend factor, the jointly chosen $x$ stayed near 0.25 where the oracle $x = \rho$ lost the factor.
+
+### A worked example
+
+The panel below has 40 never-treated and 6 treated units, 20 pretreatment and 4 posttreatment periods, two factors and AR(1) errors with $\rho = 0.7$. The true effect is 2 in every treated cell. The seed is fixed, which makes the numbers reproducible.
+
+```{r ar1-data, cache = TRUE}
+sim_ar1 <- function(Nco = 40, Ntr = 6, T0 = 20, q = 4, rho = 0.7, tau = 2, seed = 1) {
+  set.seed(seed)
+  N <- Nco + Ntr
+  TT <- T0 + q
+  fac <- matrix(rnorm(TT * 2), TT, 2)       # two factors
+  lam <- matrix(rnorm(N * 2), N, 2)         # loadings
+  e <- matrix(0, TT, N)                     # AR(1) errors, unit variance
+  e[1, ] <- rnorm(N)
+  for (t in 2:TT) e[t, ] <- rho * e[t - 1, ] + sqrt(1 - rho^2) * rnorm(N)
+  D <- matrix(0L, TT, N)
+  D[(T0 + 1):TT, Nco + seq_len(Ntr)] <- 1L  # the last Ntr units are treated
+  Y <- outer(rnorm(TT), rep(1, N)) + outer(rep(1, TT), rnorm(N)) +
+    fac %*% t(lam) + e + tau * D
+  data.frame(id = rep(seq_len(N), each = TT), time = rep(seq_len(TT), N),
+             Y = as.vector(Y), D = as.vector(D))
+}
+d.ar1 <- sim_ar1()
+```
+
+We fit the levels model and the filtered model with the same rank rule, the same parametric bootstrap and the same seed. The only difference is `serial`.
+
+```{r ar1-fits, cache = TRUE, message = FALSE, results = "hide"}
+out.lev <- fect(Y ~ D, data = d.ar1, index = c("id", "time"), method = "gsynth",
+                r = c(0, 5), cv.method = "pretreatment",
+                se = TRUE, vartype = "parametric", nboots = 200,
+                parallel = FALSE, seed = 1234)
+
+out.ar1 <- fect(Y ~ D, data = d.ar1, index = c("id", "time"), method = "gsynth",
+                r = c(0, 5), cv.method = "pretreatment", serial = "ar1",
+                se = TRUE, nboots = 200, parallel = FALSE, seed = 1234)
+```
+
+```{r ar1-compare}
+cmp <- rbind(
+  c(r = out.lev$r.cv, x = NA, out.lev$est.avg[, c("ATT.avg", "S.E.", "CI.lower", "CI.upper")]),
+  c(r = out.ar1$r.cv, x = out.ar1$ar1$x, out.ar1$est.avg[, c("ATT.avg", "S.E.", "CI.lower", "CI.upper")]))
+rownames(cmp) <- c('serial = "none"', 'serial = "ar1"')
+print(round(cmp, 3))
+```
+
+The true effect is 2. The levels fit picks `r out.lev$r.cv` factors and estimates `r round(out.lev$est.avg[, "ATT.avg"], 2)` with a standard error of `r round(out.lev$est.avg[, "S.E."], 2)`. The filtered fit settles on a coefficient of `r round(out.ar1$ar1$x, 2)` and `r out.ar1$r.cv` factors, and estimates `r round(out.ar1$est.avg[, "ATT.avg"], 2)` with a standard error of `r round(out.ar1$est.avg[, "S.E."], 2)`. One dataset cannot show that the filter is more precise on average. It shows how the pieces fit together, and the section "When to use it" below says when a gain is likely. The `print` method names the filter and states what the pretreatment event times are.
+
+```{r ar1-print}
+print(out.ar1)
+```
+
+The alternation is stored in `fit$ar1$path`. Round 0 is the rank of the unfiltered panel, and the later rows are the pairs $(x, r)$ with the ATT at that pair.
+
+```{r ar1-path}
+out.ar1$ar1$path
+```
+
+The profile of the controls' squared residuals over $x$, at the final rank, is in `fit$ar1$profile`.
+
+```{r ar1-profile, fig.height = 4, fig.width = 6}
+prof <- out.ar1$ar1$profile
+plot(prof$x, prof$ssr, type = "l", xlab = "x", ylab = "Sum of squared residuals (controls)")
+abline(v = out.ar1$ar1$x, lty = 2)
+```
+
+The gap plot works as usual. To the right of zero are the rolled-forward effects. To the left are the one-step-ahead errors.
+
+```{r ar1-gap, fig.height = 5, fig.width = 7}
+plot(out.ar1, type = "gap", xlim = c(-10, 4))
+```
+
+### Inference and what is not available
+
+The standard errors come from the parametric bootstrap of the filtered fit, with $x$ and $r$ held at their chosen values. Each draw is rolled forward by the same recursion, so intervals are on the outcome scale. They do not include the uncertainty in $x$ and $r$. `vartype = "bootstrap"` (the default value) is replaced by `"parametric"` with a message when `se = TRUE`, and `"jackknife"` stops.
+
+The filtered fit has no outcome-scale pretreatment residuals, so everything that tests or plots them stops with a message that names `serial = "ar1"`. These are `diagtest()`, the placebo and carryover tests, `loo`, `dloo`, `permute`, `fect_sens()`, `fect_iden()`, `fect_mspe()`, and the plot types `"equiv"`, `"exit"`, `"factors"`, `"calendar"`, `"box"`, `"counterfactual"` and `"sens"`. The weights `W`, `cfe`, `Z`, `Q`, `loading.bound`, `cm`, `binary` and `fill.missing = TRUE` also stop. `print`, the gap, status and loading plots, `att.cumu()`, `effect()`, `estimand()` for the ATT types and `imputed_outcomes()` work and read the outcome scale. Slots that describe the fit of the filtered outcome (`res`, `sigma2`, `factor`, `lambda.tr`, `alpha.tr` and others) are on the filtered scale; `fit$ar1$v.scale.slots` lists them.
+
+### When to use it
+
+<!-- STAGE 2: rule of thumb from simulation -->
+
+::: {.callout-warning appearance="simple"}
+**Provisional.** The rule of thumb below is a draft built from a known-factor calculation and earlier simulations. It will be replaced by the results of the simulation study of this implementation before the release.
+:::
+
+The filter can help most when the errors are persistent and the estimand is short-run. The table gives the best-case reduction in root mean squared error from filtering when the factors are known, for an ATT averaged over $q$ posttreatment periods and errors with persistence $\rho$. Realized gains with estimated factors are smaller.
+
+| $\rho$ \ $q$ | 1 | 3 | 5 | 10 | 20 |
+|---|---|---|---|---|---|
+| 0.3 | 5% | 2% | 1% | 1% | 0% |
+| 0.5 | 13% | 7% | 4% | 2% | 1% |
+| 0.7 | 29% | 19% | 13% | 6% | 3% |
+| 0.8 | 40% | 30% | 23% | 13% | 6% |
+| 0.9 | 56% | 47% | 40% | 27% | 15% |
+
+- **Little to gain** when the persistence is moderate ($\rho$ below about 0.5), or when the effect is averaged over a long window ($q$ of 10 or more with $\rho$ up to 0.7). The best case is under about 10%, and levels Gsynth with the treated-unit rank rule is enough. Its extra factors absorb the dynamics, at some cost in precision.
+- **Worth fitting** when $\rho$ is high (0.7 or more) and the estimand is short-run ($q$ of 5 or fewer, or the early event-time effects). Report the filtered estimate next to the levels estimate.
+- **Not fixed by the filter.** When treatment follows a shock in the last pretreatment periods, the levels fit and the filtered fit were biased about equally in earlier simulations. Hiding the last pretreatment periods from the fit is a candidate remedy that has not been tested.
+- **Cautions.** The residual AR(1) of the controls at the chosen rank understates $\rho$, because extra factors absorb persistence. The jointly chosen $x$ is biased toward zero in short panels, so a small $x$ does not show that the persistence is small when $T$ is small.
+
 ## CFE with GSynth
 
 Gsynth is not limited to the IFE method. The complex fixed effects (CFE) estimator can also be used with `time.component.from = "nevertreated"`. This is useful when the data generating process involves not only latent interactive fixed effects but also additional additive fixed effects (e.g., region, industry), unit-specific time trends (via `Q.type`), or time-invariant covariates with time-varying coefficients (`Z`/`gamma`). See [Chapter @sec-cfe] for the full CFE tutorial.
