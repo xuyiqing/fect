@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactual Estimators
-Version: 2.4.7
-Date: 2026-09-22
+Version: 2.4.8
+Date: 2026-10-16
 Authors@R: 
     c(person("Yiqing", "Xu", , "yiqingxu@stanford.edu", role = c("aut", "cre")),
       person("Licheng", "Liu", , "lichengl@stanford.edu", role = c("aut")), 
@@ -44,7 +44,7 @@ Imports:
 Suggests:
     panelView,
     testthat (>= 3.0.0),
-    did,
+    did (>= 2.5.1),
     DIDmultiplegtDYN,
     ggrepel,
     HonestDiDFEct,

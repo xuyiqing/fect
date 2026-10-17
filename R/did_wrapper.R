@@ -89,6 +89,21 @@ did_wrapper <- function(
   D_sym <- rlang::sym(D)
   # Y_sym    <- rlang::sym(Y) # If Y is used with dplyr NSE
 
+  ## did before 2.5.1 reports a (cohort, period) cell it cannot estimate on an
+  ## unbalanced panel as an effect of 0 (and aggte() then averages it in), and
+  ## can segfault when a cell's comparison group is empty in one of its two
+  ## periods; 2.5.1 returns NA for such cells.
+  if (method %in% c("cs_never", "cs_notyet")) {
+    if (!requireNamespace("did", quietly = TRUE)) {
+      stop("method = \"", method, "\" needs the did package: install.packages(\"did\").", call. = FALSE)
+    }
+    if (utils::packageVersion("did") < "2.5.1") {
+      stop("method = \"", method, "\" needs did >= 2.5.1 (installed: ", utils::packageVersion("did"),
+           "). Earlier versions report cells they cannot estimate on unbalanced panels as 0 ",
+           "and can crash. Update with install.packages(\"did\").", call. = FALSE)
+    }
+  }
+
   if (method == "didm" && is.na(didm.effects)) {
     stop('For "didm", you must supply "didm.effects" and "didm.placebo".')
   }
