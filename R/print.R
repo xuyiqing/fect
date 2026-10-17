@@ -44,6 +44,19 @@ print.fect <- function(x,
                          x$group.fe)
     cat("\nEstimator:    ", x$method, "\n", sep = "")
     cat("Fixed effects: ", fe.line, "\n", sep = "")
+    ## serial = "ar1": the filter coefficient and the rank behind the fit
+    if (identical(x[["serial"]], "ar1") && is.list(x$ar1)) {
+        cat("Serial correlation: AR(1) filter, x = ",
+            format(round(x$ar1$x, 3), nsmall = 2),
+            if (isTRUE(x$ar1$x.fixed)) " (x fixed)" else "",
+            "; rank r = ", x$ar1$r, " (treated-unit rule)\n", sep = "")
+    }
+    ar1.note <- function() {
+        if (identical(x[["serial"]], "ar1")) {
+            cat("Pre-treatment event times are one-step-ahead prediction ",
+                "errors on the outcome scale.\n", sep = "")
+        }
+    }
     ## The parametric bootstrap and the jackknife ignore cl, so the SEs of
     ## such fits are not clustered; say so only when they are.
     if (!is.null(x$cl.label) &&
@@ -97,6 +110,7 @@ print.fect <- function(x,
             "Tr obs. equally weighted",
             "Tr units equally weighted")
         print(att.out, digits = 4)
+        ar1.note()
         # if (switch.on == TRUE) {
         #     cat("\n   ~ by Period:\n")
         #     print(x$att[seq.on], digits = 4)
@@ -126,6 +140,7 @@ print.fect <- function(x,
             first.row,
             "Tr units equally weighted")
         print(att.out, digits = 4)
+        ar1.note()
         # if (switch.on == TRUE) {
         #     cat("\n   ~ Switch-on by Period:\n")
         #     print(x$est.att[seq.on,], digits = 4)
