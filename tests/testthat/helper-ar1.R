@@ -163,3 +163,17 @@ ar1_run_in_lib <- function(lib, code) {
   if (!file.exists(out)) stop("subprocess failed:\n", paste(utils::tail(st, 20), collapse = "\n"))
   readRDS(out)
 }
+
+## Evaluate `expr`, collecting (and muffling) its warnings; returns list(value, warnings = character()).
+ar1_collect <- function(expr) {
+  w <- character(0)
+  v <- withCallingHandlers(expr, warning = function(c) { w <<- c(w, conditionMessage(c)); invokeRestart("muffleWarning") })
+  list(value = v, warnings = w)
+}
+## Write a line of informational evidence to the AR1_TEST_LOG file when set (and always to the message stream).
+ar1_note <- function(...) {
+  txt <- paste0(...)
+  message(txt)
+  lg <- Sys.getenv("AR1_TEST_LOG", "")
+  if (nzchar(lg)) cat("NOTE\t", txt, "\n", sep = "", file = lg, append = TRUE)
+}
