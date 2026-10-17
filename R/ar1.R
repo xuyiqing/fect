@@ -39,6 +39,11 @@
 ## cap on the rank/x alternation
 .FECT_AR1_ROUNDS <- 5L
 
+## state read by the treated-unit rule inside fect_nevertreated(): set by
+## .fect_ar1()'s rule_on() only, around one call, and reset on exit
+.fect_ar1_state <- new.env(parent = emptyenv())
+.fect_ar1_state$exclude <- FALSE
+
 ## filtered-scale slots kept from the inner fit
 .FECT_AR1_V_SLOTS <- c(
     "res", "res.full", "sigma2", "sigma2.fect", "IC", "PC", "factor",
@@ -60,8 +65,10 @@
                       placeboTest, carryoverTest, carryover.rm, loo, dloo,
                       permute, normalize, keep.sims, cm, loading.bound,
                       gamma.loading, gamma.loading.grid, cv.rule, call) {
-    ## the three internal options, read once (never documented)
+    ## the five internal options, read once (never documented)
     opt.x <- getOption("fect.ar1.x", NULL)
+    exclude.nc <- !isFALSE(getOption("fect.ar1.exclude.nonconverged", TRUE))
+    mask.zero <- isTRUE(getOption("fect.ar1.mask.zero", FALSE))
     opt.rounds <- getOption("fect.ar1.rounds", NULL)
     K <- if (is.null(opt.rounds)) .FECT_AR1_ROUNDS else as.integer(opt.rounds)
     if (!is.null(opt.x) && (!is.numeric(opt.x) || length(opt.x) != 1L ||
@@ -100,7 +107,25 @@
     time <- index[2]
     prep <- .fect_ar1_prep(data, Y, D, X, id, time)
     vars <- c(Y, X)
-    quiet <- function(expr) suppressWarnings(suppressMessages(expr))
+    ## messages are muffled, and so are fect's own "did not converge" warnings
+    ## (counted: they would repeat dozens of times in the search); every other
+    ## warning passes
+    st.nc <- new.env(parent = emptyenv())
+    st.nc$n <- 0L
+    quiet <- function(expr, count = TRUE) {
+        suppressMessages(withCallingHandlers(expr, warning = function(w) {
+            if (grepl("did not converge", conditionMessage(w), fixed = TRUE)) {
+                if (count) st.nc$n <- st.nc$n + 1L
+                invokeRestart("muffleWarning")
+            }
+        }))
+    }
+    ## an inner EM fit that stopped at max.iteration did not converge (the
+    ## condition of fect's own warning)
+    em_ok <- function(f) {
+        !(length(f$niter) == 1L && is.finite(f$niter) &&
+              f$niter >= max.iteration)
+    }
     fail <- function(e) {
         stop("serial = \"ar1\": ", conditionMessage(e), call. = FALSE)
     }
@@ -115,7 +140,13 @@
         )
     }
     fd.levels <- prep$data
+    ## the profile is always on the lag-masked panel (the same cells at every
+    ## x); the rule, the final fit and everything after use V = Y without the
+    ## mask at x exactly 0
     filter <- function(x) .fect_ar1_filter(prep, x, vars)
+    filter.fit <- function(x) {
+        .fect_ar1_filter(prep, x, vars, mask = !(x == 0 && !mask.zero))
+    }
     min.rule <- max(1, min.T0 - 1)  # the filter costs each unit one period
     min.fit <- function(rr) max(min.T0 - 1, rr + 1)
 
@@ -129,7 +160,9 @@
                       parallel = FALSE, min.T0 = min.fit(rr))),
             error = function(e) NULL
         )
+        st$em <- NA
         if (is.null(f)) return(Inf)
+        st$em <- em_ok(f)
         m <- f$II[, f$co, drop = FALSE] == 1
         s <- list(ids = as.character(f$id[f$co]), m = m)
         if (is.null(st$sig)) {
@@ -149,10 +182,12 @@
         pts <- new.env(parent = emptyenv())
         pts$x <- numeric(0)
         pts$ssr <- numeric(0)
+        pts$em <- logical(0)
         f <- function(x) {
             v <- ssr_at(x, rr)
             pts$x <- c(pts$x, x)
             pts$ssr <- c(pts$ssr, v)
+            pts$em <- c(pts$em, st$em)
             v
         }
         g <- .FECT_AR1_GRID
@@ -167,12 +202,15 @@
         x.ref <- o$minimum
         xx <- if (is.finite(o$objective) && o$objective < s[k]) x.ref else g[k]
         o.ord <- order(pts$x)
-        list(x = xx, profile = data.frame(x = pts$x[o.ord], ssr = pts$ssr[o.ord]))
+        list(x = xx, profile = data.frame(x = pts$x[o.ord], ssr = pts$ssr[o.ord],
+                                          em.converged = pts$em[o.ord]))
     }
 
     ## ---- the treated-unit rule on a panel ----------------------------------
     r.range <- spec$r.range
-    rule_on <- function(fd, min.T0.rule) {
+    rule_on <- function(fd, min.T0.rule, exclude = FALSE) {
+        .fect_ar1_state$exclude <- exclude
+        on.exit(.fect_ar1_state$exclude <- FALSE, add = TRUE)
         f <- tryCatch(
             quiet(run(fd, r = r.range, CV = TRUE, cv.method = .FECT_CV_PRETREATMENT,
                       se = FALSE, parallel = FALSE, min.T0 = min.T0.rule)),
@@ -182,14 +220,17 @@
     }
 
     ## ---- choose (x, r) --------------------------------------------------------
-    path <- data.frame(round = integer(0), x = numeric(0), r = integer(0),
-                       att = numeric(0))
     rule.levels <- NULL
     rule.last <- NULL
-    profile <- data.frame(x = numeric(0), ssr = numeric(0))
+    profile <- data.frame(x = numeric(0), ssr = numeric(0),
+                          em.converged = logical(0))
     profile.rank <- NA_integer_
     converged <- NA
     x.fixed <- !is.null(opt.x)
+    cycle.df <- data.frame(round = integer(0), x = numeric(0), r = integer(0),
+                           chosen = logical(0))
+    cycled <- FALSE
+    trace <- list()
     if (spec$fixed.r) {
         r.k <- spec$r
         if (x.fixed) {
@@ -200,52 +241,85 @@
             profile <- xr$profile
             profile.rank <- as.integer(r.k)
         }
-        path <- rbind(path, data.frame(round = 1L, x = x.k, r = as.integer(r.k),
-                                       att = NA_real_))
+        path <- data.frame(round = 1L, x = x.k, r = as.integer(r.k),
+                           att = NA_real_, em.converged = NA)
         rounds <- 1L
+        final.round <- 1L
         message("serial = \"ar1\": x = ", format(round(x.k, 4)), ", rank ", r.k)
     } else {
         r0 <- rule_on(fd.levels, min.T0)
         rule.levels <- r0$rule
-        path <- rbind(path, data.frame(round = 0L, x = NA_real_, r = r0$r,
-                                       att = NA_real_))
-        r.prev <- r0$r
-        rounds <- 0L
-        converged <- FALSE
-        for (k in seq_len(K)) {
+        ## one round: the x-step at the rank fed in, then the rule on V(x)
+        step <- function(r.prev) {
             if (x.fixed) {
-                x.k <- as.numeric(opt.x)
+                x.s <- as.numeric(opt.x)
+                prof <- profile
+                prof.r <- NA_integer_
             } else {
                 xr <- x_of_r(r.prev)
-                x.k <- xr$x
-                profile <- xr$profile
-                profile.rank <- as.integer(r.prev)
+                x.s <- xr$x
+                prof <- xr$profile
+                prof.r <- as.integer(r.prev)
             }
-            rl <- rule_on(filter(x.k), min.rule)
-            r.k <- rl$r
-            rule.last <- rl$rule
-            rounds <- k
-            path <- rbind(path, data.frame(round = k, x = x.k, r = r.k,
-                                           att = NA_real_))
-            message("serial = \"ar1\": round ", k, ": x = ",
-                    format(round(x.k, 4)), ", rank ", r.k)
-            if (x.fixed) {
-                converged <- NA
-                break
+            rl <- rule_on(filter.fit(x.s), min.rule, exclude = exclude.nc)
+            if (!is.null(rl$rule$eligible) && any(!rl$rule$eligible)) {
+                bad <- rl$rule$table$r[!rl$rule$eligible]
+                message("serial = \"ar1\": rank", if (length(bad) > 1L) "s " else " ",
+                        paste(bad, collapse = ", "), " not eligible at x = ",
+                        formatC(x.s, format = "f", digits = 2),
+                        " (EM did not converge)")
             }
-            if (r.k == r.prev) {
-                converged <- TRUE
-                break
-            }
-            r.prev <- r.k
+            message("serial = \"ar1\": x = ", format(round(x.s, 4)), ", rank ",
+                    rl$r)
+            list(x = x.s, r = rl$r, profile = prof, profile.rank = prof.r,
+                 rule = rl$rule)
         }
-        if (isFALSE(converged)) {
-            if (is.null(opt.rounds)) {
-                warning("serial = \"ar1\": the rank and x did not settle in ",
-                        K, " rounds; using the last pair (x = ",
-                        format(round(x.k, 4)), ", rank ", r.k, ").",
-                        call. = FALSE)
+        if (x.fixed) {
+            ## the map does not depend on the rank: one round, no alternation
+            s1 <- step(r0$r)
+            alt <- list(
+                path = data.frame(round = 0:1, x = c(NA, s1$x),
+                                  r = c(r0$r, s1$r)),
+                final = 1L, converged = NA, cycled = FALSE,
+                cycle = integer(0), capped = FALSE, trace = list(s1)
+            )
+        } else {
+            alt <- .fect_ar1_alternate(step, r0$r, K)
+        }
+        trace <- alt$trace
+        fin <- trace[[alt$final]]
+        x.k <- fin$x
+        r.k <- fin$r
+        profile <- fin$profile
+        profile.rank <- fin$profile.rank
+        rule.last <- fin$rule
+        converged <- alt$converged
+        cycled <- alt$cycled
+        path <- data.frame(alt$path, att = NA_real_, em.converged = NA)
+        rounds <- nrow(path) - 1L
+        final.round <- as.integer(alt$final)
+        if (cycled) {
+            cy <- alt$path[match(alt$cycle, alt$path$round), ]
+            cycle.df <- data.frame(round = as.integer(cy$round), x = cy$x,
+                                   r = as.integer(cy$r),
+                                   chosen = cy$round == final.round)
+            fmt <- function(x, r) sprintf("(%.3f, %d)", x, r)
+            prs <- fmt(cycle.df$x, cycle.df$r)
+            lst <- if (length(prs) == 2L) {
+                paste(prs, collapse = " and ")
+            } else {
+                paste0(paste(prs[-length(prs)], collapse = ", "), " and ",
+                       prs[length(prs)])
             }
+            ch <- cycle.df[cycle.df$chosen, ]
+            warning("serial = \"ar1\": x and the rank cycle between (x, r) = ",
+                    lst, "; using the pair with the lowest rank, ",
+                    fmt(ch$x, ch$r), ".", call. = FALSE)
+        } else if (isTRUE(alt$capped) && is.null(opt.rounds)) {
+            warning("serial = \"ar1\": the rank and x did not settle in ",
+                    K, " rounds; using the last pair (x = ",
+                    format(round(x.k, 4)), ", rank ", r.k, ").",
+                    call. = FALSE)
         }
     }
     if (x.k <= 0 || x.k >= 1) {
@@ -257,23 +331,33 @@
     ## ---- final fit at (x, r) -----------------------------------------------
     min.final <- min.fit(r.k)
     inner <- tryCatch(
-        suppressMessages(
+        quiet(
             if (se) {
-                run(filter(x.k), r = r.k, CV = FALSE, se = TRUE,
+                run(filter.fit(x.k), r = r.k, CV = FALSE, se = TRUE,
                     vartype = "parametric", nboots = nboots,
                     para.error = para.error, alpha = alpha, ci.method = ci.method,
                     parallel = parallel, cores = cores, seed = seed,
                     keep.sims = TRUE, min.T0 = min.final)
             } else {
-                run(filter(x.k), r = r.k, CV = FALSE, se = FALSE,
+                run(filter.fit(x.k), r = r.k, CV = FALSE, se = FALSE,
                     parallel = FALSE, min.T0 = min.final)
-            }
+            },
+            count = FALSE
         ),
         error = fail
     )
+    em.final <- em_ok(inner)
+    if (!em.final) {
+        warning("serial = \"ar1\": the EM fit at x = ",
+                formatC(x.k, format = "f", digits = 2), ", rank r = ", r.k,
+                " did not converge within max.iteration = ", max.iteration,
+                "; the estimate can change with max.iteration. Raise ",
+                "max.iteration or choose r.", call. = FALSE)
+    }
 
     ctx <- list(prep = prep, id = id, time = time, Y = Y, D = D, X = X,
-                has_a = has_a, has_xi = has_xi, force.code = force.code)
+                has_a = has_a, has_xi = has_xi, force.code = force.code,
+                mask.zero = mask.zero)
     rb <- .fect_ar1_rebuild(inner, ctx, x.k)
     if (length(rb$not.rebuilt) > 0L) {
         warning("serial = \"ar1\": ", length(rb$not.rebuilt),
@@ -284,20 +368,41 @@
                 call. = FALSE)
     }
 
-    ## the outcome-scale ATT at each pair of the path (cheap: one fit each)
+    ## the outcome-scale ATT and the EM status at each pair of the path (cheap:
+    ## one fit each)
+    final.row <- which(path$round == final.round)
     for (i in seq_len(nrow(path))) {
         if (is.na(path$x[i])) next
-        if (i == nrow(path)) {
+        if (i == final.row) {
             path$att[i] <- rb$att.avg
+            path$em.converged[i] <- em.final
             next
         }
-        path$att[i] <- tryCatch({
-            fi <- quiet(run(filter(path$x[i]), r = path$r[i], CV = FALSE,
-                            se = FALSE, parallel = FALSE,
-                            min.T0 = min.fit(path$r[i])))
-            .fect_ar1_rebuild(fi, ctx, path$x[i])$att.avg
-        }, error = function(e) NA_real_)
+        fi <- tryCatch(
+            quiet(run(filter.fit(path$x[i]), r = path$r[i], CV = FALSE,
+                      se = FALSE, parallel = FALSE,
+                      min.T0 = min.fit(path$r[i]))),
+            error = function(e) NULL
+        )
+        if (is.null(fi)) next
+        path$em.converged[i] <- em_ok(fi)
+        path$att[i] <- tryCatch(
+            .fect_ar1_rebuild(fi, ctx, path$x[i])$att.avg,
+            error = function(e) NA_real_)
     }
+
+    ## ranks passed over, rounds without an eligible rank
+    excluded <- do.call(rbind, c(list(data.frame(
+        round = integer(0), x = numeric(0), r = integer(0))), lapply(
+        seq_along(trace), function(k) {
+            ru <- trace[[k]]$rule
+            if (is.null(ru$eligible) || all(ru$eligible)) return(NULL)
+            data.frame(round = as.integer(k), x = trace[[k]]$x,
+                       r = as.integer(ru$table$r[!ru$eligible]))
+        })))
+    fallback.rounds <- as.integer(which(vapply(trace, function(t) {
+        isTRUE(t$rule$fallback)
+    }, TRUE)))
 
     out <- .fect_ar1_outer(inner, rb, ctx, x.k)
     ## the final round's rule output, as on a levels fit (also in fit$ar1$rule)
@@ -308,7 +413,13 @@
         x = x.k, x.fixed = x.fixed, inner = inner, rb = rb, path = path,
         converged = converged, rounds = rounds, profile = profile,
         profile.rank = profile.rank, rule = rule.last, rule.levels = rule.levels,
-        prep = prep, data = data, id = id, min.T0 = min.final
+        prep = prep, data = data, id = id, min.T0 = min.final,
+        extra = list(
+            cycled = cycled, cycle = cycle.df, final.round = final.round,
+            em.converged = em.final, niter = as.integer(inner$niter[1]),
+            excluded = excluded, fallback.rounds = fallback.rounds,
+            search.nonconverged = st.nc$n, lag.mask = rb$lag.mask
+        )
     )
     out$serial <- .FECT_SERIAL_AR1
     out$call <- call
@@ -519,7 +630,16 @@
 ## V = v - x v_lag for the outcome and the covariates; a row exists iff its lag
 ## row exists in the data, and a value is missing if either is. D stays at its
 ## own period.
-.fect_ar1_filter <- function(prep, x, vars) {
+.fect_ar1_filter <- function(prep, x, vars, mask = TRUE) {
+    if (!mask) {
+        ## x exactly 0 (the lag is not used): V = Y on the panel without its
+        ## first period, no cell removed for a missing lag
+        k <- which(prep$pos >= 2L)
+        out <- prep$data[k, , drop = FALSE]
+        for (v in vars) out[[v]] <- as.numeric(prep$data[[v]][k])
+        rownames(out) <- NULL
+        return(out)
+    }
     k <- prep$keep
     lr <- prep$lag.row[k]
     out <- prep$data[k, , drop = FALSE]
@@ -528,6 +648,57 @@
     }
     rownames(out) <- NULL
     out
+}
+
+## ----------------------------------------------------------------------
+## The alternation as a pure function of one map on ranks
+## ----------------------------------------------------------------------
+## step(r) runs the x-step at rank r and the rule at V(x): it returns list(x, r,
+## ...) (extras are kept untouched in `trace`) and is called once per round, in
+## order, never after the decision. Stops at a fixed point (converged), at the
+## first repeated rank (cycle: the pair with the lowest rank in the cycle is
+## the result) or at the cap K.
+.fect_ar1_alternate <- function(step, r0, K = 5L) {
+    hist <- as.integer(r0)
+    xs <- numeric(0)
+    trace <- list()
+    converged <- FALSE
+    cycled <- FALSE
+    cycle <- integer(0)
+    capped <- FALSE
+    final <- NA_integer_
+    done <- FALSE
+    for (k in seq_len(K)) {
+        s <- step(hist[k])
+        trace[[k]] <- s
+        xs <- c(xs, s$x)
+        hist <- c(hist, as.integer(s$r))
+        r.k <- hist[k + 1L]
+        if (r.k == hist[k]) {
+            converged <- TRUE
+            final <- k
+            done <- TRUE
+            break
+        }
+        j <- if (k >= 2L) which(hist[seq_len(k - 1L)] == r.k)[1L] - 1L else NA_integer_
+        if (!is.na(j)) {
+            cycle <- (j + 1L):k
+            cycled <- TRUE
+            final <- cycle[which.min(hist[cycle + 1L])]
+            done <- TRUE
+            break
+        }
+    }
+    if (!done) {
+        capped <- TRUE
+        final <- as.integer(K)
+    }
+    n <- length(trace)
+    list(
+        path = data.frame(round = 0:n, x = c(NA_real_, xs), r = hist[seq_len(n + 1L)]),
+        final = as.integer(final), converged = converged, cycled = cycled,
+        cycle = as.integer(cycle), capped = capped, trace = trace
+    )
 }
 
 ## ----------------------------------------------------------------------
@@ -630,12 +801,26 @@
     anchor <- rep(NA_integer_, length(tr))
     n.post <- integer(length(tr))
     Yhat <- matrix(NA_real_, T1, length(tr))
+    ## x exactly 0 on the unmasked panel: no recursion (0 * NA is NA); the
+    ## effects are the inner fit's own at the observed cells with a finite
+    ## prediction
+    plain <- x == 0 && !isTRUE(ctx$mask.zero)
     for (w in seq_along(tr)) {
         j <- tr[w]
         pre.ok <- which(Dm[, j] == 0 & obs[, j])
         if (length(pre.ok) == 0L) next
         s <- max(pre.ok)
         anchor[w] <- s
+        if (plain) {
+            Yhat[, w] <- Vhat[, w]
+            fin <- Vobs[, j] & obs[, j] & is.finite(Vhat[, w]) &
+                is.finite(inner$eff[, j])
+            n.post[w] <- sum(Dm[, j] == 1 & fin)
+            col <- rep(NA_real_, T1)
+            col[fin] <- inner$eff[fin, j]
+            eff[, j] <- col
+            next
+        }
         yh <- rep(NA_real_, T1)
         yh[s] <- Yo[s, j]
         if (s < T1) {
@@ -685,14 +870,15 @@
     Y.ct <- Yo.fill - eff
     for (w in seq_along(tr)) {
         j <- tr[w]
-        cells <- which(!is.na(anchor[w]) & ok[w] & seq_len(T1) > anchor[w] &
+        cells <- which(!is.na(anchor[w]) & ok[w] &
+                           (plain | seq_len(T1) > anchor[w]) &
                            !obs[, j] & is.finite(Yhat[, w]))
         if (length(cells) > 0L) Y.ct[cells, j] <- Yhat[cells, w]
     }
 
     list(
         eff = eff, Y.ct = Y.ct, Yo = Yo, obs = obs, Vhat = Vhat, Yhat = Yhat,
-        D = Dm, T.on = Ton,
+        D = Dm, T.on = Ton, plain = plain, lag.mask = !plain,
         anchor = anchor, n.post = n.post, ok = ok, rows = rows,
         att.avg = att.avg, att.avg.unit = att.avg.unit,
         time = time.on, att = att.on, count = count.on,
@@ -790,6 +976,11 @@
         j <- tr[w]
         if (!rb$ok[w]) {
             mapped[, w, ] <- NA_real_
+            next
+        }
+        if (isTRUE(rb$plain)) {
+            ## x = 0 without the lag mask: the draws are already on the
+            ## outcome scale (V = Y)
             next
         }
         s <- rb$anchor[w]
@@ -929,7 +1120,7 @@
 ## ----------------------------------------------------------------------
 .fect_ar1_info <- function(x, x.fixed, inner, rb, path, converged, rounds,
                            profile, profile.rank, rule, rule.levels, prep, data,
-                           id, min.T0) {
+                           id, min.T0, extra = list()) {
     ids <- as.character(inner$id)
     tr <- inner$tr
     anchor.time <- inner$rawtime[rb$anchor]
@@ -942,13 +1133,14 @@
     )
     all.ids <- unique(as.character(data[[id]]))
     gone <- setdiff(all.ids, ids)
-    in.filtered <- unique(as.character(prep$data[[id]][prep$keep]))
+    kept <- if (isFALSE(extra$lag.mask)) which(prep$pos >= 2L) else prep$keep
+    in.filtered <- unique(as.character(prep$data[[id]][kept]))
     reason <- as.character(ifelse(
         gone %in% in.filtered,
         "removed by fect (min.T0 or max.missing on the filtered panel)",
         "no filtered period (fewer than two observed periods)"))
     dropped <- data.frame(id = gone, reason = reason, stringsAsFactors = FALSE)
-    list(
+    c(list(
         x = x, x.fixed = x.fixed, r = as.integer(inner$r.cv[1]),
         path = path, converged = converged, rounds = as.integer(rounds),
         profile = profile, profile.rank = profile.rank,
@@ -957,7 +1149,7 @@
         first.period = prep$tg[1], min.T0 = min.T0,
         pre.scale = "one-step-ahead", v.scale.slots = .FECT_AR1_V_SLOTS,
         x.bounds = c(0, 1)
-    )
+    ), extra)
 }
 
 ## ----------------------------------------------------------------------

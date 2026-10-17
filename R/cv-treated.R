@@ -65,8 +65,13 @@
 ## Scores of both windows at every rank in `parts` (a list named by rank, the
 ## ranks in increasing order). Returns the score table, both picks and the
 ## scored-unit counts, with the names of the prototype's treated_rank().
+## `eligible` (optional, named by rank or aligned with `parts`): ranks that
+## cannot be picked (the control fit did not converge); their scores are still
+## computed and reported. NULL (the default) leaves the plain rule and its
+## returned list exactly as they were.
 .fect_cv_treated_rank <- function(parts, has_a,
-                                  min.share = .FECT_CV_TREATED_MIN_SHARE) {
+                                  min.share = .FECT_CV_TREATED_MIN_SHARE,
+                                  eligible = NULL) {
     ranks <- sort(as.integer(names(parts)))
     if (length(ranks) == 0L) return(NULL)
     parts <- parts[as.character(ranks)]
@@ -88,6 +93,15 @@
     }
     rbar <- max(cand)
     ranks <- ranks[ranks <= rbar]
+    elig <- NULL
+    if (!is.null(eligible)) {
+        elig <- if (is.null(names(eligible))) {
+            as.logical(eligible)[seq_along(ranks)]
+        } else {
+            as.logical(eligible[as.character(ranks)])
+        }
+        elig[is.na(elig)] <- TRUE
+    }
     k <- rbar + has_a
     pre_idx <- lapply(seq_along(ids), function(j) which(P1$pre[, j]))
 
@@ -125,9 +139,18 @@
     lo <- score("loo")
     fw <- score("fwd")
     pick <- function(s) {
-        if (all(!is.finite(s))) NA_integer_ else ranks[which.min(s)]
+        if (all(!is.finite(s))) return(NA_integer_)
+        if (!is.null(elig)) {
+            ok <- is.finite(s) & elig
+            if (any(ok)) return(ranks[which.min(ifelse(ok, s, Inf))])
+        }
+        ranks[which.min(s)]
     }
-    list(
+    ## every rank with a finite score is ineligible: the unrestricted pick
+    fell_back <- function(s) {
+        !is.null(elig) && any(is.finite(s)) && !any(is.finite(s) & elig)
+    }
+    res <- list(
         table = data.frame(r = ranks, loo = lo$s, fwd = fw$s),
         r_loo = pick(lo$s), r_fwd = pick(fw$s), rbar = rbar,
         n_tr = length(ids), n_loo = lo$n, n_fwd = fw$n,
@@ -137,6 +160,12 @@
                    "(%.0f%% of the ATT weight), forward %d (%.0f%%)"),
             rbar, lo$n, length(ids), 100 * lo$share, fw$n, 100 * fw$share)
     )
+    if (!is.null(elig)) {
+        res$eligible <- elig
+        res$fallback <- if (identical(getOption("fect.cv.treated.window", "loo"),
+                                      "fwd")) fell_back(fw$s) else fell_back(lo$s)
+    }
+    res
 }
 
 ## The rule inside fect_nevertreated(): fit the controls at each candidate
@@ -146,7 +175,8 @@
 ## outcome (TT x Ntr) and covariates (TT x Ntr x p). Returns the per-rank fits,
 ## the rule's output and the window that sets the pick.
 .fect_cv_treated_run <- function(ranks, fit.rank, Y.tr, X.tr, p, force,
-                                 pre, post, ids) {
+                                 pre, post, ids, exclude.nonconverged = FALSE,
+                                 max.iteration = NULL) {
     TT <- nrow(Y.tr)
     Ntr <- ncol(Y.tr)
     has_a <- force %in% c(1, 3)
@@ -179,7 +209,17 @@
         parts[[i]] <- .fect_cv_treated_parts(U, pre, post, F, has_a, ids)
     }
     names(parts) <- as.character(ranks)
-    res <- .fect_cv_treated_rank(parts, has_a)
+    ## a rank whose control fit stopped at max.iteration cannot be picked
+    ## (only the serial = "ar1" alternation asks for this)
+    elig <- NULL
+    if (isTRUE(exclude.nonconverged) && !is.null(max.iteration)) {
+        elig <- vapply(fits, function(f) {
+            !(length(f$niter) == 1L && is.finite(f$niter) &&
+                  f$niter >= max.iteration)
+        }, TRUE)
+        names(elig) <- as.character(ranks)
+    }
+    res <- .fect_cv_treated_rank(parts, has_a, eligible = elig)
     window <- getOption("fect.cv.treated.window", "loo")
     if (!window %in% c("loo", "fwd")) {
         stop("option fect.cv.treated.window must be \"loo\" or \"fwd\".",

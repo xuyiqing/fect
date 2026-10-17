@@ -444,7 +444,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                                      fit_init = fit.init.co)
                     },
                     Y.tr = Y.tr, X.tr = X.tr, p = p, force = force,
-                    pre = pre.rule, post = post.rule, ids = as.character(tr)
+                    pre = pre.rule, post = post.rule, ids = as.character(tr),
+                    exclude.nonconverged = isTRUE(.fect_ar1_state$exclude),
+                    max.iteration = max.iteration
                 )
                 tr.res <- treated.run$rule
                 ## scores on the outcome's scale under normalize
@@ -1138,7 +1140,11 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
             ## (since 2.4.7, #167) picks the argmin; "1se" the smallest r within
             ## one fold-SE of the minimum-CV-error r; "1pct" preserves the legacy
             ## 1% rule from the in-loop assignments above.
-            if (criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
+            ## (not when the rule passed ranks over: its pick is not the argmin)
+            skip.cv.rule <- !is.null(treated.run) &&
+                !is.null(treated.run$rule$eligible)
+            if (!skip.cv.rule &&
+                criterion %in% c("mspe","wmspe","gmspe","wgmspe","mad","moment","gmoment")) {
                 means <- CV.out[, crit_col]
                 ses   <- CV.out.se[, crit_col]
                 ## unscored or failed rows are NA (before 2.4.7 the sentinel 1e10)
