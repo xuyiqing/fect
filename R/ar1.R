@@ -65,11 +65,18 @@
                       placeboTest, carryoverTest, carryover.rm, loo, dloo,
                       permute, normalize, keep.sims, cm, loading.bound,
                       gamma.loading, gamma.loading.grid, cv.rule, call) {
-    ## the five internal options, read once (never documented)
+    ## the six internal options, read once (never documented)
     opt.x <- getOption("fect.ar1.x", NULL)
     exclude.nc <- !isFALSE(getOption("fect.ar1.exclude.nonconverged", TRUE))
     mask.zero <- isTRUE(getOption("fect.ar1.mask.zero", FALSE))
     opt.rounds <- getOption("fect.ar1.rounds", NULL)
+    ## "x": x is re-estimated in every bootstrap draw (rank held); "fixed": the
+    ## draws condition on the chosen x
+    boot.mode <- getOption("fect.ar1.boot", "x")
+    if (!is.character(boot.mode) || length(boot.mode) != 1L ||
+        !(boot.mode %in% c("x", "fixed"))) {
+        stop("option fect.ar1.boot must be \"x\" or \"fixed\".", call. = FALSE)
+    }
     K <- if (is.null(opt.rounds)) .FECT_AR1_ROUNDS else as.integer(opt.rounds)
     if (!is.null(opt.x) && (!is.numeric(opt.x) || length(opt.x) != 1L ||
                             !is.finite(opt.x) || opt.x < 0 || opt.x > 1)) {
@@ -330,7 +337,45 @@
 
     ## ---- final fit at (x, r) -----------------------------------------------
     min.final <- min.fit(r.k)
-    inner <- tryCatch(
+    ctx <- list(prep = prep, id = id, time = time, Y = Y, D = D, X = X,
+                has_a = has_a, has_xi = has_xi, force.code = force.code,
+                mask.zero = mask.zero)
+    ## the draws that re-estimate x need the point fit's components: one more
+    ## fit at (x, r) (deterministic: the same fit as the one below)
+    hook <- NULL
+    boot.used <- boot.mode
+    if (se && identical(boot.mode, "x")) {
+        fd.k <- filter.fit(x.k)
+        inner0 <- tryCatch(
+            quiet(run(fd.k, r = r.k, CV = FALSE, se = FALSE, parallel = FALSE,
+                      min.T0 = min.final), count = FALSE),
+            error = fail
+        )
+        nrm <- if (isTRUE(normalize)) {
+            stats::sd(as.matrix(fd.k[, Y]), na.rm = TRUE)
+        } else {
+            1
+        }
+        bp <- .fect_ar1_boot_prep(
+            inner0, .fect_ar1_rebuild(inner0, ctx, x.k), ctx, x.k, nrm = nrm,
+            x.fixed = x.fixed, force = force.code, tol = tol,
+            max.iteration = max.iteration
+        )
+        if (is.null(bp)) {
+            message("serial = \"ar1\": the periods of the filtered fit are not ",
+                    "the panel's second to last; the draws keep x fixed.")
+            boot.used <- "fixed"
+        } else {
+            hook <- .fect_ar1_boot_hook(bp)
+        }
+    }
+    with_hook <- function(expr) {
+        old <- .fect_boot_hooks$panel
+        .fect_boot_hooks$panel <- hook
+        on.exit(.fect_boot_hooks$panel <- old, add = TRUE)
+        expr
+    }
+    inner <- with_hook(tryCatch(
         quiet(
             if (se) {
                 run(filter.fit(x.k), r = r.k, CV = FALSE, se = TRUE,
@@ -345,7 +390,7 @@
             count = FALSE
         ),
         error = fail
-    )
+    ))
     em.final <- em_ok(inner)
     if (!em.final) {
         warning("serial = \"ar1\": the EM fit at x = ",
@@ -355,9 +400,6 @@
                 "max.iteration or choose r.", call. = FALSE)
     }
 
-    ctx <- list(prep = prep, id = id, time = time, Y = Y, D = D, X = X,
-                has_a = has_a, has_xi = has_xi, force.code = force.code,
-                mask.zero = mask.zero)
     rb <- .fect_ar1_rebuild(inner, ctx, x.k)
     if (length(rb$not.rebuilt) > 0L) {
         warning("serial = \"ar1\": ", length(rb$not.rebuilt),
@@ -407,8 +449,29 @@
     out <- .fect_ar1_outer(inner, rb, ctx, x.k)
     ## the final round's rule output, as on a levels fit (also in fit$ar1$rule)
     if (!is.null(rule.last)) out$cv.treated <- rule.last
+    ## the draws: how many failed, and the x each one used
+    boot.failed <- NA_integer_
+    x.boot <- NULL
+    xb.kept <- NULL
+    if (se) {
+        B <- if (length(dim(inner$eff.boot)) == 3L) dim(inner$eff.boot)[3] else 0L
+        boot.failed <- as.integer(nboots - B)
+        if (B == 0L) {
+            stop("serial = \"ar1\": all bootstrap draws failed.", call. = FALSE)
+        }
+        if (boot.failed > 0.1 * nboots) {
+            warning("serial = \"ar1\": ", boot.failed, " of ", nboots,
+                    " bootstrap draws failed and were dropped.", call. = FALSE)
+        }
+        if (!is.null(inner$boot.hook)) {
+            x.boot <- inner$boot.hook$value
+            x.boot[!inner$boot.hook$kept] <- NA_real_
+            xb.kept <- inner$boot.hook$value[inner$boot.hook$kept]
+        }
+    }
     out <- .fect_ar1_inference(out, inner, rb, x.k, se = se, alpha = alpha,
-                               ci.method = ci.method, keep.sims = keep.sims)
+                               ci.method = ci.method, keep.sims = keep.sims,
+                               xb = xb.kept, mask.zero = mask.zero)
     out$ar1 <- .fect_ar1_info(
         x = x.k, x.fixed = x.fixed, inner = inner, rb = rb, path = path,
         converged = converged, rounds = rounds, profile = profile,
@@ -418,7 +481,14 @@
             cycled = cycled, cycle = cycle.df, final.round = final.round,
             em.converged = em.final, niter = as.integer(inner$niter[1]),
             excluded = excluded, fallback.rounds = fallback.rounds,
-            search.nonconverged = st.nc$n, lag.mask = rb$lag.mask
+            search.nonconverged = st.nc$n, lag.mask = rb$lag.mask,
+            boot = boot.used, x.boot = x.boot, boot.failed = boot.failed,
+            options = list(
+                x = if (x.fixed) as.numeric(opt.x) else NA_real_,
+                rounds = if (is.null(opt.rounds)) NA_integer_ else as.integer(K),
+                exclude.nonconverged = exclude.nc, mask.zero = mask.zero,
+                boot = boot.mode
+            )
         )
     )
     out$serial <- .FECT_SERIAL_AR1
@@ -947,12 +1017,12 @@
 ## are then recomputed on the cells of the point fit, and the intervals are
 ## fect's own (normal, or basic with the parametric shift).
 .fect_ar1_inference <- function(out, inner, rb, x, se, alpha, ci.method,
-                                keep.sims) {
+                                keep.sims, xb = NULL, mask.zero = FALSE) {
     ## the inner fit's V-scale inference slots never survive
     for (nm in c("est.avg", "est.avg.unit", "est.att", "est.att90", "att.bound",
                  "att.avg.boot", "att.avg.unit.boot", "att.boot",
                  "att.boot.original", "att.count.boot", "att.vcov", "eff.boot",
-                 "D.boot", "I.boot", "colnames.boot")) {
+                 "D.boot", "I.boot", "colnames.boot", "boot.hook")) {
         if (nm %in% names(out)) out[nm] <- list(NULL)
     }
     if (!isTRUE(se)) return(out)
@@ -975,35 +1045,67 @@
              "are not the fit's treated units.", call. = FALSE)
     }
 
-    ## map each draw through the recursion
+    ## map each draw through the recursion. With xb (one coefficient per
+    ## surviving draw, from draws that re-estimated x) each draw uses its own
+    ## coefficient and its own V-observed indicator; without it every draw uses
+    ## the point fit's x and indicator.
     Vobs <- inner$I.dat[, tr, drop = FALSE] == 1
     mapped <- eb
+    per.draw <- !is.null(xb)
+    if (per.draw && length(xb) != B) {
+        stop("serial = \"ar1\": the draws' x do not match the draws.",
+             call. = FALSE)
+    }
+    if (per.draw && is.null(inner$I.boot)) {
+        stop("serial = \"ar1\": the draws' observed-cell indicators are not ",
+             "available.", call. = FALSE)
+    }
+    ## draws that need no recursion: x exactly 0 without the lag mask
+    plain.b <- if (per.draw) xb == 0 & !isTRUE(mask.zero) else rep(isTRUE(rb$plain), B)
+    xv <- if (per.draw) xb else rep(x, B)
     for (w in seq_len(Ntr)) {
         j <- tr[w]
         if (!rb$ok[w]) {
             mapped[, w, ] <- NA_real_
             next
         }
-        if (isTRUE(rb$plain)) {
-            ## x = 0 without the lag mask: the draws are already on the
-            ## outcome scale (V = Y)
-            next
-        }
         s <- rb$anchor[w]
         EV <- matrix(eb[, w, ], T1, B)
+        fin <- is.finite(rb$eff[, j])
+        if (all(plain.b)) {
+            ## the draws are already on the outcome scale (V = Y). A point fit
+            ## with x = 0 leaves them as they are; a point fit with x > 0 keeps
+            ## the cells it has an effect for
+            if (!isTRUE(rb$plain)) {
+                EV[!fin, ] <- NA_real_
+                mapped[, w, ] <- EV
+            }
+            next
+        }
         EV0 <- EV
-        EV0[!Vobs[, w], ] <- 0
+        Vb <- if (per.draw) {
+            matrix(inner$I.boot[, w, ], T1, B) == 1
+        } else {
+            matrix(Vobs[, w], T1, B)
+        }
+        EV0[!Vb] <- 0
         E <- matrix(NA_real_, T1, B)
         E[s, ] <- 0
         if (s < T1) {
-            for (t in (s + 1L):T1) E[t, ] <- x * E[t - 1L, ] + EV0[t, ]
+            for (t in (s + 1L):T1) E[t, ] <- xv * E[t - 1L, ] + EV0[t, ]
         }
         res <- matrix(NA_real_, T1, B)
-        fin <- is.finite(rb$eff[, j])
         post <- which(seq_len(T1) > s & fin)
         pre <- which(seq_len(T1) <= s & fin)
         res[post, ] <- E[post, ]
         res[pre, ] <- EV[pre, ]
+        if (any(plain.b)) {
+            ## a draw whose x is exactly 0: the identity map on the cells the
+            ## point fit has
+            EVp <- EV
+            EVp[!fin, ] <- NA_real_
+            res[, plain.b] <- EVp[, plain.b]
+        }
         mapped[, w, ] <- res
     }
 
@@ -1258,6 +1360,161 @@
     xx <- if (is.finite(o$objective) && o$objective < s[k]) o$minimum else g[k]
     o.ord <- order(pts$x)
     list(x = xx, profile = data.frame(x = pts$x[o.ord], ssr = pts$ssr[o.ord]))
+}
+
+## ----------------------------------------------------------------------
+## Bootstrap draws that re-estimate x (the default parametric bootstrap)
+## ----------------------------------------------------------------------
+## A draw of the V-scale bootstrap (R/boot.R) is turned back into a levels
+## panel with the inverse filter at the chosen x (each unit starts at its first
+## observed level and runs forward on the V-scale values, and on the model
+## prediction through the cells the draw does not observe), x is searched again
+## on the pseudo-controls with the rank held at the fit's, the panel is filtered
+## at that x and the refit proceeds as in a V-scale draw. The pieces that do
+## not depend on the draw are built once here.
+.fect_ar1_boot_prep <- function(inner, rb, ctx, x, nrm, x.fixed, force, tol,
+                                max.iteration) {
+    prep <- ctx$prep
+    ids <- as.character(inner$id)
+    N1 <- length(ids)
+    Tn <- prep$T
+    rows <- rb$rows
+    if (!identical(as.integer(rows), 2:Tn)) return(NULL)
+    T1 <- Tn - 1L
+    ui <- match(as.character(prep$data[[ctx$id]]), ids)
+    sel <- !is.na(ui)
+    wide <- function(v) {
+        m <- matrix(NA_real_, Tn, N1)
+        m[cbind(prep$pos[sel], ui[sel])] <- as.numeric(v[sel])
+        m
+    }
+    p <- length(ctx$X)
+    Ylev <- wide(prep$data[[ctx$Y]])
+    Xlev <- array(NA_real_, dim = c(Tn, N1, p))
+    for (k in seq_len(p)) Xlev[, , k] <- wide(prep$data[[ctx$X[k]]])
+    O <- is.finite(Ylev)
+    for (k in seq_len(p)) O <- O & is.finite(Xlev[, , k])
+    t0 <- apply(O, 2, function(v) if (any(v)) which(v)[1L] else NA_integer_)
+
+    ## the model's prediction at every cell of every unit (treated and control)
+    plain0 <- x == 0 && !isTRUE(ctx$mask.zero)
+    Xf <- array(NA_real_, dim = c(T1, N1, p))
+    for (k in seq_len(p)) {
+        Xf[, , k] <- if (plain0) Xlev[rows, , k] else Xlev[rows, , k] - x * Xlev[rows - 1L, , k]
+    }
+    F <- if (!is.null(inner$factor)) as.matrix(inner$factor) else matrix(0, T1, 0)
+    bvec <- if (p == 0L) numeric(0) else as.numeric(inner$beta)
+    keepcov <- which(!is.na(bvec))
+    mu <- if (is.null(inner$mu)) 0 else as.numeric(inner$mu)
+    xi <- if (ctx$has_xi) as.numeric(inner$xi) else rep(0, T1)
+    tr <- inner$tr
+    co <- inner$co
+    alpha <- numeric(N1)
+    Lam <- matrix(0, N1, ncol(F))
+    if (ctx$has_a) {
+        alpha[tr] <- as.numeric(inner$alpha.tr)
+        alpha[co] <- as.numeric(inner$alpha.co)
+    }
+    if (ncol(F) > 0L) {
+        Lam[tr, ] <- as.matrix(inner$lambda.tr)
+        Lam[co, ] <- as.matrix(inner$lambda.co)
+    }
+    Vhat <- matrix(mu + xi, T1, N1) + matrix(alpha, T1, N1, byrow = TRUE)
+    if (ncol(F) > 0L) Vhat <- Vhat + F %*% t(Lam)
+    for (k in keepcov) Vhat <- Vhat + Xf[, , k] * bvec[k]
+    ## the prediction equals the fit's counterfactual at every observed cell
+    ## of the filtered panel (all units)
+    scale <- max(1, stats::sd(as.numeric(Ylev[O]), na.rm = TRUE), na.rm = TRUE)
+    cmp <- inner$I.dat == 1 & is.finite(inner$Y.ct) & is.finite(Vhat)
+    if (any(cmp) && max(abs(Vhat[cmp] - inner$Y.ct[cmp])) > 1e-8 * scale) {
+        stop("serial = \"ar1\": the rebuilt model prediction differs from the ",
+             "fit's counterfactual for the bootstrap draws (max deviation ",
+             format(max(abs(Vhat[cmp] - inner$Y.ct[cmp])), digits = 3), ").",
+             call. = FALSE)
+    }
+    list(T = Tn, N1 = N1, p = p, Ylev = Ylev, Xlev = Xlev, O = O, t0 = t0,
+         Vhat = Vhat, xhat = x, plain0 = plain0, mask.zero = isTRUE(ctx$mask.zero),
+         r = as.integer(inner$r.cv[1]), nrm = nrm, x.fixed = x.fixed,
+         force = force, tol = tol, max.iteration = max.iteration)
+}
+
+## The per-draw panel hook (R/boot.R, .fect_boot_hooks): its closure holds the
+## prepared arrays only.
+.fect_ar1_boot_hook <- function(bp) {
+    force(bp)
+    function(Y, X, D, I, II, id, Ntr) {
+        tryCatch(.fect_ar1_boot_draw(bp, Y, D, I, II, id, Ntr),
+                 error = function(e) NULL)
+    }
+}
+
+## One draw: Y, I, II, D are the draw's V-scale panel (T1 x N columns: the N_tr
+## treated units, then the pseudo-controls), id the unit of each column. Returns
+## the panel the refit uses and the draw's x, or NULL (the draw fails).
+.fect_ar1_boot_draw <- function(bp, Y, D, I, II, id, Ntr) {
+    Tn <- bp$T
+    nc <- ncol(Y)
+    cc <- Ntr + seq_len(nc - Ntr)
+    ## 1. increments: the draw's value where it observes the cell, the model
+    ## prediction (zero innovation) elsewhere
+    inc <- Y
+    miss <- I != 1
+    inc[miss] <- bp$Vhat[, id, drop = FALSE][miss]
+    ## 2. levels by the inverse filter at the chosen x
+    L <- matrix(NA_real_, Tn, nc)
+    if (bp$plain0) {
+        L[-1L, ] <- inc
+        L[1L, ] <- bp$Ylev[1L, id]
+    } else {
+        t0u <- bp$t0[id]
+        for (p in seq_len(Tn)) {
+            if (p >= 2L) L[p, ] <- bp$xhat * L[p - 1L, ] + inc[p - 1L, ]
+            st <- which(t0u == p)
+            if (length(st) > 0L) L[p, st] <- bp$Ylev[p, id[st]]
+        }
+    }
+    Os <- bp$O[, id, drop = FALSE] & is.finite(L)
+    ## 3. x again, on the pseudo-controls only, at the fit's rank
+    xb <- bp$xhat
+    if (!bp$x.fixed) {
+        Ys <- L[, cc, drop = FALSE] / bp$nrm
+        Ys[!Os[, cc, drop = FALSE]] <- NA_real_
+        Xs <- if (bp$p > 0L) bp$Xlev[, id[cc], , drop = FALSE] / bp$nrm else NULL
+        sr <- .fect_ar1_search_x(
+            Ys, matrix(0, Tn, length(cc)), Xs, r = bp$r, force = bp$force,
+            tol = bp$tol, max.iteration = bp$max.iteration
+        )
+        xb <- sr$x
+        if (!is.finite(xb)) return(NULL)
+    }
+    ## 4. filter at that x (no lag mask at exactly 0)
+    plain.b <- xb == 0 && !bp$mask.zero
+    if (plain.b) {
+        Yb <- L[-1L, , drop = FALSE]
+        Ib <- Os[-1L, , drop = FALSE]
+    } else {
+        Yb <- L[-1L, , drop = FALSE] - xb * L[-Tn, , drop = FALSE]
+        Ib <- Os[-1L, , drop = FALSE] & Os[-Tn, , drop = FALSE]
+    }
+    Ib <- Ib & is.finite(Yb)
+    ## a period no pseudo-control observes cannot be fitted: the draw fails
+    if (any(rowSums(Ib[, cc, drop = FALSE]) == 0)) return(NULL)
+    Yb[!Ib] <- 0
+    Xb <- NULL
+    if (bp$p > 0L) {
+        Xl <- bp$Xlev[, id, , drop = FALSE]
+        Xb <- array(0, dim = c(Tn - 1L, nc, bp$p))
+        for (k in seq_len(bp$p)) {
+            xk <- if (plain.b) Xl[-1L, , k] else Xl[-1L, , k] - xb * Xl[-Tn, , k]
+            xk <- xk / bp$nrm
+            xk[!Ib] <- 0
+            Xb[, , k] <- xk
+        }
+    }
+    Ib1 <- matrix(as.numeric(Ib), Tn - 1L, nc)
+    ## the cells a refit may use: observed and not treated
+    IIb <- Ib1 * (D == 0)
+    list(Y = Yb, X = Xb, I = Ib1, II = IIb, value = xb)
 }
 
 ## ----------------------------------------------------------------------
