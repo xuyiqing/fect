@@ -38,6 +38,14 @@ release.
   periods. did 2.5.1 returns `NA` for such cells and drops them from the
   averages. On a simulated unbalanced panel with a true effect of 1, the
   overall effect was 0.331 with did 2.3.0 and 0.992 with did 2.5.1.
+* fect now needs fixest 0.14.0 or later. fixest 0.13.2 and earlier can corrupt
+  R's memory when they index a variable (`fixest:::cpp_to_index()` leaves two
+  new R objects unprotected), so R can crash at random during a later garbage
+  collection. In fect this hit `did_wrapper()`, which calls `fixest::feols()`
+  once per bootstrap replicate: with `method = "st"`, `se = "boot"`,
+  `nboots = 200` on `hh2019`, 2 runs in 34 died with "Future ...
+  interrupted" (a worker segfault), and a sequential run crashed R itself.
+  fixest 0.14.0 adds the missing `PROTECT` calls.
 * The F test for no pre-trend (`fit$test.out`, `plot(type = "equiv")`) no
   longer stops the fit with "missing value where TRUE/FALSE needed" when the
   pre-treatment window has a single treated unit. Its small-sample factor
