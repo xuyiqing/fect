@@ -432,7 +432,7 @@ says what to do.
   new R objects unprotected), so R can crash at random during a later garbage
   collection. In fect this hit `did_wrapper()`, which calls `fixest::feols()`
   once per bootstrap replicate: with `method = "st"`, `se = "boot"`,
-  `nboots = 200` on `hh2019`, about one run in 15 died with "Future ...
+  `nboots = 200` on `hh2019`, 2 runs in 34 died with "Future ...
   interrupted" (a worker segfault), and a sequential run crashed R itself.
   fixest 0.14.0 adds the missing `PROTECT` calls.
 * `method = "ife"` and `method = "mc"` no longer stop with the Armadillo
