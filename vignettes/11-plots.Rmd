@@ -8,8 +8,8 @@ In this chapter, we explore visualization options available in the **fect** pack
 
 - the event study plot (`gap`)
 - treated counterfactual plot (`counterfactual`)
-- diagnostic plots (`equiv`, `placebo`, `carryover`)
-- cumulative effects (`cumul`)
+- diagnostic plots (`equiv`, and `gap` or `exit` on fits with a placebo or carryover test)
+- cumulative effects (`cumul`, on the object returned by `effect()`)
 - treatment effect heterogeneity plots (`box`, `calendar`, and `hte`)
 - special-purpose displays (`status`, `factors`, and `loadings`)
 - standalone `esplot()`
@@ -102,7 +102,7 @@ plot(out.hh,
 
 ### Presets
 
-The `preset` argument applies coordinated color schemes. Options are `"default"` (mostly black and white with accent color), `"vibrant"` (saturated colors), and `"grayscale"` (monochromatic, suitable for journals that charge for color).
+The `preset` argument applies coordinated color schemes. Leave it unset (`preset = NULL`, the default) for the standard style, mostly black and white with an accent color. The options are `"vibrant"` (saturated colors) and `"grayscale"` (monochromatic, suitable for journals that charge for color).
 
 ```{r preset-vibrant}
 plot(out,
@@ -134,7 +134,7 @@ plot(out.hh,
 
 ### Confidence intervals
 
-The `plot.ci` argument controls CI display. Options are `"0.95"` (default), `"0.9"`, and `"none"`.
+The `plot.ci` argument controls CI display. Options are `"0.95"`, `"0.9"`, and `"none"`. The default is `"0.95"`, except in the equivalence plot (`type = "equiv"`), where it is `"0.9"` to match the two one-sided tests.
 
 ```{r ci-raw-customization}
 plot(out, plot.ci = "0.9",
@@ -153,7 +153,7 @@ plot(out,
      main = "Count Histogram Customization")
 ```
 
-The `proportion` parameter controls which periods are displayed based on the count of treated units. Periods where the treated unit count falls below `proportion` $\times$ max(count) are trimmed. The default `proportion = 0.3` retains periods with at least 30% of the maximum treated unit count. When `xlim` is specified explicitly, `proportion` is overridden.
+The `proportion` parameter controls which periods are displayed based on the count of treated units. Periods where the treated unit count falls below `proportion` $\times$ max(count) are trimmed. The default `proportion = 0.3` retains periods with at least 30% of the maximum treated unit count. When `xlim` is specified explicitly, `proportion` is overridden. `proportion` also sets which pre-treatment periods enter the F test and the equivalence test, so changing it in `plot()` re-runs those tests.
 
 ### Axis customization
 
@@ -262,7 +262,7 @@ plot(out.sim, type = "gap", id = c(101, 130, 213))
 
 With parametric bootstrap draws, the plot adds a band around the gaps. The band shows how far a unit's idiosyncratic errors can move its gap away from its effect, and it works like a prediction interval for that effect. As in @Xu2017, it treats each unit's effects as fixed and its idiosyncratic errors as random, and the parametric bootstrap draws these errors from the prediction errors of control units, each control in turn playing the role of a treated unit. The band covers a unit's effect at the stated rate only if the unit's errors are distributed like those of the control units, independent across units and with the same spread. Even under that assumption, the band does not make the effect identified. Because the band is pointwise, about one 95% band in twenty can exclude zero before treatment even when the model is correct.
 
-To draw the band, fit the model with `vartype = "parametric"` and `keep.sims = TRUE`; gsynth keeps the draws when its inference is parametric. At each relative time, the plot averages the chosen units' draws within each replication and forms the band with the fit's `ci.method` and `alpha`, as the default gap plot does. The band for one unit is usually wider than the band for the average over all treated units. With the nonparametric bootstrap (`vartype = "bootstrap"`) or the jackknife, the plot shows point estimates only and prints a message, because those methods keep each unit's own outcomes fixed and so cannot measure its idiosyncratic errors.
+To draw the band, fit the model with `vartype = "parametric"` and `keep.sims = TRUE`; the **gsynth** package keeps the draws when its inference is parametric, but `fect(method = "gsynth")` does not, so set `keep.sims = TRUE` there. At each relative time, the plot averages the chosen units' draws within each replication and forms the band with the fit's `ci.method` and `alpha`, as the default gap plot does. The band for one unit is usually wider than the band for the average over all treated units. With the nonparametric bootstrap (`vartype = "bootstrap"`) or the jackknife, the plot shows point estimates only and prints a message, because those methods keep each unit's own outcomes fixed and so cannot measure its idiosyncratic errors.
 
 ```{r gap-id-band}
 data(simgsynth)
@@ -395,14 +395,14 @@ plot(out_fe_placebo, highlight.fill = TRUE,
 
 The equivalence plot displays only the **pre-treatment** period. The equivalence bound is defined by the two-one-sided test (TOST) threshold. Note: post-treatment estimates are not shown in this plot type---use the gap plot for those.
 
-The `bound` option controls which reference lines appear: `"none"`, `"min"` (maximum absolute pre-treatment residual), `"equiv"` (TOST threshold), or `"both"` (default).
+The `bound` option controls which reference lines appear: `"none"`, `"min"` (largest absolute end of the pre-treatment 90% confidence intervals), `"equiv"` (TOST threshold), or `"both"` (default).
 
 ```{r plot-equiv-bound}
 plot(out, type = "equiv", bound = "equiv", tost.threshold = 0.1,
      ylim = c(-0.15, 0.15))
 ```
 
-The `"min"` bound displays the minimum range based on the maximum absolute pre-treatment residual. For example, if the largest pre-treatment estimate is 0.03, lines appear at \$\pm\$0.03.
+The `"min"` bound displays the minimum range: the largest absolute value among the ends of the 90% confidence intervals in the pre-treatment periods. For example, if the farthest interval end is at 0.03, lines appear at \$\pm\$0.03.
 
 ```{r plot-equiv-min}
 plot(out, type = "equiv", bound = "min", ylim = c(-0.15, 0.15))
@@ -514,7 +514,7 @@ esplot(cumu.gs, Period = "event.time",
 
 ### Box plot (`type = "box"`)
 
-The box plot displays the distribution of individual treatment effects in each period. The box spans the interquartile range (middle 50%), whiskers extend to the 2.5th--97.5th percentiles, and the horizontal line marks the median.
+The box plot displays the distribution of individual treatment effects in each period. The box spans the interquartile range (middle 50%), whiskers extend to the most extreme values within 1.5 times the interquartile range of the box, values beyond them are drawn as points, and the horizontal line marks the median. Periods with few treated observations (fewer than 10, or than `proportion` times the largest count) are drawn as points only.
 
 ```{r plot-box-hte}
 plot(out, type = "box", xlim = c(-12, 3))
@@ -534,7 +534,7 @@ plot(out.hh, type = "calendar", xlim = c(1995, 2009),
 
 ### HTE by covariate (`type = "hte"`)
 
-The `"hte"` plot (or equivalently `"heterogeneous"`) displays the conditional average treatment effect (CATT) as a function of a pre-treatment covariate. The `covariate` argument specifies which variable to use. The blue curve and band show a loess fit with 95% confidence intervals; the red dashed line marks the overall ATT; and a histogram at the bottom shows the covariate distribution.
+The `"hte"` plot (or equivalently `"heterogeneous"`) displays the conditional average treatment effect (CATT) as a function of a pre-treatment covariate. The `covariate` argument specifies which variable to use. The blue curve is a loess fit, and the band is a 95% interval from the loess fit's own standard errors (it does not use the bootstrap or clustering); the red dashed line marks the overall ATT; and a histogram at the bottom shows the covariate distribution.
 
 ```{r plot-hte-covariate}
 plot(out, type = "hte", covariate = "cand_B_all",
@@ -623,7 +623,7 @@ For models with $r \geq 2$, the plot shows factors 1 and 2 with the convex hull 
 plot(out_ife, type = "loading.overlap")
 ```
 
-For $r > 2$ the plot still shows only factors 1 and 2; the hull and overlap measure are computed on the full $r$-dimensional loading vectors, so the 2D scatter is a projection of the underlying multidimensional support check. Use `factors = c(i, j)` to view a different pair.
+For $r > 2$ the plot still shows only factors 1 and 2, and the hull is drawn from these two loadings. A treated unit can sit inside this two-dimensional hull and still lie outside the hull of the full $r$-dimensional loadings; `loading.proj.resid` measures the full-dimensional distance. Other pairs of factors cannot be selected in the current version.
 
 ### One-dimensional case ($r = 1$)
 
@@ -646,7 +646,7 @@ plot(out_ife_r1, type = "loading.overlap")
 - **As an extrapolation flag**: large `loading.proj.resid` paired with treated units far outside the hull means GSC is extrapolating beyond what the donor pool supports. Such estimates should be reported with caveats or trimmed.
 - **As a model-fit diagnostic**: a treated unit far outside the hull on multiple factors may indicate that the rank `r` was set too low, or that the treated unit has a structurally different factor exposure than any control.
 
-The plot does not require `loading.bound = "simplex"` to be active, only that the model was fit with `method = "ife"` (with `time.component.from = "nevertreated"`) or `method = "gsynth"`. The hull and projection are computed on the estimated loadings regardless of how they were estimated.
+The plot does not require `loading.bound = "simplex"` to be active, only that the model was fit with `method = "gsynth"`, `"ife"` (with either `time.component.from` value), or `"fe"`, with at least one factor. The hull and projection are computed on the estimated loadings regardless of how they were estimated.
 
 ------------------------------------------------------------------------
 

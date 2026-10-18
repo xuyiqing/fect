@@ -37,7 +37,7 @@ The two paths give the same results where they overlap. `estimand(fit, "att", "e
 | ci.method | CI formula | symmetry around $\hat\theta$ | bias-aware | skew-aware |
 |---|---|---|---|---|
 | `"normal"` | $\hat\theta \pm z_{1-\alpha} \cdot \mathrm{SE}$ | symmetric | ✗ | ✗ |
-| `"basic"` | $[2\hat\theta - q_{1-\alpha},\ 2\hat\theta - q_\alpha]$ | symmetric (reflection) | ✗ | ✗ |
+| `"basic"` | $[2\hat\theta - q_{1-\alpha},\ 2\hat\theta - q_\alpha]$ | mirrors bootstrap | ✗ | ✗ |
 | `"percentile"` | $[q_\alpha,\ q_{1-\alpha}]$ | reflects bootstrap | ✗ | ✗ |
 | `"bc"` | bias-shifted percentile, with $z_0 = \Phi^{-1}(P(B < \hat\theta))$ | adapts | ✓ | ✗ |
 | `"bca"` | bias + acceleration $a$ from cell-level jackknife | adapts | ✓ | ✓ |
@@ -72,11 +72,11 @@ The `"parametric"` path resamples the residual error process and refits the mode
 | `para.error` | Residual draw | Panel shape | Notes |
 |--------------|---------------|-------------|-------|
 | `"auto"` (default) | Chosen at fit time | Any | Uses `"empirical"` for a fully observed panel and `"ar"` for a panel with missing cells; `fit$para.error` stores the chosen label |
-| `"ar"` | Draws from MVN with AR-vcov estimated from Loop-1 control residuals | Any | The v2.4.1 behavior; works as the fallback |
+| `"ar"` | Draws from a multivariate normal whose covariance across periods is the pairwise-complete covariance of the Loop-1 control residuals (no AR restriction) | Any | The v2.4.1 behavior; works as the fallback |
 | `"empirical"` | i.i.d. column resample from main-fit control residuals | Fully observed only | Returns an error if any cell is missing |
 | `"wild"` | Unit-level Rademacher sign flips over the empirical residual pool [@liu1988; @mammen1993; @cameron_gelbach_miller2008] | Fully observed only | Preserves the marginal residual distribution and within-unit dependence; returns an error if any cell is missing |
 
-The parametric path is the default in the gsynth-style setting: `time.component.from = "nevertreated"`, no treatment reversal, and a factor-augmented method.
+The parametric path is available in the gsynth-style setting: `time.component.from = "nevertreated"`, no treatment reversal, and a factor-augmented method. It is not the default; set `vartype = "parametric"` explicitly. The default is `"bootstrap"` for every method.
 
 **Caveat.** The simulation is run under $H_0$, with no treatment effect added back to treated cells. As a result, `fit$eff.boot` is centered at zero. The legacy `fit$est.avg` output and `get.pvalue()` use this $H_0$ centering to test $H_0: \mathrm{ATT} = 0$. In the current implementation, `estimand()` applies a post-hoc location shift for parametric fits: `att_b <- att_b - mean(att_b) + estimate`. This centers the bootstrap distribution at the point estimate while preserving its spread, since `sd()` is unchanged by a shift. The `"normal"` CI is unchanged by this fix; the other four CI methods now produce correctly centered CIs. The legacy cumulative-effect functions handle parametric fits separately: `effect()` and `att.cumu()` report the estimate plus or minus the normal critical value times the SE, with the matching $p$-value. Both read the variance type stored on the fit (`fit$vartype`); before v2.4.7, `att.cumu()`, and `effect()` when `vartype` was not typed as a string in the call, took quantiles of the $H_0$-centered draws, giving intervals centered near zero.
 

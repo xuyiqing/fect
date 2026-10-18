@@ -121,7 +121,7 @@ out$est.avg
 out$beta
 ```
 
-Treatment effect estimates from each bootstrap run are stored in `att.boot`, an array whose dimension = (#time periods \* #treated \* #bootstrap runs).
+Treatment effect estimates from each bootstrap run are stored in `att.boot`, a matrix with one row per event time and one column per bootstrap run. With `keep.sims = TRUE`, the cell-level draws are also kept, in `eff.boot` (time periods \* units \* bootstrap runs).
 
 ::: {.callout-note appearance="simple"}
 **Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
@@ -154,7 +154,7 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
 | `"block"` | Available | Available | Available |
 | `"loo"` | --- | Available | --- |
 
-The legacy values `"all_units"` (now `"block"`) and `"treated_units"` (block masking restricted to treated pre-treatment cells) are still accepted but emit a deprecation message; both will be replaced by the unified `(cv.method, cv.units)` API in v2.4.0. See the [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv) for the deprecation plan.
+The legacy values `"all_units"` (now `"block"`) and `"treated_units"` (block masking restricted to treated pre-treatment cells) are still accepted and print a note; use `"block"` in place of `"all_units"`. See the [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv).
 
 ### Rolling-window CV 
 
@@ -175,7 +175,7 @@ CV behavior is identical across `method = "ife"` (IFE-EM, internal `time.compone
 
 ### Visualizing Results
 
-By default, the `print` function produces a *gap* plot, equivalent to using `plot(out, type = "gap")`, and visualizes the estimated Average Treatment Effect on the Treated (ATT) by period. For reference, the true effects in `gsynth` range from 1 to 10 (with some added white noise) and take effect during periods 21 to 30.
+By default, `plot()` produces a *gap* plot, equivalent to using `plot(out, type = "gap")`, and visualizes the estimated Average Treatment Effect on the Treated (ATT) by period. For reference, the true effects in `gsynth` range from 1 to 10 (with some added white noise) and take effect during periods 21 to 30.
 
 Note that the plot() generates a **ggplot2** object, which users can save by simply calling `print` with the object's name.
 
@@ -208,9 +208,9 @@ plot(out, type = "gap", ylim = c(-6,12), xlab = "Period",
 **fect** objects can generate eight types of plots for diverse demonstration purposes. The `type` option includes the following:
 
 -   `"gap"`: Reports ATT by period (default).
--   `"counterfactual"`: Generates the observed treated outcome alongside the imputed counterfactual averages. The style can be modified with `raw = "all"` for linear or `raw = "band"` for graphic representation of all estimated counterfactual results.
+-   `"counterfactual"`: Generates the observed treated outcome alongside the imputed counterfactual averages. Set `raw = "all"` to add the observed outcome of every treated and control unit as thin lines, or `raw = "band"` to add the range of these observed outcomes as shaded bands.
 -   `"factors"` and `"loadings"`: Plot the estimated factors and loadings, respectively.
--   `"status"`: Plots treatment status of all observations, similar to `panelview()`. The time labels are displayed only when `axis.lab = "time"` is set.
+-   `"status"`: Plots treatment status of all observations, similar to `panelview()`. The `axis.lab` option chooses which labels are shown (`"both"` by default); with 200 or more units, unit labels are dropped automatically.
 -   `"box"`: Displays the estimated individual treatment effects with box plot.
 -   `"calendar"`: Shows how the treatment effect evolves over time.
 -   `"equiv"`: Exhibits the average pre-treatment residuals with equivalence confidence intervals.
@@ -221,13 +221,13 @@ To visualize the estimated counterfactual outcomes, we use `type = "counterfactu
 plot(out, type = "counterfactual")
 ```
 
-**fect** offers two options for displaying all estimated counterfactual estimates: `raw = "all"` for linear and `raw = "band"` for a graphical (shaded band) representation.
+**fect** offers two options for showing the raw data: `raw = "all"` draws each treated and control unit's observed outcome as a line, and `raw = "band"` draws shaded bands.
 
 ```{r sim-counterfactual-all, cache = FALSE,fig.height=5, fig.width=7}
 plot(out, type = "counterfactual", raw = "all")
 ```
 
-Note that in the plot below, the shaded areas represent the 5-95% quantiles of the treated and estimated counterfactual trajectories, not their uncertainty estimates.
+Note that in the plot below, the shaded areas span the 5th to 95th percentiles of the treated units' and of the control units' observed outcomes in each period. They describe the raw data and are not uncertainty estimates.
 
 ```{r sim-counterfactual-band, cache = FALSE,fig.height=5, fig.width=7}
 plot(out, type = "counterfactual", raw = "band")
@@ -469,7 +469,7 @@ Both should be of the same order of magnitude when both correctly capture the pa
 
 The status plot visualizes the regression data and differs from the **panelView** plot. Wyoming's data is shown in gray, as its observations are excluded due to an insufficient number of pre-treatment periods.
 
-The missing data matrix can also be accessed via `out_ub$obs.missing`, where values 0, 1, 2, 3, and 4 represent missing values, control observations, treated (pre-treatment) observations, treated (post-treatment) observations, and treated observations removed from the sample, respectively.
+The missing data matrix can also be accessed via `out_ub$obs.missing`, where 1 marks observations under treatment, 2 observations not under treatment (control units and the pre-treatment periods of treated units), 3 missing observations, and 4 units removed from the sample. Fits with a placebo or carryover test also use 5 for the masked placebo or carryover observations, and 6 for observations removed by `carryover.rm`.
 
 ```{r, turnout_ub_panelview_miss2, fig.height=12, fig.width=7}
 plot(out_ub, type = "status",
@@ -710,7 +710,7 @@ print(mspe.comp$summary[, c("Model", "MSPE", "RMSE", "MAD")])
 
 ## Inference
 
-The default `vartype` for the gsynth-style regime is `"parametric"` --- a two-stage pseudo-treated bootstrap that targets the conditional variance $V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D)$ on small-$N_{\text{tr}}$ panels where the standard nonparametric bootstrap is unreliable. The `para.error` argument (introduced in v2.4.2) chooses how the residual error process is resampled: `"auto"` (default, resolves to `"empirical"` on a fully-observed panel and `"ar"` on a missing-data panel), `"ar"` (the v2.4.1 behavior), `"empirical"`, or `"wild"`. The (`vartype` × `ci.method` × `para.error`) interaction, parametric-bootstrap mechanics, and an empirical coverage study live in [Chapter @sec-inference], which is the natural next read after this chapter.
+The default `vartype` is `"bootstrap"` for every method, including `method = "gsynth"`. In the gsynth-style regime, `vartype = "parametric"` must be set explicitly. It is a two-stage pseudo-treated bootstrap that targets the conditional variance $V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D)$ on small-$N_{\text{tr}}$ panels where the standard nonparametric bootstrap is unreliable. The `para.error` argument (introduced in v2.4.2) chooses how the residual error process is resampled: `"auto"` (default, resolves to `"empirical"` on a fully-observed panel and `"ar"` on a missing-data panel), `"ar"` (the v2.4.1 behavior), `"empirical"`, or `"wild"`. The (`vartype` × `ci.method` × `para.error`) interaction, parametric-bootstrap mechanics, and an empirical coverage study live in [Chapter @sec-inference], which is the natural next read after this chapter.
 
 
 ## Additional Notes
