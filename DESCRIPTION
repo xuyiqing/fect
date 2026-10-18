@@ -30,7 +30,7 @@ Imports:
     MASS, 
     gridExtra, 
     grid, 
-    fixest, 
+    fixest (>= 0.14.0), 
     doRNG,
     future, 
     parallelly,

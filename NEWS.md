@@ -427,6 +427,14 @@ says what to do.
 
 ## Bug fixes
 
+* fect now needs fixest 0.14.0 or later. fixest 0.13.2 and earlier can corrupt
+  R's memory when they index a variable (`fixest:::cpp_to_index()` leaves two
+  new R objects unprotected), so R can crash at random during a later garbage
+  collection. In fect this hit `did_wrapper()`, which calls `fixest::feols()`
+  once per bootstrap replicate: with `method = "st"`, `se = "boot"`,
+  `nboots = 200` on `hh2019`, about one run in 15 died with "Future ...
+  interrupted" (a worker segfault), and a sequential run crashed R itself.
+  fixest 0.14.0 adds the missing `PROTECT` calls.
 * `method = "ife"` and `method = "mc"` no longer stop with the Armadillo
   errors `Mat::head_cols(): size out of bounds` (IFE) or
   `Mat::operator(): index out of bounds` (MC) when a singular value
