@@ -16,7 +16,7 @@ rm(list = ls())
 |--------|---------|------|----------|
 | CRAN | 2.4.5 | 2026-05-30 | Default release |
 | GitHub (`master`) | 2.4.5 | 2026-05-30 | Same as CRAN |
-| GitHub (`dev`) | 2.4.7 | in development | Adds `dloo` placebos, the LOO equivalence-test window fix, cross-validation of the number of factors by default for `method = "ife"`, and the correctness fixes in the changelog |
+| GitHub (`dev`) | 2.4.8 | in development | Adds `dloo` placebos, the LOO equivalence-test window fix, cross-validation of the number of factors by default for `method = "ife"`, the joint fit of the intercept under `loading.bound = "simplex"`, and the correctness fixes in the changelog |
 
 To install **fect** from CRAN:
 
@@ -48,7 +48,7 @@ installed.packages()["fect", "Version"]
 devtools::install_github('xuyiqing/panelView')
 ```
 
-**fect** depends on the following packages, which should be installed automatically when **fect** is being installed. You can also install them manually.
+**fect** depends on the following packages, which should be installed automatically when **fect** is being installed. You can also install them manually. **fect** needs **fixest** 0.14.0 or later. `did_wrapper()` with the Callaway--Sant'Anna estimators needs **did** 2.5.1 or later.
 
 ```{r install-dependencies, eval=FALSE}
 install_all <- function(packages) {
@@ -59,9 +59,11 @@ install_all <- function(packages) {
     }
   }
 }
-packages <- c("abind", "doParallel", "doRNG", "fixest", "foreach", "future", 
-              "GGally", "ggplot2", "grid", "gridExtra", "MASS", 
-              "panelView", "Rcpp")
+packages <- c("abind", "codetools", "doFuture", "doParallel", "doRNG", "dplyr",
+              "fixest", "foreach", "future", "future.apply", "GGally",
+              "ggplot2", "gridExtra", "MASS", "mvtnorm", "panelView",
+              "parallelly", "Rcpp", "RcppArmadillo", "reshape2", "rlang",
+              "scales")
 install_all(packages)
 ```
 

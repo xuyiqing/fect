@@ -1,4 +1,65 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.8
+
+Development version, not yet on CRAN.
+
+Version 2.4.7 was a development version on GitHub and was not released on
+CRAN. Its changes are listed under fect 2.4.7 below and are part of this
+release.
+
+## Changes that affect results
+
+* `loading.bound = "simplex"` with `force = "unit"` or `"two-way"` now fits
+  each treated unit's intercept jointly with its constrained loadings. Before,
+  the loadings were fitted with no intercept and the intercept was then set to
+  the mean of the leftover residual, so a unit's loadings absorbed its level
+  whenever the estimated factors were not centred over its pretreatment
+  periods (always the case for a trend factor), and adding a constant to a
+  treated unit's outcome changed its estimated loadings and the ATT. The
+  intercept is still not bounded. The fit now centres the unit's outcome and
+  the factors over the unit's own pretreatment periods, which solves the joint
+  problem exactly with the same `gamma.loading`, by Newton's method on the
+  dual (the previous solver is the fallback). `gamma.loading` chosen by
+  cross-validation centres within each training fold. `loading.proj.resid` is
+  now the norm of the joint-fit residual. Estimates with `force = "unit"` or
+  `"two-way"` change, sometimes substantially; `loading.bound = "none"` and
+  `force = "none"` or `"time"` do not change. On a simulated design with five
+  treated units and `gamma.loading = 1e6`, adding 10 to one treated unit's
+  outcome moved the ATT from 0.512 to 1.607; it is now 0.647 in both cases.
+
+## Bug fixes
+
+* `did_wrapper(method = "cs_never")` and `"cs_notyet"` now need did 2.5.1 or
+  later and stop with a message on an older version. On unbalanced panels, did
+  before 2.5.1 reports a (cohort, period) cell it cannot estimate (no treated
+  rows in that period) as an effect of 0, which `aggte()` then averages in, so
+  the overall and event-time effects shrink toward zero; it can also segfault
+  when a cell's comparison group has rows in only one of the cell's two
+  periods. did 2.5.1 returns `NA` for such cells and drops them from the
+  averages. On a simulated unbalanced panel with a true effect of 1, the
+  overall effect was 0.331 with did 2.3.0 and 0.992 with did 2.5.1.
+* fect now needs fixest 0.14.0 or later. fixest 0.13.2 and earlier can corrupt
+  R's memory when they index a variable (`fixest:::cpp_to_index()` leaves two
+  new R objects unprotected), so R can crash at random during a later garbage
+  collection. In fect this hit `did_wrapper()`, which calls `fixest::feols()`
+  once per bootstrap replicate: with `method = "st"`, `se = "boot"`,
+  `nboots = 200` on `hh2019`, 2 runs in 34 died with "Future ...
+  interrupted" (a worker segfault), and a sequential run crashed R itself.
+  fixest 0.14.0 adds the missing `PROTECT` calls.
+* The F test for no pre-trend (`fit$test.out`, `plot(type = "equiv")`) no
+  longer stops the fit with "missing value where TRUE/FALSE needed" when the
+  pre-treatment window has a single treated unit. Its small-sample factor
+  (N_bar - q) / ((N_bar - 1) q) is 0/0 when N_bar = 1; the test now reports
+  `NA`, with the message it already gave for too few treated units. This
+  includes a window of one period (`pre.periods = 0` or `-1`). Seen on a
+  replication panel with one treated unit that is treated in one period.
+
+## Documentation
+
+* The "Bounded factor loadings" section of the gsynth chapter of the user
+  manual describes the joint intercept fit and says how estimates from
+  earlier versions differ; `?fect` (`loading.bound`) says the same.
+
 # fect 2.4.7
 
 Development version, not yet on CRAN.

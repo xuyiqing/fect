@@ -39,7 +39,7 @@ plot(out.fect, type = "calendar", xlim = c(1, 35))
 
 ### By a covariate
 
-By setting `type = "hte"` or `type = "heterogeneous"`, we can also plot the HTE by arbitrary covariates that are unaffected by the treatment. As before, the blue curve and band represent a lowess fit of the estimates and its 95% confidence interval, respectively. The red dashed line represents the ATT. The histogram at the bottom of the figure illustrates the distribution of the covariates, and can be turned off using `show.count = FALSE`. In our simulated case, the effect size is unrelated to the values of covariate `X1`.
+By setting `type = "hte"` or `type = "heterogeneous"`, we can also plot the HTE by arbitrary covariates that are unaffected by the treatment. The blue curve is a loess fit of the cell-level effect estimates. The band is a 95% interval from the loess fit's own standard errors: it treats the cell-level estimates as independent and does not use the bootstrap or clustering, so read it as descriptive. The red dashed line represents the ATT. The histogram at the bottom of the figure illustrates the distribution of the covariates, and can be turned off using `show.count = FALSE`. In our simulated case, the effect size is unrelated to the values of covariate `X1`.
 
 ```{r hte_X1, eval = TRUE, cache = TRUE, warning = FALSE, fig.width = 6, fig.height = 4.5}
 plot(out.fect, type = "hte", covariate = "X1")

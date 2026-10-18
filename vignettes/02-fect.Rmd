@@ -480,11 +480,11 @@ The older syntax `index = c("unit", "time", "extra1", ...)` does the same thing 
 
 ## Additional notes
 
-1.  By default, the program will drop the units that have no larger than 5 observations under control, which is the reason why sometimes there are less available units in the placebo test or carryover test than in the original estimation. We can specify a preferred criterion in the option `min.T0` (default to 5). As a rule of thumb for the IFE estimator, the minimum number of observations under control for a unit should be larger than the specified number of factor `r`.
+1.  By default, the program drops units with too few observations under control: units with none for `method = "fe"`, and units with fewer than 5 for the other methods. This is why there are sometimes fewer units in the placebo test or carryover test than in the original estimation. The option `min.T0` sets a different cutoff. As a rule of thumb for the IFE estimator, the number of observations under control for a unit should be larger than the number of factors `r`.
 
 2.  We can get replicable results by setting the option `seed` to a certain integer, no matter whether the parallel computing is used.
 
-3.  When `na.rm = FALSE` (default), the program allows observations to have missing outcomes $Y$ but not $X$ or treatment statuses $D$. When `na.rm = TRUE` the program will drop all observations that have missing values in outcomes, treatments, or covariates.
+3.  When `na.rm = FALSE` (default), observations may have a missing outcome $Y$ or missing covariates $X$; these cells are left out of the fit. The treatment status $D$ and the unit and time indices must not be missing. When `na.rm = TRUE` the program will drop all observations that have missing values in outcomes, treatments, or covariates.
 
 
 ## How to Cite
