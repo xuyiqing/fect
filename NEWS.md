@@ -26,6 +26,18 @@ release.
   `force = "none"` or `"time"` do not change. On a simulated design with five
   treated units and `gamma.loading = 1e6`, adding 10 to one treated unit's
   outcome moved the ATT from 0.512 to 1.607; it is now 0.647 in both cases.
+* `did_wrapper(se = "boot")` is now a cluster bootstrap that keeps a unit
+  drawn more than once as separate units. Before, each draw kept every drawn
+  unit only once (`data[unit %in% drawn, ]`), so a draw held about 63% of the
+  units and the standard errors were too small. On `simdata` with
+  `method = "twfe"`, the bootstrap SE moved from 0.316 to 0.404 (the clustered
+  SE is 0.427).
+* `did_wrapper(se = "jackknife")` now reports the jackknife standard error,
+  sqrt((n - 1) / n * sum((theta_i - mean)^2)), with a normal interval and
+  p-value. Before, it reported the standard deviation of the leave-one-out
+  estimates, about sqrt(n) times too small, with bootstrap-style quantile
+  intervals. On `simdata` with `method = "twfe"`, the SE moved from 0.031 to
+  0.429.
 
 ## Bug fixes
 
@@ -46,6 +58,21 @@ release.
   `nboots = 200` on `hh2019`, 2 runs in 34 died with "Future ...
   interrupted" (a worker segfault), and a sequential run crashed R itself.
   fixest 0.14.0 adds the missing `PROTECT` calls.
+* `did_wrapper()` with `method` left at its default stopped with "the
+  condition has length > 1"; it now runs `method = "twfe"`.
+* `fect_sens()`: the default `post.periods` (all post-treatment event times)
+  stopped with a dimension error, because `1:n - a - b` is read as
+  `(1:n) - a - b`; `parallel = TRUE` with `cores` stopped with "object 'cl'
+  not found"; and setting `periodMbarvec` or `periodMvec` to `NULL` also
+  dropped the overall results (setting `Mbarvec` or `Mvec` to `NULL` stopped).
+  Each part is now computed and stored on its own.
+* `fect(carryover.rm = 3L)` was ignored without a message because only class
+  "numeric" counted; any number now works.
+* `fect(placeboTest = TRUE)` without `placebo.period` now stops with a message.
+  Before, it ran no placebo test (`est.placebo` was `NULL`), or stopped with an
+  unrelated error when the model had covariates.
+* `get.cohort(varname = ...)` stopped because the new column names were never
+  set.
 * The F test for no pre-trend (`fit$test.out`, `plot(type = "equiv")`) no
   longer stops the fit with "missing value where TRUE/FALSE needed" when the
   pre-treatment window has a single treated unit. Its small-sample factor
@@ -59,6 +86,18 @@ release.
 * The "Bounded factor loadings" section of the gsynth chapter of the user
   manual describes the joint intercept fit and says how estimates from
   earlier versions differ; `?fect` (`loading.bound`) says the same.
+* The user manual and the help pages were checked against the code, and
+  statements that contradicted it were corrected. Among them: `vartype`
+  defaults to `"bootstrap"` for every method, including `method = "gsynth"`
+  (the manual said `"parametric"`); `cv.rule` defaults to `"min"`; `min.T0`
+  is 1 for `method = "fe"`; `method = "cfe"` cross-validates `r` only with
+  `time.component.from = "nevertreated"`; the codes of `obs.missing`; the
+  `bound = "min"` line, box-plot whiskers and HTE bands of `plot()`; the
+  `cfe` argument of `fect()` and four arguments of `print.fect()` do nothing;
+  `?plot.fect` documents the `type` values, `stats` values and the calendar
+  filters; `?did_wrapper` documents each method, `se` option and output
+  column; `gs2020` and `hh2019` are replication data, now with their
+  variables described.
 
 # fect 2.4.7
 

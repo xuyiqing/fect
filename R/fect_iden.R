@@ -1,13 +1,13 @@
 #' Over-identification test for causal moderation (cm)
 #'
-#' Implements the over-identification test described in the slide:
+#' Implements an over-identification test for the causal moderation model (\code{cm = TRUE} in \code{\link{fect}}):
 #' run two auxiliary regressions of residualized outcomes on the moderator
 #' and covariates (including quadratic and interaction terms) with unit and
 #' time fixed effects, then test using \eqn{n \times R^2 \sim \chi^2(df)},
 #' where df is the number of *nonlinear* (quadratic + interaction) terms that
 #' remain in the fitted model.
 #'
-#' @param x A `fect` object. Must be estimated with `cm=TRUE` so that `x$est.cm` exists.
+#' @param x A \code{fect} object estimated with \code{cm = TRUE} and at least one covariate, so that \code{x$est.cm} exists.
 #' @param moderator Character scalar. Name of the moderator \eqn{M_{it}} (must be in `x$X`).
 #' @param covariates Optional character vector. Names of other covariates \eqn{X_{it}}.
 #'   Default is all covariates in `x$X` except `moderator`.

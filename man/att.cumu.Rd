@@ -3,6 +3,7 @@
 \alias{att.cumu}
 \title{Calculate Cumulative Treatment Effects}
 \description{
+  Soft-deprecated: use \code{\link{estimand}}, e.g. \code{estimand(fit, "att.cumu", "overall", window = c(1, 5))}; \code{att.cumu()} still works and prints a message.
   Calculate cumulative treatment effects based on the results of a \code{\link{fect}} object.
 }
 \usage{
@@ -58,7 +59,7 @@ att.cumu(x, period = NULL, weighted = FALSE, alpha = 0.05, type = "on", plot = F
   Panel data models with interactive fixed effects.
   \emph{Econometrica}, 77(4), 1229-1279.
 
-  Liu, L., Wang, Y., and Xu, Y. (2022).
+  Liu, L., Wang, Y., and Xu, Y. (2024).
   A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data.
   \emph{American Journal of Political Science}, 68(1), 160-176.
 

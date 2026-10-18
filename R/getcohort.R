@@ -49,8 +49,12 @@ get.cohort <- function(data,
         }
     } else {
         if (length(varname) != 4) {
-            stop("\"varname\" should have three elements.")
+            stop("\"varname\" should have four elements.")
         }
+        varname1 <- varname[1]
+        varname2 <- varname[2]
+        varname3 <- varname[3]
+        varname4 <- varname[4]
         if (varname[1] %in% colnames(data)) {
             warnings(paste0("Variable ", varname[1], " will be replaced.\n"))
             data[, varname1] <- NULL

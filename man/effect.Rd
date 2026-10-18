@@ -2,6 +2,7 @@
 \alias{effect}
 \title{Calculate Cumulative or Sub-group Treatment Effects}
 \description{
+  Soft-deprecated: use \code{\link{estimand}}, e.g. \code{estimand(fit, "att.cumu", "event.time")}; \code{effect()} still works and prints a message.
   Calculates cumulative or average treatment effects for specified units and time periods based on a fitted \code{fect} object. The function supports both cumulative effects over time and period-specific average treatment effects, with bootstrap-based uncertainty estimates.
 }
 
@@ -26,7 +27,7 @@ effect(
 
   \item{id}{Character vector or NULL. Unit identifiers to include in the analysis; one unit is fine. If \code{NULL} (default), all treated units are included.}
 
-  \item{period}{Numeric vector of length 2 specifying the time window \code{c(start, end)} for effect calculation. If \code{NULL}, uses the maximum possible window based on the data.}
+  \item{period}{Numeric vector of length 2 specifying the window \code{c(start, end)} in event time, where 1 is the first treated period. If \code{NULL}, uses the longest window the data allow.}
 
   \item{plot}{Logical. If \code{TRUE}, creates a visualization of the cumulative treatment effects with confidence intervals and a bar chart showing the number of treated units at each time point. Default is \code{FALSE}.}
 
@@ -102,7 +103,7 @@ results_specific$effect.est.att
 }
 
 \references{
-  Liu, L., Wang, Y., & Xu, Y. (2022).
+  Liu, L., Wang, Y., & Xu, Y. (2024).
   A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data.
   \emph{American Journal of Political Science}, 68(1), 160-176.
 }

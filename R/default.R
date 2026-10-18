@@ -972,8 +972,7 @@ fect.default <- function(
                      "\n  (group.fe is for additive simple FE on a coarsening ",
                      "of the unit identifier. For cell-level interactions ",
                      "that vary within unit, use the legacy `index = c(unit, ",
-                     "time, ...)` form or the `cfe = list(...)` interactive-",
-                     "FE argument instead.)",
+                     "time, ...)` form instead.)",
                      call. = FALSE)
             }
         }
@@ -1945,6 +1944,11 @@ fect.default <- function(
     }
 
     ## placebo period
+    if (placeboTest == TRUE && is.null(placebo.period)) {
+        stop("placeboTest = TRUE needs \"placebo.period\", the pre-treatment ",
+             "periods to hold out, e.g. placebo.period = c(-2, 0).",
+             call. = FALSE)
+    }
     if (placeboTest == TRUE && !is.null(placebo.period)) {
         if (sum(placebo.period > 0) > 0) {
             stop("\"placebo.period\" should not be greater than 0.")
@@ -2218,7 +2222,9 @@ fect.default <- function(
     # recode treatment status for osbervations exposed to carryover effects
     hasCarryover <- 0
     if (!is.null(carryover.rm)) {
-        if (length(carryover.rm) == 1 & class(carryover.rm)[1] == "numeric") {
+        ## is.numeric(): an integer such as 3L counts too (before 2.4.8 only
+        ## class "numeric" did, so carryover.rm = 3L was silently ignored)
+        if (length(carryover.rm) == 1 && is.numeric(carryover.rm)) {
             if (carryover.rm > 0) {
                 newT <- c(1:TT)
                 data <- data[order(data[, id], data[, time]), ]
