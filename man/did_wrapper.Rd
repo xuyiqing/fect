@@ -27,18 +27,18 @@ did_wrapper(
   \item{data}{Input data frame.}
   \item{Y}{Outcome variable name (string).}
   \item{D}{Treatment indicator variable name (string).}
-  \item{X}{Optional covariate vector for adjustment.}
+  \item{X}{Optional character vector of covariate column names. Used by every method except \code{"st"}, which ignores it.}
   \item{index}{Character vector of unit and time variable names, e.g., \code{c("id", "time")}.}
-  \item{method}{DiD method: \code{"twfe"}, \code{"st"}, \code{"iw"}, \code{"cs_never"}, \code{"cs_notyet"}, or \code{"didm"}.}
-  \item{se}{Standard error method: \code{"default"}, \code{"boot"}, \code{"bootstrap"}, or \code{"jackknife"}.}
-  \item{nboots}{Number of bootstrap replications (if applicable).}
+  \item{method}{DiD method: \code{"twfe"} (two-way fixed effects, the default), \code{"st"} (stacked DiD), \code{"iw"} (Sun and Abraham's interaction-weighted estimator, via \code{fixest::sunab}), \code{"cs_never"} or \code{"cs_notyet"} (Callaway and Sant'Anna with never-treated or not-yet-treated controls; needs \pkg{did} 2.5.1 or later), or \code{"didm"} (de Chaisemartin and D'Haultfoeuille, via \pkg{DIDmultiplegtDYN}).}
+  \item{se}{Standard error method. \code{"default"} (the default) uses each estimator's own standard errors: clustered by unit for \code{"twfe"}, \code{"st"} and \code{"iw"}, and the defaults of \pkg{did} and \pkg{DIDmultiplegtDYN} for the other methods, with a 95\% interval. \code{"boot"} (or \code{"bootstrap"}) is a cluster bootstrap that draws units with replacement (a unit drawn twice enters as two units), with \code{nboots} draws, a basic (reflected) 95\% interval, and a p-value from the share of draws on the other side of zero. \code{"jackknife"} drops one unit at a time; its standard error is \eqn{\sqrt{(n-1)/n \sum_i (\hat\theta_{(i)} - \bar\theta)^2}} and the interval and p-value are normal. Before version 2.4.8, the bootstrap kept a unit drawn several times only once and the jackknife omitted the \eqn{(n-1)/n} scaling, so both gave standard errors that were too small.}
+  \item{nboots}{Number of bootstrap replications for \code{se = "boot"}. For \code{se = "jackknife"} it is set to the number of units.}
   \item{parallel}{Logical; use parallel computation for bootstrapping.}
   \item{core}{Number of CPU cores to use if \code{parallel = TRUE}.}
-  \item{time_to_treat_var}{Name of time-to-treatment variable; used internally.}
-  \item{treat_indicator}{Name of treatment cohort indicator variable; used internally.}
-  \item{csdid.base_period}{Baseline period choice for Callawayâ€“Sant'Anna estimators.}
-  \item{didm.effects}{Effects vector for \code{didm}; required if \code{method = "didm"}.}
-  \item{didm.placebo}{Placebo vector for \code{didm}; required if \code{method = "didm"}.}
+  \item{time_to_treat_var}{Name of the event-time column created by \code{\link{get.cohort}}; change it only if your data already use that name for something else.}
+  \item{treat_indicator}{Name of the ever-treated indicator column used by the \code{"twfe"} and \code{"st"} event studies; created if absent.}
+  \item{csdid.base_period}{Base period for the Callaway--Sant'Anna estimators, passed to \code{did::att_gt(base_period = )}: \code{"universal"} (default; every event time compared with the period just before treatment) or \code{"varying"}.}
+  \item{didm.effects}{Number of post-treatment effects to estimate with \code{method = "didm"}; required for that method.}
+  \item{didm.placebo}{Number of placebo (pre-treatment) estimates with \code{method = "didm"}; required for that method.}
 }
 \details{
 This function:
@@ -53,8 +53,8 @@ Supported methods include TWFE, stacked DiD, interaction-weighted DiD, Callawayâ
 }
 \value{
 A list of class \code{"did_wrapper"}:
-\item{est.avg}{Data frame with overall ATT, standard error, confidence interval, and p-value.}
-\item{est.att}{Event-study ATT estimates by relative period, including standard errors and confidence intervals.}
+\item{est.avg}{A one-row data frame with columns \code{ATT.avg}, \code{S.E.}, \code{CI.lower}, \code{CI.upper} and \code{p.value} (95\% interval).}
+\item{est.att}{A data frame of event-study estimates with columns \code{ATT}, \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value} and \code{count} (number of treated units). Row names are event times, with 1 the first treated period and 0 the last period before treatment, as in \code{fect}. Can be passed to \code{\link{esplot}}.}
 }
 \author{
 Rivka Lipkovitz

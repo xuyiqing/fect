@@ -97,12 +97,14 @@ estimand(
 
   \item{vartype}{\code{"bootstrap"} (default), \code{"jackknife"},
     \code{"parametric"}, or \code{"none"}. Selects which variance
-    method to source replicates from. The output \code{vartype}
-    column reports the method actually used at fit time (read from
-    \code{fit$vartype}); this argument is informational and does not
-    re-aggregate replicates. Wild-bootstrap fits (\code{vartype =
-    "wild"} at fit time) are consumed transparently and reported as
-    \code{"wild"} in the output column.}
+    method to source replicates from. The replicates themselves are
+    always those stored in the fit, made with the fit's own
+    \code{vartype}, which the output \code{vartype} column reports.
+    \code{"none"} returns point estimates without standard errors or
+    intervals. \code{"parametric"} treats the stored draws as centred at
+    zero, as parametric-bootstrap draws are, and re-centres them at the
+    estimate. Fits made with \code{para.error = "wild"} have
+    \code{vartype = "parametric"}.}
 
   \item{conf.level}{Two-sided confidence level. Defaults to 0.95. Not
     used for \code{"att.cumu"}; the per-event-time ATT without a test

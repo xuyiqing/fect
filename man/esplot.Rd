@@ -33,7 +33,7 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
        pre.label = "Pre-treatment", post.label = "Post-treatment")
 }
 \arguments{
-  \item{data}{The input data for the event study plot. Can be a \code{data.frame} or an object of class \code{did_wrapper} (in which case, the \code{est.att} component will be used).}
+  \item{data}{The input data for the event study plot. Can be a \code{data.frame}, a \code{fect} object, or an object of class \code{did_wrapper}; for the last two, the \code{est.att} component is used.}
   \item{Period}{The name of the column in \code{data} representing the relative time period. If \code{NULL} (the default), the function will attempt to automatically identify the period column from common names (e.g., 'time', 'Time', 'period', 'Period', 'event.time', 'event_time', 'rel_time') or use numeric rownames if available.}
   \item{Estimate}{The name of the column in \code{data} containing the point estimates (e.g., Average Treatment Effect on the Treated). Default is \code{"ATT"}.}
   \item{SE}{The name of the column in \code{data} containing the standard errors. If columns for \code{CI.lower} and \code{CI.upper} (as specified by their respective arguments, defaulting to \code{"CI.lower"} and \code{"CI.upper"}) are not found in \code{data}, and an \code{SE} column is provided and found, 95\% confidence intervals will be calculated using \code{Estimate +/- 1.96 * SE}. Default is \code{NULL}.}
@@ -65,7 +65,7 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
   \item{ylim}{Optional. A numeric vector of length 2 specifying the y-axis limits (\code{c(min, max)}). If \code{NULL} (default), limits are determined automatically to encompass all estimates and confidence intervals, with potential expansion if \code{show.count = TRUE}.}
   \item{xlab}{Optional. The label for the x-axis. If \code{NULL} (default), "Time Relative to Treatment" is used. If an empty string \code{""} is provided, no label is displayed.}
   \item{ylab}{Optional. The label for the y-axis. If \code{NULL} (default), "Effect on Y" is used. If an empty string \code{""} is provided, no label is displayed.}
-  \item{gridOff}{Logical. Whether to turn off major and minor grid lines. Default is \code{TRUE}.}
+  \item{gridOff}{Logical. Whether to turn off major and minor grid lines. Default is \code{FALSE}.}
   \item{stats.pos}{Optional. A numeric vector of length 2 (\code{c(x, y)}) specifying the coordinates for the top-left position of the \code{stats} text block. If \code{NULL} (default), the position is automatically determined.}
   \item{theme.bw}{Logical. Whether to use \code{ggplot2::theme_bw()}. Default is \code{TRUE}.}
   \item{legacy.style}{Logical. If \code{TRUE}, reproduces the pre-2.3.1 visual defaults (bold centered title, larger axis text, solid vline, blue placebo triangles, no peach highlight rectangle) regardless of the value of \code{theme.bw}. If \code{FALSE} (the default) and \code{theme.bw = TRUE}, the modern v2.3.1 visual recipe is used. Pass \code{legacy.style = TRUE} to byte-identical-reproduce figures rendered under earlier fect versions.}
@@ -90,7 +90,7 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
   \item{post.label}{Character. Label for the post-treatment period in the legend. Default is \code{"Post-treatment"}.}
 }
 \value{
-  \item{p}{A \code{ggplot} object representing the event study plot.}
+  A \code{ggplot} object representing the event study plot.
 }
 \author{
   Licheng Liu, Yiqing Xu, Ziyi Liu, Zhongyu Yin, Rivka Lipkovitz

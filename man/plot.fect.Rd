@@ -128,7 +128,8 @@
   \item{type}{Plot type. Options include: \code{"gap"}, \code{"equiv"} (equivalence test), \code{"status"} (treatment status), \code{"exit"} (exiting treatment effects),
     \code{"factors"}, \code{"loadings"}, \code{"calendar"} (ATT by calendar time), \code{"box"} (individual effects distribution), \code{"counterfactual"},
     \code{"sens"} (sensitivity analysis plot, e.g., for Rambachan & Roth bounds), \code{"sens_es"} (event-study style sensitivity plot),
-    or \code{"cumul"} (cumulative effect plot). Default is context-dependent (e.g., "gap", or "equiv" if \code{loo=TRUE}).}
+    \code{"heterogeneous"} (alias \code{"hte"}; effects by a covariate), \code{"loading.overlap"} (treated loadings against the hull of the control loadings),
+    or \code{"cumul"} (cumulative effect plot; only for the object returned by \code{\link{effect}}, which always gives this plot). \code{"es"} is an alias for \code{"gap"} and \code{"ct"} for \code{"counterfactual"}. Default is context-dependent: \code{"gap"}, or \code{"exit"} for a fit with a carryover test.}
   \item{restrict}{For sensitivity plots (\code{type = "sens"} or \code{type = "sens_es"}). Specifies the type of restriction: \code{"rm"} (restriction on M, for relative magnitude bounds) or \code{"sm"} (smoothness restriction, for bounds based on second differences). Default is \code{"rm"}.}
   \item{loo}{Logical; if \code{TRUE} (default is \code{FALSE}), use leave-one-out estimates for pre-treatment periods in equivalence tests or gap plots.}
   \item{dloo}{Logical; if \code{TRUE} (default is \code{FALSE}), display the double (cohort-wise) leave-one-out pre-trend placebos of a fit produced with \code{dloo = TRUE}. Uses the same slots and machinery as \code{loo} but labels the series \dQuote{Double-LOO Estimates}.}
@@ -153,7 +154,7 @@
   \item{f.threshold}{Numeric or \code{NULL} (default); F-test threshold for equivalence checks. If \code{NULL}, uses the value from the \code{fect} object.}
   \item{tost.threshold}{Numeric or \code{NULL} (default); threshold for TOST-based equivalence checks (e.g., for pre-trend, placebo, or carryover tests). If \code{NULL}, uses the value from the \code{fect} object.}
   \item{effect.bound.ratio}{Logical; if \code{TRUE} (default is \code{FALSE}), shows the ratio of ATT to the minimal bound in equivalence plots.}
-  \item{stats}{Character vector or \code{NULL} (default); specifies which test statistics to display on the plot (e.g., \code{"F.p"}, \code{"equiv.p"}, \code{"placebo.p"}). Default is context-dependent based on plot type and tests performed.}
+  \item{stats}{Character vector or \code{NULL} (default); which test statistics to display. Values: \code{"none"}, \code{"F.stat"}, \code{"F.p"}, \code{"F.equiv.p"}, \code{"equiv.p"}, \code{"placebo.p"} (fits with a placebo test) and \code{"carryover.p"} (fits with a carryover test). Default: \code{c("placebo.p", "equiv.p")} for a fit with a placebo test, \code{c("carryover.p", "equiv.p")} for the exit plot of a fit with a carryover test, \code{c("F.p", "equiv.p")} for the equivalence plot, and \code{"none"} otherwise.}
   \item{stats.labs}{Character vector or \code{NULL} (default); custom labels for the displayed statistics. Must match the length of \code{stats}.}
   \item{raw}{For \code{type = "counterfactual"} plot: \code{"none"} (default; shows average treated and counterfactual lines), \code{"band"} (shows 5-95\% quantile band for raw control/treated data), or \code{"all"} (shows all raw control/treated unit trajectories).}
   \item{vis}{(Deprecated) Formerly controlled line display for placebo/carryover tests. This is now handled by \code{highlight} and internal logic.}
@@ -191,11 +192,11 @@
   \item{shade.post}{Logical; if \code{FALSE} (default). If \code{TRUE}, shades post-treatment periods in certain plots. For counterfactual plots, if \code{NULL} (the default for the argument is \code{FALSE}), it effectively becomes \code{TRUE} internally unless explicitly set to \code{FALSE}.}
   \item{start0}{Logical; if \code{TRUE} (default is \code{FALSE}), re-indexes the first post-treatment period as 0 in event-time plots (gap, equiv, exit). The period before treatment becomes -1.}
   \item{return.test}{Logical; if \code{TRUE} (default is \code{FALSE}), returns a list containing the plot object and relevant test statistics instead of just the plot.}
-  \item{return.data}{Logical; if \code{TRUE} (default is \code{FALSE}), returns a data frame with the data used to construct the plot instead of returning a plot object. If \code{return.test=TRUE} as well, returns a list with \code{data} and \code{test.out}.}
-  \item{balance}{Logical or \code{NULL} (default); if \code{TRUE}, uses a "balance sample" (if available from the \code{fect} object, e.g., from setting \code{balanced.sample = TRUE} in \code{fect}) for plotting.}
-  \item{weight}{Logical or \code{NULL} (default); if \code{TRUE}, applies weighting (if available from the \code{fect} object, e.g., from providing weights in \code{fect}) to the estimates being plotted.}
-  \item{lcolor}{Character vector of length 1 or 2, or \code{NULL} (default). If \code{NULL}, uses a default color (e.g., \code{"#AAAAAA70"} if \code{theme.bw=TRUE}, else \code{"white"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
-  \item{lwidth}{Numeric vector of length 1 or 2, or \code{NULL} (default). If \code{NULL}, uses a default width (e.g., \code{1.5} if \code{theme.bw=TRUE}, else \code{2} for the base style). The \code{preset} argument may define a different width. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{return.data}{Logical; if \code{TRUE} (default is \code{FALSE}), the plot is drawn and a list is returned with the plot (\code{p}) and the data used to construct it (\code{data}). With \code{return.test = TRUE} as well, the list also holds \code{test.out}.}
+  \item{balance}{Logical or \code{NULL} (default); if \code{TRUE}, plots the estimates for the balanced sample of a fit with \code{balance.period}. \code{NULL} means \code{TRUE} when the fit has \code{balance.period} and \code{FALSE} otherwise.}
+  \item{weight}{Deprecated and ignored (a warning is given). A fit with weights \code{W} already reports weighted estimates.}
+  \item{lcolor}{Character vector of length 1 or 2, or \code{NULL} (default). If \code{NULL}, uses \code{"grey75"} under the default style, \code{"#AAAAAA70"} with \code{legacy.style = TRUE}, and \code{"white"} with \code{theme.bw = FALSE}. The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
+  \item{lwidth}{Numeric vector of length 1 or 2, or \code{NULL} (default). If \code{NULL}, uses \code{0.4} under the default style, \code{1.5} with \code{legacy.style = TRUE}, and \code{2} with \code{theme.bw = FALSE}. The \code{preset} argument may define a different width. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{ltype}{Character vector of length 1 or 2, or \code{NULL} (default). If \code{NULL}, uses a default linetype (e.g., \code{c("solid", "solid")} for the base style). The \code{preset} argument may define a different linetype (e.g., \code{preset="vibrant"} uses \code{c("solid", "dashed")}). Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{line.color}{(Deprecated) Use \code{color} for main estimate lines or \code{lcolor} for reference lines instead.}
   \item{line.width}{(Deprecated) Use \code{est.lwidth} for main estimate lines or \code{lwidth} for reference lines instead.}
@@ -239,17 +240,17 @@
   \item{status.balanced.post.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for balanced post-treatment status (e.g., \code{"#00852B"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{status.balanced.pre.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for balanced pre-treatment status (e.g., \code{"#A5CA18"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
   \item{status.background.color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default background color for status plots (e.g., \code{"gray90"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
-  \item{covariate}{Character string or \code{NULL} (default). If \code{NULL}, uses a default covariate for heterogeneous plots (e.g., \code{"X"} for the base style). The \code{preset} argument may define a different covariate. Specifying this argument directly overrides any \code{preset} or base style setting.}
-  \item{covariate.labels}{Character vector or \code{NULL} (default). If \code{NULL}, uses a default covariate labels for heterogeneous plots (e.g., \code{"X1"} for the base style). The \code{preset} argument may define a different covariate labels. Specifying this argument directly overrides any \code{preset} or base style setting.}
-  \item{covariate.value}{Numeric or \code{NULL} (default); a specific covariate value at which to evaluate the HTE plot. If \code{NULL}, the full range is used.}
-  \item{covariate.value.range}{Logical; if \code{TRUE}, plots HTE over the range of covariate values. Default is \code{FALSE}.}
-  \item{relative.time}{Logical; if \code{TRUE}, uses relative time (time since treatment) on the x-axis for HTE plots. Default is \code{FALSE}.}
+  \item{covariate}{For \code{type = "heterogeneous"}: the name of a covariate in the model (one of \code{x$X}), or a T x N matrix of moderator values that need not be in the model. Required when the model has more than one covariate; with one covariate, \code{NULL} (default) uses it. For \code{type = "calendar"} with \code{covariate.value}: the covariate to filter on.}
+  \item{covariate.labels}{Character vector or \code{NULL} (default). For \code{type = "heterogeneous"} with a discrete covariate: labels for its values, in sorted order.}
+  \item{covariate.value}{Numeric or \code{NULL} (default). For \code{type = "calendar"}: keep only the treated observations whose \code{covariate} takes these values (or, with \code{covariate.value.range = TRUE}, lies in this range). \code{NULL} uses all treated observations.}
+  \item{covariate.value.range}{Logical; for \code{type = "calendar"}, if \code{TRUE}, \code{covariate.value} is a numeric range \code{c(lower, upper)}. Default is \code{FALSE}.}
+  \item{relative.time}{Logical; for \code{type = "calendar"}, if \code{TRUE}, averages the effects by time since treatment onset instead of calendar time. Default is \code{FALSE}.}
   \item{pretreatment}{Logical; if \code{TRUE}, restricts HTE analysis to pre-treatment periods only. Default is \code{FALSE}.}
   \item{num.pretreatment}{Integer; number of pre-treatment periods to include when \code{pretreatment = TRUE}. Default is \code{3}.}
   \item{cm}{Logical; if \code{TRUE}, plots causal moderation estimates instead of effect modification estimates for HTE plots. Requires the \code{fect} object to have been estimated with \code{cm = TRUE}. Default is \code{FALSE}.}
   \item{legacy.style}{Logical; if \code{TRUE}, reproduces the pre-2.3.1 visual defaults (bold centered title, larger axis text, solid treatment-onset line, blue placebo triangles, no peach highlight rectangle) regardless of the value of \code{theme.bw}. If \code{FALSE} (the default) and \code{theme.bw = TRUE}, the modern v2.3.1 visual recipe is used. Pass \code{legacy.style = TRUE} for byte-identical reproduction of figures rendered under earlier fect versions.}
   \item{loess.fit}{Logical; if \code{TRUE} (default), overlays a LOESS smoothing curve on HTE scatter plots.}
-  \item{...}{Additional graphical parameters passed to internal plotting routines, primarily those accepted by \code{esplot} for event study style plots (gap, equiv, exit, sens_es, cumul).}
+  \item{...}{Not used. Arguments that \code{plot.fect} does not know are ignored without a message, so check the spelling of argument names.}
 }
 \details{
   \code{plot.fect} generates various visualizations for objects estimated via \code{\link{fect}}. Depending on
@@ -280,8 +281,8 @@
   Xu, Y. (2017). Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models.
   \emph{Political Analysis, 25}(1), 57–76.
 
-  Liu, L., Wang, Y., & Xu, Y. (2022). A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data.
-  \emph{American Journal of Political Science, 66}(1), 220-237. (Provides context for \code{esplot} which is used internally for many plot types)
+  Liu, L., Wang, Y., & Xu, Y. (2024). A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data.
+  \emph{American Journal of Political Science, 68}(1), 160-176. (Provides context for \code{esplot} which is used internally for many plot types)
 
   Rambachan, A., & Roth, J. (2023). A More Credible Approach to Parallel Trends.
   \emph{Review of Economic Studies, 90}(5), 2555-2591. (Provides context for sensitivity analysis plots like \code{type="sens"} and \code{type="sens_es"})
@@ -290,7 +291,7 @@
 library(fect)
 # For CRAN checks, use a small number of bootstraps
 # In practice, use a larger number (e.g., nboots = 200 or more)
-if(requireNamespace("ggplot2") && requireNamespace("ggrepel")) {
+if (requireNamespace("ggplot2")) {
   data(simdata)
   # Estimate with fixed effects method
   out.fect <- fect(
@@ -322,26 +323,19 @@ if(requireNamespace("ggplot2") && requireNamespace("ggrepel")) {
   # Status plot
   plot(out.fect, type = "status")
 
-  # Cumulative effect plot (if est.eff is available from fect call)
-  # This example might not have it by default, but showing how to call
-  # out.fect.cumul <- fect(Y ~ D, data = simdata, index = c("id","time"), method = "fe",
-  #                        cumulative = TRUE, se = TRUE, parallel = FALSE, nboots = 5)
-  # if (exists("out.fect.cumul")) {
-  #   plot(out.fect.cumul, type = "cumul", main = "Cumulative ATT")
-  # }
+  # Cumulative effect plot: on the object returned by effect(), which needs
+  # a fit with keep.sims = TRUE
+  # out.sims <- fect(Y ~ D, data = simdata, index = c("id","time"), method = "fe",
+  #                  se = TRUE, keep.sims = TRUE, parallel = FALSE, nboots = 50)
+  # plot(effect(out.sims), main = "Cumulative ATT")
 
-  # Example for sensitivity plot (requires IFE/GSYNTH method and sensitivity analysis)
-  # \donttest{
-  #   out.ife <- fect(Y ~ D, data = simdata, index = c("id","time"),
-  #                   method = "ife", se = TRUE, r = 2,
-  #                   sensitivity.analysis = TRUE, sensitivity.plot = FALSE, # run analysis
-  #                   parallel = FALSE, nboots = 5) # nboots low for example
-  #   if (!is.null(out.ife$sensitivity.rm)) {
-  #     plot(out.ife, type = "sens", restrict = "rm",
-  #          main = "Sensitivity Analysis (Relative Magnitude)")
-  #     plot(out.ife, type = "sens_es", restrict = "rm",
-  #          main = "Event-Study Sensitivity (Relative Magnitude)")
-  #   }
-  # }
+  # Sensitivity plots: on the object returned by fect_sens(), which needs a fit
+  # with a placebo test and the HonestDiDFEct package; see ?fect_sens
+  # out.p <- fect(Y ~ D, data = simdata, index = c("id","time"), method = "fe",
+  #               se = TRUE, placeboTest = TRUE, placebo.period = c(-2, 0),
+  #               parallel = FALSE, nboots = 50)
+  # out.s <- fect_sens(out.p, post.periods = 1:4)
+  # plot(out.s, type = "sens", restrict = "rm")
+  # plot(out.s, type = "sens_es", restrict = "rm")
 }
 }

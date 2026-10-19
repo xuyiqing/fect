@@ -126,9 +126,9 @@
         cv.method <- "all_units"  # internal dispatch alias
     }
     if (cv.method == "treated_units") {
-        message('Note: cv.method = "treated_units" will be deprecated ',
-                'when the cv.units parameter is added (v2.4.0). ',
-                'The legacy name still works for now.')
+        message('Note: cv.method = "treated_units" is a legacy name ',
+                '(block masking with anchors in treated pre-treatment cells); ',
+                'it still works.')
     }
     cv.method
 }

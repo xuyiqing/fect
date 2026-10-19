@@ -26,7 +26,7 @@ fect_mspe(
   \item{seed}{Optional integer; random seed for reproducibility.}
   \item{cv.method}{Character; cross-validation masking strategy. One of \code{"rolling"} (default) or \code{"block"} (random scattered anchors with contiguous-block masking). Legacy aliases \code{"all_units"} (= \code{"block"}) and \code{"treated_units"} are still accepted but emit a deprecation message.}
   \item{cv.nobs}{Integer; number of observations to mask per unit per fold. Default is 3.}
-  \item{cv.donut}{Integer; number of periods around treatment onset to exclude from masking. Used by block CV. Default is 1.}
+  \item{cv.donut}{Integer; for block CV, the number of periods at each end of a held-out block that are masked but not scored, so that only the middle \code{cv.nobs - 2 * cv.donut} periods are scored. Default is 1.}
   \item{cv.buffer}{Integer; number of past-side cells masked from training (but not scored) before each rolling-window holdout. Used only by \code{cv.method = "rolling"}. Default is 1.}
   \item{cv.prop}{Numeric; for block CV, proportion of observations to mask per round; for rolling CV, fraction of eligible units sampled per fold. Default is 0.1.}
   \item{min.T0}{Integer; minimum number of pre-treatment periods required. Default is 5.}

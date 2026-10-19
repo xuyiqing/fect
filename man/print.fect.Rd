@@ -2,15 +2,15 @@
 \name{print.fect}
 \alias{print.fect}
 \title{Print Results}
-\description{Print results of the matrix completion method.}
+\description{Print the results of a \code{\link{fect}} fit: the call, the average treatment effect on the treated with its uncertainty, and the coefficients of covariates. For the object returned by \code{\link{effect}}, prints the cumulative effects.}
 \usage{\method{print}{fect}(x, switch.on = TRUE,
        switch.off = FALSE,time.on.lim = NULL, time.off.lim = NULL, \dots)} 
 \arguments{
   \item{x}{a \code{\link{fect}} object.}
-  \item{switch.on}{logical; if \code{TRUE}, print switch-on effect.}
-  \item{switch.off}{logical; if \code{TRUE}, print switch-off effect.}
-  \item{time.on.lim}{two-element numeric vector specifying the switch-on effect range.}
-  \item{time.off.lim}{two-element numeric vector specifying the switch-off effect range.}
+  \item{switch.on}{not used in the current version (the period-by-period tables it controlled are no longer printed); see \code{x$est.att}.}
+  \item{switch.off}{not used in the current version; see \code{x$est.att.off}.}
+  \item{time.on.lim}{not used in the current version.}
+  \item{time.off.lim}{not used in the current version.}
   \item{\dots}{other arguments.}
 }
 \value{No return value.}
@@ -26,7 +26,7 @@
   Panel data models with interactive fixed effects. 
   \emph{Econometrica, 77}(4), 1229-1279. 
     
-  Liu, L., Wang, Y., and Xu, Y. (2022).
+  Liu, L., Wang, Y., and Xu, Y. (2024).
   A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data. 
   \emph{American Journal of Political Science, 68}(1), 160-176. 
   

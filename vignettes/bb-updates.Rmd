@@ -12,6 +12,12 @@ Version 2.4.7 was a development version on GitHub and was not released on CRAN; 
 
 **Other fixes.** `did_wrapper()` with `"cs_never"` or `"cs_notyet"` needs did 2.5.1 or later and stops on an older version. On unbalanced panels, earlier versions of did report a cohort-period effect they cannot estimate as 0 and average it in, and can crash. The F test for no pre-trend returns `NA`, with a message, when its pre-treatment window has a single treated unit; it used to stop the fit. fect now needs fixest 0.14.0 or later: earlier versions of fixest can corrupt R's memory, which crashed `did_wrapper()` at random during bootstrap runs.
 
+**Standard errors of `did_wrapper()`.** `se = "boot"` is now a cluster bootstrap that keeps a unit drawn more than once as separate units; before, a draw kept each drawn unit only once and the standard errors were too small. `se = "jackknife"` now applies the (n - 1)/n jackknife scaling; before, its standard errors were about sqrt(n) times too small. On `simdata` with `method = "twfe"`, the bootstrap SE moved from 0.316 to 0.404 and the jackknife SE from 0.031 to 0.429 (the clustered SE is 0.427).
+
+**Smaller fixes.** `did_wrapper()` runs with `method` left at its default. `fect_sens()` runs with its default `post.periods`, with `parallel = TRUE` and `cores`, and with any of its four vectors set to `NULL`. `fect(carryover.rm = 3L)` is no longer ignored, and `placeboTest = TRUE` without `placebo.period` stops with a message.
+
+**Documentation.** The manual and the help pages were checked against the code, and statements that contradicted it were corrected, among them the default `vartype` for gsynth (`"bootstrap"`, not `"parametric"`), the default `cv.rule` (`"min"`), cross-validation with `method = "cfe"`, and the codes of `obs.missing`.
+
 ## v2.4.7
 
 [Development version, not yet on CRAN.]{.text-muted}
