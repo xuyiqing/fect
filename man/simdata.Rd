@@ -24,12 +24,12 @@ removed by two-way fixed effects alone.
 \format{
 A data frame with the following columns:
 \describe{
-  \item{id}{unit identifier (1--200)}
+  \item{id}{unit identifier (101--300)}
   \item{time}{time period (1--35)}
   \item{Y}{observed outcome}
   \item{error}{idiosyncratic error \eqn{\varepsilon_{it} \sim N(0, 2)}}
   \item{eff}{realized treatment effect \eqn{\tau_{it}}}
-  \item{tr_cum, tr_prob}{treatment-probability constructions}
+  \item{tr_cum, tr_prob}{the number of consecutive treated periods up to and including the current one (0 when untreated), and the treatment probability}
   \item{D}{treatment indicator}
   \item{X1, X2}{observed time-varying covariates \eqn{\sim N(0, 1)}
         with coefficients 1 and 3}
