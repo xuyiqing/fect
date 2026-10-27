@@ -36,7 +36,7 @@ A plot type can only draw what the fit stores. The table lists, for each `type`,
 | `"sens"`, `"sens_es"` | The output of `fect_sens()` ([Chapter @sec-panel-sens]). | --- |
 | `"cumul"` | The output of `effect()`, which needs `se = TRUE` and `keep.sims = TRUE` ([Section @sec-cumul]). | --- |
 
-`plot()` does not check the names of its arguments: a misspelled argument, such as `colr = "red"`, is dropped without a message.
+A fit made with `placeboTest = TRUE` or `carryoverTest = TRUE` but `se = FALSE` can draw only `"status"` (and `"exit"` for a placebo fit); the other types stop. `plot()` does not check the names of its arguments, so a misspelled argument, such as `colr = "red"`, is dropped without a message.
 
 ------------------------------------------------------------------------
 
