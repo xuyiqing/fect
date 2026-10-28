@@ -276,3 +276,98 @@ test_that("print and plot handle conformal fits", {
   expect_error(suppressMessages(estimand(fit, "att", "overall")), "conformal")
   expect_error(suppressMessages(att.cumu(fit)), "conformal")
 })
+
+## ---- rule D: failed folds in .conformal_interval ---------------------------
+
+test_that("a failed fold keeps N and q and never shortens the interval", {
+  set.seed(21)
+  J <- 39
+  M0 <- rnorm(J)
+  R <- abs(rnorm(J))
+  f5 <- seq_len(J) == 5
+  for (gam in c(0.1, 0.2)) {
+    base <- fect:::.conformal_interval(M0, R, y = 0.2, gamma = gam)
+    one <- fect:::.conformal_interval(M0, R, y = 0.2, gamma = gam, failed = f5)
+    expect_equal(unname(one[c("N", "q")]), unname(base[c("N", "q")]))
+    expect_equal(unname(one["n.failed"]), 1)
+    expect_true(one["pred.lower"] <= base["pred.lower"])
+    expect_true(one["pred.upper"] >= base["pred.upper"])
+    expect_true(one["CI.lower"] <= base["CI.lower"])
+    expect_true(one["CI.upper"] >= base["CI.upper"])
+    ## values behind a failed slot are ignored, even NA
+    M0.na <- M0
+    R.na <- R
+    M0.na[5] <- NA
+    R.na[5] <- NA
+    one.na <- fect:::.conformal_interval(M0.na, R.na, y = 0.2, gamma = gam,
+                                         failed = f5)
+    expect_identical(one.na, one)
+  }
+})
+
+test_that("q or more failed folds give the whole real line, fewer do not", {
+  set.seed(22)
+  J <- 39  # N = 40, gamma = 0.1 -> q = 2
+  M0 <- rnorm(J)
+  R <- abs(rnorm(J))
+  expect_equal(fect:::.conformal_q(J + 1, 0.1), 2L)
+  f1 <- seq_len(J) == 3
+  f2 <- seq_len(J) %in% c(3, 30)
+  v1 <- fect:::.conformal_interval(M0, R, y = 0, gamma = 0.1, failed = f1)
+  v2 <- fect:::.conformal_interval(M0, R, y = 0, gamma = 0.1, failed = f2)
+  expect_true(is.finite(v1["pred.lower"]) && is.finite(v1["pred.upper"]))
+  ## one -Inf in a: the q = 2 smallest value is the smallest finite a
+  expect_equal(unname(v1["pred.lower"]), sort((M0 - R)[!f1])[1])
+  ## two failed slots: the q-th smallest a is -Inf, the (N - q)-th b is +Inf
+  expect_equal(unname(v2[c("pred.lower", "pred.upper")]), c(-Inf, Inf))
+  expect_equal(unname(v2[c("CI.lower", "CI.upper")]), c(-Inf, Inf))
+  expect_equal(unname(v2[c("N", "q", "n.failed")]), c(40, 2, 2))
+})
+
+test_that("failed slots keep the p-value dual to the interval", {
+  set.seed(23)
+  J <- 39
+  M0 <- rnorm(J)
+  R <- abs(rnorm(J))
+  fl <- seq_len(J) == 11
+  for (y in seq(-4, 4, by = 0.05)) {
+    for (gam in c(0.05, 0.1, 0.2)) {
+      v <- fect:::.conformal_interval(M0, R, y = y, gamma = gam, failed = fl)
+      out <- 0 < v["CI.lower"] || 0 > v["CI.upper"]
+      expect_identical(unname(v["p.value"] <= gam), unname(out))
+    }
+  }
+  ## a failed slot is no tail violation: three of four slots violate
+  v <- fect:::.conformal_interval(c(0, 0, 0, 0), c(1, 1, 1, 1), y = 5,
+                                  gamma = 0.5,
+                                  failed = c(TRUE, FALSE, FALSE, FALSE))
+  expect_equal(unname(v["p.value"]), min(1, (2 * (5 - 3) - 1) / 5))
+})
+
+test_that("failed = NULL reproduces the no-failure result; pool size sets N", {
+  set.seed(24)
+  M0 <- rnorm(30)
+  R <- abs(rnorm(30))
+  v0 <- fect:::.conformal_interval(M0, R, y = 0.1, gamma = 0.1)
+  v1 <- fect:::.conformal_interval(M0, R, y = 0.1, gamma = 0.1,
+                                   failed = rep(FALSE, 30))
+  expect_identical(v0, v1)
+  expect_equal(unname(v0["n.failed"]), 0)
+  expect_equal(names(v0), c("pred.lower", "pred.upper", "CI.lower",
+                            "CI.upper", "p.value", "N", "q", "n.failed"))
+  ## a control removed by the caller (out of pool) reduces N; a failed one
+  ## does not
+  v.drop <- fect:::.conformal_interval(M0[-1], R[-1], y = 0.1, gamma = 0.1)
+  v.fail <- fect:::.conformal_interval(M0, R, y = 0.1, gamma = 0.1,
+                                       failed = seq_len(30) == 1)
+  expect_equal(unname(v.drop["N"]), 30)
+  expect_equal(unname(v.fail["N"]), 31)
+  ## non-finite inputs count as failed
+  M0.bad <- M0
+  M0.bad[2] <- NA
+  expect_equal(unname(fect:::.conformal_interval(M0.bad, R, y = 0.1,
+                                                 gamma = 0.1)["n.failed"]), 1)
+  expect_error(fect:::.conformal_interval(M0, R, 0.1, 0.1, failed = TRUE),
+               "same length")
+  expect_error(fect:::.conformal_interval(M0, R[-1], 0.1, 0.1), "same length")
+})

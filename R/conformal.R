@@ -42,6 +42,19 @@
 ## construction is the same as above. Comparing an average of several treated
 ## units with a single control's error is conservative when many units are
 ## treated (the control's error does not average down).
+##
+## Failed folds (rule D). The calibration pool of a treated cell (or of an
+## aggregate) is fixed by the observation pattern alone, before any fit is
+## looked at: a control is in the pool iff it is eligible for the treated
+## unit's window and observed at the date (for an aggregate: in the pool of
+## every aggregated cell). Controls outside the pool are dropped and N is the
+## pool size plus one. A control inside the pool whose fold fit failed (a
+## component fit returned NULL, or its prediction or error is non-finite) is
+## NOT dropped: it keeps its slot with score R_j = +Inf, i.e. a_j = -Inf and
+## b_j = +Inf, and N and q are unchanged. The interval is therefore widened or
+## unchanged, never shortened. At least q failed slots give the whole real
+## line. Pool exclusions (n.excluded) and failed folds (n.failed) are reported
+## as separate counts, and one warning is issued when any fit failed.
 ###############################################################################
 
 
@@ -71,18 +84,35 @@
 ## Jackknife+ interval and interval-dual p-value from the fold quantities.
 ## M0: the treated query's fold predictions (length J); R: the controls'
 ## absolute fold errors (length J); y: the observed treated outcome; gamma:
-## miscoverage. Returns the prediction interval for Y(0), the effect interval,
-## the p-value at c = 0, N and q.
-.conformal_interval <- function(M0, R, y, gamma) {
-  ok <- is.finite(M0) & is.finite(R)
-  M0 <- M0[ok]
-  R <- R[ok]
+## miscoverage. One entry per control IN THE POOL: the caller has already
+## removed controls outside the pool, and this function never drops a control.
+## failed: NULL or a logical vector of length J marking pool controls whose
+## fold has no usable quantity (rule D, see the file header). Such a slot is
+## kept with a = -Inf and b = +Inf (score R = +Inf), so N = J + 1 and q do not
+## change; M0[j] and R[j] are ignored there and may be NA. Entries with
+## non-finite M0 or R are treated as failed too. The p-value uses STRICT
+## comparisons (y < a, y > b): a failed slot (a = -Inf, b = +Inf) is never a
+## lower- or upper-tail violation, so the p-value stays dual to the interval.
+## Returns the prediction interval for Y(0), the effect interval, the p-value
+## at c = 0, N, q and n.failed (the number of failed slots).
+.conformal_interval <- function(M0, R, y, gamma, failed = NULL) {
   J <- length(M0)
+  if (length(R) != J) {
+    stop("`M0` and `R` must have the same length (", J, " vs ", length(R),
+         ").", call. = FALSE)
+  }
+  if (is.null(failed)) {
+    failed <- rep(FALSE, J)
+  } else if (length(failed) != J) {
+    stop("`failed` must have the same length as `M0` (", length(failed),
+         " vs ", J, ").", call. = FALSE)
+  }
+  failed <- as.logical(failed) | !is.finite(M0) | !is.finite(R)
   N <- J + 1L
   q <- if (J >= 1L) .conformal_q(N, gamma) else 0L
   out <- c(pred.lower = -Inf, pred.upper = Inf,
            CI.lower = -Inf, CI.upper = Inf,
-           p.value = 1, N = N, q = q)
+           p.value = 1, N = N, q = q, n.failed = sum(failed))
   if (J < 1L || !is.finite(y)) {
     out[c("p.value")] <- NA_real_
     if (!is.finite(y)) out[c("CI.lower", "CI.upper")] <- NA_real_
@@ -90,6 +120,8 @@
   }
   a <- M0 - R
   b <- M0 + R
+  a[failed] <- -Inf
+  b[failed] <- Inf
   ## interval-dual p-value at c = 0 (v2 eq. placebo-jplus-pvalue-main):
   ## strict comparisons, the larger of the two tail counts
   m <- max(sum(y < a), sum(y > b))
@@ -178,6 +210,13 @@
 
 ## Fold j: background B_j = co \ {j}. Returns the treated queries' predictions
 ## (TT x Ntr) and control j's predictions over each query window (TT x K).
+## Failure masks (rule D): fail0 (length Ntr) is TRUE for a treated query
+## whose component fit returned NULL; failj (length K) is TRUE for a window in
+## which control j was queried (window in ks) and whose component fit returned
+## NULL. A window outside ks was never attempted: it is out of the pool, not
+## failed. gsynth makes one call per fold, so one NULL fails every treated
+## query and every window in ks. M0[, ii] / Mj[, k] stay NA for failed or
+## unattempted entries.
 .conformal_fold <- function(jj, ctx) {
   co <- ctx$co
   tr <- ctx$tr
@@ -199,6 +238,8 @@
                              ctx$force, ctx$tol, ctx$max.iteration)
   }
   n.fail <- 0L
+  fail0 <- logical(length(tr))
+  failj <- logical(K)
   if (ctx$method == "gsynth") {
     ## the factors come from B_j alone and every query is projected on its
     ## own pre-treatment history, so one call gives all the separate
@@ -206,6 +247,8 @@
     yct <- fit_cols(c(Bj, tr), copies)
     if (is.null(yct)) {
       n.fail <- 1L
+      fail0[] <- TRUE
+      failj[ks] <- TRUE
     } else {
       M0[, ] <- yct[, nB + seq_along(tr)]
       if (length(ks) > 0) {
@@ -219,6 +262,7 @@
       yct <- fit_cols(c(Bj, tr[ii]), list())
       if (is.null(yct)) {
         n.fail <- n.fail + 1L
+        fail0[ii] <- TRUE
       } else {
         M0[, ii] <- yct[, nB + 1L]
       }
@@ -227,12 +271,13 @@
       yct <- fit_cols(Bj, copies[kk])
       if (is.null(yct)) {
         n.fail <- n.fail + 1L
+        failj[ks[kk]] <- TRUE
       } else {
         Mj[, ks[kk]] <- yct[, nB + 1L]
       }
     }
   }
-  list(M0 = M0, Mj = Mj, n.fail = n.fail)
+  list(M0 = M0, Mj = Mj, n.fail = n.fail, fail0 = fail0, failj = failj)
 }
 
 
@@ -310,16 +355,27 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
   n.cell <- nrow(cell)
   cM <- matrix(NA_real_, n.cell, Nco)  # treated fold predictions M_0j
   cE <- matrix(NA_real_, n.cell, Nco)  # control signed errors Y_jt - M_j0
+  ## rule D: pool membership comes from the observation pattern only; a
+  ## failed slot is in the pool and has no usable fold quantity
+  F0 <- matrix(unlist(lapply(folds, function(f) f$fail0)), nrow = Ntr)
+  Fj <- matrix(unlist(lapply(folds, function(f) f$failj)), nrow = K)
+  ii.cell <- cell[, "i"]
+  kk <- key.idx[ii.cell]
+  inpool <- matrix(FALSE, n.cell, Nco)
+  failed <- matrix(FALSE, n.cell, Nco)
   for (jj in seq_len(Nco)) {
     f <- folds[[jj]]
     cM[, jj] <- f$M0[cell]
     j <- co[jj]
-    kk <- key.idx[cell[, "i"]]
     mj <- f$Mj[cbind(cell[, "t"], kk)]
     obs.j <- I[cell[, "t"], j] == 1
     e <- Y[cell[, "t"], j] - mj
     e[!obs.j] <- NA
     cE[, jj] <- e
+    inpool[, jj] <- elig[jj, kk] & obs.j
+    failed[, jj] <- inpool[, jj] &
+      (F0[ii.cell, jj] | Fj[kk, jj] | !is.finite(cM[, jj]) |
+         !is.finite(cE[, jj]))
   }
   y.cell <- Y[cbind(cell[, "t"], tr[cell[, "i"]])]
   et.cell <- T.on[cbind(cell[, "t"], tr[cell[, "i"]])]
@@ -327,24 +383,33 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
 
   ## a linear aggregate over cells with weights w (sum 1): the fold
   ## prediction and the control's error both use the same weights
+  ## (rule D) a control is in the aggregate's pool iff it is in the pool of
+  ## every aggregated cell (out of pool wins over failed); among pool controls
+  ## a failure on any aggregated cell makes the slot a = -Inf, b = +Inf
+  agg.names <- c("pred.lower", "pred.upper", "CI.lower", "CI.upper",
+                 "p.value", "N", "q", "n.excluded", "n.failed")
   agg <- function(sel, w, gamma) {
     if (length(sel) == 0) {
-      return(c(pred.lower = NA, pred.upper = NA, CI.lower = NA,
-               CI.upper = NA, p.value = NA, N = NA, q = NA))
+      v <- rep(NA_real_, length(agg.names))
+      names(v) <- agg.names
+      return(v)
     }
-    Mbar <- colSums(cM[sel, , drop = FALSE] * w)
-    Ebar <- colSums(cE[sel, , drop = FALSE] * w)
+    pool <- colSums(inpool[sel, , drop = FALSE]) == length(sel)
+    fl <- colSums(failed[sel, pool, drop = FALSE]) > 0
+    Mbar <- colSums(cM[sel, pool, drop = FALSE] * w)
+    Ebar <- colSums(cE[sel, pool, drop = FALSE] * w)
     ybar <- sum(y.cell[sel] * w)
-    v <- .conformal_interval(Mbar, abs(Ebar), ybar, gamma)
+    v <- .conformal_interval(Mbar, abs(Ebar), ybar, gamma, failed = fl)
     v[c("pred.lower", "pred.upper", "CI.lower", "CI.upper")] <-
       v[c("pred.lower", "pred.upper", "CI.lower", "CI.upper")] * scale
-    v
+    c(v[c("pred.lower", "pred.upper", "CI.lower", "CI.upper", "p.value",
+          "N", "q")],
+      n.excluded = Nco - sum(pool), n.failed = unname(v["n.failed"]))
   }
 
   ## per-unit, per-date intervals (v2, date-specific)
-  unit.tab <- matrix(NA_real_, n.cell, 7)
-  colnames(unit.tab) <- c("pred.lower", "pred.upper", "CI.lower", "CI.upper",
-                          "p.value", "N", "q")
+  unit.tab <- matrix(NA_real_, n.cell, length(agg.names))
+  colnames(unit.tab) <- agg.names
   for (s in seq_len(n.cell)) {
     unit.tab[s, ] <- agg(s, 1, alpha)
   }
@@ -353,7 +418,8 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
     Y = y.cell * scale, Y.ct = (y.cell * scale) - eff.cell, eff = eff.cell,
     CI.lower = unit.tab[, "CI.lower"], CI.upper = unit.tab[, "CI.upper"],
     p.value = unit.tab[, "p.value"], N = unit.tab[, "N"],
-    q = unit.tab[, "q"], stringsAsFactors = FALSE
+    q = unit.tab[, "q"], n.excluded = unit.tab[, "n.excluded"],
+    n.failed = unit.tab[, "n.failed"], stringsAsFactors = FALSE
   )
 
   ## event-time ATT (extension beyond v2)
@@ -365,8 +431,9 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
   att.mat[, "ATT"] <- out$att
   att.mat[, "count"] <- out$count
   att90.mat <- att.mat
-  att.info <- matrix(NA_real_, length(time.on), 3,
-                     dimnames = list(time.on, c("event.time", "N", "q")))
+  att.info <- matrix(NA_real_, length(time.on), 5,
+                     dimnames = list(time.on, c("event.time", "N", "q",
+                                                "n.excluded", "n.failed")))
   att.info[, "event.time"] <- time.on
   for (l in seq_along(time.on)) {
     if (time.on[l] < 1) next
@@ -376,7 +443,8 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
     v <- agg(sel, w, alpha)
     att.mat[l, c("CI.lower", "CI.upper", "p.value")] <-
       v[c("CI.lower", "CI.upper", "p.value")]
-    att.info[l, c("N", "q")] <- v[c("N", "q")]
+    att.info[l, c("N", "q", "n.excluded", "n.failed")] <-
+      v[c("N", "q", "n.excluded", "n.failed")]
     v90 <- agg(sel, w, 2 * alpha)
     att90.mat[l, c("CI.lower", "CI.upper", "p.value")] <-
       v90[c("CI.lower", "CI.upper", "p.value")]
@@ -434,6 +502,22 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
     "ok"
   }
 
+  ## rule D bookkeeping: failures are reported apart from pool exclusions
+  n.failed.folds <- sum((colSums(F0) + colSums(Fj)) > 0)
+  n.intervals.affected <- sum(unit.df$n.failed > 0, na.rm = TRUE)
+  any.failed <- n.fail > 0 || any(failed)
+  if (any.failed) {
+    status <- paste0(status, "; ", n.fail, " failed fold fit(s), affected ",
+                     "intervals widened")
+    warning("vartype = \"conformal\": ", n.fail, " fold fit(s) failed, ",
+            "affecting ", n.failed.folds, " fold(s). Failed folds are kept ",
+            "in the calibration pool with infinite endpoints, so the ",
+            "affected intervals are widened, not dropped, and N and q are ",
+            "not reduced. ", n.intervals.affected, " reported unit-date ",
+            "interval(s) are affected; see fit$conformal$unit$n.failed.",
+            call. = FALSE)
+  }
+
   conformal <- list(
     procedure = "pooled information-matched Jackknife+ (Liu, v2)",
     method = method,
@@ -442,15 +526,25 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
     status = status,
     r = r,
     lambda = if (method == "mc") out$lambda.cv else NULL,
+    ## n.controls: never-treated controls (the maximum pool);
+    ## n.controls.ineligible: controls usable for no treated unit's window
+    ## (a count of controls, not of cells); n.failed.fits: component fits that
+    ## returned NULL; n.failed.folds: controls with at least one failed fit;
+    ## n.intervals.affected: rows of `unit` with n.failed > 0
     n.controls = Nco,
     n.controls.ineligible = sum(rowSums(elig) == 0),
     n.failed.fits = n.fail,
+    n.failed.folds = n.failed.folds,
+    n.intervals.affected = n.intervals.affected,
     N.range = if (length(N.used)) range(N.used, na.rm = TRUE) else NA,
     unit = unit.df,
     att = data.frame(att.info, row.names = NULL),
     avg = data.frame(type = c("ATT.avg", "ATT.avg.unit"),
                      N = c(v.avg["N"], v.avg.unit["N"]),
                      q = c(v.avg["q"], v.avg.unit["q"]),
+                     n.excluded = c(v.avg["n.excluded"],
+                                    v.avg.unit["n.excluded"]),
+                     n.failed = c(v.avg["n.failed"], v.avg.unit["n.failed"]),
                      row.names = NULL),
     extension = paste0(
       "Intervals for est.att, est.avg, est.avg.unit and the calendar-time ",
