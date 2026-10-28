@@ -193,7 +193,12 @@
 ## outcome times 100, with normalize = FALSE and TRUE; `scaled` names the
 ## arguments that are on the outcome's scale (a given lambda)
 .si_expect_homogeneous <- function(..., scaled = character(),
-                                   ignore = c("$niter", "$est$niter"),
+                                   ## the EM's round count and final relative change
+                                   ## (convergence, rel.change, est$dif, since 2.4.9)
+                                   ## follow the iteration path, not the scale
+                                   ignore = c("$niter", "$est$niter", "$est$dif", "$rel.change",
+                                              "$convergence$niter", "$convergence$rel.change",
+                                              "$convergence$converged"),
                                    tol = 1e-6, c = 100) {
   data("sim_gsynth", package = "fect", envir = environment())
   d100 <- sim_gsynth

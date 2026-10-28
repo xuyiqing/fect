@@ -4329,7 +4329,8 @@ fect.default <- function(
     ## The warning above covers fits that hit max.iteration; a fit can also
     ## meet tol while its estimate is still moving, so report the rounds
     ## and the final relative change for every EM fit.
-    if (identical(method, "ife") && identical(time.component.from, "notyettreated") &&
+    ## method = "fe" runs the same EM routine with r = 0.
+    if (method %in% c("ife", "fe") && identical(time.component.from, "notyettreated") &&
         !is.null(output$niter) && length(output$niter) == 1 && is.finite(output$niter)) {
         rc <- if (is.numeric(output$rel.change) && length(output$rel.change) == 1) {
             as.numeric(output$rel.change)

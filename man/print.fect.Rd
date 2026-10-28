@@ -6,7 +6,7 @@
 \title{Print Results}
 \description{Print the results of a \code{\link{fect}} fit: the call, the average treatment effect on the treated with its uncertainty, and the coefficients of covariates. For the object returned by \code{\link{effect}}, prints the cumulative effects.
 
-For \code{method = "ife"} fitted by EM (\code{time.component.from = "notyettreated"}), a line under the estimator reports how the fit stopped: the number of rounds, the final relative change and \code{tol}, or that it hit \code{max.iteration} (see \code{convergence} in \code{\link{fect}}). When the bootstrap draws of the average effect break down (their SD is more than 5 times their IQR/1.349; see \code{boot.diag} in \code{\link{fect}}), the output ends with that check.
+For \code{method = "ife"} fitted by EM (\code{time.component.from = "notyettreated"}) and \code{method = "fe"}, a line under the estimator reports how the fit stopped: the number of rounds, the final relative change and \code{tol}, or that it hit \code{max.iteration} (see \code{convergence} in \code{\link{fect}}). When the bootstrap draws of the average effect break down (their SD is more than 5 times their IQR/1.349; see \code{boot.diag} in \code{\link{fect}}), the output ends with that check.
 
 \code{summary()} prints the same, and always ends with the bootstrap check when one was computed (since 2.4.9).}
 \usage{\method{print}{fect}(x, switch.on = TRUE,

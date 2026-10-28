@@ -201,10 +201,10 @@ trim_closure_env <- function(fun) {
     format(signif(bd$sd, 4)), format(signif(bd$sd.ratio, 3)), format(signif(bd$iqr.sd, 4)),
     bd$n.extreme, bd$n.used,
     if (isTRUE(bd$n.sim.extreme > 0)) sprintf(paste0(
-      "\n  Parametric bootstrap: %d of %d simulated-error draws (the first step) are extreme.",
-      " Each is reused by every replicate that samples it. Such a draw typically comes from a",
-      " refit with too few distinct control units for r = %s, whose loading regression is",
-      " nearly singular."),
+      "\n  Parametric bootstrap: %d of %d simulated-error draws (the first step) are extreme,",
+      " and each is reused by every replicate that samples it. Such draws come from refits",
+      " whose loading regression is nearly singular, for example when the resampled controls",
+      " have too few distinct outcome paths for r = %s."),
       bd$n.sim.extreme, bd$n.sim, paste(r.cv, collapse = ",")) else ""
   )
 }

@@ -23,10 +23,15 @@ changes; the changes add checks and report them.
   to 19 million. Each replicate draws a simulated error for each of the 23
   treated units from that pool, so 94 of the 1,000 replicates picked up one of
   them, and the SE was 158,668 for an ATT of -3.24. The robust spread is 1.36
-  and the ratio 116,814. Whether to report the robust spread, or to drop such
-  draws, is left open; the reported `S.E.` is the SD as before.
+  and the ratio 116,814. In 34 McNamee "pop" (`r = 3`, 4 treated units) the
+  loading regressions are ill-conditioned in every refit (condition number
+  about 1e6, the main fit included) and the simulated errors are
+  heavy-tailed; the check fires there too. Whether to report the robust
+  spread, or to drop such draws, is left open; the reported `S.E.` is the SD
+  as before.
 * IFE-EM convergence. For `method = "ife"` with
-  `time.component.from = "notyettreated"`, `print()` and the new `summary()`
+  `time.component.from = "notyettreated"` (and `method = "fe"`, the same EM
+  routine with no factors), `print()` and the new `summary()`
   method say how the EM fit stopped: the number of rounds and the final
   relative change against `tol`, or that it hit `max.iteration`. The fit
   stores them as `convergence` (and the final change as `rel.change`). fect
