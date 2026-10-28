@@ -50,6 +50,7 @@ print.fect <- function(x,
         !isTRUE(x$vartype %in% c("parametric", "jackknife"))) {
         cat("Cluster SE:   ", x$cl.label, "\n", sep = "")
     }
+    .print_convergence(x$convergence)
 
     if (switch.on == TRUE) {
         if (!is.null(time.on.lim)) {
@@ -144,4 +145,54 @@ print.fect <- function(x,
         cat("\nPlacebo effect for pre-treatment periods:\n")
         print(x$est.placebo, digits = 4)
     }
+    ## v2.4.9: flag a bootstrap whose draws break down (see ?fect, boot.diag)
+    if (isTRUE(x$boot.diag$breakdown)) {
+        .print_boot_diag(x$boot.diag)
+    }
+}
+
+## One line on how the IFE-EM main fit stopped (x$convergence, v2.4.9).
+.print_convergence <- function(conv) {
+    if (is.null(conv) || is.null(conv$niter)) return(invisible(NULL))
+    rc <- conv$rel.change
+    rc.txt <- if (is.null(rc) || is.na(rc)) "not available" else formatC(rc, format = "e", digits = 3)
+    if (isTRUE(conv$converged)) {
+        cat("EM convergence: stopped by tol after ", conv$niter, " rounds ",
+            "(final relative change ", rc.txt, ", tol = ", format(conv$tol), ")\n", sep = "")
+    } else {
+        cat("EM convergence: NOT converged; stopped at max.iteration = ", conv$max.iteration,
+            " (final relative change ", rc.txt, ", tol = ", format(conv$tol), ")\n", sep = "")
+    }
+    invisible(NULL)
+}
+
+## The bootstrap breakdown check on the average effect (x$boot.diag, v2.4.9).
+.print_boot_diag <- function(bd, always = FALSE) {
+    if (is.null(bd)) return(invisible(NULL))
+    cat("\nBootstrap draws of the average effect (", bd$n.used, " of ", bd$nboots, " used):\n", sep = "")
+    cat("  SD of draws (the S.E. above): ", format(signif(bd$sd, 4)),
+        ";  IQR/1.349: ", format(signif(bd$iqr.sd, 4)),
+        ";  ratio: ", format(signif(bd$sd.ratio, 3)), "\n", sep = "")
+    cat("  draws more than 20 IQRs from the median: ", bd$n.extreme,
+        ";  failed draws dropped: ", bd$n.failed, "\n", sep = "")
+    if (isTRUE(bd$breakdown)) {
+        cat("  The SD is more than ", bd$threshold, " times IQR/1.349: the bootstrap has broken down ",
+            "and the S.E. is not reliable.\n", sep = "")
+    }
+    invisible(NULL)
+}
+
+## summary() of a fect fit (v2.4.9): what print() shows, plus the bootstrap
+## check on the average effect whenever it was computed.
+summary.fect <- function(object, ...) {
+    structure(list(object = object), class = "summary.fect")
+}
+
+print.summary.fect <- function(x, ...) {
+    fit <- x$object
+    print.fect(fit, ...)
+    if (!is.null(fit$boot.diag) && !isTRUE(fit$boot.diag$breakdown)) {
+        .print_boot_diag(fit$boot.diag)
+    }
+    invisible(x)
 }

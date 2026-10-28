@@ -1,4 +1,40 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.9
+
+Development version, not yet on CRAN. No estimate, standard error or default
+changes; the changes add checks and report them.
+
+## New checks
+
+* Bootstrap breakdown check. With `se = TRUE` and `vartype = "bootstrap"` or
+  `"parametric"`, the fit now has `boot.diag`: the SD of the draws of
+  `att.avg` (the reported `S.E.`, unchanged), a robust spread (their
+  interquartile range divided by 1.349, equal to the SD for normal draws),
+  their ratio, the count of draws more than 20 interquartile ranges from the
+  median, and the count of failed draws. fect warns, and `print()` shows the
+  check, when the SD is more than 5 times the robust spread. For the
+  parametric bootstrap `boot.diag` also counts the simulated-error draws of
+  the first step that failed or are extreme. The cause found in the
+  gsynth-revisit reanalysis: in 02 Gilens "tort" (`method = "gsynth"`,
+  `r = 2`, 26 controls, 18 of them with a constant outcome), 5 of 1,000
+  first-step refits drew too few distinct control units, so the two factors
+  and the unit intercept were nearly collinear over the pretreatment years
+  (condition number 1e11 to 1e13). The simulated errors of those refits were 5
+  to 19 million. Each replicate draws a simulated error for each of the 23
+  treated units from that pool, so 94 of the 1,000 replicates picked up one of
+  them, and the SE was 158,668 for an ATT of -3.24. The robust spread is 1.36
+  and the ratio 116,814. Whether to report the robust spread, or to drop such
+  draws, is left open; the reported `S.E.` is the SD as before.
+* IFE-EM convergence. For `method = "ife"` with
+  `time.component.from = "notyettreated"`, `print()` and the new `summary()`
+  method say how the EM fit stopped: the number of rounds and the final
+  relative change against `tol`, or that it hit `max.iteration`. The fit
+  stores them as `convergence` (and the final change as `rel.change`). fect
+  already warned when EM hit `max.iteration` (2.4.3); a fit can also meet
+  `tol` while its estimate still moves (in the reanalysis, Alcocer
+  "homicides" met `tol = 1e-5` after 3,432 rounds and moved 0.56 published SEs
+  under a tighter stop).
+
 # fect 2.4.8
 
 Development version, not yet on CRAN.

@@ -4325,6 +4325,50 @@ fect.default <- function(
         ), call. = FALSE)
     }
 
+    ## v2.4.9: how the IFE-EM main fit stopped, for print() and summary().
+    ## The warning above covers fits that hit max.iteration; a fit can also
+    ## meet tol while its estimate is still moving, so report the rounds
+    ## and the final relative change for every EM fit.
+    if (identical(method, "ife") && identical(time.component.from, "notyettreated") &&
+        !is.null(output$niter) && length(output$niter) == 1 && is.finite(output$niter)) {
+        rc <- if (is.numeric(output$rel.change) && length(output$rel.change) == 1) {
+            as.numeric(output$rel.change)
+        } else {
+            NA_real_
+        }
+        output$convergence <- list(
+            niter = as.integer(output$niter),
+            rel.change = rc,
+            tol = tol,
+            max.iteration = as.integer(max.iteration),
+            converged = if (is.na(rc)) output$niter < max.iteration else rc <= tol
+        )
+    }
+
+    ## v2.4.9 (B1): breakdown check on the bootstrap draws of the average
+    ## effect. The reported S.E. (est.avg) is the SD of these draws and is
+    ## NOT changed here. A few wild draws can inflate the SD by orders of
+    ## magnitude (in the parametric bootstrap: a nearly singular Step-1
+    ## refit whose huge simulated error is reused by many replicates), so
+    ## report a robust spread (IQR/1.349) and the count of extreme draws
+    ## beside it, and warn when SD > 5 * IQR/1.349 (the breakdown rule of
+    ## the gsynth-revisit reanalysis).
+    output$boot.diag <- NULL
+    if (isTRUE(se) && vartype %in% c("bootstrap", "parametric") &&
+        is.numeric(output$att.avg.boot) && length(output$att.avg.boot) > 0) {
+        output$boot.diag <- .fect_boot_diag(
+            att.avg.boot = output$att.avg.boot,
+            nboots = nboots,
+            n.failed = output$n.boot.fail,
+            sim = output$para.sim.check
+        )
+        if (isTRUE(output$boot.diag$breakdown)) {
+            warning(.fect_boot_diag_message(output$boot.diag, output$r.cv), call. = FALSE)
+        }
+    }
+    output$n.boot.fail <- NULL
+    output$para.sim.check <- NULL
+
     ## Surface the user's group.fe input on the fit object so print/summary
     ## can show the absorbed FE composition (per D8 in design memo). Also
     ## store the user-facing cl column name (cl gets reshaped to a matrix

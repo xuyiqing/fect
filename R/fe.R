@@ -860,6 +860,7 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         est = est.best,
         mu = est.best$mu,
         niter = est.best$niter,
+        rel.change = est.best$dif, # EM: relative change at the last round
         validX = validX,
         validF = validF,
         time = time.on,
