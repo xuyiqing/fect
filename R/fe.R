@@ -861,6 +861,7 @@ fect_fe <- function(Y, # Outcome variable, (T*N) matrix
         mu = est.best$mu,
         niter = est.best$niter,
         rel.change = est.best$dif, # EM: relative change at the last round
+        iter.cap = est.best$max_iter, # EM: the round cap the loop applied
         validX = validX,
         validF = validF,
         time = time.on,

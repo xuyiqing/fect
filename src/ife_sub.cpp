@@ -75,6 +75,7 @@ List fe_ad_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, con
   result["fit"] = fit;
   result["niter"] = niter;
   result["dif"] = dif; // relative change at the last round (compared with tol)
+  result["max_iter"] = 500; // the round cap this loop applies: 500, whatever max_iter is
   result["e"] = e;
   if (force == 1 || force == 3) {
     alpha = as<arma::mat>(Y_fe_ad["alpha"]);
@@ -176,6 +177,7 @@ List fe_ad_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const arma::
   result["fit"] = fit;
   result["niter"] = niter;
   result["dif"] = dif; // relative change at the last round (compared with tol)
+  result["max_iter"] = max_iter; // the round cap this loop applied
   result["e"] = e;
   if (p > 0) {
     result["beta"] = beta;
@@ -329,6 +331,7 @@ List fe_ad_inter_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& 
   result["mu"] = mu;
   result["niter"] = niter;
   result["dif"] = dif; // relative change at the last round (compared with tol)
+  result["max_iter"] = max_iter; // the round cap this loop applied
   result["fit"] = fit;
   result["e"] = e;
   result["validF"] = validF;
@@ -530,6 +533,7 @@ List fe_ad_inter_covar_iter(const arma::cube& XX, const arma::mat& xxinv, const 
   result["mu"] = mu;
   result["niter"] = niter;
   result["dif"] = dif; // relative change at the last round (compared with tol)
+  result["max_iter"] = max_iter; // the round cap this loop applied
   result["e"] = e;
   result["beta"] = beta;
   result["fit"] = fit;

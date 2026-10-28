@@ -4337,14 +4337,24 @@ fect.default <- function(
         } else {
             NA_real_
         }
+        ## the cap the EM loop applied: max.iteration, except the loop for
+        ## models with neither factors nor covariates (fe_ad_iter), which
+        ## stops at 500 rounds whatever max.iteration is
+        cap <- if (is.numeric(output$iter.cap) && length(output$iter.cap) == 1) {
+            as.integer(output$iter.cap)
+        } else {
+            as.integer(max.iteration)
+        }
         output$convergence <- list(
             niter = as.integer(output$niter),
             rel.change = rc,
             tol = tol,
             max.iteration = as.integer(max.iteration),
-            converged = if (is.na(rc)) output$niter < max.iteration else rc <= tol
+            iter.cap = cap,
+            converged = if (is.na(rc)) output$niter < cap else rc <= tol
         )
     }
+    output$iter.cap <- NULL
 
     ## v2.4.9 (B1): breakdown check on the bootstrap draws of the average
     ## effect. The reported S.E. (est.avg) is the SD of these draws and is
@@ -4361,7 +4371,8 @@ fect.default <- function(
             att.avg.boot = output$att.avg.boot,
             nboots = nboots,
             n.failed = output$n.boot.fail,
-            sim = output$para.sim.check
+            sim = output$para.sim.check,
+            para.error = output$para.error
         )
         if (isTRUE(output$boot.diag$breakdown)) {
             warning(.fect_boot_diag_message(output$boot.diag, output$r.cv), call. = FALSE)

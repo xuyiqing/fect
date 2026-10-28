@@ -145,14 +145,16 @@ trim_closure_env <- function(fun) {
 }
 
 ## v2.4.9 (B1): draws "more than k IQRs from the median" -- the extreme-draw
-## rule of the gsynth-revisit reanalysis. With IQR = 0 every draw that differs
-## from the median counts. NA and non-finite values are not counted here.
+## rule of the gsynth-revisit reanalysis. NA when the IQR is 0 (at least half
+## the draws are equal): the rule has no scale then, and counting every draw
+## off the median would flag ordinary draws. NA and non-finite values are
+## not counted.
 .fect_n_extreme <- function(v, k = 20) {
   v <- v[is.finite(v)]
   if (length(v) < 2L) return(0L)
   med <- stats::median(v)
   iqr <- stats::IQR(v)
-  if (iqr > 0) sum(abs(v - med) > k * iqr) else sum(v != med)
+  if (iqr > 0) as.integer(sum(abs(v - med) > k * iqr)) else NA_integer_
 }
 
 ## v2.4.9 (B1): breakdown check on the bootstrap draws of att.avg. The
@@ -164,13 +166,14 @@ trim_closure_env <- function(fun) {
 ## the seed, because the explosions are rare draws). `sim` is
 ## .fect_para_sim_check()'s list (parametric bootstrap only).
 .fect_boot_diag <- function(att.avg.boot, nboots, n.failed = 0L, sim = NULL,
-                            threshold = 5) {
+                            para.error = NULL, threshold = 5, min.draws = 20L) {
   b.all <- as.numeric(att.avg.boot)
   b <- b.all[is.finite(b.all)]
   sd.b <- if (length(b) >= 2L) stats::sd(b) else NA_real_
   iqr.sd <- if (length(b) >= 2L) stats::IQR(b) / 1.349 else NA_real_
-  sd.ratio <- if (is.finite(sd.b) && is.finite(iqr.sd)) {
-    if (iqr.sd > 0) sd.b / iqr.sd else if (sd.b > 0) Inf else NA_real_
+  ## not defined when the IQR is 0 (the robust spread has no scale)
+  sd.ratio <- if (is.finite(sd.b) && is.finite(iqr.sd) && iqr.sd > 0) {
+    sd.b / iqr.sd
   } else {
     NA_real_
   }
@@ -184,7 +187,11 @@ trim_closure_env <- function(fun) {
     iqr.sd = iqr.sd,
     sd.ratio = sd.ratio,
     threshold = threshold,
-    breakdown = isTRUE(sd.ratio > threshold),
+    min.draws = as.integer(min.draws),
+    ## with fewer than min.draws usable draws the ratio is too noisy to
+    ## read (normal draws exceed 5 in about 4% of fits at nboots = 5)
+    breakdown = length(b) >= min.draws && isTRUE(sd.ratio > threshold),
+    para.error = para.error,
     n.sim = if (!is.null(sim)) sim$n.sim else NULL,
     n.sim.failed = if (!is.null(sim)) sim$n.sim.failed else NULL,
     n.sim.extreme = if (!is.null(sim)) sim$n.sim.extreme else NULL
@@ -201,11 +208,17 @@ trim_closure_env <- function(fun) {
     format(signif(bd$sd, 4)), format(signif(bd$sd.ratio, 3)), format(signif(bd$iqr.sd, 4)),
     bd$n.extreme, bd$n.used,
     if (isTRUE(bd$n.sim.extreme > 0)) sprintf(paste0(
-      "\n  Parametric bootstrap: %d of %d simulated-error draws (the first step) are extreme,",
-      " and each is reused by every replicate that samples it. Such draws come from refits",
-      " whose loading regression is nearly singular, for example when the resampled controls",
-      " have too few distinct outcome paths for r = %s."),
-      bd$n.sim.extreme, bd$n.sim, paste(r.cv, collapse = ",")) else ""
+      "\n  Parametric bootstrap: %d of %d simulated-error draws (the first step) are extreme;",
+      " %s",
+      " Possible causes include a refit whose loading regression is nearly singular (too few",
+      " distinct control paths for r = %s) and a refit that stopped far from its solution."),
+      bd$n.sim.extreme, bd$n.sim,
+      if (identical(bd$para.error, "ar")) {
+        "with para.error = \"ar\" they enter the error covariance every replicate is drawn from."
+      } else {
+        "each is reused by every replicate that samples it."
+      },
+      paste(r.cv, collapse = ",")) else ""
   )
 }
 

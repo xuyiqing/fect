@@ -161,3 +161,66 @@ test_that("IFE-EM with cross-validation and r = 0 also report convergence; gsynt
   expect_null(g$convergence)
   expect_false(any(grepl("EM convergence", capture.output(print(g)))))
 })
+
+## Review of PR #183 (2026-10-28): edge cases of the check and the convergence line.
+
+test_that("the breakdown check needs 20 usable draws and a positive IQR", {
+  set.seed(4)
+  few <- c(rnorm(9), 1e4)                      # 10 draws, one wild
+  bd <- fect:::.fect_boot_diag(few, nboots = 10)
+  expect_gt(bd$sd.ratio, 5)
+  expect_false(bd$breakdown)                   # too few draws to read
+  expect_identical(bd$min.draws, 20L)
+  many <- c(rnorm(29), 1e4)
+  expect_true(fect:::.fect_boot_diag(many, nboots = 30)$breakdown)
+
+  flat <- c(rep(1, 80), rnorm(20))             # IQR = 0
+  bd <- fect:::.fect_boot_diag(flat, nboots = 100)
+  expect_identical(bd$iqr.sd, 0)
+  expect_true(is.na(bd$sd.ratio))
+  expect_true(is.na(bd$n.extreme))             # not every draw off the median
+  expect_false(bd$breakdown)
+  txt <- capture.output(fect:::.print_boot_diag(bd))
+  expect_true(any(grepl("not defined", txt)))
+  expect_false(any(grepl("Inf", txt)))
+})
+
+test_that("the warning describes the first-step pool by error mode", {
+  bd <- fect:::.fect_boot_diag(c(rnorm(99), 1e5), nboots = 100,
+                               sim = list(n.sim = 100L, n.sim.failed = 0L, n.sim.extreme = 2L),
+                               para.error = "empirical")
+  m <- fect:::.fect_boot_diag_message(bd, r.cv = 2)
+  expect_match(m, "reused by every replicate")
+  bd$para.error <- "ar"
+  m <- fect:::.fect_boot_diag_message(bd, r.cv = 2)
+  expect_match(m, "error covariance")
+  expect_false(grepl("reused by every replicate", m))
+  expect_match(m, "stopped far from its solution")
+})
+
+test_that("summary() shows the first-step counts of a parametric bootstrap", {
+  data(simgsynth, package = "fect")
+  out <- suppressMessages(fect(Y ~ D, data = simgsynth, index = c("id", "time"),
+                               method = "gsynth", force = "two-way", r = 1, CV = FALSE, se = TRUE,
+                               vartype = "parametric", nboots = 50, parallel = FALSE, seed = 2))
+  expect_identical(out$boot.diag$para.error, out$para.error)
+  txt <- capture.output(print(summary(out)))
+  expect_true(any(grepl("simulated-error draws \\(first step\\): 50;  failed: 0", txt)))
+})
+
+test_that("the convergence line reports the cap the EM loop applied", {
+  data(simdata, package = "fect")
+  fe <- suppressMessages(fect(Y ~ D, data = simdata, index = c("id", "time"),
+                              method = "fe", se = FALSE))
+  expect_identical(fe$convergence$iter.cap, 500L)    # fe_ad_iter() stops at 500 rounds
+  expect_null(fe$iter.cap)
+  ife <- suppressMessages(fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+                               method = "ife", r = 1, CV = FALSE, se = FALSE))
+  expect_identical(ife$convergence$iter.cap, 5000L)
+  capped <- list(niter = 501L, rel.change = 2e-5, tol = 1e-5, max.iteration = 5000L,
+                 iter.cap = 500L, converged = FALSE)
+  txt <- capture.output(fect:::.print_convergence(capped))
+  expect_match(txt, "routine's own cap of 500 rounds, not max.iteration = 5000")
+  capped$iter.cap <- 5000L; capped$niter <- 5001L
+  expect_match(capture.output(fect:::.print_convergence(capped)), "stopped at max.iteration = 5000")
+})

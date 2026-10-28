@@ -1,8 +1,9 @@
 <!-- markdownlint-disable MD025 -->
 # fect 2.4.9
 
-Development version, not yet on CRAN. No estimate or default changes. One bug
-fix changes standard errors (below); the other changes add checks and report
+Development version, not yet on CRAN. No default changes. One bug fix
+changes standard errors, and cross-validation scores when a covariate is
+collinear within a fold (below); the other changes add checks and report
 them.
 
 ## Changes that affect results
@@ -18,8 +19,14 @@ them.
   "gsynth"`, parametric bootstrap, 200 draws), one simulated-error draw had
   prediction errors up to 2,557 on an outcome between about -3 and 3, and it
   set the error covariance of every replicate: the SE was 35.8 and is now
-  0.083. Point estimates do not change. Standard errors change for fits in
-  which `feols()` drops a collinear covariate inside a bootstrap draw.
+  0.083. Standard errors change for fits in which `feols()` drops a
+  collinear covariate inside a bootstrap draw. Cross-validation scores change
+  for fits in which it drops one inside a CV fold, so the chosen `r`, and with
+  it the point estimate, can change too (with `r` fixed, point estimates do
+  not change). On the first 80 units of `simdata` with `X0` equal to `X1`
+  except on one control row, `fect(Y ~ D + X1 + X0 + X2, method = "ife",
+  r = c(0, 3), CV = TRUE, k = 10, seed = 5)` scores r = 3 at an MSPE of 12.24
+  instead of 11.07; the chosen `r` (2) and the estimate stay the same there.
 
 ## New checks
 
@@ -29,9 +36,13 @@ them.
   interquartile range divided by 1.349, equal to the SD for normal draws),
   their ratio, the count of draws more than 20 interquartile ranges from the
   median, and the count of failed draws. fect warns, and `print()` shows the
-  check, when the SD is more than 5 times the robust spread. For the
-  parametric bootstrap `boot.diag` also counts the simulated-error draws of
-  the first step that failed or are extreme. The cause found in the
+  check, when the SD is more than 5 times the robust spread and at least 20
+  draws are usable. For the parametric bootstrap `boot.diag` also counts the
+  simulated-error draws of the first step that failed or are extreme, and
+  `print()` and `summary()` show those counts. With `para.error = "ar"` (the
+  default when cells are missing) an extreme first-step draw widens every
+  replicate while the final draws look normal, so the count is then the only
+  sign; the warning does not fire on it. The cause found in the
   gsynth-revisit reanalysis: in 02 Gilens "tort" (`method = "gsynth"`,
   `r = 2`, 26 controls, 18 of them with a constant outcome), 5 of 1,000
   first-step refits drew too few distinct control units, so the two factors
@@ -50,8 +61,10 @@ them.
   `time.component.from = "notyettreated"` (and `method = "fe"`, the same EM
   routine with no factors), `print()` and the new `summary()`
   method say how the EM fit stopped: the number of rounds and the final
-  relative change against `tol`, or that it hit `max.iteration`. The fit
-  stores them as `convergence` (and the final change as `rel.change`). fect
+  relative change against `tol`, or the round cap it hit. The fit stores them
+  as `convergence` (and the final change as `rel.change`). A model with
+  neither factors nor covariates stops at 500 rounds whatever
+  `max.iteration` is, as before; the message says so. fect
   already warned when EM hit `max.iteration` (2.4.3); a fit can also meet
   `tol` while its estimate still moves (in the reanalysis, Alcocer
   "homicides" met `tol = 1e-5` after 3,432 rounds and moved 0.56 published SEs
