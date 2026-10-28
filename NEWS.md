@@ -1,8 +1,25 @@
 <!-- markdownlint-disable MD025 -->
 # fect 2.4.9
 
-Development version, not yet on CRAN. No estimate, standard error or default
-changes; the changes add checks and report them.
+Development version, not yet on CRAN. No estimate or default changes. One bug
+fix changes standard errors (below); the other changes add checks and report
+them.
+
+## Changes that affect results
+
+* Bootstrap refits with a collinear covariate started from misplaced
+  coefficients. When `feols()` drops a covariate that is collinear in a
+  resampled panel, `align_beta0()` read the coefficient names after
+  `as.numeric()` had dropped them, so it placed the starting values by
+  position and every later coefficient moved one slot. The main fit is not
+  affected (fect drops such covariates first), but bootstrap refits are: the
+  EM solver can then stop at `max.iteration` far from the solution. In the
+  gsynth-revisit reanalysis of Carter (2025) "dem-filter" (`method =
+  "gsynth"`, parametric bootstrap, 200 draws), one simulated-error draw had
+  prediction errors up to 2,557 on an outcome between about -3 and 3, and it
+  set the error covariance of every replicate: the SE was 35.8 and is now
+  0.083. Point estimates do not change. Standard errors change for fits in
+  which `feols()` drops a collinear covariate inside a bootstrap draw.
 
 ## New checks
 
