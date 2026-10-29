@@ -59,6 +59,29 @@ release.
   r = c(0, 3), CV = TRUE, k = 10, seed = 5)` scores r = 3 at an MSPE of 12.24
   instead of 11.07; the chosen `r` (2) and the estimate stay the same there.
 
+* `carryover.rm` now removes the marked cells from the fit. Before, the cells
+  were marked but stayed in the fit as untreated controls, so `att.avg`,
+  `beta` and the fit were exactly the same with and without the argument, and
+  only `carry.att` was computed (from a fit that contained the cells). Now
+  they enter neither as treated nor as control observations, and the fit
+  equals the fit on the panel with those rows deleted. On `simdata`
+  (`method = "ife"`, `r = 1`, `force = "two-way"`, `carryover.rm = 2`) the
+  ATT moved from 3.389 to 3.930 and `carry.att` from (-0.360, 0.037) to
+  (-0.084, 0.079). Fits that use `carryover.rm` change; others do not. The
+  window is now counted by period position in both balanced and unbalanced
+  panels: on a balanced panel with a time step other than 1 (say, data every
+  5 years) it was built from raw time values and marked nothing, without a
+  message; it now removes the next `k` observed periods, as on an unbalanced
+  panel. Cells removed by `carryover.rm` are coded 6 in `obs.missing` (before,
+  only with `carryoverTest`) and are `TRUE` in `sample`, as before.
+* The EM loop for models with neither factors nor covariates (`fe_ad_iter`)
+  now obeys `max.iteration`. Before, it stopped at 501 rounds whatever
+  `max.iteration` was, without a warning. It starts from fixest's exact
+  two-way fit, so at the default `tol` it runs one round on ordinary panels
+  and nothing changes; on chain-like panels with a tight `tol` it now runs to
+  `max.iteration` and warns when it does not converge, and with
+  `max.iteration` below 500 it stops earlier than before.
+
 ## New features
 
 * Bootstrap breakdown check. With `se = TRUE` and `vartype = "bootstrap"` or
@@ -72,8 +95,18 @@ release.
   simulated-error draws of the first step that failed or are extreme, and
   `print()` and `summary()` show those counts. With `para.error = "ar"` (the
   default when cells are missing) an extreme first-step draw widens every
-  replicate while the final draws look normal, so the count is then the only
-  sign; the warning does not fire on it. The cause found in the
+  replicate while the final draws look normal, so the first step has its own
+  check: fect also warns when, with at least 20 usable first-step draws, one
+  of them is extreme or the SD of their largest errors is more than 5 times
+  its robust spread (`sim.breakdown`; `cause` says which check fired). The
+  warning says not to report the S.E., interval and p-value of the average
+  effect, that the S.E. by period are affected too, and how to cross-check
+  (jackknife, the unit bootstrap, `para.error = "empirical"`). `boot.diag`
+  also has `sd.trim`, the SD without the draws more than 20 interquartile
+  ranges from the median, and `n.dropped`, their count; neither is used for
+  the S.E. In the gsynth-revisit reanalysis of Carter (2025) the first-step
+  check fires on all four autocracy outcomes and not on the corrected
+  dem-filter fit; it fired on none of 80 simulated coverage-suite fits. The cause found in the
   gsynth-revisit reanalysis: in 02 Gilens "tort" (`method = "gsynth"`,
   `r = 2`, 26 controls, 18 of them with a constant outcome), 5 of 1,000
   first-step refits drew too few distinct control units, so the two factors
@@ -93,9 +126,7 @@ release.
   routine with no factors), `print()` and the new `summary()`
   method say how the EM fit stopped: the number of rounds and the final
   relative change against `tol`, or the round cap it hit. The fit stores them
-  as `convergence` (and the final change as `rel.change`). A model with
-  neither factors nor covariates stops at 500 rounds whatever
-  `max.iteration` is, as before; the message says so. fect
+  as `convergence` (and the final change as `rel.change`). fect
   already warned when EM hit `max.iteration` (2.4.3); a fit can also meet
   `tol` while its estimate still moves (in the reanalysis, Alcocer
   "homicides" met `tol = 1e-5` after 3,432 rounds and moved 0.56 published SEs
@@ -130,6 +161,23 @@ release.
   Each part is now computed and stored on its own.
 * `fect(carryover.rm = 3L)` was ignored without a message because only class
   "numeric" counted; any number now works.
+* `carryover.rm` is now checked: anything other than a single non-negative
+  whole number stops (before, `"a"` or `c(1, 2)` were ignored and `2.5` was
+  truncated). `0` means none. A value that marks no cell gives a message. With
+  `time.component.from = "nevertreated"` (and so `method = "gsynth"`) it has
+  no effect and is ignored with a warning. `permute = TRUE` with
+  `carryover.rm` stops, because the permutation refits would use the removed
+  cells as controls.
+* `loo = TRUE` with `carryover.rm` no longer stops with "arguments must have
+  same length".
+* `method = "both"` at its defaults (`r = NULL`, so `r = 0:5`) stopped with
+  "the condition has length > 1"; it now runs.
+* `plot(type = "hte")` without `covariate` stopped with "'length = 3' in
+  coercion to 'logical(1)'" for every fit. A fit with one covariate now uses
+  it; with several the plot asks for one; with none it stops with a message
+  asking for a moderator matrix.
+* `fect(carryoverTest = TRUE)` without `carryover.period` now stops with a
+  message (it stopped with "object 'II.origin' not found").
 * `fect(placeboTest = TRUE)` without `placebo.period` now stops with a message.
   Before, it ran no placebo test (`est.placebo` was `NULL`), or stopped with an
   unrelated error when the model had covariates.
@@ -145,6 +193,11 @@ release.
 
 ## Documentation
 
+* `?fect` (`tol`) says how far a fit at the default `tol = 1e-5` can sit from
+  a fully converged one on slowly converging real panels (in the
+  gsynth-revisit reanalysis of 17 published IFE fits, 5 moved more than 0.1
+  published S.E. after 20,000 rounds, the largest 0.56 S.E.) and how to check
+  a fit. The defaults (`tol = 1e-5`, `max.iteration = 5000`) do not change.
 * The "Bounded factor loadings" section of the gsynth chapter of the user
   manual describes the joint intercept fit and says how estimates from
   earlier versions differ; `?fect` (`loading.bound`) says the same.

@@ -796,8 +796,9 @@ The table below summarizes which parameters apply to each plot type. Parameters 
 Every fect fit returns a logical matrix `$sample` indicating which
 cells the estimator actually consumed. The matrix is the same shape as
 the panel; a cell is true when it entered the main fit, a placebo or
-carryover test, or a balance check, and false when it was missing,
-dropped, or excluded by `carryover.rm`. **panelView** consumes this
+carryover test, or a balance check, or when it was removed from the fit
+by `carryover.rm` (its effect is reported in `carry.att`), and false
+when it was missing or dropped. **panelView** consumes this
 matrix directly via its `panelview(fit)` entry-point, so visualizing
 the estimation sample takes one call:
 
