@@ -1,12 +1,43 @@
 <!-- markdownlint-disable MD025 -->
-# fect 2.4.9
+# fect 2.4.8
 
-Development version, not yet on CRAN. No default changes. One bug fix
-changes standard errors, and cross-validation scores when a covariate is
-collinear within a fold (below); the other changes add checks and report
-them.
+Development version, not yet on CRAN.
+
+Version 2.4.7 was a development version on GitHub and was not released on
+CRAN. Its changes are listed under fect 2.4.7 below and are part of this
+release.
 
 ## Changes that affect results
+
+* `loading.bound = "simplex"` with `force = "unit"` or `"two-way"` now fits
+  each treated unit's intercept jointly with its constrained loadings. Before,
+  the loadings were fitted with no intercept and the intercept was then set to
+  the mean of the leftover residual, so a unit's loadings absorbed its level
+  whenever the estimated factors were not centred over its pretreatment
+  periods (always the case for a trend factor), and adding a constant to a
+  treated unit's outcome changed its estimated loadings and the ATT. The
+  intercept is still not bounded. The fit now centres the unit's outcome and
+  the factors over the unit's own pretreatment periods, which solves the joint
+  problem exactly with the same `gamma.loading`, by Newton's method on the
+  dual (the previous solver is the fallback). `gamma.loading` chosen by
+  cross-validation centres within each training fold. `loading.proj.resid` is
+  now the norm of the joint-fit residual. Estimates with `force = "unit"` or
+  `"two-way"` change, sometimes substantially; `loading.bound = "none"` and
+  `force = "none"` or `"time"` do not change. On a simulated design with five
+  treated units and `gamma.loading = 1e6`, adding 10 to one treated unit's
+  outcome moved the ATT from 0.512 to 1.607; it is now 0.647 in both cases.
+* `did_wrapper(se = "boot")` is now a cluster bootstrap that keeps a unit
+  drawn more than once as separate units. Before, each draw kept every drawn
+  unit only once (`data[unit %in% drawn, ]`), so a draw held about 63% of the
+  units and the standard errors were too small. On `simdata` with
+  `method = "twfe"`, the bootstrap SE moved from 0.316 to 0.404 (the clustered
+  SE is 0.427).
+* `did_wrapper(se = "jackknife")` now reports the jackknife standard error,
+  sqrt((n - 1) / n * sum((theta_i - mean)^2)), with a normal interval and
+  p-value. Before, it reported the standard deviation of the leave-one-out
+  estimates, about sqrt(n) times too small, with bootstrap-style quantile
+  intervals. On `simdata` with `method = "twfe"`, the SE moved from 0.031 to
+  0.429.
 
 * Bootstrap refits with a collinear covariate started from misplaced
   coefficients. When `feols()` drops a covariate that is collinear in a
@@ -28,7 +59,7 @@ them.
   r = c(0, 3), CV = TRUE, k = 10, seed = 5)` scores r = 3 at an MSPE of 12.24
   instead of 11.07; the chosen `r` (2) and the estimate stay the same there.
 
-## New checks
+## New features
 
 * Bootstrap breakdown check. With `se = TRUE` and `vartype = "bootstrap"` or
   `"parametric"`, the fit now has `boot.diag`: the SD of the draws of
@@ -69,46 +100,6 @@ them.
   `tol` while its estimate still moves (in the reanalysis, Alcocer
   "homicides" met `tol = 1e-5` after 3,432 rounds and moved 0.56 published SEs
   under a tighter stop).
-
-# fect 2.4.8
-
-Development version, not yet on CRAN.
-
-Version 2.4.7 was a development version on GitHub and was not released on
-CRAN. Its changes are listed under fect 2.4.7 below and are part of this
-release.
-
-## Changes that affect results
-
-* `loading.bound = "simplex"` with `force = "unit"` or `"two-way"` now fits
-  each treated unit's intercept jointly with its constrained loadings. Before,
-  the loadings were fitted with no intercept and the intercept was then set to
-  the mean of the leftover residual, so a unit's loadings absorbed its level
-  whenever the estimated factors were not centred over its pretreatment
-  periods (always the case for a trend factor), and adding a constant to a
-  treated unit's outcome changed its estimated loadings and the ATT. The
-  intercept is still not bounded. The fit now centres the unit's outcome and
-  the factors over the unit's own pretreatment periods, which solves the joint
-  problem exactly with the same `gamma.loading`, by Newton's method on the
-  dual (the previous solver is the fallback). `gamma.loading` chosen by
-  cross-validation centres within each training fold. `loading.proj.resid` is
-  now the norm of the joint-fit residual. Estimates with `force = "unit"` or
-  `"two-way"` change, sometimes substantially; `loading.bound = "none"` and
-  `force = "none"` or `"time"` do not change. On a simulated design with five
-  treated units and `gamma.loading = 1e6`, adding 10 to one treated unit's
-  outcome moved the ATT from 0.512 to 1.607; it is now 0.647 in both cases.
-* `did_wrapper(se = "boot")` is now a cluster bootstrap that keeps a unit
-  drawn more than once as separate units. Before, each draw kept every drawn
-  unit only once (`data[unit %in% drawn, ]`), so a draw held about 63% of the
-  units and the standard errors were too small. On `simdata` with
-  `method = "twfe"`, the bootstrap SE moved from 0.316 to 0.404 (the clustered
-  SE is 0.427).
-* `did_wrapper(se = "jackknife")` now reports the jackknife standard error,
-  sqrt((n - 1) / n * sum((theta_i - mean)^2)), with a normal interval and
-  p-value. Before, it reported the standard deviation of the leave-one-out
-  estimates, about sqrt(n) times too small, with bootstrap-style quantile
-  intervals. On `simdata` with `method = "twfe"`, the SE moved from 0.031 to
-  0.429.
 
 ## Bug fixes
 
