@@ -8,7 +8,7 @@
 
 For \code{method = "ife"} fitted by EM (\code{time.component.from = "notyettreated"}) and \code{method = "fe"}, a line under the estimator reports how the fit stopped: the number of rounds, the final relative change and \code{tol}, or that it hit \code{max.iteration} (see \code{convergence} in \code{\link{fect}}). When the bootstrap draws of the average effect break down (their SD is more than 5 times their IQR/1.349; see \code{boot.diag} in \code{\link{fect}}), the output ends with that check.
 
-\code{summary()} prints the same, and always ends with the bootstrap check when one was computed (since 2.4.9).}
+\code{summary()} prints the same, and always ends with the bootstrap check when one was computed (since 2.4.8).}
 \usage{\method{print}{fect}(x, switch.on = TRUE,
        switch.off = FALSE,time.on.lim = NULL, time.off.lim = NULL, \dots)
 \method{summary}{fect}(object, \dots)

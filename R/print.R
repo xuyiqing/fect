@@ -145,13 +145,13 @@ print.fect <- function(x,
         cat("\nPlacebo effect for pre-treatment periods:\n")
         print(x$est.placebo, digits = 4)
     }
-    ## v2.4.9: flag a bootstrap whose draws break down (see ?fect, boot.diag)
+    ## v2.4.8: flag a bootstrap whose draws break down (see ?fect, boot.diag)
     if (isTRUE(x$boot.diag$breakdown)) {
         .print_boot_diag(x$boot.diag)
     }
 }
 
-## One line on how the IFE-EM main fit stopped (x$convergence, v2.4.9).
+## One line on how the IFE-EM main fit stopped (x$convergence, v2.4.8).
 .print_convergence <- function(conv) {
     if (is.null(conv) || is.null(conv$niter)) return(invisible(NULL))
     rc <- conv$rel.change
@@ -172,7 +172,7 @@ print.fect <- function(x,
     invisible(NULL)
 }
 
-## The bootstrap breakdown check on the average effect (x$boot.diag, v2.4.9).
+## The bootstrap breakdown check on the average effect (x$boot.diag, v2.4.8).
 .print_boot_diag <- function(bd, always = FALSE) {
     if (is.null(bd)) return(invisible(NULL))
     cat("\nBootstrap draws of the average effect (", bd$n.used, " of ", bd$nboots, " used):\n", sep = "")
@@ -200,7 +200,7 @@ print.fect <- function(x,
     invisible(NULL)
 }
 
-## summary() of a fect fit (v2.4.9): what print() shows, plus the bootstrap
+## summary() of a fect fit (v2.4.8): what print() shows, plus the bootstrap
 ## check on the average effect whenever it was computed.
 summary.fect <- function(object, ...) {
     structure(list(object = object), class = "summary.fect")

@@ -4325,7 +4325,7 @@ fect.default <- function(
         ), call. = FALSE)
     }
 
-    ## v2.4.9: how the IFE-EM main fit stopped, for print() and summary().
+    ## v2.4.8: how the IFE-EM main fit stopped, for print() and summary().
     ## The warning above covers fits that hit max.iteration; a fit can also
     ## meet tol while its estimate is still moving, so report the rounds
     ## and the final relative change for every EM fit.
@@ -4356,7 +4356,7 @@ fect.default <- function(
     }
     output$iter.cap <- NULL
 
-    ## v2.4.9 (B1): breakdown check on the bootstrap draws of the average
+    ## v2.4.8 (B1): breakdown check on the bootstrap draws of the average
     ## effect. The reported S.E. (est.avg) is the SD of these draws and is
     ## NOT changed here. A few wild draws can inflate the SD by orders of
     ## magnitude (in the parametric bootstrap: a nearly singular Step-1

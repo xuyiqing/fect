@@ -1,4 +1,4 @@
-## fect 2.4.9 fixes from the gsynth-revisit reanalysis (2026-10-27).
+## fect 2.4.8 fixes from the gsynth-revisit reanalysis (2026-10-27).
 ##
 ## B1. Exploding parametric-bootstrap draws. In 02 Gilens "tort" (r = 2, 26
 ##     controls, 18 of them with a constant outcome) 5 of 1,000 simulated-error

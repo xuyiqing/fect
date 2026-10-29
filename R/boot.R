@@ -144,7 +144,7 @@ trim_closure_env <- function(fun) {
   x[sample.int(length(x), size, replace = replace)]
 }
 
-## v2.4.9 (B1): draws "more than k IQRs from the median" -- the extreme-draw
+## v2.4.8 (B1): draws "more than k IQRs from the median" -- the extreme-draw
 ## rule of the gsynth-revisit reanalysis. NA when the IQR is 0 (at least half
 ## the draws are equal): the rule has no scale then, and counting every draw
 ## off the median would flag ordinary draws. NA and non-finite values are
@@ -157,7 +157,7 @@ trim_closure_env <- function(fun) {
   if (iqr > 0) as.integer(sum(abs(v - med) > k * iqr)) else NA_integer_
 }
 
-## v2.4.9 (B1): breakdown check on the bootstrap draws of att.avg. The
+## v2.4.8 (B1): breakdown check on the bootstrap draws of att.avg. The
 ## reported S.E. is the SD of these draws and is not changed. A robust spread
 ## (IQR/1.349, equal to the SD for normal draws) and the count of extreme
 ## draws are reported beside it; `breakdown` is the gsynth-revisit rule
@@ -222,7 +222,7 @@ trim_closure_env <- function(fun) {
   )
 }
 
-## v2.4.9 (B1): the simulated-error pool of the parametric bootstrap (Step 1).
+## v2.4.8 (B1): the simulated-error pool of the parametric bootstrap (Step 1).
 ## `error.tr` is TT x Ntr x nboots: draw j is the prediction error of one
 ## control refitted as a pseudo-treated unit. One draw with a huge error is
 ## reused by every replicate that samples it, which is how a few nearly
@@ -5024,7 +5024,7 @@ fect_boot <- function(
     att.count.boot = att.count.boot,
     vartype = vartype,
     para.error = if (vartype == "parametric" && exists("para.error.resolved")) para.error.resolved else NULL,
-    ## v2.4.9 (B1): replicates dropped as failed, and the Step-1 error pool
+    ## v2.4.8 (B1): replicates dropped as failed, and the Step-1 error pool
     ## check; read by fect.default() to build boot.diag
     n.boot.fail = n.fail,
     para.sim.check = if (vartype == "parametric" && exists("para.sim.check", inherits = FALSE)) para.sim.check else NULL
