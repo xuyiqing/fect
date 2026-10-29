@@ -16,7 +16,7 @@ Version 2.4.7 was a development version on GitHub and was not released on CRAN; 
 
 **Smaller fixes.** `did_wrapper()` runs with `method` left at its default. `fect_sens()` runs with its default `post.periods`, with `parallel = TRUE` and `cores`, and with any of its four vectors set to `NULL`. `fect(carryover.rm = 3L)` is no longer ignored, and `placeboTest = TRUE` without `placebo.period` stops with a message.
 
-**Documentation.** The manual and the help pages were checked against the code, and statements that contradicted it were corrected, among them the default `vartype` for gsynth (`"bootstrap"`, not `"parametric"`), the default `cv.rule` (`"min"`), cross-validation with `method = "cfe"`, and the codes of `obs.missing`.
+**Documentation.** The manual and the help pages were checked against the code, and statements that contradicted it were corrected, among them the default `vartype` for gsynth (`"bootstrap"`, not `"parametric"`), the default `cv.rule` (`"min"`), cross-validation with `method = "cfe"`, and the codes of `obs.missing`. New reference material, also checked against the code: a guide to choosing a method and tables of the option combinations that `fect()` changes or refuses ([cheatsheet](aa-cheatsheet.html#sec-cheatsheet-choose)), a table of what each plot type needs ([Chapter @sec-plots]), every slot of a fit in `?fect`, the arguments `alpha`, `max.missing`, `fill.missing`, `f.threshold` and `normalize` in `?fect`, and the variables of `sim_base`, `sim_gsynth` and `turnout`.
 
 ## v2.4.7
 

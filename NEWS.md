@@ -169,6 +169,16 @@ release.
   filters; `?did_wrapper` documents each method, `se` option and output
   column; `gs2020` and `hh2019` are replication data, now with their
   variables described.
+* New reference material, checked against the code. The cheatsheet chapter
+  of the user manual has a guide to choosing a method and tables of the
+  option combinations that `fect()` changes or refuses;
+  the plots chapter has a table of what each plot type needs from the fit.
+  The "Value" section of `?fect` now lists every slot of a fit, with the
+  columns of the `est.*` tables and the components of `test.out`.
+  `?fect` now documents `alpha` (and the 90% intervals it sets), `max.missing`,
+  `fill.missing`, `f.threshold` and `normalize`; `?sim_base`, `?sim_gsynth`,
+  `?simgsynth` and `?turnout` describe their variables, and `?simdata` gives
+  the correct unit identifiers (101 to 300).
 
 # fect 2.4.7
 
