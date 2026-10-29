@@ -308,6 +308,8 @@ List inter_fe_ub(
   int p = X.n_slices;
   double obs = accu(I);
   int niter = 0;
+  double dif = NA_REAL; // relative change at the last round of the loop
+  int iter_cap = max_iter; // the round cap the loop applied (fe_ad_iter: 500)
   arma::mat factor;
   arma::mat lambda;
   arma::mat VNT;
@@ -395,6 +397,8 @@ List inter_fe_ub(
         xi = as<arma::mat>(fe_ad_inter["xi"]);
       }
       niter = as<int>(fe_ad_inter["niter"]);
+      dif = as<double>(fe_ad_inter["dif"]);
+      iter_cap = as<int>(fe_ad_inter["max_iter"]);
     } else {
       if (force == 0) {
         U = YY;
@@ -412,6 +416,8 @@ List inter_fe_ub(
           xi = as<arma::mat>(fe_ad["xi"]);
         }
         niter = as<int>(fe_ad["niter"]);
+        dif = as<double>(fe_ad["dif"]);
+        iter_cap = as<int>(fe_ad["max_iter"]);
       }
     }
   } else {
@@ -437,6 +443,8 @@ List inter_fe_ub(
         xi = as<arma::mat>(fe_ad["xi"]);
       }
       niter = as<int>(fe_ad["niter"]);
+      dif = as<double>(fe_ad["dif"]);
+      iter_cap = as<int>(fe_ad["max_iter"]);
     } else if (r > 0) {
       // add, covar, interactive, iteration
       List fe_ad_inter_covar = fe_ad_inter_covar_iter(
@@ -459,6 +467,8 @@ List inter_fe_ub(
         xi = as<arma::mat>(fe_ad_inter_covar["xi"]);
       }
       niter = as<int>(fe_ad_inter_covar["niter"]);
+      dif = as<double>(fe_ad_inter_covar["dif"]);
+      iter_cap = as<int>(fe_ad_inter_covar["max_iter"]);
     }
   }
   /* sigma2 and IC */
@@ -522,6 +532,8 @@ List inter_fe_ub(
 
   if (!(force == 0 && r == 0 && p1 == 0)) {
     output["niter"] = niter;
+    output["dif"] = dif;
+    output["max_iter"] = iter_cap;
   }
   if (force == 1 || force == 3) {
     output["alpha"] = alpha;

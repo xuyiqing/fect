@@ -50,6 +50,7 @@ print.fect <- function(x,
         !isTRUE(x$vartype %in% c("parametric", "jackknife"))) {
         cat("Cluster SE:   ", x$cl.label, "\n", sep = "")
     }
+    .print_convergence(x$convergence)
 
     if (switch.on == TRUE) {
         if (!is.null(time.on.lim)) {
@@ -144,4 +145,72 @@ print.fect <- function(x,
         cat("\nPlacebo effect for pre-treatment periods:\n")
         print(x$est.placebo, digits = 4)
     }
+    ## v2.4.8: flag a bootstrap whose draws break down (see ?fect, boot.diag)
+    if (isTRUE(x$boot.diag$breakdown)) {
+        .print_boot_diag(x$boot.diag)
+    }
+}
+
+## One line on how the IFE-EM main fit stopped (x$convergence, v2.4.8).
+.print_convergence <- function(conv) {
+    if (is.null(conv) || is.null(conv$niter)) return(invisible(NULL))
+    rc <- conv$rel.change
+    rc.txt <- if (is.null(rc) || is.na(rc)) "not available" else formatC(rc, format = "e", digits = 3)
+    cap <- if (is.null(conv$iter.cap)) conv$max.iteration else conv$iter.cap
+    if (isTRUE(conv$converged)) {
+        cat("EM convergence: stopped by tol after ", conv$niter, " rounds ",
+            "(final relative change ", rc.txt, ", tol = ", format(conv$tol), ")\n", sep = "")
+    } else if (isTRUE(cap == conv$max.iteration)) {
+        cat("EM convergence: NOT converged; stopped at max.iteration = ", cap,
+            " (final relative change ", rc.txt, ", tol = ", format(conv$tol), ")\n", sep = "")
+    } else {
+        ## fe_ad_iter() (no factors, no covariates) caps itself at 500 rounds
+        cat("EM convergence: NOT converged; stopped at the routine's own cap of ", cap,
+            " rounds, not max.iteration = ", conv$max.iteration,
+            " (final relative change ", rc.txt, ", tol = ", format(conv$tol), ")\n", sep = "")
+    }
+    invisible(NULL)
+}
+
+## The bootstrap breakdown check on the average effect (x$boot.diag, v2.4.8).
+.print_boot_diag <- function(bd, always = FALSE) {
+    if (is.null(bd)) return(invisible(NULL))
+    cat("\nBootstrap draws of the average effect (", bd$n.used, " of ", bd$nboots, " used):\n", sep = "")
+    cat("  SD of draws (the S.E. above): ", format(signif(bd$sd, 4)),
+        ";  IQR/1.349: ", format(signif(bd$iqr.sd, 4)),
+        ";  ratio: ", if (is.na(bd$sd.ratio)) "not defined" else format(signif(bd$sd.ratio, 3)), "\n", sep = "")
+    cat("  draws more than 20 IQRs from the median: ",
+        if (is.na(bd$n.extreme)) "not defined (IQR = 0)" else bd$n.extreme,
+        ";  failed draws dropped: ", bd$n.failed, "\n", sep = "")
+    if (!is.null(bd$n.sim)) {
+        ## the first-step pool; with para.error = "ar" a huge draw here widens
+        ## every replicate while the ratio above stays near 1
+        cat("  simulated-error draws (first step): ", bd$n.sim, ";  failed: ", bd$n.sim.failed,
+            ";  more than 20 IQRs from the median: ",
+            if (is.na(bd$n.sim.extreme)) "not defined (IQR = 0)" else bd$n.sim.extreme,
+            "\n", sep = "")
+    }
+    if (isTRUE(bd$n.used < bd$min.draws)) {
+        cat("  Fewer than ", bd$min.draws, " usable draws: the breakdown check is not applied.\n", sep = "")
+    }
+    if (isTRUE(bd$breakdown)) {
+        cat("  The SD is more than ", bd$threshold, " times IQR/1.349: the bootstrap has broken down ",
+            "and the S.E. is not reliable.\n", sep = "")
+    }
+    invisible(NULL)
+}
+
+## summary() of a fect fit (v2.4.8): what print() shows, plus the bootstrap
+## check on the average effect whenever it was computed.
+summary.fect <- function(object, ...) {
+    structure(list(object = object), class = "summary.fect")
+}
+
+print.summary.fect <- function(x, ...) {
+    fit <- x$object
+    print.fect(fit, ...)
+    if (!is.null(fit$boot.diag) && !isTRUE(fit$boot.diag$breakdown)) {
+        .print_boot_diag(fit$boot.diag)
+    }
+    invisible(x)
 }

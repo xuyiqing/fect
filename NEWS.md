@@ -39,6 +39,68 @@ release.
   intervals. On `simdata` with `method = "twfe"`, the SE moved from 0.031 to
   0.429.
 
+* Bootstrap refits with a collinear covariate started from misplaced
+  coefficients. When `feols()` drops a covariate that is collinear in a
+  resampled panel, `align_beta0()` read the coefficient names after
+  `as.numeric()` had dropped them, so it placed the starting values by
+  position and every later coefficient moved one slot. The main fit is not
+  affected (fect drops such covariates first), but bootstrap refits are: the
+  EM solver can then stop at `max.iteration` far from the solution. In the
+  gsynth-revisit reanalysis of Carter (2025) "dem-filter" (`method =
+  "gsynth"`, parametric bootstrap, 200 draws), one simulated-error draw had
+  prediction errors up to 2,557 on an outcome between about -3 and 3, and it
+  set the error covariance of every replicate: the SE was 35.8 and is now
+  0.083. Standard errors change for fits in which `feols()` drops a
+  collinear covariate inside a bootstrap draw. Cross-validation scores change
+  for fits in which it drops one inside a CV fold, so the chosen `r`, and with
+  it the point estimate, can change too (with `r` fixed, point estimates do
+  not change). On the first 80 units of `simdata` with `X0` equal to `X1`
+  except on one control row, `fect(Y ~ D + X1 + X0 + X2, method = "ife",
+  r = c(0, 3), CV = TRUE, k = 10, seed = 5)` scores r = 3 at an MSPE of 12.24
+  instead of 11.07; the chosen `r` (2) and the estimate stay the same there.
+
+## New features
+
+* Bootstrap breakdown check. With `se = TRUE` and `vartype = "bootstrap"` or
+  `"parametric"`, the fit now has `boot.diag`: the SD of the draws of
+  `att.avg` (the reported `S.E.`, unchanged), a robust spread (their
+  interquartile range divided by 1.349, equal to the SD for normal draws),
+  their ratio, the count of draws more than 20 interquartile ranges from the
+  median, and the count of failed draws. fect warns, and `print()` shows the
+  check, when the SD is more than 5 times the robust spread and at least 20
+  draws are usable. For the parametric bootstrap `boot.diag` also counts the
+  simulated-error draws of the first step that failed or are extreme, and
+  `print()` and `summary()` show those counts. With `para.error = "ar"` (the
+  default when cells are missing) an extreme first-step draw widens every
+  replicate while the final draws look normal, so the count is then the only
+  sign; the warning does not fire on it. The cause found in the
+  gsynth-revisit reanalysis: in 02 Gilens "tort" (`method = "gsynth"`,
+  `r = 2`, 26 controls, 18 of them with a constant outcome), 5 of 1,000
+  first-step refits drew too few distinct control units, so the two factors
+  and the unit intercept were nearly collinear over the pretreatment years
+  (condition number 1e11 to 1e13). The simulated errors of those refits were 5
+  to 19 million. Each replicate draws a simulated error for each of the 23
+  treated units from that pool, so 94 of the 1,000 replicates picked up one of
+  them, and the SE was 158,668 for an ATT of -3.24. The robust spread is 1.36
+  and the ratio 116,814. In 34 McNamee "pop" (`r = 3`, 4 treated units) the
+  loading regressions are ill-conditioned in every refit (condition number
+  about 1e6, the main fit included) and the simulated errors are
+  heavy-tailed; the check fires there too. Whether to report the robust
+  spread, or to drop such draws, is left open; the reported `S.E.` is the SD
+  as before.
+* IFE-EM convergence. For `method = "ife"` with
+  `time.component.from = "notyettreated"` (and `method = "fe"`, the same EM
+  routine with no factors), `print()` and the new `summary()`
+  method say how the EM fit stopped: the number of rounds and the final
+  relative change against `tol`, or the round cap it hit. The fit stores them
+  as `convergence` (and the final change as `rel.change`). A model with
+  neither factors nor covariates stops at 500 rounds whatever
+  `max.iteration` is, as before; the message says so. fect
+  already warned when EM hit `max.iteration` (2.4.3); a fit can also meet
+  `tol` while its estimate still moves (in the reanalysis, Alcocer
+  "homicides" met `tol = 1e-5` after 3,432 rounds and moved 0.56 published SEs
+  under a tighter stop).
+
 ## Bug fixes
 
 * `did_wrapper(method = "cs_never")` and `"cs_notyet"` now need did 2.5.1 or

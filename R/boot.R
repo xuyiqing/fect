@@ -144,6 +144,106 @@ trim_closure_env <- function(fun) {
   x[sample.int(length(x), size, replace = replace)]
 }
 
+## v2.4.8 (B1): draws "more than k IQRs from the median" -- the extreme-draw
+## rule of the gsynth-revisit reanalysis. NA when the IQR is 0 (at least half
+## the draws are equal): the rule has no scale then, and counting every draw
+## off the median would flag ordinary draws. NA and non-finite values are
+## not counted.
+.fect_n_extreme <- function(v, k = 20) {
+  v <- v[is.finite(v)]
+  if (length(v) < 2L) return(0L)
+  med <- stats::median(v)
+  iqr <- stats::IQR(v)
+  if (iqr > 0) as.integer(sum(abs(v - med) > k * iqr)) else NA_integer_
+}
+
+## v2.4.8 (B1): breakdown check on the bootstrap draws of att.avg. The
+## reported S.E. is the SD of these draws and is not changed. A robust spread
+## (IQR/1.349, equal to the SD for normal draws) and the count of extreme
+## draws are reported beside it; `breakdown` is the gsynth-revisit rule
+## SD > 5 * IQR/1.349 (in its 38 cached bootstraps the three broken cases
+## scored 10.5 or more, the rest 1.7 or less; the score of a case varies with
+## the seed, because the explosions are rare draws). `sim` is
+## .fect_para_sim_check()'s list (parametric bootstrap only).
+.fect_boot_diag <- function(att.avg.boot, nboots, n.failed = 0L, sim = NULL,
+                            para.error = NULL, threshold = 5, min.draws = 20L) {
+  b.all <- as.numeric(att.avg.boot)
+  b <- b.all[is.finite(b.all)]
+  sd.b <- if (length(b) >= 2L) stats::sd(b) else NA_real_
+  iqr.sd <- if (length(b) >= 2L) stats::IQR(b) / 1.349 else NA_real_
+  ## not defined when the IQR is 0 (the robust spread has no scale)
+  sd.ratio <- if (is.finite(sd.b) && is.finite(iqr.sd) && iqr.sd > 0) {
+    sd.b / iqr.sd
+  } else {
+    NA_real_
+  }
+  list(
+    nboots = as.integer(nboots),
+    n.used = length(b),
+    n.failed = if (is.numeric(n.failed) && length(n.failed) == 1) as.integer(n.failed) else 0L,
+    n.nonfinite = sum(!is.finite(b.all)),
+    n.extreme = as.integer(.fect_n_extreme(b)),
+    sd = sd.b,
+    iqr.sd = iqr.sd,
+    sd.ratio = sd.ratio,
+    threshold = threshold,
+    min.draws = as.integer(min.draws),
+    ## with fewer than min.draws usable draws the ratio is too noisy to
+    ## read (normal draws exceed 5 in about 4% of fits at nboots = 5)
+    breakdown = length(b) >= min.draws && isTRUE(sd.ratio > threshold),
+    para.error = para.error,
+    n.sim = if (!is.null(sim)) sim$n.sim else NULL,
+    n.sim.failed = if (!is.null(sim)) sim$n.sim.failed else NULL,
+    n.sim.extreme = if (!is.null(sim)) sim$n.sim.extreme else NULL
+  )
+}
+
+.fect_boot_diag_message <- function(bd, r.cv = NULL) {
+  sprintf(
+    paste(
+      "The bootstrap draws of the average effect break down: their SD (%s, the reported S.E.)",
+      "is %s times their IQR/1.349 (%s); %d of %d draws lie more than 20 IQRs from the median.%s",
+      "The S.E., confidence interval and p-value of the average effect are not reliable.",
+      "See fit$boot.diag.", sep = "\n  "),
+    format(signif(bd$sd, 4)), format(signif(bd$sd.ratio, 3)), format(signif(bd$iqr.sd, 4)),
+    bd$n.extreme, bd$n.used,
+    if (isTRUE(bd$n.sim.extreme > 0)) sprintf(paste0(
+      "\n  Parametric bootstrap: %d of %d simulated-error draws (the first step) are extreme;",
+      " %s",
+      " Possible causes include a refit whose loading regression is nearly singular (too few",
+      " distinct control paths for r = %s) and a refit that stopped far from its solution."),
+      bd$n.sim.extreme, bd$n.sim,
+      if (identical(bd$para.error, "ar")) {
+        "with para.error = \"ar\" they enter the error covariance every replicate is drawn from."
+      } else {
+        "each is reused by every replicate that samples it."
+      },
+      paste(r.cv, collapse = ",")) else ""
+  )
+}
+
+## v2.4.8 (B1): the simulated-error pool of the parametric bootstrap (Step 1).
+## `error.tr` is TT x Ntr x nboots: draw j is the prediction error of one
+## control refitted as a pseudo-treated unit. One draw with a huge error is
+## reused by every replicate that samples it, which is how a few nearly
+## singular Step-1 refits blow up the SD of the att.avg draws. Reads only;
+## draws no random numbers.
+.fect_para_sim_check <- function(error.tr) {
+  d <- dim(error.tr)
+  B <- if (length(d) == 3L) d[3] else 1L
+  e.max <- vapply(seq_len(B), function(j) {
+    v <- if (length(d) == 3L) error.tr[, , j] else error.tr
+    v <- v[!is.na(v)]
+    if (length(v) == 0L) NA_real_ else max(abs(v))
+  }, numeric(1))
+  list(
+    n.sim = as.integer(B),
+    n.sim.failed = sum(is.na(e.max)),
+    n.sim.extreme = as.integer(.fect_n_extreme(e.max)),
+    sim.max.error = e.max
+  )
+}
+
 ## Store matrix `m` (TT x w) in slice j of `arr` (TT x W x B), padding with NA.
 ## Widens `arr` (new columns NA) when w > W. An all-NA `m` (failed replicate)
 ## never widens. Cluster-bootstrap replicates have varying width w (the units
@@ -1130,6 +1230,8 @@ fect_boot <- function(
         # }
       }
     }
+
+    para.sim.check <- .fect_para_sim_check(error.tr)
 
     if (para.error.resolved == "ar") {
       ## calculate vcov of ep_tr
@@ -4921,7 +5023,11 @@ fect_boot <- function(
     att.vcov = vcov.att,
     att.count.boot = att.count.boot,
     vartype = vartype,
-    para.error = if (vartype == "parametric" && exists("para.error.resolved")) para.error.resolved else NULL
+    para.error = if (vartype == "parametric" && exists("para.error.resolved")) para.error.resolved else NULL,
+    ## v2.4.8 (B1): replicates dropped as failed, and the Step-1 error pool
+    ## check; read by fect.default() to build boot.diag
+    n.boot.fail = n.fail,
+    para.sim.check = if (vartype == "parametric" && exists("para.sim.check", inherits = FALSE)) para.sim.check else NULL
   )
   if (keep.sims) {
     result = c(

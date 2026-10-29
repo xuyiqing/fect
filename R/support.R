@@ -90,8 +90,15 @@ align_beta0 <- function(beta_raw, p) {
         return(matrix(0, 1, 0))
     }
 
-    beta_raw <- as.numeric(beta_raw)
+    ## Read the names before as.numeric(), which drops them. Without the
+    ## names the coefficients were placed by position, so when feols()
+    ## dropped a collinear covariate every later coefficient moved one slot
+    ## left (2.4.8 and earlier): the starting value put, e.g., a per-capita
+    ## coefficient on a total, and the solver could stop at max.iteration far
+    ## from the solution (one such parametric-bootstrap draw inflated the
+    ## whole error covariance; Carter 2025, gsynth-revisit).
     beta_names <- names(beta_raw)
+    beta_raw <- as.numeric(beta_raw)
     beta_full <- rep(0, p)
     filled <- rep(FALSE, p)
     used_raw <- rep(FALSE, length(beta_raw))
