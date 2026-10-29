@@ -6,7 +6,8 @@
 ## "Unit-Level Conformal Inference for Panel Counterfactuals" (write-up v2):
 ## Section 3.4 (pooled query and background information), Section 4.3
 ## (Jackknife+ for a pooled estimator), the calibration q_gamma of eq.
-## (jplus-calibration-main), Section 4.5 (date-specific coverage; q_gamma = 0
+## (jplus-calibration-main; the exact floating-point convention is at
+## .conformal_q), Section 4.5 (date-specific coverage; q_gamma = 0
 ## gives the whole real line) and the appendix algorithm "Pooled
 ## information-matched Jackknife+ interval". The p-value is the interval-dual
 ## p-value of eq. (placebo-jplus-pvalue-main) evaluated at c = 0.
@@ -71,13 +72,33 @@
 }
 
 
-## q_gamma of v2 eq. (jplus-calibration-main):
-## max{q in 0..floor(N/2) : (2q - 1)_+ / N <= gamma}. q = 0 means the counting
-## bound certifies no finite interval.
+## Calibration q_gamma(N), the counting bound of v2 eq. (jplus-calibration-main)
+## in one exact convention for floating point:
+##   q_gamma(N) = max{ q in 0..floor(N/2) : q = 0 or fl((2q - 1) / N) <= gamma }.
+## 2q - 1 and N are exact integers in double arithmetic, `/` is the single
+## correctly rounded IEEE division, and `gamma` is the double the caller passed,
+## compared as it is: there is no tolerance and no rounding of `gamma`.
+## fl((2q - 1) / N) is nondecreasing in q, so the admissible q form a prefix
+## and the maximum is well defined. q = 0 means no finite interval. The
+## p-value in .conformal_interval() uses the same division and the same
+## comparison to gamma, so the two cannot disagree.
+##  * If gamma equals a cutoff (2q - 1)/N as a rational number (0.1 at N = 10,
+##    0.05 at N = 20, 0.29 at N = 100), both sides are the same double and that
+##    q is admitted, as the exact definition requires.
+##  * A gamma below a cutoff, however slightly (0.1 - 1e-12 at N = 10), does
+##    not admit it: q = 0.
+##  * The product form gamma * N is not used: 0.29 * 100 is 28.999999999999996.
+##  * Duality is exact for 0 < gamma < 1: p <= gamma iff m >= N - q iff 0 lies
+##    outside the effect interval. For gamma >= 1 (reached only as 2 * alpha
+##    with alpha >= 0.5) q = floor(N/2) and no duality is claimed.
+##  * 2 * alpha (est.att90, att.bound) is exact in floating point.
+##  * An alpha that is computed rather than typed (1 - 0.9) is below 0.1 and is
+##    treated as such.
+## N < 1, non-finite N or non-finite gamma give 0.
 .conformal_q <- function(N, gamma) {
-  if (!is.finite(N) || N < 1) return(0L)
+  if (!is.finite(N) || N < 1 || !is.finite(gamma)) return(0L)
   qs <- 0:floor(N / 2)
-  ok <- pmax(2 * qs - 1, 0) <= gamma * N + 1e-10
+  ok <- qs == 0L | (2 * qs - 1) / N <= gamma
   as.integer(max(qs[ok]))
 }
 
