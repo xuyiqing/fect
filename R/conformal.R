@@ -523,15 +523,20 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
     "ok"
   }
 
-  ## rule D bookkeeping: failures are reported apart from pool exclusions
-  n.failed.folds <- sum((colSums(F0) + colSums(Fj)) > 0)
+  ## rule D bookkeeping: failures are reported apart from pool exclusions.
+  ## n.failed.folds counts controls whose fold had a component fit that
+  ## returned nothing (F0, Fj) OR an in-pool slot with a non-finite prediction
+  ## or error (failed), so the note and the warning never say 0 while an
+  ## interval is widened.
+  n.failed.folds <- sum(((colSums(F0) + colSums(Fj)) > 0) |
+                          (colSums(failed) > 0))
   n.intervals.affected <- sum(unit.df$n.failed > 0, na.rm = TRUE)
   any.failed <- n.fail > 0 || any(failed)
   if (any.failed) {
-    status <- paste0(status, "; ", n.fail, " failed fold fit(s), affected ",
+    status <- paste0(status, "; ", n.failed.folds, " failed fold(s), affected ",
                      "intervals widened")
-    warning("vartype = \"conformal\": ", n.fail, " fold fit(s) failed, ",
-            "affecting ", n.failed.folds, " fold(s). Failed folds are kept ",
+    warning("vartype = \"conformal\": ", n.failed.folds, " fold(s) failed (",
+            n.fail, " fit(s) returned no prediction). Failed folds are kept ",
             "in the calibration pool with infinite endpoints, so the ",
             "affected intervals are widened, not dropped, and N and q are ",
             "not reduced. ", n.intervals.affected, " reported unit-date ",
@@ -550,7 +555,8 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
     ## n.controls: never-treated controls (the maximum pool);
     ## n.controls.ineligible: controls usable for no treated unit's window
     ## (a count of controls, not of cells); n.failed.fits: component fits that
-    ## returned NULL; n.failed.folds: controls with at least one failed fit;
+    ## returned NULL; n.failed.folds: controls whose fold had a failed fit or
+    ## an in-pool slot with a non-finite prediction or error (union);
     ## n.intervals.affected: rows of `unit` with n.failed > 0
     n.controls = Nco,
     n.controls.ineligible = sum(rowSums(elig) == 0),

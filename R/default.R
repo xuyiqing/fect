@@ -1114,6 +1114,14 @@ fect.default <- function(
                 .cf_stop("extra fixed effects (cfe, group.fe, index[3:])")
             }
             if (!identical(loading.bound, "none")) .cf_stop("loading.bound")
+            ## the calibration q and the dual p-value are defined for
+            ## 0 < alpha < 1 (alpha >= 0.5 is allowed: the 90% bands use
+            ## 2 * alpha); outside it no duality is claimed
+            if (!(is.numeric(alpha) && length(alpha) == 1L &&
+                  is.finite(alpha) && alpha > 0 && alpha < 1)) {
+                stop("vartype = \"conformal\" needs 0 < alpha < 1; got alpha = ",
+                     paste(format(alpha), collapse = ", "), ".", call. = FALSE)
+            }
             if (!is.null(cl)) {
                 warning("vartype = \"conformal\" with cl = ... : the cl ",
                         "argument is ignored; the conformal intervals do not ",
