@@ -21,3 +21,4 @@
 ^fect\.Rcheck$
 ^tests/coverage-study$
 ^Rplots\.pdf$
+^\.git$

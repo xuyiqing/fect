@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD025 -->
-# fect 2.4.7.9000
+# fect 2.4.9
 
 Development version.
 
@@ -29,6 +29,178 @@ Development version.
 * A coverage study is in `tests/coverage-study/conformal_v2_coverage.R`
   (gsynth, one treated unit; results in
   `tests/coverage-study/results/conformal_v2_coverage.md`).
+
+# fect 2.4.8
+
+Development version, not yet on CRAN.
+
+Version 2.4.7 was a development version on GitHub and was not released on
+CRAN. Its changes are listed under fect 2.4.7 below and are part of this
+release.
+
+## Changes that affect results
+
+* `loading.bound = "simplex"` with `force = "unit"` or `"two-way"` now fits
+  each treated unit's intercept jointly with its constrained loadings. Before,
+  the loadings were fitted with no intercept and the intercept was then set to
+  the mean of the leftover residual, so a unit's loadings absorbed its level
+  whenever the estimated factors were not centred over its pretreatment
+  periods (always the case for a trend factor), and adding a constant to a
+  treated unit's outcome changed its estimated loadings and the ATT. The
+  intercept is still not bounded. The fit now centres the unit's outcome and
+  the factors over the unit's own pretreatment periods, which solves the joint
+  problem exactly with the same `gamma.loading`, by Newton's method on the
+  dual (the previous solver is the fallback). `gamma.loading` chosen by
+  cross-validation centres within each training fold. `loading.proj.resid` is
+  now the norm of the joint-fit residual. Estimates with `force = "unit"` or
+  `"two-way"` change, sometimes substantially; `loading.bound = "none"` and
+  `force = "none"` or `"time"` do not change. On a simulated design with five
+  treated units and `gamma.loading = 1e6`, adding 10 to one treated unit's
+  outcome moved the ATT from 0.512 to 1.607; it is now 0.647 in both cases.
+* `did_wrapper(se = "boot")` is now a cluster bootstrap that keeps a unit
+  drawn more than once as separate units. Before, each draw kept every drawn
+  unit only once (`data[unit %in% drawn, ]`), so a draw held about 63% of the
+  units and the standard errors were too small. On `simdata` with
+  `method = "twfe"`, the bootstrap SE moved from 0.316 to 0.404 (the clustered
+  SE is 0.427).
+* `did_wrapper(se = "jackknife")` now reports the jackknife standard error,
+  sqrt((n - 1) / n * sum((theta_i - mean)^2)), with a normal interval and
+  p-value. Before, it reported the standard deviation of the leave-one-out
+  estimates, about sqrt(n) times too small, with bootstrap-style quantile
+  intervals. On `simdata` with `method = "twfe"`, the SE moved from 0.031 to
+  0.429.
+
+* Bootstrap refits with a collinear covariate started from misplaced
+  coefficients. When `feols()` drops a covariate that is collinear in a
+  resampled panel, `align_beta0()` read the coefficient names after
+  `as.numeric()` had dropped them, so it placed the starting values by
+  position and every later coefficient moved one slot. The main fit is not
+  affected (fect drops such covariates first), but bootstrap refits are: the
+  EM solver can then stop at `max.iteration` far from the solution. In the
+  gsynth-revisit reanalysis of Carter (2025) "dem-filter" (`method =
+  "gsynth"`, parametric bootstrap, 200 draws), one simulated-error draw had
+  prediction errors up to 2,557 on an outcome between about -3 and 3, and it
+  set the error covariance of every replicate: the SE was 35.8 and is now
+  0.083. Standard errors change for fits in which `feols()` drops a
+  collinear covariate inside a bootstrap draw. Cross-validation scores change
+  for fits in which it drops one inside a CV fold, so the chosen `r`, and with
+  it the point estimate, can change too (with `r` fixed, point estimates do
+  not change). On the first 80 units of `simdata` with `X0` equal to `X1`
+  except on one control row, `fect(Y ~ D + X1 + X0 + X2, method = "ife",
+  r = c(0, 3), CV = TRUE, k = 10, seed = 5)` scores r = 3 at an MSPE of 12.24
+  instead of 11.07; the chosen `r` (2) and the estimate stay the same there.
+
+## New features
+
+* Bootstrap breakdown check. With `se = TRUE` and `vartype = "bootstrap"` or
+  `"parametric"`, the fit now has `boot.diag`: the SD of the draws of
+  `att.avg` (the reported `S.E.`, unchanged), a robust spread (their
+  interquartile range divided by 1.349, equal to the SD for normal draws),
+  their ratio, the count of draws more than 20 interquartile ranges from the
+  median, and the count of failed draws. fect warns, and `print()` shows the
+  check, when the SD is more than 5 times the robust spread and at least 20
+  draws are usable. For the parametric bootstrap `boot.diag` also counts the
+  simulated-error draws of the first step that failed or are extreme, and
+  `print()` and `summary()` show those counts. With `para.error = "ar"` (the
+  default when cells are missing) an extreme first-step draw widens every
+  replicate while the final draws look normal, so the count is then the only
+  sign; the warning does not fire on it. The cause found in the
+  gsynth-revisit reanalysis: in 02 Gilens "tort" (`method = "gsynth"`,
+  `r = 2`, 26 controls, 18 of them with a constant outcome), 5 of 1,000
+  first-step refits drew too few distinct control units, so the two factors
+  and the unit intercept were nearly collinear over the pretreatment years
+  (condition number 1e11 to 1e13). The simulated errors of those refits were 5
+  to 19 million. Each replicate draws a simulated error for each of the 23
+  treated units from that pool, so 94 of the 1,000 replicates picked up one of
+  them, and the SE was 158,668 for an ATT of -3.24. The robust spread is 1.36
+  and the ratio 116,814. In 34 McNamee "pop" (`r = 3`, 4 treated units) the
+  loading regressions are ill-conditioned in every refit (condition number
+  about 1e6, the main fit included) and the simulated errors are
+  heavy-tailed; the check fires there too. Whether to report the robust
+  spread, or to drop such draws, is left open; the reported `S.E.` is the SD
+  as before.
+* IFE-EM convergence. For `method = "ife"` with
+  `time.component.from = "notyettreated"` (and `method = "fe"`, the same EM
+  routine with no factors), `print()` and the new `summary()`
+  method say how the EM fit stopped: the number of rounds and the final
+  relative change against `tol`, or the round cap it hit. The fit stores them
+  as `convergence` (and the final change as `rel.change`). A model with
+  neither factors nor covariates stops at 500 rounds whatever
+  `max.iteration` is, as before; the message says so. fect
+  already warned when EM hit `max.iteration` (2.4.3); a fit can also meet
+  `tol` while its estimate still moves (in the reanalysis, Alcocer
+  "homicides" met `tol = 1e-5` after 3,432 rounds and moved 0.56 published SEs
+  under a tighter stop).
+
+## Bug fixes
+
+* `did_wrapper(method = "cs_never")` and `"cs_notyet"` now need did 2.5.1 or
+  later and stop with a message on an older version. On unbalanced panels, did
+  before 2.5.1 reports a (cohort, period) cell it cannot estimate (no treated
+  rows in that period) as an effect of 0, which `aggte()` then averages in, so
+  the overall and event-time effects shrink toward zero; it can also segfault
+  when a cell's comparison group has rows in only one of the cell's two
+  periods. did 2.5.1 returns `NA` for such cells and drops them from the
+  averages. On a simulated unbalanced panel with a true effect of 1, the
+  overall effect was 0.331 with did 2.3.0 and 0.992 with did 2.5.1.
+* fect now needs fixest 0.14.0 or later. fixest 0.13.2 and earlier can corrupt
+  R's memory when they index a variable (`fixest:::cpp_to_index()` leaves two
+  new R objects unprotected), so R can crash at random during a later garbage
+  collection. In fect this hit `did_wrapper()`, which calls `fixest::feols()`
+  once per bootstrap replicate: with `method = "st"`, `se = "boot"`,
+  `nboots = 200` on `hh2019`, 2 runs in 34 died with "Future ...
+  interrupted" (a worker segfault), and a sequential run crashed R itself.
+  fixest 0.14.0 adds the missing `PROTECT` calls.
+* `did_wrapper()` with `method` left at its default stopped with "the
+  condition has length > 1"; it now runs `method = "twfe"`.
+* `fect_sens()`: the default `post.periods` (all post-treatment event times)
+  stopped with a dimension error, because `1:n - a - b` is read as
+  `(1:n) - a - b`; `parallel = TRUE` with `cores` stopped with "object 'cl'
+  not found"; and setting `periodMbarvec` or `periodMvec` to `NULL` also
+  dropped the overall results (setting `Mbarvec` or `Mvec` to `NULL` stopped).
+  Each part is now computed and stored on its own.
+* `fect(carryover.rm = 3L)` was ignored without a message because only class
+  "numeric" counted; any number now works.
+* `fect(placeboTest = TRUE)` without `placebo.period` now stops with a message.
+  Before, it ran no placebo test (`est.placebo` was `NULL`), or stopped with an
+  unrelated error when the model had covariates.
+* `get.cohort(varname = ...)` stopped because the new column names were never
+  set.
+* The F test for no pre-trend (`fit$test.out`, `plot(type = "equiv")`) no
+  longer stops the fit with "missing value where TRUE/FALSE needed" when the
+  pre-treatment window has a single treated unit. Its small-sample factor
+  (N_bar - q) / ((N_bar - 1) q) is 0/0 when N_bar = 1; the test now reports
+  `NA`, with the message it already gave for too few treated units. This
+  includes a window of one period (`pre.periods = 0` or `-1`). Seen on a
+  replication panel with one treated unit that is treated in one period.
+
+## Documentation
+
+* The "Bounded factor loadings" section of the gsynth chapter of the user
+  manual describes the joint intercept fit and says how estimates from
+  earlier versions differ; `?fect` (`loading.bound`) says the same.
+* The user manual and the help pages were checked against the code, and
+  statements that contradicted it were corrected. Among them: `vartype`
+  defaults to `"bootstrap"` for every method, including `method = "gsynth"`
+  (the manual said `"parametric"`); `cv.rule` defaults to `"min"`; `min.T0`
+  is 1 for `method = "fe"`; `method = "cfe"` cross-validates `r` only with
+  `time.component.from = "nevertreated"`; the codes of `obs.missing`; the
+  `bound = "min"` line, box-plot whiskers and HTE bands of `plot()`; the
+  `cfe` argument of `fect()` and four arguments of `print.fect()` do nothing;
+  `?plot.fect` documents the `type` values, `stats` values and the calendar
+  filters; `?did_wrapper` documents each method, `se` option and output
+  column; `gs2020` and `hh2019` are replication data, now with their
+  variables described.
+* New reference material, checked against the code. The cheatsheet chapter
+  of the user manual has a guide to choosing a method and tables of the
+  option combinations that `fect()` changes or refuses;
+  the plots chapter has a table of what each plot type needs from the fit.
+  The "Value" section of `?fect` now lists every slot of a fit, with the
+  columns of the `est.*` tables and the components of `test.out`.
+  `?fect` now documents `alpha` (and the 90% intervals it sets), `max.missing`,
+  `fill.missing`, `f.threshold` and `normalize`; `?sim_base`, `?sim_gsynth`,
+  `?simgsynth` and `?turnout` describe their variables, and `?simdata` gives
+  the correct unit identifiers (101 to 300).
 
 # fect 2.4.7
 

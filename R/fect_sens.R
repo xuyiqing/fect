@@ -21,10 +21,13 @@ fect_sens <- function(
     parallel = FALSE,
     cores = NULL) {
   .fect_stop_if_conformal(fect.out, "fect_sens()")
-  if (!identical(parallel, FALSE) && is.null(cores)) {
-    cores <- parallelly::availableCores(omit = 2, max = 8) # use at most 8 cores
+  if (!identical(parallel, FALSE)) {
+    if (is.null(cores)) {
+      cores <- parallelly::availableCores(omit = 2, max = 8) # use at most 8 cores
+    }
     cl <- parallel::makeCluster(cores)
     doParallel::registerDoParallel(cl)
+    on.exit(parallel::stopCluster(cl), add = TRUE)
   }
 
   # -------------------------------------------------------------------
@@ -32,8 +35,15 @@ fect_sens <- function(
   # -------------------------------------------------------------------
   # We want event-time strings for pre and post
   pre.periods <- fect.out$placebo.period[1]:fect.out$placebo.period[2]
+  ## Default: every post-treatment event time from 1 up to the last one in
+  ## est.att. (Before 2.4.8 the default was 1:n - a - b, which R reads as
+  ## (1:n) - a - b, so it held negative event times and the call stopped.)
   if (any(is.na(post.periods))) {
-    post.periods <- 1:length(fect.out$time) - length(fect.out$pre.periods) - (fect.out$placebo.period[2] - fect.out$placebo.period[1] + 1)
+    event.times <- suppressWarnings(as.numeric(rownames(fect.out$est.att)))
+    post.periods <- seq_len(max(c(0, event.times[!is.na(event.times)])))
+    if (length(post.periods) == 0) {
+      stop("fect_sens: the fit has no post-treatment event times.", call. = FALSE)
+    }
   }
   all.periods.char <- as.character(c(pre.periods, post.periods))
 
@@ -97,6 +107,8 @@ fect_sens <- function(
   # Initialize empty placeholders
   fect.out$RM_Sensitivity <- NULL
   fect.out$Smooth_Sensitivity <- NULL
+  rm_sens_results <- rm_original_cs <- rm_period_output <- NULL
+  smooth_sens_results <- sm_original_cs <- smooth_period_output <- NULL
 
   # -------------------------------------------------------------------
   # 3) Relative Magnitude Analysis (RM), if Mbarvec is non-empty
@@ -156,8 +168,10 @@ fect_sens <- function(
       # Append
       rm_period_output <- rbind(rm_period_output, honest.dte)
     }
-
-    # Store results in fect.out$sensitivity.rm
+  }
+  # Store results in fect.out$sensitivity.rm (overall and period-by-period
+  # parts are kept independently: either may be NULL)
+  if (!is.null(rm_sens_results) || !is.null(rm_period_output)) {
     fect.out$sensitivity.rm <- list(
       results = rm_sens_results,
       original = rm_original_cs,
@@ -215,16 +229,14 @@ fect_sens <- function(
 
       smooth_period_output <- rbind(smooth_period_output, honest.dte)
     }
-
-    # Store results in fect.out$sensitivity.smooth
+  }
+  # Store results in fect.out$sensitivity.smooth
+  if (!is.null(smooth_sens_results) || !is.null(smooth_period_output)) {
     fect.out$sensitivity.smooth <- list(
       results = smooth_sens_results,
       original = sm_original_cs,
       periods = smooth_period_output
     )
-  }
-  if (!identical(parallel, FALSE)) {
-    stopCluster(cl)
   }
   # -------------------------------------------------------------------
   # 5) Return the updated fect.out

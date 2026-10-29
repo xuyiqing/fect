@@ -16,7 +16,7 @@ rm(list = ls())
 |--------|---------|------|----------|
 | CRAN | 2.4.5 | 2026-05-30 | Default release |
 | GitHub (`master`) | 2.4.5 | 2026-05-30 | Same as CRAN |
-| GitHub (`dev`) | 2.4.7 | in development | Adds `dloo` placebos, the LOO equivalence-test window fix, cross-validation of the number of factors by default for `method = "ife"`, and the correctness fixes in the changelog |
+| GitHub (`dev`) | 2.4.8 | in development | Adds `dloo` placebos, the LOO equivalence-test window fix, cross-validation of the number of factors by default for `method = "ife"`, the joint fit of the intercept under `loading.bound = "simplex"`, and the correctness fixes in the changelog |
 
 To install **fect** from CRAN:
 
@@ -48,7 +48,7 @@ installed.packages()["fect", "Version"]
 devtools::install_github('xuyiqing/panelView')
 ```
 
-**fect** depends on the following packages, which should be installed automatically when **fect** is being installed. You can also install them manually.
+**fect** depends on the following packages, which should be installed automatically when **fect** is being installed. You can also install them manually. **fect** needs **fixest** 0.14.0 or later. `did_wrapper()` with the Callaway--Sant'Anna estimators needs **did** 2.5.1 or later.
 
 ```{r install-dependencies, eval=FALSE}
 install_all <- function(packages) {
@@ -59,9 +59,11 @@ install_all <- function(packages) {
     }
   }
 }
-packages <- c("abind", "doParallel", "doRNG", "fixest", "foreach", "future", 
-              "GGally", "ggplot2", "grid", "gridExtra", "MASS", 
-              "panelView", "Rcpp")
+packages <- c("abind", "codetools", "doFuture", "doParallel", "doRNG", "dplyr",
+              "fixest", "foreach", "future", "future.apply", "GGally",
+              "ggplot2", "gridExtra", "MASS", "mvtnorm", "panelView",
+              "parallelly", "Rcpp", "RcppArmadillo", "reshape2", "rlang",
+              "scales")
 install_all(packages)
 ```
 
@@ -86,13 +88,13 @@ ls()
 
 The package includes six simulated panel datasets. Two (`simdata` and `sim_base`) are based on the data-generating process (DGP) in @LWX2024. Both have $N = 200$ units and $T = 35$ time periods. Treatment switches on and off over time (99 of 150 treated units experience at least one reversal), reflecting a general treatment pattern rather than simple staggered adoption. Three more (`sim_trend`, `sim_region`, `sim_linear`) are block DID designs used to demonstrate CFE model components. The sixth (`sim_gsynth`) is a no-reversal DGP from @Xu2017 used to illustrate the synthetic-control regime.
 
-The full DGP for `simdata` is: $$Y_{it} = \tau_{it} D_{it} + X_{1,it} + 3 X_{2,it} + \mu + 3\alpha_i + \xi_t  + 2\, \lambda_i' f_t +  \varepsilon_{it}$$ where $\alpha_i \sim N(0,1)$ are unit fixed effects, $\xi_t$ follows an AR(1) process with drift (time fixed effects), $X_{1,it}$ and $X_{2,it} \sim N(0,1)$ are observed covariates with coefficients 1 and 3, $\lambda_i \in \mathbb{R}^2$ are unit-specific factor loadings drawn from $N(0.5, 1)$, $f_t \in \mathbb{R}^2$ are latent time factors (one trending, one white noise), and $\varepsilon_{it} \sim N(0,2)$. The treatment effect is heterogeneous, i.e., $\tau_{it} \sim N(0.4 \cdot \text{tr\_cum}_{it}/T,\; 0.2)$, where $\text{tr\_cum}_{it}$ counts cumulative treatment periods. The grand mean is $\mu = 5$. The factor contribution carries a coefficient of 2 (vs the original LWX 2024 DGP's coefficient of 1) to give a factor signal-to-noise ratio of approximately 10.9, well above the threshold needed for cross-validated rank selection to recover the true rank reliably on this dataset.
+The full DGP for `simdata` is: $$Y_{it} = \tau_{it} D_{it} + X_{1,it} + 3 X_{2,it} + \mu + 3\alpha_i + \xi_t  + 2\, \lambda_i' f_t +  \varepsilon_{it}$$ where $\alpha_i \sim N(0,1)$ are unit fixed effects, $\xi_t$ follows an AR(1) process with drift (time fixed effects), $X_{1,it}$ and $X_{2,it} \sim N(0,1)$ are observed covariates with coefficients 1 and 3, $\lambda_i \in \mathbb{R}^2$ are unit-specific factor loadings drawn from $N(0.5, 1)$, $f_t \in \mathbb{R}^2$ are latent time factors (one trending, one white noise), and $\varepsilon_{it} \sim N(0,2)$. The treatment effect is heterogeneous, i.e., $\tau_{it} \sim N(0.4 \cdot \text{tr\_cum}_{it}/T,\; 0.2)$, where $\text{tr\_cum}_{it}$ counts the consecutive treated periods of unit $i$ up to and including period $t$ (it restarts after a reversal). The grand mean is $\mu = 5$. The factor contribution carries a coefficient of 2 (vs the original LWX 2024 DGP's coefficient of 1) to give a factor signal-to-noise ratio of approximately 10.9, well above the threshold needed for cross-validated rank selection to recover the true rank reliably on this dataset.
 
 Treatment assignment is correlated with unobservables: the latent index $D^*_{it}$ depends on the factor component $5 \lambda_i' f_t$, the unit fixed effect $2\alpha_i$, the time fixed effect $2\xi_t$, and an AR(1)-like persistence term $5 D_{i,t-1}$, passed through a logistic link. Units with larger factor loadings and fixed effects are more likely to be treated, creating confounding that correlates treatment with unobserved heterogeneity. This is why the FE estimator is biased when factors are present---the parallel trends assumption fails because treated units systematically differ in their factor loadings.
 
 -   `simdata`: The main simulated dataset. The outcome includes two latent factors ($r = 2$), so the parallel trends assumption is violated and the FE estimator is biased. Because treatment assignment loads on the same factors and fixed effects that enter the outcome---units with larger $\lambda_i$ and $\alpha_i$ are more likely to be treated---the confounding is structural and cannot be removed by two-way fixed effects alone. Used in [Chapter @sec-ife-mc] and [Chapter @sec-cfe] to demonstrate factor-augmented approaches.
 
--   `sim_base`: A simplified version of `simdata` in which the latent factor contributions ($\lambda_i' f_t$) are removed from the outcome. The parallel trends assumption holds, and the FE estimator is consistent. Treatment assignment, covariates, fixed effects, and errors are identical to `simdata`---treatment still correlates with the factor loadings and fixed effects, but this no longer causes bias because the factors do not enter the outcome. Used in [Chapter @sec-fect] to demonstrate the imputation estimator.
+-   `sim_base`: A simplified version of `simdata` without latent factors. Its outcome is $Y_{it} = \tau_{it} D_{it} + X_{1,it} + 3 X_{2,it} + \alpha_i + \xi_t + \varepsilon_{it}$: the factor term is removed, the unit effect enters with coefficient 1 instead of 3, and there is no grand mean. The parallel trends assumption holds, and the FE estimator is consistent. The treatment, the covariates, $\alpha_i$, $\xi_t$, the errors and the effects are the same columns as in `simdata`. Treatment still correlates with the factor loadings and fixed effects, but this no longer causes bias because the factors do not enter the outcome. Used in [Chapter @sec-fect] to demonstrate the imputation estimator.
 
 -   `sim_trend`: A block DID dataset with unit-specific sinusoidal time trends. $N = 200$ units ($80$ treated, $120$ control), $T = 50$ periods, treatment starts at period 41 for all treated units. The DGP is: $$Y_{it} = \alpha_i + \xi_t + \kappa_i \sin(2\pi t / 2T) + \tau D_{it} + \varepsilon_{it}$$ where $\kappa_i \sim U(0.5, 1.0)$ for treated units and $\kappa_i \sim U(0.125, 0.375)$ for controls. Treatment is deterministic (block assignment), but confounding arises because treated units load more heavily on the sinusoidal time trend---the correlation between $\kappa_i$ and $D_i$ violates parallel trends. Used in [Chapter @sec-cfe] to demonstrate nonlinear unit-specific time trends with B-splines.
 
@@ -100,12 +102,16 @@ Treatment assignment is correlated with unobservables: the latent index $D^*_{it
 
 -   `sim_region`: An unbalanced panel with region-specific time effects. $N = 500$ units in 5 regions, $T = 20$ periods. The DGP is: $$Y_{it}^{0} = \alpha_i + \xi_t + \delta_{g(i),t} + \varepsilon_{it}$$ where $\delta_{g(i),t}$ are region-specific linear time trends. Treatment probability and timing depend on region, and units in higher-numbered regions enter the panel later. Used in [Chapter @sec-cfe] to demonstrate additional fixed effects in the CFE estimator.
 
--   `sim_gsynth`: A simulated dataset with no treatment reversal, based on @Xu2017. Used in [Chapter @sec-gsynth] to demonstrate the never-treated estimation regime (generalized synthetic control).
+-   `sim_gsynth`: A simulated dataset with no treatment reversal, based on @Xu2017: 50 units (5 treated, 45 never treated) and 30 periods, with treatment starting in period 21 for all treated units. The outcome has two latent factors. Used in [Chapter @sec-gsynth] to demonstrate the never-treated estimation regime (generalized synthetic control). `simgsynth` is an identical copy kept for older code.
 
-The scripts that generate simulated datasets are in `data-raw/`.
+The scripts that generated the simulated datasets are not part of the package. The help page of each dataset (for example `?sim_base`) lists its variables and, for the simulated ones, how the outcome was built.
 
 ### Empirical datasets
 
--   `turnout`: Based on @Xu2017. Used in [Chapter @sec-gsynth] alongside `sim_gsynth`.
+-   `turnout`: Based on @Xu2017: turnout in U.S. presidential elections in 47 states, 1920 to 2012, and the adoption of Election-Day Registration (EDR) by 9 states. Used in [Chapter @sec-gsynth] alongside `sim_gsynth`.
 -   `gs2020`: Based on @GS2020, who examine the effect of minority candidate presence on the proportion of coethnic donations in U.S. House elections. Used in [Chapter @sec-panel] and  [Chapter @sec-plots].
 -   `hh2019`: Based on @HH2019, who study the effect of indirect versus direct democracy on naturalization rates in Switzerland. Used in [Chapter @sec-panel], [Chapter @sec-panel-sens], and  [Chapter @sec-plots].
+
+## Which method to start with
+
+The [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-choose) has a guide to choosing among `fe`, `ife`, `mc`, `gsynth` and `cfe`, and a table of the option combinations that `fect()` changes or refuses. [Chapter @sec-fect] starts with the FE estimator, the default.

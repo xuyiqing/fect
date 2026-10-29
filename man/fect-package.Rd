@@ -36,7 +36,7 @@
   Panel data models with interactive fixed effects. 
   \emph{Econometrica, 77}(4), 1229-1279.
     
-  Liu, L., Wang, Y., and Xu, Y. (2022).
+  Liu, L., Wang, Y., and Xu, Y. (2024).
   A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data. 
   \emph{American Journal of Political Science, 68}(1), 160-176.
   

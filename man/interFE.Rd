@@ -42,7 +42,7 @@
   \item{residuals}{model residuals.}
   \item{sigma2}{residual mean squared error.}
   \item{IC}{information criterion.}
-  \item{ValidX}{logical for whether valid covariates exist.}
+  \item{validX}{logical for whether valid covariates exist.}
   \item{dat.Y}{matrix of outcome data.}
   \item{dat.X}{array of independent variables.}
   \item{Y}{name of the outcome variable.}

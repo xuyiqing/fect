@@ -963,7 +963,7 @@ res_st <- did_wrapper(
 print(res_st)
 ```
 
-It also supports a bootstrap variance estimator via the `se` argument: `se = "default"` uses the standard errors from the underlying estimator, while `se = "boot"` applies bootstrapping.
+It also supports resampling variance estimators via the `se` argument: `se = "default"` uses the standard errors from the underlying estimator, `se = "boot"` is a cluster bootstrap that draws units with replacement (a unit drawn twice enters as two units), and `se = "jackknife"` drops one unit at a time. Before version 2.4.8, both gave standard errors that were too small; see the changelog.
 
 ```{r wrapper_boot, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4.5, cache=TRUE}
 res_st <- did_wrapper(

@@ -18,11 +18,11 @@ fect_sens(
 )
 }
 \arguments{
-  \item{fect.out}{A fitted \code{fect} object.}
-  \item{post.periods}{Vector of post-treatment periods for sensitivity analysis. Default uses all available post-treatment periods.}
-  \item{l_vec}{Optional weighting vector for averaging ATT across post-treatment periods. Default weights by treated-unit counts.}
-  \item{Mbarvec}{Values of \code{Mbar} for overall RM-based sensitivity analysis.}
-  \item{Mvec}{Values of \code{M} for overall smoothness-based sensitivity analysis.}
+  \item{fect.out}{A fitted \code{fect} object with uncertainty estimates (\code{se = TRUE}) and a placebo test (\code{placeboTest = TRUE} with a range \code{placebo.period = c(a, b)}): the placebo periods are the pre-treatment estimates against which violations are measured.}
+  \item{post.periods}{Vector of post-treatment event times for the analysis (1 is the first treated period). Default \code{NA}: every event time from 1 to the last one in \code{fect.out$est.att}.}
+  \item{l_vec}{Optional weighting vector, one weight per element of \code{post.periods}, for averaging the ATT across post-treatment periods. Default weights by the number of treated units in each period.}
+  \item{Mbarvec}{Values of \code{Mbar} for the relative-magnitude analysis of the average effect. \code{Mbar} is relative: post-treatment violations may be up to \code{Mbar} times the largest pre-treatment violation. \code{NULL} skips this part.}
+  \item{Mvec}{Values of \code{M} for the smoothness analysis of the average effect, in the units of the outcome: how much the slope of the violation may change between consecutive periods. \code{NULL} skips this part.}
   \item{periodMbarvec}{Values of \code{Mbar} for period-specific RM sensitivity analysis.}
   \item{periodMvec}{Values of \code{M} for period-specific smoothness sensitivity analysis.}
   \item{parallel}{Logical; if \code{TRUE}, uses parallel computation where supported. Default is \code{FALSE}.}
@@ -40,8 +40,8 @@ Robust sets are computed using functions from the \pkg{HonestDiDFEct} package.
 }
 \value{
 An updated \code{fect} object including:
-\item{sensitivity.rm}{Relative Magnitude (RM) sensitivity results for average and period-by-period ATT.}
-\item{sensitivity.smooth}{Smoothness (C-LF) sensitivity results for average and period-by-period ATT.}
+\item{sensitivity.rm}{Relative-magnitude results, a list: \code{results} (robust confidence sets for the average effect, one row per \code{Mbar}), \code{original} (the original confidence set for the average effect) and \code{periods} (robust sets for each post-treatment period, one row per period and \code{Mbar}). Parts not requested are \code{NULL}.}
+\item{sensitivity.smooth}{Smoothness results, with the same three parts, by \code{M}.}
 }
 \author{
 Rivka Lipkovitz

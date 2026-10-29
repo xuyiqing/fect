@@ -96,6 +96,91 @@
     list(w = w, n_iter = iter, obj = obj_new)
 }
 
+## -----------------------------------------------------------------------------
+## .newton_bounded_loading
+##
+## Solves the same strictly convex problem as the L-BFGS-B route to machine
+## precision, by Newton's method on its dual. Writing the squared fit term as
+## ||e||^2 = max_z { 2 z'e - ||z||^2 }, the minimiser over w is
+##
+##   w(z) = softmax( log q + 2 gamma * Lambda_co %*% t(F_pre) %*% z ),
+##
+## and the dual  D(z) = 2 z'u - ||z||^2 - (1/gamma) log sum_j q_j exp(2 gamma ...)
+## is smooth and strongly concave on R^T0. Its stationarity condition is
+##
+##   g(z) = u - z - F_pre %*% t(Lambda_co) %*% w(z) = 0,
+##
+## i.e. z is the residual of the fit. The Newton direction solves
+## (I + F M F') delta = g with M = 2 gamma * Cov_w(Lambda_co rows); the system is
+## solved with the Woodbury identity in r dimensions. Steps are damped until the
+## sup-norm of g falls. The solution is the unique minimiser, so it does not
+## depend on a stopping rule: the L-BFGS-B route stops where the relative
+## decrease of the objective drops below a tolerance, which for the softmax
+## parameterisation can be far from the minimiser.
+##
+## Returns list(w, obj, n_iter, converged).
+## -----------------------------------------------------------------------------
+
+.NEWTON_LOADING_TOL      <- 1e-13   # target: sup-norm of g, relative to max(1, |u|)
+.NEWTON_LOADING_ACCEPT   <- 1e-9    # accept at stagnation if g is below this
+.NEWTON_LOADING_MAX_ITER <- 100L
+
+.newton_bounded_loading <- function(u_pre, F_pre, Lambda_co, gamma, q) {
+    r     <- ncol(F_pre)
+    fail  <- list(w = NULL, obj = NA_real_, n_iter = NA_integer_, converged = FALSE)
+    if (r < 1L) return(fail)
+    scale <- max(1, max(abs(u_pre)))
+    B     <- Lambda_co %*% t(F_pre)             # Nco x T0
+    logq  <- log(q)
+    FtF   <- crossprod(F_pre)
+    Ir    <- diag(r)
+
+    softmax_w <- function(z) {
+        a  <- logq + 2 * gamma * as.numeric(B %*% z)
+        a  <- a - max(a)
+        ea <- exp(a)
+        ea / sum(ea)
+    }
+    gfun <- function(z, w) {
+        as.numeric(u_pre - z - F_pre %*% crossprod(Lambda_co, w))
+    }
+
+    w <- q
+    z <- gfun(rep(0, length(u_pre)), w)         # z = u - F Lambda' q
+    w <- softmax_w(z)
+    g <- gfun(z, w)
+    gn <- max(abs(g))
+    n_iter <- 0L
+    while (is.finite(gn) && gn > .NEWTON_LOADING_TOL * scale &&
+           n_iter < .NEWTON_LOADING_MAX_ITER) {
+        n_iter <- n_iter + 1L
+        v  <- as.numeric(crossprod(Lambda_co, w))
+        S  <- crossprod(Lambda_co, w * Lambda_co) - tcrossprod(v)
+        M  <- 2 * gamma * S
+        Ftg   <- crossprod(F_pre, g)
+        inner <- tryCatch(solve(Ir + M %*% FtF, M %*% Ftg), error = function(e) NULL)
+        if (is.null(inner)) return(fail)
+        delta <- g - as.numeric(F_pre %*% inner)
+        tstep <- 1
+        accepted <- FALSE
+        for (k in 1:40) {
+            z_new <- z + tstep * delta
+            w_new <- softmax_w(z_new)
+            g_new <- gfun(z_new, w_new)
+            gn_new <- max(abs(g_new))
+            if (is.finite(gn_new) && gn_new < gn) { accepted <- TRUE; break }
+            tstep <- tstep / 2
+        }
+        if (!accepted) break                    # stagnation at the rounding floor
+        z <- z_new; w <- w_new; g <- g_new; gn <- gn_new
+    }
+    if (!is.finite(gn) || gn > .NEWTON_LOADING_ACCEPT * scale) return(fail)
+    lam <- crossprod(Lambda_co, w)
+    obj <- sum((u_pre - F_pre %*% lam)^2) +
+        (1 / gamma) * sum(w * (log(pmax(w, 1e-300)) - logq))
+    list(w = w, obj = obj, n_iter = n_iter, converged = TRUE)
+}
+
 .solve_bounded_loading <- function(
     u_pre,
     F_pre,
@@ -104,7 +189,8 @@
     q        = NULL,
     tol      = 1e-8,
     max_iter = 200L,
-    fallback = TRUE
+    fallback = TRUE,
+    newton   = FALSE
 ) {
     u_pre     <- as.numeric(u_pre)
     F_pre     <- as.matrix(F_pre)
@@ -150,6 +236,26 @@
             "be highly constrained.",
             call. = FALSE
         )
+    }
+
+    ## newton = TRUE (the intercept path, see .solve_bounded_loading_int): solve
+    ## to machine precision on the dual. If that fails, fall through to the
+    ## L-BFGS-B route below, unchanged.
+    if (isTRUE(newton)) {
+        nt <- tryCatch(
+            .newton_bounded_loading(u_pre, F_pre, Lambda_co, gamma, q),
+            error = function(e) list(converged = FALSE)
+        )
+        if (isTRUE(nt$converged)) {
+            return(list(
+                w          = nt$w,
+                lambda_hat = as.numeric(crossprod(Lambda_co, nt$w)),
+                obj        = nt$obj,
+                converged  = TRUE,
+                n_iter     = nt$n_iter,
+                method     = "newton"
+            ))
+        }
     }
 
     theta0 <- rep(0, Nco)
@@ -217,12 +323,87 @@
 }
 
 ## -----------------------------------------------------------------------------
+## .solve_bounded_loading_int
+##
+## Wrapper around .solve_bounded_loading() that optionally fits the unit's free
+## intercept jointly with the simplex-constrained loadings (fect 2.4.8).
+##
+## With intercept = TRUE the joint problem
+##
+##   min_{alpha, w}  (1/gamma) KL(w || q) + || u - alpha * 1 - F lambda(w) ||^2
+##
+## is solved exactly by profiling alpha out: for fixed w the minimiser is
+## alpha*(w) = mean(u - F lambda(w)), and the profiled objective is the
+## unchanged solver's objective evaluated at the centred data
+## (u_c = u - mean(u), F_c = F minus its column means). Centring is over the
+## rows passed in, i.e. the unit's own training periods. gamma is not rescaled.
+##
+## The centred problem is solved by Newton's method on the dual to machine
+## precision (.newton_bounded_loading), so the loadings do not depend on where
+## an iterative solver's stopping rule fires; this is what makes them invariant
+## to the unit's outcome level to rounding error. L-BFGS-B is kept as the
+## fallback if Newton fails.
+##
+## With intercept = FALSE nothing is centred; the solver is called exactly as in
+## fect 2.4.7 and alpha is NA.
+##
+## Returns the solver's list plus alpha (intercept; NA_real_ if intercept =
+## FALSE) and resid_norm (L2 norm of the joint-fit residual).
+## -----------------------------------------------------------------------------
+
+.solve_bounded_loading_int <- function(
+    u_pre,
+    F_pre,
+    Lambda_co,
+    gamma,
+    intercept = FALSE,
+    ...
+) {
+    u_pre <- as.numeric(u_pre)
+    F_pre <- as.matrix(F_pre)
+
+    if (!isTRUE(intercept)) {
+        sol <- .solve_bounded_loading(
+            u_pre     = u_pre,
+            F_pre     = F_pre,
+            Lambda_co = Lambda_co,
+            gamma     = gamma,
+            ...
+        )
+        sol$alpha <- NA_real_
+        sol$resid_norm <- sqrt(sum((u_pre - F_pre %*% sol$lambda_hat)^2))
+        return(sol)
+    }
+
+    u_bar <- mean(u_pre)
+    F_bar <- colMeans(F_pre)
+    u_c   <- u_pre - u_bar
+    F_c   <- sweep(F_pre, 2L, F_bar, "-")
+    sol <- .solve_bounded_loading(
+        u_pre     = u_c,
+        F_pre     = F_c,
+        Lambda_co = Lambda_co,
+        gamma     = gamma,
+        newton    = TRUE,
+        ...
+    )
+    sol$alpha <- u_bar - sum(F_bar * sol$lambda_hat)
+    sol$resid_norm <- sqrt(sum((u_c - F_c %*% sol$lambda_hat)^2))
+    sol
+}
+
+## -----------------------------------------------------------------------------
 ## .cv_gamma_loading
 ##
 ## Selects gamma by 5-fold CV over pre-treatment periods. Folds are constructed
 ## across pre-treatment time indices (shared across treated units); per-fold
 ## score is the mean squared prediction error of the bounded projection on the
 ## held-out pre-treatment observations.
+##
+## intercept = TRUE (unit effect in the model): each training fold is fitted with
+## the unit's intercept (centred within the training fold, see
+## .solve_bounded_loading_int) and the held-out periods are predicted with
+## F_te %*% lambda_hat + alpha_train. intercept = FALSE reproduces fect 2.4.7.
 ## -----------------------------------------------------------------------------
 
 .cv_gamma_loading <- function(
@@ -232,10 +413,13 @@
     gamma_grid,      # positive numeric vector
     cv_k        = 5L,
     tol         = 1e-8,
-    max_iter    = 200L
+    max_iter    = 200L,
+    intercept   = FALSE
 ) {
     Lambda_co <- as.matrix(Lambda_co)
     stopifnot(all(gamma_grid > 0))
+    ## Smallest training-fold size: r periods without an intercept, r + 1 with.
+    min_extra <- if (isTRUE(intercept)) 1L else 0L
 
     is_balanced <- is.matrix(U_tr_pre) && is.matrix(F_hat_pre)
 
@@ -258,21 +442,24 @@
             for (ii in seq_len(cv_k)) {
                 tr_idx <- which(fold_id != ii)
                 te_idx <- which(fold_id == ii)
-                if (length(tr_idx) < ncol(F_hat_pre) || length(te_idx) == 0L) next
+                if (length(tr_idx) < ncol(F_hat_pre) + min_extra ||
+                    length(te_idx) == 0L) next
                 F_tr <- F_hat_pre[tr_idx, , drop = FALSE]
                 F_te <- F_hat_pre[te_idx, , drop = FALSE]
                 for (i in seq_len(Ntr)) {
                     u_tr <- U_tr_pre[tr_idx, i]
                     u_te <- U_tr_pre[te_idx, i]
-                    sol <- .solve_bounded_loading(
+                    sol <- .solve_bounded_loading_int(
                         u_pre     = u_tr,
                         F_pre     = F_tr,
                         Lambda_co = Lambda_co,
                         gamma     = gamma_i,
+                        intercept = intercept,
                         tol       = tol,
                         max_iter  = max_iter
                     )
                     pred <- as.numeric(F_te %*% sol$lambda_hat)
+                    if (isTRUE(intercept)) pred <- pred + sol$alpha
                     sq_err <- sq_err + sum((u_te - pred)^2)
                     n_obs  <- n_obs + length(u_te)
                 }
@@ -287,16 +474,19 @@
                 for (ii in seq_len(cv_k)) {
                     tr_idx <- which(fold_i != ii)
                     te_idx <- which(fold_i == ii)
-                    if (length(tr_idx) < ncol(F_i) || length(te_idx) == 0L) next
-                    sol <- .solve_bounded_loading(
+                    if (length(tr_idx) < ncol(F_i) + min_extra ||
+                        length(te_idx) == 0L) next
+                    sol <- .solve_bounded_loading_int(
                         u_pre     = u_i[tr_idx],
                         F_pre     = F_i[tr_idx, , drop = FALSE],
                         Lambda_co = Lambda_co,
                         gamma     = gamma_i,
+                        intercept = intercept,
                         tol       = tol,
                         max_iter  = max_iter
                     )
                     pred <- as.numeric(F_i[te_idx, , drop = FALSE] %*% sol$lambda_hat)
+                    if (isTRUE(intercept)) pred <- pred + sol$alpha
                     sq_err <- sq_err + sum((u_i[te_idx] - pred)^2)
                     n_obs  <- n_obs + length(te_idx)
                 }

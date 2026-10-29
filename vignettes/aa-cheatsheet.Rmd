@@ -1,38 +1,142 @@
 # Cheatsheet {#sec-cheatsheet}
 
-In this chapter, we provide an overview of the main functionalities of the **fect** package, including the required inputs, available plot types, key options, and testing capabilities across various methods.
+In this chapter, we provide an overview of the main functionalities of the **fect** package, including the required inputs, available plot types, key options, and testing capabilities across various methods. It starts with a guide to choosing a method and a table of the option combinations that `fect()` changes or refuses.
+
+## Choosing a method {#sec-cheatsheet-choose}
+
+Every method in **fect** works in the same three steps. It fits a model of the untreated outcome $Y(0)$ on the untreated cells, predicts $Y(0)$ for the treated cells, and averages the differences between the observed outcomes and these predictions. The methods differ in two things only: the model for $Y(0)$, and which untreated cells are used to fit it.
+
+| **Data and concern** | **Method** | **Model for** $Y(0)$ **and fitting sample** |
+|:------------------------|:-----------|:--------------------------------------------|
+| Many treated units; parallel trends are plausible once unit and time fixed effects and the covariates are accounted for | `"fe"` (the default) | Two-way fixed effects and the covariates. Fitted on all untreated cells, including those of treated units before treatment. Internally it is `"ife"` with `r` = 0. |
+| The pre-treatment estimates show trends, which suggests unobserved confounders that change over time and affect units differently | `"ife"` or `"mc"` | `"ife"` adds `r` latent factors, each with unit-specific loadings. When `r` is not given, cross-validation chooses it from 0 to 5. `"mc"` shrinks the untreated outcome matrix toward a low-rank matrix (a nuclear-norm penalty `lambda`, chosen by cross-validation). Both use all untreated cells. |
+| Few treated units (as few as one), treatment never switches off, and many never-treated units | `"gsynth"` | The `"ife"` model with the factors estimated from the never-treated units only (`time.component.from = "nevertreated"`). The treated units' pre-treatment cells are then used only to estimate their own loadings and unit effects. Allows the parametric bootstrap (`vartype = "parametric"`), which [Chapter @sec-gsynth] recommends when treated units are few. |
+| The form of the confounding is known, such as shocks shared by a group in a period (for example region-by-year), time-invariant covariates whose effect changes over time, or unit-specific trends | `"cfe"` | Fixed effects plus the terms named in the call: extra fixed effects (`index[3:]` or `group.fe`), `Z` with `gamma`, `Q` or `Q.type` with `kappa`, and optional factors `r`. See [Chapter @sec-cfe]. |
+| Cross-validation should choose between IFE and MC | `"both"`, with `CV = TRUE` | Cross-validates `"ife"` over `r` and `"mc"` over `lambda`, then fits the one with the lower error. |
+
+`"ife"` and `"gsynth"` fit the same model. The only difference is `time.component.from`: `"ife"` estimates the factors from all untreated cells (`"notyettreated"`, the default), and `"gsynth"` from the never-treated units only. `method = "ife"` with `time.component.from = "nevertreated"` is the same fit as `method = "gsynth"`, and the fit reports `method = "gsynth"`.
+
+A typical sequence:
+
+1. Fit `"fe"` with `se = TRUE` and look at the pre-treatment estimates: the gap plot, the F test and the equivalence test in `fit$test.out`, and a placebo test (`placeboTest = TRUE` with `placebo.period`). See [Chapter @sec-fect].
+2. If the pre-treatment estimates move away from zero, fit `"ife"` and `"mc"` and repeat the checks. `fect_mspe()` compares the prediction errors of fitted models ([Chapter @sec-cfe]).
+3. With few treated units and no treatment reversal, use `"gsynth"` with `vartype = "parametric"`.
+4. Choose the variance estimator separately. `vartype = "bootstrap"` (the default for every method) resamples units, or clusters with `cl`. `"jackknife"` leaves out one unit at a time. `"parametric"` works only in the gsynth setting. See [Chapter @sec-inference].
+
+## Option combinations that fect changes or refuses {#sec-cheatsheet-overrides}
+
+Some combinations of options are changed by `fect()` before it fits, and some stop with an error. The tables below list them. The last column says how `fect()` reports the change. "Nothing" means that the change happens without a message.
+
+### Method and model
+
+| **Setting** | **What fect does** | **Notice** |
+|:------------|:-------------------|:--------------|
+| `method = "fe"` with `r` or `CV = TRUE` | Ignores both and fits `r` = 0 without cross-validation. | nothing |
+| `method = "ife"` or `"gsynth"`, `r` not given | Cross-validates `r` from 0 to 5 (`CV` becomes `TRUE`). | CV progress |
+| the same, with `CV = FALSE` | Fits `r` = 0, the FE model; the fit reports `method = "fe"`. | message |
+| `"ife"` or `"gsynth"` with one value of `r` | No cross-validation. With `CV = TRUE`, that value is the only candidate. | nothing |
+| `method = "mc"`, `lambda` not given, `CV = FALSE` | Fits the FE model (`r` = 0); the fit reports `method = "fe"`. | message |
+| `method = "cfe"` with the default `time.component.from = "notyettreated"` | Turns cross-validation off, even with `CV = TRUE`, and fits the smallest value of `r`, so `r` = `c(0, 3)` fits `r` = 0. The fit reports `method = "fe"` (`r` = 0) or `"ife"` (`r` > 0). | nothing |
+| `method = "gsynth"` | Sets `time.component.from = "nevertreated"` and `em = FALSE`. | nothing |
+| `method = "ife"` or `"fe"` with `time.component.from = "nevertreated"` | Fits the gsynth model; the fit reports `method = "gsynth"`. | nothing |
+| `group.fe` with `method = "fe"` | Fits `method = "cfe"` with `r` = 0 and no cross-validation. With one `group.fe` column and no `cl`, clusters the bootstrap by that column. | nothing |
+| `group.fe` with `"ife"`, `"mc"`, `"both"` or `"gsynth"`; two or more `group.fe` columns without `cl` | Stops. | error |
+| `Z`, `gamma`, `Q`, `kappa` or `Q.type` with a method other than `"cfe"` | Ignores them. | nothing |
+| more than two `index` columns with a method other than `"cfe"` | Stops. | error |
+| `"gsynth"` on data where treatment switches off | Stops. | error |
+| `"mc"` or `"both"` with `time.component.from = "nevertreated"`; `em = FALSE` with `"notyettreated"` | Stops. | error |
+| `loading.bound = "simplex"` with a method other than `"ife"` or `"gsynth"`, or with `"notyettreated"` | Stops. When the chosen `r` is 0, the bound has no effect. | error; message |
+| `cm = TRUE` with a method other than `"fe"` or `"ife"`, or with `"nevertreated"` | Stops. | error |
+| `method = "both"` with `criterion = "pc"` | Stops. | error |
+
+### Tests
+
+| **Setting** | **What fect does** | **Notice** |
+|:------------|:-------------------|:--------------|
+| `loo = TRUE` | Sets `se = TRUE`, and turns off `placeboTest` and `carryoverTest`. | messages |
+| `dloo = TRUE` | Sets `se = TRUE`. Needs `method = "fe"`, `time.component.from = "notyettreated"`, no treatment reversal, a balanced panel before treatment, and `vartype = "bootstrap"` or `"jackknife"`; cannot be combined with `loo`, `placeboTest`, `carryoverTest` or `permute`. Otherwise stops. | message; error |
+| `placeboTest = TRUE` without `placebo.period`; `carryoverTest = TRUE` without `carryover.period` | Stops. | error |
+| `placeboTest = TRUE` and `carryoverTest = TRUE` | Stops. | error |
+| `placeboTest` or `carryoverTest` with cross-validation | Stops. This includes `"ife"` or `"gsynth"` without `r`, and `"mc"` without `lambda`, since they cross-validate by default. Give a single `r` or `lambda`. | error |
+| `carryoverTest = TRUE` when treatment never switches off | Stops. | error |
+| `permute = TRUE` with `placeboTest`, `carryoverTest` or `loo`, or with `method = "gsynth"` | Stops. The permutation test runs for `"fe"`, `"ife"` and `"mc"`. | error |
+| `balance.period` with `group` or with `carryover.rm` | Stops. | error |
+| `fill.missing` without `balance.period` | Ignored. | nothing |
+
+### Inference
+
+| **Setting** | **What fect does** | **Notice** |
+|:------------|:-------------------|:--------------|
+| `se = FALSE` (the default) | Ignores `nboots`, `vartype`, `cl`, `ci.method` and `keep.sims`. | nothing |
+| `vartype = "parametric"` | Needs `time.component.from = "nevertreated"` (as with `"gsynth"`), no treatment reversal, a method other than `"mc"` or `"both"`, and at least two never-treated units. Otherwise stops. Ignores `cl`. | error; warning for `cl` |
+| `para.error` with `vartype` other than `"parametric"` | Ignored. | nothing |
+| `vartype = "jackknife"` with `cl` | Ignores `cl`, since the jackknife leaves out one unit at a time. | warning |
+| `vartype = "jackknife"` with `ci.method = "basic"` | Stops. | error |
+| `cl` equal to the unit index (`index[1]`) | The same as no `cl`: the bootstrap resamples units. | nothing |
+| `ci.method = "basic"` with `nboots` below 1000 | Fits as asked. | warning |
+| `CV = TRUE` | The folds use `max(tol, 1e-3)`; the chosen model is then refitted at `tol`. | nothing |
+
+### Data
+
+| **Setting or data** | **What fect does** | **Notice** |
+|:------------|:-------------------|:--------------|
+| rows whose weight (`W`, `W.est` or `W.agg`) is 0 | Drops these rows before fitting; a unit whose weights are all 0 leaves the fit. | nothing |
+| `W.est` and `W.agg` naming different columns | Stops. | error |
+| infinite values in the outcome | Sets them to `NA`. | warning |
+| units with fewer than `min.T0` untreated observations | Removes them before fitting (listed in `fit$remove.id`). | message |
+| units with more than `max.missing` missing periods | Removes them before fitting (listed in `fit$remove.id`). | a message only when 10 or fewer units remain |
+| a period in which no unit is untreated | Drops the period. | message |
+| `na.rm = FALSE` (the default) with missing `Y` or `X` | Keeps the rows but leaves those cells out of the fit. Missing `D` or index values stop. | error for `D` and index |
+
+## Where the results are {#sec-cheatsheet-output}
+
+`?fect` lists every slot of a fit under "Value". The ones most often read:
+
+| **Slot** | **Contents** |
+|:---------|:-------------|
+| `att.avg`, `est.avg` | The overall ATT; with `se = TRUE`, `est.avg` adds `S.E.`, `CI.lower`, `CI.upper` and `p.value`. |
+| `att`, `time`, `count`; `est.att` | The ATT by period relative to treatment onset (1 is the first treated period, 0 the last one before it) and the number of treated cells in each; `est.att` has the columns `ATT`, `S.E.`, `CI.lower`, `CI.upper`, `p.value` and `count`. |
+| `est.att90`, `att.bound` | The same with the (1 - 2`alpha`) interval, 90% by default, which the equivalence plot draws. |
+| `att.off`, `est.att.off` | The ATT by period relative to treatment exit, when treatment switches off. |
+| `eff`, `Y.ct` | Cell-level effects and predicted untreated outcomes, T by N matrices (rows are periods, columns are units). |
+| `test.out` | The F test and equivalence tests of the pre-treatment estimates (`f.p`, `f.equiv.p`, `tost.equiv.p`), or the placebo or carryover test (`placebo.p`, `placebo.equiv.p`; `carryover.p`, `carryover.equiv.p`). |
+| `est.placebo`, `est.carryover` | The placebo or carryover ATT with its S.E., interval, p-value and 90% interval. |
+| `r.cv`, `lambda.cv`, `CV.out` | The chosen number of factors or `lambda`, and the cross-validation scores of each candidate. |
+| `beta`, `est.beta` | Covariate coefficients, and with `se = TRUE` their inference. |
+| `remove.id`, `obs.missing` | Units removed before fitting, and a T by N code of each cell (1 treated, 2 untreated, 3 missing, 4 removed unit, 5 held out for a test, 6 removed by `carryover.rm`). |
 
 ## Methods
 
-*Inputs for* `fect(methods = "___")`
+*Inputs for* `fect(method = "___")`
 
 | **Method** | **Model for** $\hat{Y}(0)$ | **References** |
 |------------------------|------------------------|------------------------|
 | **fe** | Standard two-way fixed effects model | Liu, Wang & Xu (2022), Borusyak, Jaravel & Spiess (2024) |
-| **ife** | Interactive fixed effects model | Gobillon & Magnac (2016), Xu (2017) |
+| **ife** | Interactive fixed effects model; by default the factors are estimated from all untreated observations (`time.component.from = "notyettreated"`) | Gobillon & Magnac (2016), Xu (2017) |
 | **mc** | Matrix completion method | Athey et al. (2021) |
 | **cfe** | "Complex" or multi-level fixed effects | – |
-| **gsynth** | Interactive fixed effects model | Xu (2017) |
+| **gsynth** | Interactive fixed effects model with the factors estimated from the never-treated units only (`time.component.from = "nevertreated"`) | Xu (2017) |
 
 ## Plot Types
 
-*Inputs for* `plot(fect_object, type = "___")`
+*Inputs for* `plot(fect_object, type = "___")`. The last column says what the fit needs; [Chapter @sec-plots] has the full table, with what each plot draws without uncertainty estimates.
 
-| **Type** | **Description** | **Applicable Methods** |
+| **Type** | **Description** | **Needs from the fit** |
 |------------------------|------------------------|------------------------|
-| **box** | Box plot of ATT by period. | fe, ife, mc, gsynth, cfe |
-| **calendar** | CATT by calendar time. | fe, ife, mc, gsynth, cfe |
-| **heterogeneous** or **hte** | CATT by a covariate. | fe, ife, mc, gsynth, cfe |
-| **counterfactual** or **ct** | Observed vs. imputed outcome for treated units. | fe, ife, mc, gsynth |
-| **equiv** | Pretreatment residuals with equivalence intervals. | fe, ife, mc, gsynth, cfe |
-| **exit** | Period-wise ATT relative to treatment exit. | fe, ife, mc, cfe |
-| **factors** | Estimated factors (factor-based methods). | ife, gsynth |
-| **gap** or **es** | Event-study plot: ATT by pre- and post-treatment periods. | fe, ife, mc, gsynth, cfe |
-| **loadings** | Estimated factor loadings (factor-based methods). | ife, gsynth |
-| **status** | Treatment status by period for all units. | fe, ife, mc, gsynth, cfe |
-| **sens** | Rambachan & Roth (2023) sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, cfe |
-| **sens_es** | Event-study sensitivity analysis for treatment effects. | `fect_sens()` function applied to fe, ife, mc, gsynth, cfe |
-| **cumul** | Cumulative treatment effects over time. | `estimand(fit, "att.cumu", "event.time")`; see [Chapter @sec-estimands]. |
+| **gap** or **es** | Event-study plot: ATT by pre- and post-treatment periods. | Any fit; intervals need `se = TRUE`, and so does a fit with a placebo or carryover test. |
+| **equiv** | Pre-treatment ATTs with their 90% intervals and the equivalence range. | `se = TRUE` |
+| **exit** | Period-wise ATT relative to treatment exit. | Treatment that switches off; intervals need `se = TRUE`. |
+| **counterfactual** or **ct** | Observed vs. imputed outcome for treated units. | Any fit. |
+| **status** | Treatment status by period for all units. | Any fit. |
+| **box** | Box plot of the cell-level effects by period. | Any fit. |
+| **calendar** | ATT by calendar time. | Any fit; intervals need `se = TRUE`. |
+| **heterogeneous** or **hte** | ATT by a covariate. | `covariate`: the name of a covariate of the fit, or a T x N matrix. |
+| **factors** | Estimated factors. | `method = "ife"` or `"gsynth"` with at least one factor. |
+| **loadings** | Estimated factor loadings. | The same as **factors**. |
+| **loading.overlap** | Treated units' factor loadings against the convex hull of the control loadings. | The same as **factors**. |
+| **sens** | Rambachan & Roth (2023) sensitivity analysis for the average effect over the post-treatment periods. | The output of `fect_sens()`. |
+| **sens_es** | Sensitivity analysis by event time. | The output of `fect_sens()`. |
+| **cumul** | Cumulative treatment effects over time. | The output of `effect()`; for new code use `estimand(fit, "att.cumu", "event.time")` with `esplot()` (see [Chapter @sec-estimands]). |
 
 ## Tests as Options
 
@@ -45,8 +149,8 @@ In this chapter, we provide an overview of the main functionalities of the **fec
 | `dloo.adjust` | With `dloo = TRUE`: use the pre-treatment-average baseline of @liu2025cohort (`TRUE/FALSE`). | fe |
 | `carryoverTest` | Tests for carryover effects in post-treatment periods (`TRUE/FALSE`). | fe, ife, mc, cfe |
 | `carryover.period` | Range of post-treatment periods for the carryover test (vector). | fe, ife, mc, cfe |
-| `permute` | Permutation test (`TRUE/FALSE`). | fe, ife, mc, gsynth |
-| `m` | Block length for permutation test (`m=2` by default). | fe, ife, mc, gsynth |
+| `permute` | Permutation test (`TRUE/FALSE`). | fe, ife, mc |
+| `m` | Block length for permutation test (`m=2` by default). | fe, ife, mc |
 | `CV` | Cross-validation for factor-based methods. | ife, mc, gsynth |
 
 ## Required and Optional Inputs
@@ -63,7 +167,6 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | `data` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `index` (unit & time IDs) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `group.fe` (additional additive FEs; auto-routes `fe` → `cfe`) | ✓ | – | – | – | ✓ |
-| `cfe` (complex / interactive FEs) | – | – | – | – | ✓ |
 | `Z` (time-invariant covariates) | – | – | – | – | ✓ |
 | `Q` (known time trends) | – | – | – | – | ✓ |
 | `Q.type` (auto time trends) | – | – | – | – | ✓ |
@@ -75,13 +178,13 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | `W` (weight column; convenience default for both `W.est` and `W.agg`) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `W.est` (weight column for outcome-model fit only) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `W.agg` (weight column for ATT aggregation only) | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `time.component.from` (time component source) | – | ✓ | ✓ | ✓ | ✓ |
+| `time.component.from` (time component source) | – | ✓ | – | ✓ | ✓ |
 | `em` (EM algorithm) | – | ✓ | – | – | ✓ |
 | `se` (uncertainty) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `nboots` (# bootstrap reps) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `force` (FE structure) | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `lambda` (Hyper-parameter sequence) | – | – | ✓ | ✓ | – |
-| `nlambda` (Length of hyper-parameter sequence) | – | – | ✓ | ✓ | – |
+| `lambda` (Hyper-parameter sequence) | – | – | ✓ | – | – |
+| `nlambda` (Length of hyper-parameter sequence) | – | – | ✓ | – | – |
 | `r` (# factor) | – | ✓ | – | ✓ | ✓ |
 | `k` ( \# cross-validation rounds) | – | ✓ | ✓ | ✓ | – |
 | `gamma` (time grouping for Z) | – | – | – | – | ✓ |
@@ -95,10 +198,9 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | **Input** | **Options** | **Applicable Methods** |
 |:-----------------------|:-----------------------|:-----------------------|
 | `force` | Fixed effects structure: "none", "unit", "time", "two-way" (default) | fe, ife, mc, cfe, gsynth |
-| `time.component.from` | Time component source: "notyettreated" (default), "nevertreated". Controls which units provide the time-varying model components (time fixed effects, latent factors, temporal dynamics). When "nevertreated", only never-treated controls estimate these components. `method = "gsynth"` auto-sets to "nevertreated". | ife, mc, cfe, gsynth |
+| `time.component.from` | Time component source: "notyettreated" (default), "nevertreated". Controls which units provide the time-varying model components (time fixed effects, latent factors, temporal dynamics). When "nevertreated", only never-treated controls estimate these components. `method = "gsynth"` auto-sets to "nevertreated". `method = "mc"` supports "notyettreated" only. | ife, cfe, gsynth |
 | `em` | EM algorithm: `TRUE` (default), `FALSE`. Required `TRUE` for "notyettreated"; auto-set to `FALSE` by `method = "gsynth"`. | ife, cfe |
-| `vartype` (when `method = "gsynth"`) | Uncertainty estimator: "parametric" (default), "bootstrap", "jackknife" | gsynth |
-| `vartype` (otherwise) | Uncertainty estimator: "bootstrap" (default), "jackknife" | fe, ife, mc, cfe |
+| `vartype` | Uncertainty estimator: "bootstrap" (default for every method, including gsynth), "jackknife", or "parametric". "parametric" needs `time.component.from = "nevertreated"` and no treatment reversal, and is not available for mc; set it explicitly when there are few treated units. | fe, ife, mc, cfe, gsynth |
 | `criterion` | Model selection criterion: "mspe" (default), "gmspe", "moment", "pc". | ife, mc, cfe, gsynth |
 
 ## Cross-Validation {#sec-cheatsheet-cv}
@@ -111,13 +213,13 @@ Cross-validation in `fect()` selects the number of factors `r` (or the regulariz
 |:--|:--|:--|
 | **`"rolling"`** (default) | Per-fold sample of `cv.prop` of eligible units; per sampled unit a random anchor + `cv.nobs` scored holdout + `cv.buffer` past-side buffer + drop-future from anchor through end-of-eligible. Eligible units = controls + treated pre-treatment cells. | The recommended default. Closes the future-side leakage channel that block CV cannot, eliminating the over-selection pathology that pegs `r.cv = r.max` on serially correlated panels. |
 | `"block"` | Random scattered anchors; mask `cv.nobs` contiguous cells per anchor; `cv.donut` cells flanking each side excluded from training but not scored. Eligible units = controls. | Use under approximately i.i.d. residuals when forecast-style scoring is not needed. |
-| `"loo"` | Leave-one-out, one treated pre-treatment period at a time. | Legacy gsynth method; can be unstable with few pre-treatment periods. Available for `fect_nevertreated` (`time.component.from = "nevertreated"`) only. |
+| `"loo"` | Leave-one-out, one treated pre-treatment period at a time. | Legacy gsynth method; can be unstable with few pre-treatment periods. Available only with `time.component.from = "nevertreated"` (including `method = "gsynth"`). |
 
 ::: {.callout-warning appearance="simple"}
 
 ### Deprecation: `"all_units"` and `"treated_units"`
 
-Pre-v2.3.0 callers used `cv.method = "all_units"` (= the new `"block"`) or `cv.method = "treated_units"` (block masking with anchors restricted to treated pre-treatment cells). Both names still work and produce identical numerical behavior, but they emit a one-time deprecation message and will be removed in v2.4.0. The replacement plan: keep `cv.method = "block"` as the masking strategy and introduce a separate `cv.units` parameter (`"all"` / `"treated"` / `"control"`) for unit-scope selection. For now, replace `"all_units"` with `"block"` directly, and continue using `"treated_units"` until the cv.units parameter is available.
+Pre-v2.3.0 callers used `cv.method = "all_units"` (= the new `"block"`) or `cv.method = "treated_units"` (block masking with anchors restricted to treated pre-treatment cells). Both names still work and print a note. `"all_units"` behaves exactly like `"block"`, so use `"block"` instead. `"treated_units"` has no replacement yet and can still be used.
 
 :::
 
@@ -130,8 +232,8 @@ Pre-v2.3.0 callers used `cv.method = "all_units"` (= the new `"block"`) or `cv.m
 | `cv.nobs` | 3 | all | Block size for the held-out (scored) cells per anchor |
 | `cv.donut` | 1 | block only | Cells excluded around the holdout on each side, masked but not scored (attenuates AR leakage on both train/test boundaries; matches `cv.buffer` for rolling CV) |
 | `cv.buffer` | 1 | rolling only | Past-side buffer cells before the holdout, masked but not scored (the future side is dropped from training by construction) |
-| `cv.rule` | `"1se"` | all | Rule for picking `r` from the MSPE curve: `"1se"` (default; Hastie/Tibshirani/Friedman 2009 §7.10), `"min"`, or `"1pct"` (pre-v2.3.0 default) |
-| `min.T0` | 5 | all | Minimum pre-treatment observations required per unit |
+| `cv.rule` | `"min"` | all | Rule for picking `r` from the MSPE curve: `"min"` (default since v2.4.7; the `r` with the lowest error), `"1se"` (the smallest `r` within one fold standard error of the lowest; Hastie/Tibshirani/Friedman 2009 §7.10; the default from v2.3.0 to v2.4.6), or `"1pct"` (pre-v2.3.0 default) |
+| `min.T0` | 1 for fe, 5 otherwise | all | Minimum number of observations under control required per unit |
 | `seed` | NULL | all | Optional integer seed for reproducible per-fold mask sampling |
 
 ### Scoring criteria
@@ -154,11 +256,11 @@ fit_cv <- fect(Y ~ D, data = simdata, index = c("id", "time"),
                CV = TRUE, r = c(0, 3),
                cv.method = "rolling",
                cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
-               cv.rule = "1se", se = TRUE)
+               cv.rule = "min", se = TRUE)
 fit_cv$r.cv  # selected r
 ```
 
-Block-CV variants are drop-in replacements: change `cv.method` to `"all_units"` or `"treated_units"` and replace `cv.buffer` with `cv.donut` (the buffer-parameter analog for block CV).
+Block-CV variants are drop-in replacements: change `cv.method` to `"block"` (or the legacy `"treated_units"`) and replace `cv.buffer` with `cv.donut` (the buffer-parameter analog for block CV).
 
 ::: {.callout-note appearance="simple"}
 
@@ -205,7 +307,7 @@ In addition to the main `fect()` function, the package provides several utility 
 
 -   Method `cfe` allows either "jackknife" or "bootstrap" for uncertainty estimates.
 
--   Factor-based methods (`ife`, `gsynth`) can use `r` and `k` for factor selection and cross-validation. We can implement a similar process using `mc` or `gsynth` with `lambda` and `nlambda`.
+-   Factor-based methods (`ife`, `gsynth`) can use `r` and `k` for factor selection and cross-validation. `mc` uses `lambda` and `nlambda` instead of `r`.
 
 -   `carryoverTest` is available in `fe`, `ife`, `mc`, and `cfe` but not in `gsynth`. `loo` is available in `fe`, `ife`, `mc`, and `gsynth`. `dloo` is available in `fe` only, and only for staggered adoption without reversal.
 
@@ -213,16 +315,28 @@ In addition to the main `fect()` function, the package provides several utility 
 
 -   `force` allows various levels of fixed effects (`"none"`, `"unit"`, `"time"`, `"two-way"`).
 
--   **fect** includes several built-in values for optional arguments that often require an integer or boolean input. All boolean arguments (such as `parallel`, `se`, or `CV`) are set to `FALSE` by default to speed up computation. Below is a complementary table listing parameters that require numeric inputs.
+-   **fect** includes several built-in values for optional arguments that often require an integer or boolean input. Most logical arguments, such as `se`, `placeboTest` and `loo`, default to `FALSE`. The exceptions are `parallel = TRUE`, `em = TRUE`, and `CV = NULL`, which turns cross-validation on for `ife` and `gsynth` when `r` is not a single number, and for `mc` when `lambda` is not a single number. Below is a complementary table listing parameters that require numeric inputs.
 
 | **Inputs** | **Description** | **Default** |
 |:--:|:---|:--:|
 | `nboots` | Number of bootstrap runs (int) | 200 |
-| `k` | Sets the number of cross-validation rounds(int) | 10 |
+| `k` | Sets the number of cross-validation rounds(int) | 20 |
 | `r` | Sets the number of factors | NULL: cross-validated over 0 to 5 for ife/gsynth, 0 for fe/cfe; a range such as c(0,3) sets the CV search |
 | `m` | Specifies the block length for the permutation test | 2 |
 | `nlambda` | Length of hyper-parameter sequence | 10 |
+| `alpha` | Significance level. Intervals in `est.att`, `est.avg` and the other `est.*` slots are (1 - `alpha`); `att.bound`, `est.att90` and the equivalence tests use (1 - 2`alpha`) | 0.05 |
+| `min.T0` | Minimum number of untreated observations a unit needs; units with fewer are removed | NULL: 1 for `fe`, 5 otherwise |
+| `max.missing` | Maximum number of missing periods a unit may have; units with more are removed | NULL: no limit |
+| `proportion` | Pre-treatment periods with fewer than `proportion` times the largest number of treated units are left out of the F and equivalence tests | 0.3 |
+| `f.threshold` | Equivalence bound of the F test (see `?fect`) | 0.5 |
+| `tost.threshold` | Equivalence range of the TOST tests, [-`tost.threshold`, `tost.threshold`] | NULL: 0.36 times the residual standard deviation of the FE model |
+| `cores` | Number of cores for parallel computing | NULL: available cores minus two, at most 8 |
+| `tol`, `max.iteration` | Convergence tolerance and iteration cap of the EM and other iterative fits | 1e-5, 5000 |
 
 -   With an integer input for `nlambda`, **fect** can randomly generate appropriate hyper-parameter sequence.
+
+-   `normalize = TRUE` divides the outcome and the covariates by the standard deviation of the outcome during estimation; every slot of the fit is still reported on the outcome's scale, so it changes only the speed.
+
+-   `fill.missing` is read only with `balance.period`. With `FALSE` (the default), a treated unit enters the balanced sample only if its outcome is observed at every period of the window; with `TRUE`, missing outcomes inside the window do not exclude it, and the balanced estimates average its observed cells.
 
 Enjoy using **fect**!

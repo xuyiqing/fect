@@ -62,13 +62,13 @@ When both are given, \code{W.est} and \code{W.agg} must name the same column; di
 \item{force}{a string indicating whether unit or time or both fixed effects will be imposed. Must be one of the following, "none", "unit", "time", or "two-way". The default is "two-way".}
 \item{time.component.from}{Controls which units provide the time-varying model components (time fixed effects, factor structure, temporal dynamics). Options are \code{"notyettreated"} (default) --- all units contribute during their pre-treatment periods, or \code{"nevertreated"} --- only never-treated units estimate the time components, which are then projected onto treated units. With \code{"nevertreated"}, \code{method = "ife"} fits the same model as \code{method = "gsynth"}, with or without \code{se}, and the fit reports \code{method = "gsynth"}.}
 \item{em}{a logical flag indicating whether to use the EM algorithm for missing data in the estimation sample. Default is \code{TRUE}. Setting \code{em = FALSE} requires a complete estimation sample and is only compatible with \code{time.component.from = "nevertreated"}.}
-\item{r}{an integer specifying the number of factors, or a range such as \code{c(0, 5)}. Default \code{NULL}: for \code{method = "ife"} or \code{"gsynth"} the number of factors is then selected by cross-validation over 0 to 5, as \code{method = "mc"} does for \code{lambda}; for \code{method = "fe"} or \code{"cfe"} it means no factors. With \code{CV = FALSE} and no \code{r}, the fit falls back to \code{r = 0} (the FEct model) with a message. A single number with \code{CV = FALSE} (the default when \code{r} is a single number) fixes the number of factors; \code{r = 0} then estimates no factors. If \code{CV = TRUE}, the cross validation procedure will select the optimal number of factors from \code{r} to 5. When the factors are estimated from the never-treated units only (\code{method = "gsynth"}, or \code{time.component.from = "nevertreated"}), at most \code{Nco - 1} factors can be estimated, where \code{Nco} is the number of never-treated units; cross-validation then searches no further, with a message.}
+\item{r}{an integer specifying the number of factors, or a range such as \code{c(0, 5)}. Default \code{NULL}: for \code{method = "ife"} or \code{"gsynth"} the number of factors is then selected by cross-validation over 0 to 5, as \code{method = "mc"} does for \code{lambda}; for \code{method = "fe"} or \code{"cfe"} it means no factors. With \code{CV = FALSE} and no \code{r}, the fit falls back to \code{r = 0} (the FEct model) with a message. A single number with \code{CV = FALSE} (the default when \code{r} is a single number) fixes the number of factors; \code{r = 0} then estimates no factors. With \code{CV = TRUE}, a range \code{c(a, b)} is searched from \code{a} to \code{b}; a single number is the only candidate, so no search takes place. When the factors are estimated from the never-treated units only (\code{method = "gsynth"}, or \code{time.component.from = "nevertreated"}), at most \code{Nco - 1} factors can be estimated, where \code{Nco} is the number of never-treated units; cross-validation then searches no further, with a message.}
 \item{lambda}{a single or sequence of positive numbers specifying the hyper-parameter sequence for matrix completion method. If \code{lambda} is a sequence and \code{CV = 1}, cross-validation will be performed.}
 \item{nlambda}{an integer specifying the length of hyper-parameter sequence for matrix completion method. Default is \code{nlambda = 10}.}
 \item{CV}{a logical flag indicating whether cross-validation will be performed to select the optimal number of factors or hyper-parameter in matrix completion algorithm. If \code{r} is not specified, the procedure searches through \code{r = 0} to \code{5}; for \code{method = "ife"} and \code{"gsynth"} this is the default behaviour.}
 \item{k}{an integer specifying number of cross-validation rounds. Default is \code{k = 20}.}
-\item{cv.prop}{a numerical value specifying the proportion of testing set compared to sample size during the cross-validation procedure.}
-\item{cv.method}{a string specifying the cross-validation masking strategy. One of \code{"rolling"} (default; standard time-series rolling-window CV), \code{"block"} (random scattered anchors with contiguous-block masking), or \code{"loo"} (leave-one-out, available for \code{fect_nevertreated}). The legacy aliases \code{"all_units"} (= \code{"block"}) and \code{"treated_units"} (block masking restricted to treated pre-treatment cells) are still accepted but emit a deprecation message; both will be replaced by the unified \code{(cv.method, cv.units)} API in v2.4.0.}
+\item{cv.prop}{a number between 0 and 1. With \code{cv.method = "rolling"} (the default), the share of eligible units sampled in each fold; with \code{cv.method = "block"}, the share of observations masked in each fold. Default \code{0.1}.}
+\item{cv.method}{a string specifying the cross-validation masking strategy. One of \code{"rolling"} (default; standard time-series rolling-window CV), \code{"block"} (random scattered anchors with contiguous-block masking), or \code{"loo"} (leave-one-out, available only with \code{time.component.from = "nevertreated"}, including \code{method = "gsynth"}). The legacy names \code{"all_units"} (the same as \code{"block"}) and \code{"treated_units"} (block masking with anchors in treated pre-treatment cells) still work and print a note.}
 \item{cv.nobs}{an integer specifying the length of continuous observations within a unit in the testing set. Default is \code{cv.nobs = 3}.}
 \item{cv.donut}{an integer specifying the length of removed observations at the head and tail of the continuous observations specified by \code{cv.nobs}. Used by block CV (\code{cv.method = "block"}, or the legacy aliases \code{"all_units"}/\code{"treated_units"}). Default is 1 (matches \code{cv.buffer} for rolling CV). When \code{cv.nobs >= 3}, \code{2 * cv.donut} must be smaller than \code{cv.nobs}, so that each held-out run keeps at least one scored period.}
 \item{cv.buffer}{an integer specifying the length of past-side buffer cells masked from training (but not scored) immediately before each rolling-window holdout. Used only by \code{cv.method = "rolling"}; the future side is dropped from training by construction. Analogous to \code{cv.donut} for block CV but applied only on the past side. Default is 1.}
@@ -86,7 +86,10 @@ When both are given, \code{W.est} and \code{W.agg} must name the same column; di
 \item{QR}{This version doesn't support this option.}
 \item{method}{a string specifying which imputation algorithm will be used.
   \code{"fe"}, \code{"ife"}, \code{"mc"},
-  \code{"gsynth"}, or \code{"cfe"}. Default is \code{"fe"}.}
+  \code{"gsynth"}, \code{"cfe"}, or \code{"both"}. Default is \code{"fe"}.
+  \code{"both"} cross-validates \code{"ife"} (over \code{r}) and \code{"mc"}
+  (over \code{lambda}) and fits the one with the lower cross-validation
+  error. \code{"fe"} is fitted as \code{"ife"} with \code{r = 0}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
 \item{vartype}{a string specifying the type of variance estimator, e.g.
   \code{"bootstrap"}. Three values are supported:
@@ -97,8 +100,6 @@ When both are given, \code{W.est} and \code{W.agg} must name the same column; di
   gsynth-style regime: it requires
   \code{time.component.from = "nevertreated"}, no treatment reversal,
   and \code{method} not in \code{c("mc", "both")}.
-  These three conditions correspond to Gates A, B, and C in the
-  three-gate defense system (see \code{ARCHITECTURE.md}).
   It also needs at least two never-treated units, and it ignores
   \code{cl} (with a warning).
   For all other settings, \code{vartype = "bootstrap"} is recommended.
@@ -198,7 +199,7 @@ on alternative estimands like \code{aptt} and \code{log.att}), call
 \code{quantile.CI = TRUE} maps to \code{ci.method = "basic"}. Both
 mappings still work but emit a one-time deprecation warning.}
 \item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}. Default \code{200}, sufficient for the standard error and the normal-CI structure that \code{fect} ships in \code{est.att}/\code{att.avg}. For tail-quantile-based CI methods accessed via \code{estimand()} (\code{ci.method} \code{"basic"}, \code{"percentile"}, \code{"bc"}, \code{"bca"}), bump to \code{nboots = 1000} or higher (Efron 1987 Section 3; DiCiccio & Efron 1996 Section 4); \code{estimand()} emits a warning when called on under-replicated fits.}
-\item{alpha}{the significance level for hypothesis tests and confidence intervals. Default \code{0.05}.}
+\item{alpha}{the significance level. Default \code{0.05}. The intervals in \code{est.avg}, \code{est.att} and the other \code{est.*} tables are (1 - \code{alpha}) intervals. \code{att.bound}, \code{est.att90}, \code{att.off.bound} and the \code{(90\%)} columns of \code{est.placebo} and \code{est.carryover} are (1 - 2\code{alpha}) intervals, 90\% at the default; the equivalence plot draws them. The p-values and the tests in \code{test.out} do not depend on \code{alpha}, and \code{Y.avg} always holds 95\% and 90\% intervals.}
 \item{parallel}{controls which operations run in parallel. Accepted values:
 \describe{
   \item{\code{TRUE}}{Enable parallel computing for both CV and bootstrap (default in \code{fect()}).}
@@ -219,7 +220,7 @@ all candidate lambda values without early stopping (the serial path uses a
 returns). This guarantees numerical identity between serial and parallel
 results but may compute a few extra lambda values compared to the serial
 path. Use \code{parallel = FALSE} to preserve the short-circuit behavior.}
-\item{cores}{an integer indicating the number of cores for parallel computing.}
+\item{cores}{an integer indicating the number of cores for parallel computing. Default \code{NULL}: the number of available cores minus two, at most 8.}
 \item{tol}{a positive number indicating the relative tolerance for the
 EM update check (\code{||fit_new - fit_old||_F / ||fit_old||_F < tol}). With \code{CV = TRUE} the cross-validation folds use \code{max(tol, 1e-3)} and the chosen model is then refit at \code{tol}.
 Default tightened from \code{1e-3} to \code{1e-5} in v2.4.3 because the
@@ -232,12 +233,12 @@ canonical IFE/CFE fits converge in 700-2000 iters at \code{tol = 1e-5}.
 A \code{warning()} is emitted when the EM hits this cap without
 satisfying the tol gate (under-convergence diagnostic).}
 \item{seed}{an integer seed for random number generation. When supplied, it fixes the cross-validation folds and the bootstrap and permutation draws, so repeating a call gives the same results; the same \code{seed} also gives the same cross-validation folds, and so the same \code{r}, with and without \code{se}. Default \code{NULL}: the cross-validation folds and the serial bootstrap (\code{parallel = FALSE}) follow the current state of R's random number generator (see \code{\link{set.seed}}), but the parallel bootstrap draws do not, so calling \code{set.seed()} before \code{fect()} does not make them reproducible. For reproducible bootstrap draws, pass \code{seed}.}
-\item{min.T0}{an integer specifying the minimum number of pre-treatment periods for each treated unit.}
-\item{max.missing}{an integer specifying the maximum number of missing observations allowed per unit.}
+\item{min.T0}{an integer: the minimum number of observations under control a unit needs; units with fewer are removed before estimation (see \code{remove.id} in the value). Default \code{NULL}: 1 for \code{method = "fe"} and 5 for the other methods.}
+\item{max.missing}{an integer: the maximum number of missing periods a unit may have. A period is missing for a unit when its row is absent or its outcome or a covariate is missing. Units with more missing periods are removed before estimation (see \code{remove.id} in the value). Default \code{NULL}: no limit.}
 \item{proportion}{a numeric value specifying which pre-treatment periods are used for goodness-of-fit tests. In cross-validation, the same periods count in the weighted scores (WMSPE, WGMSPE, Moment and GMoment); periods with at most \code{proportion} times the largest number of treated units get zero weight.}
 \item{pre.periods}{a vector specifying the range of pre-treatment periods used for the goodness-of-fit test.}
-\item{f.threshold}{a numeric threshold for an F-test in equivalence testing. Default \code{0.5}.}
-\item{tost.threshold}{a numeric threshold for two-one-sided t-tests.}
+\item{f.threshold}{the equivalence bound of the F test of the pre-treatment ATTs (\code{se = TRUE}). \code{test.out$f.equiv.p} is the probability that an F statistic with noncentrality \code{N_bar * f.threshold} is no larger than the observed one, where \code{N_bar} is the largest number of treated units in the tested event times; a small value supports equivalence. Default \code{0.5}.}
+\item{tost.threshold}{a numeric threshold for the two one-sided tests (TOST) of equivalence: the equivalence range is \code{[-tost.threshold, tost.threshold]}. Default \code{NULL}: 0.36 times the residual standard deviation of the fixed-effects model, \code{0.36 * sqrt(sigma2.fect)}.}
 \item{knots}{a numeric vector specifying knots (currently unused; reserved for future use).}
 \item{degree}{an integer specifying the degree (currently unused; reserved for future use).}
 \item{group.fe}{a character vector of column names naming additional simple
@@ -255,22 +256,22 @@ cluster at the unit level instead, pass \code{cl = index[1]} (e.g.,
 \code{cl = "id"}); \code{cl = NULL} does NOT change behavior (the case
 bootstrap always resamples units regardless of \code{cl}), and
 \code{cl = FALSE} is rejected with a guiding error.}
-\item{cfe}{a vector of lists specifying interactive fixed effects for \code{method="cfe"}.}
+\item{cfe}{not used: this argument is ignored and is kept only so that older code still runs. Add extra additive fixed effects with \code{group.fe} (or extra columns in \code{index}), and factors with \code{r}.}
 \item{Z}{a vector of column names: time-invariant unit covariates whose coefficients vary by period (grouped by \code{gamma}). Each must be the same in every period of a unit; a value that varies within a unit stops with a message.}
 \item{gamma}{a column name giving each period's group for the coefficients on \code{Z}; it must be the same for every unit in a period. Default: one group per period.}
 \item{Q}{a vector of column names: known time trends whose loadings vary by unit (grouped by \code{kappa}). Each must be the same for every unit in a period; a value that varies within a period stops with a message. See also \code{Q.type}.}
 \item{kappa}{a column name giving each unit's group for the loadings on \code{Q}; it must be the same in every period of a unit. Default: one group per unit.}
-\item{Q.type}{a vector specifying the type of Q matrix.}
+\item{Q.type}{a vector of known time trends to build as \code{Q} for \code{method = "cfe"}: any of \code{"linear"} (or \code{1}), \code{"quadratic"} (\code{2}), \code{"cubic"} (\code{3}) and \code{"bspline"}. Cannot be combined with \code{Q}.}
 \item{Q.bspline.degree}{an integer specifying the degree used when \code{Q.type} includes \code{"bspline"} in \code{method="cfe"}. If NULL, a default degree is chosen based on the number of distinct time values.}
 \item{Z.param}{a list specifying the parameters for the Z matrix.}
 \item{Q.param}{a list specifying the parameters for the Q matrix.}
-\item{balance.period}{a length-2 vector specifying a time range for a balanced sample.}
-\item{fill.missing}{a logical flag indicating whether to allow missing observations in a balanced sample.}
-\item{placeboTest}{a logical flag indicating whether to perform a placebo test.}
-\item{placebo.period}{an integer or 2-element numeric vector specifying pseudo-treatment periods.}
+\item{balance.period}{a length-2 vector \code{c(a, b)}, with \code{a <= 0} and \code{b >= 1}, of event times (1 is the first treated period, 0 the last one before it). The treated units whose event times cover every period from \code{a} to \code{b} form a balanced sample, and its effects are reported in the \code{balance.*} and \code{est.balance.*} slots. Cannot be combined with \code{group} or \code{carryover.rm}.}
+\item{fill.missing}{a logical flag, used only with \code{balance.period}. With \code{FALSE} (the default), a treated unit enters the balanced sample only if its outcome is observed in every period of the window. With \code{TRUE}, periods of the window whose outcome or covariates are missing, or whose rows are absent, do not exclude the unit; the balanced-sample estimates then average its observed cells.}
+\item{placeboTest}{a logical flag indicating whether to perform a placebo test: the periods in \code{placebo.period} are held out of the fit and their effects estimated as if they were treated. Needs \code{placebo.period}. Cannot be combined with \code{carryoverTest = TRUE}, \code{CV = TRUE} (give a single \code{r} or \code{lambda}) or \code{permute = TRUE}; \code{loo = TRUE} turns it off.}
+\item{placebo.period}{the pre-treatment periods to hold out for the placebo test, in time relative to treatment onset (1 is the first treated period, 0 the last period before it): one period, or a range \code{c(a, b)} with \code{a <= b <= 0}, e.g. \code{c(-2, 0)}. Required when \code{placeboTest = TRUE}.}
 \item{carryoverTest}{a logical flag for carryover tests.}
 \item{carryover.period}{an integer or 2-element numeric vector specifying pseudo-carryover periods.}
-\item{carryover.rm}{an integer specifying the range of post-treatment periods to treat as carryover.}
+\item{carryover.rm}{a positive integer \code{k}: for each treated unit, the observations whose time value is 1 to \code{k} above a treated period, but not themselves treated, are removed from the fit, so possible carryover effects after treatment ends do not enter the estimation. With a time index that steps by 1, these are the first \code{k} periods after treatment ends. Cannot be combined with \code{balance.period}.}
 \item{loo}{a logical flag for leave-one-period-out goodness-of-fit tests. Each pre-treatment period is held out in turn and the model is refitted with the fit's settings, including the selected \code{r} (or \code{lambda}), \code{loading.bound} with its \code{gamma.loading}, \code{time.component.from} and \code{para.error}.}
 \item{dloo}{a logical flag for the double (cohort-wise) leave-one-out pre-trend
 placebos. When \code{TRUE}, \code{fect} estimates these directly from the in-sample fit -- without re-fitting
@@ -288,7 +289,7 @@ double-LOO rescaled by \eqn{(g-2)/(g-1)} for a cohort adopting at period
 \item{normalize}{a logical flag indicating whether to divide the outcome and covariates by the standard deviation of the outcome during estimation. Default \code{FALSE}. Every slot of the fit is reported on the outcome's scale, so the option changes only the speed of estimation, and a given \code{lambda} (\code{method = "mc"}) is on the outcome's scale too. Before version 2.4.7, \code{Y.dat}, \code{est.cm}, the stored covariates, \code{data.long}, \code{sigma2.fect} (and so the default equivalence threshold), \code{est$VNT}, the gsynth \code{IC}, the cross-validation tables and the mc \code{lambda} slots were on the normalized scale or put back with the wrong power of sd(Y).}
 \item{keep.sims}{a logical flag indicating whether to save unit-time level bootstrap effects (\code{eff.boot}, with \code{D.boot}, \code{I.boot} and \code{colnames.boot}; see Value). Default \code{keep.sims = FALSE}. If \code{se = FALSE}, this argument is ignored. \code{\link{effect}}, \code{imputed_outcomes(replicates = TRUE)} and most \code{\link{estimand}} calls need these draws.}
 \item{cm}{a logical flag indicating whether to enable causal moderation analysis. When \code{TRUE}, the estimator decomposes the treatment effect into effect modification and causal moderation components. Currently available for \code{method = "fe"} and \code{method = "ife"} with \code{time.component.from = "notyettreated"}. The fit then carries \code{est.cm}, the model of the treated outcomes fitted on the treated cells, which \code{\link{fect_iden}} and \code{plot(type = "hte", cm = TRUE)} use; it is stored with or without standard errors and after cross-validation. Default is \code{FALSE}.}
-\item{loading.bound}{a string controlling whether treated-unit factor loadings are bounded inside the convex hull of control loadings. \code{"none"} (default) reproduces standard GSC behavior. \code{"simplex"} constrains each treated unit's loading to be a non-negative convex combination of control loadings via an entropy-regularized simplex projection, ensuring the imputed counterfactual lies pointwise in the convex hull of factor-implied control outcomes. Currently applies only to \code{method = "ife"} or \code{method = "gsynth"} (equivalent forms), and requires \code{time.component.from = "nevertreated"}. The bound applies wherever the model is fitted: with or without cross-validation, with or without \code{se}, in the bootstrap and parametric-bootstrap replicates, and in the \code{loo} refits. If the selected number of factors is 0, a message says that the bound has no effect.}
+\item{loading.bound}{a string controlling whether treated-unit factor loadings are bounded inside the convex hull of control loadings. \code{"none"} (default) reproduces standard GSC behavior. \code{"simplex"} constrains each treated unit's loading to be a non-negative convex combination of control loadings via an entropy-regularized simplex projection, ensuring the imputed counterfactual lies pointwise in the convex hull of factor-implied control outcomes. Currently applies only to \code{method = "ife"} or \code{method = "gsynth"} (equivalent forms), and requires \code{time.component.from = "nevertreated"}. The bound applies wherever the model is fitted: with or without cross-validation, with or without \code{se}, in the bootstrap and parametric-bootstrap replicates, and in the \code{loo} refits. With a unit effect (\code{force = "unit"} or \code{"two-way"}), each treated unit's intercept is fitted jointly with its constrained loadings (since 2.4.8); the intercept itself is not bounded. Fits with \code{force = "none"} or \code{"time"} have no intercept to fit. If the selected number of factors is 0, a message says that the bound has no effect.}
 \item{gamma.loading}{scalar regularization strength for the \code{"simplex"} projection. \code{NULL} (default) triggers 5-fold cross-validation over \code{gamma.loading.grid}. A numeric value is used directly. Ignored when \code{loading.bound = "none"}.}
 \item{gamma.loading.grid}{a numeric vector of candidate \code{gamma.loading} values for cross-validation. \code{NULL} (default) uses \code{10^seq(-2, 2, length.out = 9)}. Ignored when \code{loading.bound = "none"} or when \code{gamma.loading} is supplied.}
 \item{cv.rule}{a string selecting the cross-validation rule for choosing the number of factors \code{r} (or matrix-completion penalty \code{lambda}). One of:
@@ -303,112 +304,122 @@ Ignored when \code{CV = FALSE}.}
   \code{fect} implements counterfactual estimators for TSCS data. It first imputes counterfactuals by fitting an outcome model using untreated observations, then estimates the individual treatment effect as the difference between observed and predicted outcomes. Finally, it computes average treatment effects on the treated (ATT) and period-specific ATTs. Placebo and equivalence tests help evaluate identification assumptions.
 }
 \value{
-  \item{Y.dat}{T-by-N matrix of the outcome variable.}
-  \item{D.dat}{T-by-N matrix of the treatment variable.}
-  \item{I.dat}{T-by-N matrix of observation indicators (observed/missing).}
-  \item{Y}{name of the outcome variable.}
-  \item{D}{name of the treatment variable.}
-  \item{X}{names of the requested covariates, including any dropped before the fit (see the \code{X} argument).}
-  \item{method}{the estimation method. A \code{method = "ife"} fit with \code{time.component.from = "nevertreated"} reports \code{"gsynth"}.}
-  \item{W}{name of the weight variable.}
-  \item{W.agg}{with \code{W} or \code{W.agg}: the aggregation weights as a T-by-N matrix on the fit's panel (like \code{Y.dat}); read by \code{\link{imputed_outcomes}}, \code{\link{estimand}} and \code{\link{effect}}. Absent for unweighted fits and with \code{W.est} alone.}
-  \item{index}{name of the unit and time indicators.}
-  \item{force}{specified fixed effects option.}
-  \item{T}{number of time periods.}
-  \item{N}{number of units.}
-  \item{p}{number of time-varying observables.}
-  \item{r.cv}{number of factors (selected by cross-validation if needed).}
-  \item{lambda.cv}{optimal hyper-parameter for matrix completion, if applicable.}
-  \item{beta}{coefficients of the covariates, one row per requested covariate; \code{NA} for a covariate dropped before the fit (see the \code{X} argument).}
-  \item{sigma2}{mean squared error.}
-  \item{IC}{information criterion.}
-  \item{est}{results of the fitted model.}
-  \item{est.cm}{with \code{cm = TRUE}: the fitted model of the treated outcomes (see \code{cm}).}
-  \item{MSPE}{mean squared prediction error from cross-validation.}
-  \item{CV.out}{results of the cross-validation procedure: one row per candidate \code{r} (or \code{lambda}), the scores of each; a row the loop did not score holds \code{NA}. An \code{ife} fit also keeps its table as \code{CV.out.ife}, an \code{mc} fit as \code{CV.out.mc}, and a \code{"both"} fit keeps both tables; \code{CV.out} is the one of the method fitted.}
-  \item{CV.out.se}{the fold standard errors of the scores in \code{CV.out} (same rows, the score columns), the ones \code{cv.rule} reads; with \code{CV.out.ife} and \code{CV.out.mc} come \code{CV.out.ife.se} and \code{CV.out.mc.se}.}
-  \item{niter}{number of iterations.}
-  \item{factor}{estimated time-varying factors.}
-  \item{lambda}{estimated loadings.}
-  \item{lambda.tr}{estimated loadings for treated units.}
-  \item{lambda.co}{estimated loadings for control units.}
-  \item{mu}{estimated grand mean.}
-  \item{xi}{estimated time fixed effects.}
-  \item{alpha}{estimated unit fixed effects.}
-  \item{alpha.tr}{estimated unit fixed effects for treated units.}
-  \item{alpha.co}{estimated unit fixed effects for control units.}
-  \item{validX}{logical indicating if valid covariates exist; 0 when no covariate was estimated (e.g. every covariate was dropped).}
-  \item{validF}{logical indicating if factors exist.}
-  \item{id}{vector of unit IDs.}
-  \item{rawtime}{vector of time periods; for a factor time index whose levels are not increasing numbers, the level labels.}
-  \item{remove.id}{IDs of the units removed before estimation (e.g. units with too few pre-treatment periods; see \code{min.T0}). Present only when units were removed.}
-  \item{wgt.implied}{for fits whose factors are estimated from the never-treated units (\code{method = "gsynth"}, or \code{"ife"} and \code{"cfe"} with \code{time.component.from = "nevertreated"}) with at least one factor: the implied weights of the control units for each treated unit (Xu 2017), an Nco x Ntr matrix with the control unit IDs as row names and the treated unit IDs as column names. Column \eqn{i} holds \eqn{w_i = \Lambda_{co} (\Lambda_{co}' \Lambda_{co})^{-1} \lambda_i}{w_i = L_co (L_co' L_co)^(-1) lambda_i}, which satisfies \code{t(lambda.co) \%*\% w_i == lambda.tr[i, ]}; so the factor part of treated unit \eqn{i}'s counterfactual is the \eqn{w_i}-weighted sum of the control units' factor parts. The weights can be negative. Under \code{loading.bound = "simplex"}, column \eqn{i} holds the simplex weights of treated unit \eqn{i}: non-negative, summing to one. \code{NULL} when no factor is estimated.}
-  \item{obs.missing}{matrix indicating missingness patterns.}
-  \item{Y.ct}{T-by-N matrix of predicted outcomes under no treatment.}
-  \item{eff}{T-by-N matrix of estimated individual treatment effects.}
-  \item{res}{residuals for observed values.}
-  \item{eff.pre}{effects for treated units in pre-treatment periods.}
-  \item{eff.pre.equiv}{pre-treatment effects under baseline (two-way FE) model.}
-  \item{pre.sd}{by-period residual standard deviations for pre-treatment ATT.}
-  \item{att.avg}{overall average treatment effect on the treated. With \code{W} (or \code{W.agg}), \code{att.avg}, \code{att}, \code{att.off} and their inference slots (\code{est.avg}, \code{est.att}, \code{est.att.off}) hold the weighted estimates; a fit has no separate weighted slots.}
-  \item{att.avg.unit}{average over treated units of each treated unit's average effect over its observed treated cells ("Tr units equally weighted" in \code{print()}).}
-  \item{time}{time index for switch-on treatment effect.}
-  \item{count}{count of observations for each switch-on effect time.}
-  \item{att}{switch-on treatment effect.}
-  \item{time.off}{time index for switch-off treatment effect.}
-  \item{att.off}{switch-off treatment effect.}
-  \item{count.off}{count for each switch-off period.}
-  \item{att.placebo}{ATT for placebo periods.}
-  \item{att.carryover}{ATT for carryover periods.}
-  \item{eff.calendar}{ATT by calendar time.}
-  \item{eff.calendar.fit}{loess-fitted ATT by calendar time.}
-  \item{N.calandar}{number of treated observations each calendar period.}
-  \item{balance.avg.att}{ATT for balanced sample.}
-  \item{balance.att}{switch-on ATT for balanced sample.}
-  \item{balance.time}{time index for balanced sample.}
-  \item{balance.count}{count for each time in balanced sample.}
-  \item{balance.att.placebo}{ATT for placebo period in balanced sample.}
-  \item{group.att}{ATT for different groups.}
-  \item{group.output}{list of switch-on treatment effects by group.}
-  \item{est.avg}{inference for \code{att.avg}.}
-  \item{est.avg.unit}{inference for \code{att.avg.unit}.}
-  \item{est.att}{inference for \code{att}.}
-  \item{est.att.off}{inference for switch-off.}
-  \item{est.placebo}{inference for placebo ATT.}
-  \item{est.carryover}{inference for carryover ATT.}
-  \item{est.eff.calendar}{inference for \code{eff.calendar}.}
-  \item{est.eff.calendar.fit}{inference for \code{eff.calendar.fit}.}
-  \item{est.balance.att}{inference for balanced sample switch-on.}
-  \item{est.balance.avg}{inference for balanced sample average ATT.}
-  \item{est.balance.placebo}{inference for balanced sample placebo.}
-  \item{est.beta}{inference for \code{beta} (\code{NA} rows for dropped covariates).}
-  \item{est.group.att}{inference for group-specific ATT; its interval and p-value follow \code{ci.method}.}
-  \item{est.group.output}{inference for group output.}
-  \item{att.avg.boot}{bootstrap draws for \code{att.avg}.}
-  \item{att.avg.unit.boot}{bootstrap draws for \code{att.avg.unit}.}
-  \item{att.count.boot}{bootstrap draws for \code{count}.}
-  \item{att.off.boot}{bootstrap draws for \code{att.off}.}
-  \item{att.off.count.boot}{bootstrap draws for \code{count.off}.}
-  \item{att.placebo.boot}{bootstrap draws for \code{att.placebo}.}
-  \item{att.carryover.boot}{bootstrap draws for \code{att.carryover}.}
-  \item{balance.att.boot}{bootstrap draws for \code{balance.att}.}
-  \item{att.bound}{equivalence confidence interval for pre-trend.}
-  \item{att.off.bound}{equivalence confidence interval for switch-off.}
-  \item{beta.boot}{bootstrap draws for \code{beta} (\code{NA} rows for dropped covariates).}
-  \item{vartype}{the variance estimator used (\code{se = TRUE} only): \code{"bootstrap"}, \code{"jackknife"}, \code{"parametric"} or \code{"conformal"}.}
+  An object of class \code{"fect"}: a list. Which slots it holds depends on the method and the options; a slot that a fit does not need is absent or \code{NULL}. Matrices called T-by-N have one row per period and one column per unit of the fit (units removed before estimation are not among them, except in \code{obs.missing}). "Event time" is time relative to treatment onset: 1 is the first treated period and 0 the last period before it.
+
+  \emph{Point estimates of the effects.}
+  \item{att.avg}{the overall ATT: the average of \code{eff} over the treated cells.}
+  \item{att.avg.unit}{the average over treated units of each unit's average effect over its observed treated cells ("Tr units equally weighted" in \code{print()}).}
+  \item{att, time, count}{the ATT at each event time, the event times, and the number of treated cells at each.}
+  \item{att.off, time.off, count.off}{the same by time relative to treatment exit (1 is the first period after treatment ends); only when treatment switches off for some unit.}
+  \item{eff}{T-by-N matrix of cell-level effects, the observed outcome minus \code{Y.ct}; \code{NA} where the outcome is missing.}
+  \item{Y.ct}{T-by-N matrix of predicted untreated outcomes; \code{NA} where the outcome is missing.}
+  \item{eff.calendar, eff.calendar.fit}{two-column matrices by calendar period: the ATT of the treated cells in that period (\code{ATT-calendar}), or its loess fit (\code{ATT-calendar Fitted}), and their number (\code{count}).}
+  \item{N.calendar}{the number of treated cells in each calendar period.}
+  \item{calendar.enp}{the equivalent number of parameters of the loess fit in \code{eff.calendar.fit}.}
+  \item{att.placebo, att.carryover}{with \code{placeboTest} or \code{carryoverTest}: the ATT of the held-out cells.}
+  \item{carry.att, carry.time}{with \code{carryover.rm}: the ATT of the cells marked by \code{carryover.rm}, by time after treatment exit.}
+  \item{group.att, group.output}{with \code{group}: the ATT of each group, and for each group a list of its \code{att.on}, \code{time.on}, \code{count.on} (by event time) and, with reversals, \code{att.off}, \code{time.off}, \code{count.off}.}
+  \item{group, g.level, G}{with \code{group}: a data frame matching each value of the group variable (\code{rawgroup}) to its code (\code{newgroup}); the codes, named by group value; and the T-by-N matrix of codes.}
+  \item{balance.att, balance.time, balance.count, balance.avg.att}{with \code{balance.period}: the ATT by event time in the balanced sample, the event times, the numbers of cells, and the overall ATT of the balanced sample. \code{balance.att.placebo} is added with \code{placeboTest}.}
+
+  With \code{W} (or \code{W.agg}), \code{att.avg}, \code{att}, \code{att.off}, \code{att.placebo}, \code{att.carryover} and their inference slots (\code{est.avg}, \code{est.att}, \code{est.att.off}, ...) hold the weighted estimates; a fit has no separate weighted slots.
+
+  \emph{Inference} (\code{se = TRUE}). Unless noted, intervals are (1 - \code{alpha}) intervals built by \code{ci.method}, and p-values test that the effect is 0.
+  \item{est.avg}{1-row matrix for \code{att.avg} with columns \code{ATT.avg}, \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value}.}
+  \item{est.avg.unit}{the same for \code{att.avg.unit} (first column \code{ATT.avg.unit}).}
+  \item{est.att}{matrix for \code{att}, one row per event time (the row names): columns \code{ATT}, \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value}, \code{count}.}
+  \item{est.att90, att.bound}{\code{est.att} with the (1 - 2\code{alpha}) interval (90\% by default) in place of the (1 - \code{alpha}) one, and that interval alone (\code{CI.lower}, \code{CI.upper}). The equivalence plot (\code{plot(type = "equiv")}) draws it.}
+  \item{att.vcov}{the covariance matrix of the bootstrap draws of \code{att} across event times (rows and columns in the order of \code{time}); \code{\link{fect_sens}} reads it.}
+  \item{est.att.off, att.off.bound, att.off.vcov}{the same three for \code{att.off} (first column \code{ATT.OFF}, last \code{count.off}).}
+  \item{est.eff.calendar, est.eff.calendar.fit}{inference for \code{eff.calendar} and \code{eff.calendar.fit}, one row per calendar period, with the columns of \code{est.att} (the first named \code{ATT-calendar} or \code{ATT-calendar Fitted}).}
+  \item{est.placebo, est.carryover}{with \code{placeboTest} or \code{carryoverTest}: a 1-row matrix with the ATT of the held-out cells (column \code{ATT.placebo} or \code{ATT.carryover}; named \code{Coef} when the model has covariates), \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value}, and the (1 - 2\code{alpha}) interval in \code{CI.lower(90\%)} and \code{CI.upper(90\%)}.}
+  \item{est.beta}{inference for \code{beta}: columns \code{Coef}, \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value}; \code{NA} rows for dropped covariates.}
+  \item{est.group.att, est.group.output}{with \code{group}: a matrix with one row per group (columns as in \code{est.avg}, first \code{ATT}), and for each group a list with \code{att.on} (as \code{est.att}), \code{att.on.bound}, \code{att.on.boot}, \code{att.off}, \code{att.off.bound}, \code{att.off.boot}, \code{att.placebo} and \code{att.carryover}. The interval and p-value follow \code{ci.method}.}
+  \item{est.balance.att, est.balance.avg, est.balance.placebo, balance.att.bound, balance.att.vcov}{with \code{balance.period}: \code{est.att}, \code{est.avg}, \code{est.placebo}, \code{att.bound} and \code{att.vcov} for the balanced sample.}
+  \item{Y.avg}{with \code{vartype = "bootstrap"} or \code{"jackknife"}: a data frame of the average observed outcome of the treated units (\code{treated}) and their average predicted untreated outcome (\code{counterfactual}) by \code{period}, with 95\% intervals (\code{lower.tr}, \code{upper.tr}, \code{lower.ct}, \code{upper.ct}) and 90\% intervals (\code{lower90.tr}, ...). The levels are fixed, whatever \code{alpha} and \code{ci.method}: basic intervals for the bootstrap, normal intervals for the jackknife. \code{period} is event time when the treated units start treatment at different times (attribute \code{period_type = "event_time"}) and calendar time when they all start at once.}
+  \item{vartype}{the variance estimator used: \code{"bootstrap"}, \code{"jackknife"}, \code{"parametric"} or \code{"conformal"}.}
+  \item{para.error}{for \code{vartype = "parametric"}: the residual model used, with \code{"auto"} resolved to \code{"empirical"} or \code{"ar"}.}
+  \item{ci.method, ci.alpha}{the interval rule (\code{"normal"} or \code{"basic"}) and \code{alpha}. The gap plot with \code{id} uses them for the band of the chosen units; see \code{\link{plot.fect}}.}
   \item{conformal}{with \code{vartype = "conformal"}, a list: \code{level} (1 - \code{alpha}), \code{status} (\code{"ok"}, or a note when some or all intervals are the whole real line), \code{r} and \code{lambda} (the tuning held fixed), \code{n.controls} (never-treated controls), \code{n.controls.ineligible} (controls usable for no treated unit), \code{n.failed.fits}, \code{unit} (a data frame with one row per treated unit and post-treatment date: \code{Y}, \code{Y.ct}, \code{eff}, \code{CI.lower}, \code{CI.upper}, \code{p.value}, \code{N} and \code{q}), \code{att} and \code{avg} (N and q of the aggregated intervals) and, with \code{keep.sims = TRUE}, \code{folds} (the treated fold predictions \code{M0} and the controls' signed errors \code{E}, one row per treated post-treatment cell and one column per control).}
-  \item{ci.method, ci.alpha}{the interval rule (\code{"normal"} or \code{"basic"}) and the significance level of the fit's intervals (\code{se = TRUE} only). The gap plot with \code{id} uses them for the band of the chosen units; see \code{\link{plot.fect}}.}
+
+  \emph{Bootstrap draws} (\code{se = TRUE}). One column per kept replicate; failed replicates are dropped.
+  \item{att.avg.boot, att.avg.unit.boot}{draws of \code{att.avg} and \code{att.avg.unit}.}
+  \item{att.boot, att.count.boot}{draws of \code{att} and of \code{count}, one row per event time.}
+  \item{att.boot.original}{\code{att.boot} before failed replicates are dropped.}
+  \item{att.off.boot, att.off.count.boot}{draws of \code{att.off} and \code{count.off}.}
+  \item{att.placebo.boot, att.carryover.boot}{draws of \code{att.placebo} and \code{att.carryover}.}
+  \item{balance.att.boot, balance.count.boot}{draws of \code{balance.att} and \code{balance.count}.}
+  \item{beta.boot}{draws of \code{beta} (\code{NA} rows for dropped covariates).}
   \item{eff.boot}{with \code{keep.sims = TRUE}, the cell-level treatment effects of each replicate, a T-by-W-by-B array (B = number of replicates kept). Slice \code{b} holds the units \code{colnames.boot[[b]]}, in that order: under the case bootstrap a unit drawn twice appears twice and an undrawn unit not at all; under the parametric bootstrap the treated units come first. W = N, except for the cluster bootstrap (\code{cl}), whose replicates differ in size and are padded with \code{NA} to the widest one, and the jackknife (W = N - 1, B = N).}
   \item{D.boot, I.boot}{with \code{keep.sims = TRUE}, the treatment and observation indicators of each replicate, laid out as \code{eff.boot}.}
   \item{colnames.boot}{with \code{keep.sims = TRUE}, a list with one element per replicate: the column positions, in the original panel, of the replicate's units; its length is the replicate's width.}
-  \item{test.out}{F-test and equivalence test results for pre-treatment fit.}
-  \item{loo.test.out}{leave-one-period-out test results.}
-  \item{dloo.test.out}{double leave-one-out (\code{dloo}) pre-trend test results.}
-  \item{pre.est.att}{when \code{loo} or \code{dloo} is \code{TRUE}, the
-  pre-treatment placebo estimates (ATT, S.E., CI, p-value, count) by event
-  time; for \code{dloo} these are the double-LOO (or, with
-  \code{dloo.adjust}, pre-treatment-average) estimates.}
-  \item{permute}{permutation test results.}
+  \item{eff.off.boot}{with \code{keep.sims = TRUE} and reversals, a list with one \code{eff.off}-like matrix per replicate.}
+  \item{boot.diag}{with \code{se = TRUE} and \code{vartype = "bootstrap"} or \code{"parametric"}: a check of the bootstrap draws of \code{att.avg} (since 2.4.8). A list with \code{nboots} (draws requested), \code{n.used} (finite draws kept), \code{n.failed} (replicates that failed and were dropped), \code{n.nonfinite}, \code{n.extreme} (draws more than 20 interquartile ranges from the median; \code{NA} when the interquartile range is 0), \code{sd} (the SD of the draws, which is the \code{S.E.} in \code{est.avg}), \code{iqr.sd} (the interquartile range of the draws divided by 1.349, a spread that a few wild draws do not move; it equals the SD for normal draws), \code{sd.ratio} (\code{sd / iqr.sd}; \code{NA} when \code{iqr.sd} is 0), \code{threshold} (5), \code{min.draws} (20), \code{breakdown} (\code{TRUE} when at least \code{min.draws} draws are usable and \code{sd.ratio} exceeds \code{threshold}; fect then warns, and \code{print()} shows the check) and \code{para.error} (the error mode of a parametric bootstrap). For the parametric bootstrap it also holds \code{n.sim}, \code{n.sim.failed} and \code{n.sim.extreme}: the simulated-error draws of the first step, the ones that failed, and the ones whose largest error lies more than 20 interquartile ranges from the median. With \code{para.error = "empirical"} or \code{"wild"} an extreme first-step draw is reused by every replicate that samples it, so the final draws explode and \code{breakdown} fires. With \code{"ar"} (the default when cells are missing) the first-step draws only set the error covariance the replicates are drawn from: one extreme draw widens every replicate while \code{sd.ratio} stays near 1, so \code{n.sim.extreme} is then the only sign; \code{print()} and \code{summary()} show it. Extreme first-step draws can come from a refit whose loading regression is nearly singular (too few distinct control paths for \code{r}) or from a refit that stopped far from its solution. The reported \code{S.E.} is not changed by this check.}
+
+  \emph{Tests of the identifying assumptions.}
+  \item{test.out}{(\code{se = TRUE}) a list. Without a placebo or carryover test, it tests the pre-treatment ATTs in the event times \code{pre.periods}: \code{f.stat}, \code{f.p} (F test that they are all 0), \code{f.threshold}, \code{f.equiv.p} (equivalence F test), \code{df1}, \code{df2}, \code{N_bar} (the largest number of treated units in those event times), \code{tost.equiv.p} (the largest p-value of the two one-sided tests, one per event time) and \code{tost.threshold}. With \code{placeboTest}: \code{placebo.p} and \code{placebo.equiv.p} (TOST of the placebo ATT); with \code{carryoverTest}: \code{carryover.p} and \code{carryover.equiv.p}. An F statistic that cannot be computed (for example a singular covariance of the draws) is \code{NA}, with a message.}
+  \item{loo.test.out, dloo.test.out}{with \code{loo} or \code{dloo}: the same tests on the leave-one-out (or double leave-one-out) pre-treatment estimates.}
+  \item{pre.est.att, pre.att.bound, pre.att.boot, pre.est.group.output}{when \code{loo} or \code{dloo} is \code{TRUE}, the pre-treatment placebo estimates by event time (columns \code{ATT}, \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value}, \code{count.on}), their (1 - 2\code{alpha}) intervals, their draws, and by group with \code{group}. For \code{dloo} these are the double-LOO (or, with \code{dloo.adjust}, pre-treatment-average) estimates.}
+  \item{permute}{with \code{permute = TRUE}: a list with \code{permute.att.avg}, the overall ATT of each permutation, and \code{p}, the permutation p-value.}
+  \item{eff.pre, eff.pre.equiv}{matrices of the treated units' pre-treatment cells: the effect (\code{eff}), or the effect under the two-way FE model (\code{eff.equiv}), its event time (\code{period}) and the unit's column position (\code{unit}).}
+  \item{pre.sd}{by event time before treatment: the standard deviation of \code{eff.pre.equiv} (\code{sd}), the event time (\code{period}) and the number of cells (\code{count}).}
+  \item{eff.off, eff.off.equiv, off.sd}{the same three by time after treatment exit; only with reversals.}
+  \item{rmse}{the root mean squared \code{eff} over the treated units' untreated cells used in the fit.}
+  \item{sigma2.fect}{the residual variance of the two-way FE model; the default \code{tost.threshold} is \code{0.36 * sqrt(sigma2.fect)}.}
+  \item{tost.threshold, proportion, pre.periods}{the equivalence range used (with \code{NULL} resolved), \code{proportion}, and the event times the tests use (resolved from \code{proportion} when \code{pre.periods = NULL}).}
+
+  \emph{The fitted model.}
+  \item{method}{the method as the fit records it, which can differ from the \code{method} argument: a fit without factors can report \code{"fe"}; a \code{method = "cfe"} fit with not-yet-treated controls reports \code{"fe"} (\code{r = 0}) or \code{"ife"}; a fit whose factors are estimated from the never-treated units reports \code{"gsynth"} (\code{"cfe"} for \code{method = "cfe"}); a \code{"both"} fit reports the method chosen. See the option tables in the cheatsheet chapter of the user manual.}
+  \item{r.cv}{the number of factors (selected by cross-validation if needed).}
+  \item{lambda.cv, lambda.seq, lambda.norm, eigen.all}{\code{method = "mc"}: the chosen penalty, the candidates, the chosen penalty divided by the largest of \code{eigen.all}, and the singular values (divided by T x N) of the untreated outcome matrix after the fixed effects, from which the candidates are built.}
+  \item{CV.out, CV.out.ife, CV.out.mc}{results of the cross-validation procedure: one row per candidate \code{r} (or \code{lambda}), the scores of each; a row the loop did not score holds \code{NA}. An \code{ife} fit also keeps its table as \code{CV.out.ife}, an \code{mc} fit as \code{CV.out.mc}, and a \code{"both"} fit keeps both tables; \code{CV.out} is the one of the method fitted.}
+  \item{CV.out.se, CV.out.ife.se, CV.out.mc.se}{the fold standard errors of the scores in \code{CV.out} (same rows, the score columns), the ones \code{cv.rule} reads; with \code{CV.out.ife} and \code{CV.out.mc} come \code{CV.out.ife.se} and \code{CV.out.mc.se}.}
+  \item{rmCV, estCV}{cross-validation: for each fold, the positions of the held-out cells and of the cells scored; kept for internal use.}
+  \item{beta}{coefficients of the covariates (column \code{Coef}), one row per requested covariate; \code{NA} for a covariate dropped before the fit (see the \code{X} argument).}
+  \item{mu, alpha, xi}{the grand mean, the unit effects (N-by-1) and the time effects (T-by-1), as \code{force} includes them. Never-treated fits keep the unit effects as \code{alpha.tr} and \code{alpha.co} only.}
+  \item{alpha.tr, alpha.co}{the unit effects of the treated and the control units. With \code{loading.bound = "simplex"}, \code{alpha.tr} comes from the joint fit with the constrained loadings (since 2.4.8).}
+  \item{factor, lambda, lambda.tr, lambda.co}{with factors: the factors (T-by-r) and the loadings of all units (not kept by never-treated fits), of the treated units and of the control units.}
+  \item{wgt.implied}{for fits whose factors are estimated from the never-treated units (\code{method = "gsynth"}, or \code{"ife"} and \code{"cfe"} with \code{time.component.from = "nevertreated"}) with at least one factor: the implied weights of the control units for each treated unit (Xu 2017), an Nco x Ntr matrix with the control unit IDs as row names and the treated unit IDs as column names. Column \eqn{i} holds \eqn{w_i = \Lambda_{co} (\Lambda_{co}' \Lambda_{co})^{-1} \lambda_i}{w_i = L_co (L_co' L_co)^(-1) lambda_i}, which satisfies \code{t(lambda.co) \%*\% w_i == lambda.tr[i, ]}; so the factor part of treated unit \eqn{i}'s counterfactual is the \eqn{w_i}-weighted sum of the control units' factor parts. The weights can be negative. Under \code{loading.bound = "simplex"}, column \eqn{i} holds the simplex weights of treated unit \eqn{i}: non-negative, summing to one. \code{NULL} when no factor is estimated.}
+  \item{loading.bound, gamma.loading, loading.proj.resid}{for never-treated fits with factors: the bound used; under \code{"simplex"} also the \code{gamma.loading} used and, for each treated unit, the norm of the residual of its constrained fit.}
+  \item{gamma, kappa}{\code{method = "cfe"} (and never-treated fits): the estimated coefficients on \code{Z} and loadings on \code{Q}; \code{NULL} without them.}
+  \item{est}{the fitted model as the estimator returns it: a list with \code{beta}, \code{mu}, \code{fit} (fitted values), \code{niter}, \code{alpha}, \code{xi}, \code{residuals}, \code{sigma2}, \code{validX}, and, depending on the method, \code{IC}, \code{PC}, \code{validF}, \code{factor}, \code{lambda} and \code{VNT}.}
+  \item{est.cm}{with \code{cm = TRUE}: the fitted model of the treated outcomes (see \code{cm}).}
+  \item{sigma2}{the residual variance of the fitted model.}
+  \item{IC, PC}{information criteria of the fitted model (not for \code{"mc"}); \code{criterion = "pc"} selects on \code{PC}.}
+  \item{niter}{number of iterations of the main fit. For an EM fit, a value above \code{max.iteration} means the fit stopped at the cap without meeting \code{tol} (fect then warns).}
+  \item{rel.change}{for \code{method = "ife"} with \code{time.component.from = "notyettreated"}, and \code{method = "fe"} (the same EM routine with no factors): the quantity compared with \code{tol} at the last iteration of the main fit (since 2.4.8): the relative change in the fitted values, \eqn{||fit_{new} - fit_{old}||_F / ||fit_{old}||_F}{||fit_new - fit_old||_F / ||fit_old||_F}; with factors (\code{r > 0}), the larger of that and the relative change in the interactive (factor) part of the fit. Not reported by other methods.}
+  \item{convergence}{for \code{method = "ife"} with \code{time.component.from = "notyettreated"} (the EM algorithm), and for \code{method = "fe"}: a list with \code{niter}, \code{rel.change}, \code{tol}, \code{max.iteration}, \code{iter.cap} (the round cap the EM loop applied: \code{max.iteration}, except for a model with neither factors nor covariates, whose loop stops at 500 rounds whatever \code{max.iteration} is), and \code{converged} (\code{TRUE} when the fit stopped because \code{rel.change} met \code{tol}). \code{print()} and \code{summary()} report it (since 2.4.8). A fit can meet \code{tol} while its estimate is still moving slowly, so a large \code{niter} is worth checking with a smaller \code{tol}.}
+  \item{validX, validF}{1 if covariates (0 when every covariate was dropped) or factors are in the model.}
+  \item{res, res.full}{T-by-N matrices of residuals: at the cells used to fit the model (\code{NA} elsewhere), and as the estimator returns them, before the other cells are set to \code{NA}.}
+  \item{Y.ct.full}{\code{Y.ct} before the cells with a missing outcome are set to \code{NA}.}
+  \item{eff.tr}{\code{eff} for the treated units (T-by-Ntr); not kept by every method.}
+  \item{Y.tr.cnt, Y.ct.cnt}{never-treated fits: the predicted untreated outcomes of the treated units (T-by-Ntr) and the fitted outcomes of the control units (T-by-Nco).}
+
+  \emph{Data, sample and settings.}
+  \item{Y.dat, D.dat, I.dat}{T-by-N matrices of the outcome, the treatment and the observation indicator (1 if the outcome and covariates are observed).}
+  \item{Y, D, X}{the names of the outcome, the treatment and the requested covariates (including any dropped before the fit). Each name occurs twice in the list: the second \code{Y} and \code{D} are the estimator's T-by-N outcome and treatment matrices, and the second \code{X} is its covariate array, T-by-N-by-p (\code{x[names(x) == "X"][[2]]}).}
+  \item{I, II}{T-by-N indicators: the cell is observed (\code{I}); the cell was used to fit the model, that is, observed, untreated and not held out for a test (\code{II}).}
+  \item{T.on, T.off, T.on.balance}{T-by-N matrices of event time, of time relative to treatment exit (with reversals), and of event time within the balanced sample (with \code{balance.period}); \code{NA} where not defined.}
+  \item{obs.missing}{a T x N matrix over all units, including those removed, coding each cell: 1 under treatment; 2 not under treatment (control units, and treated units before treatment); 3 missing; 4 in a unit removed from the sample; 5 held out for the placebo or carryover test; 6 removed by \code{carryover.rm}.}
+  \item{obs.missing.balance}{with \code{balance.period}: \code{obs.missing} with the cells of the balanced sample coded 7 (after onset) and 8 (before); \code{NA} otherwise.}
+  \item{sample}{a T x N logical matrix over all units: \code{TRUE} for the cells coded 1, 2 or 5 in \code{obs.missing}.}
+  \item{unit.type}{for each unit of the fit: 1 untreated in all its observed periods, 2 treated in all, 3 treatment status changes.}
+  \item{tr, co, Ntr, Nco}{the column positions of the treated (ever-treated) and the never-treated units, and their numbers.}
+  \item{T, N, p}{the numbers of periods, units in the fit and covariates.}
+  \item{id}{the IDs of the units in the fit.}
+  \item{rawtime}{the periods; for a factor time index whose levels are not increasing numbers, the level labels.}
+  \item{remove.id}{IDs of the units removed before estimation (too few untreated periods, see \code{min.T0}, or too many missing periods, see \code{max.missing}). Present only when units were removed.}
+  \item{hasRevs}{1 if treatment switches off for some unit.}
+  \item{data.long}{the input panel (unit, time, outcome and treatment columns) before units were removed; \code{panelView::panelview(fit)} draws it.}
+  \item{index}{the unit and time column names (with \code{group.fe} appended).}
+  \item{force}{the fixed effects as a code: 0 \code{"none"}, 1 \code{"unit"}, 2 \code{"time"}, 3 \code{"two-way"}.}
+  \item{W}{the name of the weight column. A weighted fit has a second element \code{W}, its T-by-N weight matrix.}
+  \item{W.agg}{with \code{W} or \code{W.agg}: the aggregation weights as a T-by-N matrix on the fit's panel (like \code{Y.dat}); read by \code{\link{imputed_outcomes}}, \code{\link{estimand}} and \code{\link{effect}}. Absent for unweighted fits and with \code{W.est} alone.}
+  \item{W.est.col, W.agg.col, W.in.fit, W.in.agg}{the weight column used in the fit and in the aggregation (\code{NULL} if none), and whether each is weighted.}
+  \item{time.component.from, em}{the values used (after the changes \code{method = "gsynth"} makes).}
+  \item{placeboTest, placebo.period, carryoverTest, carryover.period, carryover.rm, balance.period, loo, dloo, dloo.adjust, binary, group.fe, cl.label}{the settings, as used (\code{loo = TRUE} turns off \code{placeboTest} and \code{carryoverTest}); \code{cl.label} is the cluster column name.}
+  \item{formula, call}{the formula (formula interface only) and the call.}
+  \item{eff_debias}{reserved; \code{NULL}.}
 }
 \author{
   Licheng Liu; Ye Wang; Yiqing Xu; Ziyi Liu
@@ -422,7 +433,7 @@ Ignored when \code{CV = FALSE}.}
   Panel data models with interactive fixed effects.
   \emph{Econometrica, 77}(4), 1229-1279.
 
-  Liu, L., Wang, Y., and Xu, Y. (2022).
+  Liu, L., Wang, Y., and Xu, Y. (2024).
   A Practical Guide to Counterfactual Estimators for Causal Inference with Time-Series Cross-Sectional Data.
   \emph{American Journal of Political Science, 68}(1), 160-176.
 
@@ -431,7 +442,9 @@ Ignored when \code{CV = FALSE}.}
   \emph{Political Analysis, 25}(1), 57-76.
 }
 \seealso{
-  \code{\link{plot.fect}}, \code{\link{print.fect}}
+  \code{\link{plot.fect}}, \code{\link{print.fect}}, \code{\link{estimand}},
+  \code{\link{esplot}}, \code{\link{get.cohort}}, \code{\link{did_wrapper}},
+  \code{\link{fect_sens}}, \code{\link{fect_mspe}}
 }
 \examples{
 library(fect)

@@ -1222,6 +1222,9 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
         loading.proj.resid <- NULL
 
         if (use_bounded) {
+            ## With a unit effect the free intercept is fitted jointly with the
+            ## simplex-constrained loadings (profiled out; since 2.4.8).
+            has_unit_fe <- force %in% c(1, 3)
             Lambda.co.raw <- as.matrix(est.co.best$lambda)   # Nco x r.cv (no intercept col)
             F.hat.raw     <- as.matrix(est.co.best$factor)   # TT  x r.cv (no intercept col)
             Nco_b         <- nrow(Lambda.co.raw)
@@ -1251,7 +1254,8 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     F_hat_pre  = cv_F_pre,
                     Lambda_co  = Lambda.co.raw,
                     gamma_grid = gamma_grid_use,
-                    cv_k       = 5L
+                    cv_k       = 5L,
+                    intercept  = has_unit_fe
                 )$gamma_cv
             }
         }
@@ -1274,24 +1278,24 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                 lambda.tr.r <- matrix(NA_real_, nrow = r.cv, ncol = Ntr)
                 W_tr <- matrix(NA_real_, nrow = Ntr, ncol = Nco_b)
                 loading.proj.resid <- numeric(Ntr)
+                alpha_vec <- numeric(Ntr)
                 for (i.tr in seq_len(Ntr)) {
-                    sol <- .solve_bounded_loading(
+                    sol <- .solve_bounded_loading_int(
                         u_pre     = U.tr.pre[, i.tr],
                         F_pre     = F.pre.r,
                         Lambda_co = Lambda.co.raw,
-                        gamma     = gamma_use
+                        gamma     = gamma_use,
+                        intercept = has_unit_fe
                     )
                     lambda.tr.r[, i.tr] <- sol$lambda_hat
                     W_tr[i.tr, ] <- sol$w
-                    loading.proj.resid[i.tr] <- sqrt(sum(
-                        (U.tr.pre[, i.tr] - F.pre.r %*% sol$lambda_hat)^2
-                    ))
+                    loading.proj.resid[i.tr] <- sol$resid_norm
+                    if (has_unit_fe) alpha_vec[i.tr] <- sol$alpha
                 }
-                if (force %in% c(1, 3)) {
-                    ## alpha.tr is residual-mean (NOT bounded; per locked decision)
-                    resid_mat <- U.tr.pre - F.pre.r %*% lambda.tr.r   # T0.min x Ntr
-                    alpha_row <- matrix(colMeans(resid_mat), nrow = 1L)
-                    lambda.tr <- rbind(lambda.tr.r, alpha_row)
+                if (has_unit_fe) {
+                    ## alpha.tr is not bounded; it is fitted jointly with the
+                    ## loadings (centred fit, see .solve_bounded_loading_int)
+                    lambda.tr <- rbind(lambda.tr.r, matrix(alpha_vec, nrow = 1L))
                 } else {
                     lambda.tr <- lambda.tr.r
                 }
@@ -1318,20 +1322,19 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     for (i.tr in seq_len(Ntr)) {
                         vec <- U.tr.pre[[i.tr]]
                         F.pre.i <- F.hat.raw[seq_along(vec), , drop = FALSE]
-                        sol <- .solve_bounded_loading(
+                        sol <- .solve_bounded_loading_int(
                             u_pre     = vec,
                             F_pre     = F.pre.i,
                             Lambda_co = Lambda.co.raw,
-                            gamma     = gamma_use
+                            gamma     = gamma_use,
+                            intercept = has_unit_fe
                         )
                         lambda.tr.r[, i.tr] <- sol$lambda_hat
                         W_tr[i.tr, ] <- sol$w
-                        loading.proj.resid[i.tr] <- sqrt(sum(
-                            (vec - F.pre.i %*% sol$lambda_hat)^2
-                        ))
-                        alpha_vec[i.tr] <- mean(vec - F.pre.i %*% sol$lambda_hat)
+                        loading.proj.resid[i.tr] <- sol$resid_norm
+                        if (has_unit_fe) alpha_vec[i.tr] <- sol$alpha
                     }
-                    if (force %in% c(1, 3)) {
+                    if (has_unit_fe) {
                         lambda.tr <- rbind(lambda.tr.r, matrix(alpha_vec, nrow = 1L))
                     } else {
                         lambda.tr <- lambda.tr.r
@@ -1362,20 +1365,19 @@ fect_nevertreated <- function(Y, # Outcome variable, (T*N) matrix
                     for (i.tr in seq_len(Ntr)) {
                         vec    <- as.numeric(U.tr.pre[[i.tr]])
                         F.pre.i <- F.hat.raw[time.pre[[i.tr]], , drop = FALSE]
-                        sol <- .solve_bounded_loading(
+                        sol <- .solve_bounded_loading_int(
                             u_pre     = vec,
                             F_pre     = F.pre.i,
                             Lambda_co = Lambda.co.raw,
-                            gamma     = gamma_use
+                            gamma     = gamma_use,
+                            intercept = has_unit_fe
                         )
                         lambda.tr.r[, i.tr] <- sol$lambda_hat
                         W_tr[i.tr, ] <- sol$w
-                        loading.proj.resid[i.tr] <- sqrt(sum(
-                            (vec - F.pre.i %*% sol$lambda_hat)^2
-                        ))
-                        alpha_vec[i.tr] <- mean(vec - F.pre.i %*% sol$lambda_hat)
+                        loading.proj.resid[i.tr] <- sol$resid_norm
+                        if (has_unit_fe) alpha_vec[i.tr] <- sol$alpha
                     }
-                    if (force %in% c(1, 3)) {
+                    if (has_unit_fe) {
                         lambda.tr <- rbind(lambda.tr.r, matrix(alpha_vec, nrow = 1L))
                     } else {
                         lambda.tr <- lambda.tr.r

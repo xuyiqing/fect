@@ -86,7 +86,7 @@ $$Y_{it}^{0} = \alpha_i + \xi_t + \delta_{g(i),t} + e_{it}$$
 
 where $\alpha_i$ is a unit fixed effect, $\xi_t$ is a time fixed effect, and $\delta_{g(i),t}$ is a region-specific time effect that serves as the confounding source. Because treatment assignment and timing both depend on region, $\delta_{g(i),t}$ correlates with treatment status --- creating exactly the kind of bias that additional fixed effects are designed to absorb.
 
-We generate an unbalanced panel with 300 units belonging to 5 regions. Each region has a distinct linear time trend, and treatment probability and timing both depend on region. Units in higher-numbered regions enter the panel later, creating the kind of unbalancedness common in real datasets (e.g., firms entering markets, countries joining surveys).
+We generate an unbalanced panel with 500 units belonging to 5 regions. Each region has a distinct linear time trend, and treatment probability and timing both depend on region. Units in higher-numbered regions enter the panel later, creating the kind of unbalancedness common in real datasets (e.g., firms entering markets, countries joining surveys).
 
 The `sim_region` dataset ships with the package. It is an unbalanced panel with 500 units belonging to 5 regions. The DGP generation script is in `data-raw/sim_region.R`.
 
@@ -422,22 +422,22 @@ This means: the linear and quadratic trend bases are grouped by sector, while th
 
 ## Cross-validation
 
-The number of latent factors `r` in a CFE specification can be selected by cross-validation through the main `fect()` dispatcher --- set `CV = TRUE` and pass `cv.method = "rolling"` to use rolling-window CV (recommended on macro panels with serially correlated residuals; see [Chapter @sec-ife-mc]). CFE-specific structural arguments (`Z`, `gamma`, `Q`, `Q.type`, `kappa`, plus extra index columns for additional grouping FEs) are held fixed at the user-supplied spec; CV varies only `r`.
+With `method = "cfe"`, `fect()` cross-validates `r` only when the factors are estimated from the never-treated units (`time.component.from = "nevertreated"`). Under the default `time.component.from = "notyettreated"`, `CV = TRUE` is switched off without a message and the smallest value in `r` is used, so `r` = `c(0, 3)` fits `r` = 0. In that setting, choose `r` with `r.cv.rolling(method = "cfe")` (see the [cheatsheet](aa-cheatsheet.html)) and pass the chosen value to `fect()`. With never-treated factors, set `CV = TRUE` and pass `cv.method = "rolling"` to use rolling-window CV (recommended on macro panels with serially correlated residuals; see [Chapter @sec-ife-mc]). CFE-specific structural arguments (`Z`, `gamma`, `Q`, `Q.type`, `kappa`, plus extra index columns for additional grouping FEs) are held fixed at the user-supplied spec; CV varies only `r`.
 
 ```{r cfe-cv-dispatcher, eval = FALSE}
 fit.cfe <- fect(Y ~ D, data = sim_region,
   index   = c("id", "time", "region_time"),
   method  = "cfe", force = "two-way",
+  time.component.from = "nevertreated",
   CV      = TRUE, r = c(0, 3),
   cv.method = "rolling",
   cv.buffer = 1, cv.nobs = 3, k = 20, cv.prop = 0.1,
-  cv.rule = "1se",
   se = TRUE, parallel = TRUE, cores = 16, nboots = 200
 )
 fit.cfe$r.cv  # selected r
 ```
 
-Block CV (`cv.method = "block"`) is also available as a drop-in replacement; see the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv) for the full parameter reference and the deprecation plan for the legacy `"all_units"` / `"treated_units"` values.
+Block CV (`cv.method = "block"`) is also available as a drop-in replacement; see the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv) for the full parameter reference and the legacy `"all_units"` / `"treated_units"` values.
 
 ------------------------------------------------------------------------
 
@@ -455,7 +455,7 @@ Block CV (`cv.method = "block"`) is also available as a drop-in replacement; see
 | `Q.bspline.degree` | integer | Degree of B-spline when `Q.type = "bspline"` (default: auto) |
 | `Z.param` | named list | Block assignment: which $Z$ columns share which $\gamma$ grouping |
 | `Q.param` | named list | Block assignment: which $Q$ columns share which $\kappa$ grouping |
-| `r` | integer or vector | Number of latent factors; use `c(0, 5)` with `CV = TRUE` to select |
+| `r` | integer or vector | Number of latent factors; `c(0, 5)` with `CV = TRUE` selects it when `time.component.from = "nevertreated"`; otherwise use `r.cv.rolling()` |
 | `force` | character | Additive FE: `"none"`, `"unit"`, `"time"`, `"two-way"` |
 
 The CFE estimator combines all these components into a single unified model. Each component relaxes a specific assumption about the data-generating process. In practice, researchers should use `fect_mspe()` (@sec-cfe-mspe) to compare specifications and placebo tests to validate the chosen model.

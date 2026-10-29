@@ -60,6 +60,25 @@ make_es_df <- function(Period_vec, est_vec, se_vec = NULL,
   df
 }
 
+# Jackknife standard error from leave-one-unit-out estimates
+.did_jackknife_se <- function(reps) {
+  n <- length(reps)
+  if (n < 2) {
+    return(NA_real_)
+  }
+  sqrt((n - 1) / n * sum((reps - mean(reps))^2))
+}
+
+# One cluster-bootstrap sample: draw the units with replacement and give each
+# drawn copy its own ID (1..number of units)
+.did_cluster_boot_draw <- function(data, unit_id, rows_by_cluster) {
+  n_clusters <- length(rows_by_cluster)
+  idx_b <- rows_by_cluster[sample.int(n_clusters, n_clusters, replace = TRUE)]
+  d_b <- data[unlist(idx_b, use.names = FALSE), ]
+  d_b[[unit_id]] <- rep(seq_along(idx_b), lengths(idx_b))
+  d_b
+}
+
 # ── Main wrapper ───────────────────────────────────────────────────────────
 
 did_wrapper <- function(
@@ -78,9 +97,9 @@ did_wrapper <- function(
     ## DIDmultiplegtDYN options
     didm.effects = NA,
     didm.placebo = NA) {
-  if (method == "bootstrap") method <- "boot"
   method <- match.arg(method)
   se <- match.arg(se)
+  if (se == "bootstrap") se <- "boot"
   unit_id <- index[1]
   time_id <- index[2]
 
@@ -88,6 +107,21 @@ did_wrapper <- function(
   unit_sym <- rlang::sym(unit_id)
   D_sym <- rlang::sym(D)
   # Y_sym    <- rlang::sym(Y) # If Y is used with dplyr NSE
+
+  ## did before 2.5.1 reports a (cohort, period) cell it cannot estimate on an
+  ## unbalanced panel as an effect of 0 (and aggte() then averages it in), and
+  ## can segfault when a cell's comparison group is empty in one of its two
+  ## periods; 2.5.1 returns NA for such cells.
+  if (method %in% c("cs_never", "cs_notyet")) {
+    if (!requireNamespace("did", quietly = TRUE)) {
+      stop("method = \"", method, "\" needs the did package: install.packages(\"did\").", call. = FALSE)
+    }
+    if (utils::packageVersion("did") < "2.5.1") {
+      stop("method = \"", method, "\" needs did >= 2.5.1 (installed: ", utils::packageVersion("did"),
+           "). Earlier versions report cells they cannot estimate on unbalanced panels as 0 ",
+           "and can crash. Update with install.packages(\"did\").", call. = FALSE)
+    }
+  }
 
   if (method == "didm" && is.na(didm.effects)) {
     stop('For "didm", you must supply "didm.effects" and "didm.placebo".')
@@ -510,6 +544,9 @@ did_wrapper <- function(
 
     cluster_ids <- unique(data[[unit_id]]) # Base R, fine
     n_clusters <- length(cluster_ids)
+    ## row indices of each unit, in the order of cluster_ids
+    rows_by_cluster <- split(seq_len(nrow(data)),
+                             factor(data[[unit_id]], levels = cluster_ids))
 
     # Ensure nboots is sensible for jackknife
     if (se == "jackknife" && nboots != n_clusters) {
@@ -519,18 +556,15 @@ did_wrapper <- function(
 
 
     boot_fun <- function(b) { # b is the iteration number
-      if (se %in% c("boot", "bootstrap")) {
-        # Stratified bootstrap if applicable, or simple cluster bootstrap
-        samp_indices <- sample(seq_along(cluster_ids), n_clusters, replace = TRUE)
-        samp_cluster_names <- cluster_ids[samp_indices]
-        # Efficiently create bootstrap sample by selecting rows
-        # This assumes unit_id column is a factor or character
-        d_b <- data[data[[unit_id]] %in% samp_cluster_names, ]
-        # To handle duplicated clusters correctly if units within clusters are distinct in d_b:
-        # This requires more care if unit IDs are not unique across original clusters
-        # A common way is to replicate data for chosen clusters and assign new unique IDs if needed by downstream.
-        # However, fixest handles repeated clusters in cluster argument if data is just rbind-ed.
-        # The current approach data[data[[unit_id]] %in% samp, ] is standard for cluster bootstrap.
+      if (se == "boot") {
+        # Cluster (unit) bootstrap: draw n_clusters units with replacement.
+        # A unit drawn k times enters k times, each copy as its own unit
+        # (new IDs 1..n_clusters), so the unit fixed effects, the clustering
+        # and the cohort definitions treat the copies as distinct units.
+        # (Before 2.4.8 the sample was data[unit %in% drawn, ], which kept a
+        # unit drawn several times only once: each draw held about 63% of
+        # the units and the standard errors were too small.)
+        d_b <- .did_cluster_boot_draw(data, unit_id, rows_by_cluster)
       } else { # jackknife
         omit_cluster_name <- cluster_ids[b] # b is 1 to n_clusters
         d_b <- data[data[[unit_id]] != omit_cluster_name, ]
@@ -566,6 +600,17 @@ did_wrapper <- function(
       out_full$CI_lower <- NA_real_
       out_full$CI_upper <- NA_real_
       overall_p <- NA_real_
+    } else if (se == "jackknife") {
+      # Jackknife: SE = sqrt((n - 1) / n * sum((theta_i - mean)^2)) over the
+      # n leave-one-unit-out estimates, with a normal interval and p-value.
+      # (Before 2.4.8 the SE was sd() of the leave-one-out estimates, about
+      # sqrt(n) times too small, and the interval used bootstrap quantiles.)
+      out_full <- run_estimator_once(data)
+      theta_hat <- out_full$ATT
+      out_full$ATT_se <- .did_jackknife_se(att_reps_clean)
+      out_full$CI_lower <- theta_hat - 1.96 * out_full$ATT_se
+      out_full$CI_upper <- theta_hat + 1.96 * out_full$ATT_se
+      overall_p <- 2 * (1 - stats::pnorm(abs(theta_hat / out_full$ATT_se)))
     } else {
       out_full <- run_estimator_once(data) # Get point estimate from full sample
       theta_hat <- out_full$ATT
@@ -632,10 +677,18 @@ did_wrapper <- function(
         out_full$es$CI.upper <- NA_real_
         out_full$es$p.value <- NA_real_
 
-        out_full$es$`S.E.`[valid_cols] <- boot_se
-        out_full$es$CI.lower[valid_cols] <- 2 * original_att_filtered - ci_quantiles_upper
-        out_full$es$CI.upper[valid_cols] <- 2 * original_att_filtered - ci_quantiles_lower
-        out_full$es$p.value[valid_cols] <- pvals_es
+        if (se == "jackknife") {
+          jack_se <- apply(boot_mat_filtered, 2, function(col) .did_jackknife_se(col[!is.na(col)]))
+          out_full$es$`S.E.`[valid_cols] <- jack_se
+          out_full$es$CI.lower[valid_cols] <- original_att_filtered - 1.96 * jack_se
+          out_full$es$CI.upper[valid_cols] <- original_att_filtered + 1.96 * jack_se
+          out_full$es$p.value[valid_cols] <- 2 * (1 - stats::pnorm(abs(original_att_filtered / jack_se)))
+        } else {
+          out_full$es$`S.E.`[valid_cols] <- boot_se
+          out_full$es$CI.lower[valid_cols] <- 2 * original_att_filtered - ci_quantiles_upper
+          out_full$es$CI.upper[valid_cols] <- 2 * original_att_filtered - ci_quantiles_lower
+          out_full$es$p.value[valid_cols] <- pvals_es
+        }
       } else {
         warning("No valid data for bootstrapping event study standard errors.")
       }

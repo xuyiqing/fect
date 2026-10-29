@@ -1983,6 +1983,8 @@ fect_cv <- function(Y, # Outcome variable, (T*N) matrix
         validX = validX,
         validF = validF,
         niter = est.best$niter,
+        rel.change = est.best$dif, # EM: relative change at the last round
+        iter.cap = est.best$max_iter, # EM: the round cap the loop applied
         time = time.on,
         att = att.on,
         count = count.on,

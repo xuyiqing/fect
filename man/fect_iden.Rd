@@ -13,7 +13,7 @@ fect_iden(
 )
 }
 \arguments{
-\item{x}{A `fect` object. Must be estimated with `cm=TRUE` so that `x$est.cm` exists.}
+\item{x}{A \code{fect} object estimated with \code{cm = TRUE} and at least one covariate, so that \code{x$est.cm} exists.}
 
 \item{moderator}{Character scalar. Name of the moderator \eqn{M_{it}} (must be in `x$X`).}
 
@@ -34,7 +34,7 @@ A list with elements `e1` and `e0`, each containing:
   - `model`: the fitted `fixest` model
 }
 \description{
-Implements the over-identification test described in the slide:
+Implements an over-identification test for the causal moderation model (\code{cm = TRUE} in \code{\link{fect}}):
 run two auxiliary regressions of residualized outcomes on the moderator
 and covariates (including quadratic and interaction terms) with unit and
 time fixed effects, then test using \eqn{n \times R^2 \sim \chi^2(df)},
