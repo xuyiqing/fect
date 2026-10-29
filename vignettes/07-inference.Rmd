@@ -12,6 +12,8 @@ The chapter is organized around three choices:
 2. `ci.method` --- how the CI is built from that distribution: basic, percentile, bc, bca, or normal.
 3. `para.error` --- which residual-error model the parametric path uses: auto, ar, empirical, or wild. This option applies only when `vartype = "parametric"` and is ignored when `vartype` is `"bootstrap"` or `"jackknife"`.
 
+`vartype = "conformal"` is a separate procedure: it uses no bootstrap draws and no `ci.method`; see `?fect`.
+
 For each combination, `fect` also reports a corresponding $p$-value by test inversion and a recommended minimum number of bootstrap replicates, `nboots`, based on the classic literature. We summarize these choices and report the empirical coverage of each combination on a clean DGP. Below, we use $\hat\theta$ to denote a point estimate.
 
 ## The 3 × 5 inference matrix

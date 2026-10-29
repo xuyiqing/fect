@@ -92,10 +92,12 @@ When both are given, \code{W.est} and \code{W.agg} must name the same column; di
   error. \code{"fe"} is fitted as \code{"ife"} with \code{r = 0}.}
 \item{se}{a logical flag indicating whether uncertainty estimates will be produced.}
 \item{vartype}{a string specifying the type of variance estimator, e.g.
-  \code{"bootstrap"}. Three values are supported:
+  \code{"bootstrap"}. Four values are supported:
   \code{"bootstrap"} (nonparametric cluster-bootstrap; the safe default),
-  \code{"jackknife"} (leave-one-unit-out), and
-  \code{"parametric"} (two-stage pseudo-treated parametric bootstrap).
+  \code{"jackknife"} (leave-one-unit-out),
+  \code{"parametric"} (two-stage pseudo-treated parametric bootstrap), and
+  \code{"conformal"} (conformal intervals from leave-one-control-out fits,
+  new in 2.4.9; see the section "Conformal intervals" under Details).
   The \code{"parametric"} option is restricted to the
   gsynth-style regime: it requires
   \code{time.component.from = "nevertreated"}, no treatment reversal,
@@ -104,51 +106,7 @@ When both are given, \code{W.est} and \code{W.agg} must name the same column; di
   \code{cl} (with a warning).
   For all other settings, \code{vartype = "bootstrap"} is recommended.
   The variance type used is stored in the fit as \code{vartype}, which
-  \code{\link{effect}} and \code{\link{att.cumu}} read.
-
-  \code{vartype = "conformal"} (development version) gives conformal
-  intervals instead of a variance estimate: the pooled
-  information-matched Jackknife+ of Liu, "Unit-Level Conformal Inference
-  for Panel Counterfactuals" (write-up v2). It is available for
-  \code{method = "gsynth"}, \code{"ife"} and \code{"mc"} with an
-  absorbing treatment, and it uses the never-treated units as the
-  calibration pool. For each never-treated control j, the other controls
-  (the background) keep their complete panels; the treated unit and
-  control j expose only the treated unit's pre-treatment history and are
-  predicted separately against the background (\code{"gsynth"}: one
-  factor estimation on the background, then each unit's loading
-  projection; \code{"ife"} and \code{"mc"}: one fit per predicted unit).
-  The number of factors \code{r}, \code{lambda}, \code{force}, the
-  covariates and the convergence settings are those of the original fit;
-  there is no cross-validation inside these fits. With N the number of
-  controls used plus one, the interval at miscoverage \code{alpha} takes
-  the q-th smallest lower endpoint and the (N - q)-th smallest upper
-  endpoint, with q the largest integer in 0, ..., floor(N/2) such that
-  (2q - 1)/N <= \code{alpha}; if q = 0 (fewer than 1/\code{alpha}
-  units) the interval is the whole real line. Coverage is date-specific
-  (each treated unit and post-treatment date), not simultaneous. The
-  p-value is the one dual to the interval at zero effect. The point
-  estimates are those of the ordinary fit; \code{S.E.} is \code{NA}.
-  Controls not observed at all of a treated unit's pre-treatment dates
-  are not used for it, and a control not observed at a date is not used
-  at that date; the number used is reported. The intervals for each
-  treated unit and date are in \code{conformal$unit}.
-
-  The intervals in \code{est.att} (by event time), \code{est.avg},
-  \code{est.avg.unit} and \code{est.eff.calendar} are an EXTENSION beyond
-  the write-up, which covers one treated unit and one date, and await the
-  author's review: in each fold the treated units' predictions and the
-  control's signed errors are averaged with the same cell weights (with
-  staggered adoption the control is predicted over each cohort's window and
-  its errors are weighted by cohort size). With many treated units these
-  intervals are conservative, since a single control's error does not
-  average down as the treated average does. Pre-treatment event times have
-  no interval. \code{vartype = "conformal"} does not support weights,
-  \code{group}, \code{balance.period}, placebo, carryover, \code{loo}
-  or permutation tests, \code{cm}, extra fixed effects, binary outcomes or
-  \code{loading.bound}; \code{cl} is ignored. The equivalence plot,
-  \code{\link{estimand}}, \code{\link{att.cumu}}, \code{\link{effect}}
-  and \code{\link{fect_sens}} need draws and stop for these fits.}
+  \code{\link{effect}} and \code{\link{att.cumu}} read.}
 \item{para.error}{a string specifying the residual-error model used by
   the parametric bootstrap path; sub-option of \code{vartype = "parametric"}
   (silently ignored otherwise). One of \code{"auto"}, \code{"ar"},
@@ -199,7 +157,7 @@ on alternative estimands like \code{aptt} and \code{log.att}), call
 \code{quantile.CI = TRUE} maps to \code{ci.method = "basic"}. Both
 mappings still work but emit a one-time deprecation warning.}
 \item{nboots}{an integer specifying the number of bootstrap runs. Ignored if \code{se=FALSE}. Default \code{200}, sufficient for the standard error and the normal-CI structure that \code{fect} ships in \code{est.att}/\code{att.avg}. For tail-quantile-based CI methods accessed via \code{estimand()} (\code{ci.method} \code{"basic"}, \code{"percentile"}, \code{"bc"}, \code{"bca"}), bump to \code{nboots = 1000} or higher (Efron 1987 Section 3; DiCiccio & Efron 1996 Section 4); \code{estimand()} emits a warning when called on under-replicated fits.}
-\item{alpha}{the significance level. Default \code{0.05}. The intervals in \code{est.avg}, \code{est.att} and the other \code{est.*} tables are (1 - \code{alpha}) intervals. \code{att.bound}, \code{est.att90}, \code{att.off.bound} and the \code{(90\%)} columns of \code{est.placebo} and \code{est.carryover} are (1 - 2\code{alpha}) intervals, 90\% at the default; the equivalence plot draws them. The p-values and the tests in \code{test.out} do not depend on \code{alpha}, and \code{Y.avg} always holds 95\% and 90\% intervals.}
+\item{alpha}{the significance level. Default \code{0.05}. The intervals in \code{est.avg}, \code{est.att} and the other \code{est.*} tables are (1 - \code{alpha}) intervals. \code{att.bound}, \code{est.att90}, \code{att.off.bound} and the \code{(90\%)} columns of \code{est.placebo} and \code{est.carryover} are (1 - 2\code{alpha}) intervals, 90\% at the default; the equivalence plot draws them. The p-values and the tests in \code{test.out} do not depend on \code{alpha}, and \code{Y.avg} always holds 95\% and 90\% intervals. With \code{vartype = "conformal"}, \code{alpha} must lie in (0, 1), and the comparison that sets the interval is exact, so pass the number you mean (\code{alpha = 0.1}), not \code{1 - level}.}
 \item{parallel}{controls which operations run in parallel. Accepted values:
 \describe{
   \item{\code{TRUE}}{Enable parallel computing for both CV and bootstrap (default in \code{fect()}).}
@@ -302,6 +260,32 @@ Ignored when \code{CV = FALSE}.}
 }
 \details{
   \code{fect} implements counterfactual estimators for TSCS data. It first imputes counterfactuals by fitting an outcome model using untreated observations, then estimates the individual treatment effect as the difference between observed and predicted outcomes. Finally, it computes average treatment effects on the treated (ATT) and period-specific ATTs. Placebo and equivalence tests help evaluate identification assumptions.
+
+  \subsection{Conformal intervals (\code{vartype = "conformal"}, new in 2.4.9)}{
+  \code{vartype = "conformal"} gives conformal intervals instead of a variance estimate. The procedure is the pooled information-matched Jackknife+ of Liu, "Unit-Level Conformal Inference for Panel Counterfactuals". It is available for \code{method = "gsynth"}, \code{"ife"} and \code{"mc"} with an absorbing treatment. The never-treated units form the calibration pool, and at least two are needed.
+
+  \emph{Construction.} For each never-treated control j, the other controls (the background) keep their complete panels. The treated unit and control j expose only the treated unit's pre-treatment history. Each is predicted separately against the background. With \code{"gsynth"} this is one factor estimation on the background and then each unit's loading projection. With \code{"ife"} and \code{"mc"} it is one fit per predicted unit. The number of factors \code{r}, \code{lambda}, \code{force}, the covariates and the convergence settings are those of the original fit. There is no cross-validation inside these fits.
+
+  \emph{Calibration.} Let N be the number of controls in the pool plus one. The interval takes the q-th smallest lower endpoint and the (N - q)-th smallest upper endpoint, where q is the largest integer in 0, ..., floor(N/2) such that q = 0 or (2q - 1)/N <= \code{alpha}. The comparison is made in double precision with no tolerance, and the p-value uses the same expression. Pass \code{alpha} as the number you mean (0.1), not as 1 - level: in floating point 1 - 0.9 is slightly below 0.1, and at N = 10 it gives q = 0 where 0.1 gives q = 1. If q = 0 (N is below 1/\code{alpha}), the interval is the whole real line. \code{alpha} must lie in (0, 1); \code{fect} stops otherwise. Coverage is date-specific (each treated unit and post-treatment date), not simultaneous. The intervals for each treated unit and date are in \code{conformal$unit}.
+
+  \emph{Pool.} The pool for an interval is the set of controls observed at every pre-treatment date at which the treated unit is observed, and at the date of the interval. For an aggregate (see below) a control must be in the pool of every aggregated cell. Controls outside the pool are not used. Their number is \code{n.excluded}, and N is the pool size plus one.
+
+  \emph{Failed folds.} A control in the pool whose fold fit fails is not dropped. A fit fails when it returns nothing, or when its prediction or error is not finite. The control keeps its slot with an infinite score, so N and q do not change. The interval is widened or unchanged, never shortened. With at least q failed folds the interval is the whole real line. A fold fit that stops at \code{max.iteration} without converging is used as it is and is not counted as failed. The number of failed folds in an interval is \code{n.failed}. \code{fect} issues one warning when any fit fails, and \code{conformal$status} carries a note.
+
+  \emph{p-value.} The p-value is the one dual to the interval at zero effect: \code{p.value} <= \code{alpha} exactly when 0 is outside the interval.
+
+  \emph{What the guarantee needs.} For each treated unit and date, the interval covers the counterfactual outcome with probability at least 1 - (2q - 1)/N if the four conditions below hold. \code{fect} checks none of them.
+  \enumerate{
+    \item The prediction errors of the pool controls and of the treated unit are exchangeable, given the information used.
+    \item The failure rule is valid relative to a finite reference completion. This is a procedure with the same pool, N and q that equals the fold quantities of every successful fold, supplies a finite, unit-symmetric fallback on every failed fold, and satisfies condition 1. The interval here contains the reference interval on every data set, so it covers at least as often and its p-value is at least as large. \code{fect} does not build or check the reference completion.
+    \item The pool depends only on the observation pattern, that is, on which cells are observed. The guarantee is conditional on that pattern and assumes that, given it, the prediction errors of the pool controls and of the treated unit are exchangeable. If missingness depends on outcomes, or on unobserved unit traits that also drive the error, coverage is not established.
+    \item The tuning does not depend on which unit is treated in a way that breaks exchangeability. The tuning is frozen from the original fit, which uses the treated units' pre-treatment cells and the controls' full panels. Cross-validated tuning is not covered. Fixing the tuning in advance, for example a given \code{r} with \code{CV = FALSE}, avoids the issue.
+  }
+
+  \emph{Aggregated targets.} The intervals in \code{est.att} (by event time), \code{est.avg}, \code{est.avg.unit} and \code{est.eff.calendar} are an extension beyond the write-up, which covers one treated unit and one date, and await the author's review. In each fold the treated units' predictions and the control's signed errors are averaged with the same cell weights. With staggered adoption the control is predicted over each cohort's window, and its errors are weighted by cohort size. Coverage for these aggregated targets is not established by the unit-level theorem. These intervals require separate assumptions and validation. In a constructed example with nine controls and 100 treated units whose outcomes are independent Bernoulli(0.01) draws, a zero predictor and no effect, \code{alpha = 0.1} gives N = 10 and q = 1, and the interval for the average effect covers 0 with probability 0.42, not 0.90. Pre-treatment event times have no interval.
+
+  \emph{Output and limits.} The point estimates are those of the ordinary fit, and \code{S.E.} is \code{NA}. \code{ci.method} and \code{ci.alpha} do not apply (the stored values are defaults). \code{est.att90} and \code{att.bound} are the intervals at 2 \code{alpha}. \code{est.eff.calendar.fit} has no interval. \code{vartype = "conformal"} stops with weights, \code{group}, \code{balance.period}, placebo and carryover tests, \code{loo}, permutation tests, \code{cm}, extra fixed effects, binary outcomes, \code{loading.bound}, a treatment that switches off, a \code{method} other than the three above, or fewer than two never-treated units. \code{cl} is ignored, with a warning. The equivalence plot, \code{\link{estimand}}, \code{\link{att.cumu}}, \code{\link{effect}} and \code{\link{fect_sens}} need draws and stop for these fits.
+  }
 }
 \value{
   An object of class \code{"fect"}: a list. Which slots it holds depends on the method and the options; a slot that a fit does not need is absent or \code{NULL}. Matrices called T-by-N have one row per period and one column per unit of the fit (units removed before estimation are not among them, except in \code{obs.missing}). "Event time" is time relative to treatment onset: 1 is the first treated period and 0 the last period before it.
@@ -324,23 +308,23 @@ Ignored when \code{CV = FALSE}.}
 
   With \code{W} (or \code{W.agg}), \code{att.avg}, \code{att}, \code{att.off}, \code{att.placebo}, \code{att.carryover} and their inference slots (\code{est.avg}, \code{est.att}, \code{est.att.off}, ...) hold the weighted estimates; a fit has no separate weighted slots.
 
-  \emph{Inference} (\code{se = TRUE}). Unless noted, intervals are (1 - \code{alpha}) intervals built by \code{ci.method}, and p-values test that the effect is 0.
+  \emph{Inference} (\code{se = TRUE}). Unless noted, intervals are (1 - \code{alpha}) intervals built by \code{ci.method}, and p-values test that the effect is 0. With \code{vartype = "conformal"} (since 2.4.9) they are Jackknife+ intervals (see \code{conformal}), \code{S.E.} is \code{NA}, and \code{ci.method} does not apply.
   \item{est.avg}{1-row matrix for \code{att.avg} with columns \code{ATT.avg}, \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value}.}
   \item{est.avg.unit}{the same for \code{att.avg.unit} (first column \code{ATT.avg.unit}).}
   \item{est.att}{matrix for \code{att}, one row per event time (the row names): columns \code{ATT}, \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value}, \code{count}.}
   \item{est.att90, att.bound}{\code{est.att} with the (1 - 2\code{alpha}) interval (90\% by default) in place of the (1 - \code{alpha}) one, and that interval alone (\code{CI.lower}, \code{CI.upper}). The equivalence plot (\code{plot(type = "equiv")}) draws it.}
   \item{att.vcov}{the covariance matrix of the bootstrap draws of \code{att} across event times (rows and columns in the order of \code{time}); \code{\link{fect_sens}} reads it.}
   \item{est.att.off, att.off.bound, att.off.vcov}{the same three for \code{att.off} (first column \code{ATT.OFF}, last \code{count.off}).}
-  \item{est.eff.calendar, est.eff.calendar.fit}{inference for \code{eff.calendar} and \code{eff.calendar.fit}, one row per calendar period, with the columns of \code{est.att} (the first named \code{ATT-calendar} or \code{ATT-calendar Fitted}).}
+  \item{est.eff.calendar, est.eff.calendar.fit}{inference for \code{eff.calendar} and \code{eff.calendar.fit}, one row per calendar period, with the columns of \code{est.att} (the first named \code{ATT-calendar} or \code{ATT-calendar Fitted}). With \code{vartype = "conformal"}, \code{CI.lower}, \code{CI.upper} and \code{p.value} of \code{est.eff.calendar.fit} are \code{NA}.}
   \item{est.placebo, est.carryover}{with \code{placeboTest} or \code{carryoverTest}: a 1-row matrix with the ATT of the held-out cells (column \code{ATT.placebo} or \code{ATT.carryover}; named \code{Coef} when the model has covariates), \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value}, and the (1 - 2\code{alpha}) interval in \code{CI.lower(90\%)} and \code{CI.upper(90\%)}.}
   \item{est.beta}{inference for \code{beta}: columns \code{Coef}, \code{S.E.}, \code{CI.lower}, \code{CI.upper}, \code{p.value}; \code{NA} rows for dropped covariates.}
   \item{est.group.att, est.group.output}{with \code{group}: a matrix with one row per group (columns as in \code{est.avg}, first \code{ATT}), and for each group a list with \code{att.on} (as \code{est.att}), \code{att.on.bound}, \code{att.on.boot}, \code{att.off}, \code{att.off.bound}, \code{att.off.boot}, \code{att.placebo} and \code{att.carryover}. The interval and p-value follow \code{ci.method}.}
   \item{est.balance.att, est.balance.avg, est.balance.placebo, balance.att.bound, balance.att.vcov}{with \code{balance.period}: \code{est.att}, \code{est.avg}, \code{est.placebo}, \code{att.bound} and \code{att.vcov} for the balanced sample.}
   \item{Y.avg}{with \code{vartype = "bootstrap"} or \code{"jackknife"}: a data frame of the average observed outcome of the treated units (\code{treated}) and their average predicted untreated outcome (\code{counterfactual}) by \code{period}, with 95\% intervals (\code{lower.tr}, \code{upper.tr}, \code{lower.ct}, \code{upper.ct}) and 90\% intervals (\code{lower90.tr}, ...). The levels are fixed, whatever \code{alpha} and \code{ci.method}: basic intervals for the bootstrap, normal intervals for the jackknife. \code{period} is event time when the treated units start treatment at different times (attribute \code{period_type = "event_time"}) and calendar time when they all start at once.}
-  \item{vartype}{the variance estimator used: \code{"bootstrap"}, \code{"jackknife"}, \code{"parametric"} or \code{"conformal"}.}
+  \item{vartype}{the variance estimator used: \code{"bootstrap"}, \code{"jackknife"}, \code{"parametric"} or \code{"conformal"} (since 2.4.9).}
   \item{para.error}{for \code{vartype = "parametric"}: the residual model used, with \code{"auto"} resolved to \code{"empirical"} or \code{"ar"}.}
   \item{ci.method, ci.alpha}{the interval rule (\code{"normal"} or \code{"basic"}) and \code{alpha}. The gap plot with \code{id} uses them for the band of the chosen units; see \code{\link{plot.fect}}.}
-  \item{conformal}{with \code{vartype = "conformal"}, a list: \code{level} (1 - \code{alpha}), \code{status} (\code{"ok"}, or a note when some or all intervals are the whole real line), \code{r} and \code{lambda} (the tuning held fixed), \code{n.controls} (never-treated controls), \code{n.controls.ineligible} (controls usable for no treated unit), \code{n.failed.fits}, \code{unit} (a data frame with one row per treated unit and post-treatment date: \code{Y}, \code{Y.ct}, \code{eff}, \code{CI.lower}, \code{CI.upper}, \code{p.value}, \code{N} and \code{q}), \code{att} and \code{avg} (N and q of the aggregated intervals) and, with \code{keep.sims = TRUE}, \code{folds} (the treated fold predictions \code{M0} and the controls' signed errors \code{E}, one row per treated post-treatment cell and one column per control).}
+  \item{conformal}{with \code{vartype = "conformal"} (since 2.4.9), a list: \code{procedure} and \code{method}; \code{level} (1 - \code{alpha}) and \code{gamma} (\code{alpha}); \code{status} (\code{"ok"}; \code{"infinite: ..."} or \code{"partly infinite: ..."} when all or some intervals are the whole real line; followed by \code{"; <n> failed fold(s), affected intervals widened"} when a fold failed); \code{r} and \code{lambda} (the tuning held fixed); \code{n.controls} (never-treated controls, the largest pool); \code{n.controls.ineligible} (controls usable for no treated unit's window); \code{n.failed.fits} (component fits that returned no prediction); \code{n.failed.folds} (controls whose fold had a failed fit or a prediction or error that is not finite); \code{n.intervals.affected} (rows of \code{unit} with \code{n.failed} above 0); \code{N.range} (the smallest and largest N); \code{unit} (a data frame with one row per treated unit and post-treatment date: \code{unit}, \code{time}, \code{event.time}, \code{Y}, \code{Y.ct}, \code{eff}, \code{CI.lower}, \code{CI.upper}, \code{p.value}, \code{N}, \code{q}, \code{n.excluded} (controls outside the pool) and \code{n.failed} (pool controls whose fold failed)); \code{att} (by event time) and \code{avg} (rows \code{ATT.avg} and \code{ATT.avg.unit}), with \code{N}, \code{q}, \code{n.excluded} and \code{n.failed} of the aggregated intervals (for an aggregate, a control outside the pool of any aggregated cell is excluded, not failed); \code{extension} (a note on the aggregated intervals); and, with \code{keep.sims = TRUE}, \code{folds} (the treated fold predictions \code{M0} and the controls' signed errors \code{E}, one row per treated post-treatment cell and one column per control; an entry is \code{NA} where the fold gave no value, and entries of controls outside the pool or of failed folds are not used for the interval).}
 
   \emph{Bootstrap draws} (\code{se = TRUE}). One column per kept replicate; failed replicates are dropped.
   \item{att.avg.boot, att.avg.unit.boot}{draws of \code{att.avg} and \code{att.avg.unit}.}

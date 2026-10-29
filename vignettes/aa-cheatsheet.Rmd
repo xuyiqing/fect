@@ -21,7 +21,7 @@ A typical sequence:
 1. Fit `"fe"` with `se = TRUE` and look at the pre-treatment estimates: the gap plot, the F test and the equivalence test in `fit$test.out`, and a placebo test (`placeboTest = TRUE` with `placebo.period`). See [Chapter @sec-fect].
 2. If the pre-treatment estimates move away from zero, fit `"ife"` and `"mc"` and repeat the checks. `fect_mspe()` compares the prediction errors of fitted models ([Chapter @sec-cfe]).
 3. With few treated units and no treatment reversal, use `"gsynth"` with `vartype = "parametric"`.
-4. Choose the variance estimator separately. `vartype = "bootstrap"` (the default for every method) resamples units, or clusters with `cl`. `"jackknife"` leaves out one unit at a time. `"parametric"` works only in the gsynth setting. See [Chapter @sec-inference].
+4. Choose the variance estimator separately. `vartype = "bootstrap"` (the default for every method) resamples units, or clusters with `cl`. `"jackknife"` leaves out one unit at a time. `"parametric"` works only in the gsynth setting. `vartype = "conformal"` gives conformal intervals from leave-one-control-out fits instead of resampling (`gsynth`, `ife` and `mc` with an absorbing treatment; see `?fect`). See [Chapter @sec-inference].
 
 ## Option combinations that fect changes or refuses {#sec-cheatsheet-overrides}
 
@@ -69,6 +69,7 @@ Some combinations of options are changed by `fect()` before it fits, and some st
 |:------------|:-------------------|:--------------|
 | `se = FALSE` (the default) | Ignores `nboots`, `vartype`, `cl`, `ci.method` and `keep.sims`. | nothing |
 | `vartype = "parametric"` | Needs `time.component.from = "nevertreated"` (as with `"gsynth"`), no treatment reversal, a method other than `"mc"` or `"both"`, and at least two never-treated units. Otherwise stops. Ignores `cl`. | error; warning for `cl` |
+| `vartype = "conformal"` | Needs `method` `"gsynth"`, `"ife"` or `"mc"`, an absorbing treatment, at least two never-treated units, and `0 < alpha < 1`. Stops with weights, `group`, `balance.period`, placebo, carryover, `loo`, permutation tests, `cm`, extra fixed effects, binary outcomes or `loading.bound`. Ignores `cl`. `S.E.` is `NA`. | error; warning for `cl` |
 | `para.error` with `vartype` other than `"parametric"` | Ignored. | nothing |
 | `vartype = "jackknife"` with `cl` | Ignores `cl`, since the jackknife leaves out one unit at a time. | warning |
 | `vartype = "jackknife"` with `ci.method = "basic"` | Stops. | error |
@@ -200,7 +201,7 @@ A check mark (✓) indicates that the method requires or accepts the input.
 | `force` | Fixed effects structure: "none", "unit", "time", "two-way" (default) | fe, ife, mc, cfe, gsynth |
 | `time.component.from` | Time component source: "notyettreated" (default), "nevertreated". Controls which units provide the time-varying model components (time fixed effects, latent factors, temporal dynamics). When "nevertreated", only never-treated controls estimate these components. `method = "gsynth"` auto-sets to "nevertreated". `method = "mc"` supports "notyettreated" only. | ife, cfe, gsynth |
 | `em` | EM algorithm: `TRUE` (default), `FALSE`. Required `TRUE` for "notyettreated"; auto-set to `FALSE` by `method = "gsynth"`. | ife, cfe |
-| `vartype` | Uncertainty estimator: "bootstrap" (default for every method, including gsynth), "jackknife", or "parametric". "parametric" needs `time.component.from = "nevertreated"` and no treatment reversal, and is not available for mc; set it explicitly when there are few treated units. | fe, ife, mc, cfe, gsynth |
+| `vartype` | Uncertainty estimator: "bootstrap" (default for every method, including gsynth), "jackknife", "parametric", or "conformal". "parametric" needs `time.component.from = "nevertreated"` and no treatment reversal, and is not available for mc; set it explicitly when there are few treated units. "conformal" gives conformal intervals for gsynth, ife and mc (see `?fect`). | fe, ife, mc, cfe, gsynth |
 | `criterion` | Model selection criterion: "mspe" (default), "gmspe", "moment", "pc". | ife, mc, cfe, gsynth |
 
 ## Cross-Validation {#sec-cheatsheet-cv}

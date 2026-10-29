@@ -33,6 +33,14 @@
 > stopping when its pre-treatment window has one treated unit or one period (#179). Rows, nodes and
 > notes marked "2.4.8" describe them; blue nodes include them. Call graph 5 and the section "Contracts
 > introduced in 2.4.8" are new.
+>
+> Updated on 2026-10-28 for branch `feat/conformal-v2` (run `2026-10-28-fect-248-assembly`, part 3),
+> which adds `vartype = "conformal"` as fect 2.4.9: the new file `R/conformal.R` (the pooled
+> information-matched Jackknife+) and its hooks in `R/default.R`, `R/boot.R`, `R/print.R`, `R/plot.R`,
+> `R/effect.R`, `R/cumu.R`, `R/po-estimands.R` and `R/fect_sens.R`. Rows, nodes and notes marked
+> "2.4.9" describe it; blue nodes include it. Call graph 6 and the section "Contracts introduced in
+> 2.4.9" are new. This update covers the conformal path only. The 2.4.8 changes of #181 to #183 (for
+> example `boot.diag` and `convergence`) are not described in this file.
 
 ## Overview
 
@@ -40,15 +48,16 @@ fect is an R package for causal panel analysis with binary treatments under para
 (Fixed Effects Counterfactual Estimators). Its core abstraction is counterfactual imputation: fit an
 outcome model on untreated cells, impute the missing potential outcomes Y(0) of treated cells, and
 average the gaps Y - Y(0) into the ATT and its by-period, by-cohort and cumulative summaries. The
-package is an R/C++ hybrid: R (`R/`, 37 files, about 36,300 lines) does input handling, data
+package is an R/C++ hybrid: R (`R/`, 38 files, about 37,300 lines) does input handling, data
 reshaping, cross-validation, inference and output; C++ via Rcpp and RcppArmadillo (`src/`, 11 files
 plus a header, about 5,000 lines) does the linear algebra (SVD, EM iterations, demeaning, factor
 extraction). Estimators: two-way FE, interactive fixed effects (IFE, and gsynth, its never-treated
 form), matrix completion (MC) and complex fixed effects (CFE). Inference: unit (cluster) bootstrap,
-jackknife, and a parametric bootstrap for the gsynth setting. Post-hoc estimands (cumulative ATT,
+jackknife, a parametric bootstrap for the gsynth setting, and (2.4.9) conformal intervals from
+leave-one-control-out fits (`vartype = "conformal"`, no resampling). Post-hoc estimands (cumulative ATT,
 APTT, log-ATT) are computed from the saved replicate draws. Key dependencies: fixest (initial
 fits, covariate demeaning), MASS (`ginv`), future / doFuture / doRNG / foreach (parallel
-bootstrap), ggplot2 and GGally (plots), mvtnorm (parametric errors). Version 2.4.8 (unreleased; 2.4.7 was a development version and is part of it).
+bootstrap), ggplot2 and GGally (plots), mvtnorm (parametric errors). Version 2.4.9 (unreleased; 2.4.8 and 2.4.7 were development versions and are part of it).
 
 ---
 
@@ -86,6 +95,7 @@ graph TD
     subgraph Inf["Inference"]
         I1["boot.R: fect_boot()"]
         I2["impute_Y0.R"]
+        I3["conformal.R (new, 2.4.9)"]
     end
 
     subgraph Post["Post-hoc Estimands"]
@@ -129,6 +139,10 @@ graph TD
     I1 --> I2
     I2 --> E1
     I2 --> E4
+    I1 -->|"vartype = conformal"| I3
+    I3 --> E1
+    I3 --> E2
+    I3 --> E4
     P1 --> P2
     P1 -.->|"reads fit"| A1
     O1 -.->|"reads fit"| A1
@@ -155,6 +169,7 @@ graph TD
     style H1 fill:#1e90ff,stroke:#1565c0,color:#fff
     style I1 fill:#1e90ff,stroke:#1565c0,color:#fff
     style I2 fill:#1e90ff,stroke:#1565c0,color:#fff
+    style I3 fill:#1e90ff,stroke:#1565c0,color:#fff
     style P1 fill:#1e90ff,stroke:#1565c0,color:#fff
     style P2 fill:#1e90ff,stroke:#1565c0,color:#fff
     style O1 fill:#1e90ff,stroke:#1565c0,color:#fff
@@ -170,29 +185,33 @@ graph TD
 > `r.cv.rolling()` (in `K2`) to build the prediction they score (#163); `E1`-`E3` are blue for #156
 > (and `fe.R` for #157), `E5` (`dloo.R`) for #158. `E6` (`R/loading_bound.R`, the bounded-loading
 > solver) is shown for 2.4.8: `fect_nevertreated()` (`E4`) is its only caller, and `fect_cv()`, `fect_boot()`
-> and `impute_Y0()` reach it through `E4`.
+> and `impute_Y0()` reach it through `E4`. 2.4.9: `I3` (`R/conformal.R`) is new. `fect_boot()` (`I1`)
+> returns into it before any resampling when `vartype = "conformal"`; it fits leave-one-control-out
+> folds with `fect_fe()` (`E1`, method `"ife"`), `fect_mc()` (`E2`) or `fect_nevertreated()` (`E4`,
+> method `"gsynth"`), with the point fit's tuning and no cross-validation.
 
 ### Module Reference
 
 | Module / File | Layer | Purpose | Key Exports | Changed in this run |
 | --- | --- | --- | --- | --- |
-| `R/default.R` (4,185 lines) | API + Validation | `fect()` generic, formula and default methods: input checks, reshaping to T x N matrices, CV / fit / bootstrap routing, diagnostics, output assembly | `fect()` | yes: A2 (stores `vartype`), A6 (`cl` checks, parametric warning), B5 (`wgt.implied` dimnames), B7, B8, B8b-d (loo refit arguments), B9, C1-C6, C4b; follow-up: B10-cfe (`dloo` with never-treated fitting stops in the argument checks), B13 (stores the `W.agg` matrix); final: S3 (`cm` reaches the fit without SEs; the `cm` model is fitted after cross-validation; `cm` with never-treated controls stops); follow-up batch: #157 (`Y.dat` and the stored covariate array on the outcome's scale under `normalize = TRUE`), #160 (`binary = TRUE` stops in the `fect()` generic) |
+| `R/default.R` (4,463 lines) | API + Validation | `fect()` generic, formula and default methods: input checks, reshaping to T x N matrices, CV / fit / bootstrap routing, diagnostics, output assembly | `fect()` | yes: A2 (stores `vartype`), A6 (`cl` checks, parametric warning), B5 (`wgt.implied` dimnames), B7, B8, B8b-d (loo refit arguments), B9, C1-C6, C4b; follow-up: B10-cfe (`dloo` with never-treated fitting stops in the argument checks), B13 (stores the `W.agg` matrix); final: S3 (`cm` reaches the fit without SEs; the `cm` model is fitted after cross-validation; `cm` with never-treated controls stops); follow-up batch: #157 (`Y.dat` and the stored covariate array on the outcome's scale under `normalize = TRUE`), #160 (`binary = TRUE` stops in the `fect()` generic); 2.4.9: the `vartype = "conformal"` value and its guards (method, options that have no conformal version, `0 < alpha < 1`, `cl` ignored with a warning, absorbing treatment), unit and time labels for `conformal$unit` and `conformal$folds`, no `diagtest()` for conformal fits |
 | `R/interFE.R` (570) | API | Standalone interactive fixed effects estimator | `interFE()` | yes: C1, C2 (formula parser, `X` with formula), C6 (absorbed-covariate labels); final: S5 (stops for a covariate absorbed by the intercept, or by the unit and time effects together); #160 (`binary = TRUE` stops in the `interFE()` generic; the file keeps CRLF line endings) |
 | `R/did_wrapper.R` (674), `R/fect_mspe.R` (468) | API | DID estimator wrappers; MSPE model comparison | `did_wrapper()`, `fect_mspe()` | follow-up: M1 (`fect_mspe()` refits no longer pass the call's `Y`, `D`, `X`; the rebuilt formula carries them); final: S2 (each fit is refitted with the function that made it, e.g. `gsynth()`), S4 (the call's data and arguments are evaluated where `fect_mspe()` is called, then in the formula's environment); #152 (the data lookup accepts only a data frame, so a function named like the data is skipped), #163 (scores the model's full prediction at the held-out cells through `.fect_heldout_pred()`); 2.4.8, #178 (`did_wrapper(method = "cs_never")` and `"cs_notyet"` stop with a message when did is older than 2.5.1, which reported unestimable cohort-period cells as 0 on unbalanced panels) |
-| `R/po-estimands.R` (2,334) | Post-hoc | `imputed_outcomes()` long-form accessor and `estimand()` dispatcher; replicate alignment helpers | `estimand()`, `imputed_outcomes()` | yes: A1 (`.po_replicate_cells()`, `.po_replicate_att()`, `cells` scoping), A6 (slot contract allows padded arrays); follow-up: B13 (`.po_agg_weights()`); final: W1 (`.po_agg_weights_or_null()`, `.po_wmean()`: every cell-based estimand of a weighted fit is weighted by `fit$W.agg`; one `weights` check in `estimand()`), J2 (jackknife overall SE from `att.avg.boot`); #159 (jackknife fits default to `ci.method = "normal"` for every type), #161 (`.estimand_by_stop()`; `cells` with `"att.cumu"` stops; the stop messages name the cause) |
-| `R/effect.R` (450), `R/cumu.R` (272) | Post-hoc | Cumulative / subgroup effects (soft-deprecated) | `effect()`, `att.cumu()` | yes: A2 (stored `vartype`, `drop = FALSE`, parametric normal CI in `att.cumu()`), A6 (replicate width); follow-up: B11 (running sum of the per-period ATTs); final: J1 (`.jackknife_se()` in both), S1 (`effect()`: normal intervals for parametric and jackknife fits), W1 (`getEffect()` weights); #153 (`att.cumu()` fills every row from `att.cumu.sub()`, the first included; a window of one event time keeps a matrix) |
+| `R/po-estimands.R` (2,336) | Post-hoc | `imputed_outcomes()` long-form accessor and `estimand()` dispatcher; replicate alignment helpers | `estimand()`, `imputed_outcomes()` | yes: A1 (`.po_replicate_cells()`, `.po_replicate_att()`, `cells` scoping), A6 (slot contract allows padded arrays); follow-up: B13 (`.po_agg_weights()`); final: W1 (`.po_agg_weights_or_null()`, `.po_wmean()`: every cell-based estimand of a weighted fit is weighted by `fit$W.agg`; one `weights` check in `estimand()`), J2 (jackknife overall SE from `att.avg.boot`); #159 (jackknife fits default to `ci.method = "normal"` for every type), #161 (`.estimand_by_stop()`; `cells` with `"att.cumu"` stops; the stop messages name the cause); 2.4.9: `estimand()` stops for a conformal fit through `.fect_stop_if_conformal()` |
+| `R/effect.R` (451), `R/cumu.R` (273) | Post-hoc | Cumulative / subgroup effects (soft-deprecated) | `effect()`, `att.cumu()` | yes: A2 (stored `vartype`, `drop = FALSE`, parametric normal CI in `att.cumu()`), A6 (replicate width); follow-up: B11 (running sum of the per-period ATTs); final: J1 (`.jackknife_se()` in both), S1 (`effect()`: normal intervals for parametric and jackknife fits), W1 (`getEffect()` weights); #153 (`att.cumu()` fills every row from `att.cumu.sub()`, the first included; a window of one event time keeps a matrix); 2.4.9: `effect()` and `att.cumu()` stop for a conformal fit through `.fect_stop_if_conformal()` |
 | `R/fe.R` (985), `R/mc.R` (813), `R/cfe.R` (1,179) | Estimation | IFE / FE, matrix completion, complex FE fits | internal | follow-up batch: #156 (per-unit ATT over each unit's observed treated cells, in all three), #157 (`fe.R`: `est.cm` rescaled like `est` under `normalize = TRUE`) |
 | `R/fect_nevertreated.R` (3,642) | Estimation | Never-treated estimators (gsynth, IFE and CFE with `time.component.from = "nevertreated"`), their CV, implied weights | internal | yes: A7 (degenerate solves stop), B1 (`"pc"`), B2 (CV cap), B3 (skip messages), B4 (`W.cvfit`), B5 (`.fect_nt_implied_weights()`); follow-up: B12 (one treated unit in the CFE branch); #156 (per-unit ATT over observed cells); 2.4.8: the bounded-loading block (`use_bounded`) fits each treated unit's intercept jointly with its loadings in all three branches and in the gamma CV, through `.solve_bounded_loading_int()` |
 | `R/dloo.R` (719) | Estimation | Double leave-one-out pre-trend overlay (closed form, no refits) | internal | #158 (basic p-values of `pre.est.att` through `.pvalue_basic_dual()`, as `loo` gets them from `fect_boot()`) |
 | `R/cv.R` (2,076) | CV | `fect_cv()`: selection of `r` / `lambda`; delegates never-treated CV to `fect_nevertreated()` | internal | yes: B1 (`"pc"` table), B4 (`W.in.fit` forwarded), B8 (`loading.bound` arguments); #156 (per-unit ATT over observed cells) |
 | `R/cv-rolling.R` (417), `R/cv-rule-helpers.R` (127), `R/cv-helpers.R` (554), `R/cv_binary.R` (441) | CV | Rolling CV, 1se / min / 1pct rules, fold helpers, binary CV | `r.cv.rolling()` | #163 (`cv-rolling.R`: each held-out block is scored with `.fect_heldout_pred()`, not `Y.ct.full`) |
 | `R/heldout-pred.R` (102) | CV / scoring | The model's full prediction at held-out cells, for `fect_mspe()` and `r.cv.rolling()` | internal | new (#163) |
-| `R/boot.R` (5,094) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing); follow-up: B10-cfe (cfe + never-treated replicates); final: P1 (`.pvalue.basic()`: effect p-values of parametric fits with `ci.method = "basic"`); follow-up batch: #154 (90% bounds in the weighted jackknife placebo and carryover slots), #155 (the `est.group.att` branch follows `ci.method`), #158 (`.pvalue_basic_dual()`: basic p-values of bootstrap fits, coefficients included, go with the basic interval; subgroup switch-off effects get the normal p-value under `"normal"`) |
+| `R/boot.R` (5,203) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing); follow-up: B10-cfe (cfe + never-treated replicates); final: P1 (`.pvalue.basic()`: effect p-values of parametric fits with `ci.method = "basic"`); follow-up batch: #154 (90% bounds in the weighted jackknife placebo and carryover slots), #155 (the `est.group.att` branch follows `ci.method`), #158 (`.pvalue_basic_dual()`: basic p-values of bootstrap fits, coefficients included, go with the basic interval; subgroup switch-off effects get the normal p-value under `"normal"`); 2.4.9: `fect_boot()` calls `conformal_jplus()` and returns before any resampling when `vartype = "conformal"`; nothing below that point runs for these fits |
+| `R/conformal.R` (649) | Inference | `vartype = "conformal"`: pooled information-matched Jackknife+ (fold fits, pool by observation pattern, rule D for failed folds, aggregation, interval-dual p-value, calibration `q`). Entry point `conformal_jplus()`, called from `fect_boot()` | `conformal_jplus()` (internal), `.fect_stop_if_conformal()` | new (2.4.9) |
 | `R/impute_Y0.R` (246) | Inference | Y(0) imputer used by the parametric bootstrap | internal | yes: A4 (`W.in.fit`), B8 (`loading.bound` arguments) |
 | `R/valid_controls.R` (34), `R/permutation.R` (264) | Inference | Control screening for the parametric bootstrap; permutation test | internal | no |
-| `R/diagtest.R` (233), `R/fittest.R` (636), `R/fect_sens.R` (232), `R/fect_iden.R` (224) | Diagnostics | Pre-trend / placebo / carryover / equivalence tests; sensitivity; identification | `fect_sens()`, `fect_iden()` | 2.4.8, #179: `diagtest.R` (the F test's small-sample factor `(N_bar - q) / ((N_bar - 1) q)` is 0/0 or infinite when `N_bar = 1`, including a one-period window; both branches now test `!is.finite(scale) \|\| scale <= 0` and report `NA` with the existing message) |
-| `R/plot.R` (5,487) | Output | `plot.fect()`, 14+ plot types; the gap plot draws the chosen treated units' gaps when `id` is given, with a band from parametric bootstrap draws (#162) | `plot.fect()` | yes: B6 (NULL-safe `vartype` tests, factors-plot labels); #162 (gap plot with `id`) |
-| `R/print.R` (147) | Output | S3 print methods | `print.fect()` | yes: A6 (no "Cluster SE" line for parametric and jackknife fits) |
+| `R/diagtest.R` (233), `R/fittest.R` (636), `R/fect_sens.R` (245), `R/fect_iden.R` (224) | Diagnostics | Pre-trend / placebo / carryover / equivalence tests; sensitivity; identification | `fect_sens()`, `fect_iden()` | 2.4.8, #179: `diagtest.R` (the F test's small-sample factor `(N_bar - q) / ((N_bar - 1) q)` is 0/0 or infinite when `N_bar = 1`, including a one-period window; both branches now test `!is.finite(scale) \|\| scale <= 0` and report `NA` with the existing message); 2.4.9: `fect_sens()` stops for a conformal fit through `.fect_stop_if_conformal()` |
+| `R/plot.R` (5,505) | Output | `plot.fect()`, 14+ plot types; the gap plot draws the chosen treated units' gaps when `id` is given, with a band from parametric bootstrap draws (#162) | `plot.fect()` | yes: B6 (NULL-safe `vartype` tests, factors-plot labels); #162 (gap plot with `id`); 2.4.9: the equivalence plot stops for a conformal fit; the gap plot with `id` draws the estimates without a band and points to `fit$conformal$unit`; the calendar plot drops the smoothed band |
+| `R/print.R` (225) | Output | S3 print methods | `print.fect()` | yes: A6 (no "Cluster SE" line for parametric and jackknife fits); 2.4.9: an `Inference:` line for conformal fits and a `Conformal:` line when `conformal$status` is not `"ok"` |
 | `R/esplot.R` (1,229), `R/theme-helpers.R` (42), `R/plot_return.R` (9) | Output | Event-study plots, theme, plot-return class | `esplot()` | no |
 | `R/support.R` (733), `R/score.R` (105), `R/getcohort.R` (264), `R/state.R` (7), `R/RcppExports.R` (191) | Utilities | Initial fits, scores, cohorts, session state, Rcpp bindings | `get.cohort()` | no |
 | `R/loading_bound.R` (508) | Estimation helper | Simplex-constrained treated loadings (entropy-regularized), gamma cross-validation; 2.4.8 adds the joint intercept fit and a Newton solver for it | internal | 2.4.8: new `.solve_bounded_loading_int()`, `.newton_bounded_loading()`; `.cv_gamma_loading()` gets `intercept`; `.solve_bounded_loading()` gets `newton`; objective, gradient, mirror descent and the gamma grid are unchanged |
@@ -501,6 +520,73 @@ graph TD
 | `.solve_bounded_loading()` | `R/loading_bound.R` | `.solve_bounded_loading_int()` | `.newton_bounded_loading()`, `optim()`, `.mirror_descent_bounded_loading()` | yes (2.4.8: `newton = FALSE` argument) | Entropy-regularized simplex projection; `method` in the result reads `"newton"`, `"lbfgs"` or `"mirror-descent"` |
 | `.cv_gamma_loading()` | `R/loading_bound.R` | `fect_nevertreated()` | `.solve_bounded_loading_int()` | yes (2.4.8: `intercept = FALSE` argument) | 5-fold CV of `gamma` over pre-treatment periods. `intercept = TRUE`: each training fold is centred on its own periods, the held-out periods are predicted with `F_te lambda_hat + alpha_train`, a fold needs at least `ncol(F) + 1` training periods; the random draws are the same as in 2.4.7 |
 
+### 6. Conformal intervals: folds, pool and calibration (2.4.9)
+
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+graph TD
+    FD["fect.default()"]
+    BT["fect_boot()"]
+    CJ["conformal_jplus()"]
+    FO[".conformal_fold()"]
+    CP[".conformal_copy()"]
+    PN[".conformal_panel()"]
+    CF[".conformal_component_fit()"]
+    NT["fect_nevertreated()"]
+    FE["fect_fe()"]
+    MC["fect_mc()"]
+    IV[".conformal_interval()"]
+    QQ[".conformal_q()"]
+    ST[".fect_stop_if_conformal()"]
+    PH["effect, att.cumu, estimand, fect_sens"]
+
+    FD --> BT
+    BT -->|"vartype = conformal"| CJ
+    CJ --> FO
+    CJ --> IV
+    FO --> CP
+    FO --> PN
+    FO --> CF
+    CF -->|"gsynth"| NT
+    CF -->|"ife"| FE
+    CF -->|"mc"| MC
+    IV --> QQ
+    PH --> ST
+
+    style CJ fill:#1e90ff,stroke:#1565c0,color:#fff
+    style FO fill:#1e90ff,stroke:#1565c0,color:#fff
+    style CP fill:#1e90ff,stroke:#1565c0,color:#fff
+    style PN fill:#1e90ff,stroke:#1565c0,color:#fff
+    style CF fill:#1e90ff,stroke:#1565c0,color:#fff
+    style IV fill:#1e90ff,stroke:#1565c0,color:#fff
+    style QQ fill:#1e90ff,stroke:#1565c0,color:#fff
+    style ST fill:#1e90ff,stroke:#1565c0,color:#fff
+    style FD fill:#1e90ff,stroke:#1565c0,color:#fff
+    style BT fill:#1e90ff,stroke:#1565c0,color:#fff
+```
+
+> `fect.default()` checks the options (method, no weights or tests that have no conformal version,
+> `0 < alpha < 1`, an absorbing treatment) before the point fit.
+> `fect_boot()` then calls `conformal_jplus()` (which stops with fewer than two never-treated units)
+> and returns its list, with no resampling. For each
+> never-treated control `.conformal_fold()` builds a background of the other controls and fits the
+> predictions of the treated units and of the control (shown only the treated unit's pre-treatment
+> window) against it, with the point fit's tuning. `gsynth` makes one component fit per fold; `ife`
+> and `mc` make one per predicted unit. `conformal_jplus()` forms the pool of each interval from the
+> observation pattern, marks failed slots, and passes the fold quantities to `.conformal_interval()`,
+> which sorts the endpoints at the `q` returned by `.conformal_q()` and computes the dual p-value.
+> The post-hoc functions that need draws stop through `.fect_stop_if_conformal()`.
+
+| Function | Defined In | Called By | Calls | Changed | Purpose |
+| --- | --- | --- | --- | --- | --- |
+| `conformal_jplus()` | `R/conformal.R` | `fect_boot()` | `.conformal_fold()` (serial or parallel), `.conformal_interval()` | new (2.4.9) | Windows of the treated units, eligibility of each control per window, one fold per control, pool by observation pattern, failed-slot bookkeeping (`n.failed.fits`, `n.failed.folds`, `n.intervals.affected`, status note, one warning), intervals per cell (`unit`), event time (`att`), overall (`avg`) and calendar time; the returned `conformal` list and the `est.*` slots |
+| `.conformal_fold()` | `R/conformal.R` | `conformal_jplus()` | `.conformal_copy()`, `.conformal_panel()`, `.conformal_component_fit()` | new (2.4.9) | Fold j: background = the other controls with complete panels; treated queries and control j predicted separately against it; returns `M0`, `Mj` and the failure masks `fail0`, `failj` |
+| `.conformal_copy()`, `.conformal_panel()` | `R/conformal.R` | `.conformal_fold()` | none | new (2.4.9) | A pseudo-treated copy of control j that exposes only a treated unit's observed pre-treatment dates; binds the background and the query columns into one sub-panel |
+| `.conformal_component_fit()` | `R/conformal.R` | `.conformal_fold()` | `fect_nevertreated()`, `fect_fe()`, `fect_mc()` | new (2.4.9) | One fit with the original fit's `r`, `lambda`, `force`, `tol`, `max.iteration` and no cross-validation; returns the T x n `Y.ct` or `NULL` when the fit errors or has no `Y.ct` (a fit that stops at `max.iteration` is returned as it is) |
+| `.conformal_interval()` | `R/conformal.R` | `conformal_jplus()` | `.conformal_q()` | new (2.4.9) | Jackknife+ interval and p-value from one pool's fold quantities; a failed or non-finite slot keeps its place with `a = -Inf`, `b = +Inf`; strict comparisons in the tail counts; `p = min(1, (2 (N - m) - 1) / N)` |
+| `.conformal_q()` | `R/conformal.R` | `.conformal_interval()` | none | new (2.4.9) | The largest `q` in `0, ..., floor(N/2)` with `q = 0` or `(2q - 1) / N <= gamma`, in double precision with no tolerance |
+| `.fect_stop_if_conformal()` | `R/conformal.R` | `effect()`, `att.cumu()`, `estimand()`, `fect_sens()` | none | new (2.4.9) | Stops with a message that names the function and tells the user to refit with another `vartype` |
+
 ### Function Reference
 
 | Function | Defined In | Called By | Calls | Changed | Purpose |
@@ -583,6 +669,8 @@ graph TD
     CVB["select r / lambda"]
     FIT["main fit, Y(0), ATT"]
     SQ{"se = TRUE?"}
+    CF{"vartype = conformal?"}
+    CJ["conformal_jplus() (2.4.9)"]
     BOOT["replicates + collector"]
     DG["diagnostics, loo refits"]
     AS["assemble output"]
@@ -605,8 +693,11 @@ graph TD
     CQ -- no --> FIT
     CVB --> FIT
     FIT --> SQ
-    SQ -- yes --> BOOT
+    SQ -- yes --> CF
     SQ -- no --> DG
+    CF -- no --> BOOT
+    CF -- yes --> CJ
+    CJ --> DG
     BOOT --> DG
     DG --> AS
     AS --> PH
@@ -622,12 +713,14 @@ graph TD
     style RK fill:#1e90ff,stroke:#1565c0,color:#fff
     style CVB fill:#1e90ff,stroke:#1565c0,color:#fff
     style BOOT fill:#1e90ff,stroke:#1565c0,color:#fff
+    style CF fill:#1e90ff,stroke:#1565c0,color:#fff
+    style CJ fill:#1e90ff,stroke:#1565c0,color:#fff
     style DG fill:#1e90ff,stroke:#1565c0,color:#fff
     style AS fill:#1e90ff,stroke:#1565c0,color:#fff
     style PH fill:#1e90ff,stroke:#1565c0,color:#fff
 ```
 
-| Step | Where | What happens (2.4.7; 2.4.8 rows marked) |
+| Step | Where | What happens (2.4.7; 2.4.8 and 2.4.9 rows marked) |
 | --- | --- | --- |
 | binary | `fect()` and `interFE()` generics | `binary = TRUE` stops before dispatch; the probit code stays in place, unreachable (#160) |
 | parse | `fect.formula()`, `.fect_formula_names()` | Outcome, treatment, covariates from bare names; `X` with a formula stops (C1, C2) |
@@ -639,10 +732,54 @@ graph TD
 | rank check | `fect.default()` step 7b | `.fect_check_covariates()` on the estimation cells; dropped covariates leave `X` before every later fit (C5, C6) |
 | select r / lambda | `fect_cv()` / `fect_nevertreated()` | `"pc"` rule, CV cap, `W.agg` kept out, bounds honoured (B1-B4, B8); serial seed as `se = FALSE` (B9) |
 | replicates | `fect_boot()` | Routing (B8e), replicate checks (A7), resampling (A5), parametric scale and weights (A3, A4), collector with padding (A6), count message; cfe + never-treated replicates use the never-treated model (follow-up B10-cfe); p-values of the effects of parametric fits under `ci.method = "basic"` (final P1); per-unit ATT over observed cells (#156); 90% bounds in the weighted jackknife placebo and carryover slots (#154); `est.group.att` follows `ci.method` (#155); basic p-values of bootstrap fits go with the basic interval, subgroup switch-off p-values under `"normal"` are normal (#158) |
+| conformal intervals (2.4.9) | `fect_boot()` calls `conformal_jplus()` | With `vartype = "conformal"` the bootstrap is skipped: one fold per never-treated control (call graph 6), a pool per interval from the observation pattern, rule D for failed folds, `conformal$unit`, `att`, `avg`; the est.* slots are filled with `S.E.` `NA`. `fect.default()` then skips `diagtest()` (no draws) |
 | bounded loadings (2.4.8) | `fect_nevertreated()`, inside "select r / lambda" and "main fit" | With `loading.bound = "simplex"`, each treated unit's loadings are solved with its intercept fitted jointly when `force` has a unit effect (call graph 5); `gamma` is chosen by the same centred CV; bootstrap, parametric and loo refits inherit it |
 | loo refits | `fect.default()` loo block | Refits keep `loading.bound`, `time.component.from`, `para.error` (B8b-d); their replicates follow the routing above (follow-up B10-cfe) |
 | assemble | `fect.default()` output | NA rows for dropped covariates, `wgt.implied` dimnames, `remove.id`, `vartype`, labelled `rawtime` / `data.long`; the `W.agg` matrix when `W` or `W.agg` weights the aggregation (follow-up B13); `est.cm` for `cm = TRUE` fits without SEs or after cross-validation (final S3; `cm` with never-treated controls stops in the argument checks); with `normalize = TRUE`, `Y.dat`, `est.cm` and the stored covariate array on the outcome's scale (#157) |
 | post-hoc | `po-estimands.R`, `effect.R`, `cumu.R`, `plot.R`, `fect_mspe.R` | Replicates read through `colnames.boot` (A1, A6); stored `vartype` (A2); NULL-safe plots (B6); cumulative ATT as a running sum (follow-up B11); weights of weighted fits in `estimand()` and `effect()` (final W1); jackknife SEs and normal intervals (final J1, J2, S1); `fect_mspe()` refits with the fit's own function, evaluating its call where it is called (final S2, S4); the data lookup skips values that are not data frames (#152); `fect_mspe()` and `r.cv.rolling()` score the model's full prediction at held-out cells (#163); every row of `att.cumu()` by one rule (#153); `estimand()` defaults on jackknife fits and its stops (#159, #161) |
+
+---
+
+## Contracts introduced in 2.4.9
+
+### Conformal intervals (`vartype = "conformal"`, `R/conformal.R`)
+
+- **Pool by observation pattern only.** A control is in the pool of a treated cell iff it is eligible
+  for the treated unit's window (observed at every pre-treatment date the treated unit is observed)
+  and observed at the date. For an aggregate it must be in the pool of every aggregated cell. The pool
+  is fixed before any fit is looked at. Controls outside it are not used and are counted in
+  `n.excluded`; `N` is the pool size plus one.
+- **A failed fold keeps its slot.** A pool control whose component fit returns `NULL`, or whose
+  prediction or error is not finite, has `a = -Inf` and `b = +Inf`. `N` and `q` do not change, the
+  interval is widened or unchanged, never shortened, and with at least `q` failed slots it is the
+  whole real line. The p-value counts only strict tail violations, so a failed slot never adds to a
+  count and the p-value stays dual to the interval. A fit that stops at `max.iteration` is used as it
+  is and is not failed.
+- **Counts.** `n.failed` (per interval) counts failed pool slots. `n.failed.folds` (overall) is the
+  number of controls with a failed component fit or a non-finite in-pool slot, so the status note and
+  the warning never say 0 while an interval is widened. `n.failed.fits` counts component fits that
+  returned `NULL`. `n.intervals.affected` counts rows of `conformal$unit` with `n.failed > 0`.
+- **One calibration convention.** `q = max{q in 0..floor(N/2) : q = 0 or fl((2q - 1)/N) <= gamma}`,
+  compared in double precision with no tolerance. `.conformal_interval()` computes the p-value with the
+  same division and the same comparison, so `p <= gamma` iff 0 is outside the effect interval, for
+  `0 < gamma < 1`. `fect.default()` stops when `alpha` is not a single number in `(0, 1)`. `fect` builds
+  no other alpha on this path: `est.att90` and `att.bound` use `2 * alpha`, which is exact in binary,
+  and `level = 1 - alpha` is stored metadata only. A caller who passes a computed alpha (`1 - 0.9`)
+  gets that value's q.
+- **Tuning is frozen.** `r`, `lambda`, `force`, covariates, `tol` and `max.iteration` come from the
+  point fit; no fold cross-validates. The finite-sample guarantee needs the tuning not to depend on
+  which unit is treated, which holds when it is fixed in advance (`CV = FALSE`).
+- **What is claimed, and what is not.** For one treated unit and one date, coverage is at least
+  `1 - (2q - 1)/N` if the pool controls' and the treated unit's errors are exchangeable given the
+  observation pattern, the failure rule is valid relative to a finite reference completion, and the
+  tuning is symmetric across units. `fect` checks none of this. Coverage for `est.att`, `est.avg`,
+  `est.avg.unit` and the calendar-time ATT is not established by the unit-level theorem.
+- **Scope.** Options without a conformal version stop in `fect.default()`; post-hoc functions that need
+  draws stop through `.fect_stop_if_conformal()`; the equivalence plot stops in `plot.fect()`.
+- **No bootstrap objects.** A conformal fit has no `boot.diag` and no draws; `fect_boot()` returns
+  before any resampling. For `method = "ife"` the `convergence` slot is the point fit's.
+- **Numbers.** For a fit with no failed fold and no `alpha` within `1e-10` below a cutoff, every number
+  equals the one the implementation before this convention gave (commit e99f2d2).
 
 ---
 
@@ -969,6 +1106,13 @@ more with `r.cv` and `boot = 0`. No replicate fits this model. `cm = TRUE` with
 - 2.4.8: `R/loading_bound.R` has one known limit above its 1e-8 shift-invariance target (see "Contracts introduced in 2.4.8");
   `vignettes/06-gsynth.Rmd` ("Bounded factor loadings") and `?fect` describe the joint intercept and
   say that estimates with `force = "unit"` or `"two-way"` from earlier versions differ.
+- 2.4.9: `vartype = "conformal"` is the one inference path with no draws. Its pieces that other parts
+  of the package read (`est.*`, `att.bound`, `est.att90`, `conformal`) are filled by
+  `conformal_jplus()`; everything that needs draws or a variance matrix stops with a message. Open: the
+  aggregated intervals (`est.att`, `est.avg`, `est.avg.unit`, calendar) are an extension awaiting the
+  write-up author's review, and their coverage is not established (see "Contracts introduced in 2.4.9").
+  `tests/coverage-study/` holds the simulation script and its results; `tests/testthat/test-conformal-v2.R`
+  and `test-conformal-q-convention.R` test the path.
 - Vignettes are a Quarto book under `vignettes/` (build-ignored in the package tarball); chapters
   01-11 plus cheatsheet, changelog (`bb-updates.Rmd`) and references.
 - Ten bundled datasets (`simdata`, `simgsynth`, `sim_base`, `sim_gsynth`, `sim_linear`, `sim_region`,

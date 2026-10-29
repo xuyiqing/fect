@@ -23,13 +23,13 @@ A plot type can only draw what the fit stores. The table lists, for each `type`,
 | `type` | The fit needs | With `se = FALSE` |
 |:-------|:--------------|:------------------|
 | `"gap"` (or `"es"`), the default | Any fit. A fit made with `placeboTest = TRUE` or `carryoverTest = TRUE` needs `se = TRUE`. `plot(loo = TRUE)` and `plot(dloo = TRUE)` need a fit made with `loo = TRUE` or `dloo = TRUE`. | Point estimates only, with a message; `plot.ci = "0.95"` stops. |
-| `"gap"` with `id` | The chosen units must be treated units of the fit. A band needs `vartype = "parametric"` and `keep.sims = TRUE`; other fits draw the estimates with a message ([Section @sec-gap-id]). | Point estimates only. |
-| `"equiv"` | `se = TRUE`. Uses the (1 - 2`alpha`) intervals, 90% by default. | Stops. |
+| `"gap"` with `id` | The chosen units must be treated units of the fit. A band needs `vartype = "parametric"` and `keep.sims = TRUE`; other fits draw the estimates with a message ([Section @sec-gap-id]); a conformal fit draws the estimates without a band, with a message. | Point estimates only. |
+| `"equiv"` | `se = TRUE`. Uses the (1 - 2`alpha`) intervals, 90% by default. A conformal fit stops (no pre-treatment intervals). | Stops. |
 | `"exit"` | Treatment that switches off (the fit has `att.off`). | Point estimates only. |
 | `"counterfactual"` (or `"ct"`) | Any fit. | Draws the averages. |
 | `"status"` | Any fit. | Draws the plot. |
 | `"box"` | Any fit. | Draws the plot (it uses the cell-level effects). |
-| `"calendar"` | Any fit. | Point estimates and the loess curve, with a message. |
+| `"calendar"` | Any fit. A conformal fit has no smoothed band. | Point estimates and the loess curve, with a message. |
 | `"heterogeneous"` (or `"hte"`) | `covariate`: the name of a covariate in the fit (`x$X`), or a T x N matrix of values for the fit's units and periods. `cm = TRUE` needs a fit made with `cm = TRUE`. | Draws the plot; its band does not come from `se`. |
 | `"factors"`, `"loadings"` | `method = "ife"` or `"gsynth"` with at least one factor (`x$r.cv >= 1`). | Draws the plot. |
 | `"loading.overlap"` | The same as `"factors"`. | Draws the plot. |

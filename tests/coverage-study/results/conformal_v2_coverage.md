@@ -13,7 +13,7 @@ DGP: one treated unit, two factors, T = 30 (T0 = 20), J never-treated controls, 
 
 ## Extension beyond v2: five treated units
 
-J = 40, iid errors, r = 2 fixed, 90% level. `block`: all five adopt at date 21; `staggered`: three at 17, two at 21. `coverage.att` is the coverage of the event-time intervals (`est.att`) for the ATT at each event time, averaged over event times; `coverage.avg` is for `est.avg`. `width.unit` is the mean width of the per-unit, per-date intervals, for comparison: the averaged intervals stay about as wide as one unit's (a single control's error does not average down), so they are conservative.
+J = 40, iid errors, r = 2 fixed, 90% level. `block`: all five adopt at date 21; `staggered`: three at 17, two at 21. `coverage.att` is the coverage of the event-time intervals (`est.att`) for the ATT at each event time, averaged over event times; `coverage.avg` is for `est.avg`. `width.unit` is the mean width of the per-unit, per-date intervals, for comparison: the averaged intervals stay about as wide as one unit's (a single control's error does not average down). In these designs they cover at or above the nominal level. That is a simulation result, not a guarantee: coverage for aggregated targets is not established by the unit-level theorem, and a constructed example (nine controls, 100 treated units, iid Bernoulli outcomes) has coverage 0.42 at nominal 0.90.
 
 | design | reps | failed | coverage.att | width.att | coverage.avg | width.avg | width.unit |
 |---|---|---|---|---|---|---|---|

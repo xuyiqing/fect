@@ -5,27 +5,35 @@ Development version.
 
 ## New features
 
-* `vartype = "conformal"` gives conformal intervals by the pooled
-  information-matched Jackknife+ of Ziyi Liu's write-up "Unit-Level
-  Conformal Inference for Panel Counterfactuals" (v2), for
-  `method = "gsynth"`, `"ife"` and `"mc"` with an absorbing treatment and
-  never-treated controls. Each never-treated control j in turn is predicted
-  over a treated unit's window, with only that unit's pre-treatment dates
-  shown, against the other controls; the treated unit is predicted against
-  the same controls. The tuning (number of factors, `lambda`, covariates,
-  convergence settings) is that of the original fit. The interval is
-  date-specific: one for each treated unit and post-treatment date, in
-  `fit$conformal$unit`, with the number of controls used. With fewer than
-  1 / `alpha` units the interval is the whole real line. Point estimates
-  are the ordinary fit's; the S.E. column is `NA`; the p-value is the one
-  dual to the interval.
+* New `vartype = "conformal"`: date-specific conformal intervals, one for
+  each treated unit and post-treatment date (in `fit$conformal$unit`), by the
+  pooled information-matched Jackknife+ of Liu, "Unit-Level Conformal
+  Inference for Panel Counterfactuals". For `method = "gsynth"`, `"ife"` and
+  `"mc"` with an absorbing treatment. It supersedes the June design (#143),
+  which was never released.
+* The never-treated controls are the calibration pool. Point estimates are
+  the ordinary fit's, `S.E.` is `NA`, and the p-value is dual to the interval.
+* The tuning (`r`, `lambda`) is frozen from the original fit. The guarantee
+  assumes it does not depend on which unit is treated; fix it in advance
+  with `CV = FALSE`.
+* The pool of an interval is fixed by the observation pattern. Controls
+  outside it are not used and are counted in `n.excluded`.
+* A control in the pool whose fold fit fails is kept with an infinite score.
+  `N` and `q` do not change, the interval is widened or unchanged, and with
+  at least `q` failures it is the whole real line. Failures are counted in
+  `n.failed` (and `n.failed.folds`, `n.intervals.affected`) and one warning is
+  issued. The guarantee for failed folds holds relative to a
+  finite reference completion, and for the pool it is conditional on the
+  observation pattern.
+* The calibration index `q` is the largest integer with `q = 0` or
+  `(2q - 1)/N <= alpha`, compared in double precision with no tolerance and
+  with the same expression as the p-value. Pass `alpha = 0.1`, not
+  `1 - level`.
+* `alpha` must lie in (0, 1) with `vartype = "conformal"`.
 * The intervals for the ATT by event time (`est.att`), the average ATT
   (`est.avg`, `est.avg.unit`) and the calendar-time ATT are an extension
-  beyond the v2 write-up, not yet reviewed by its author: in each fold the
-  treated units' predictions and the control's errors are averaged with the
-  same weights (cohort sizes under staggered adoption). They are
-  conservative when many units are treated, because one control's error
-  does not average down as the average of many treated units does.
+  beyond the write-up, not yet reviewed by its author. Their coverage is
+  not established by the unit-level theorem.
 * A coverage study is in `tests/coverage-study/conformal_v2_coverage.R`
   (gsynth, one treated unit; results in
   `tests/coverage-study/results/conformal_v2_coverage.md`).
