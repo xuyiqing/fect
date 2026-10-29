@@ -40,9 +40,15 @@
 ## adoption the control's error at event time l is the cohort-size weighted
 ## average of its signed errors over the cohorts' calendar windows. The
 ## absolute value of that weighted signed error is R_j, and the endpoint
-## construction is the same as above. Comparing an average of several treated
-## units with a single control's error is conservative when many units are
-## treated (the control's error does not average down).
+## construction is the same as above.
+## Coverage for these aggregated targets is NOT established by the unit-level
+## theorem, which is about one treated unit and one pseudo-treated control's
+## error. An average of treated units is a different object, and these
+## intervals are not wide enough in general: with nine controls and 100 treated
+## units whose outcomes are iid Bernoulli(0.01), a zero predictor and no
+## effect, gamma = 0.1 gives N = 10 and q = 1 and exact coverage
+## 1 - 0.99^9 * (1 - 0.99^100) = 0.42, not 0.90. They need separate
+## assumptions and validation.
 ##
 ## Failed folds (rule D). The calibration pool of a treated cell (or of an
 ## aggregate) is fixed by the observation pattern alone, before any fit is
@@ -56,6 +62,35 @@
 ## unchanged, never shortened. At least q failed slots give the whole real
 ## line. Pool exclusions (n.excluded) and failed folds (n.failed) are reported
 ## as separate counts, and one warning is issued when any fit failed.
+##
+## What the guarantee needs. All of it is an assumption about the data and the
+## fits; fect checks none of it.
+##  (1) Exchangeable scores. The unit-level coverage bound 1 - (2q - 1)/N holds
+##      if the all-pairs score table is exchangeable given the information used.
+##  (2) Rule D is valid relative to a finite reference completion. The theorem
+##      is stated for a finite-valued rule. Take a reference procedure with the
+##      same pool, N and q that equals the fold quantities of every successful
+##      fold, supplies a finite, unit-symmetric fallback on every failed fold,
+##      and whose score table satisfies (1). Replacing a failed lower endpoint
+##      by -Inf can only lower each lower order statistic, and replacing a
+##      failed upper endpoint by +Inf can only raise each upper one. So the
+##      interval here contains the reference interval on every data set, covers
+##      at least as often, and has a p-value at least as large. fect does not
+##      build or check the reference completion.
+##  (3) Pool by observation pattern. The pool is a function of which cells are
+##      observed. The guarantee is conditional on that pattern and assumes that,
+##      given it, the prediction errors of the pool controls and of the treated
+##      unit are exchangeable: missingness carries no information about the size
+##      of the errors beyond the pattern. If missingness depends on outcomes, or
+##      on unobserved unit traits that also drive the error, coverage is not
+##      established.
+##  (4) Tuning. r and lambda are frozen from the original fit, which uses the
+##      treated units' pre-treatment cells and the controls' full panels. The
+##      guarantee needs the tuning not to depend on which unit is treated in a
+##      way that breaks exchangeability. That holds when the tuning is fixed in
+##      advance (CV = FALSE); cross-validated tuning is not covered.
+##  A fold fit that stops at max.iteration without converging is used as it is;
+##  it is not counted as failed.
 ###############################################################################
 
 
@@ -576,9 +611,11 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
     extension = paste0(
       "Intervals for est.att, est.avg, est.avg.unit and the calendar-time ",
       "ATT aggregate the treated fold predictions and the controls' signed ",
-      "errors with the same cell weights; this is an extension beyond the ",
-      "v2 write-up (which covers one treated unit and one date) and awaits ",
-      "Ziyi Liu's sign-off. It is conservative when many units are treated."
+      "errors with the same cell weights. This is an extension beyond the ",
+      "v2 write-up (one treated unit, one date) and awaits Ziyi Liu's ",
+      "review. Coverage for these aggregated targets is not established by ",
+      "the unit-level theorem. These intervals require separate assumptions ",
+      "and validation."
     )
   )
   if (isTRUE(keep.sims)) {
