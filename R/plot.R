@@ -4246,7 +4246,10 @@ plot.fect <- function(
       (is.numeric(covariate) && length(covariate) == TT * N)
     covariate_name <- if (is.character(covariate) && length(covariate) == 1 && covariate != "") covariate else NULL
 
-    if (!covariate_is_custom && is.null(covariate_name) && ((dim(Xs) > 2) && (dim(Xs)[3] > 1))) {
+    if (!covariate_is_custom && is.null(covariate_name) && length(x$X) == 0) {
+      stop("The fit has no covariates; give `covariate` as a T x N matrix of moderator values.\n")
+    }
+    if (!covariate_is_custom && is.null(covariate_name) && (length(dim(Xs)) > 2 && dim(Xs)[3] > 1)) {
       stop("Please provide a covariate to plot heterogeneous effects.\n")
     }
 

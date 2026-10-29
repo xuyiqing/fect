@@ -1252,6 +1252,30 @@ fect.default <- function(
         em <- FALSE
     }
 
+    ## carryover.rm: NULL or one non-negative whole number; 0 means none
+    if (!is.null(carryover.rm)) {
+        if (!is.numeric(carryover.rm) || length(carryover.rm) != 1 ||
+            !is.finite(carryover.rm) || carryover.rm < 0 ||
+            carryover.rm != round(carryover.rm)) {
+            stop("\"carryover.rm\" should be a single non-negative whole number ",
+                 "(the number of periods after treatment ends to remove from the fit).",
+                 call. = FALSE)
+        }
+        if (carryover.rm == 0) {
+            carryover.rm <- NULL
+        }
+    }
+    ## the never-treated routes fit only never-treated units, so no cell of a
+    ## treated unit enters the fit and there is nothing to remove
+    if (!is.null(carryover.rm) && time.component.from == "nevertreated") {
+        warning("\"carryover.rm\" has no effect with time.component.from = ",
+                "\"nevertreated\" (method = \"gsynth\"): no cell of a treated unit ",
+                "enters those fits, so none is removed. It is ignored. With ",
+                "time.component.from = \"notyettreated\" the cells are removed.",
+                call. = FALSE)
+        carryover.rm <- NULL
+    }
+
     if (is.null(min.T0)) {
         if (method == "fe") {
             min.T0 <- 1
@@ -1310,7 +1334,7 @@ fect.default <- function(
             }
         } else if (method == "both") {
             CV <- TRUE
-            if (length(r) == 1 & r == 0) {
+            if (length(r) == 1 && r == 0) {
                 r <- c(0:5)
             }
         } else if (method %in% c("ife", "gsynth")) {
@@ -1450,6 +1474,9 @@ fect.default <- function(
         }
         if (carryoverTest == TRUE) {
             stop("\"permute\" can't be used with \"carryoverTest\".")
+        }
+        if (!is.null(carryover.rm)) {
+            stop("\"permute\" can't be used with \"carryover.rm\".")
         }
         if (loo == TRUE) {
             stop("\"permute\" can't be used with \"loo\".")
@@ -1960,6 +1987,11 @@ fect.default <- function(
     }
 
     ## carry-over period
+    if (carryoverTest == TRUE && is.null(carryover.period)) {
+        stop("carryoverTest = TRUE needs \"carryover.period\", the post-treatment ",
+             "periods to test, e.g. carryover.period = c(1, 3).",
+             call. = FALSE)
+    }
     if (carryoverTest == TRUE && !is.null(carryover.period)) {
         if (sum(carryover.period <= 0) > 0) {
             stop("\"carryover.period\" should be larger than 0.")
@@ -2222,36 +2254,39 @@ fect.default <- function(
     # recode treatment status for osbervations exposed to carryover effects
     hasCarryover <- 0
     if (!is.null(carryover.rm)) {
-        ## is.numeric(): an integer such as 3L counts too (before 2.4.8 only
-        ## class "numeric" did, so carryover.rm = 3L was silently ignored)
-        if (length(carryover.rm) == 1 && is.numeric(carryover.rm)) {
-            if (carryover.rm > 0) {
-                newT <- c(1:TT)
-                data <- data[order(data[, id], data[, time]), ]
-                tempID <- unique(data[, id])
-                for (i in tempID) {
-                    subpos <- which(data[, id] == i)
-                    subtime <- data[subpos, time]
-                    subd <- data[subpos, Dname]
-                    if (sum(subd) >= 1) {
-                        tr.time <- subtime[which(subd == 1)]
-                        cr.time <- c() # carryover period
-                        for (k in 1:carryover.rm) {
-                            cr.time <- c(cr.time, tr.time + k)
-                        }
-                        # note: if a period has both treatment effect and carryover effect,
-                        # regard carryover effect as 0
-                        cr.time <- unique(cr.time)
-                        cr.time <- setdiff(cr.time, tr.time)
+        ## carryover.rm is validated above: one whole number > 0. The window is
+        ## the k periods that follow each treated period, counted by position in
+        ## the sorted periods of the data (a balanced panel still holds raw time
+        ## values here, an unbalanced one holds positions already), so a panel
+        ## observed every 5 years marks the next k observed periods
+        data <- data[order(data[, id], data[, time]), ]
+        time.pos <- match(data[, time], sort(unique(data[, time])))
+        tempID <- unique(data[, id])
+        for (i in tempID) {
+            subpos <- which(data[, id] == i)
+            subtime <- time.pos[subpos]
+            subd <- data[subpos, Dname]
+            if (sum(subd) >= 1) {
+                tr.time <- subtime[which(subd == 1)]
+                cr.time <- c() # carryover period
+                for (k in 1:carryover.rm) {
+                    cr.time <- c(cr.time, tr.time + k)
+                }
+                # note: if a period has both treatment effect and carryover effect,
+                # regard carryover effect as 0
+                cr.time <- unique(cr.time)
+                cr.time <- setdiff(cr.time, tr.time)
 
-                        cr.pos <- subpos[which(subtime %in% cr.time)]
+                cr.pos <- subpos[which(subtime %in% cr.time)]
 
-                        if (length(cr.pos) > 0) {
-                            data[cr.pos, Dname] <- 2
-                        }
-                    }
+                if (length(cr.pos) > 0) {
+                    data[cr.pos, Dname] <- 2
                 }
             }
+        }
+        if (!(2 %in% data[, Dname])) {
+            message("carryover.rm = ", carryover.rm, " marked no cell: no treated ",
+                    "unit leaves treatment within the panel.")
         }
     }
 
@@ -2478,6 +2513,7 @@ fect.default <- function(
     ## ----------------------------------------------------------- ##
     II <- I
     II[which(D == 1)] <- 0 ## regard treated values as missing
+    II[which(D == 2)] <- 0 ## cells removed by carryover.rm: neither treated nor controls
 
     II.cm <- matrix(0, TT, N)
     II.cm[which(D == 1)] <- 1
@@ -3636,6 +3672,7 @@ fect.default <- function(
             pI <- I
             pII <- II
             pT.on <- T.on
+            pT.on.carry <- T.on.carry
             pT.off <- T.off
             pG <- G
             pW <- W
@@ -3694,6 +3731,9 @@ fect.default <- function(
                     pI <- as.matrix(I[, -rm.id.2.pos]) ## after removing
                     pII <- as.matrix(II[, -rm.id.2.pos])
                     pT.on <- as.matrix(T.on[, -rm.id.2.pos])
+                    if (!is.null(T.on.carry)) {
+                        pT.on.carry <- as.matrix(T.on.carry[, -rm.id.2.pos])
+                    }
                     if (!is.null(cl)) {
                         p.cl <- cl[-rm.id.2.pos]
                     } else {
@@ -3726,7 +3766,7 @@ fect.default <- function(
                     T.on = pT.on,
                     T.off = pT.off,
                     cl = p.cl,
-                    T.on.carry = T.on.carry,
+                    T.on.carry = pT.on.carry,
                     method = method,
                     degree = degree,
                     X.extra.FE = X.extra.FE,
@@ -3923,14 +3963,18 @@ fect.default <- function(
     # 3 missing
     # 4 removed
     # 5 placebo or carryover
+    # 6 removed by carryover.rm
     obs.missing <- matrix(0, TT, N) ## not under treatment
     obs.missing[, rem.id] <- D + as.matrix(abs(I - 1)) * 3 ## under treatment
     obs.missing[which(obs.missing == 0)] <- 2
     if (placeboTest | carryoverTest) {
         obs.missing[, rem.id] <- obs.missing[, rem.id] + 3 * (II.origin != II) ## placebo or carryover
     }
-    if (carryoverTest & !is.null(carryover.rm)) {
-        obs.missing[intersect(which(D.origin == 2), which(I == 1))] <- 6
+    ## 6: removed by carryover.rm (D.pos indexes the fitted units' matrices)
+    if (length(D.pos) > 0) {
+        om <- obs.missing[, rem.id, drop = FALSE]
+        om[D.pos[I[D.pos] == 1]] <- 6
+        obs.missing[, rem.id] <- om
     }
     obs.missing[which(obs.missing == 4)] <- 3 # in case if I.D!=I
     obs.missing[, rm.id] <- 4 ## removed
@@ -3948,7 +3992,7 @@ fect.default <- function(
         obs.missing.balance[, rem.id] <- obs.missing.sub
     }
 
-    sample <- matrix(obs.missing %in% c(1L, 2L, 5L), nrow = TT, ncol = N,
+    sample <- matrix(obs.missing %in% c(1L, 2L, 5L, 6L), nrow = TT, ncol = N,
                      dimnames = dimnames(obs.missing))
 
     # if cross-validation:
@@ -4337,9 +4381,9 @@ fect.default <- function(
         } else {
             NA_real_
         }
-        ## the cap the EM loop applied: max.iteration, except the loop for
-        ## models with neither factors nor covariates (fe_ad_iter), which
-        ## stops at 500 rounds whatever max.iteration is
+        ## the cap the EM loop applied: max.iteration for every loop (before
+        ## 2.4.8 the loop for models with neither factors nor covariates,
+        ## fe_ad_iter, stopped at 500 rounds whatever max.iteration was)
         cap <- if (is.numeric(output$iter.cap) && length(output$iter.cap) == 1) {
             as.integer(output$iter.cap)
         } else {
@@ -4374,8 +4418,11 @@ fect.default <- function(
             sim = output$para.sim.check,
             para.error = output$para.error
         )
-        if (isTRUE(output$boot.diag$breakdown)) {
-            warning(.fect_boot_diag_message(output$boot.diag, output$r.cv), call. = FALSE)
+        ## warn when the final draws or the first-step pool break down
+        if (!identical(output$boot.diag$cause, "none")) {
+            warning(.fect_boot_diag_message(output$boot.diag, output$r.cv,
+                                            has.missing = any(I == 0)),
+                    call. = FALSE)
         }
     }
     output$n.boot.fail <- NULL

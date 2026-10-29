@@ -59,8 +59,11 @@ Some combinations of options are changed by `fect()` before it fits, and some st
 | `placeboTest = TRUE` and `carryoverTest = TRUE` | Stops. | error |
 | `placeboTest` or `carryoverTest` with cross-validation | Stops. This includes `"ife"` or `"gsynth"` without `r`, and `"mc"` without `lambda`, since they cross-validate by default. Give a single `r` or `lambda`. | error |
 | `carryoverTest = TRUE` when treatment never switches off | Stops. | error |
-| `permute = TRUE` with `placeboTest`, `carryoverTest` or `loo`, or with `method = "gsynth"` | Stops. The permutation test runs for `"fe"`, `"ife"` and `"mc"`. | error |
+| `permute = TRUE` with `placeboTest`, `carryoverTest`, `loo` or `carryover.rm`, or with `method = "gsynth"` | Stops. The permutation test runs for `"fe"`, `"ife"` and `"mc"`. | error |
 | `balance.period` with `group` or with `carryover.rm` | Stops. | error |
+| `carryover.rm` that is not a single non-negative whole number | Stops. `0` means none. | error |
+| `carryover.rm` with `time.component.from = "nevertreated"` (and so `method = "gsynth"`) | Ignored: these fits use no cell of a treated unit, so there is nothing to remove. | warning |
+| `carryover.rm` when no treated unit leaves treatment within the panel | Removes nothing. | message |
 | `fill.missing` without `balance.period` | Ignored. | nothing |
 
 ### Inference

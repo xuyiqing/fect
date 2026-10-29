@@ -145,8 +145,9 @@ print.fect <- function(x,
         cat("\nPlacebo effect for pre-treatment periods:\n")
         print(x$est.placebo, digits = 4)
     }
-    ## v2.4.8: flag a bootstrap whose draws break down (see ?fect, boot.diag)
-    if (isTRUE(x$boot.diag$breakdown)) {
+    ## v2.4.8: flag a bootstrap whose final draws or first-step pool break
+    ## down (see ?fect, boot.diag)
+    if (.boot_diag_flagged(x$boot.diag)) {
         .print_boot_diag(x$boot.diag)
     }
 }
@@ -160,16 +161,19 @@ print.fect <- function(x,
     if (isTRUE(conv$converged)) {
         cat("EM convergence: stopped by tol after ", conv$niter, " rounds ",
             "(final relative change ", rc.txt, ", tol = ", format(conv$tol), ")\n", sep = "")
-    } else if (isTRUE(cap == conv$max.iteration)) {
-        cat("EM convergence: NOT converged; stopped at max.iteration = ", cap,
-            " (final relative change ", rc.txt, ", tol = ", format(conv$tol), ")\n", sep = "")
     } else {
-        ## fe_ad_iter() (no factors, no covariates) caps itself at 500 rounds
-        cat("EM convergence: NOT converged; stopped at the routine's own cap of ", cap,
-            " rounds, not max.iteration = ", conv$max.iteration,
+        cat("EM convergence: NOT converged; stopped at max.iteration = ", cap,
             " (final relative change ", rc.txt, ", tol = ", format(conv$tol), ")\n", sep = "")
     }
     invisible(NULL)
+}
+
+## Whether either check fired: the final draws or the first-step pool. Fits
+## saved before `cause` existed fall back to `breakdown`.
+.boot_diag_flagged <- function(bd) {
+    if (is.null(bd)) return(FALSE)
+    if (is.null(bd$cause)) return(isTRUE(bd$breakdown))
+    !identical(bd$cause, "none")
 }
 
 ## The bootstrap breakdown check on the average effect (x$boot.diag, v2.4.8).
@@ -189,6 +193,21 @@ print.fect <- function(x,
             ";  more than 20 IQRs from the median: ",
             if (is.na(bd$n.sim.extreme)) "not defined (IQR = 0)" else bd$n.sim.extreme,
             "\n", sep = "")
+        if (!is.null(bd$sim.sd)) {
+            fmt <- function(v) if (is.na(v)) "not defined" else format(signif(v, 4))
+            cat("  largest error of each simulated-error draw: SD ", fmt(bd$sim.sd),
+                ";  IQR/1.349: ", fmt(bd$sim.iqr.sd),
+                ";  ratio: ", if (is.na(bd$sim.sd.ratio)) "not defined" else format(signif(bd$sim.sd.ratio, 3)),
+                "\n", sep = "")
+        }
+        if (isTRUE(bd$n.sim.used < bd$min.draws)) {
+            cat("  Fewer than ", bd$min.draws, " usable simulated-error draws: the first-step check ",
+                "is not applied.\n", sep = "")
+        }
+    }
+    if (isTRUE(bd$n.dropped > 0) && !is.na(bd$sd.trim)) {
+        cat("  SD without the draws more than 20 IQRs from the median (sd.trim, not the S.E.): ",
+            format(signif(bd$sd.trim, 4)), "\n", sep = "")
     }
     if (isTRUE(bd$n.used < bd$min.draws)) {
         cat("  Fewer than ", bd$min.draws, " usable draws: the breakdown check is not applied.\n", sep = "")
@@ -196,6 +215,14 @@ print.fect <- function(x,
     if (isTRUE(bd$breakdown)) {
         cat("  The SD is more than ", bd$threshold, " times IQR/1.349: the bootstrap has broken down ",
             "and the S.E. is not reliable.\n", sep = "")
+    }
+    if (isTRUE(bd$sim.breakdown)) {
+        if (isTRUE(bd$breakdown)) {
+            cat("  The first-step simulated errors have broken down too.\n")
+        } else {
+            cat("  The first-step simulated errors have broken down and the S.E. is not reliable, ",
+                "although the draws above look well behaved.\n", sep = "")
+        }
     }
     invisible(NULL)
 }
@@ -209,7 +236,7 @@ summary.fect <- function(object, ...) {
 print.summary.fect <- function(x, ...) {
     fit <- x$object
     print.fect(fit, ...)
-    if (!is.null(fit$boot.diag) && !isTRUE(fit$boot.diag$breakdown)) {
+    if (!is.null(fit$boot.diag) && !.boot_diag_flagged(fit$boot.diag)) {
         .print_boot_diag(fit$boot.diag)
     }
     invisible(x)

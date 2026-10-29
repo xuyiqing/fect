@@ -177,49 +177,112 @@ trim_closure_env <- function(fun) {
   } else {
     NA_real_
   }
+  n.extreme <- as.integer(.fect_n_extreme(b))
+  ## SD without the draws the 20-IQR rule counts; reported beside the S.E.,
+  ## never used for it. NA when the IQR is 0 or fewer than 2 draws stay
+  sd.trim <- NA_real_
+  if (length(b) >= 2L && stats::IQR(b) > 0) {
+    kept <- b[abs(b - stats::median(b)) <= 20 * stats::IQR(b)]
+    if (length(kept) >= 2L) sd.trim <- stats::sd(kept)
+  }
+  ## with fewer than min.draws usable draws the ratio is too noisy to
+  ## read (normal draws exceed 5 in about 4% of fits at nboots = 5)
+  breakdown <- length(b) >= min.draws && isTRUE(sd.ratio > threshold)
+  ## the first-step pool breaks down when one of its draws is extreme or its
+  ## spread fails the same ratio rule; the final draws can look normal then
+  ## (with para.error = "ar" a wild draw widens every replicate alike)
+  sim.breakdown <- !is.null(sim) && isTRUE(sim$n.sim.used >= min.draws) &&
+    (isTRUE(sim$n.sim.extreme > 0) || isTRUE(sim$sim.sd.ratio > threshold))
   list(
     nboots = as.integer(nboots),
     n.used = length(b),
     n.failed = if (is.numeric(n.failed) && length(n.failed) == 1) as.integer(n.failed) else 0L,
     n.nonfinite = sum(!is.finite(b.all)),
-    n.extreme = as.integer(.fect_n_extreme(b)),
+    n.extreme = n.extreme,
+    n.dropped = n.extreme,
     sd = sd.b,
+    sd.trim = sd.trim,
     iqr.sd = iqr.sd,
     sd.ratio = sd.ratio,
     threshold = threshold,
     min.draws = as.integer(min.draws),
-    ## with fewer than min.draws usable draws the ratio is too noisy to
-    ## read (normal draws exceed 5 in about 4% of fits at nboots = 5)
-    breakdown = length(b) >= min.draws && isTRUE(sd.ratio > threshold),
+    breakdown = breakdown,
     para.error = para.error,
     n.sim = if (!is.null(sim)) sim$n.sim else NULL,
     n.sim.failed = if (!is.null(sim)) sim$n.sim.failed else NULL,
-    n.sim.extreme = if (!is.null(sim)) sim$n.sim.extreme else NULL
+    n.sim.extreme = if (!is.null(sim)) sim$n.sim.extreme else NULL,
+    ## v2.4.8: the first-step pool gets its own check (parametric only)
+    n.sim.used = if (!is.null(sim)) sim$n.sim.used else NULL,
+    sim.sd = if (!is.null(sim)) sim$sim.sd else NULL,
+    sim.iqr.sd = if (!is.null(sim)) sim$sim.iqr.sd else NULL,
+    sim.sd.ratio = if (!is.null(sim)) sim$sim.sd.ratio else NULL,
+    sim.breakdown = if (!is.null(sim)) sim.breakdown else NULL,
+    cause = if (breakdown && sim.breakdown) "both" else if (breakdown) "draws" else
+      if (sim.breakdown) "pool" else "none"
   )
 }
 
-.fect_boot_diag_message <- function(bd, r.cv = NULL) {
-  sprintf(
-    paste(
-      "The bootstrap draws of the average effect break down: their SD (%s, the reported S.E.)",
-      "is %s times their IQR/1.349 (%s); %d of %d draws lie more than 20 IQRs from the median.%s",
-      "The S.E., confidence interval and p-value of the average effect are not reliable.",
-      "See fit$boot.diag.", sep = "\n  "),
-    format(signif(bd$sd, 4)), format(signif(bd$sd.ratio, 3)), format(signif(bd$iqr.sd, 4)),
-    bd$n.extreme, bd$n.used,
-    if (isTRUE(bd$n.sim.extreme > 0)) sprintf(paste0(
-      "\n  Parametric bootstrap: %d of %d simulated-error draws (the first step) are extreme;",
-      " %s",
-      " Possible causes include a refit whose loading regression is nearly singular (too few",
-      " distinct control paths for r = %s) and a refit that stopped far from its solution."),
-      bd$n.sim.extreme, bd$n.sim,
+## One warning, built from the cause (bd$cause): which check fired, what not
+## to report, and how to cross-check. `has.missing`: whether the panel has
+## missing cells (para.error = "empirical" needs a complete panel).
+.fect_boot_diag_message <- function(bd, r.cv = NULL, has.missing = NA) {
+  cause <- if (is.null(bd$cause)) (if (isTRUE(bd$breakdown)) "draws" else "none") else bd$cause
+  fmt <- function(v, d = 4) if (is.null(v) || is.na(v)) "not defined" else format(signif(v, d))
+  draws.txt <- sprintf(paste(
+    "The bootstrap draws of the average effect break down: their SD (%s, the reported S.E.)",
+    "is %s times their IQR/1.349 (%s); %d of %d draws lie more than 20 IQRs from the median."),
+    fmt(bd$sd), fmt(bd$sd.ratio, 3), fmt(bd$iqr.sd), bd$n.extreme, bd$n.used)
+  pool.txt <- ""
+  if (cause %in% c("pool", "both")) {
+    fired <- c(
+      if (isTRUE(bd$n.sim.extreme > 0)) sprintf(
+        "%d of %d usable draws lie more than 20 IQRs from the median", bd$n.sim.extreme, bd$n.sim.used),
+      if (isTRUE(bd$sim.sd.ratio > bd$threshold)) sprintf(
+        "the SD of their largest errors is %s times their IQR/1.349", fmt(bd$sim.sd.ratio, 3)))
+    pool.txt <- paste0(
+      "The simulated-error draws of the first step of the parametric bootstrap break down: ",
+      paste(fired, collapse = ", and "), ".")
+    if (cause == "pool") {
+      pool.txt <- paste0(pool.txt, sprintf(
+        " The final draws of the average effect do not show it (their SD is %s times IQR/1.349).",
+        fmt(bd$sd.ratio, 3)))
+    }
+  }
+  causes.txt <- ""
+  if (cause %in% c("pool", "both") || isTRUE(bd$n.sim.extreme > 0)) {
+    causes.txt <- paste0(
+      "In the parametric bootstrap ",
       if (identical(bd$para.error, "ar")) {
-        "with para.error = \"ar\" they enter the error covariance every replicate is drawn from."
+        "the simulated-error draws enter the error covariance every replicate is drawn from."
       } else {
-        "each is reused by every replicate that samples it."
+        "each simulated-error draw is reused by every replicate that samples it."
       },
-      paste(r.cv, collapse = ",")) else ""
+      sprintf(paste(
+        " Possible causes include a refit whose loading regression is nearly singular (too few",
+        "distinct control paths for r = %s) and a refit that stopped far from its solution."),
+        paste(r.cv, collapse = ",")))
+  }
+  parametric <- !is.null(bd$n.sim)
+  checks <- if (parametric) {
+    c("vartype = \"jackknife\"", "the unit bootstrap (vartype = \"bootstrap\")",
+      if (isFALSE(has.missing) && !identical(bd$para.error, "empirical")) "para.error = \"empirical\"")
+  } else {
+    "vartype = \"jackknife\" (this fit used the unit bootstrap, vartype = \"bootstrap\")"
+  }
+  checks.txt <- if (length(checks) > 1) {
+    paste0(paste(checks[-length(checks)], collapse = ", "), " or ", checks[length(checks)])
+  } else checks
+  txt <- c(
+    if (cause %in% c("draws", "both")) draws.txt,
+    if (nzchar(pool.txt)) pool.txt,
+    if (nzchar(causes.txt)) causes.txt,
+    "The standard error, confidence interval and p-value of the average effect should not be reported.",
+    "The standard errors by period are affected too.",
+    paste0("Cross-check with ", checks.txt, "."),
+    paste("See fit$boot.diag; its sd.trim is the SD without the dropped draws",
+          "(not used for the reported S.E.).")
   )
+  paste(txt, collapse = "\n  ")
 }
 
 ## v2.4.8 (B1): the simulated-error pool of the parametric bootstrap (Step 1).
@@ -236,11 +299,23 @@ trim_closure_env <- function(fun) {
     v <- v[!is.na(v)]
     if (length(v) == 0L) NA_real_ else max(abs(v))
   }, numeric(1))
+  m <- e.max[is.finite(e.max)]
+  sim.sd <- if (length(m) >= 2L) stats::sd(m) else NA_real_
+  sim.iqr.sd <- if (length(m) >= 2L) stats::IQR(m) / 1.349 else NA_real_
   list(
     n.sim = as.integer(B),
     n.sim.failed = sum(is.na(e.max)),
     n.sim.extreme = as.integer(.fect_n_extreme(e.max)),
-    sim.max.error = e.max
+    sim.max.error = e.max,
+    n.sim.used = length(m),
+    sim.sd = sim.sd,
+    sim.iqr.sd = sim.iqr.sd,
+    ## not defined when the IQR is 0 or fewer than 2 draws are usable
+    sim.sd.ratio = if (is.finite(sim.sd) && is.finite(sim.iqr.sd) && sim.iqr.sd > 0) {
+      sim.sd / sim.iqr.sd
+    } else {
+      NA_real_
+    }
   )
 }
 
