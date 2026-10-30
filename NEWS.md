@@ -198,9 +198,16 @@ release.
   gsynth-revisit reanalysis of 17 published IFE fits, 5 moved more than 0.1
   published S.E. after 20,000 rounds, the largest 0.56 S.E.) and how to check
   a fit. The defaults (`tol = 1e-5`, `max.iteration = 5000`) do not change.
-* The "Bounded factor loadings" section of the gsynth chapter of the user
-  manual describes the joint intercept fit and says how estimates from
-  earlier versions differ; `?fect` (`loading.bound`) says the same.
+* `loading.bound = "simplex"` is now described as experimental, and the user
+  manual no longer recommends it. It has not appeared in a published paper,
+  it trades bias for variance as synthetic control does, it does not fix a
+  lack of overlap, and its intervals have not been checked. The gsynth
+  chapter and `?fect` say so and recommend checking overlap with
+  `plot(type = "loading.overlap")` instead. The default (`"none"`) does not
+  change.
+* The "Bounded factor loadings (experimental)" section of the gsynth chapter
+  of the user manual describes the joint intercept fit and says how estimates
+  from earlier versions differ; `?fect` (`loading.bound`) says the same.
 * The user manual and the help pages were checked against the code, and
   statements that contradicted it were corrected. Among them: `vartype`
   defaults to `"bootstrap"` for every method, including `method = "gsynth"`
