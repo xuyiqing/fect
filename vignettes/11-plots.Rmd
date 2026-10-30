@@ -633,7 +633,7 @@ Note: `connected`, `plot.ci`, `show.count`, and most gap-plot styling parameters
 
 ## Loading-Overlap Diagnostic {#sec-loading-overlap}
 
-The **loading.overlap** plot is the companion diagnostic for the bounded-loadings feature in v2.3.0 (see [Chapter @sec-gsynth] for the underlying simplex projection). It answers a single question that determines whether the GSC counterfactual for a treated unit is interpolated (safe) or extrapolated (risky): **do treated units lie inside the support of the controls in factor space?**
+The **loading.overlap** plot answers a single question that determines whether the GSC counterfactual for a treated unit is interpolated or extrapolated: **do treated units lie inside the support of the controls in factor space?** An extrapolated counterfactual is correct only if the factor model holds outside the controls' range, which the data cannot check. We recommend the plot for every GSC fit. It was added in v2.3.0 together with the experimental bounded loadings (see [Chapter @sec-gsynth]), but it does not need them.
 
 When a treated unit's factor loadings $\lambda_i$ lie inside the convex hull of control loadings $\{\lambda_j : j \in \text{controls}\}$, the GSC counterfactual $F \hat\lambda_i$ is a true interpolation: any prediction error reflects model misspecification, not extrapolation. When $\lambda_i$ is outside the hull, the unbounded estimator extrapolates and the bounded estimator (`loading.bound = "simplex"`) projects $\lambda_i$ onto the hull boundary, leaving a residual `loading.proj.resid` that measures the extent of the projection. Large `loading.proj.resid` for a treated unit is a flag that GSC is being asked to predict outside the support of controls.
 
@@ -664,7 +664,7 @@ plot(out_ife_r1, type = "loading.overlap")
 
 ### When to use it
 
-- **Before deciding `loading.bound`**: the plot is informative even when `loading.bound = "none"` --- it shows whether the constraint *would* bind if activated. If most treated units are inside the hull, the constraint would have minimal effect; if many are outside, the constraint would meaningfully change the estimates.
+- **On every GSC fit, before reading the estimate**: if most treated units are inside the hull, the counterfactual is an interpolation. If many are outside, the estimate rests on extrapolation. Bounding the loadings (`loading.bound = "simplex"`, experimental) does not fix this: it swaps the extrapolation for a counterfactual from inside the hull, which is biased if the factor model holds outside it.
 - **As an extrapolation flag**: large `loading.proj.resid` paired with treated units far outside the hull means GSC is extrapolating beyond what the donor pool supports. Such estimates should be reported with caveats or trimmed.
 - **As a model-fit diagnostic**: a treated unit far outside the hull on multiple factors may indicate that the rank `r` was set too low, or that the treated unit has a structurally different factor exposure than any control.
 
