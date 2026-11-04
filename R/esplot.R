@@ -57,9 +57,29 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
                    legendOff = FALSE,
                    cex.legend = NULL,
                    pre.label  = "Pre-treatment",
-                   post.label = "Post-treatment"
+                   post.label = "Post-treatment",
+                   preset = NULL
 )
 {
+  publication_recipe <- identical(preset, "publication")
+  if (!is.null(preset) && !publication_recipe) {
+    stop("`preset` must be NULL or 'publication'.", call. = FALSE)
+  }
+  if (publication_recipe) {
+    if (is.null(main)) main <- ""
+    if (is.null(ylab)) ylab <- "Estimate"
+    if (is.null(lcolor)) lcolor <- c("black", "grey55")
+    if (is.null(lwidth)) lwidth <- c(0.7, 0.5)
+    if (is.null(pre.color)) pre.color <- color
+    if (is.null(post.color)) post.color <- color
+    if (is.null(cex.lab)) cex.lab <- 18
+    if (is.null(cex.axis)) cex.axis <- 12
+    if (is.null(cex.legend)) cex.legend <- 11
+    if (missing(gridOff)) gridOff <- TRUE
+    if (missing(fill.gap)) fill.gap <- FALSE
+    if (missing(count.color)) count.color <- "grey75"
+    if (missing(count.outline.color)) count.outline.color <- NA_character_
+  }
   ## Three visual modes:
   ##  - modern    (theme.bw = TRUE,  legacy.style = FALSE): 2.3.1 default
   ##  - classic   (theme.bw = TRUE,  legacy.style = TRUE):  pre-2.3.1 white-panel default
@@ -1188,10 +1208,14 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   } else if (main != "") {
     p <- p + ggtitle(main)
   }
-  p <- p + coord_cartesian(xlim = c(final_xlim[1]-0.2,final_xlim[2]+0.2), ylim = final_ylim)
+  edge_pad <- if (publication_recipe) 0.5 else 0.2
+  p <- p + coord_cartesian(xlim = c(final_xlim[1]-edge_pad,final_xlim[2]+edge_pad), ylim = final_ylim)
   p <- p + scale_x_continuous(
     breaks = function(lims) {
       ## 1. ggplot’s own suggestion (needs {scales})
+      if (publication_recipe) {
+        return(sort(unique(data[[Period]][is.finite(data[[Estimate]])])))
+      }
       br <- scales::pretty_breaks()(lims)
 
       ## 2. keep only integers
@@ -1223,6 +1247,11 @@ esplot <- function(data,  # time, ATT, CI.lower, CI.upper, count, ...
   }
   if (!is.null(cex.legend)) {
     p <- p + theme(legend.text = element_text(size = cex.legend))
+  }
+
+  if (publication_recipe) {
+    p <- p + .publication_theme(cex.lab, cex.axis, cex.legend) +
+      labs(subtitle = NULL, caption = NULL)
   }
 
   return(p)

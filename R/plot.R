@@ -127,6 +127,8 @@ plot.fect <- function(
     ## theme.bw = FALSE for the pre-2.3.1 gray-panel look. Use this for
     ## byte-identical reproduction of figures rendered with fect <= 2.3.0;
     ## remove once you have re-rendered with the modern defaults.
+    show.average = NULL,
+    average.label = FALSE,
     ...) {
 
   rbind_fill_fect_plot <- function(...) {
@@ -161,6 +163,18 @@ plot.fect <- function(
   }
 
   finalize_plot_return <- function(p, data = NULL, test.out = NULL) {
+    if (publication_recipe && inherits(p, "ggplot")) {
+      sizes <- if (publication_sizes_resolved) {
+        c(cex.lab, cex.axis, cex.legend)
+      } else {
+        c(18 * if (is.null(cex.lab)) 1 else cex.lab,
+          12 * if (is.null(cex.axis)) 1 else cex.axis,
+          11 * if (is.null(cex.legend)) 1 else cex.legend)
+      }
+      p <- p + .publication_theme(sizes[1], sizes[2], sizes[3])
+      # Figure captions belong in the manuscript, outside the plotting region.
+      p <- p + labs(subtitle = NULL, caption = NULL)
+    }
     if (isTRUE(return.data)) {
       maybe_print_fect_plot(p)
       out <- list(p = p, data = data)
@@ -188,6 +202,36 @@ plot.fect <- function(
     if (is.logical(count) && missing(show.count)) show.count <- count
   }
   use_loess <- isTRUE(loess.fit)
+  publication_recipe <- identical(preset, "publication")
+  publication_sizes_resolved <- FALSE
+  if (is.null(show.average)) show.average <- !publication_recipe
+  if (!is.logical(show.average) || length(show.average) != 1L || is.na(show.average)) {
+    stop("`show.average` must be TRUE, FALSE, or NULL.", call. = FALSE)
+  }
+  if (!is.logical(average.label) || length(average.label) != 1L || is.na(average.label)) {
+    stop("`average.label` must be TRUE or FALSE.", call. = FALSE)
+  }
+  if (publication_recipe) {
+    if (is.null(main)) main <- ""
+    if (is.null(ylab)) ylab <- "Estimate"
+    if (missing(show.stats)) show.stats <- FALSE
+    if (missing(highlight)) highlight <- FALSE
+    if (is.null(legend.pos)) legend.pos <- "top"
+    if (is.null(gridOff)) gridOff <- TRUE
+    if (is.null(lcolor)) lcolor <- c("black", "grey55")
+    if (is.null(lwidth)) lwidth <- c(0.7, 0.5)
+    if (is.null(pre.color)) pre.color <- "black"
+    if (is.null(post.color)) post.color <- "black"
+    if (is.null(heterogeneous.color)) heterogeneous.color <- "black"
+    if (is.null(heterogeneous.cicolor)) heterogeneous.cicolor <- "grey75"
+    if (is.null(heterogeneous.lcolor)) heterogeneous.lcolor <- "grey40"
+    if (is.null(calendar.color)) calendar.color <- "black"
+    if (is.null(calendar.cicolor)) calendar.cicolor <- "grey75"
+    if (is.null(calendar.lcolor)) calendar.lcolor <- "grey40"
+    if (is.null(count.color)) count.color <- "grey75"
+    if (is.null(count.outline.color)) count.outline.color <- NA_character_
+    if (is.null(count.alpha)) count.alpha <- 0.5
+  }
   ## Three visual modes:
   ##  - modern    (theme.bw = TRUE,  legacy.style = FALSE): 2.3.1 default
   ##  - classic   (theme.bw = TRUE,  legacy.style = TRUE):  pre-2.3.1 white-panel default
@@ -292,7 +336,7 @@ plot.fect <- function(
     if (is.null(status.balanced.post.color)) status.balanced.post.color <- "#E6AF2E"
     if (is.null(status.balanced.pre.color)) status.balanced.pre.color <- "#777777"
     if (is.null(status.background.color)) status.background.color <- "#FFFFFF"
-  } else if (preset %in% c("grayscale", "greyscale")) {
+  } else if (preset %in% c("grayscale", "greyscale", "publication")) {
     if (is.null(connected)) connected <- FALSE
     if (is.null(color)) color <- "black"
     if (is.null(count.color)) count.color <- "gray80"
@@ -1423,10 +1467,10 @@ plot.fect <- function(
   #### font size
   ## Defaults differ by recipe: modern (theme.bw + !legacy.style) is
   ## publication-sized; legacy / classic preserve the larger pre-2.3.1 sizes.
-  .cex_main_default    <- if (use_modern_recipe) 11 else 16
-  .cex_lab_default     <- if (use_modern_recipe) 9  else 15
-  .cex_axis_default    <- if (use_modern_recipe) 8  else 15
-  .cex_legend_default  <- if (use_modern_recipe) 9  else 15
+  .cex_main_default    <- if (publication_recipe) 18 else if (use_modern_recipe) 11 else 16
+  .cex_lab_default     <- if (publication_recipe) 18 else if (use_modern_recipe) 9  else 15
+  .cex_axis_default    <- if (publication_recipe) 12 else if (use_modern_recipe) 8  else 15
+  .cex_legend_default  <- if (publication_recipe) 11 else if (use_modern_recipe) 9  else 15
   .cex_text_default    <- if (use_modern_recipe) 3.0 else 5
 
   ## title
@@ -1483,6 +1527,8 @@ plot.fect <- function(
   } else {
     cex.text <- .cex_text_default
   }
+
+  publication_sizes_resolved <- TRUE
 
   ## text label position
   if (!is.null(stats.pos)) {
@@ -2227,7 +2273,7 @@ plot.fect <- function(
                 current_plot_yrange <- range(y_data_for_range_calc, na.rm = TRUE)
               }
             }
-            count_bar_space_prop <- 0.20
+            count_bar_space_prop <- if (publication_recipe) 0.32 else 0.20
             count_bar_space_height_abs <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
             actual_rect_length_abs <- count_bar_space_height_abs * 0.8
             rect_min_val_abs <- if (!is.null(ylim)) ylim[1] else current_plot_yrange[1] - count_bar_space_height_abs
@@ -2549,9 +2595,9 @@ plot.fect <- function(
                 current_plot_yrange <- range(y_data_for_range_calc, na.rm = TRUE)
               }
             }
-            count_bar_space_prop <- 0.20
+            count_bar_space_prop <- if (publication_recipe) 0.32 else 0.20
             count_bar_space_height <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
-            actual_rect_length <- count_bar_space_height * 0.8
+            actual_rect_length <- count_bar_space_height * if (publication_recipe) 0.5 else 0.8
             rect_min_val <- if (!is.null(ylim)) ylim[1] else current_plot_yrange[1] - count_bar_space_height
 
             counts_for_plot_df$ymin <- rect_min_val
@@ -3334,6 +3380,7 @@ plot.fect <- function(
         stats.pos = stats.pos,
         theme.bw = theme.bw,
         legacy.style = legacy.style,
+        preset = if (publication_recipe) "publication" else NULL,
         only.pre = type == "equiv",
         xangle = xangle,
         yangle = yangle,
@@ -3415,6 +3462,7 @@ plot.fect <- function(
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         theme.bw = theme.bw,
         legacy.style = legacy.style,
+        preset = if (publication_recipe) "publication" else NULL,
         stats.pos = stats.pos,
         only.pre = type == "equiv",
         xangle = xangle,
@@ -3533,6 +3581,7 @@ plot.fect <- function(
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
         theme.bw = theme.bw,
         legacy.style = legacy.style,
+        preset = if (publication_recipe) "publication" else NULL,
         stats.pos = stats.pos,
         xangle = xangle,
         yangle = yangle,
@@ -4056,12 +4105,20 @@ plot.fect <- function(
     p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
 
     TTT <- as.numeric(rownames(data.1))
+    if (average.label && is.finite(att.avg.use)) {
+      p <- p + annotate("text", x = -Inf, y = Inf,
+        label = sprintf("Mean estimate = %.3g", att.avg.use),
+        hjust = -0.05, vjust = 1.4, size = cex.text, colour = "black")
+    }
+    if (publication_recipe && is.null(xlim)) {
+      xlim <- range(TTT[is.finite(TTT)]) + c(-0.5, 0.5)
+    }
     if (has_fit) {
       TTT.2 <- as.numeric(rownames(data.2))
     }
 
     if (CI == FALSE) {
-      p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+      if (show.average) p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
       if (has_fit) {
         if (isTRUE(relative.time) && !is.null(x$eff.calendar.fit.group)) {
           fit_data <- x$eff.calendar.fit.group
@@ -4088,7 +4145,7 @@ plot.fect <- function(
             alpha = 0.5,
             linewidth = 0
           )
-          p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+          if (show.average) p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
           p <- p + geom_line(
             data = fit_data,
             aes(x = time, y = fit, group = group),
@@ -4097,11 +4154,11 @@ plot.fect <- function(
           )
         } else {
           p <- p + geom_ribbon(aes(x = TTT.2, ymin = d2[, 3], ymax = d2[, 4]), color = calendar.cicolor, fill = calendar.cicolor, alpha = 0.5, linewidth = 0)
-          p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+          if (show.average) p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
           p <- p + geom_line(aes(x = TTT.2, y = d2[, 1]), color = calendar.color, linewidth = 1.1)
         }
       } else {
-        p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
+        if (show.average) p <- p + geom_hline(yintercept = att.avg.use, color = calendar.lcolor, linewidth = 0.8, linetype = "dashed")
       }
       p <- p + geom_pointrange(aes(x = TTT, y = d1[, 1], ymin = d1[, 3], ymax = d1[, 4]), color = "gray50", fill = "gray50", alpha = 1, size = 0.6, linewidth = 0.6)
     }
@@ -4117,9 +4174,9 @@ plot.fect <- function(
         current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
       }
 
-      count_bar_space_prop <- 0.15
+      count_bar_space_prop <- if (publication_recipe) 0.28 else 0.15
       count_bar_space_height <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
-      actual_rect_length <- count_bar_space_height * 0.8
+      actual_rect_length <- count_bar_space_height * if (publication_recipe) 0.5 else 0.8
       rect_min_val <- if (!is.null(ylim) && length(ylim) == 2) ylim[1] else current_plot_yrange[1] - count_bar_space_height
 
       T.start <- c()
@@ -4441,7 +4498,7 @@ plot.fect <- function(
 
       ## core geoms (even spacing because x is factor)
       p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
-      p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
+      if (show.average) p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
       # nicer CI + mean: thick error bars + solid point
       p <- p + geom_linerange(
         aes(x = x, ymin = .data$lower, ymax = .data$upper),
@@ -4462,9 +4519,9 @@ plot.fect <- function(
           gb <- ggplot_build(p)
           current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
         }
-        count_bar_space_prop <- 0.20
+        count_bar_space_prop <- if (publication_recipe) 0.32 else 0.20
         count_bar_space_height <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
-        actual_rect_length <- count_bar_space_height * 0.8
+        actual_rect_length <- count_bar_space_height * if (publication_recipe) 0.5 else 0.8
         rect_min_val <- if (!is.null(ylim)) ylim[1] else current_plot_yrange[1] - count_bar_space_height
 
         # Even spacing: rectangles centered on factor positions with fixed half-width
@@ -4488,11 +4545,19 @@ plot.fect <- function(
           data = data_counts, inherit.aes = FALSE,
           size = cex.text * 0.85, hjust = 0.5, vjust = 0.5, color = "#444444"
         )
-        if (!is.null(covariate.labels)) {
-          p <- p + scale_x_discrete(labels = covariate.labels)
-        } else {
-          p <- p + scale_x_discrete(labels = as.character(x_levels_sorted))
+        if (!publication_recipe) {
+          if (!is.null(covariate.labels)) {
+            p <- p + scale_x_discrete(labels = covariate.labels)
+          } else {
+            p <- p + scale_x_discrete(labels = as.character(x_levels_sorted))
+          }
         }
+      }
+
+      if (publication_recipe) {
+        p <- p + scale_x_discrete(
+          labels = if (is.null(covariate.labels)) as.character(x_levels_sorted) else covariate.labels,
+          expand = ggplot2::expansion(add = 0.5))
       }
 
       # NOTE: In ggplot2, adding coord_cartesian() multiple times will replace the
@@ -4539,7 +4604,7 @@ plot.fect <- function(
       }
 
       p <- p + geom_hline(yintercept = 0, colour = lcolor[1], linewidth = lwidth[1], linetype = ltype[1])
-      p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
+      if (show.average) p <- p + geom_hline(yintercept = att.avg.use, color = heterogeneous.lcolor, linewidth = 0.8, linetype = "dashed")
       if (use_loess) {
         p <- p + geom_ribbon(aes(x = X.vec, ymin = y_hat_lower, ymax = y_hat_upper), color = heterogeneous.cicolor, fill = heterogeneous.cicolor, alpha = 0.5, linewidth = 0)
         p <- p + geom_line(aes(x = X.vec, y = y_hat), color = heterogeneous.color, linewidth = 1.1)
@@ -4567,9 +4632,9 @@ plot.fect <- function(
           gb <- ggplot_build(p)
           current_plot_yrange <- gb$layout$panel_scales_y[[1]]$range$range
         }
-        count_bar_space_prop <- 0.20
+        count_bar_space_prop <- if (publication_recipe) 0.32 else 0.20
         count_bar_space_height <- (current_plot_yrange[2] - current_plot_yrange[1]) * count_bar_space_prop
-        actual_rect_length <- count_bar_space_height * 0.8
+        actual_rect_length <- count_bar_space_height * if (publication_recipe) 0.5 else 0.8
         rect_min_val <- if (!is.null(ylim)) ylim[1] else current_plot_yrange[1] - count_bar_space_height
 
         X.vec.for.hist <- X.vec
@@ -4610,6 +4675,12 @@ plot.fect <- function(
       }
     }
  
+    if (average.label && is.finite(att.avg.use)) {
+      p <- p + annotate("text", x = -Inf, y = Inf,
+        label = sprintf("Mean estimate = %.3g", att.avg.use),
+        hjust = -0.05, vjust = 1.4, size = cex.text, colour = "black")
+    }
+
     p <- p + theme(
       legend.text = element_text(margin = margin(r = 10, unit = "pt"), size = cex.legend),
       legend.position = legend.pos,
@@ -5266,6 +5337,7 @@ plot.fect <- function(
         est.lwidth = est.lwidth,
         theme.bw = theme.bw,
         legacy.style = legacy.style,
+        preset = if (publication_recipe) "publication" else NULL,
         est.pointsize = est.pointsize,
         stats = if (exists("stats_values")) stats_values else NULL,
         stats.labs = if (exists("stats_labels")) stats_labels else NULL,
@@ -5371,6 +5443,7 @@ plot.fect <- function(
         start0 = start0,
         theme.bw = theme.bw,
         legacy.style = legacy.style,
+        preset = if (publication_recipe) "publication" else NULL,
         est.lwidth = est.lwidth,
         est.pointsize = est.pointsize,
         stats = if (exists("stats_values")) stats_values else NULL,
@@ -5450,6 +5523,7 @@ plot.fect <- function(
       count.outline.color = count.outline.color,
       theme.bw = theme.bw,
       legacy.style = legacy.style,
+        preset = if (publication_recipe) "publication" else NULL,
       connected = connected,
       only.post = TRUE,
       gridOff = gridOff,

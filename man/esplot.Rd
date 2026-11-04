@@ -30,7 +30,8 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
        xangle = NULL, yangle = NULL,
        xbreaks = NULL, ybreaks = NULL,
        legendOff = FALSE, cex.legend = NULL,
-       pre.label = "Pre-treatment", post.label = "Post-treatment")
+       pre.label = "Pre-treatment", post.label = "Post-treatment",
+       preset = NULL)
 }
 \arguments{
   \item{data}{The input data for the event study plot. Can be a \code{data.frame}, a \code{fect} object, or an object of class \code{did_wrapper}; for the last two, the \code{est.att} component is used.}
@@ -86,6 +87,7 @@ esplot(data, Period = NULL, Estimate = "ATT", SE = NULL,
   \item{ybreaks}{Optional. A numeric vector of break points for the y-axis. If \code{NULL} (default), breaks are determined automatically.}
   \item{legendOff}{Logical. If \code{TRUE}, the legend is suppressed. Default is \code{FALSE}.}
   \item{cex.legend}{Optional. Numeric scaling factor for the legend text size. Default is \code{NULL} (uses ggplot2 defaults).}
+  \item{preset}{Optional \code{"publication"} style: no automatic title, black pre/post estimates, a prominent zero line, larger axis titles (18 pt) and ticks (12 pt), half-period edge padding, and tick marks only at observed event times. Missing periods are not filled unless \code{fill.gap=TRUE} is explicitly requested. Individual appearance arguments override the preset. Input estimates and confidence limits are unchanged. Default \code{NULL}.}
   \item{pre.label}{Character. Label for the pre-treatment period in the legend. Default is \code{"Pre-treatment"}.}
   \item{post.label}{Character. Label for the post-treatment period in the legend. Default is \code{"Post-treatment"}.}
 }

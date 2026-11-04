@@ -120,6 +120,8 @@
     num.pretreatment = 3,
     cm = FALSE,
     legacy.style = FALSE,
+    show.average = NULL,
+    average.label = FALSE,
     ...
 )
 }
@@ -201,7 +203,7 @@
   \item{line.color}{(Deprecated) Use \code{color} for main estimate lines or \code{lcolor} for reference lines instead.}
   \item{line.width}{(Deprecated) Use \code{est.lwidth} for main estimate lines or \code{lwidth} for reference lines instead.}
   \item{count}{(Deprecated) Use \code{show.count} to control visibility and \code{count.color}, \code{count.alpha}, \code{count.outline.color} for appearance.}
-  \item{preset}{A character string specifying a color and style preset: \code{NULL} (default, uses a base style, often with \code{theme_bw} if \code{theme.bw=TRUE}), \code{"vibrant"}, or \code{"grayscale"}. This sets a group of defaults for many plot elements. Individual appearance arguments (like \code{color}, \code{lcolor}, etc.) can override settings from a \code{preset} or the base style.}
+  \item{preset}{A character string specifying a color and style preset: \code{NULL} (default), \code{"vibrant"}, \code{"grayscale"}, or \code{"publication"}. Individual appearance arguments override preset defaults. The publication preset uses black estimates, a prominent zero line, uncapped confidence intervals by default, larger axis titles (18 pt) and ticks (12 pt), compact legends, and extra spacing for moderator categories and count labels. It suppresses automatic titles, statistics, captions, and average-estimate lines. Explicit titles and statistics remain available. Estimates and uncertainty calculations are unchanged.}
   \item{connected}{Logical or \code{NULL} (default). For event study type plots (e.g., \code{type="gap"}), if \code{TRUE}, connects points with lines; if \code{FALSE}, shows point-ranges. If \code{NULL}, defaults to \code{FALSE} for the base style, and \code{TRUE} if \code{preset = "vibrant"}.}
   \item{ci.outline}{Logical; if \code{FALSE} (default). For event study plots where CIs are shown as ribbons, if \code{TRUE}, adds an outline to the CI ribbon.}
   \item{color}{Character string or \code{NULL} (default). If \code{NULL}, uses a default color for main plot lines/points (e.g., \code{"black"} for the base style). The \code{preset} argument may define a different color. Specifying this argument directly overrides any \code{preset} or base style setting.}
@@ -249,6 +251,8 @@
   \item{num.pretreatment}{Integer; number of pre-treatment periods to include when \code{pretreatment = TRUE}. Default is \code{3}.}
   \item{cm}{Logical; if \code{TRUE}, plots causal moderation estimates instead of effect modification estimates for HTE plots. Requires the \code{fect} object to have been estimated with \code{cm = TRUE}. Default is \code{FALSE}.}
   \item{legacy.style}{Logical; if \code{TRUE}, reproduces the pre-2.3.1 visual defaults (bold centered title, larger axis text, solid treatment-onset line, blue placebo triangles, no peach highlight rectangle) regardless of the value of \code{theme.bw}. If \code{FALSE} (the default) and \code{theme.bw = TRUE}, the modern v2.3.1 visual recipe is used. Pass \code{legacy.style = TRUE} for byte-identical reproduction of figures rendered under earlier fect versions.}
+  \item{show.average}{Logical or \code{NULL}. Whether to draw the dashed average-estimate line in calendar and heterogeneous plots. \code{NULL} preserves the historical line except with \code{preset="publication"}, which omits it. This does not affect estimates or zero reference lines.}
+  \item{average.label}{Logical; when \code{TRUE}, add a numeric ``Mean estimate'' annotation in the upper-left corner of calendar and heterogeneous plots, instead of requiring a horizontal average line. The displayed scalar is the same quantity used by the historical reference line; in pretreatment or subgroup views it need not be a posttreatment ATT. Default \code{FALSE}.}
   \item{loess.fit}{Logical; if \code{TRUE} (default), overlays a LOESS smoothing curve on HTE scatter plots.}
   \item{...}{Not used. Arguments that \code{plot.fect} does not know are ignored without a message, so check the spelling of argument names.}
 }

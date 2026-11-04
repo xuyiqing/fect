@@ -3,6 +3,21 @@
 
 Development version, not yet on CRAN.
 
+## Plotting
+
+* `plot.fect()` and `esplot()` now accept `preset = "publication"` for
+  manuscript panels: black estimates, a prominent zero line, larger consistent
+  labels, uncapped intervals, compact legends, extra edge spacing, and no
+  automatic title or caption. Heterogeneous count bars have more space between
+  the bars, labels, and estimates; binary moderator points sit at one quarter
+  and three quarters of the plotting width. Event-study ticks use observed
+  periods, without adding unsupported periods. Other presets are unchanged.
+* `plot.fect(show.average = FALSE)` removes the historical dashed mean line
+  from calendar and heterogeneous plots (the publication default).
+  `average.label = TRUE` displays that scalar as a numeric annotation instead.
+  These options change presentation only; estimates and CI calculations remain
+  unchanged.
+
 Version 2.4.7 was a development version on GitHub and was not released on
 CRAN. Its changes are listed under fect 2.4.7 below and are part of this
 release.

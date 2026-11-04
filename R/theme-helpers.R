@@ -33,6 +33,29 @@
     )
 }
 
+## Optional manuscript recipe. All sizes are points; cex.* multipliers are
+## resolved by plot.fect before this theme is applied. This is visual only.
+.publication_theme <- function(label_size = 18, axis_size = 12, legend_size = 11) {
+  ggplot2::theme(
+    panel.grid = ggplot2::element_blank(),
+    panel.border = ggplot2::element_blank(),
+    axis.line = ggplot2::element_line(colour = "grey45", linewidth = 0.35),
+    axis.title = ggplot2::element_text(size = label_size, colour = "black"),
+    axis.title.x = ggplot2::element_text(margin = ggplot2::margin(t = 10)),
+    axis.title.y = ggplot2::element_text(margin = ggplot2::margin(r = 10)),
+    axis.text = ggplot2::element_text(size = axis_size, colour = "black"),
+    axis.text.x = ggplot2::element_text(size = axis_size),
+    axis.text.y = ggplot2::element_text(size = axis_size),
+    legend.title = ggplot2::element_blank(),
+    legend.text = ggplot2::element_text(size = legend_size),
+    legend.key.height = grid::unit(9, "pt"),
+    legend.key.width = grid::unit(16, "pt"),
+    legend.margin = ggplot2::margin(0, 0, 2, 0),
+    legend.box.spacing = grid::unit(2, "pt"),
+    plot.margin = ggplot2::margin(14, 18, 14, 18)
+  )
+}
+
 ## Lighten a color toward white. Used to auto-derive rect-fill from a point color
 ## (e.g., orange #E07A2B -> peach #F5C8A8).
 .lighten_color <- function(col, amount = 0.75) {
