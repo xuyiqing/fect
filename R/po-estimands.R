@@ -703,6 +703,7 @@ estimand <- function(fit,
     type      <- match.arg(type)
     test      <- match.arg(test)
     vartype   <- match.arg(vartype)
+    if (vartype != "none") .fect_stop_if_conformal(fit, "estimand()")
 
     ## test = "placebo" / "carryover": auto-set direction to the semantic
     ## default. Users should not need to remember the pairing.

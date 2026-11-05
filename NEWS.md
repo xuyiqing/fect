@@ -1,4 +1,68 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.4.9
+
+Development version.
+
+## New features
+
+* New `vartype = "conformal"`: date-specific conformal intervals, one for
+  each treated unit and post-treatment date (in `fit$conformal$unit`), by the
+  Jackknife+ for full-path estimators of Liu and Xu (2026), "Unit-Level
+  Conformal Inference for Panel Counterfactuals". For `method = "gsynth"`,
+  `"ife"` and `"mc"` with an absorbing treatment. It supersedes the June
+  design (#143), which was never released. The paper's full conformal
+  inference, for target-date estimators, is not implemented.
+* `conformal.diag = m`: the paper's pre-treatment diagnostics at each treated
+  unit's last m pre-treatment dates. Each date is treated as if the unit had
+  adopted then, and the interval and p-value test a pseudo-effect of zero.
+  They fill the pre-treatment rows of `est.att` (event times 1 - m to 0) and are in
+  `fit$conformal$diag`. The paper uses m = 4.
+* `conformal.block = TRUE`: the block Jackknife+ for averages over treated
+  units, with a coverage guarantee for the average effect. The complete
+  never-treated controls are split at random into blocks of the size of the
+  treated group, each control matched with one treated unit, and N = G + 1.
+  It covers common and staggered adoption. The partition is in
+  `fit$conformal$block`.
+* `conformal.relabel = B`: the relabeling test of the sharp null of no effect
+  in any treated cell, with B random relabelings, one refit each. p-values
+  for the overall average and for each event time are in
+  `fit$conformal$relabel`, with the relabeled average-effect paths.
+* A message when cross-validation chose `r` or `lambda` for a conformal fit,
+  naming the value and how to fix it (`CV = FALSE`).
+* The gap plot of a conformal fit carries a caption on what the averaged
+  intervals rest on, and `print()` reports the block, diagnostic and
+  relabeling results.
+* The never-treated controls are the calibration pool. Point estimates are
+  the ordinary fit's, `S.E.` is `NA`, and the p-value is dual to the interval.
+* The tuning (`r`, `lambda`) is frozen from the original fit. A value chosen
+  by cross-validation on that fit can break the exchangeability the
+  guarantee needs, and `fect` does not check it. Fix it in advance with a
+  single `r` (or `lambda`) and `CV = FALSE`.
+* The pool of an interval is fixed by the observation pattern. Controls
+  outside it supply no score but stay in every fold fit as training units.
+  They are counted in `n.excluded`.
+* A control in the pool whose fold fit fails is kept with an infinite score.
+  `N` and `q` do not change, the interval is widened or unchanged, and with
+  at least `q` failures it is the whole real line. Failures are counted in
+  `n.failed` (and `n.failed.folds`, `n.intervals.affected`) and one warning is
+  issued. The guarantee for failed folds holds relative to a
+  finite reference completion, and for the pool it is conditional on the
+  observation pattern.
+* The calibration index `q` is the largest integer with `q = 0` or
+  `(2q - 1)/N <= alpha`, compared in double precision with no tolerance and
+  with the same expression as the p-value. Pass `alpha = 0.1`, not
+  `1 - level`.
+* `alpha` must lie in (0, 1) with `vartype = "conformal"`.
+* The intervals for the ATT by event time (`est.att`), the average ATT
+  (`est.avg`, `est.avg.unit`) and the calendar-time ATT average the fold
+  predictions and the control's errors over cells, unless
+  `conformal.block = TRUE`. With several treated units their coverage is
+  not established by the unit-level theorem. `print()` and the gap plot say
+  so.
+* A coverage study is in `tests/coverage-study/conformal_v2_coverage.R`
+  (gsynth, one treated unit; results in
+  `tests/coverage-study/results/conformal_v2_coverage.md`).
+
 # fect 2.4.8
 
 Development version, not yet on CRAN.
