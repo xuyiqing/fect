@@ -3561,6 +3561,13 @@ plot.fect <- function(
       )
     }
 
+    ## conformal fits: say what the averaged intervals rest on
+    if (type == "gap" && identical(x[["vartype"]], "conformal") &&
+        !isTRUE(unit.gap) && !is.null(x[["conformal"]])) {
+      cf.note <- .conformal_plot_note(x[["conformal"]])
+      if (!is.null(cf.note)) p <- p + labs(caption = cf.note)
+    }
+
     # plot bound
     if (bound.old != "none") { ## with bounds
       p <- p + geom_line(data = data2, aes(time, bound, colour = type, linetype = type, linewidth = type, group = id))

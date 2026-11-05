@@ -61,9 +61,25 @@ print.fect <- function(x,
         ## averages over several treated units go beyond the unit-level
         ## guarantee (Liu and Xu 2026, "Multiple treated units")
         n.tr.cf <- if (is.data.frame(cf$unit)) length(unique(cf$unit$unit)) else 0L
-        if (n.tr.cf > 1L) {
+        if (identical(cf$aggregate, "block") && !is.null(cf$block)) {
+            cat("Aggregates:    block Jackknife+, ", cf$block$G,
+                " control blocks of ", cf$block$K, " (N = ", cf$block$N,
+                ", q = ", cf$block$q, ")\n", sep = "")
+        } else if (n.tr.cf > 1L) {
             cat("Aggregates:    intervals for averages over ", n.tr.cf,
                 " treated units have no coverage guarantee (?fect)\n", sep = "")
+        }
+        if (!is.null(cf$diag) && is.data.frame(cf$diag$unit)) {
+            du <- cf$diag$unit
+            n.ex <- sum(du$CI.lower > 0 | du$CI.upper < 0, na.rm = TRUE)
+            cat("Diagnostics:   last ", cf$diag$m, " pre-treatment dates; ",
+                n.ex, " of ", nrow(du), " unit-date intervals exclude zero\n",
+                sep = "")
+        }
+        if (!is.null(cf$relabel)) {
+            cat("Relabeling:    sharp null of no effect, ", cf$relabel$B,
+                " draws, p = ", format(signif(cf$relabel$p.value, 3)),
+                " (absolute average effect)\n", sep = "")
         }
     }
     .print_convergence(x$convergence)
