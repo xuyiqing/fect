@@ -6,10 +6,12 @@
 ##   obs.missing == 1  (treated)
 ##   obs.missing == 2  (control / pre-treatment)
 ##   obs.missing == 5  (placebo or carryover period)
+##   obs.missing == 6  (removed from the fit by carryover.rm; their
+##                      effects are reported in carry.att) -- since 2.4.8
 ## Cells with obs.missing == 3 (missing/unbalanced) or 4 (removed unit)
 ## are FALSE.
 ##
-## Derived via:  sample <- obs.missing %in% c(1L, 2L, 5L)
+## Derived via:  sample <- obs.missing %in% c(1L, 2L, 5L, 6L)
 ## ---------------------------------------------------------------
 
 suppressWarnings(data("simdata", package = "fect"))
@@ -53,9 +55,10 @@ test_that("S.2: fit$sample has the same dimensions as fit$Y.dat", {
 
 
 ## -- S.3  Consistency with obs.missing codes --
-## sample must equal obs.missing %in% c(1L, 2L, 5L) cell-for-cell.
+## sample must equal obs.missing %in% c(1L, 2L, 5L, 6L) cell-for-cell,
+## with and without carryover.rm (code 6).
 
-test_that("S.3: fit$sample equals obs.missing %in% c(1L, 2L, 5L)", {
+test_that("S.3: fit$sample equals obs.missing %in% c(1L, 2L, 5L, 6L)", {
 
   skip_on_cran()
 
@@ -67,10 +70,24 @@ test_that("S.3: fit$sample equals obs.missing %in% c(1L, 2L, 5L)", {
     )
   ))
 
-  expected <- matrix(fit$obs.missing %in% c(1L, 2L, 5L),
+  expected <- matrix(fit$obs.missing %in% c(1L, 2L, 5L, 6L),
                      nrow = nrow(fit$obs.missing), ncol = ncol(fit$obs.missing),
                      dimnames = dimnames(fit$obs.missing))
   expect_identical(fit$sample, expected)
+
+  fit6 <- suppressWarnings(suppressMessages(
+    fect::fect(
+      Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
+      method = "fe", CV = FALSE, se = FALSE, parallel = FALSE,
+      carryover.rm = 2
+    )
+  ))
+  expect_true(any(fit6$obs.missing == 6L))
+  expect_true(all(fit6$sample[fit6$obs.missing == 6L]))
+  expected6 <- matrix(fit6$obs.missing %in% c(1L, 2L, 5L, 6L),
+                      nrow = nrow(fit6$obs.missing), ncol = ncol(fit6$obs.missing),
+                      dimnames = dimnames(fit6$obs.missing))
+  expect_identical(fit6$sample, expected6)
 })
 
 

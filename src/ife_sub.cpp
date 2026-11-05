@@ -34,7 +34,7 @@ List fe_ad_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, con
   List Y_ad;
   List Y_fe_ad;
 
-  while (dif > tolerate && niter <= 500) {
+  while (dif > tolerate && niter <= max_iter) {
     if (use_weight == 1) {
       YY = wE_adj(Y, fit, W, I); // e step: expeactation
     } else {
@@ -75,7 +75,7 @@ List fe_ad_iter(const arma::mat& Y, const arma::mat& Y0, const arma::mat& I, con
   result["fit"] = fit;
   result["niter"] = niter;
   result["dif"] = dif; // relative change at the last round (compared with tol)
-  result["max_iter"] = 500; // the round cap this loop applies: 500, whatever max_iter is
+  result["max_iter"] = max_iter; // the round cap this loop applies (max.iteration since 2.4.8)
   result["e"] = e;
   if (force == 1 || force == 3) {
     alpha = as<arma::mat>(Y_fe_ad["alpha"]);

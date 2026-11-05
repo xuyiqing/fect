@@ -212,15 +212,16 @@ test_that("the convergence line reports the cap the EM loop applied", {
   data(simdata, package = "fect")
   fe <- suppressMessages(fect(Y ~ D, data = simdata, index = c("id", "time"),
                               method = "fe", se = FALSE))
-  expect_identical(fe$convergence$iter.cap, 500L)    # fe_ad_iter() stops at 500 rounds
+  ## since 2.4.8 fe_ad_iter() (no factors, no covariates) obeys max.iteration
+  ## too; before, it stopped at 500 rounds
+  expect_identical(fe$convergence$iter.cap, 5000L)
   expect_null(fe$iter.cap)
   ife <- suppressMessages(fect(Y ~ D + X1 + X2, data = simdata, index = c("id", "time"),
                                method = "ife", r = 1, CV = FALSE, se = FALSE))
   expect_identical(ife$convergence$iter.cap, 5000L)
-  capped <- list(niter = 501L, rel.change = 2e-5, tol = 1e-5, max.iteration = 5000L,
-                 iter.cap = 500L, converged = FALSE)
+  capped <- list(niter = 5001L, rel.change = 2e-5, tol = 1e-5, max.iteration = 5000L,
+                 iter.cap = 5000L, converged = FALSE)
   txt <- capture.output(fect:::.print_convergence(capped))
-  expect_match(txt, "routine's own cap of 500 rounds, not max.iteration = 5000")
-  capped$iter.cap <- 5000L; capped$niter <- 5001L
-  expect_match(capture.output(fect:::.print_convergence(capped)), "stopped at max.iteration = 5000")
+  expect_match(txt, "NOT converged; stopped at max.iteration = 5000")
+  expect_false(any(grepl("routine's own cap", txt)))
 })
