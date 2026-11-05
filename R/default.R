@@ -1083,7 +1083,7 @@ fect.default <- function(
                 call. = FALSE
             )
         }
-        ## vartype = "conformal": the pooled information-matched Jackknife+
+        ## vartype = "conformal": the Jackknife+ for full-path estimators
         ## (R/conformal.R). It is defined for the pooled estimators with
         ## never-treated controls as the calibration pool; the options below
         ## have no conformal version yet.

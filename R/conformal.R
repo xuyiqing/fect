@@ -1,16 +1,22 @@
 ###############################################################################
-## vartype = "conformal": pooled information-matched Jackknife+ (v2)
+## vartype = "conformal": the Jackknife+ for full-path estimators
 ###############################################################################
 ##
-## Implements the pooled information-matched Jackknife+ interval of Ziyi Liu,
-## "Unit-Level Conformal Inference for Panel Counterfactuals" (write-up v2):
-## Section 3.4 (pooled query and background information), Section 4.3
-## (Jackknife+ for a pooled estimator), the calibration q_gamma of eq.
-## (jplus-calibration-main; the exact floating-point convention is at
-## .conformal_q), Section 4.5 (date-specific coverage; q_gamma = 0
-## gives the whole real line) and the appendix algorithm "Pooled
-## information-matched Jackknife+ interval". The p-value is the interval-dual
-## p-value of eq. (placebo-jplus-pvalue-main) evaluated at c = 0.
+## Implements the Jackknife+ for full-path estimators of Ziyi Liu and Yiqing
+## Xu, "Unit-Level Conformal Inference for Panel Counterfactuals" (2026; the
+## draft of 2026-11-05 is the reference for the section names below): the
+## section "Held-out units and what they hide" (a full-path estimator hides
+## each held-out unit's whole post-treatment path), the section "The
+## Jackknife+" (fold j holds out unit 0 and control j, each predicted in a
+## separate fit against the other controls; the calibration q_gamma; coverage
+## 1 - (2q - 1)_+/N; q_gamma = 0 gives the whole real line) and the SM
+## algorithm "Full-path Jackknife+ interval". GSC, IFE-EM and matrix
+## completion fit the whole panel, so they are full-path estimators there.
+## The p-value is the interval-dual p-value of the SM section on pre-treatment
+## diagnostics, evaluated at c = 0. The paper's other procedures are not
+## implemented here: full conformal inference (for target-date estimators),
+## the pre-treatment diagnostic intervals, the block Jackknife+ for average
+## effects and the relabeling test.
 ##
 ## For one treated unit (unit 0) and one post-treatment date t, the never-
 ## treated controls C form the calibration pool and N = |C| + 1. In fold j:
@@ -30,7 +36,7 @@
 ## the effect interval is [Y_0t - b_(N - q), Y_0t - a_(q)]. The point estimate
 ## is the original fit's (all controls).
 ##
-## EXTENSION BEYOND v2 (Yiqing, 2026-10-14; needs Ziyi's sign-off): intervals
+## AGGREGATED TARGETS (Yiqing, 2026-10-14; beyond the paper): intervals
 ## for aggregated effects (est.att by event time, est.avg, est.avg.unit and the
 ## calendar-time ATT). In each fold the aggregated treated query is the
 ## weighted average of the treated units' fold predictions (each treated unit
@@ -43,8 +49,10 @@
 ## construction is the same as above.
 ## Coverage for these aggregated targets is NOT established by the unit-level
 ## theorem, which is about one treated unit and one pseudo-treated control's
-## error. An average of treated units is a different object, and these
-## intervals are not wide enough in general: with nine controls and 100 treated
+## error. The paper (section "Multiple treated units") says so: an average of
+## K prediction errors need not be exchangeable with a single control's error,
+## and its block Jackknife+ (controls in blocks of K) is the construction with
+## a guarantee. These intervals are not wide enough in general: with nine controls and 100 treated
 ## units whose outcomes are iid Bernoulli(0.01), a zero predictor and no
 ## effect, gamma = 0.1 gives N = 10 and q = 1 and exact coverage
 ## 1 - 0.99^9 * (1 - 0.99^100) = 0.42, not 0.90. They need separate
@@ -86,9 +94,13 @@
 ##      established.
 ##  (4) Tuning. r and lambda are frozen from the original fit, which uses the
 ##      treated units' pre-treatment cells and the controls' full panels. The
-##      guarantee needs the tuning not to depend on which unit is treated in a
-##      way that breaks exchangeability. That holds when the tuning is fixed in
-##      advance (CV = FALSE); cross-validated tuning is not covered.
+##      paper allows tuning fixed in advance, or selected once and reused in
+##      every refit if the score condition holds given the selected values
+##      (SM proposition on tuning); it recommends fixing it in advance and
+##      warns that tuning on the treated unit's fit can invalidate coverage.
+##      With CV = TRUE, fect selects r or lambda on that fit, so the guarantee
+##      rests on the condition given the selected value; CV = FALSE with a
+##      given r or lambda avoids the issue.
 ##  A fold fit that stops at max.iteration without converging is used as it is;
 ##  it is not counted as failed.
 ###############################################################################
@@ -107,7 +119,7 @@
 }
 
 
-## Calibration q_gamma(N), the counting bound of v2 eq. (jplus-calibration-main)
+## Calibration q_gamma(N), the counting bound of the paper's Jackknife+
 ## in one exact convention for floating point:
 ##   q_gamma(N) = max{ q in 0..floor(N/2) : q = 0 or fl((2q - 1) / N) <= gamma }.
 ## 2q - 1 and N are exact integers in double arithmetic, `/` is the single
@@ -178,7 +190,7 @@
   b <- M0 + R
   a[failed] <- -Inf
   b[failed] <- Inf
-  ## interval-dual p-value at c = 0 (v2 eq. placebo-jplus-pvalue-main):
+  ## interval-dual p-value at c = 0 (paper, SM pre-treatment diagnostics):
   ## strict comparisons, the larger of the two tail counts
   m <- max(sum(y < a), sum(y > b))
   out["p.value"] <- min(1, (2 * (N - m) - 1) / N)
@@ -580,7 +592,7 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
   }
 
   conformal <- list(
-    procedure = "pooled information-matched Jackknife+ (Liu, v2)",
+    procedure = "Jackknife+ for full-path estimators (Liu and Xu 2026)",
     method = method,
     level = 1 - alpha,
     gamma = alpha,
@@ -611,11 +623,13 @@ conformal_jplus <- function(Y, X, D, I, II, T.on, out, method, force, tol,
     extension = paste0(
       "Intervals for est.att, est.avg, est.avg.unit and the calendar-time ",
       "ATT aggregate the treated fold predictions and the controls' signed ",
-      "errors with the same cell weights. This is an extension beyond the ",
-      "v2 write-up (one treated unit, one date) and awaits Ziyi Liu's ",
-      "review. Coverage for these aggregated targets is not established by ",
-      "the unit-level theorem. These intervals require separate assumptions ",
-      "and validation."
+      "errors with the same cell weights. This goes beyond Liu and Xu ",
+      "(2026), whose guarantee is for one treated unit and one date. ",
+      "Coverage for these aggregated targets is not established by the ",
+      "unit-level theorem: an average of treated units' errors need not be ",
+      "exchangeable with a single control's error. These intervals require ",
+      "separate assumptions and validation; the paper's block Jackknife+ ",
+      "has a guarantee for an average effect."
     )
   )
   if (isTRUE(keep.sims)) {

@@ -52,11 +52,18 @@ print.fect <- function(x,
     }
     if (identical(x$vartype, "conformal") && !is.null(x$conformal)) {
         cf <- x$conformal
-        cat("Inference:     conformal, pooled information-matched Jackknife+ ",
+        cat("Inference:     conformal, Jackknife+ for full-path estimators ",
             "(", round(100 * cf$level, 1), "% level; ", cf$n.controls,
             " never-treated controls; no S.E.)\n", sep = "")
         if (!identical(cf$status, "ok")) {
             cat("Conformal:     ", cf$status, "\n", sep = "")
+        }
+        ## averages over several treated units go beyond the unit-level
+        ## guarantee (Liu and Xu 2026, "Multiple treated units")
+        n.tr.cf <- if (is.data.frame(cf$unit)) length(unique(cf$unit$unit)) else 0L
+        if (n.tr.cf > 1L) {
+            cat("Aggregates:    intervals for averages over ", n.tr.cf,
+                " treated units have no coverage guarantee (?fect)\n", sep = "")
         }
     }
     .print_convergence(x$convergence)

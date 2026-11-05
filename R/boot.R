@@ -854,7 +854,7 @@ fect_boot <- function(
   fit.out <- out$Y.ct
   N_unit <- dim(out$res)[2]
 
-  ## ---- vartype = "conformal": pooled information-matched Jackknife+ -------
+  ## ---- vartype = "conformal": Jackknife+ for full-path estimators --------
   ## No resampling: the intervals come from leave-one-control-out fold fits
   ## with the point fit's tuning (R/conformal.R). The est.* slots are filled
   ## so print() and plot() work; S.E. is NA. fect.default() has already

@@ -21,7 +21,7 @@ A typical sequence:
 1. Fit `"fe"` with `se = TRUE` and look at the pre-treatment estimates: the gap plot, the F test and the equivalence test in `fit$test.out`, and a placebo test (`placeboTest = TRUE` with `placebo.period`). See [Chapter @sec-fect].
 2. If the pre-treatment estimates move away from zero, fit `"ife"` and `"mc"` and repeat the checks. `fect_mspe()` compares the prediction errors of fitted models ([Chapter @sec-cfe]).
 3. With few treated units and no treatment reversal, use `"gsynth"` with `vartype = "parametric"`.
-4. Choose the variance estimator separately. `vartype = "bootstrap"` (the default for every method) resamples units, or clusters with `cl`. `"jackknife"` leaves out one unit at a time. `"parametric"` works only in the gsynth setting. `vartype = "conformal"` gives conformal intervals from leave-one-control-out fits instead of resampling (`gsynth`, `ife` and `mc` with an absorbing treatment; see `?fect`). See [Chapter @sec-inference].
+4. Choose the variance estimator separately. `vartype = "bootstrap"` (the default for every method) resamples units, or clusters with `cl`. `"jackknife"` leaves out one unit at a time. `"parametric"` works only in the gsynth setting. `vartype = "conformal"` gives conformal intervals from leave-one-control-out fits instead of resampling (`gsynth`, `ife` and `mc` with an absorbing treatment; see [Section @sec-conformal] and `?fect`). See [Chapter @sec-inference].
 
 ## Option combinations that fect changes or refuses {#sec-cheatsheet-overrides}
 

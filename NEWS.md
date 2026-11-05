@@ -7,17 +7,21 @@ Development version.
 
 * New `vartype = "conformal"`: date-specific conformal intervals, one for
   each treated unit and post-treatment date (in `fit$conformal$unit`), by the
-  pooled information-matched Jackknife+ of Liu, "Unit-Level Conformal
-  Inference for Panel Counterfactuals". For `method = "gsynth"`, `"ife"` and
-  `"mc"` with an absorbing treatment. It supersedes the June design (#143),
-  which was never released.
+  Jackknife+ for full-path estimators of Liu and Xu (2026), "Unit-Level
+  Conformal Inference for Panel Counterfactuals". For `method = "gsynth"`,
+  `"ife"` and `"mc"` with an absorbing treatment. It supersedes the June
+  design (#143), which was never released. The paper's full conformal
+  inference, pre-treatment diagnostic intervals, block Jackknife+ and
+  relabeling test are not implemented.
 * The never-treated controls are the calibration pool. Point estimates are
   the ordinary fit's, `S.E.` is `NA`, and the p-value is dual to the interval.
-* The tuning (`r`, `lambda`) is frozen from the original fit. The guarantee
-  assumes it does not depend on which unit is treated; fix it in advance
-  with `CV = FALSE`.
+* The tuning (`r`, `lambda`) is frozen from the original fit. A value chosen
+  by cross-validation on that fit can break the exchangeability the
+  guarantee needs, and `fect` does not check it; fix it in advance with
+  `CV = FALSE`.
 * The pool of an interval is fixed by the observation pattern. Controls
-  outside it are not used and are counted in `n.excluded`.
+  outside it supply no score but stay in every fold fit as training units;
+  they are counted in `n.excluded`.
 * A control in the pool whose fold fit fails is kept with an infinite score.
   `N` and `q` do not change, the interval is widened or unchanged, and with
   at least `q` failures it is the whole real line. Failures are counted in
@@ -31,9 +35,11 @@ Development version.
   `1 - level`.
 * `alpha` must lie in (0, 1) with `vartype = "conformal"`.
 * The intervals for the ATT by event time (`est.att`), the average ATT
-  (`est.avg`, `est.avg.unit`) and the calendar-time ATT are an extension
-  beyond the write-up, not yet reviewed by its author. Their coverage is
-  not established by the unit-level theorem.
+  (`est.avg`, `est.avg.unit`) and the calendar-time ATT average the fold
+  predictions and the control's errors over cells. With several treated
+  units their coverage is not established by the unit-level theorem; the
+  paper's block Jackknife+ is the construction with a guarantee. `print()`
+  says so for such fits.
 * A coverage study is in `tests/coverage-study/conformal_v2_coverage.R`
   (gsynth, one treated unit; results in
   `tests/coverage-study/results/conformal_v2_coverage.md`).

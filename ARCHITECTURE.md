@@ -35,8 +35,8 @@
 > introduced in 2.4.8" are new.
 >
 > Updated on 2026-10-28 for branch `feat/conformal-v2` (run `2026-10-28-fect-248-assembly`, part 3),
-> which adds `vartype = "conformal"` as fect 2.4.9: the new file `R/conformal.R` (the pooled
-> information-matched Jackknife+) and its hooks in `R/default.R`, `R/boot.R`, `R/print.R`, `R/plot.R`,
+> which adds `vartype = "conformal"` as fect 2.4.9: the new file `R/conformal.R` (the Jackknife+
+> for full-path estimators of Liu and Xu 2026) and its hooks in `R/default.R`, `R/boot.R`, `R/print.R`, `R/plot.R`,
 > `R/effect.R`, `R/cumu.R`, `R/po-estimands.R` and `R/fect_sens.R`. Rows, nodes and notes marked
 > "2.4.9" describe it; blue nodes include it. Call graph 6 and the section "Contracts introduced in
 > 2.4.9" are new. This update covers the conformal path only. The 2.4.8 changes of #181 to #183 (for
@@ -206,7 +206,7 @@ graph TD
 | `R/cv-rolling.R` (417), `R/cv-rule-helpers.R` (127), `R/cv-helpers.R` (554), `R/cv_binary.R` (441) | CV | Rolling CV, 1se / min / 1pct rules, fold helpers, binary CV | `r.cv.rolling()` | #163 (`cv-rolling.R`: each held-out block is scored with `.fect_heldout_pred()`, not `Y.ct.full`) |
 | `R/heldout-pred.R` (102) | CV / scoring | The model's full prediction at held-out cells, for `fect_mspe()` and `r.cv.rolling()` | internal | new (#163) |
 | `R/boot.R` (5,203) | Inference | `fect_boot()`: bootstrap, jackknife and parametric replicates, shared collector, SEs and CIs | internal | yes: A3-A7, B8 (bounds in CV and parametric draws), B8e (ife + never-treated routing); follow-up: B10-cfe (cfe + never-treated replicates); final: P1 (`.pvalue.basic()`: effect p-values of parametric fits with `ci.method = "basic"`); follow-up batch: #154 (90% bounds in the weighted jackknife placebo and carryover slots), #155 (the `est.group.att` branch follows `ci.method`), #158 (`.pvalue_basic_dual()`: basic p-values of bootstrap fits, coefficients included, go with the basic interval; subgroup switch-off effects get the normal p-value under `"normal"`); 2.4.9: `fect_boot()` calls `conformal_jplus()` and returns before any resampling when `vartype = "conformal"`; nothing below that point runs for these fits |
-| `R/conformal.R` (649) | Inference | `vartype = "conformal"`: pooled information-matched Jackknife+ (fold fits, pool by observation pattern, rule D for failed folds, aggregation, interval-dual p-value, calibration `q`). Entry point `conformal_jplus()`, called from `fect_boot()` | `conformal_jplus()` (internal), `.fect_stop_if_conformal()` | new (2.4.9) |
+| `R/conformal.R` (649) | Inference | `vartype = "conformal"`: Jackknife+ for full-path estimators (fold fits, pool by observation pattern, rule D for failed folds, aggregation, interval-dual p-value, calibration `q`). Entry point `conformal_jplus()`, called from `fect_boot()` | `conformal_jplus()` (internal), `.fect_stop_if_conformal()` | new (2.4.9) |
 | `R/impute_Y0.R` (246) | Inference | Y(0) imputer used by the parametric bootstrap | internal | yes: A4 (`W.in.fit`), B8 (`loading.bound` arguments) |
 | `R/valid_controls.R` (34), `R/permutation.R` (264) | Inference | Control screening for the parametric bootstrap; permutation test | internal | no |
 | `R/diagtest.R` (233), `R/fittest.R` (636), `R/fect_sens.R` (245), `R/fect_iden.R` (224) | Diagnostics | Pre-trend / placebo / carryover / equivalence tests; sensitivity; identification | `fect_sens()`, `fect_iden()` | 2.4.8, #179: `diagtest.R` (the F test's small-sample factor `(N_bar - q) / ((N_bar - 1) q)` is 0/0 or infinite when `N_bar = 1`, including a one-period window; both branches now test `!is.finite(scale) \|\| scale <= 0` and report `NA` with the existing message); 2.4.9: `fect_sens()` stops for a conformal fit through `.fect_stop_if_conformal()` |
@@ -1109,10 +1109,11 @@ more with `r.cv` and `boot = 0`. No replicate fits this model. `cm = TRUE` with
 - 2.4.9: `vartype = "conformal"` is the one inference path with no draws. Its pieces that other parts
   of the package read (`est.*`, `att.bound`, `est.att90`, `conformal`) are filled by
   `conformal_jplus()`; everything that needs draws or a variance matrix stops with a message. Open: the
-  aggregated intervals (`est.att`, `est.avg`, `est.avg.unit`, calendar) are an extension awaiting the
-  write-up author's review, and their coverage is not established (see "Contracts introduced in 2.4.9").
-  `tests/coverage-study/` holds the simulation script and its results; `tests/testthat/test-conformal-v2.R`
-  and `test-conformal-q-convention.R` test the path.
+  aggregated intervals (`est.att`, `est.avg`, `est.avg.unit`, calendar) average one control's error
+  against several treated units; with more than one treated unit their coverage is not established (the
+  paper's block Jackknife+ is not implemented; see "Contracts introduced in 2.4.9").
+  `tests/coverage-study/` holds the simulation script and its results; `tests/testthat/test-conformal-*.R`
+  test the path.
 - Vignettes are a Quarto book under `vignettes/` (build-ignored in the package tarball); chapters
   01-11 plus cheatsheet, changelog (`bb-updates.Rmd`) and references.
 - Ten bundled datasets (`simdata`, `simgsynth`, `sim_base`, `sim_gsynth`, `sim_linear`, `sim_region`,

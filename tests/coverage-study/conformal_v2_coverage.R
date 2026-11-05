@@ -1,5 +1,5 @@
-## Coverage of vartype = "conformal" (pooled information-matched Jackknife+,
-## Liu write-up v2) for method = "gsynth".
+## Coverage of vartype = "conformal" (Jackknife+ for full-path estimators,
+## Liu and Xu 2026) for method = "gsynth".
 ##
 ## One treated unit, factor DGP with r = 2 factors, T = 30 (T0 = 20, 10
 ## post-treatment dates), J = 30 or 60 never-treated controls, iid N(0, 1)
