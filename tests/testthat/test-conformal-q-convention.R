@@ -194,10 +194,10 @@ test_that("a conformal fit prints and summarises on the merged code", {
   fit <- .cq_fit(df, method = "ife", r = 1)
   expect_null(fit$boot.diag)
   out <- capture.output(print(fit))
-  expect_true(any(grepl("conformal, pooled information-matched Jackknife+", out,
+  expect_true(any(grepl("conformal, Jackknife+ for full-path estimators", out,
                         fixed = TRUE)))
   out.s <- capture.output(summary(fit))
-  expect_true(any(grepl("conformal, pooled information-matched Jackknife+",
+  expect_true(any(grepl("conformal, Jackknife+ for full-path estimators",
                         out.s, fixed = TRUE)))
   expect_false(any(grepl("Bootstrap check", out.s, ignore.case = TRUE)))
 })

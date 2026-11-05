@@ -1,4 +1,4 @@
-## vartype = "conformal": pooled information-matched Jackknife+ (Liu, v2).
+## vartype = "conformal": Jackknife+ for full-path estimators (Liu and Xu 2026).
 ## See R/conformal.R. Small panels; every fit runs with parallel = FALSE.
 
 .cf_sim <- function(J = 20, Ntr = 1, TT = 20, T0 = 15, r = 1, seed = 1,
