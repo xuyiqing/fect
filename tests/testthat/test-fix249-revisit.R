@@ -94,7 +94,7 @@ test_that("case bootstrap gets boot.diag too; jackknife and se = FALSE do not", 
 ## gsynth-revisit triage folder exists (FECT_TRIAGE_DIR, or Yiqing's Dropbox).
 test_that("Gilens tort (r = 2): the breakdown warning fires and the S.E. stays 158,668", {
   dir <- Sys.getenv("FECT_TRIAGE_DIR",
-    "~/Dropbox/Research_Hub/Packages/fect/triage/2026-10-14-gsynth-revisit-bugs")
+    "~/Dropbox/Research_Hub/_system/packages/fect/triage/2026-10-14-gsynth-revisit-bugs")
   f <- file.path(path.expand(dir), "cases.rds")
   skip_if_not(file.exists(f), "gsynth-revisit triage cases not available")
   x <- readRDS(f)$explode_tort
