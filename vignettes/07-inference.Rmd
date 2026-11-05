@@ -12,7 +12,7 @@ The chapter is organized around three choices:
 2. `ci.method` --- how the CI is built from that distribution: basic, percentile, bc, bca, or normal.
 3. `para.error` --- which residual-error model the parametric path uses: auto, ar, empirical, or wild. This option applies only when `vartype = "parametric"` and is ignored when `vartype` is `"bootstrap"` or `"jackknife"`.
 
-`vartype = "conformal"` is a separate procedure: it uses no bootstrap draws and no `ci.method`; see `?fect`.
+`vartype = "conformal"` is a separate procedure: it uses no bootstrap draws and no `ci.method`. It gives intervals for each treated unit and date by comparing the treated unit's prediction with the controls' prediction errors; see [Section @sec-conformal].
 
 For each combination, `fect` also reports a corresponding $p$-value by test inversion and a recommended minimum number of bootstrap replicates, `nboots`, based on the classic literature. We summarize these choices and report the empirical coverage of each combination on a clean DGP. Below, we use $\hat\theta$ to denote a point estimate.
 
@@ -269,6 +269,65 @@ A, B, and C₂ are at nominal across all ci.methods. In C₁, the tail-quantile 
 
 Calibration ratios (mean SE divided by empirical SD across replications) are: A = 1.05, B = 1.04, C₁ = 1.01, and C₂ = 1.05. In all cases, variance is calibrated within about 5%. Any remaining coverage gap is a finite-sample issue and shrinks as $K$ or $B$ increases.
 
+## Conformal intervals {#sec-conformal}
+
+`vartype = "conformal"` (new in 2.4.9) gives intervals without resampling. It implements the Jackknife+ for full-path estimators of @liuxu2026conformal, for `method = "gsynth"`, `"ife"` and `"mc"` with an absorbing treatment. These estimators fit the whole panel, so a prediction for one date can use the controls' outcomes at every post-treatment date; the paper calls them full-path estimators.
+
+### How the interval is built
+
+Take one treated unit and one post-treatment date. The never-treated controls are paired with the treated unit one at a time. In the fold for control $j$, both units hide their post-treatment outcomes and keep only the treated unit's pre-treatment window. The other controls keep their full panels, and each of the two hidden units is predicted from them in a separate fit. Control $j$'s outcome at the date is known, so its prediction error $R_j$ shows how far off a prediction from this fold can be. The fold gives the treated unit's prediction $\hat M_{0j}$ and the pair of endpoints $\hat M_{0j} \mp R_j$.
+
+With $J$ controls in the pool, let $N = J + 1$. The interval for the untreated outcome runs from the $q$-th smallest lower endpoint to the $q$-th largest upper endpoint, where $q$ is the largest integer with $(2q-1)/N \le$ `alpha`. Subtracting it from the observed outcome gives the interval for the effect. It covers the effect with probability at least $1 - (2q-1)/N$. With 45 controls and `alpha = 0.1`, for example, $N = 46$, $q = 2$ and the guarantee is $1 - 3/46 = 0.935$. When $N < 1/$`alpha`, $q = 0$ and the interval is the whole real line. The p-value is the one dual to the interval: it is at most `alpha` exactly when the interval excludes zero.
+
+The guarantee does not need stationary errors or a model for them. It needs the treated unit to be no harder to predict than the controls: the table of pair errors (unit $i$'s error when $i$ and $k$ are held out together) must keep its distribution when units are relabeled. The factor model and the tuning matter for this. `fect` reuses the original fit's `r` or `lambda` in every fold, and a value chosen by cross-validation on that fit can break the condition, so fix the tuning in advance (`CV = FALSE`). `fect` checks neither condition.
+
+### Example
+
+We use `sim_gsynth` from [Chapter @sec-gsynth]: five treated units, 45 never-treated controls and two factors.
+
+```{r conformal-fit, cache = TRUE}
+out.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+               method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+               se = TRUE, vartype = "conformal", alpha = 0.1)
+print(out.cf)
+```
+
+The intervals for each treated unit and date are in `out.cf$conformal$unit`, with the pool size `N` and the index `q` that set each interval:
+
+```{r conformal-unit}
+head(out.cf$conformal$unit[, c("unit", "time", "eff", "CI.lower", "CI.upper",
+                               "p.value", "N", "q")])
+```
+
+The plot below draws these intervals for each treated unit. Each covers that unit's effect at that date with probability at least 0.935 under the conditions above; the guarantee is for each date separately, not for the whole path.
+
+```{r conformal-unit-plot, fig.width = 8, fig.height = 4.5}
+library(ggplot2)
+cu <- out.cf$conformal$unit
+ggplot(cu, aes(x = event.time, y = eff)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_pointrange(aes(ymin = CI.lower, ymax = CI.upper), size = 0.2) +
+  facet_wrap(~ unit, nrow = 1) +
+  labs(x = "Periods since treatment", y = "Effect on Y") +
+  theme_bw()
+```
+
+### Averages over treated units
+
+`est.att`, `est.avg` and the gap plot also show intervals for averages. In each fold, `fect` averages the treated units' predictions and the control's errors over the same cells and uses the absolute average error as the control's score. With one treated unit, the averages over dates are covered by the paper when these scores are exchangeable. With several treated units they are not. An average of several treated units' errors behaves differently from one control's error (it is usually less noisy), so the two need not be exchangeable, and the coverage of these intervals is not established. In a constructed example in `?fect` the interval for an average effect covers it with probability 0.42 at a nominal 0.90. `print()` says so above. @liuxu2026conformal give a block Jackknife+ that compares the treated units with blocks of controls of the same size and does have a guarantee for the average effect; `fect` does not implement it.
+
+```{r conformal-gap, fig.width = 6, fig.height = 4.5}
+plot(out.cf, main = "Average effect; intervals without a coverage guarantee")
+```
+
+### Limits
+
+- No standard errors: `S.E.` is `NA`, and `ci.method` does not apply.
+- No pre-treatment intervals. The paper's pre-treatment diagnostics refit the model at each diagnostic date and are not computed.
+- At least two never-treated units are needed, and about $1/$`alpha` of them for a finite interval.
+- `vartype = "conformal"` stops with weights, `group`, `balance.period`, placebo and carryover tests, `loo`, permutation tests, `cm`, extra fixed effects, binary outcomes, `loading.bound` and treatments that switch off. The equivalence plot, `estimand()`, `att.cumu()`, `effect()` and `fect_sens()` need bootstrap draws and stop for these fits.
+- A fold fit that fails keeps its control in the pool with an infinite score. The interval widens, `N` and `q` do not change, and `fect` warns. See `?fect` for the details.
+
 ## Decision tree
 
 A practical default when picking a (`vartype`, `ci.method`, `para.error`) combination:
@@ -296,4 +355,6 @@ reversal, and using `method` in {"gsynth", "ife", "cfe"}?
                     Bump nboots to 1000+ when using a tail-quantile
                       ci.method (basic / percentile / bc / bca)
 ```
+
+For intervals for each treated unit and date with `method = "gsynth"`, `"ife"` or `"mc"`, and at least about $1/$`alpha` never-treated controls, `vartype = "conformal"` is an alternative to all three branches ([Section @sec-conformal]).
 
