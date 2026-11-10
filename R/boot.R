@@ -863,8 +863,7 @@ fect_boot <- function(
   ## so print() and plot() work; S.E. is NA. fect.default() has already
   ## restricted the options (method, absorbing treatment, no weights, ...).
   if (vartype == "conformal") {
-    ## tuning chosen by cross-validation on the fit that holds the treated
-    ## units' pre-treatment outcomes is reused in every fold; the paper's
+    ## tuning chosen by cross-validation is reused in every fold; the paper's
     ## guarantee then rests on a condition fect cannot check (Liu and Xu
     ## 2026, SM proposition on data-selected tuning)
     if (isTRUE(as.logical(CV))) {
@@ -873,14 +872,21 @@ fect_boot <- function(
       } else {
         paste0("r = ", as.numeric(out$r.cv[1]))
       }
+      ## gsynth's rolling and block CV score held-out never-treated cells
+      ## only; every other CV here also scores treated pre-treatment cells
+      cv.src <- if (method == "gsynth" &&
+                    !(cv.method %in% c("treated_units", "loo"))) {
+        "the never-treated units' outcomes only"
+      } else {
+        "a fit that includes the treated units' pre-treatment outcomes"
+      }
       message("vartype = \"conformal\": ", tun.txt, " was chosen by ",
-              "cross-validation on a fit that uses the treated units' ",
-              "pre-treatment outcomes, and every fold reuses it. The coverage ",
-              "guarantee then needs the prediction errors to stay ",
-              "exchangeable given this choice, which fect cannot check; ",
-              "tuning chosen on the treated units' fit can break it ",
-              "(Liu and Xu 2026). To fix the tuning in advance, refit with ",
-              tun.txt, " and CV = FALSE.")
+              "cross-validation on ", cv.src, ", and every fold reuses it. ",
+              "The coverage guarantee then needs the prediction errors to ",
+              "stay exchangeable given this choice, which fect cannot check; ",
+              "tuning selected from the controls alone or from the treated ",
+              "units' fit can break it (Liu and Xu 2026). To fix the tuning ",
+              "in advance, refit with ", tun.txt, " and CV = FALSE.")
     }
     cf <- conformal_jplus(
       Y = Y, X = X, D = D, I = I, II = II, T.on = T.on, out = out,

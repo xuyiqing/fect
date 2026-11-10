@@ -63,7 +63,14 @@ test_that("a conformal fit with cross-validated tuning prints a message", {
     fect(Y ~ D, data = df, index = c("id", "time"), method = "gsynth",
          r = c(0, 2), CV = TRUE, se = TRUE, vartype = "conformal",
          parallel = FALSE),
-    "chosen by cross-validation.*refit with r = [0-9]+ and CV = FALSE"
+    "chosen by cross-validation on the never-treated units' outcomes only.*refit with r = [0-9]+ and CV = FALSE"
+  )
+  ## ife's cross-validation also scores the treated units' pre-period cells
+  expect_message(
+    fect(Y ~ D, data = df, index = c("id", "time"), method = "ife",
+         r = c(0, 2), CV = TRUE, se = TRUE, vartype = "conformal",
+         parallel = FALSE),
+    "chosen by cross-validation on a fit that includes the treated units' pre-treatment outcomes"
   )
   ## fixed tuning: no such message
   msgs <- character(0)

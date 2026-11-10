@@ -383,7 +383,7 @@ ggplot(paths, aes(x = event.time, y = eff, group = draw)) +
 
 ### Tuning
 
-All of these guarantees assume that the tuning is fixed in advance. Every fold, diagnostic, block and relabeling fit reuses the original fit's number of factors or `lambda`. With `CV = TRUE`, that value is chosen on a fit that uses the treated units' pre-treatment outcomes, which can make the treated units easier to predict than the controls. `fect` then prints a message that names the chosen value. No extra option is needed to fix it: pass a single number of factors (or `lambda`) with `CV = FALSE`, as in the examples above.
+All of these guarantees assume that the tuning is fixed in advance. Every fold, diagnostic, block and relabeling fit reuses the original fit's number of factors or `lambda`. With `CV = TRUE`, that value is chosen from the data. With `method = "gsynth"`, the default cross-validation scores the never-treated units' held-out cells only; with `"ife"` and `"mc"` it also scores the treated units' pre-treatment cells. Either way the choice can fit the controls, or the treated units, better than the other group, and the guarantee no longer follows. `fect` then prints a message that names the chosen value. No extra option is needed to fix it: pass a single number of factors (or `lambda`) with `CV = FALSE`, as in the examples above.
 
 ### Limits
 
@@ -396,44 +396,46 @@ All of these guarantees assume that the tuning is fixed in advance. Every fold, 
 
 ## Decision tree
 
-A practical default when picking `vartype` and, for the bootstrap-based options, `ci.method` and `para.error`:
+A practical default when picking `vartype` and, for the bootstrap-based options, `ci.method` and `para.error`. The tree runs from the most common case, many treated units, to the rarer ones:
 
 ```text
-Do you want intervals for each treated unit and date (often the
-case with few treated units), with `method` in {"gsynth", "ife",
-"mc"}, a treatment that never switches off, and at least about
-1/alpha never-treated controls (20 for alpha = 0.05)?
+Are there many treated units (Ntr >= 10)?
 
-├── Yes: vartype = "conformal"
-│        Fix the tuning: a single r (or lambda) and CV = FALSE
-│        conformal.block = TRUE for intervals for the average
-│          effect over K treated units (needs about K/alpha
-│          never-treated controls observed at every date)
-│        conformal.diag = 4 for pre-treatment checks
-│        conformal.relabel = 999 for a test of no effect
-│        No standard errors; ci.method and para.error do not apply
+├── Yes: vartype = "bootstrap" (unit-level cluster bootstrap)
+│        Use normal for att, bca for aptt / log.att
+│        Bump nboots to 1000+ when using a tail-quantile
+│          ci.method (basic / percentile / bc / bca)
 │
-└── No: Is the design factor-augmented with never-treated controls,
-        no reversal, and using `method` in {"gsynth", "ife", "cfe"}?
+└── No: few treated units. Is the design factor-augmented with
+        never-treated controls and no reversal, with `method` in
+        {"gsynth", "ife", "cfe", "mc"}?
 
-    ├── Yes: vartype = "parametric", para.error = "auto"
-    │        para.error = "auto" resolves to "empirical" on a fully-
-    │          observed panel and to "ar" when missing-data cells exist
-    │        Override para.error to "wild" or "empirical" only when you
-    │          have a fully-observed panel and a reason to bypass the
-    │          resolved default
-    │        Use normal for att, bca for aptt / log.att
+    ├── No: vartype = "jackknife"
+    │        ci.method = "normal" (the only ci.method jackknife accepts)
+    │        Wald-style interval theta-hat ± z * SE_jack
     │
-    └── No: choose between bootstrap and jackknife by treated-unit count
+    └── Yes: Do you want intervals for each treated unit and date
+             with a finite-sample guarantee, and are there at least
+             about 1/alpha never-treated controls (20 for
+             alpha = 0.05)?
 
-        ├── Ntr small (< 10): vartype = "jackknife"
-        │        ci.method = "normal" (the only ci.method jackknife accepts)
-        │        Wald-style interval theta-hat ± z * SE_jack
+        ├── No: vartype = "parametric", para.error = "auto"
+        │        (gsynth, ife, cfe; not mc)
+        │        para.error = "auto" resolves to "empirical" on a fully-
+        │          observed panel and to "ar" when missing-data cells exist
+        │        Override para.error to "wild" or "empirical" only when you
+        │          have a fully-observed panel and a reason to bypass the
+        │          resolved default
+        │        Use normal for att, bca for aptt / log.att
         │
-        └── Ntr >= 10: vartype = "bootstrap" (unit-level cluster bootstrap)
-                        Use normal for att, bca for aptt / log.att
-                        Bump nboots to 1000+ when using a tail-quantile
-                          ci.method (basic / percentile / bc / bca)
+        └── Yes: vartype = "conformal" (gsynth, ife, mc; not cfe)
+                 Fix the tuning: a single r (or lambda) and CV = FALSE
+                 conformal.block = TRUE for intervals for the average
+                   effect over K treated units (needs about K/alpha
+                   never-treated controls observed at every date)
+                 conformal.diag = 4 for pre-treatment checks
+                 conformal.relabel = 999 for a test of no effect
+                 No standard errors; ci.method and para.error do not apply
 ```
 
 The conformal branch, its guarantee and its options are explained in [Section @sec-conformal].
