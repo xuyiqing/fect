@@ -23,6 +23,24 @@ For those interested in exploring the algorithms used in **fect** for calculatin
 This manual was rendered against **fect** `r read.dcf("../DESCRIPTION")[,"Version"]` on `r format(Sys.Date(), "%Y-%m-%d")`.
 :::
 
+::: {.callout-tip appearance="simple"}
+### Using fect with an AI assistant
+
+We wrote a guide to **fect** for AI assistants such as Claude, ChatGPT, Codex and Gemini. Copy the text below, give it to your assistant, and then discuss your project with it:
+
+<style>
+.agent-prompt pre, .agent-prompt pre code, .agent-prompt pre code span { white-space: pre-wrap !important; overflow-wrap: anywhere; }
+</style>
+
+::: {.agent-prompt}
+```md
+Read the guide at https://raw.githubusercontent.com/xuyiqing/fect/master/AGENT_GUIDE.md. Then help me analyze my panel data with the R package fect. Before writing any code, ask me about my research design and propose a plan.
+```
+:::
+
+If your assistant cannot open web links, download [AGENT_GUIDE.md](https://github.com/xuyiqing/fect/blob/master/AGENT_GUIDE.md) from GitHub and attach the file instead. The guide tells the assistant what to ask you about your data, how to choose a method and an uncertainty estimate, which diagnostics to run, and where each topic is in this manual. Assistants make mistakes: check their code and claims against this manual.
+:::
+
 ## Why Counterfactual Estimators?
 
 There are several reasons why you might consider using counterfactual estimators for your panel data applications:
