@@ -16,6 +16,52 @@ The chapter is organized around three choices:
 
 For each combination, `fect` also reports a corresponding $p$-value by test inversion and a recommended minimum number of bootstrap replicates, `nboots`, based on the classic literature. We summarize these choices and report the empirical coverage of each combination on a clean DGP. Below, we use $\hat\theta$ to denote a point estimate.
 
+## Decision tree {#sec-decision-tree}
+
+A practical default when picking `vartype` and, for the bootstrap-based options, `ci.method` and `para.error`. The tree runs from the most common case, many treated units, to the rarer ones. The sections after it explain each choice.
+
+```text
+Are there many treated units?
+
+├── Yes: vartype = "bootstrap" (unit-level cluster bootstrap)
+│        Use normal for att, bca for aptt / log.att
+│        Bump nboots to 1000+ when using a tail-quantile
+│          ci.method (basic / percentile / bc / bca)
+│
+└── No: few treated units. Is the design factor-augmented with
+        never-treated controls and no reversal, with `method` in
+        {"gsynth", "ife", "cfe", "mc"}?
+
+    ├── No: vartype = "jackknife"
+    │        ci.method = "normal" (the only ci.method jackknife accepts)
+    │        Wald-style interval theta-hat ± z * SE_jack
+    │
+    └── Yes: Do you want intervals for each treated unit and date
+             with a finite-sample guarantee, and are there at least
+             about 1/alpha never-treated controls (20 for
+             alpha = 0.05)?
+
+        ├── No: vartype = "parametric", para.error = "auto"
+        │        (gsynth, ife, cfe; not mc)
+        │        para.error = "auto" resolves to "empirical" on a fully-
+        │          observed panel and to "ar" when missing-data cells exist
+        │        Override para.error to "wild" or "empirical" only when you
+        │          have a fully-observed panel and a reason to bypass the
+        │          resolved default
+        │        Use normal for att, bca for aptt / log.att
+        │
+        └── Yes: vartype = "conformal" (gsynth, ife, mc; not cfe)
+                 Fix the tuning: a single r (or lambda) and CV = FALSE
+                 conformal.block = TRUE for intervals for the average
+                   effect over K treated units (needs about K/alpha
+                   never-treated controls observed at every date)
+                 conformal.diag = 4 for pre-treatment checks
+                 conformal.relabel = 999 for a test of no effect
+                 No standard errors; ci.method and para.error do not apply
+```
+
+The conformal branch, its guarantee and its options are explained in [Section @sec-conformal].
+
 ## The 3 × 5 inference matrix
 
 A `fect()` fit with `se = TRUE` and `keep.sims = TRUE` stores bootstrap estimates in `fit$eff.boot`, a $T \times N \times B$ array. Slice $b$ holds the units of replicate $b$ in the order `fit$colnames.boot[[b]]` (their column positions in the original panel): under the unit bootstrap a unit drawn twice appears twice, and under the parametric bootstrap the treated units come first. With a cluster bootstrap (`cl`), replicates differ in size and the array is padded with `NA` to the widest one. For `vartype = "jackknife"`, it stores a $T \times (N-1) \times N$ array instead. Two functions use this array:
@@ -393,50 +439,3 @@ All of these guarantees assume that the tuning is fixed in advance. Every fold, 
 - The diagnostics refit for each of the dates, and the relabeling test refits once per draw. With `"ife"` and `"mc"`, which fit once per held-out unit, `conformal.diag = 4` makes the run about five times longer.
 - `vartype = "conformal"` stops with weights, `group`, `balance.period`, placebo and carryover tests, `loo`, permutation tests, `cm`, extra fixed effects, binary outcomes, `loading.bound` and treatments that switch off. The equivalence plot, `estimand()`, `att.cumu()`, `effect()` and `fect_sens()` need bootstrap draws and stop for these fits.
 - A fold fit that fails keeps its control in the pool with an infinite score. The interval widens, `N` and `q` do not change, and `fect` warns. See `?fect` for the details.
-
-## Decision tree
-
-A practical default when picking `vartype` and, for the bootstrap-based options, `ci.method` and `para.error`. The tree runs from the most common case, many treated units, to the rarer ones:
-
-```text
-Are there many treated units (Ntr >= 10)?
-
-├── Yes: vartype = "bootstrap" (unit-level cluster bootstrap)
-│        Use normal for att, bca for aptt / log.att
-│        Bump nboots to 1000+ when using a tail-quantile
-│          ci.method (basic / percentile / bc / bca)
-│
-└── No: few treated units. Is the design factor-augmented with
-        never-treated controls and no reversal, with `method` in
-        {"gsynth", "ife", "cfe", "mc"}?
-
-    ├── No: vartype = "jackknife"
-    │        ci.method = "normal" (the only ci.method jackknife accepts)
-    │        Wald-style interval theta-hat ± z * SE_jack
-    │
-    └── Yes: Do you want intervals for each treated unit and date
-             with a finite-sample guarantee, and are there at least
-             about 1/alpha never-treated controls (20 for
-             alpha = 0.05)?
-
-        ├── No: vartype = "parametric", para.error = "auto"
-        │        (gsynth, ife, cfe; not mc)
-        │        para.error = "auto" resolves to "empirical" on a fully-
-        │          observed panel and to "ar" when missing-data cells exist
-        │        Override para.error to "wild" or "empirical" only when you
-        │          have a fully-observed panel and a reason to bypass the
-        │          resolved default
-        │        Use normal for att, bca for aptt / log.att
-        │
-        └── Yes: vartype = "conformal" (gsynth, ife, mc; not cfe)
-                 Fix the tuning: a single r (or lambda) and CV = FALSE
-                 conformal.block = TRUE for intervals for the average
-                   effect over K treated units (needs about K/alpha
-                   never-treated controls observed at every date)
-                 conformal.diag = 4 for pre-treatment checks
-                 conformal.relabel = 999 for a test of no effect
-                 No standard errors; ci.method and para.error do not apply
-```
-
-The conformal branch, its guarantee and its options are explained in [Section @sec-conformal].
-
