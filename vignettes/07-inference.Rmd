@@ -396,31 +396,45 @@ All of these guarantees assume that the tuning is fixed in advance. Every fold, 
 
 ## Decision tree
 
-A practical default when picking a (`vartype`, `ci.method`, `para.error`) combination:
+A practical default when picking `vartype` and, for the bootstrap-based options, `ci.method` and `para.error`:
 
 ```text
-Is the design factor-augmented with never-treated controls, no
-reversal, and using `method` in {"gsynth", "ife", "cfe"}?
+Do you want intervals for each treated unit and date (often the
+case with few treated units), with `method` in {"gsynth", "ife",
+"mc"}, a treatment that never switches off, and at least about
+1/alpha never-treated controls (20 for alpha = 0.05)?
 
-├── Yes: vartype = "parametric", para.error = "auto"
-│        para.error = "auto" resolves to "empirical" on a fully-
-│          observed panel and to "ar" when missing-data cells exist
-│        Override para.error to "wild" or "empirical" only when you
-│          have a fully-observed panel and a reason to bypass the
-│          resolved default
-│        Use normal for att, bca for aptt / log.att
+├── Yes: vartype = "conformal"
+│        Fix the tuning: a single r (or lambda) and CV = FALSE
+│        conformal.block = TRUE for intervals for the average
+│          effect over K treated units (needs about K/alpha
+│          never-treated controls observed at every date)
+│        conformal.diag = 4 for pre-treatment checks
+│        conformal.relabel = 999 for a test of no effect
+│        No standard errors; ci.method and para.error do not apply
+│
+└── No: Is the design factor-augmented with never-treated controls,
+        no reversal, and using `method` in {"gsynth", "ife", "cfe"}?
 
-└── No: choose between bootstrap and jackknife by treated-unit count
+    ├── Yes: vartype = "parametric", para.error = "auto"
+    │        para.error = "auto" resolves to "empirical" on a fully-
+    │          observed panel and to "ar" when missing-data cells exist
+    │        Override para.error to "wild" or "empirical" only when you
+    │          have a fully-observed panel and a reason to bypass the
+    │          resolved default
+    │        Use normal for att, bca for aptt / log.att
+    │
+    └── No: choose between bootstrap and jackknife by treated-unit count
 
-    ├── Ntr small (< 10): vartype = "jackknife"
-    │        ci.method = "normal" (the only ci.method jackknife accepts)
-    │        Wald-style interval theta-hat ± z * SE_jack
-
-    └── Ntr >= 10: vartype = "bootstrap" (unit-level cluster bootstrap)
-                    Use normal for att, bca for aptt / log.att
-                    Bump nboots to 1000+ when using a tail-quantile
-                      ci.method (basic / percentile / bc / bca)
+        ├── Ntr small (< 10): vartype = "jackknife"
+        │        ci.method = "normal" (the only ci.method jackknife accepts)
+        │        Wald-style interval theta-hat ± z * SE_jack
+        │
+        └── Ntr >= 10: vartype = "bootstrap" (unit-level cluster bootstrap)
+                        Use normal for att, bca for aptt / log.att
+                        Bump nboots to 1000+ when using a tail-quantile
+                          ci.method (basic / percentile / bc / bca)
 ```
 
-For intervals for each treated unit and date with `method = "gsynth"`, `"ife"` or `"mc"`, and at least about $1/$`alpha` never-treated controls, `vartype = "conformal"` is an alternative to all three branches ([Section @sec-conformal]).
+The conformal branch, its guarantee and its options are explained in [Section @sec-conformal].
 
