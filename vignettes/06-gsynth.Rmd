@@ -146,13 +146,14 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
 
 ### Cross-validation
 
-`cv.method = "rolling"` is the new default across all CV entry points (DID/TWFE, Gsynth, and `fect_mspe`). `cv.method = "block"` is also available; `"loo"` is exclusive to Gsynth (`time.component.from = "nevertreated"`) because it requires factor estimation to be independent of the held-out treated observations.
+`cv.method = "rolling"` is the new default across all CV entry points (DID/TWFE, Gsynth, and `fect_mspe`). `cv.method = "block"` is also available; `"loo"` is exclusive to Gsynth (`time.component.from = "nevertreated"`) because it requires factor estimation to be independent of the held-out treated observations. `"forward"` (v2.5.0), also exclusive to Gsynth, masks no cells: it chooses the rank by how well each rank predicts the treated units' pretreatment outcomes from earlier periods (see [Section @sec-gsynth-checks]).
 
 | | `fect_cv` (DID/TWFE) | CV in Gsynth | `fect_mspe` (post-hoc) |
 |:--|:--|:--|:--|
 | `"rolling"` | **Default** | **Default** | **Default** |
 | `"block"` | Available | Available | Available |
 | `"loo"` | --- | Available | --- |
+| `"forward"` | --- | Available (v2.5.0) | --- |
 
 The legacy values `"all_units"` (now `"block"`) and `"treated_units"` (block masking restricted to treated pre-treatment cells) are still accepted and print a note; use `"block"` in place of `"all_units"`. See the [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv).
 
@@ -275,6 +276,87 @@ In the plot below, the points represent the ATTs by calendar time. The blue curv
 ```{r calendar, cache = FALSE,fig.height=5, fig.width=7}
 plot(out,type = "calendar")
 ```
+
+
+------------------------------------------------------------------------
+
+## Five checks for a GSC analysis {#sec-gsynth-checks}
+
+@iwasakixu2026overlap reanalyze published applications of GSC and IFE-EM and recommend five steps, in order: count the data, check overlap before choosing the rank, choose the rank forward from the treated units, use out-of-sample inference, and report what was done. Version 2.5.0 of **fect** runs each step. This section walks through them on `sim_gsynth`.
+
+### Step 1: count the data
+
+GSC predicts a treated unit's untreated outcome from the factors of the never-treated units and the unit's own pretreatment periods, so count both. `sim_gsynth` has 45 never-treated units and 5 treated units, each with 20 pretreatment periods. The rank rule of Step 3 needs about 15 pretreatment periods when the candidate ranks go up to 5. With fewer, report the ranks that both rules of Step 3 pick (forward and leave one out), and treat a finding that holds at some ranks and not at others as fragile. `fect_rank()` reports whether the window is long enough (see Step 3).
+
+### Step 2: check overlap before choosing the rank
+
+A factor model can only predict a treated unit well if the controls can represent it. `overlap_check()` asks this of the raw data, before any model is fitted. For each treated unit, it takes the unit's pretreatment periods, subtracts from the treated unit's path and from each never-treated unit's path its mean over those periods, rebuilds the treated unit's path as a weighted average of the never-treated units' paths (weights that are non-negative and sum to one), and records the root mean squared error. The yardstick is the same error for each never-treated unit rebuilt from the others. A treated unit is flagged when its error is larger than the donors' 90th percentile.
+
+```{r gsc-check-overlap}
+oc <- overlap_check(Y ~ D, data = sim_gsynth, index = c("id", "time"), level = 0.90)
+oc
+```
+
+One of the five treated units, unit 105, is rebuilt worse than 93% of the donors and is flagged. The table `oc$units` gives each unit's error, its percentile (`pct`) and its weight in the average effect. The check needs no rank and no factor model, so the choice of the rank cannot change it. It is a screen rather than a test. A treated unit is rebuilt from all the donors, while each donor is rebuilt from the others, so the treated unit's error tends to be smaller, and a unit slightly outside what the donors can reproduce may pass. Like every pretreatment check, it cannot detect a factor that does not vary before treatment starts. `plot(oc)` shows each unit's percentile, sized by its weight.
+
+```{r gsc-check-overlap-plot, fig.width = 7, fig.height = 3}
+plot(oc)
+```
+
+### Step 3: choose the rank forward from the treated units
+
+`fect_rank()` fits GSC at every candidate rank and scores each rank by how well it predicts the treated units' own pretreatment outcomes. The forward rule refits each treated unit's loadings on its first pretreatment periods and predicts the next one, moving the cutoff forward one period at a time, so every prediction uses only earlier periods, as the post-treatment prediction does. The leave-one-out rule of @Xu2017 also trains on later periods, which under serially correlated errors carry information about the held-out one, so it leans toward more factors. The chosen rank is the smallest minimizer of the forward score. The table also gives the estimate at every rank and the share of the treated units' predicted post-treatment outcomes that lie outside the range of all observed outcomes in the panel (`extrapolation`).
+
+```{r gsc-check-rank, cache = TRUE}
+rk <- fect_rank(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+                force = "two-way", r = 0:5)
+rk
+```
+
+The forward rule picks 2 factors, the number in the simulation, and so does the leave-one-out rule. Report the estimate at every candidate rank and mark the one the rule chose. Here it moves between 5.54 and 5.81 from r = 1 on, a range of about one standard error (0.26 in the output below). To fit at the forward rule's rank in one call, set `cv.method = "forward"`:
+
+```{r gsc-check-forward, cache = TRUE}
+out.fwd <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+                method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+                cv.method = "forward", se = TRUE, vartype = "parametric",
+                nboots = 500, seed = 1234, parallel = TRUE, cores = 16)
+out.fwd$r.cv
+out.fwd$est.avg
+```
+
+At the chosen rank, `loading_check()` checks overlap in the factor model itself. It asks whether each treated unit's estimated loading lies inside the region the controls' loadings enclose (their convex hull). For a unit outside the hull, it measures the distance to the hull relative to the sampling variance of the unit's own loading estimate, and flags the unit when that distance exceeds the 95th percentile of a chi-square distribution with r degrees of freedom. With `trim = TRUE` it drops the flagged units, chooses the rank again on the units kept and refits. Report the trimmed estimate beside the full one. It is the effect for the treated units the controls can represent, a different estimand.
+
+```{r gsc-check-loading, cache = TRUE}
+lc <- loading_check(out.fwd, trim = TRUE)
+lc
+```
+
+Three of the five treated units, unit 105 among them, lie outside the hull, but each by less than the noise in its loadings allows (`lc$table`). None is flagged, so there is nothing to trim. Step 2 flags unit 105 and this check does not, because the two checks ask different questions, and each can flag a unit the other passes. `plot(lc)` draws the loadings.
+
+```{r gsc-check-loading-plot, fig.width = 6, fig.height = 4.5}
+plot(lc)
+```
+
+### Step 4: use out-of-sample inference
+
+With few treated units, use the parametric bootstrap (`vartype = "parametric"`, Algorithm 2 of @Xu2017, as in `out.fwd` above). It simulates each treated unit's prediction error with the prediction errors of controls left out of the factor fit. Use it with caution when the controls are few relative to the treated units or to the rank. The interval at the chosen rank does not account for the choice of the rank.
+
+For IFE-EM (`method = "ife"`, factors from all untreated cells), Algorithm 2 does not apply, because the factors depend on the treated units' own pretreatment errors. Since version 2.5.0, `vartype = "parametric"` with `method = "ife"` runs the experimental bootstrap of @iwasakixu2026overlap instead. It regenerates the whole panel from the fitted model plus noise vectors taken from controls left out of the fit, and refits IFE-EM in every draw. It has not been proved valid. In the paper's simulations with one treated unit and 30 or more controls, its 95% intervals cover 94% to 99% of the time at the true rank and 92% to 97% with one factor too many, and less than 93% with 7 or 10 controls and one factor too many. Each draw refits IFE-EM, so it costs 20 to 30 times as much as Algorithm 2. See "IFE-EM bootstrap" in `?fect`.
+
+```{r gsc-check-ifeboot, cache = TRUE, message = FALSE}
+out.ife <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+                method = "ife", force = "two-way", r = 2, se = TRUE,
+                vartype = "parametric", nboots = 200, seed = 1234,
+                parallel = TRUE, cores = 16)
+out.ife$est.avg
+out.ife$ife.boot[c("r", "r.noise", "G")]
+```
+
+With 30 or more controls (here 45), fect takes the noise vectors from fits with one factor fewer (`r.noise = 1`), because a rank above the true one absorbs part of the noise and makes the vectors too small. Do not rely on a rank at which IFE-EM has not converged; `out.ife$convergence$converged` reports whether the fit met `tol` before `max.iteration` rounds.
+
+### Step 5: report
+
+Report the rank and how it was chosen (here, the forward rule over ranks 0 to 5), whether a printed estimate is an average or a single period, the version of **fect**, the stopping rule (`tol`, `max.iteration`) and the seed, and post the data and code.
 
 
 ------------------------------------------------------------------------
