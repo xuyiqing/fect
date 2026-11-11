@@ -64,6 +64,20 @@ test_that("overlap_check(): a unit off the donors' span is flagged", {
   expect_identical(oc$units$pct[oc$units$unit == "101"], 1)
 })
 
+test_that("overlap_check(): thousands of donors (long window keys, the active-set solver)", {
+  skip_on_cran()
+  set.seed(4)
+  N <- 2205; T <- 9
+  F <- matrix(rnorm(T * 2), T, 2)
+  Y <- F %*% matrix(rnorm(2 * N), 2, N) + matrix(rnorm(T * N, sd = 0.5), T, N)
+  D <- matrix(0, T, N); D[7:T, 1:5] <- 1
+  d <- data.frame(id = rep(1:N, each = T), time = rep(1:T, N), Y = c(Y), D = c(D))
+  oc <- overlap_check(Y ~ D, data = d, index = c("id", "time"), max.heldout = 30)
+  expect_identical(oc$units$n.donors, rep(2200L, 5))
+  expect_true(all(oc$units$status == "ok"))
+  expect_identical(lengths(oc$yard), rep(30L, 5))
+})
+
 test_that("overlap_check(): not assessable, and input checks", {
   d <- simgsynth[simgsynth$time > 18, ]                    # two pretreatment periods
   oc <- overlap_check(Y ~ D, data = d, index = c("id", "time"))

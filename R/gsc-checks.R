@@ -125,15 +125,22 @@
     donors <- .of_donors(Y, rows, co)
     if (length(donors) < pars$min.donors)
         return(.of_na("too few donors", length(rows), length(donors)))
-    key <- paste(paste(rows, collapse = ","), paste(donors, collapse = ","), sep = "|")
-    e.co <- cache[[key]]
+    ## reuse the yardstick of a window already seen (same periods and donors);
+    ## the cache is a list searched in full, since a key built from the
+    ## indices can exceed R's limit on the length of a name
+    e.co <- NULL
+    for (ce in cache$entries)
+        if (identical(ce$rows, rows) && identical(ce$donors, donors)) {
+            e.co <- ce$e.co
+            break
+        }
     if (is.null(e.co)) {
         held <- donors
         if (length(held) > pars$max.heldout)
             held <- sort(.gsc_with_seed(pars$seed, sample(donors, pars$max.heldout)))
         e.co <- vapply(held, function(j)
             .gsc_sc_rmse(Y[rows, j], Y[rows, setdiff(donors, j), drop = FALSE]), 0)
-        cache[[key]] <- e.co
+        cache$entries[[length(cache$entries) + 1L]] <- list(rows = rows, donors = donors, e.co = e.co)
     }
     .of_judge(.gsc_sc_rmse(Y[rows, i], Y[rows, donors, drop = FALSE]), e.co,
               Y, rows, donors, pars$level, pars$collapse)
@@ -300,7 +307,8 @@ overlap_check <- function(formula, data, index, level = 0.90,
     onset <- vapply(tr, function(i) min(which(D[, i] == 1)), 0L)
     post <- vapply(tr, function(i) sum(D[, i] == 1 & !is.na(Y[, i]), na.rm = TRUE), 0)
     wt <- post / sum(post)
-    cache <- new.env(hash = TRUE)
+    cache <- new.env()
+    cache$entries <- list()
     ux <- lapply(seq_along(tr), function(k)
         .of_unit(Y, tr[k], seq_len(onset[k] - 1L), co, cache, pars))
     cols <- c("status", "reason", "error", "yardstick", "median", "score",
