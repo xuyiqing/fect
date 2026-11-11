@@ -59,7 +59,7 @@
             failed <- c(failed, conditionMessage(f))
             next
         }
-        Z <- cbind(1, if (r.noise > 0) as.matrix(f$factor))
+        Z <- cbind(rep(1, TT), if (r.noise > 0) as.matrix(f$factor))
         base <- rep(as.numeric(f$mu), TT)
         if (!is.null(f$xi)) base <- base + as.vector(f$xi)
         beta <- if (p > 0) as.vector(f$beta) else numeric(0)
