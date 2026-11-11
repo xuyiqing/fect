@@ -431,6 +431,9 @@ fect_boot <- function(
   group = NULL,
   dis = 0,
   keep.sims = FALSE,
+  conformal.diag = 0,
+  conformal.block = FALSE,
+  conformal.relabel = 0,
   time.component.from = "notyettreated",
   loading.bound = "none",
   gamma.loading = NULL,
@@ -853,6 +856,48 @@ fect_boot <- function(
   eff.out <- out$eff
   fit.out <- out$Y.ct
   N_unit <- dim(out$res)[2]
+
+  ## ---- vartype = "conformal": Jackknife+ for full-path estimators --------
+  ## No resampling: the intervals come from leave-one-control-out fold fits
+  ## with the point fit's tuning (R/conformal.R). The est.* slots are filled
+  ## so print() and plot() work; S.E. is NA. fect.default() has already
+  ## restricted the options (method, absorbing treatment, no weights, ...).
+  if (vartype == "conformal") {
+    ## tuning chosen by cross-validation is reused in every fold; the paper's
+    ## guarantee then rests on a condition fect cannot check (Liu and Xu
+    ## 2026, SM proposition on data-selected tuning)
+    if (isTRUE(as.logical(CV))) {
+      tun.txt <- if (method == "mc") {
+        paste0("lambda = ", format(signif(out$lambda.cv, 6)))
+      } else {
+        paste0("r = ", as.numeric(out$r.cv[1]))
+      }
+      ## gsynth's rolling and block CV score held-out never-treated cells
+      ## only; every other CV here also scores treated pre-treatment cells
+      cv.src <- if (method == "gsynth" &&
+                    !(cv.method %in% c("treated_units", "loo"))) {
+        "the never-treated units' outcomes only"
+      } else {
+        "a fit that includes the treated units' pre-treatment outcomes"
+      }
+      message("vartype = \"conformal\": ", tun.txt, " was chosen by ",
+              "cross-validation on ", cv.src, ", and every fold reuses it. ",
+              "The coverage guarantee then needs the prediction errors to ",
+              "stay exchangeable given this choice, which fect cannot check; ",
+              "tuning selected from the controls alone or from the treated ",
+              "units' fit can break it (Liu and Xu 2026). To fix the tuning ",
+              "in advance, refit with ", tun.txt, " and CV = FALSE.")
+    }
+    cf <- conformal_jplus(
+      Y = Y, X = X, D = D, I = I, II = II, T.on = T.on, out = out,
+      method = method, force = force, tol = tol,
+      max.iteration = max.iteration, alpha = alpha, norm.para = norm.para,
+      parallel = do_parallel_boot, keep.sims = keep.sims,
+      diag = conformal.diag, block = conformal.block,
+      relabel = conformal.relabel
+    )
+    return(c(out, cf))
+  }
 
   if (!is.null(group)) {
     group.output.origin <- out$group.output

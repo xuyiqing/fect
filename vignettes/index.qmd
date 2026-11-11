@@ -54,7 +54,7 @@ The **Synth** (synthetic control) setting learns time components from never-trea
 
 The **DID/TWFE** setting imputes treated counterfactuals using all not-yet-treated observations, including both never-treated units and pre-treatment periods of treated units. This accommodates treatment reversal and uses more data. The estimand is PATT.
 
-Inference differs across the two settings. The Synth setting conditions on fixed pre-treatment information $X$ and uses predictive uncertainty, implemented via a two-stage parametric bootstrap (`vartype = "parametric"`). The DID/TWFE setting relies on super-population inference, for which nonparametric bootstrap (`vartype = "bootstrap"`) or jackknife (`vartype = "jackknife"`) are appropriate.
+Inference differs across the two settings. The Synth setting conditions on fixed pre-treatment information $X$ and uses predictive uncertainty, implemented via a two-stage parametric bootstrap (`vartype = "parametric"`) or conformal intervals (`vartype = "conformal"`). The DID/TWFE setting relies on super-population inference, for which nonparametric bootstrap (`vartype = "bootstrap"`) or jackknife (`vartype = "jackknife"`) are appropriate.
 
 ### Estimation and Inference
 
@@ -78,12 +78,12 @@ Choose based on estimand and inference. If the target is unit-specific and condi
 |:-----------------------|:-----------------------------------------------|
 | Treatment switches on and off | `time.component.from = "notyettreated"` (default) |
 | No reversal, many treated units | Either setting |
-| No reversal, few treated units | `time.component.from = "nevertreated"`, `vartype = "parametric"` |
+| No reversal, few treated units | `time.component.from = "nevertreated"`, `vartype = "parametric"` or `"conformal"` |
 | Reproduce **gsynth** | `method = "gsynth"` or `method = "ife"`, `time.component.from = "nevertreated"` |
 
 ## Organization
 
-The user guide is structured into four parts. Most users only need the **Basics** part to perform a complete analysis with the fixed effects counterfactual estimator; the remaining parts are referenced as needed.
+The user guide is structured into five parts. Most users only need the **Basics** part to perform a complete analysis with the fixed effects counterfactual estimator; the remaining parts are referenced as needed.
 
 ### Basics
 
@@ -96,7 +96,7 @@ The user guide is structured into four parts. Most users only need the **Basics*
 -   [Chapter @sec-estimands]\
     Alternative estimands and the unified post-hoc estimand interface: cumulative ATT, APTT, log-scale ATT, window-restricted ATT, and the long-form accessor for custom estimands.
 
-### Advanced estimators and inference
+### Advanced estimators
 
 -   [Chapter @sec-ife-mc]\
     Interactive fixed effects (IFE) and matrix completion (MC) methods, cross-validation, and diagnostic tests.
@@ -107,8 +107,13 @@ The user guide is structured into four parts. Most users only need the **Basics*
 -   [Chapter @sec-gsynth]\
     The Gsynth program --- the synthetic control setting using `time.component.from = "nevertreated"` --- originally developed in the **gsynth** package, with CFE extensions.
 
+### Inference
+
 -   [Chapter @sec-inference]\
-    Bootstrap inference internals: the `vartype` × `ci.method` × `para.error` matrix, parametric bootstrap mechanics, and the decision tree for choosing an inference path. Most relevant after Chapter @sec-gsynth where parametric bootstrap is the default.
+    A decision tree for choosing the uncertainty estimate, then the bootstrap, jackknife and parametric bootstrap in depth: the `vartype` × `ci.method` × `para.error` matrix, p-values, the number of replicates, and an empirical coverage study.
+
+-   [Chapter @sec-conformal]\
+    Conformal intervals (`vartype = "conformal"`) for few treated units: the idea, the conditions behind the finite-sample guarantee, the block Jackknife+ for averages over treated units, pre-treatment diagnostics, and the relabeling test of no effect.
 
 ### Diagnostics and extensions
 
