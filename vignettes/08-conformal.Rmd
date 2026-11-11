@@ -1,0 +1,232 @@
+# Conformal Inference {#sec-conformal}
+
+```{r .common, include = FALSE}
+source("_common.R")
+```
+
+Suppose one state adopts a policy in 2010 and 45 states never do. We fit a factor model, predict the state's outcome without the policy, and read the effect in each year as the gap between what happened and the prediction. How far off could that prediction be? The bootstrap and the jackknife answer by resampling treated units, and with one treated unit there is nothing to resample. The parametric bootstrap answers with a model of the prediction errors, which has to be right.
+
+Conformal inference answers by comparison. Pretend, one at a time, that each of the 45 states had adopted the policy in 2010, predict it the same way, and look at how far off those predictions are. The treated state's prediction error should look like one of theirs. If the largest of the 45 errors in 2012 is 2.4, it would be unusual for the treated state's error in 2012 to be larger.
+
+`vartype = "conformal"` (new in 2.4.9) turns this comparison into intervals, using the Jackknife+ of @liuxu2026conformal. It gives an interval for each treated unit and each date after treatment, with a coverage guarantee that holds in finite samples. It works with `method = "gsynth"`, `"ife"` and `"mc"` when the treatment never switches off. This chapter explains the idea, says what the guarantee needs, and shows how to use it with one and with several treated units.
+
+## The idea {#sec-conformal-idea}
+
+Take one treated unit and one date after treatment. The never-treated units, called controls below, are paired with the treated unit one at a time. In the fold for control $j$:
+
+1. Both units hide their outcomes from the treated unit's adoption date on. Control $j$ keeps only the treated unit's pre-treatment window, so it is predicted from the same amount of history.
+2. The other controls keep their full panels. Each hidden unit is predicted from them, in a separate fit.
+3. Control $j$ was never treated, so its outcome at the date is known. Its prediction error $R_j$ shows how far off a prediction from this fold can be.
+4. The fold gives the treated unit's prediction $\hat M_{0j}$ and two endpoints, $\hat M_{0j} - R_j$ and $\hat M_{0j} + R_j$.
+
+With $J$ controls there are $J$ folds and $J$ pairs of endpoints. Let $N = J + 1$, the controls plus the treated unit. The interval for the treated unit's untreated outcome runs from the $q$-th smallest lower endpoint to the $q$-th largest upper endpoint, where $q$ is the largest integer with $(2q - 1)/N \le$ `alpha`. Subtracting the interval from the observed outcome gives the interval for the effect.
+
+The interval covers the effect with probability at least $1 - (2q - 1)/N$. Two examples:
+
+- With 19 controls and `alpha = 0.1`, $N = 20$ and $q = 1$. The interval runs from the smallest lower endpoint to the largest upper one, and the guarantee is $1 - 1/20 = 0.95$.
+- With 45 controls and `alpha = 0.1`, $N = 46$ and $q = 2$. The second smallest and second largest endpoints are used, and the guarantee is $1 - 3/46 = 0.935$.
+
+The guarantee is at least $1 -$ `alpha` and can be higher, because $N$ is a whole number. With fewer than $1/$`alpha` $- 1$ controls, $q = 0$ and the interval is the whole real line: there are too few controls to tell an unusual error from a usual one. Each interval also has a p-value for the null of no effect at that date. It is at most `alpha` exactly when the interval excludes zero, and it can be no smaller than $1/N$.
+
+## What the guarantee needs {#sec-conformal-assumptions}
+
+The guarantee rests on a comparison, so it needs the comparison to be fair.
+
+- **The treated unit is no harder to predict than the controls.** Formally, take the table of pair errors, whose entry for units $i$ and $k$ is unit $i$'s error when the two are held out together. Its distribution must not change when the units are relabeled. The usual way this fails is a treated unit unlike any control, for example one whose factor loadings lie outside the controls' range. Its prediction is then an extrapolation, and its errors can be larger than any control's.
+- **The tuning is fixed in advance.** Every fold reuses the original fit's number of factors `r` (or `lambda` for `"mc"`). If that number was chosen by cross-validation, the choice depends on the data in ways that can favor one group. See [Section @sec-conformal-tuning].
+- **No anticipation and no reversal.** Outcomes before adoption are untreated, and treatment stays on once it starts.
+- **Enough controls.** About $1/$`alpha` or more never-treated units, as above.
+
+The guarantee does not need the factor model to be correct, the errors to be stationary, or a long pre-treatment period. A poor model makes the intervals wider. They keep their guarantee as long as the model is equally poor for the treated unit and the controls. `fect` cannot check the first two conditions. [Section @sec-conformal-checks] shows how to look for evidence against the first.
+
+## One treated unit {#sec-conformal-one}
+
+We start with the synthetic control setting. `sim_gsynth`, from [Chapter @sec-gsynth], has five treated units, 45 never-treated controls, 30 periods and two factors. We keep the first treated unit and the 45 controls.
+
+```{r conformal-one-data}
+data(sim_gsynth)
+treated <- unique(sim_gsynth$id[sim_gsynth$D == 1])
+d1 <- subset(sim_gsynth, !(id %in% treated[-1]))
+length(unique(d1$id))
+```
+
+The call is a usual `gsynth` fit with three changes: `vartype = "conformal"`, a single number of factors with `CV = FALSE`, and `alpha` set to the error rate we accept.
+
+```{r conformal-one-fit}
+out.cf1 <- fect(Y ~ D + X1 + X2, data = d1, index = c("id", "time"),
+                method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+                se = TRUE, vartype = "conformal", alpha = 0.1)
+print(out.cf1)
+```
+
+The intervals for each date are in `out.cf1$conformal$unit`. The columns `N` and `q` give the pool size and the endpoint used.
+
+```{r conformal-one-unit}
+cu1 <- out.cf1$conformal$unit
+cu1[, c("time", "event.time", "eff", "CI.lower", "CI.upper", "p.value", "N", "q")]
+```
+
+Read the second row. At the second period after treatment, the estimated effect is `r round(cu1$eff[2], 2)` and the interval runs from `r round(cu1$CI.lower[2], 2)` to `r round(cu1$CI.upper[2], 2)`. With $N = 46$ and $q = 2$, it covers the effect with probability at least 0.935 if the conditions above hold. Its p-value, `r round(cu1$p.value[2], 3)`, equals $1/46$, the smallest possible with 45 controls. The interval for the first period includes zero.
+
+The gap plot draws the same intervals, since with one treated unit the average effect at each event time is that unit's effect.
+
+```{r conformal-one-gap, fig.width = 6, fig.height = 4.5}
+plot(out.cf1, main = "One treated unit, conformal intervals")
+```
+
+Each interval has its guarantee at its own date. They are not joint: across the ten dates, about one interval in ten can miss by chance. `est.avg` also reports an interval for the average effect over the ten dates. With one treated unit, @liuxu2026conformal cover such averages over dates, with the same conditions.
+
+## Several treated units {#sec-conformal-several}
+
+Now we use all five treated units.
+
+```{r conformal-fit, cache = TRUE}
+out.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+               method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+               se = TRUE, vartype = "conformal", alpha = 0.1)
+print(out.cf)
+```
+
+### An interval for each unit and date
+
+Each treated unit gets its own intervals, built against the same 45 controls as before. Under the conditions above, each covers that unit's effect at that date with probability at least 0.935.
+
+```{r conformal-unit-plot, fig.width = 8, fig.height = 4.5}
+library(ggplot2)
+cu <- out.cf$conformal$unit
+ggplot(cu, aes(x = event.time, y = eff)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_pointrange(aes(ymin = CI.lower, ymax = CI.upper), size = 0.2) +
+  facet_wrap(~ unit, nrow = 1) +
+  scale_x_continuous(breaks = seq(2, 10, by = 2)) +
+  labs(x = "Periods since treatment", y = "Effect on Y") +
+  theme_bw()
+```
+
+### Averages: the default has no guarantee
+
+`est.att`, `est.avg` and the gap plot show intervals for averages over the treated units. By default, `fect` averages the treated units' predictions and a control's errors over the same cells in each fold, and uses the absolute average error as the control's score. With several treated units these intervals have no guarantee. An average of five treated units' errors is usually less noisy than one control's error, so the two need not be comparable. In a constructed example in `?fect`, the interval for an average effect covers it with probability 0.42 at a nominal 0.90. `print()` and the caption of the gap plot say so.
+
+```{r conformal-gap, fig.width = 6, fig.height = 4.5}
+plot(out.cf, main = "Average effect, pooled intervals (no guarantee)")
+```
+
+### Block Jackknife+ for the average effect {#sec-conformal-block}
+
+The block Jackknife+ of @liuxu2026conformal fixes this by comparing like with like: the five treated units, taken together, against blocks of five controls. `conformal.block = TRUE` does the following.
+
+1. It splits the 45 controls at random into nine blocks of five.
+2. Within each block, each control is matched with one treated unit and takes that unit's pre-treatment window and adoption date.
+3. Each fold hides the treated units and one block from their adoption dates on, and fits the model once.
+4. The fold's prediction for the average is the average of the treated units' predictions. Its score is the absolute average error of the block's five controls at the same dates.
+
+The interval then follows the rule in [Section @sec-conformal-idea], with the nine blocks in place of the 45 controls: $N = 9 + 1 = 10$, $q = 1$ at `alpha = 0.1`, and the guarantee is $1 - 1/10 = 0.9$.
+
+The guarantee holds for the average effect even when effects differ across the treated units. It needs the treated units, as a block, to be as easy to predict as a block of controls. A finite interval at `alpha = 0.1` needs at least nine controls per treated unit, and controls with missing outcomes stay out of the blocks. The partition is random, so set `seed` to reproduce it. With staggered adoption, each control takes its matched unit's adoption date, and the average at an event time uses the treated units observed then and their matched controls.
+
+The fit below also adds the pre-treatment diagnostics and the relabeling test, which the next two sections explain.
+
+```{r conformal-block, cache = TRUE}
+out.cfb <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+                method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+                se = TRUE, vartype = "conformal", alpha = 0.1,
+                conformal.block = TRUE, conformal.diag = 4,
+                conformal.relabel = 999, seed = 1234)
+print(out.cfb)
+```
+
+The partition is in `out.cfb$conformal$block$partition`. In the gap plot, the intervals after treatment are now block Jackknife+ intervals, and the four dates before treatment show the diagnostics.
+
+```{r conformal-block-gap, fig.width = 6, fig.height = 4.5}
+plot(out.cfb, main = "Average effect, block Jackknife+ intervals")
+```
+
+## Checking the assumption {#sec-conformal-checks}
+
+The guarantee needs the treated units to be no harder to predict than the controls. No test can prove this, but two checks can find evidence against it.
+
+### Where the treated units' loadings lie
+
+With a factor model, a treated unit whose loadings lie far from the controls' is predicted by extrapolation. The `loading.overlap` plot from [Chapter @sec-gsynth] shows the control loadings, their convex hull, and the treated units' loadings. Treated units inside or near the hull are the comfortable case.
+
+```{r conformal-overlap, fig.width = 6, fig.height = 5}
+plot(out.cf, type = "loading.overlap")
+```
+
+In this fit, three of the five treated units lie outside the hull, to the left of the controls. Their intervals depend more on the condition that they are no harder to predict than the controls, so their pre-treatment diagnostics deserve a close look.
+
+### Pre-treatment diagnostics
+
+`conformal.diag = 4` runs the procedure at each treated unit's last four dates before treatment, as if the unit had adopted then. Its outcomes from that date on are hidden, and the outcome at the date is predicted from earlier dates and the controls. The estimate is a pseudo-effect, which should be zero, since nothing had happened yet. The interval and p-value test that zero. An interval away from zero says the unit was harder to predict than the controls before treatment, which weakens the case for the intervals after it.
+
+```{r conformal-diag}
+du <- out.cfb$conformal$diag$unit
+head(du[, c("unit", "time", "event.time", "eff", "CI.lower", "CI.upper",
+            "p.value")], 8)
+```
+
+The dates are not adjusted for multiple testing. At `alpha = 0.1`, about $0.1 \times 4 = 0.4$ of each unit's four intervals are expected to exclude zero by chance, so one miss is no cause for alarm and a run of misses is. The pre-treatment rows of `est.att` hold the average pseudo-effect at each of the four event times, with the same kind of interval as the rows after treatment (block Jackknife+ here).
+
+## Testing for any effect {#sec-conformal-relabel}
+
+The intervals ask how large the effect is at each date. The relabeling test asks a simpler question: did the treatment have any effect at all? Under the sharp null of no effect in any treated cell, every observed outcome is untreated, and the treated units are just five units with adoption dates attached.
+
+`conformal.relabel = 999` gives the five adoption dates to five units drawn at random, 999 times, refits the model each time, and records the average effect over the new treated cells. The p-value is the share of the 1,000 assignments, the actual one included, whose absolute average effect is at least as large as the actual one. It is exact if the treated units, absent treatment, are as easy to predict as any five other units. With random assignment, it is Fisher's randomization test.
+
+Here the p-value is `r round(out.cfb$conformal$relabel$p.value, 3)`, the smallest possible with 999 draws. The same draws give a p-value at each event time, in `out.cfb$conformal$relabel$att`. The plot shows each draw's average effect by period in grey and the actual one in blue. It is the placebo plot of the synthetic control literature, with five units moved at a time.
+
+```{r conformal-relabel-plot, fig.width = 6, fig.height = 4.5}
+rl <- out.cfb$conformal$relabel
+paths <- data.frame(
+  event.time = rep(as.numeric(rownames(rl$paths)), ncol(rl$paths)),
+  eff = c(rl$paths),
+  draw = rep(seq_len(ncol(rl$paths)), each = nrow(rl$paths))
+)
+ggplot(paths, aes(x = event.time, y = eff, group = draw)) +
+  geom_line(colour = "grey80", linewidth = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_line(data = rl$att, aes(x = event.time, y = ATT), inherit.aes = FALSE,
+            colour = "#004a8c", linewidth = 1) +
+  scale_x_continuous(breaks = seq(2, 10, by = 2)) +
+  labs(x = "Periods since treatment", y = "Average effect on Y") +
+  theme_bw()
+```
+
+## Tuning {#sec-conformal-tuning}
+
+All of these guarantees assume that the tuning is fixed in advance. Every fold, diagnostic, block and relabeling fit reuses the original fit's number of factors or `lambda`. With `CV = TRUE`, that value is chosen from the data. With `method = "gsynth"`, the default cross-validation scores the never-treated units' held-out cells only. With `"ife"` and `"mc"`, it also scores the treated units' pre-treatment cells. Either way, the choice can fit the controls, or the treated units, better than the other group, and the guarantee no longer follows. `fect` then prints a message that names the chosen value.
+
+No extra option is needed. Pass a single number of factors (or `lambda`) with `CV = FALSE`, as in the examples above. When the number of factors is unknown, it should be chosen before looking at the outcomes, for example from theory or from an earlier study, and reported. Choosing it by cross-validation on the controls alone does not help: that choice also favors one group. With few treated units, it is also worth showing that the conclusions hold for a nearby value.
+
+## Conformal or parametric bootstrap? {#sec-conformal-vs-parametric}
+
+Both are meant for few treated units. They answer different questions and rest on different conditions.
+
+| | Parametric bootstrap | Conformal (Jackknife+) |
+|---|---|---|
+| Output | Standard errors and intervals for the average effect by period and overall | Intervals for each treated unit and date; averages through the block Jackknife+ |
+| Guarantee | Approximate, as the numbers of controls and pre-treatment periods grow | Finite-sample, at each date |
+| Main conditions | The factor model holds for every unit, `r` is at least the true number of factors, the controls' loadings span the factors, and errors are independent across units with the same distribution for treated units and controls | The treated units are no harder to predict than the controls, the tuning is fixed, and there are about $1/$`alpha` or more controls |
+| Methods | `"gsynth"`, and `"ife"` or `"cfe"` with `time.component.from = "nevertreated"` | `"gsynth"`, `"ife"`, `"mc"` |
+| Tuning by cross-validation | Allowed | Breaks the guarantee |
+
+When both are possible, they can be reported side by side. If they disagree, the parametric intervals lean on the model of the errors, and the conformal intervals lean on the comparison with the controls. [Chapter @sec-inference] explains the parametric bootstrap and its conditions.
+
+## Limits {#sec-conformal-limits}
+
+- There are no standard errors. `S.E.` is `NA`, and `ci.method` does not apply.
+- The paper's full conformal inference, for target-date estimators such as synthetic control, is not implemented.
+- At least two never-treated units are needed, and about $1/$`alpha` of them for a finite interval.
+- The diagnostics refit for each of their dates, and the relabeling test refits once per draw. With `"ife"` and `"mc"`, which fit once per held-out unit, `conformal.diag = 4` makes the run about five times longer.
+- `vartype = "conformal"` stops with weights, `group`, `balance.period`, placebo and carryover tests, `loo`, permutation tests, `cm`, extra fixed effects, binary outcomes, `loading.bound` and treatments that switch off. The equivalence plot, `estimand()`, `att.cumu()`, `effect()` and `fect_sens()` need bootstrap draws and stop for these fits.
+- A fold fit that fails keeps its control in the pool with an infinite score. The interval widens, `N` and `q` do not change, and `fect` warns. See `?fect` for the details.
+
+## Summary {#sec-conformal-summary}
+
+A typical analysis with few treated units:
+
+1. Choose `r` (or `lambda`) before looking at the outcomes after treatment, and fit with `CV = FALSE`.
+2. Fit with `vartype = "conformal"`. With more than one treated unit, add `conformal.block = TRUE` for the average effect, and set `seed`.
+3. Add `conformal.diag = 4` and look at the pre-treatment intervals and the `loading.overlap` plot.
+4. Add `conformal.relabel = 999` to test whether there is any effect.
+5. Report the intervals for each unit and date, the block interval for the average, the guarantee level (`print()` shows it), and the diagnostics.

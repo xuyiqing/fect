@@ -15,6 +15,7 @@ book:
     - 05-cfe.Rmd
     - 06-gsynth.Rmd
     - 07-inference.Rmd
+    - 08-conformal.Rmd
     - 08-hte.Rmd
     - 09-panel.Rmd
     - 10-sens.Rmd

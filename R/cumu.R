@@ -14,6 +14,7 @@ att.cumu <- function(x, ## a fect object
     ## users at the unified API. Removal not before v3.0.0. Suppressed
     ## when called internally from .compute_att_cumu_overall().
     .fect_deprecation_message_once("att.cumu")
+    .fect_stop_if_conformal(x, "att.cumu()")
 
     end <- catt <- CI.lower <- CI.upper <- NULL
     if (is.null(period)) {

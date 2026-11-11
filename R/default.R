@@ -100,6 +100,9 @@ fect <- function(
     m = 2, ## block length
     normalize = FALSE, # accelerate option
     keep.sims = FALSE, # keep individual bootstrap/jackknife simulations
+    conformal.diag = 0, # vartype = "conformal": number of pre-treatment diagnostic dates
+    conformal.block = FALSE, # vartype = "conformal": block Jackknife+ for averages
+    conformal.relabel = 0, # vartype = "conformal": relabeling-test draws
     cm = FALSE, # causal moderation
     loading.bound = "none",           # simplex projection of treated loadings
     gamma.loading = NULL,             # scalar gamma for simplex; NULL = CV
@@ -522,6 +525,9 @@ fect.formula <- function(
     m = 2, ## block length
     normalize = FALSE,
     keep.sims = FALSE,
+    conformal.diag = 0, # vartype = "conformal": number of pre-treatment diagnostic dates
+    conformal.block = FALSE, # vartype = "conformal": block Jackknife+ for averages
+    conformal.relabel = 0, # vartype = "conformal": relabeling-test draws
     cm = FALSE,
     loading.bound = "none",
     gamma.loading = NULL,
@@ -654,6 +660,9 @@ fect.formula <- function(
         m = m,
         normalize = normalize,
         keep.sims = keep.sims,
+        conformal.diag = conformal.diag,
+        conformal.block = conformal.block,
+        conformal.relabel = conformal.relabel,
         cm = cm,
         loading.bound      = loading.bound,
         gamma.loading      = gamma.loading,
@@ -747,6 +756,9 @@ fect.default <- function(
     m = 2, ## block length
     normalize = FALSE,
     keep.sims = FALSE,
+    conformal.diag = 0, # vartype = "conformal": number of pre-treatment diagnostic dates
+    conformal.block = FALSE, # vartype = "conformal": block Jackknife+ for averages
+    conformal.relabel = 0, # vartype = "conformal": relabeling-test draws
     cm=FALSE,
     loading.bound = "none",
     gamma.loading = NULL,
@@ -1076,12 +1088,79 @@ fect.default <- function(
     ## further down so error messages name the user's actual method = "fe".
     method_arg <- method
 
+    if (!(isTRUE(se == 1) && identical(vartype, "conformal")) &&
+        (isTRUE(conformal.diag != 0) || isTRUE(conformal.block) ||
+         isTRUE(conformal.relabel != 0))) {
+        warning("conformal.diag, conformal.block and conformal.relabel apply ",
+                "only with se = TRUE and vartype = \"conformal\"; they are ",
+                "ignored.", call. = FALSE)
+    }
+
     if (se == 1) {
-        if (!vartype %in% c("bootstrap", "jackknife", "parametric")) {
+        if (!vartype %in% c("bootstrap", "jackknife", "parametric", "conformal")) {
             stop(
-                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", or \"parametric\".",
+                "\"vartype\" must be one of \"bootstrap\", \"jackknife\", \"parametric\", or \"conformal\".",
                 call. = FALSE
             )
+        }
+        ## vartype = "conformal": the Jackknife+ for full-path estimators
+        ## (R/conformal.R). It is defined for the pooled estimators with
+        ## never-treated controls as the calibration pool; the options below
+        ## have no conformal version yet.
+        if (vartype == "conformal") {
+            .cf_stop <- function(what) {
+                stop("vartype = \"conformal\" does not support ", what,
+                     ". Use vartype = \"bootstrap\", \"jackknife\" or ",
+                     "\"parametric\" for that.", call. = FALSE)
+            }
+            if (!method_arg %in% c("gsynth", "ife", "mc")) {
+                stop("vartype = \"conformal\" is available for method = ",
+                     "\"gsynth\", \"ife\" or \"mc\" only; got method = \"",
+                     method_arg, "\".",
+                     if (identical(method_arg, "fe"))
+                         " For the two-way fixed-effects model use method = \"ife\" with r = 0.",
+                     call. = FALSE)
+            }
+            if (isTRUE(binary)) .cf_stop("binary (probit) models")
+            if (!is.null(W) || !is.null(W.est) || !is.null(W.agg)) .cf_stop("weights")
+            if (!is.null(group)) .cf_stop("group-level (cohort) estimates (group)")
+            if (!is.null(balance.period)) .cf_stop("balance.period")
+            if (isTRUE(placeboTest)) .cf_stop("placebo tests (placeboTest)")
+            if (isTRUE(carryoverTest)) .cf_stop("carryover tests (carryoverTest)")
+            if (isTRUE(loo)) .cf_stop("the leave-one-period-out test (loo)")
+            if (isTRUE(permute)) .cf_stop("the permutation test (permute)")
+            if (isTRUE(cm)) .cf_stop("causal moderation (cm)")
+            if (!is.null(cfe) || !is.null(group.fe) || length(index) > 2) {
+                .cf_stop("extra fixed effects (cfe, group.fe, index[3:])")
+            }
+            if (!identical(loading.bound, "none")) .cf_stop("loading.bound")
+            ## the calibration q and the dual p-value are defined for
+            ## 0 < alpha < 1 (alpha >= 0.5 is allowed: the 90% bands use
+            ## 2 * alpha); outside it no duality is claimed
+            if (!(is.numeric(alpha) && length(alpha) == 1L &&
+                  is.finite(alpha) && alpha > 0 && alpha < 1)) {
+                stop("vartype = \"conformal\" needs 0 < alpha < 1; got alpha = ",
+                     paste(format(alpha), collapse = ", "), ".", call. = FALSE)
+            }
+            .cf_count <- function(v, nm) {
+                if (!(is.numeric(v) && length(v) == 1L && is.finite(v) &&
+                      v >= 0 && v == round(v))) {
+                    stop(nm, " must be a whole number of 0 or more; got ",
+                         paste(format(v), collapse = ", "), ".", call. = FALSE)
+                }
+                as.integer(v)
+            }
+            conformal.diag <- .cf_count(conformal.diag, "conformal.diag")
+            conformal.relabel <- .cf_count(conformal.relabel, "conformal.relabel")
+            if (!(is.logical(conformal.block) && length(conformal.block) == 1L &&
+                  !is.na(conformal.block))) {
+                stop("conformal.block must be TRUE or FALSE.", call. = FALSE)
+            }
+            if (!is.null(cl)) {
+                warning("vartype = \"conformal\" with cl = ... : the cl ",
+                        "argument is ignored; the conformal intervals do not ",
+                        "cluster.", call. = FALSE)
+            }
         }
         if (vartype == "parametric" && method %in% c("mc", "both")) {
             stop(
@@ -2772,6 +2851,12 @@ fect.default <- function(
     if (hasRevs == TRUE & method == "gsynth") {
         stop("Gsynth can't be used when treatments have reversals.")
     }
+    if (se == 1 && vartype == "conformal" && hasRevs == TRUE) {
+        stop("vartype = \"conformal\" requires an absorbing treatment ",
+             "(no reversals): the controls' query windows mimic a treated ",
+             "unit's pre-treatment history and post-treatment block.",
+             call. = FALSE)
+    }
     if (se == 1 && vartype == "parametric" && hasRevs == TRUE) {
         stop(
             "Parametric bootstrap is not valid when treatment reversal is present. ",
@@ -3516,6 +3601,9 @@ fect.default <- function(
             group.level = g.level,
             group = G,
             keep.sims = keep.sims,
+            conformal.diag = conformal.diag,
+            conformal.block = conformal.block,
+            conformal.relabel = conformal.relabel,
             time.component.from = time.component.from,
             loading.bound      = loading.bound,
             gamma.loading      = gamma.loading,
@@ -4052,6 +4140,39 @@ fect.default <- function(
     }
     colnames(out$eff) <- iname
     rownames(out$eff) <- tname
+    ## conformal intervals per treated unit and date: column positions to
+    ## the unit and time labels
+    if (!is.null(out$conformal$unit)) {
+        cu <- out$conformal$unit
+        cu$unit <- iname[cu$unit]
+        cu$time <- tname[cu$time]
+        out$conformal$unit <- cu
+        if (!is.null(out$conformal$folds)) {
+            cf.cell <- out$conformal$folds$cell
+            cf.cell$unit <- iname[cf.cell$unit]
+            cf.cell$time <- tname[cf.cell$time]
+            out$conformal$folds$cell <- cf.cell
+            out$conformal$folds$control <- iname[out$conformal$folds$control]
+            colnames(out$conformal$folds$M0) <- out$conformal$folds$control
+            colnames(out$conformal$folds$E) <- out$conformal$folds$control
+        }
+        if (!is.null(out$conformal$diag$unit)) {
+            du <- out$conformal$diag$unit
+            du$unit <- iname[du$unit]
+            du$time <- tname[du$time]
+            out$conformal$diag$unit <- du
+        }
+        if (!is.null(out$conformal$block$partition)) {
+            bp <- out$conformal$block$partition
+            bp$unit <- iname[bp$unit]
+            bp$matched.to <- iname[bp$matched.to]
+            out$conformal$block$partition <- bp
+        }
+        if (!is.null(out$conformal$relabel$units)) {
+            ru <- out$conformal$relabel$units
+            out$conformal$relabel$units <- matrix(iname[ru], nrow = nrow(ru))
+        }
+    }
     ## implied weights: rows = control units, columns = treated units
     if (is.matrix(out$wgt.implied) &&
         nrow(out$wgt.implied) == length(out$co) &&
@@ -4242,7 +4363,9 @@ fect.default <- function(
         output$loo <- FALSE
     }
 
-    if (se == 1) {
+    ## conformal fits have no bootstrap draws, so the bootstrap-based F and
+    ## equivalence tests (diagtest) do not apply
+    if (se == 1 && vartype != "conformal") {
         suppressWarnings(
             test.out <- diagtest(
                 output,
