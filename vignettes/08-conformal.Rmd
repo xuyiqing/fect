@@ -202,7 +202,7 @@ For target-date estimators the paper gives a second procedure, full conformal in
 2. Hold out each unit alone, the treated unit included, and predict its outcome at the date from all the others. A control's prediction uses the treated unit's completed outcome. The treated unit's prediction is the ordinary estimate, so its error is $\hat\tau - c$.
 3. The p-value of $c$ is the share of units whose absolute error is at least the treated unit's. The set keeps the candidates with p-value above `alpha`.
 
-If the errors are exchangeable at the true effect, the set covers it with probability at least $1 - \lfloor \alpha N \rfloor / N$, which is at least $1 -$ `alpha`: with 45 controls and `alpha = 0.1`, $N = 46$ and the guarantee is $1 - 4/46 = 0.913$. The Jackknife+ guarantee for the same $N$ is $1 - 3/46 = 0.935$, but in the paper's simulations full conformal sets are narrower where the Jackknife+ covers more than it promises. For the fixed-effects rule and for synthetic control, each unit's error is a straight-line function of $c$, so `fect` finds the set exactly, with no grid of candidates. The set is usually an interval but can be a union of intervals; `CI.lower` and `CI.upper` then give its hull, and `disconnected` is `TRUE`.
+If the errors are exchangeable at the true effect, the set covers it with probability at least $1 - \lfloor \alpha N \rfloor / N$, which is at least $1 -$ `alpha`: with 45 controls and `alpha = 0.1`, $N = 46$ and the guarantee is $1 - 4/46 = 0.913$. The Jackknife+ guarantee for the same $N$ is $1 - 3/46 = 0.935$, but in the paper's simulations full conformal sets are narrower where the Jackknife+ covers more than it promises. For the fixed-effects rule and for synthetic control, each unit's error is a straight-line function of $c$, so `fect` finds the set exactly, with no grid of candidates. For these two estimators the set is always one interval, because every control's weight on the treated unit lies between 0 and 1. A rule written by the user can put a larger weight on it, and then the set can be a union of intervals; `CI.lower` and `CI.upper` give its hull, and `disconnected` is `TRUE`.
 
 ### With the fixed-effects model
 
@@ -235,7 +235,7 @@ out.sc <- conformal_td(Y ~ D, data = d1, index = c("id", "time"),
 print(out.sc)
 ```
 
-`out.sc$unit` holds the set for each date, `out.sc$avg` the set for the effect averaged over the post-treatment dates, and `out.sc$diag` the pre-treatment placebo dates. `plot(out.sc)` draws them. With `procedure = "jackknife+"`, the same rule gives Jackknife+ intervals.
+`out.sc$unit` holds the set for each date, `out.sc$avg` the set for the effect averaged over the post-treatment dates (its guarantee needs the units' errors averaged over the dates to be exchangeable), and `out.sc$diag` the pre-treatment placebo dates. `plot(out.sc)` draws them. With `procedure = "jackknife+"`, the same rule gives Jackknife+ intervals.
 
 ```{r conformal-full-sc-plot, fig.width = 6, fig.height = 4.5}
 plot(out.sc)
@@ -252,7 +252,7 @@ out.my <- conformal_td(Y ~ D, data = d1, index = c("id", "time"),
 head(out.my$unit[, c("time", "eff", "CI.lower", "CI.upper", "method")])
 ```
 
-`fect` checks whether a rule's prediction is a straight-line function of the completed outcome. If it is, the set is exact (`method` is `"exact"`); if not, the p-value is evaluated on a grid of candidates (`grid`), each of which refits every control, and the set's ends are as fine as the grid. The guarantee needs the same conditions as before: the treated unit is no harder to predict than the controls under the rule, and the rule and its tuning, such as a synthetic control penalty, are fixed in advance and the same for every unit.
+For a user-written rule, `fect` checks numerically whether the prediction is a straight-line function of the completed outcome: at five candidates far on both sides of zero, and again by refitting just inside and just outside the ends of the set. If both checks pass, the set is exact (`method` is `"exact"`). If not, the p-value is evaluated on a grid of candidates (`grid`), each of which refits every control; the set's ends are as fine as the grid, and `lower.truncated` or `upper.truncated` flags a set that reaches the grid's end. The guarantee needs the same conditions as before: the treated unit is no harder to predict than the controls under the rule, and the rule and its tuning, such as a synthetic control penalty, are fixed in advance and the same for every unit.
 
 ## Tuning {#sec-conformal-tuning}
 

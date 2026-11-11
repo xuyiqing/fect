@@ -31,9 +31,16 @@
 ## and b_0 = -1. Then S_i(c) >= S_0(c) iff
 ##   ((a_i - a_0) + (b_i - b_0) c) * ((a_i + a_0) + (b_i + b_0) c) >= 0,
 ## a product of two linear functions, so the set is found exactly from their
-## roots by a sweep: no grid. It can be a union of intervals. Affinity is
-## checked numerically at a third candidate; a rule that is not affine falls
-## back to a grid of candidates (each refits every control).
+## roots by a sweep: no grid. When every control's slope satisfies
+## |b_i| <= 1 (the built-in rules: DID and the time mean put weight 1/(N - 1)
+## on the completed outcome, the unit mean 0, simplex synthetic control a
+## weight in [0, 1]), each control's acceptance set is an interval containing
+## tau_hat, so the set is a single interval; a user rule with a larger weight
+## can give a union of intervals. The built-in rules are affine by
+## construction. A user rule is checked numerically at five candidates far on
+## both sides of c = 0, and the ends of its exact set are confirmed by
+## refitting just inside and just outside them; a rule that fails either
+## check falls back to a grid of candidates (each refits every control).
 ##
 ## Average over dates (one treated unit). If every unit's slope b_i is the same
 ## at every target date (true for DID and for synthetic control, whose weights
@@ -105,18 +112,21 @@
       stop("A rule function must take three arguments: query.pre, ",
            "background.pre and background.target.", call. = FALSE)
     }
-    return(list(fun = rule, name = "user rule"))
+    return(list(fun = rule, name = "user rule", affine = FALSE))
   }
   if (!(is.character(rule) && length(rule) == 1L)) {
     stop("rule must be \"did\", \"sc\" or a function.", call. = FALSE)
   }
+  ## the built-in rules are affine in the completed outcome by construction
+  ## (DID and the time mean put weight 1/(N - 1) on it, the unit mean 0, and
+  ## synthetic control a simplex weight fitted on pre-treatment outcomes)
   switch(rule,
-         did = list(fun = .fc_rule_did, name = "did"),
+         did = list(fun = .fc_rule_did, name = "did", affine = TRUE),
          sc = list(fun = .fc_make_rule_sc(sc.eta),
                    name = paste0("sc (ridge-simplex, eta = ", format(sc.eta),
-                                 ")")),
-         unit = list(fun = .fc_rule_unit, name = "unit"),
-         time = list(fun = .fc_rule_time, name = "time"),
+                                 ")"), affine = TRUE),
+         unit = list(fun = .fc_rule_unit, name = "unit", affine = TRUE),
+         time = list(fun = .fc_rule_time, name = "time", affine = TRUE),
          stop("rule must be \"did\", \"sc\" or a function; got \"", rule,
               "\".", call. = FALSE))
 }
@@ -286,7 +296,7 @@
 ## date; i0: the treated column; the others are the pool of controls.
 ## Returns the prediction coefficients: a (error at c = 0), b (slope), whether
 ## the rule was affine, and the treated prediction.
-.fc_coefs <- function(Ypre, ytg, i0, fun) {
+.fc_coefs <- function(Ypre, ytg, i0, fun, known.affine = FALSE) {
   N <- ncol(Ypre)
   ctrl <- setdiff(seq_len(N), i0)
   h <- stats::sd(ytg)
@@ -304,15 +314,27 @@
     p.0 <- .fc_call(fun, Ypre[, j], bp, bt)
     bt[pos] <- ytg[i0] - h
     p.h <- .fc_call(fun, Ypre[, j], bp, bt)
-    bt[pos] <- ytg[i0] + h
-    p.m <- .fc_call(fun, Ypre[, j], bp, bt)
     a[j] <- ytg[j] - p.0
     b[j] <- (p.0 - p.h) / h
-    ## affinity: the prediction at -h must continue the line
-    if (!all(is.finite(c(p.0, p.h, p.m))) ||
-        abs((p.m - p.0) - (p.0 - p.h)) >
-        1e-8 * max(1, abs(p.0), abs(p.h), abs(p.m))) {
+    if (!all(is.finite(c(p.0, p.h)))) {
       affine <- FALSE
+      next
+    }
+    ## affinity: the prediction must continue the line at candidates far on
+    ## both sides (relative tolerance, so the check does not depend on the
+    ## outcome's units); a rule that is affine only near c = 0 fails here or
+    ## at the endpoint check in .fc_one_unit()
+    if (!known.affine) {
+      for (cc in c(-h, 10 * h, -10 * h, 100 * h, -100 * h)) {
+        bt[pos] <- ytg[i0] - cc
+        p.c <- .fc_call(fun, Ypre[, j], bp, bt)
+        lin <- p.0 - b[j] * cc
+        if (!is.finite(p.c) ||
+            abs(p.c - lin) > 1e-8 * max(abs(p.c), abs(lin), abs(p.0), h)) {
+          affine <- FALSE
+          break
+        }
+      }
     }
   }
   list(a = a, b = b, affine = affine, pred = pred0,
@@ -321,21 +343,24 @@
 
 ## Grid inversion for a rule that is not affine: p(c) at each candidate,
 ## each needing a refit of every control.
+## Full conformal p-value of one candidate c by refitting every control.
+.fc_pdirect <- function(Ypre, ytg, i0, fun, c0, tau) {
+  N <- ncol(Ypre)
+  yc <- ytg
+  yc[i0] <- ytg[i0] - c0
+  s <- numeric(N)
+  s[i0] <- abs(tau - c0)
+  for (j in setdiff(seq_len(N), i0)) {
+    bg <- setdiff(seq_len(N), j)
+    pj <- .fc_call(fun, Ypre[, j], Ypre[, bg, drop = FALSE], yc[bg])
+    s[j] <- if (is.finite(pj)) abs(ytg[j] - pj) else Inf
+  }
+  mean(s >= s[i0])
+}
+
 .fc_grid <- function(Ypre, ytg, i0, fun, gamma, grid, tau) {
   N <- ncol(Ypre)
-  ctrl <- setdiff(seq_len(N), i0)
-  pval <- function(c0) {
-    yc <- ytg
-    yc[i0] <- ytg[i0] - c0
-    s <- numeric(N)
-    s[i0] <- abs(tau - c0)
-    for (j in ctrl) {
-      bg <- setdiff(seq_len(N), j)
-      pj <- .fc_call(fun, Ypre[, j], Ypre[, bg, drop = FALSE], yc[bg])
-      s[j] <- if (is.finite(pj)) abs(ytg[j] - pj) else Inf
-    }
-    mean(s >= s[i0])
-  }
+  pval <- function(c0) .fc_pdirect(Ypre, ytg, i0, fun, c0, tau)
   pv <- vapply(grid, pval, numeric(1))
   acc <- pv > gamma
   comp <- data.frame(lower = numeric(0), upper = numeric(0),
@@ -376,7 +401,7 @@
   list(CI.lower = unname(v["CI.lower"]), CI.upper = unname(v["CI.upper"]),
        p.value = unname(v["p.value"]), N = unname(v["N"]),
        q = unname(v["q"]), n.failed = unname(v["n.failed"]),
-       level = if (v["q"] >= 1) 1 - (2 * v["q"] - 1) / v["N"] else 0)
+       level = unname(1 - max(2 * v["q"] - 1, 0) / v["N"]))
 }
 
 ## Default grid for a rule that is not affine: centred on the estimate and
@@ -433,13 +458,33 @@
   list(tr = tr, co = co, T.on = T.on)
 }
 
+## Refit check of an exact set's finite ends: just inside an end the direct
+## p-value must exceed gamma, just outside it must not.
+.fc_verify_ends <- function(v, Ypre, ytg, fun, gamma, tau) {
+  comp <- v$components
+  if (!nrow(comp)) return(TRUE)
+  h <- stats::sd(ytg)
+  if (!is.finite(h) || h == 0) h <- 1
+  ends <- c(comp$lower, comp$upper)
+  side <- c(rep(1, nrow(comp)), rep(-1, nrow(comp)))   # +1: inside is above
+  for (k in seq_along(ends)) {
+    e <- ends[k]
+    if (!is.finite(e)) next
+    eps <- 1e-6 * max(abs(e), h)
+    p.in <- .fc_pdirect(Ypre, ytg, 1L, fun, e + side[k] * eps, tau)
+    p.out <- .fc_pdirect(Ypre, ytg, 1L, fun, e - side[k] * eps, tau)
+    if (!(p.in > gamma) || (p.out > gamma)) return(FALSE)
+  }
+  TRUE
+}
+
 ## One treated unit k: full conformal sets (or Jackknife+ intervals) at each
 ## target date, and the full conformal set for the average over the post-
 ## treatment dates. `targets` are row positions; `history` the rows used as
 ## pre-treatment dates for each target (the dates before adoption for post
 ## dates; the dates before s for a diagnostic date s).
 .fc_one_unit <- function(Y, i, co, targets, history, fun, procedure, gamma,
-                         grid) {
+                         grid, known.affine = FALSE) {
   rows <- vector("list", length(targets))
   coefs <- vector("list", length(targets))
   pools <- vector("list", length(targets))
@@ -473,8 +518,7 @@
                                 components = list(NULL)))
       next
     }
-    cf <- .fc_coefs(Ypre, ytg, 1L, fun)
-    coefs[[s]] <- cf
+    cf <- .fc_coefs(Ypre, ytg, 1L, fun, known.affine)
     tau <- cf$a[1L]
     if (cf$failed) {
       rows[[s]] <- c(base, list(eff = tau, CI.lower = NA_real_,
@@ -484,11 +528,21 @@
                                 components = list(NULL)))
       next
     }
-    v <- if (cf$affine) {
-      .fc_invert_affine(cf$a, cf$b, 1L, gamma)
-    } else {
+    v <- NULL
+    if (cf$affine) {
+      v <- .fc_invert_affine(cf$a, cf$b, 1L, gamma)
+      ## a user rule that passed the affinity check: confirm each finite end
+      ## of the set by refitting just inside and just outside it; if the
+      ## refits disagree, the rule is not affine there and the grid is used
+      if (!known.affine && !.fc_verify_ends(v, Ypre, ytg, fun, gamma, tau)) {
+        cf$affine <- FALSE
+        v <- NULL
+      }
+    }
+    coefs[[s]] <- cf
+    if (is.null(v)) {
       g <- if (is.null(grid)) .fc_default_grid(tau, cf) else tau + grid
-      .fc_grid(Ypre, ytg, 1L, fun, gamma, g, tau)
+      v <- .fc_grid(Ypre, ytg, 1L, fun, gamma, g, tau)
     }
     rows[[s]] <- c(base, list(eff = tau, CI.lower = v$CI.lower,
                               CI.upper = v$CI.upper, p.value = v$p.value,
@@ -539,7 +593,8 @@
 ## Run the procedure for every treated unit. Returns the unit-date table, the
 ## per-unit averages, the diagnostics and the components.
 .fc_panel <- function(Y, D, fun, procedure, gamma, diag = 0L, grid = NULL,
-                      units = colnames(Y), times = rownames(Y)) {
+                      units = colnames(Y), times = rownames(Y),
+                      known.affine = FALSE) {
   ds <- .fc_design(D)
   tr <- ds$tr
   co <- ds$co
@@ -553,15 +608,19 @@
   avg <- list()
   comps <- list()
   dcomps <- list()
+  skipped <- character(0)
   for (k in seq_along(tr)) {
     i <- tr[k]
     on <- ds$T.on[k]
     pre <- seq_len(on - 1L)
     post <- on:TT
     post <- post[!is.na(Y[post, i])]
-    if (length(pre) < 1L) next
+    if (length(pre) < 1L || all(is.na(Y[pre, i])) || !length(post)) {
+      skipped <- c(skipped, as.character(units[i]))
+      next
+    }
     res <- .fc_one_unit(Y, i, co, post, rep(list(pre), length(post)), fun,
-                        procedure, gamma, grid)
+                        procedure, gamma, grid, known.affine)
     for (s in seq_along(post)) {
       r <- res$rows[[s]]
       comps[[length(comps) + 1L]] <- r$components[[1L]]
@@ -571,10 +630,24 @@
         CI.upper = r$CI.upper, p.value = r$p.value, N = r$N,
         level = r$level, disconnected = r$disconnected,
         method = r$method, n.history = r$n.history,
+        lower.truncated = isTRUE(r$lower.truncated),
+        upper.truncated = isTRUE(r$upper.truncated),
         stringsAsFactors = FALSE)
     }
     if (procedure == "full") {
-      a <- .fc_avg(res, seq_along(post), gamma)
+      ## the average over dates needs one pool at every date: when the pools
+      ## differ, use the controls observed at every date the unit uses
+      pk <- vapply(res$pools, paste, character(1), collapse = ",")
+      res.avg <- res
+      if (length(unique(pk)) > 1L) {
+        hh <- pre[!is.na(Y[pre, i])]
+        common <- co[vapply(co, function(j) all(!is.na(Y[c(hh, post), j])),
+                            logical(1))]
+        res.avg <- .fc_one_unit(Y, i, common, post,
+                                rep(list(pre), length(post)), fun, procedure,
+                                gamma, grid, known.affine)
+      }
+      a <- .fc_avg(res.avg, seq_along(post), gamma)
       avg[[length(avg) + 1L]] <- data.frame(
         unit = units[i], n.dates = length(post), eff = a$eff,
         CI.lower = a$CI.lower, CI.upper = a$CI.upper, p.value = a$p.value,
@@ -590,7 +663,7 @@
       if (length(ds.rows)) {
         dres <- .fc_one_unit(Y, i, co, ds.rows,
                              lapply(ds.rows, function(s) seq_len(s - 1L)),
-                             fun, procedure, gamma, grid)
+                             fun, procedure, gamma, grid, known.affine)
         for (s in seq_along(ds.rows)) {
           r <- dres$rows[[s]]
           dcomps[[length(dcomps) + 1L]] <- r$components[[1L]]
@@ -600,7 +673,10 @@
             eff = r$eff, CI.lower = r$CI.lower, CI.upper = r$CI.upper,
             p.value = r$p.value, N = r$N, level = r$level,
             disconnected = r$disconnected, method = r$method,
-            n.history = r$n.history, stringsAsFactors = FALSE)
+            n.history = r$n.history,
+            lower.truncated = isTRUE(r$lower.truncated),
+            upper.truncated = isTRUE(r$upper.truncated),
+            stringsAsFactors = FALSE)
         }
       }
     }
@@ -608,7 +684,8 @@
   bind <- function(x) if (length(x)) do.call(rbind, x) else NULL
   list(unit = bind(tab), avg = bind(avg), diag = bind(dtab),
        components = comps, diag.components = dcomps,
-       n.treated = length(tr), n.controls = length(co))
+       n.treated = length(tr) - length(skipped), skipped = skipped,
+       n.controls = length(co))
 }
 
 
@@ -673,16 +750,24 @@
 #' is no harder to predict than a control, and the rule and its tuning are
 #' the same for every unit and fixed in advance. When the rule's prediction
 #' is affine in the completed outcome, as for \code{"did"} and \code{"sc"},
-#' the set is computed exactly; it can be a union of intervals
-#' (\code{disconnected = TRUE}, the parts in \code{components}). Otherwise it
-#' is evaluated on \code{grid}, and \code{lower.truncated} or
-#' \code{upper.truncated} flag a set that reaches the end of the grid.
+#' the set is computed exactly. For \code{"did"} and \code{"sc"} it is a
+#' single interval, because every control's weight on the treated unit lies
+#' between 0 and 1; a user rule with a larger weight can give a union of
+#' intervals (\code{disconnected = TRUE}, the parts in \code{components}). A
+#' user rule is treated as affine only if its predictions lie on a line at
+#' five candidates far on both sides of zero and refits just inside and just
+#' outside the ends of the set agree with it; otherwise the set is evaluated
+#' on \code{grid}, and \code{lower.truncated} or \code{upper.truncated} flag
+#' a set that reaches the end of the grid (\code{conformal_td} then gives a
+#' message).
 #'
 #' For each treated unit, the set for the effect averaged over its
 #' post-treatment dates (\code{avg}) uses the errors averaged over the dates.
 #' It is computed when the rule is affine with the same slope at every date
-#' (true for \code{"did"} and \code{"sc"}) and the pool is the same at every
-#' date.
+#' (true for \code{"did"} and \code{"sc"}), with the controls observed at
+#' every date the unit uses. Its guarantee needs the units' absolute
+#' prediction errors averaged over the dates, rather than the errors at each
+#' date, to be exchangeable.
 #'
 #' \strong{Jackknife+.} The treated unit is held out together with each
 #' control, and both are predicted from the other controls. The interval
@@ -697,12 +782,17 @@
 #'     \code{eff} (estimate), \code{CI.lower}, \code{CI.upper} (the set's
 #'     hull), \code{p.value}, \code{N}, \code{level} (the guaranteed
 #'     coverage), \code{disconnected}, \code{method} (\code{"exact"},
-#'     \code{"grid"} or \code{"jackknife+"}) and \code{n.history}.}
+#'     \code{"grid"} or \code{"jackknife+"}), \code{n.history}, and
+#'     \code{lower.truncated} and \code{upper.truncated} (a grid-based set
+#'     that reaches the end of the grid).}
 #'   \item{avg}{For \code{procedure = "full"}: one row per treated unit with
 #'     the set for the effect averaged over its post-treatment dates.}
 #'   \item{diag}{The pre-treatment placebo rows, if \code{diag > 0}.}
 #'   \item{components}{A list with the components of each set in
 #'     \code{unit}, in the same order.}
+#'   \item{n.treated, n.controls, skipped}{The treated units analysed, the
+#'     never-treated controls, and the treated units left out because they
+#'     have no pre-treatment or post-treatment outcome.}
 #'   \item{procedure, rule, alpha, call}{The settings.}
 #'
 #' @references Liu, Licheng and Yiqing Xu. 2026. "Conformal Inference for
@@ -775,7 +865,19 @@ conformal_td <- function(formula, data, index, rule = "did",
   ru <- .fc_resolve_rule(rule, sc.eta)
   w <- .fc_wide(data, vars[1], vars[2], index)
   res <- .fc_panel(w$Y, w$D, ru$fun, procedure, alpha, diag = as.integer(diag),
-                   grid = grid, units = w$units, times = w$times)
+                   grid = grid, units = w$units, times = w$times,
+                   known.affine = isTRUE(ru$affine))
+  if (length(res$skipped)) {
+    message("Treated unit(s) without a pre-treatment or post-treatment ",
+            "outcome are left out: ", paste(res$skipped, collapse = ", "), ".")
+  }
+  tr.flag <- c(res$unit$lower.truncated, res$unit$upper.truncated,
+               res$diag$lower.truncated, res$diag$upper.truncated)
+  if (any(tr.flag %in% TRUE)) {
+    message("Some grid-based sets reach the end of the grid ",
+            "(lower.truncated or upper.truncated is TRUE): the true set extends ",
+            "beyond it. Widen `grid`.")
+  }
   if (!is.null(res$unit) && procedure == "full" &&
       any(res$unit$disconnected %in% TRUE)) {
     message("Some full conformal sets are unions of intervals; CI.lower and ",
@@ -871,10 +973,16 @@ conformal_full_fe <- function(Y, D, I, T.on, out, force, alpha,
   rule.name <- switch(as.character(force), "1" = "unit mean",
                       "2" = "time mean", "3" = "difference in differences")
   res <- .fc_panel(Yr, Dm, rule, "full", alpha, diag = diag,
-                   units = seq_len(N), times = seq_len(TT))
+                   units = seq_len(N), times = seq_len(TT),
+                   known.affine = TRUE)
   res90 <- .fc_panel(Yr, Dm, rule, "full", 2 * alpha, diag = diag,
-                     units = seq_len(N), times = seq_len(TT))
+                     units = seq_len(N), times = seq_len(TT),
+                     known.affine = TRUE)
   u <- res$unit
+  if (length(res$skipped)) {
+    message("vartype = \"conformal\": treated unit(s) without a ",
+            "pre-treatment or post-treatment outcome get no set.")
+  }
   if (is.null(u) || !nrow(u)) {
     stop("vartype = \"conformal\": no treated unit has a pre-treatment date ",
          "and a post-treatment outcome.", call. = FALSE)
@@ -889,8 +997,11 @@ conformal_full_fe <- function(Y, D, I, T.on, out, force, alpha,
             "with the never-treated units as controls, which differs from ",
             "fect's estimate in ", sum(dev > 1e-6 * (1 + abs(eff.fit)),
                                        na.rm = TRUE),
-            " cell(s) (other treated units or not-yet-treated cells enter ",
-            "fect's fit). Both are in fit$conformal$unit (eff, eff.fit).")
+            " cell(s): other treated units or not-yet-treated cells enter ",
+            "fect's fit, or controls with missing outcomes at the dates used ",
+            "are dropped from the pool. Both estimates are in ",
+            "fit$conformal$unit (eff, eff.fit); with one treated unit, the ",
+            "ATT rows of est.att and est.avg hold the target-date estimate.")
   }
   unit.df <- data.frame(
     unit = u$unit, time = u$time, event.time = u$event.time, Y = u$Y,

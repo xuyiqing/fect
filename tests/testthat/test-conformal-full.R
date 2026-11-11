@@ -233,3 +233,55 @@ test_that("staggered fe fits say when the target-date estimate differs from fect
   u <- f$conformal$unit
   expect_true(any(abs(u$eff - u$eff.fit) > 1e-6))
 })
+
+## ---- review fixes (2026-11-11) -------------------------------------------------
+
+test_that("a locally linear rule is not taken as affine", {
+  d <- fc_panel_data(J = 20, T0 = 8, T1 = 1, seed = 3, tau = 3)
+  med <- function(qp, bp, bt) mean(qp) + stats::median(bt - colMeans(bp))
+  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = med,
+                    grid = seq(-8, 8, by = 0.05))
+  expect_equal(f$unit$method, "grid")
+  ## a curved rule on outcomes measured in small units is not affine either
+  quad <- function(qp, bp, bt) mean(qp) + 0.3 * mean(bt - colMeans(bp))^2
+  d2 <- d
+  d2$Y <- d2$Y * 1e-3
+  f2 <- suppressMessages(conformal_td(Y ~ D, data = d2,
+                                      index = c("id", "time"), rule = quad))
+  expect_equal(f2$unit$method, "grid")
+})
+
+test_that("grid sets that reach the grid's end are flagged", {
+  d <- fc_panel_data(J = 20, T0 = 8, T1 = 1, seed = 3, tau = 3)
+  quad <- function(qp, bp, bt) mean(qp) + 0.3 * mean(bt - colMeans(bp))^2
+  expect_message(
+    f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = quad,
+                      grid = seq(-0.5, 0.5, length.out = 21)),
+    "end of the grid")
+  expect_true(f$unit$lower.truncated && f$unit$upper.truncated)
+})
+
+test_that("the Jackknife+ reports coverage 1 when its interval is the whole line", {
+  d <- fc_panel_data(J = 6, seed = 8)
+  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"),
+                    procedure = "jackknife+", alpha = 0.1)
+  expect_true(all(is.infinite(f$unit$CI.lower)))
+  expect_true(all(f$unit$level == 1))
+})
+
+test_that("the average over dates uses the controls observed at every date", {
+  d <- fc_panel_data(J = 25, seed = 10)
+  d$Y[d$id == 5 & d$time == 14] <- NA
+  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = "did")
+  expect_true(is.finite(f$avg$CI.lower))
+  expect_equal(f$avg$N, 25)            # 24 complete controls + the treated unit
+  expect_equal(range(f$unit$N), c(25, 26))
+})
+
+test_that("built-in rules always give one interval", {
+  for (seed in 1:20) {
+    d <- fc_panel_data(J = 15, T0 = 6, T1 = 2, seed = seed)
+    f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = "did")
+    expect_false(any(f$unit$disconnected))
+  }
+})

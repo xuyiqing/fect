@@ -61,12 +61,17 @@ An object of class \code{"conformal_td"}, a list with
     \code{eff} (estimate), \code{CI.lower}, \code{CI.upper} (the set's
     hull), \code{p.value}, \code{N}, \code{level} (the guaranteed
     coverage), \code{disconnected}, \code{method} (\code{"exact"},
-    \code{"grid"} or \code{"jackknife+"}) and \code{n.history}.}
+    \code{"grid"} or \code{"jackknife+"}), \code{n.history}, and
+    \code{lower.truncated} and \code{upper.truncated} (a grid-based set
+    that reaches the end of the grid).}
   \item{avg}{For \code{procedure = "full"}: one row per treated unit with
     the set for the effect averaged over its post-treatment dates.}
   \item{diag}{The pre-treatment placebo rows, if \code{diag > 0}.}
   \item{components}{A list with the components of each set in
     \code{unit}, in the same order.}
+  \item{n.treated, n.controls, skipped}{The treated units analysed, the
+    never-treated controls, and the treated units left out because they
+    have no pre-treatment or post-treatment outcome.}
   \item{procedure, rule, alpha, call}{The settings.}
 }
 \description{
@@ -97,16 +102,24 @@ scores are exchangeable across units at the true effect: the treated unit
 is no harder to predict than a control, and the rule and its tuning are
 the same for every unit and fixed in advance. When the rule's prediction
 is affine in the completed outcome, as for \code{"did"} and \code{"sc"},
-the set is computed exactly; it can be a union of intervals
-(\code{disconnected = TRUE}, the parts in \code{components}). Otherwise it
-is evaluated on \code{grid}, and \code{lower.truncated} or
-\code{upper.truncated} flag a set that reaches the end of the grid.
+the set is computed exactly. For \code{"did"} and \code{"sc"} it is a
+single interval, because every control's weight on the treated unit lies
+between 0 and 1; a user rule with a larger weight can give a union of
+intervals (\code{disconnected = TRUE}, the parts in \code{components}). A
+user rule is treated as affine only if its predictions lie on a line at
+five candidates far on both sides of zero and refits just inside and just
+outside the ends of the set agree with it; otherwise the set is evaluated
+on \code{grid}, and \code{lower.truncated} or \code{upper.truncated} flag
+a set that reaches the end of the grid (\code{conformal_td} then gives a
+message).
 
 For each treated unit, the set for the effect averaged over its
 post-treatment dates (\code{avg}) uses the errors averaged over the dates.
 It is computed when the rule is affine with the same slope at every date
-(true for \code{"did"} and \code{"sc"}) and the pool is the same at every
-date.
+(true for \code{"did"} and \code{"sc"}), with the controls observed at
+every date the unit uses. Its guarantee needs the units' absolute
+prediction errors averaged over the dates, rather than the errors at each
+date, to be exchangeable.
 
 \strong{Jackknife+.} The treated unit is held out together with each
 control, and both are predicted from the other controls. The interval
