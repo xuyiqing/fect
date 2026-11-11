@@ -2,7 +2,7 @@
 
 This file is for an AI assistant (Claude, ChatGPT, Codex, Gemini and the like) that is helping someone analyze panel
 data with the R package **fect**. Read it once, then work with the user as described below. It is written for fect
-2.4.8. When it disagrees with the installed package, trust the package: check `packageVersion("fect")`, `args(fect)`
+2.4.9. When it disagrees with the installed package, trust the package: check `packageVersion("fect")`, `args(fect)`
 and `?fect`.
 
 - User manual (Quarto book): <https://yiqingxu.org/packages/fect/>
@@ -73,7 +73,7 @@ A typical sequence:
 1. Fit `"fe"` with `se = TRUE`. Look at the pre-treatment estimates in the gap plot and the tests in `fit$test.out`.
 2. If the pre-treatment estimates move away from zero, fit `"ife"` and `"mc"`, and repeat the checks.
    `fect_mspe()` compares the prediction errors of fitted models.
-3. With few treated units and no reversal, use `"gsynth"` with `vartype = "parametric"`.
+3. With few treated units and no reversal, use `"gsynth"` with `vartype = "parametric"` or `vartype = "conformal"`.
 
 ## Choosing the uncertainty estimate
 
@@ -84,10 +84,23 @@ Set `se = TRUE` to get standard errors, intervals and p-values. `vartype` choose
 - `"parametric"` simulates prediction errors from never-treated units. It is meant for few treated units. It needs
   `time.component.from = "nevertreated"` (as with `method = "gsynth"`), no treatment reversal, not `"mc"`, and at
   least two never-treated units.
+- `"conformal"` (new in 2.4.9; check `packageVersion("fect")`) compares each treated unit with the never-treated units, each held out as if it
+  were treated, and gives an interval for each treated unit and date with a guarantee that holds in finite
+  samples. It works with `"gsynth"`, `"ife"` and `"mc"` and a treatment that never switches off. It gives no
+  standard errors.
 
 With one or very few treated units, do not report bootstrap or jackknife intervals as if they were reliable:
-they resample the treated units, and there are too few to resample. Use `"gsynth"` with `vartype = "parametric"`,
-and say that its validity rests on the factor model and on the treated units' errors behaving like the controls'.
+they resample the treated units, and there are too few to resample. Use `vartype = "parametric"` (with
+`"gsynth"`) or `vartype = "conformal"`, and say what each rests on:
+
+- The parametric bootstrap needs the factor model to hold for every unit, enough factors, and errors that are
+  independent across units and alike for treated units and controls. Its intervals are approximate.
+- Conformal intervals need the treated units to be no harder to predict than the never-treated units, and
+  at least `1/alpha - 1` never-treated units (19 for `alpha = 0.05`). The tuning must be fixed in advance:
+  give a single `r` (or `lambda`) with `CV = FALSE`, since a value chosen by cross-validation can break the
+  guarantee. With several treated units, the default intervals for averages (`est.att`, `est.avg`) have no
+  guarantee; add `conformal.block = TRUE` for the average effect. Add `conformal.diag = 4` for pre-treatment
+  checks and `conformal.relabel = 999` for a test of no effect.
 
 `nboots` is 200 by default. Use 1000 or more for intervals built from bootstrap quantiles (`ci.method = "basic"`,
 `"percentile"`, `"bc"`, `"bca"` in `estimand()`). The manual's chapter on the
@@ -120,7 +133,17 @@ fit.gs <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
 fit.gs$r.cv                      # number of factors chosen by cross-validation
 plot(fit.gs, type = "counterfactual")  # observed and predicted Y(0) for the treated
 plot(fit.gs, type = "loading.overlap") # treated loadings against the controls'
+
+fit.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+               method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+               se = TRUE, vartype = "conformal", alpha = 0.1,
+               conformal.block = TRUE, conformal.diag = 4, seed = 1234)
+print(fit.cf)                    # guarantee level and the block interval for the average
+head(fit.cf$conformal$unit)      # an interval for each treated unit and date
+head(fit.cf$conformal$diag$unit) # pre-treatment checks; intervals should cover zero
 ```
+
+`r = 2` is fixed here for the example. In a real analysis, choose it before looking at the outcomes and report it.
 
 ## Diagnostics to run and report
 
@@ -149,6 +172,7 @@ plot(fit.gs, type = "loading.overlap") # treated loadings against the controls'
 | `r.cv`, `lambda.cv` | Tuning chosen by cross-validation |
 | `est.beta` | Covariate coefficients with inference |
 | `remove.id` | Units dropped before fitting |
+| `conformal` | With `vartype = "conformal"`: intervals for each treated unit and date (`unit`), the block, diagnostic and relabeling results, and the guarantee level |
 
 `estimand(fit, "att.cumu", "event.time")` and its siblings give cumulative ATT, log-scale ATT and other targets.
 The manual's Alternative Estimands chapter (<https://yiqingxu.org/packages/fect/03-estimands>) explains them.
@@ -162,6 +186,9 @@ The manual's Alternative Estimands chapter (<https://yiqingxu.org/packages/fect/
   single `r` fixes it. `"mc"` works the same way with `lambda`.
 - `alpha = 0.05` gives 95% intervals in `est.att` and `est.avg`, and `est.att90` holds the 90% intervals used by the
   equivalence plot.
+- `vartype = "conformal"` stops with weights, placebo and carryover tests, `loo`, `cm`, binary outcomes,
+  `loading.bound` and treatment that switches off. `estimand()`, `effect()`, the equivalence plot and `fect_sens()`
+  need bootstrap draws and stop on a conformal fit.
 - `fect()` runs in parallel by default. On a shared machine pass `parallel = FALSE` or a small `cores`.
 - Report the version (`packageVersion("fect")`), the method, `r` or `lambda`, the variance type and `nboots`.
 - An ATT is causal only under the model's assumptions (parallel trends, or the factor structure, plus no
@@ -177,7 +204,8 @@ The manual's Alternative Estimands chapter (<https://yiqingxu.org/packages/fect/
 | IFE and MC, cross-validation | <https://yiqingxu.org/packages/fect/04-ife-mc> |
 | Complex fixed effects | <https://yiqingxu.org/packages/fect/05-cfe> |
 | Gsynth (few treated units) | <https://yiqingxu.org/packages/fect/06-gsynth> |
-| Inference | <https://yiqingxu.org/packages/fect/07-inference> |
+| Bootstrap and jackknife | <https://yiqingxu.org/packages/fect/07-inference> |
+| Conformal inference (few treated units) | <https://yiqingxu.org/packages/fect/08-conformal> |
 | Sensitivity analysis | <https://yiqingxu.org/packages/fect/10-sens> |
 | Plots | <https://yiqingxu.org/packages/fect/11-plots> |
 | Cheatsheet: every option and what fect changes or refuses | <https://yiqingxu.org/packages/fect/aa-cheatsheet> |
