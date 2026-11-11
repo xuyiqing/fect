@@ -90,7 +90,8 @@ they resample the treated units, and there are too few to resample. Use `"gsynth
 and say that its validity rests on the factor model and on the treated units' errors behaving like the controls'.
 
 `nboots` is 200 by default. Use 1000 or more for intervals built from bootstrap quantiles (`ci.method = "basic"`,
-`"percentile"`, `"bc"`, `"bca"` in `estimand()`). Chapter 7 of the manual explains the choices.
+`"percentile"`, `"bc"`, `"bca"` in `estimand()`). The manual's chapter on the
+bootstrap and jackknife (<https://yiqingxu.org/packages/fect/07-inference>) explains the choices.
 
 ## A first analysis
 
@@ -135,7 +136,7 @@ plot(fit.gs, type = "loading.overlap") # treated loadings against the controls'
   unit whose loadings fall outside the controls' range is a warning sign, because its counterfactual is an extrapolation.
 - **Sensitivity.** `fect_sens()` on a fit with a placebo test, then `plot(..., type = "sens")`, gives a Rambachan
   and Roth (2023) sensitivity analysis for violations of parallel trends. It needs the **HonestDiDFEct** package.
-  Chapter 10 of the manual shows the setup.
+  The manual's Sensitivity Analysis chapter (<https://yiqingxu.org/packages/fect/10-sens>) shows the setup.
 
 ## Where the results are
 
@@ -150,7 +151,7 @@ plot(fit.gs, type = "loading.overlap") # treated loadings against the controls'
 | `remove.id` | Units dropped before fitting |
 
 `estimand(fit, "att.cumu", "event.time")` and its siblings give cumulative ATT, log-scale ATT and other targets.
-Chapter 3 of the manual explains them.
+The manual's Alternative Estimands chapter (<https://yiqingxu.org/packages/fect/03-estimands>) explains them.
 
 ## Common mistakes to avoid
 
