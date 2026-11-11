@@ -225,21 +225,37 @@ plot(out.fe, main = "Fixed effects, full conformal sets")
 
 These sets are wide because the fixed-effects model leaves out the two factors that drive `sim_gsynth`. The guarantee still holds if the treated unit is no harder to predict than the controls under that model, but the sets reflect how poorly the model predicts. With several treated units, `fect` reports a set for each unit and date (and each unit's average over its dates) in `fit$conformal$unit` and `fit$conformal$avg`, and the averages over units in `est.att` and `est.avg` carry no interval. With staggered adoption, each treated unit is compared with the never-treated units over its own pre-treatment dates, and `fect` says when this target-date estimate differs from its ordinary estimate.
 
-### Other estimators: `conformal_td()`
+### Synthetic control and other estimators: `conformal_sc()`
 
-`conformal_td()` runs full conformal inference, or the Jackknife+, for any target-date estimator. The estimator is a *rule*: `"did"` (the fixed-effects rule above), `"sc"` (synthetic control with simplex weights fitted on the pre-treatment outcomes; it needs the **quadprog** package), or a function the user writes. On Proposition 99 and German reunification, it reproduces the paper's synthetic control results.
+`conformal_sc()` gives conformal inference for synthetic control and other target-date estimators. The estimator is a *rule*: `"sc"` (the default: synthetic control with simplex weights fitted on the pre-treatment outcomes; it needs the **quadprog** package), `"did"` (the fixed-effects rule above), or a function the user writes. The procedure is the user's choice: `procedure = "full"` (the default) for full conformal sets, or `procedure = "jackknife+"` for Jackknife+ intervals. On Proposition 99 and German reunification, it reproduces the paper's synthetic control results.
 
 ```{r conformal-full-sc, cache = TRUE}
-out.sc <- conformal_td(Y ~ D, data = d1, index = c("id", "time"),
-                       rule = "sc", alpha = 0.1, diag = 4)
+out.sc <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"),
+                       alpha = 0.1, diag = 4)
 print(out.sc)
 ```
 
-`out.sc$unit` holds the set for each date, `out.sc$avg` the set for the effect averaged over the post-treatment dates (its guarantee needs the units' errors averaged over the dates to be exchangeable), and `out.sc$diag` the pre-treatment placebo dates. `plot(out.sc)` draws them. With `procedure = "jackknife+"`, the same rule gives Jackknife+ intervals.
+`out.sc$unit` holds the set for each date, `out.sc$avg` the set for the effect averaged over the post-treatment dates (its guarantee needs the units' errors averaged over the dates to be exchangeable), and `out.sc$diag` the pre-treatment placebo dates. `plot(out.sc)` draws them.
 
 ```{r conformal-full-sc-plot, fig.width = 6, fig.height = 4.5}
 plot(out.sc)
 ```
+
+The same rule with `procedure = "jackknife+"` gives Jackknife+ intervals. Both procedures have a guarantee under the same conditions. For a target-date estimator the paper recommends full conformal inference: its sets cover at their stated level, while Jackknife+ intervals often cover more than they state and are then wider. The Jackknife+ is the better choice when the rule is not a straight-line function of the outcomes, since full conformal inference then needs a grid of candidates and a refit of every control at each one. The table below compares the two for the synthetic control fit above.
+
+```{r conformal-full-sc-jp, cache = TRUE}
+out.jp <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"),
+                       procedure = "jackknife+", alpha = 0.1)
+cmp <- data.frame(event.time = out.sc$unit$event.time,
+                  full.lower = out.sc$unit$CI.lower,
+                  full.upper = out.sc$unit$CI.upper,
+                  jackknife.lower = out.jp$unit$CI.lower,
+                  jackknife.upper = out.jp$unit$CI.upper)
+round(cmp, 2)
+c(full = out.sc$unit$level[1], jackknife = out.jp$unit$level[1])
+```
+
+The last line gives each procedure's guaranteed coverage with 45 controls: $1 - 4/46 = 0.913$ for full conformal inference and $1 - 3/46 = 0.935$ for the Jackknife+.
 
 A user-written rule is a function of three arguments: the held-out unit's outcomes at the pre-treatment dates, the training units' outcomes at those dates (one column per unit), and the training units' outcomes at the target date. It returns the held-out unit's prediction at the target date, which it cannot see. The rule below shifts the training units' mean at the date by the held-out unit's average pre-treatment gap to them.
 
@@ -247,7 +263,7 @@ A user-written rule is a function of three arguments: the held-out unit's outcom
 my_rule <- function(query.pre, background.pre, background.target) {
   mean(background.target) + mean(query.pre - rowMeans(background.pre))
 }
-out.my <- conformal_td(Y ~ D, data = d1, index = c("id", "time"),
+out.my <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"),
                        rule = my_rule, alpha = 0.1)
 head(out.my$unit[, c("time", "eff", "CI.lower", "CI.upper", "method")])
 ```
@@ -277,7 +293,7 @@ When both are possible, they can be reported side by side. If they disagree, the
 ## Limits {#sec-conformal-limits}
 
 - There are no standard errors. `S.E.` is `NA`, and `ci.method` does not apply.
-- Full conformal inference ([Section @sec-conformal-full]) covers target-date estimators only: `method = "fe"` without covariates, and the rules given to `conformal_td()`.
+- Full conformal inference ([Section @sec-conformal-full]) covers target-date estimators only: `method = "fe"` without covariates, and the rules given to `conformal_sc()`.
 - At least two never-treated units are needed, and about $1/$`alpha` of them for a finite interval.
 - The diagnostics refit for each of their dates, and the relabeling test refits once per draw. With `"ife"` and `"mc"`, which fit once per held-out unit, `conformal.diag = 4` makes the run about five times longer.
 - `vartype = "conformal"` stops with weights, `group`, `balance.period`, placebo and carryover tests, `loo`, permutation tests, `cm`, extra fixed effects, binary outcomes, `loading.bound` and treatments that switch off. The equivalence plot, `estimand()`, `att.cumu()`, `effect()` and `fect_sens()` need bootstrap draws and stop for these fits.
@@ -291,5 +307,5 @@ A typical analysis with few treated units:
 2. Fit with `vartype = "conformal"`. With more than one treated unit, add `conformal.block = TRUE` for the average effect, and set `seed`.
 3. Add `conformal.diag = 4` and look at the pre-treatment intervals and the `loading.overlap` plot.
 4. Add `conformal.relabel = 999` to test whether there is any effect.
-5. With a target-date estimator, such as the fixed-effects model with one treated unit or synthetic control, use full conformal inference: `method = "fe"` in `fect()`, or `conformal_td()`.
+5. With a target-date estimator, such as the fixed-effects model with one treated unit or synthetic control, use full conformal inference: `method = "fe"` in `fect()`, or `conformal_sc()`.
 6. Report the intervals for each unit and date, the block interval for the average, the guarantee level (`print()` shows it), and the diagnostics.

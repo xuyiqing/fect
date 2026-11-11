@@ -35,7 +35,7 @@ scconf_data <- function(a) {
   d
 }
 
-test_that("conformal_td reproduces the paper's reference results", {
+test_that("conformal_sc reproduces the paper's reference results", {
   skip_on_cran()
   skip_if_not(scconf_ready(), "paper reference folder not found")
   skip_if_not_installed("quadprog")
@@ -48,7 +48,7 @@ test_that("conformal_td reproduces the paper's reference results", {
       for (pr in c("full", "jackknife+")) {
         design <- if (pr == "full") "pointwise_full_conformal" else
           "pointwise_jackknife_plus"
-        f <- conformal_td(Y ~ D, data = d, index = c("id", "time"),
+        f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"),
                           rule = rule, procedure = pr, alpha = 0.1, diag = 5)
         mine <- rbind(f$diag, f$unit)
         r <- ref[ref$scenario == nm & ref$estimator == est &
@@ -74,21 +74,21 @@ test_that("the average over post-treatment dates matches the paper (exact)", {
   ## Prop 99 [-35.0540, -3.9733] (N = 39, rank 3, p = 0.077);
   ## West Germany [-4.7079, 2.1129] (N = 17, p = 0.412); at gamma = 0.05
   ## California [-58.8, 19.8] and West Germany the whole line.
-  fp <- conformal_td(Y ~ D, data = scconf_data(scconf_apps$prop99),
+  fp <- conformal_sc(Y ~ D, data = scconf_data(scconf_apps$prop99),
                      index = c("id", "time"), rule = "sc", alpha = 0.1)
   expect_equal(round(c(fp$avg$CI.lower, fp$avg$CI.upper), 4),
                c(-35.0540, -3.9733))
   expect_equal(fp$avg$p.value, 3 / 39)
-  fg <- conformal_td(Y ~ D, data = scconf_data(scconf_apps$germany),
+  fg <- conformal_sc(Y ~ D, data = scconf_data(scconf_apps$germany),
                      index = c("id", "time"), rule = "sc", alpha = 0.1)
   expect_equal(round(c(fg$avg$CI.lower, fg$avg$CI.upper), 4),
                c(-4.7079, 2.1129))
   expect_equal(fg$avg$p.value, 7 / 17)
-  fp5 <- conformal_td(Y ~ D, data = scconf_data(scconf_apps$prop99),
+  fp5 <- conformal_sc(Y ~ D, data = scconf_data(scconf_apps$prop99),
                       index = c("id", "time"), rule = "sc", alpha = 0.05)
   expect_equal(round(c(fp5$avg$CI.lower, fp5$avg$CI.upper), 1),
                c(-58.8, 19.8))
-  fg5 <- conformal_td(Y ~ D, data = scconf_data(scconf_apps$germany),
+  fg5 <- conformal_sc(Y ~ D, data = scconf_data(scconf_apps$germany),
                       index = c("id", "time"), rule = "sc", alpha = 0.05)
   expect_equal(c(fg5$avg$CI.lower, fg5$avg$CI.upper), c(-Inf, Inf))
 })

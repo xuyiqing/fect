@@ -66,7 +66,7 @@ test_that("too few controls give the whole real line", {
   expect_equal(v$level, 1)
 })
 
-## ---- rules and conformal_td() --------------------------------------------------
+## ---- rules and conformal_sc() --------------------------------------------------
 
 fc_panel_data <- function(J = 30, T0 = 12, T1 = 4, K = 1, tau = 1, seed = 1,
                           stagger = FALSE) {
@@ -89,16 +89,16 @@ fc_panel_data <- function(J = 30, T0 = 12, T1 = 4, K = 1, tau = 1, seed = 1,
 
 test_that("the did rule is affine and a user copy gives identical results", {
   d <- fc_panel_data()
-  f1 <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = "did")
+  f1 <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = "did")
   my_did <- function(query.pre, background.pre, background.target) {
     mean(query.pre) + mean(background.target - colMeans(background.pre))
   }
-  f2 <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = my_did)
+  f2 <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = my_did)
   expect_true(all(f1$unit$method == "exact"))
   expect_equal(f1$unit[, c("eff", "CI.lower", "CI.upper", "p.value", "N")],
                f2$unit[, c("eff", "CI.lower", "CI.upper", "p.value", "N")])
   expect_equal(f1$avg$CI.lower, f2$avg$CI.lower)
-  expect_s3_class(f1, "conformal_td")
+  expect_s3_class(f1, "conformal_sc")
   expect_output(print(f1), "Full conformal inference")
   expect_s3_class(plot(f1), "ggplot")
 })
@@ -108,7 +108,7 @@ test_that("a rule that is not affine falls back to the grid, and the grid p-valu
   med_rule <- function(query.pre, background.pre, background.target) {
     mean(query.pre) + stats::median(background.target - colMeans(background.pre))
   }
-  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = med_rule,
+  f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = med_rule,
                     grid = seq(-6, 6, by = 0.25))
   expect_true(all(f$unit$method == "grid"))
   ## brute force at the estimate for the first date: p = 1 there
@@ -119,7 +119,7 @@ test_that("a rule that is not affine falls back to the grid, and the grid p-valu
 
 test_that("the p-value at zero equals a direct refit of every unit", {
   d <- fc_panel_data(J = 12, T0 = 6, T1 = 2, seed = 4)
-  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = "did")
+  f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = "did")
   Y <- matrix(d$Y, ncol = 13)
   t <- 7
   sc <- numeric(13)
@@ -133,7 +133,7 @@ test_that("the p-value at zero equals a direct refit of every unit", {
 
 test_that("the Jackknife+ agrees with .conformal_interval on hand-built folds", {
   d <- fc_panel_data(J = 20, T0 = 6, T1 = 1, seed = 9)
-  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = "did",
+  f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = "did",
                     procedure = "jackknife+", alpha = 0.1)
   Y <- matrix(d$Y, ncol = 21)
   M0 <- R <- numeric(20)
@@ -149,25 +149,27 @@ test_that("the Jackknife+ agrees with .conformal_interval on hand-built folds", 
   expect_equal(f$unit$p.value, unname(v["p.value"]))
 })
 
-test_that("conformal_td checks its inputs", {
+test_that("conformal_sc checks its inputs", {
   d <- fc_panel_data()
-  expect_error(conformal_td(Y ~ D + id, data = d, index = c("id", "time")),
+  expect_error(conformal_sc(Y ~ D + id, data = d, index = c("id", "time"),
+                            rule = "did"),
                "covariates")
-  expect_error(conformal_td(Y ~ D, data = d, index = c("id", "time"),
-                            alpha = 1), "alpha")
-  expect_error(conformal_td(Y ~ D, data = d, index = c("id", "time"),
+  expect_error(conformal_sc(Y ~ D, data = d, index = c("id", "time"),
+                            rule = "did", alpha = 1), "alpha")
+  expect_error(conformal_sc(Y ~ D, data = d, index = c("id", "time"),
                             rule = "nope"), "rule")
-  expect_error(conformal_td(Y ~ D, data = d, index = c("id", "time"),
-                            diag = -1), "diag")
+  expect_error(conformal_sc(Y ~ D, data = d, index = c("id", "time"),
+                            rule = "did", diag = -1), "diag")
   d2 <- d
   d2$D[d2$id == 1 & d2$time == 16] <- 0
-  expect_error(conformal_td(Y ~ D, data = d2, index = c("id", "time")),
+  expect_error(conformal_sc(Y ~ D, data = d2, index = c("id", "time"),
+                            rule = "did"),
                "stays on")
 })
 
 test_that("staggered adoption: each treated unit uses its own pre-treatment dates", {
   d <- fc_panel_data(K = 3, stagger = TRUE, seed = 2)
-  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = "did")
+  f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = "did")
   expect_setequal(unique(f$unit$unit), c("1", "2", "3"))
   expect_equal(as.numeric(tapply(f$unit$n.history, f$unit$unit, unique)),
                c(11, 12, 13))
@@ -176,13 +178,13 @@ test_that("staggered adoption: each treated unit uses its own pre-treatment date
 
 ## ---- fect(method = "fe", vartype = "conformal") --------------------------------
 
-test_that("fect fe conformal equals conformal_td with the did rule", {
+test_that("fect fe conformal equals conformal_sc with the did rule", {
   d <- fc_panel_data(J = 25, seed = 5)
   f <- suppressMessages(fect(Y ~ D, data = d, index = c("id", "time"),
                              method = "fe", se = TRUE, vartype = "conformal",
                              alpha = 0.1, conformal.diag = 2,
                              parallel = FALSE))
-  td <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = "did",
+  td <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = "did",
                      alpha = 0.1, diag = 2)
   u <- f$conformal$unit
   expect_equal(u$eff, u$eff.fit, tolerance = 1e-10)
@@ -239,14 +241,14 @@ test_that("staggered fe fits say when the target-date estimate differs from fect
 test_that("a locally linear rule is not taken as affine", {
   d <- fc_panel_data(J = 20, T0 = 8, T1 = 1, seed = 3, tau = 3)
   med <- function(qp, bp, bt) mean(qp) + stats::median(bt - colMeans(bp))
-  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = med,
+  f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = med,
                     grid = seq(-8, 8, by = 0.05))
   expect_equal(f$unit$method, "grid")
   ## a curved rule on outcomes measured in small units is not affine either
   quad <- function(qp, bp, bt) mean(qp) + 0.3 * mean(bt - colMeans(bp))^2
   d2 <- d
   d2$Y <- d2$Y * 1e-3
-  f2 <- suppressMessages(conformal_td(Y ~ D, data = d2,
+  f2 <- suppressMessages(conformal_sc(Y ~ D, data = d2,
                                       index = c("id", "time"), rule = quad))
   expect_equal(f2$unit$method, "grid")
 })
@@ -255,7 +257,7 @@ test_that("grid sets that reach the grid's end are flagged", {
   d <- fc_panel_data(J = 20, T0 = 8, T1 = 1, seed = 3, tau = 3)
   quad <- function(qp, bp, bt) mean(qp) + 0.3 * mean(bt - colMeans(bp))^2
   expect_message(
-    f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = quad,
+    f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = quad,
                       grid = seq(-0.5, 0.5, length.out = 21)),
     "end of the grid")
   expect_true(f$unit$lower.truncated && f$unit$upper.truncated)
@@ -263,8 +265,8 @@ test_that("grid sets that reach the grid's end are flagged", {
 
 test_that("the Jackknife+ reports coverage 1 when its interval is the whole line", {
   d <- fc_panel_data(J = 6, seed = 8)
-  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"),
-                    procedure = "jackknife+", alpha = 0.1)
+  f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"),
+                    rule = "did", procedure = "jackknife+", alpha = 0.1)
   expect_true(all(is.infinite(f$unit$CI.lower)))
   expect_true(all(f$unit$level == 1))
 })
@@ -272,7 +274,7 @@ test_that("the Jackknife+ reports coverage 1 when its interval is the whole line
 test_that("the average over dates uses the controls observed at every date", {
   d <- fc_panel_data(J = 25, seed = 10)
   d$Y[d$id == 5 & d$time == 14] <- NA
-  f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = "did")
+  f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = "did")
   expect_true(is.finite(f$avg$CI.lower))
   expect_equal(f$avg$N, 25)            # 24 complete controls + the treated unit
   expect_equal(range(f$unit$N), c(25, 26))
@@ -281,7 +283,23 @@ test_that("the average over dates uses the controls observed at every date", {
 test_that("built-in rules always give one interval", {
   for (seed in 1:20) {
     d <- fc_panel_data(J = 15, T0 = 6, T1 = 2, seed = seed)
-    f <- conformal_td(Y ~ D, data = d, index = c("id", "time"), rule = "did")
+    f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"), rule = "did")
     expect_false(any(f$unit$disconnected))
   }
+})
+
+test_that("conformal_sc uses synthetic control by default and offers both procedures", {
+  skip_if_not_installed("quadprog")
+  d <- fc_panel_data(J = 20, T0 = 10, T1 = 2, seed = 12)
+  f <- conformal_sc(Y ~ D, data = d, index = c("id", "time"))
+  expect_match(f$rule, "^sc")
+  expect_identical(f$procedure, "full")
+  expect_true(all(f$unit$method == "exact"))
+  j <- conformal_sc(Y ~ D, data = d, index = c("id", "time"),
+                    procedure = "jackknife+")
+  expect_identical(j$procedure, "jackknife+")
+  expect_true(all(j$unit$method == "jackknife+"))
+  expect_equal(j$unit$eff, f$unit$eff)
+  expect_error(conformal_sc(Y ~ D, data = d, index = c("id", "time"),
+                            procedure = "bootstrap"), "arg")
 })

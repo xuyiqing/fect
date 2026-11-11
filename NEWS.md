@@ -77,9 +77,11 @@ Development version.
   (the effect averaged over the post-treatment dates) carry its sets; with
   several, the sets are by unit and date. `conformal.diag` works; covariates,
   `force = "none"`, `conformal.block` and `conformal.relabel` stop.
-* New `conformal_td()`: full conformal inference and the Jackknife+ for any
-  target-date estimator, given as `rule = "did"`, `"sc"` (ridge-simplex
-  synthetic control, `eta = 1e-5`, needs quadprog) or a function of the
+* New `conformal_sc()`: full conformal inference or the Jackknife+
+  (`procedure = "full"`, the default, or `"jackknife+"`) for synthetic
+  control and other target-date estimators, given as `rule = "sc"` (the
+  default: ridge-simplex synthetic control, `eta = 1e-5`, needs quadprog),
+  `"did"` or a function of the
   held-out unit's pre-treatment outcomes and the training units'
   pre-treatment and target-date outcomes. Affine rules get exact sets
   (a user rule's affinity is checked numerically and at the ends of its

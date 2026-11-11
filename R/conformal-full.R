@@ -691,27 +691,27 @@
 
 ## ---- user-facing function ------------------------------------------------------
 
-#' Conformal inference for target-date estimators
+#' Conformal inference for synthetic control and other target-date estimators
 #'
-#' Full conformal confidence sets, or Jackknife+ intervals, for the effect on
-#' each treated unit at each post-treatment date, for any estimator that
-#' predicts a treated unit's untreated outcome at a date from pre-treatment
-#' outcomes and the controls' outcomes at that date. Synthetic control and the
-#' difference-in-differences (two-way fixed effects) imputation with one
-#' treated unit are such target-date estimators. The procedures are those of
-#' Liu and Xu (2026).
+#' Full conformal confidence sets or Jackknife+ intervals, as the user
+#' chooses, for the effect on each treated unit at each post-treatment date.
+#' The estimator is synthetic control by default. Any estimator that predicts
+#' a treated unit's untreated outcome at a date from pre-treatment outcomes and
+#' the controls' outcomes at that date (a target-date estimator) can be used
+#' instead, such as difference in differences or a function the user writes.
+#' The procedures are those of Liu and Xu (2026).
 #'
 #' @param formula A formula \code{Y ~ D} with the outcome and the 0/1
 #'   treatment. Covariates are not supported.
 #' @param data A data frame in long format.
 #' @param index A character vector of length two: the unit and time
 #'   variables.
-#' @param rule The estimator: \code{"did"} (difference in differences: the
-#'   held-out unit's pre-treatment mean plus the training units' average
-#'   change from their pre-treatment means to the target date), \code{"sc"}
-#'   (synthetic control with simplex weights fitted on the pre-treatment
-#'   outcomes, with a ridge term \code{sc.eta}; needs the \pkg{quadprog}
-#'   package), or a function \code{function(query.pre, background.pre,
+#' @param rule The estimator: \code{"sc"} (the default: synthetic control
+#'   with simplex weights fitted on the pre-treatment outcomes, with a ridge
+#'   term \code{sc.eta}; needs the \pkg{quadprog} package), \code{"did"}
+#'   (difference in differences: the held-out unit's pre-treatment mean plus
+#'   the training units' average change from their pre-treatment means to the
+#'   target date), or a function \code{function(query.pre, background.pre,
 #'   background.target)} that returns the held-out unit's predicted outcome
 #'   at the target date. \code{query.pre} holds the held-out unit's outcomes
 #'   at the pre-treatment dates, \code{background.pre} the training units'
@@ -719,8 +719,16 @@
 #'   \code{background.target} the training units' outcomes at the target
 #'   date. The function never sees the held-out unit's outcome at the target
 #'   date.
-#' @param procedure \code{"full"} (full conformal inference, the default) or
-#'   \code{"jackknife+"}.
+#' @param procedure The inference procedure: \code{"full"} (full conformal
+#'   inference, the default) or \code{"jackknife+"}. Both have a
+#'   finite-sample guarantee under the same conditions. Full conformal
+#'   inference is what Liu and Xu (2026) recommend for target-date
+#'   estimators: its sets cover at their stated level, while Jackknife+
+#'   intervals often cover more than stated and are then wider. For a rule
+#'   whose prediction is not affine in the completed outcome, full conformal
+#'   inference falls back to a grid and refits every control at each
+#'   candidate; the Jackknife+ needs a fixed number of fits and no grid. See
+#'   Details.
 #' @param alpha Miscoverage level, \code{0 < alpha < 1}.
 #' @param diag Number of pre-treatment dates at which to run the procedure as
 #'   a placebo, each with the dates before it as its history (0 for none).
@@ -758,7 +766,7 @@
 #' five candidates far on both sides of zero and refits just inside and just
 #' outside the ends of the set agree with it; otherwise the set is evaluated
 #' on \code{grid}, and \code{lower.truncated} or \code{upper.truncated} flag
-#' a set that reaches the end of the grid (\code{conformal_td} then gives a
+#' a set that reaches the end of the grid (\code{conformal_sc} then gives a
 #' message).
 #'
 #' For each treated unit, the set for the effect averaged over its
@@ -777,7 +785,7 @@
 #' The p-value reported for each date is for the null of no effect at that
 #' date.
 #'
-#' @return An object of class \code{"conformal_td"}, a list with
+#' @return An object of class \code{"conformal_sc"}, a list with
 #'   \item{unit}{One row per treated unit and post-treatment date:
 #'     \code{eff} (estimate), \code{CI.lower}, \code{CI.upper} (the set's
 #'     hull), \code{p.value}, \code{N}, \code{level} (the guaranteed
@@ -804,27 +812,33 @@
 #' @examples
 #' data(sim_gsynth)
 #' d1 <- subset(sim_gsynth, !(id %in% 102:105))
-#' out <- conformal_td(Y ~ D, data = d1, index = c("id", "time"),
+#' ## difference in differences, full conformal sets
+#' out <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"),
 #'                     rule = "did", alpha = 0.1)
 #' out
 #' head(out$unit)
 #'
 #' \donttest{
 #' if (requireNamespace("quadprog", quietly = TRUE)) {
-#'   out.sc <- conformal_td(Y ~ D, data = d1, index = c("id", "time"),
-#'                          rule = "sc", alpha = 0.1)
+#'   ## synthetic control (the default rule): full conformal sets, then
+#'   ## Jackknife+ intervals
+#'   out.sc <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"),
+#'                          alpha = 0.1)
 #'   out.sc$avg
+#'   out.jp <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"),
+#'                          procedure = "jackknife+", alpha = 0.1)
+#'   head(out.jp$unit)
 #' }
 #' ## a user rule: the mean of the training units at the target date, shifted
 #' ## by the held-out unit's pre-treatment gap to them
 #' my_rule <- function(query.pre, background.pre, background.target) {
 #'   mean(background.target) + mean(query.pre - rowMeans(background.pre))
 #' }
-#' out.my <- conformal_td(Y ~ D, data = d1, index = c("id", "time"),
+#' out.my <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"),
 #'                        rule = my_rule)
 #' }
 #' @export
-conformal_td <- function(formula, data, index, rule = "did",
+conformal_sc <- function(formula, data, index, rule = "sc",
                          procedure = c("full", "jackknife+"), alpha = 0.1,
                          diag = 0, grid = NULL, sc.eta = 1e-5) {
   cl <- match.call()
@@ -885,11 +899,11 @@ conformal_td <- function(formula, data, index, rule = "did",
   }
   structure(c(res, list(procedure = procedure, rule = ru$name,
                         alpha = alpha, call = cl)),
-            class = "conformal_td")
+            class = "conformal_sc")
 }
 
 #' @export
-print.conformal_td <- function(x, digits = 3, ...) {
+print.conformal_sc <- function(x, digits = 3, ...) {
   cat("Call:\n")
   print(x$call)
   lab <- if (x$procedure == "full") "Full conformal inference" else
@@ -926,7 +940,7 @@ print.conformal_td <- function(x, digits = 3, ...) {
 }
 
 #' @export
-plot.conformal_td <- function(x, ...) {
+plot.conformal_sc <- function(x, ...) {
   if (is.null(x$unit) || !nrow(x$unit)) {
     stop("Nothing to plot.", call. = FALSE)
   }
