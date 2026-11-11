@@ -19,7 +19,8 @@ importFrom("ggplot2", "ggplot_build", "geom_boxplot", "geom_density", "geom_tile
            "scale_color_discrete", "scale_color_manual", "ggplotGrob",
            "guide_legend", "margin", "geom_jitter", "geom_pointrange",
            "guides","xlab","ylab","element_rect","geom_errorbar","geom_linerange",
-           "scale_linewidth_manual","geom_polygon","geom_histogram","after_stat")
+           "scale_linewidth_manual","geom_polygon","geom_histogram","after_stat",
+           "scale_size_continuous")
 importFrom("abind", "abind")
 importFrom("mvtnorm", "rmvnorm")
 importFrom("GGally", "ggpairs")
@@ -64,4 +65,12 @@ S3method("print", "interFE")
 S3method("print", "conformal_sc")
 S3method("plot", "conformal_sc")
 
-
+## 2.5.0: the gsynth-revisit steps
+export(overlap_check)
+export(loading_check)
+export(fect_rank)
+S3method(print, fect_overlap)
+S3method(plot, fect_overlap)
+S3method(print, fect_loading)
+S3method(plot, fect_loading)
+S3method(print, fect_rank)

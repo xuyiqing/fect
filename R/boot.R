@@ -451,7 +451,8 @@ fect_boot <- function(
   dloo.adjust = FALSE,     # dloo: use Liu's pre-treatment-average baseline
   dloo.controls = "not-yet-treated",
   dloo.rawtime = NULL,     # calendar time per row (for cohort/event alignment)
-  dloo.group.map = NULL    # rawgroup<->newgroup map for the per-group breakdown
+  dloo.group.map = NULL,   # rawgroup<->newgroup map for the per-group breakdown
+  seed = NULL              # IFE-EM bootstrap: seeds the group split and the draws
 ) {
   do_parallel_boot <- isTRUE(parallel) || "boot" %in% as.character(parallel)
   ## dloo overlay bookkeeping: the pre-trend draws are collected per replicate
@@ -1196,6 +1197,148 @@ fect_boot <- function(
       } else {
         return(boot)
       }
+    }
+  } else if (
+    binary == FALSE & method == "ife" & time.component.from == "notyettreated" &
+      vartype == "parametric"
+  ) {
+    ## IFE-EM parametric bootstrap (2.5.0, experimental; R/ife-boot.R): the
+    ## whole panel is regenerated from the fitted untreated outcome plus noise
+    ## vectors from leave-group-out refits, and IFE-EM is refitted with the
+    ## same mask. All random draws are made here, before the refits.
+    message("Parametric bootstrap for IFE-EM (experimental: not proved valid; ",
+            "see ?fect, \"IFE-EM bootstrap\") \n")
+    sum.D <- colSums(out$D)
+    id.co <- which(sum.D == 0)
+    Nco <- length(id.co)
+    if (Nco < 2) {
+      stop("The IFE-EM bootstrap needs at least two never-treated units (found ",
+           Nco, ").", call. = FALSE)
+    }
+    r.ife <- as.integer(out$r.cv[1])
+    r.noise <- .ife_noise_rank(r.ife, Nco)
+    G.ife <- min(Nco, 30L)
+    fit.w <- out$Y.ct
+    if (!is.null(norm.para)) fit.w <- fit.w / norm.para[1]
+    fit.w[which(out$I == 0 | is.na(fit.w))] <- 0
+    if (!is.null(seed)) set.seed(seed)
+    noise <- .ife_noise_group(
+      Y = Y, X = if (p > 0) X else NULL, D = out$D, I = out$I, II = out$II,
+      T.on = T.on, co = id.co, r.noise = r.noise, G = G.ife, force = force,
+      tol = tol, max.iteration = max.iteration
+    )
+    if (length(noise$failed)) {
+      warning(length(noise$failed), " of ", length(unique(noise$groups)),
+              " leave-group-out IFE-EM refits failed; their controls have no ",
+              "noise vector (", noise$failed[1], ")", call. = FALSE)
+    }
+    if (all(is.na(noise$E))) {
+      stop("The IFE-EM bootstrap found no noise vector.", call. = FALSE)
+    }
+    ife.draws <- .ife_draws(noise$E, out$I, nboots)
+    ife.boot.info <- list(
+      r = r.ife, r.noise = r.noise, G = G.ife, groups = noise$groups,
+      controls = id.co,
+      noise = if (is.null(norm.para)) noise$E else noise$E * norm.para[1],
+      n.no.noise = sum(colSums(!is.na(noise$E)) == 0),
+      n.failed.groups = length(noise$failed),
+      draws = if (keep.sims) do.call(rbind, lapply(ife.draws, `[[`, "idx")) else NULL
+    )
+    I.ife <- out$I
+    pool.ife <- noise$E
+
+    one.nonpara <- function(num = NULL) {
+      id.boot <- seq_len(N)
+      Y.boot <- fit.w + .ife_noise_matrix(pool.ife, ife.draws[[num]], I.ife)
+      W.boot <- W
+      synth.out <- try(
+        impute_Y0(
+          method     = method,
+          predictive = time.component.from,
+          Y          = Y.boot,
+          X          = if (p > 0) X else NULL,
+          D          = out$D,
+          W          = W.boot,
+          W.in.fit   = W.in.fit,
+          I          = out$I,
+          II         = out$II,
+          T.on       = T.on,
+          T.on.balance = T.on.balance,
+          balance.period = balance.period,
+          X.extra.FE = X.extra.FE,
+          X.Z        = X.Z,
+          X.Q        = X.Q,
+          X.gamma    = X.gamma,
+          X.kappa    = X.kappa,
+          Zgamma.id  = Zgamma.id,
+          kappaQ.id  = kappaQ.id,
+          tuning     = out$r.cv,
+          boot       = 1,
+          placeboTest = placeboTest,
+          placebo.period = placebo.period,
+          carryover.period = carryover.period,
+          carryoverTest = carryoverTest,
+          calendar.enp.seq = target.enp,
+          time.on.seq      = time.on,
+          time.off.seq     = time.off,
+          time.on.seq.W    = time.on.W,
+          time.off.seq.W   = time.off.W,
+          time.on.seq.group    = group.time.on,
+          time.off.seq.group   = group.time.off,
+          time.on.balance.seq  = balance.time,
+          norm.para    = norm.para,
+          tol          = tol,
+          max.iteration = max.iteration,
+          group.level  = group.level,
+          group        = group,
+          force        = force,
+          hasRevs      = hasRevs,
+          loading.bound      = loading.bound,
+          gamma.loading      = gamma.loading,
+          gamma.loading.grid = gamma.loading.grid
+        ),
+        silent = TRUE
+      )
+      if ("try-error" %in% class(synth.out) ||
+          !.fect_boot_result_ok(synth.out, length(time.on), TT, keep.sims, N)) {
+        boot0 <- list(
+          att.avg = NA,
+          att = NA,
+          count = NA,
+          beta = NA,
+          att.off = NA,
+          count.off = NA,
+          eff.calendar = NA,
+          eff.calendar.fit = NA,
+          att.placebo = NA,
+          att.avg.unit = NA,
+          att.carryover = NA,
+          group.att = NA,
+          marginal = NA,
+          balance.att = NA,
+          balance.att.placebo = NA,
+          balance.count = NA,
+          balance.avg.att = NA,
+          balance.time = NA,
+          att.avg.W = NA,
+          att.on.W = NA,
+          count.on.W = NA,
+          time.on.W = NA,
+          att.placebo.W = NA,
+          att.off.W = NA,
+          count.off.W = NA,
+          time.off.W = NA,
+          att.carryover.W = NA,
+          group.output = list(),
+          eff = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          D = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          I = if (keep.sims) matrix(NA_real_, TT, N) else NULL,
+          boot.id = NULL
+        )
+        return(boot0)
+      }
+      synth.out$boot.id <- id.boot
+      synth.out
     }
   } else if (
     binary == FALSE & method %in% c("gsynth", "ife", "cfe") & vartype == "parametric"
@@ -2093,6 +2236,10 @@ fect_boot <- function(
     ## nboots <- min(N, nboots)
     ## boot.seq <- jack.seq[1:nboots]
     boot.seq <- 1:N
+  }
+  if (exists("ife.draws", inherits = FALSE)) {
+    ## IFE-EM bootstrap: replicate b uses the b-th set of draws
+    boot.seq <- seq_len(nboots)
   }
 
   ## computing
@@ -5156,7 +5303,8 @@ fect_boot <- function(
     ## v2.4.8 (B1): replicates dropped as failed, and the Step-1 error pool
     ## check; read by fect.default() to build boot.diag
     n.boot.fail = n.fail,
-    para.sim.check = if (vartype == "parametric" && exists("para.sim.check", inherits = FALSE)) para.sim.check else NULL
+    para.sim.check = if (vartype == "parametric" && exists("para.sim.check", inherits = FALSE)) para.sim.check else NULL,
+    ife.boot = if (exists("ife.boot.info", inherits = FALSE)) ife.boot.info else NULL
   )
   if (keep.sims) {
     result = c(

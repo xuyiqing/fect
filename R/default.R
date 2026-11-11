@@ -768,6 +768,17 @@ fect.default <- function(
     ## -------------------------------##
     ## Checking Parameters
     ## -------------------------------##
+    ## cv.method = "forward" (2.5.0): the rank of GSC from the forward rule
+    ## (R/gsc-rank.R), then the fit at that rank
+    if (identical(cv.method, "forward")) {
+        if (isFALSE(CV) || (is.null(CV) && !is.null(r) && length(r) == 1L)) {
+            stop("cv.method = \"forward\" chooses the rank: set CV = TRUE, or give ",
+                 "a range of ranks in r.", call. = FALSE)
+        }
+        return(.fect_forward_cv(match.call(), parent.frame(),
+                                list(method = method, time.component.from = time.component.from,
+                                     r = r, lambda = lambda, binary = binary)))
+    }
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     placeboEquiv <- loo
     permu.dimension <- "time"
@@ -2888,7 +2899,29 @@ fect.default <- function(
     ## actionable reversal message first. Uses method_arg (saved before the
     ## silent fe -> ife coercion) so the message names the user's literal
     ## method argument.
-    if (se == 1 && vartype == "parametric" && time.component.from != "nevertreated") {
+    ## 2.5.0: method = "ife" with time.component.from = "notyettreated" (IFE-EM)
+    ## runs the experimental IFE-EM parametric bootstrap (R/ife-boot.R).
+    ife.em.boot <- se == 1 && vartype == "parametric" &&
+        time.component.from == "notyettreated" && identical(method_arg, "ife") &&
+        identical(method, "ife") && binary == 0
+    if (ife.em.boot) {
+        if (!force %in% c(1, 3)) {
+            stop("The IFE-EM bootstrap (vartype = \"parametric\" with method = \"ife\") ",
+                 "needs force = \"unit\" or \"two-way\".", call. = FALSE)
+        }
+        if (!is.null(W)) {
+            stop("The IFE-EM bootstrap does not take weights.", call. = FALSE)
+        }
+        if (isTRUE(placeboTest) || isTRUE(carryoverTest)) {
+            stop("The IFE-EM bootstrap does not run placebo or carryover tests; ",
+                 "use vartype = \"bootstrap\" or \"jackknife\" for them.", call. = FALSE)
+        }
+        if (isTRUE(cm)) {
+            stop("The IFE-EM bootstrap does not take cm = TRUE.", call. = FALSE)
+        }
+    }
+    if (se == 1 && vartype == "parametric" && time.component.from != "nevertreated" &&
+        !ife.em.boot) {
         stop(sprintf(
             paste0(
                 "vartype = \"parametric\" requires time.component.from = \"nevertreated\".\n",
@@ -3633,7 +3666,8 @@ fect.default <- function(
             ## inside fect_boot (no separate resampler, no retained sims).
             dloo               = dloo,
             dloo.adjust        = dloo.adjust,
-            dloo.group.map     = if (!is.null(group)) rawgroup else NULL
+            dloo.group.map     = if (!is.null(group)) rawgroup else NULL,
+            seed               = seed
         )
 
     }
