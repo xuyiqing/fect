@@ -153,7 +153,7 @@ With a factor model, a treated unit whose loadings lie far from the controls' is
 plot(out.cf, type = "loading.overlap")
 ```
 
-In `sim_gsynth`, three of the five treated units lie outside the hull, to the left of the controls. Their intervals depend more on the condition that they are no harder to predict than the controls, so their pre-treatment diagnostics deserve a close look.
+In this fit, three of the five treated units lie outside the hull, to the left of the controls. Their intervals depend more on the condition that they are no harder to predict than the controls, so their pre-treatment diagnostics deserve a close look.
 
 ### Pre-treatment diagnostics
 
