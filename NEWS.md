@@ -63,6 +63,14 @@ Development version.
   (gsynth, one treated unit; results in
   `tests/coverage-study/results/conformal_v2_coverage.md`).
 
+## Documentation
+
+* New book chapter, "Conformal Inference" (Chapter 8), on the idea, the
+  conditions behind the guarantee, and its use with one and several treated
+  units. It replaces the conformal section of the Inference chapter. The
+  chapters after it are renumbered; their file names and web addresses are
+  unchanged.
+
 # fect 2.4.8
 
 Development version, not yet on CRAN.
