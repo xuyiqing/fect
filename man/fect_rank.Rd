@@ -21,11 +21,17 @@ fect_rank(
 \item{formula, data, index}{as in \code{\link{fect}}.}
 
 \item{r}{the candidate ranks, from 0 without gaps (default 0:5); a pair
-\code{c(0, 5)} is read as a range, as in \code{fect(CV = TRUE)}.}
+\code{c(0, 5)} is read as a range, as in \code{fect(CV = TRUE)}, and a
+single number as 0 to that number. The largest candidate sets the
+forward window (its shortest training set has one period more than the
+largest rank needs), so the pick can depend on it; the paper uses 0:5.}
 
-\item{se}{if \code{TRUE}, every fit has standard errors (by default the
-parametric bootstrap, Algorithm 2 of Xu 2017), so the table gives the
-estimate and its interval at every rank. The choice itself needs none.}
+\item{se}{if \code{TRUE}, every fit has standard errors, so the table
+gives the estimate and its interval at every rank. Unless
+\code{vartype} is given in \code{...}, \code{fect_rank()} uses the
+parametric bootstrap (\code{vartype = "parametric"}, Algorithm 2 of Xu
+2017), not \code{fect()}'s default unit bootstrap, which gives no valid
+interval with one treated unit. The choice itself needs none.}
 
 \item{keep.fits}{if \code{TRUE}, return the fits.}
 
@@ -94,7 +100,7 @@ structural rank.
 }
 \examples{
 data(simgsynth)
-rk <- fect_rank(Y ~ D, data = simgsynth, index = c("id", "time"), r = 0:3)
+rk <- fect_rank(Y ~ D, data = simgsynth, index = c("id", "time"), r = 0:5)
 rk
 }
 \seealso{

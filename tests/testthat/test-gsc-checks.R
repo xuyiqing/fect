@@ -74,8 +74,8 @@ test_that("overlap_check(): thousands of donors (long window keys, the active-se
   d <- data.frame(id = rep(1:N, each = T), time = rep(1:T, N), Y = c(Y), D = c(D))
   oc <- overlap_check(Y ~ D, data = d, index = c("id", "time"), max.heldout = 30)
   expect_identical(oc$units$n.donors, rep(2200L, 5))
-  expect_true(all(oc$units$status == "ok"))
-  expect_identical(unname(lengths(oc$yard)), rep(30L, 5))
+  ## 6 periods and 2,200 donors: the donors rebuild one another exactly
+  expect_true(all(oc$units$reason == "yardstick collapsed"))
 })
 
 test_that("overlap_check(): not assessable, and input checks", {
@@ -109,6 +109,17 @@ test_that("fect_rank(): picks, table and the forward window", {
   expect_output(print(rk), "Forward rule")
   expect_error(fect_rank(Y ~ D, data = simgsynth, index = c("id", "time"), method = "ife"), "sets")
   expect_error(fect_rank(Y ~ D, data = simgsynth, index = c("id", "time"), r = c(1, 2, 4)), "without gaps")
+})
+
+test_that("fect_rank(se = TRUE) uses the parametric bootstrap unless told otherwise", {
+  skip_on_cran()
+  rk <- suppressWarnings(fect_rank(Y ~ D, data = simgsynth, index = c("id", "time"), r = 0:1, se = TRUE,
+                                   nboots = 20, parallel = FALSE, keep.fits = TRUE))
+  expect_identical(rk$fits[["1"]]$vartype, "parametric")
+  expect_true(all(is.finite(rk$table$S.E.)))
+  rk2 <- suppressWarnings(fect_rank(Y ~ D, data = simgsynth, index = c("id", "time"), r = 0:1, se = TRUE,
+                                    vartype = "jackknife", parallel = FALSE, keep.fits = TRUE))
+  expect_identical(rk2$fits[["1"]]$vartype, "jackknife")
 })
 
 test_that("fect_rank(): a short window is flagged, and units with too few periods are left out", {

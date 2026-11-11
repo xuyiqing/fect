@@ -261,10 +261,16 @@
 #'
 #' @param formula,data,index as in \code{\link{fect}}.
 #' @param r the candidate ranks, from 0 without gaps (default 0:5); a pair
-#'   \code{c(0, 5)} is read as a range, as in \code{fect(CV = TRUE)}.
-#' @param se if \code{TRUE}, every fit has standard errors (by default the
-#'   parametric bootstrap, Algorithm 2 of Xu 2017), so the table gives the
-#'   estimate and its interval at every rank. The choice itself needs none.
+#'   \code{c(0, 5)} is read as a range, as in \code{fect(CV = TRUE)}, and a
+#'   single number as 0 to that number. The largest candidate sets the
+#'   forward window (its shortest training set has one period more than the
+#'   largest rank needs), so the pick can depend on it; the paper uses 0:5.
+#' @param se if \code{TRUE}, every fit has standard errors, so the table
+#'   gives the estimate and its interval at every rank. Unless
+#'   \code{vartype} is given in \code{...}, \code{fect_rank()} uses the
+#'   parametric bootstrap (\code{vartype = "parametric"}, Algorithm 2 of Xu
+#'   2017), not \code{fect()}'s default unit bootstrap, which gives no valid
+#'   interval with one treated unit. The choice itself needs none.
 #' @param keep.fits if \code{TRUE}, return the fits.
 #' @param ... further arguments to \code{fect()} (for example \code{force},
 #'   \code{min.T0}, \code{nboots}, \code{vartype}, \code{seed}). \code{CV} and
@@ -286,7 +292,7 @@
 #'   rule's rank directly.
 #' @examples
 #' data(simgsynth)
-#' rk <- fect_rank(Y ~ D, data = simgsynth, index = c("id", "time"), r = 0:3)
+#' rk <- fect_rank(Y ~ D, data = simgsynth, index = c("id", "time"), r = 0:5)
 #' rk
 #' @export
 fect_rank <- function(formula = NULL, data, index, r = 0:5, se = FALSE,
@@ -298,6 +304,7 @@ fect_rank <- function(formula = NULL, data, index, r = 0:5, se = FALSE,
     if (!is.null(dots$time.component.from) && !identical(dots$time.component.from, "nevertreated"))
         stop("fect_rank() fits GSC, whose factors come from the never-treated units.", call. = FALSE)
     dots$time.component.from <- NULL
+    if (isTRUE(se) && is.null(dots$vartype)) dots$vartype <- "parametric"
     ranks <- .rank_candidates(r)
     fit_at <- function(k) {
         args <- c(list(formula = formula, data = data, index = index, method = "gsynth",

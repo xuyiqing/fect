@@ -437,7 +437,7 @@ plot.fect_overlap <- function(x, ...) {
             b <- qr.solve(Z[p, , drop = FALSE], R[p, j])
             max(abs(b - c(if (has.a) A[j], L[j, ])))
         }, 0)
-        scale <- max(1, stats::sd(as.vector(fit$Y.dat[obs])), na.rm = TRUE)
+        scale <- max(1, stats::sd(fit$Y.dat[, tr, drop = FALSE][obs]), na.rm = TRUE)
         if (max(dev) > 1e-6 * scale)
             stop(sprintf("rebuilt loadings differ from the fit's (max %.2g) at r = %d",
                          max(dev), r), call. = FALSE)

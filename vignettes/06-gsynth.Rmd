@@ -352,6 +352,8 @@ out.ife$est.avg
 out.ife$ife.boot[c("r", "r.noise", "G")]
 ```
 
+The interval printed here is fect's default normal interval. The coverage figures above are for the paper's basic interval on the draws as they are, `out.ife$att.avg - quantile(out.ife$att.avg.boot, c(0.975, 0.025))`; `ci.method = "basic"` recenters the draws at the estimate first, so it differs from the paper's by the mean of the draws.
+
 With 30 or more controls (here 45), fect takes the noise vectors from fits with one factor fewer (`r.noise = 1`), because a rank above the true one absorbs part of the noise and makes the vectors too small. Do not rely on a rank at which IFE-EM has not converged; `out.ife$convergence$converged` reports whether the fit met `tol` before `max.iteration` rounds.
 
 ### Step 5: report
