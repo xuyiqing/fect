@@ -22,8 +22,8 @@ Jackknife+ 1 - (2q - 1)/N = 0.85 at N = 20 and 0.875 at N = 40.
 | 39 | factor_out | did  | 0.318 | 0.359 | 3.43 | 4.07 |
 | 39 | factor_out | sc   | 0.241 | 0.297 | 2.31 | 2.60 |
 
-Monte Carlo s.e. of a coverage near 0.9 is 0.0067. Full conformal sets sit at their guarantee and are 15-25%
-narrower than Jackknife+ intervals, which over-cover. No set was disconnected. When the treated unit lies outside
+Monte Carlo s.e. of a coverage near 0.9 is 0.0067. Full conformal sets sit at their guarantee and are 15-20%
+narrower than Jackknife+ intervals, which over-cover (designs where both hold). No set was disconnected. When the treated unit lies outside
 the controls' range, both fail, as the theory allows (the scores are not exchangeable).
 
 The J = 39 additive DID cell (0.881) is 2.8 s.e. below 0.90. A rerun with 20,000 replications gave 0.896; the same
