@@ -67,8 +67,9 @@ Development version.
 
 * New book chapter, "Conformal Inference" (Chapter 8), on the idea, the
   conditions behind the guarantee, and its use with one and several treated
-  units. It replaces the conformal section of the Inference chapter. The
-  chapters after it are renumbered; their file names and web addresses are
+  units. It replaces the conformal section of Chapter 7, which is renamed
+  "Bootstrap and Jackknife" (formerly "Inference"). The chapters after it
+  are renumbered; their file names and web addresses are
   unchanged.
 
 # fect 2.4.8

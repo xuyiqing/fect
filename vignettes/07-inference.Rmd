@@ -1,10 +1,10 @@
-# Inference {#sec-inference}
+# Bootstrap and Jackknife {#sec-inference}
 
 ```{r .common, include = FALSE}
 source("_common.R")
 ```
 
-This chapter explains inference in `fect`. Read it when you need to justify a particular (`vartype`, `ci.method`) choice in a paper, or when you want to understand why log-scale and ratio estimands use `bca` by default.
+This chapter explains inference in `fect` by the bootstrap, the jackknife and the parametric bootstrap. Read it when you need to justify a particular (`vartype`, `ci.method`) choice in a paper, or when you want to understand why log-scale and ratio estimands use `bca` by default.
 
 The chapter is organized around three choices:
 
