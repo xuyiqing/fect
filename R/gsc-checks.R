@@ -45,6 +45,21 @@
                 error = function(e) NULL)
             if (!is.null(w)) return(w)
         }
+        ## badly scaled data (outcomes in the tens of thousands): the same
+        ## problem divided by a constant has the same solution
+        sc <- max(abs(Xs), abs(y), 1e-12)
+        if (sc != 1) {
+            D <- crossprod(Xs / sc)
+            s <- max(mean(diag(D)), 1e-12)
+            for (eps in eps0 * c(1, 1e2, 1e4)) {
+                w <- tryCatch(
+                    quadprog::solve.QP(D + diag(eps * s, k), drop(crossprod(Xs / sc, y / sc)),
+                                       cbind(rep(1, k), diag(k)), c(1, rep(0, k)),
+                                       meq = 1)$solution,
+                    error = function(e) NULL)
+                if (!is.null(w)) return(w)
+            }
+        }
         stop("least squares on the simplex failed", call. = FALSE)
     }
     if (J <= dense.max) return(qp(X, ridge))
