@@ -713,7 +713,7 @@
 #'
 #' @examples
 #' data(sim_gsynth)
-#' d1 <- subset(sim_gsynth, id %in% c(101, 1:45))
+#' d1 <- subset(sim_gsynth, !(id %in% 102:105))
 #' out <- conformal_td(Y ~ D, data = d1, index = c("id", "time"),
 #'                     rule = "did", alpha = 0.1)
 #' out
@@ -840,4 +840,196 @@ plot.conformal_td <- function(x, ...) {
     ggplot2::facet_wrap(~ unit) +
     ggplot2::labs(x = "Periods since treatment", y = "Effect") +
     ggplot2::theme_bw()
+}
+
+
+## ---- fect(method = "fe", vartype = "conformal") -------------------------------
+
+## Called from fect_boot() after the point fit `out`. Y, D, I: TT x N
+## matrices (Y possibly normalized by norm.para); force: 1 unit, 2 time,
+## 3 two-way. The rule is the target-date form of the fixed-effects
+## imputation: for force = 3 the difference in differences between the
+## treated unit's pre-treatment mean and the controls' change to the target
+## date. With one treated unit and controls observed at every date it equals
+## fect's estimate; otherwise the two can differ, and the intervals are built
+## around the rule's estimate (column eff; fect's estimate is in eff.fit).
+conformal_full_fe <- function(Y, D, I, T.on, out, force, alpha,
+                              norm.para = NULL, diag = 0) {
+  scale <- if (is.null(norm.para)) 1 else norm.para[1]
+  TT <- nrow(Y)
+  N <- ncol(Y)
+  Yr <- Y * scale
+  Yr[I == 0] <- NA
+  Dm <- D
+  Dm[I == 0] <- NA
+  rule <- switch(as.character(force),
+                 "1" = .fc_rule_unit, "2" = .fc_rule_time,
+                 "3" = .fc_rule_did,
+                 stop("vartype = \"conformal\" with method = \"fe\" needs ",
+                      "force = \"unit\", \"time\" or \"two-way\".",
+                      call. = FALSE))
+  rule.name <- switch(as.character(force), "1" = "unit mean",
+                      "2" = "time mean", "3" = "difference in differences")
+  res <- .fc_panel(Yr, Dm, rule, "full", alpha, diag = diag,
+                   units = seq_len(N), times = seq_len(TT))
+  res90 <- .fc_panel(Yr, Dm, rule, "full", 2 * alpha, diag = diag,
+                     units = seq_len(N), times = seq_len(TT))
+  u <- res$unit
+  if (is.null(u) || !nrow(u)) {
+    stop("vartype = \"conformal\": no treated unit has a pre-treatment date ",
+         "and a post-treatment outcome.", call. = FALSE)
+  }
+  tr.units <- sort(unique(u$unit))
+  Ntr <- length(tr.units)
+  eff.fit <- out$eff[cbind(u$time, u$unit)]
+  dev <- abs(u$eff - eff.fit)
+  if (any(dev > 1e-6 * (1 + abs(eff.fit)), na.rm = TRUE)) {
+    message("vartype = \"conformal\" with method = \"fe\": the sets are built ",
+            "around the target-date (difference-in-differences) estimate ",
+            "with the never-treated units as controls, which differs from ",
+            "fect's estimate in ", sum(dev > 1e-6 * (1 + abs(eff.fit)),
+                                       na.rm = TRUE),
+            " cell(s) (other treated units or not-yet-treated cells enter ",
+            "fect's fit). Both are in fit$conformal$unit (eff, eff.fit).")
+  }
+  unit.df <- data.frame(
+    unit = u$unit, time = u$time, event.time = u$event.time, Y = u$Y,
+    Y.ct = u$Y - u$eff, eff = u$eff, eff.fit = eff.fit,
+    CI.lower = u$CI.lower, CI.upper = u$CI.upper, p.value = u$p.value,
+    N = u$N, level = u$level, disconnected = u$disconnected,
+    stringsAsFactors = FALSE)
+
+  ## event-time and overall rows: with one treated unit they are that unit's
+  ## sets; with several, the averages have no full conformal set here
+  time.on <- out$time
+  mk <- function(nm) {
+    m <- matrix(NA_real_, length(time.on), 6,
+                dimnames = list(time.on, c(nm, "S.E.", "CI.lower", "CI.upper",
+                                           "p.value", "count")))
+    m[, nm] <- out$att
+    m[, "count"] <- out$count
+    m
+  }
+  att.mat <- mk("ATT")
+  att90.mat <- mk("ATT")
+  est.avg <- t(as.matrix(c(out$att.avg, NA_real_, NA_real_, NA_real_,
+                           NA_real_)))
+  colnames(est.avg) <- c("ATT.avg", "S.E.", "CI.lower", "CI.upper", "p.value")
+  est.avg.unit <- t(as.matrix(c(out$att.avg.unit, NA_real_, NA_real_,
+                                NA_real_, NA_real_)))
+  colnames(est.avg.unit) <- c("ATT.avg.unit", "S.E.", "CI.lower", "CI.upper",
+                              "p.value")
+  cal.eff <- as.numeric(out$eff.calendar)
+  cal.N <- if (!is.null(out$N.calendar)) as.numeric(out$N.calendar) else
+    rep(NA_real_, TT)
+  est.cal <- cbind(cal.eff, NA_real_, NA_real_, NA_real_, NA_real_, cal.N)
+  colnames(est.cal) <- c("ATT-calendar", "S.E.", "CI.lower", "CI.upper",
+                         "p.value", "count")
+  diag.att <- NULL
+  if (Ntr == 1L) {
+    u90 <- res90$unit
+    for (l in seq_along(time.on)) {
+      k <- which(u$event.time == time.on[l])
+      if (length(k) != 1L) next
+      att.mat[l, "ATT"] <- att90.mat[l, "ATT"] <- u$eff[k]
+      att.mat[l, c("CI.lower", "CI.upper", "p.value")] <-
+        unlist(u[k, c("CI.lower", "CI.upper", "p.value")])
+      k90 <- which(u90$event.time == time.on[l])
+      att90.mat[l, c("CI.lower", "CI.upper", "p.value")] <-
+        unlist(u90[k90, c("CI.lower", "CI.upper", "p.value")])
+    }
+    for (k in seq_len(nrow(u))) {
+      est.cal[u$time[k], c("CI.lower", "CI.upper", "p.value")] <-
+        unlist(u[k, c("CI.lower", "CI.upper", "p.value")])
+    }
+    a <- res$avg
+    if (!is.null(a) && nrow(a) == 1L && is.finite(a$eff)) {
+      est.avg[1, ] <- c(a$eff, NA_real_, a$CI.lower, a$CI.upper, a$p.value)
+      est.avg.unit[1, ] <- est.avg[1, ]
+    }
+    if (!is.null(res$diag)) {
+      dg <- res$diag
+      dg90 <- res90$diag
+      for (k in seq_len(nrow(dg))) {
+        l <- match(dg$event.time[k], time.on)
+        if (is.na(l)) next
+        att.mat[l, "ATT"] <- att90.mat[l, "ATT"] <- dg$eff[k]
+        att.mat[l, c("CI.lower", "CI.upper", "p.value")] <-
+          unlist(dg[k, c("CI.lower", "CI.upper", "p.value")])
+        att90.mat[l, c("CI.lower", "CI.upper", "p.value")] <-
+          unlist(dg90[k, c("CI.lower", "CI.upper", "p.value")])
+      }
+      diag.att <- dg
+    }
+  }
+  est.cal.fit <- cbind(if (!is.null(out$eff.calendar.fit))
+    as.numeric(out$eff.calendar.fit) else rep(NA_real_, TT),
+    NA_real_, NA_real_, NA_real_, NA_real_, cal.N)
+  colnames(est.cal.fit) <- colnames(est.cal)
+  att.bound <- att90.mat[, c("CI.lower", "CI.upper"), drop = FALSE]
+  rownames(att.bound) <- out$time
+
+  lv <- unit.df$level
+  status <- if (all(!is.finite(lv))) {
+    "no sets"
+  } else if (any(is.infinite(unit.df$CI.lower) | is.infinite(unit.df$CI.upper),
+                 na.rm = TRUE)) {
+    "partly infinite: too few controls for a finite set at some dates"
+  } else {
+    "ok"
+  }
+  if (any(unit.df$disconnected %in% TRUE)) {
+    status <- paste0(status, "; ", sum(unit.df$disconnected %in% TRUE),
+                     " set(s) are unions of intervals (hull reported; see ",
+                     "fit$conformal$components)")
+  }
+  diag.unit <- NULL
+  if (!is.null(res$diag)) {
+    dg <- res$diag
+    diag.unit <- data.frame(unit = dg$unit, time = dg$time,
+                            event.time = dg$event.time, eff = dg$eff,
+                            CI.lower = dg$CI.lower, CI.upper = dg$CI.upper,
+                            p.value = dg$p.value, N = dg$N,
+                            stringsAsFactors = FALSE)
+  }
+  conformal <- list(
+    procedure = "Full conformal inference for target-date estimators (Liu and Xu 2026)",
+    procedure.type = "full",
+    method = "fe",
+    rule = rule.name,
+    level = suppressWarnings(min(lv[is.finite(lv)])),
+    gamma = alpha,
+    status = status,
+    n.controls = res$n.controls,
+    n.treated = Ntr,
+    unit = unit.df,
+    avg = res$avg,
+    components = res$components,
+    aggregate = "none",
+    diag = if (diag > 0) list(m = diag, unit = diag.unit, att = diag.att,
+                              components = res$diag.components) else NULL,
+    extension = if (Ntr == 1L) {
+      paste0("With one treated unit, est.att and the calendar-time ATT ",
+             "carry its full conformal sets at each date, and est.avg the ",
+             "set for its effect averaged over the post-treatment dates.")
+    } else {
+      paste0("Full conformal sets are reported for each treated unit and ",
+             "date (fit$conformal$unit) and for each unit's average over ",
+             "its dates (fit$conformal$avg). Averages over several treated ",
+             "units have no full conformal set here, so est.att and est.avg ",
+             "carry no interval.")
+    }
+  )
+  list(
+    est.avg = est.avg,
+    est.avg.unit = est.avg.unit,
+    est.att = att.mat,
+    est.att90 = att90.mat,
+    att.bound = att.bound,
+    est.eff.calendar = est.cal,
+    est.eff.calendar.fit = est.cal.fit,
+    est.beta = NULL,
+    vartype = "conformal",
+    conformal = conformal
+  )
 }
