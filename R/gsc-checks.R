@@ -29,6 +29,8 @@
 ## least-squares problem on the simplex has at most m + 1 positive weights,
 ## so the working set stays small. Returns the weights.
 .gsc_simplex_ls <- function(y, X, dense.max = 200L, ridge = 1e-10) {
+    y <- as.vector(y)
+    X <- as.matrix(X)
     J <- ncol(X)
     if (J == 1L) return(1)
     qp <- function(Xs, eps0) {
