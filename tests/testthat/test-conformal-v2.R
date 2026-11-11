@@ -223,7 +223,10 @@ test_that("too few controls give the whole real line", {
 
 test_that("unsupported methods and options stop with a message", {
   df <- .cf_sim(J = 15, seed = 10)
-  expect_error(.cf_fit(df, method = "fe"), "method = \"ife\" with r = 0")
+  ## method = "fe" runs full conformal inference since the 2.4.9 extension
+  ## (test-conformal-full.R); its unsupported options stop
+  expect_error(.cf_fit(df, method = "fe", conformal.block = TRUE),
+               "conformal.block")
   expect_error(.cf_fit(df, method = "cfe", r = 0), "gsynth")
   expect_error(.cf_fit(df, method = "both"), "gsynth")
   df$w <- 1

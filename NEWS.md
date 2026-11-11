@@ -62,6 +62,34 @@ Development version.
 * A coverage study is in `tests/coverage-study/conformal_v2_coverage.R`
   (gsynth, one treated unit; results in
   `tests/coverage-study/results/conformal_v2_coverage.md`).
+* Full conformal inference for target-date estimators (Liu and Xu 2026,
+  Sec. 2.3). `fect(method = "fe", vartype = "conformal")`, which stopped
+  before, now gives a full conformal set for each treated unit and date,
+  using the target-date form of the fixed-effects imputation (the treated
+  unit's pre-treatment mean plus the controls' change to the date; the unit
+  or time mean with `force = "unit"` or `"time"`). The scores are affine in
+  the candidate effect, so the sets are computed exactly, and each is a
+  single interval (every control's weight on the treated unit lies in
+  [0, 1]). With one treated unit and a control missing an outcome, the
+  target-date estimate can differ from fect's; `fect` says so, and
+  `est.att` and `est.avg` then hold the target-date estimate.
+  With one treated unit, `est.att`, the calendar-time ATT and `est.avg`
+  (the effect averaged over the post-treatment dates) carry its sets; with
+  several, the sets are by unit and date. `conformal.diag` works; covariates,
+  `force = "none"`, `conformal.block` and `conformal.relabel` stop.
+* New `conformal_sc()`: full conformal inference or the Jackknife+
+  (`procedure = "full"`, the default, or `"jackknife+"`) for synthetic
+  control and other target-date estimators, given as `rule = "sc"` (the
+  default: ridge-simplex synthetic control, `eta = 1e-5`, needs quadprog),
+  `"did"` or a function of the
+  held-out unit's pre-treatment outcomes and the training units'
+  pre-treatment and target-date outcomes. Affine rules get exact sets
+  (a user rule's affinity is checked numerically and at the ends of its
+  set), others a grid with flags when the set reaches its ends. It also gives the set for each treated unit's effect
+  averaged over its post-treatment dates and pre-treatment placebo dates
+  (`diag`). On Proposition 99 and German reunification it reproduces the
+  paper's DID and synthetic control results, full conformal and Jackknife+,
+  to 1e-8. quadprog is added to Suggests.
 
 ## Documentation
 
