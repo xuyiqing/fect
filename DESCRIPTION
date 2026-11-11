@@ -48,6 +48,7 @@ Suggests:
     DIDmultiplegtDYN,
     ggrepel,
     HonestDiDFEct,
+    quadprog,
     withr
 Depends: R (>= 4.1.0)
 LinkingTo: Rcpp, RcppArmadillo
