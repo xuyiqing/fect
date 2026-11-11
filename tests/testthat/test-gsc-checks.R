@@ -75,7 +75,7 @@ test_that("overlap_check(): thousands of donors (long window keys, the active-se
   oc <- overlap_check(Y ~ D, data = d, index = c("id", "time"), max.heldout = 30)
   expect_identical(oc$units$n.donors, rep(2200L, 5))
   expect_true(all(oc$units$status == "ok"))
-  expect_identical(lengths(oc$yard), rep(30L, 5))
+  expect_identical(unname(lengths(oc$yard)), rep(30L, 5))
 })
 
 test_that("overlap_check(): not assessable, and input checks", {
