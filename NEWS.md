@@ -1,4 +1,11 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.5.0
+
+Development version. 2.4.9 remains the CRAN candidate; everything in 2.4.9
+below is part of this version.
+
+## New features
+
 # fect 2.4.9
 
 Development version.

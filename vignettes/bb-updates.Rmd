@@ -1,5 +1,9 @@
 # Changelog {.unnumbered}
 
+## v2.5.0
+
+[Development version, not yet on CRAN.]{.text-muted}
+
 ## v2.4.9
 
 [Development version, not yet on CRAN.]{.text-muted}
