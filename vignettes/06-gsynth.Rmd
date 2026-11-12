@@ -297,11 +297,13 @@ oc <- overlap_check(Y ~ D, data = sim_gsynth, index = c("id", "time"), level = 0
 oc
 ```
 
-One of the five treated units, unit 105, is rebuilt worse than 93% of the donors and is flagged. The table `oc$units` gives each unit's error, its percentile (`pct`) and its weight in the average effect. The check needs no rank and no factor model, so the choice of the rank cannot change it. It is a screen rather than a test. A treated unit is rebuilt from all the donors, while each donor is rebuilt from the others, so the treated unit's error tends to be smaller, and a unit slightly outside what the donors can reproduce may pass. Like every pretreatment check, it cannot detect a factor that does not vary before treatment starts. `plot(oc)` shows each unit's percentile, sized by its weight.
+One of the five treated units, unit 105, is rebuilt worse than 93% of the donors and is flagged. The table `oc$units` gives each unit's error, its percentile (`pct`) and its weight in the average effect. The check needs no rank and no factor model, so the choice of the rank cannot change it. It is a screen rather than a test. A treated unit is rebuilt from all the donors, while each donor is rebuilt from the others, so the treated unit's error tends to be smaller, and a unit slightly outside what the donors can reproduce may pass. Like every pretreatment check, it cannot detect a factor that does not vary before treatment starts. `plot(oc)` draws each treated unit's gap, its demeaned pretreatment outcome minus its rebuild, in each period before adoption.
 
-```{r gsc-check-overlap-plot, fig.width = 7, fig.height = 3}
+```{r gsc-check-overlap-plot, fig.width = 8, fig.height = 5}
 plot(oc)
 ```
+
+The grey lines are the donors' gaps, each donor rebuilt from the others, and the shaded region holds 90% of them in each period. A unit the donors can follow has a gap that stays mostly inside the region and crosses zero at random. A gap that leaves the region often, or that trends or stays on one side of zero near adoption, belongs to a unit the donors cannot follow. Unit 105's gap leaves the region in 6 of its 20 periods, against 1 to 3 for the other units, and its region is pink because it is flagged. `plot(oc, type = "percentile")` draws one row per unit, which suits panels with many treated units.
 
 ### Step 3: choose the rank forward from the treated units
 

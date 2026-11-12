@@ -18,7 +18,7 @@ overlap_check(
 
 \method{print}{fect_overlap}(x, ...)
 
-\method{plot}{fect_overlap}(x, ...)
+\method{plot}{fect_overlap}(x, type = c("gap", "percentile"), units = NULL, ...)
 }
 \arguments{
 \item{formula}{a formula \code{Y ~ D} or \code{Y ~ D + X1 + ...}; the
@@ -42,6 +42,22 @@ random-number state is restored afterwards.}
 \item{x}{an object returned by \code{overlap_check()}.}
 
 \item{...}{ignored.}
+
+\item{type}{\code{"gap"} (default) draws, for each treated unit, its gap
+(demeaned pretreatment outcome minus its rebuild from the donors) in
+each period before its first treated period, over a shaded region that
+holds the donors' own gaps in that period up to the \code{level}
+quantile of their absolute size. A unit whose gap leaves the region in
+several periods, or follows a pattern (a trend, or a run on one side
+of zero) near adoption, is one the donors cannot follow. The flag itself
+compares the unit's error over the whole window with the donors' errors.
+\code{"percentile"} draws each unit's percentile among the donors'
+errors, one row per unit, sized by its weight: the summary view for
+many units.}
+
+\item{units}{for \code{type = "gap"}, the treated units to draw. By
+default all assessable units when there are at most 12, otherwise 12:
+the flagged units first, then those with the largest percentiles.}
 }
 \value{
 An object of class \code{"fect_overlap"}: a list with
@@ -53,7 +69,13 @@ An object of class \code{"fect_overlap"}: a list with
   \code{median} (their median), \code{score} (error over median),
   \code{pct}, \code{flag}, \code{n.periods}, \code{n.donors});
   \code{cohorts} (the same by adoption cohort, with \code{n.units});
-  \code{yard} (each unit's donor errors); \code{summary}; \code{level}.
+  \code{yard} (each unit's donor errors); \code{summary}; \code{level};
+  \code{paths} (for each assessed unit, its gap in each pretreatment
+  period: \code{rows}, \code{rel} (periods relative to its first treated
+  period), \code{gap} and \code{window}); \code{windows} (for each
+  window of periods and donors, the held-out donors' gaps, one column
+  per donor). \code{plot()} draws the gaps (\code{type = "gap"}) or the
+  percentiles (\code{type = "percentile"}).
 }
 \description{
 Checks, before any model is fitted, whether each treated unit's
@@ -95,6 +117,7 @@ pretreatment check, it cannot see a factor that is flat before adoption.
 data(simgsynth)
 oc <- overlap_check(Y ~ D, data = simgsynth, index = c("id", "time"))
 oc
+plot(oc)
 }
 \seealso{
 \code{\link{loading_check}}, \code{\link{fect_rank}}

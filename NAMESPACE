@@ -20,14 +20,14 @@ importFrom("ggplot2", "ggplot_build", "geom_boxplot", "geom_density", "geom_tile
            "guide_legend", "margin", "geom_jitter", "geom_pointrange",
            "guides","xlab","ylab","element_rect","geom_errorbar","geom_linerange",
            "scale_linewidth_manual","geom_polygon","geom_histogram","after_stat",
-           "scale_size_continuous")
+           "scale_size_continuous", "facet_wrap", "theme_minimal", "element_line")
 importFrom("abind", "abind")
 importFrom("mvtnorm", "rmvnorm")
 importFrom("GGally", "ggpairs")
 importFrom("graphics", "plot")
 importFrom("graphics", "hist")
 importFrom("gridExtra", "grid.arrange", "arrangeGrob")
-importFrom("grid", "textGrob", "gpar")
+importFrom("grid", "textGrob", "gpar", "unit")
 importFrom("grDevices", "adjustcolor")
 importFrom("fixest", "feols")
 importFrom(dplyr, "%>%", "group_by", "mutate")

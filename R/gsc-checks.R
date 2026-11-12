@@ -86,15 +86,18 @@
     w
 }
 
-## RMSE of y (length k) rebuilt from the columns of X (k x J) after both are
-## demeaned over the window.
-.gsc_sc_rmse <- function(y, X) {
+## The gap of y (length k) rebuilt from the columns of X (k x J) after both
+## are demeaned over the window: y minus its rebuild, period by period.
+.gsc_sc_gap <- function(y, X) {
     y <- y - mean(y)
     X <- sweep(X, 2, colMeans(X))
-    if (ncol(X) == 1L) return(sqrt(mean((y - X[, 1])^2)))
+    if (ncol(X) == 1L) return(y - X[, 1])
     w <- .gsc_simplex_ls(y, X)
-    sqrt(mean((y - drop(X %*% w))^2))
+    y - drop(X %*% w)
 }
+
+## Its root mean squared error.
+.gsc_sc_rmse <- function(y, X) sqrt(mean(.gsc_sc_gap(y, X)^2))
 
 ## Run `expr` with the RNG seeded, restoring the caller's RNG state.
 .gsc_with_seed <- function(seed, expr) {
@@ -143,22 +146,31 @@
     ## reuse the yardstick of a window already seen (same periods and donors);
     ## the cache is a list searched in full, since a key built from the
     ## indices can exceed R's limit on the length of a name
-    e.co <- NULL
-    for (ce in cache$entries)
-        if (identical(ce$rows, rows) && identical(ce$donors, donors)) {
-            e.co <- ce$e.co
+    win <- 0L
+    for (k in seq_along(cache$entries))
+        if (identical(cache$entries[[k]]$rows, rows) && identical(cache$entries[[k]]$donors, donors)) {
+            win <- k
             break
         }
-    if (is.null(e.co)) {
+    if (!win) {
         held <- donors
         if (length(held) > pars$max.heldout)
             held <- sort(.gsc_with_seed(pars$seed, sample(donors, pars$max.heldout)))
-        e.co <- vapply(held, function(j)
-            .gsc_sc_rmse(Y[rows, j], Y[rows, setdiff(donors, j), drop = FALSE]), 0)
-        cache$entries[[length(cache$entries) + 1L]] <- list(rows = rows, donors = donors, e.co = e.co)
+        ## each held-out donor's gap, period by period (one column per donor)
+        G <- vapply(held, function(j)
+            .gsc_sc_gap(Y[rows, j], Y[rows, setdiff(donors, j), drop = FALSE]),
+            numeric(length(rows)))
+        e.co <- stats::setNames(vapply(seq_along(held), function(m) sqrt(mean(G[, m]^2)), 0),
+                                names(held))
+        cache$entries[[length(cache$entries) + 1L]] <-
+            list(rows = rows, donors = donors, e.co = e.co, gaps = G)
+        win <- length(cache$entries)
     }
-    .of_judge(.gsc_sc_rmse(Y[rows, i], Y[rows, donors, drop = FALSE]), e.co,
-              Y, rows, donors, pars$level, pars$collapse)
+    g <- .gsc_sc_gap(Y[rows, i], Y[rows, donors, drop = FALSE])
+    out <- .of_judge(sqrt(mean(g^2)), cache$entries[[win]]$e.co,
+                     Y, rows, donors, pars$level, pars$collapse)
+    out$path <- list(rows = rows, gap = g, window = win)
+    out
 }
 
 .of_cohort <- function(Y, grp, pre, co, seed, pars) {
@@ -273,12 +285,19 @@
 #'   \code{median} (their median), \code{score} (error over median),
 #'   \code{pct}, \code{flag}, \code{n.periods}, \code{n.donors});
 #'   \code{cohorts} (the same by adoption cohort, with \code{n.units});
-#'   \code{yard} (each unit's donor errors); \code{summary}; \code{level}.
+#'   \code{yard} (each unit's donor errors); \code{summary}; \code{level};
+#'   \code{paths} (for each assessed unit, its gap in each pretreatment
+#'   period: \code{rows}, \code{rel} (periods relative to its first treated
+#'   period), \code{gap} and \code{window}); \code{windows} (for each
+#'   window of periods and donors, the held-out donors' gaps, one column
+#'   per donor). \code{plot()} draws the gaps (\code{type = "gap"}) or the
+#'   percentiles (\code{type = "percentile"}).
 #' @seealso \code{\link{loading_check}}, \code{\link{fect_rank}}
 #' @examples
 #' data(simgsynth)
 #' oc <- overlap_check(Y ~ D, data = simgsynth, index = c("id", "time"))
 #' oc
+#' plot(oc)
 #' @export
 overlap_check <- function(formula, data, index, level = 0.90,
                           max.heldout = 200L, groups = 100L, seed = 1L) {
@@ -332,6 +351,14 @@ overlap_check <- function(formula, data, index, level = 0.90,
         data.frame(unit = ids[tr[k]], onset = onset[k], weight = wt[k],
                    ux[[k]][cols], stringsAsFactors = FALSE)))
     yard <- stats::setNames(lapply(ux, `[[`, "e.co"), ids[tr])
+    ## each assessed unit's gap path (rows relative to its first treated
+    ## period) and, by window, the held-out donors' gaps, for plot()
+    paths <- stats::setNames(lapply(seq_along(tr), function(k) {
+        p <- ux[[k]]$path
+        if (is.null(p)) return(NULL)
+        list(rows = p$rows, rel = p$rows - onset[k], gap = p$gap, window = p$window)
+    }), ids[tr])
+    windows <- lapply(cache$entries, function(ce) list(rows = ce$rows, gaps = ce$gaps))
     cohorts <- do.call(rbind, lapply(sort(unique(onset)), function(o) {
         g <- tr[onset == o]
         x <- .of_cohort(Y, g, seq_len(o - 1L), co, seed = seed - 1L + o, pars)
@@ -349,7 +376,7 @@ overlap_check <- function(formula, data, index, level = 0.90,
         cohorts = nrow(cohorts), cohort.weight.assessable = sum(cohorts$weight[ok.c]),
         cohort.weight.flagged = sum(cohorts$weight[cohorts$flag %in% TRUE]))
     structure(list(units = units, cohorts = cohorts, yard = yard,
-                   summary = summary, level = level),
+                   summary = summary, level = level, paths = paths, windows = windows),
               class = "fect_overlap")
 }
 
@@ -384,27 +411,102 @@ print.fect_overlap <- function(x, ...) {
 }
 
 #' @rdname overlap_check
+#' @param type \code{"gap"} (default) draws, for each treated unit, its gap
+#'   (demeaned pretreatment outcome minus its rebuild from the donors) in
+#'   each period before its first treated period, over a shaded region that
+#'   holds the donors' own gaps in that period up to the \code{level}
+#'   quantile of their absolute size. A unit whose gap leaves the region in
+#'   several periods, or follows a pattern (a trend, or a run on one side
+#'   of zero) near adoption, is one the donors cannot follow. The flag itself
+#'   compares the unit's error over the whole window with the donors' errors.
+#'   \code{"percentile"} draws each unit's percentile among the donors'
+#'   errors, one row per unit, sized by its weight: the summary view for
+#'   many units.
+#' @param units for \code{type = "gap"}, the treated units to draw. By
+#'   default all assessable units when there are at most 12, otherwise 12:
+#'   the flagged units first, then those with the largest percentiles.
 #' @export
-plot.fect_overlap <- function(x, ...) {
+plot.fect_overlap <- function(x, type = c("gap", "percentile"), units = NULL, ...) {
+    type <- match.arg(type)
     u <- x$units[x$units$status == "ok", , drop = FALSE]
     if (!nrow(u)) stop("No assessable treated unit to plot.", call. = FALSE)
-    u <- u[order(u$pct, u$score), ]
-    u$unit <- factor(u$unit, levels = u$unit)
-    u$Flag <- ifelse(u$flag, "flagged", "not flagged")
-    ggplot(u, aes(x = .data$pct, y = .data$unit)) +
-        geom_vline(xintercept = x$level, linetype = "dashed", colour = "grey40") +
-        geom_point(aes(size = .data$weight, colour = .data$Flag)) +
-        scale_colour_manual(values = c(flagged = "#a8003b", `not flagged` = "#004a8c"),
-                            name = NULL) +
-        scale_size_continuous(name = "Weight", range = c(1, 4),
-                              guide = if (length(unique(u$weight)) > 1) "legend" else "none") +
-        scale_x_continuous(limits = c(0, 1)) +
-        labs(x = "Percentile among the donors' errors", y = NULL,
+    cols <- c(flagged = "#a8003b", `not flagged` = "#004a8c")
+    if (type == "percentile") {
+        u <- u[order(u$pct, u$score), ]
+        u$unit <- factor(u$unit, levels = u$unit)
+        u$Flag <- ifelse(u$flag, "flagged", "not flagged")
+        return(ggplot(u, aes(x = .data$pct, y = .data$unit)) +
+            geom_vline(xintercept = x$level, linetype = "dashed", colour = "grey40") +
+            geom_point(aes(size = .data$weight, colour = .data$Flag)) +
+            scale_colour_manual(values = cols, name = NULL) +
+            scale_size_continuous(name = "Weight", range = c(1, 4),
+                                  guide = if (length(unique(u$weight)) > 1) "legend" else "none") +
+            scale_x_continuous(limits = c(0, 1)) +
+            labs(x = "Percentile among the donors' errors", y = NULL,
+                 title = "Overlap check without a rank",
+                 subtitle = sprintf("%d of %d assessable units flagged at level %s",
+                                    sum(u$flag), nrow(u), format(x$level))) +
+            theme_bw() +
+            theme(axis.text.y = if (nrow(u) > 40) element_blank() else element_text()))
+    }
+    if (is.null(x$paths))
+        stop("This object has no gap paths (made by an earlier version); run overlap_check() again.",
+             call. = FALSE)
+    if (is.null(units)) {
+        o <- u[order(!u$flag, -u$pct, -u$score), ]
+        units <- utils::head(o$unit, 12L)
+        if (nrow(u) > 12L)
+            message(sprintf("Showing 12 of %d assessable units (flagged first, then the largest percentiles); choose others with units = .",
+                            nrow(u)))
+    } else {
+        units <- as.character(units)
+        bad <- setdiff(units, u$unit)
+        if (length(bad))
+            stop("Not an assessable treated unit: ", paste(bad, collapse = ", "), call. = FALSE)
+    }
+    u <- u[match(units, u$unit), ]
+    lab <- sprintf("%s: percentile %.2f%s", u$unit, u$pct, ifelse(u$flag, ", flagged", ""))
+    parts <- lapply(seq_len(nrow(u)), function(k) {
+        p <- x$paths[[u$unit[k]]]
+        G <- x$windows[[p$window]]$gaps
+        band <- apply(abs(G), 1, stats::quantile, probs = x$level, names = FALSE)
+        list(unit = data.frame(unit = lab[k], rel = p$rel, gap = p$gap, hi = band,
+                               Flag = if (u$flag[k]) "flagged" else "not flagged"),
+             donors = data.frame(unit = lab[k], rel = rep(p$rel, ncol(G)), gap = c(G),
+                                 donor = rep(seq_len(ncol(G)), each = nrow(G))))
+    })
+    d <- do.call(rbind, lapply(parts, `[[`, "unit"))
+    g <- do.call(rbind, lapply(parts, `[[`, "donors"))
+    d$unit <- factor(d$unit, levels = lab)
+    g$unit <- factor(g$unit, levels = lab)
+    ## fainter donor lines when there are many, so the region stays visible
+    a <- min(0.25, 8 / max(g$donor))
+    ggplot(d, aes(x = .data$rel)) +
+        geom_line(data = g, aes(y = .data$gap, group = .data$donor),
+                  colour = "grey40", alpha = a, linewidth = 0.3) +
+        ## the region is pink for a flagged unit (its error exceeds the threshold)
+        geom_ribbon(aes(ymin = -.data$hi, ymax = .data$hi, fill = .data$Flag), alpha = 0.12) +
+        geom_line(aes(y = .data$hi, colour = .data$Flag), alpha = 0.5, linewidth = 0.3) +
+        geom_line(aes(y = -.data$hi, colour = .data$Flag), alpha = 0.5, linewidth = 0.3) +
+        geom_hline(yintercept = 0, colour = "grey40", linewidth = 0.3) +
+        geom_line(aes(y = .data$gap, colour = .data$Flag), linewidth = 0.9) +
+        scale_colour_manual(values = cols, guide = "none") +
+        scale_fill_manual(values = cols, guide = "none") +
+        facet_wrap(~ unit, ncol = min(3L, nrow(u))) +
+        labs(x = "Period relative to the first treated period",
+             y = "Gap: actual minus rebuilt (demeaned)",
              title = "Overlap check without a rank",
-             subtitle = sprintf("%d of %d assessable units flagged at level %s",
-                                sum(u$flag), nrow(u), format(x$level))) +
-        theme_bw() +
-        theme(axis.text.y = if (nrow(u) > 40) element_blank() else element_text())
+             subtitle = sprintf(paste0("Grey lines: each donor rebuilt from the others. ",
+                                       "Shaded: where %s%% of their gaps lie in each period.\n",
+                                       "Flagged (red, pink region): the unit's error over the whole window exceeds %s%% of the donors'"),
+                                format(100 * x$level), format(100 * x$level))) +
+        theme_minimal(base_size = 11) +
+        theme(strip.text = element_text(hjust = 0, face = "bold", size = 10),
+              panel.grid.minor = element_blank(),
+              panel.grid.major = element_line(colour = "grey92", linewidth = 0.3),
+              panel.spacing = unit(1, "lines"),
+              plot.subtitle = element_text(colour = "grey30", size = 9.5),
+              plot.background = element_rect(fill = "white", colour = NA))
 }
 
 ## ---------------------------------------------------------------------------

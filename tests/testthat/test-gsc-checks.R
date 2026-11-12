@@ -45,7 +45,20 @@ test_that("overlap_check(): tables, weights, flags and the caller's RNG", {
   expect_identical(oc$level, 0.90)
   expect_true(all(u$onset == 21))
   expect_output(print(oc), "Overlap check without a rank")
+  ## the gap paths behind plot(): each unit's gap has the unit's error as its
+  ## RMSE, ends at the period before adoption, and its window's donor gaps
+  ## have the donors' errors as their RMSEs
+  for (k in seq_len(nrow(u))) {
+    p <- oc$paths[[u$unit[k]]]
+    expect_equal(sqrt(mean(p$gap^2)), u$error[k], tolerance = 1e-12)
+    expect_identical(p$rel, -20:-1)
+    G <- oc$windows[[p$window]]$gaps
+    expect_equal(unname(sqrt(colMeans(G^2))), unname(oc$yard[[u$unit[k]]]), tolerance = 1e-12)
+  }
   expect_s3_class(plot(oc), "ggplot")
+  expect_s3_class(plot(oc, type = "percentile"), "ggplot")
+  expect_s3_class(plot(oc, units = u$unit[1]), "ggplot")
+  expect_error(plot(oc, units = "999"), "assessable")
 })
 
 test_that("overlap_check(): a level shift of a treated unit changes nothing", {
