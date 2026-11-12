@@ -14,8 +14,8 @@
 ##                    outside the range of the observed outcomes.
 ##
 ## The reference implementation is the paper's replication code
-## (R/overlap_free.R and R/rank_rule.R); tests/testthat/test-gsc-reference.R
-## compares the two when the replication code is available.
+## (R/overlap_free.R and R/rank_rule.R). The 2.5.0 run log in workbench
+## (statsclaw-workspace/fect/runs/) records the comparison on the paper's cases.
 
 ## ---------------------------------------------------------------------------
 ## Least squares on the simplex

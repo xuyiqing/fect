@@ -1,6 +1,5 @@
 ## fect 2.5.0: the gsynth-revisit steps (R/gsc-checks.R, R/gsc-rank.R,
-## R/ife-boot.R). Fast unit tests; the comparisons with the paper's
-## replication code are in test-gsc-reference.R.
+## R/ife-boot.R). Fast unit tests on simulated data shipped with fect.
 
 data(simgsynth, package = "fect")
 
