@@ -822,38 +822,29 @@ print(out.cf)
 
 The block interval for the average effect runs from `r round(out.cf$est.avg[1, "CI.lower"], 2)` to `r round(out.cf$est.avg[1, "CI.upper"], 2)`. The 90% normal interval from the parametric bootstrap in Step 3 runs from `r round(out.fwd$est.avg[1, "ATT.avg"] - qnorm(0.95) * out.fwd$est.avg[1, "S.E."], 2)` to `r round(out.fwd$est.avg[1, "ATT.avg"] + qnorm(0.95) * out.fwd$est.avg[1, "S.E."], 2)`. The p-value, `r round(out.cf$est.avg[1, "p.value"], 2)`, is the smallest possible with nine blocks ($1/N$ with $N = 10$). There are no standard errors. When both intervals are reported and they disagree, the parametric one depends on the model of the errors, and the conformal one on the comparison with the controls.
 
-The plot compares the two 90% intervals in each period, from ten periods before treatment to ten after.
+The two gap plots show the same estimates with 90% intervals, from ten periods before treatment to ten after: the parametric bootstrap on the left and the conformal intervals on the right.
 
-```{r gsc-conformal-plot, fig.width = 7, fig.height = 4.2}
-library(ggplot2)
-post <- function(m) m[as.numeric(rownames(m)) >= -9, , drop = FALSE]
-pb <- post(out.fwd$est.att)
-cf <- post(out.cf$est.att)
-z <- qnorm(0.95)
-ci <- rbind(
-  data.frame(t = as.numeric(rownames(pb)), att = pb[, "ATT"],
-             lo = pb[, "ATT"] - z * pb[, "S.E."], hi = pb[, "ATT"] + z * pb[, "S.E."],
-             type = "Parametric bootstrap"),
-  data.frame(t = as.numeric(rownames(cf)), att = cf[, "ATT"],
-             lo = cf[, "CI.lower"], hi = cf[, "CI.upper"],
-             type = "Conformal (block Jackknife+)"))
-ci$type <- factor(ci$type, levels = c("Parametric bootstrap", "Conformal (block Jackknife+)"))
-ggplot(ci, aes(x = t, y = att, ymin = lo, ymax = hi, colour = type)) +
-  geom_hline(yintercept = 0, colour = "grey60") +
-  geom_vline(xintercept = 0.5, linetype = "dashed", colour = "grey50") +
-  geom_pointrange(position = position_dodge(width = 0.5), shape = 21,
-                  fill = "white", size = 0.3, linewidth = 0.6) +
-  scale_colour_manual(values = c("grey50", "#004a8c"), name = NULL) +
-  scale_x_continuous(breaks = seq(-9, 10, by = 1)) +
-  labs(x = "Periods since treatment", y = "Effect on Y (90% intervals)") +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom", panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_blank())
+```{r gsc-conformal-plot, fig.width = 9, fig.height = 4, message = FALSE}
+library(gridExtra)
+p.pb <- plot(out.fwd, type = "gap", plot.ci = "0.9", xlim = c(-9, 10),
+             ylim = c(-3, 11.5), main = "Parametric bootstrap")
+p.cf <- plot(out.cf, type = "gap", xlim = c(-9, 10), ylim = c(-3, 11.5),
+             main = "Conformal (block Jackknife+)")
+## drop the plot's note on the blocks and the pre-treatment intervals,
+## so that the two panels have the same height
+grid.arrange(p.pb, p.cf + ggplot2::labs(caption = NULL), ncol = 2)
 ```
 
-With nine blocks, each conformal interval is set by the most extreme of the nine blocks' errors at that date, so its width changes more from period to period than the parametric interval's. After treatment, it is wider in `r with(subset(ci, t >= 1), sum((hi - lo)[type != "Parametric bootstrap"] > (hi - lo)[type == "Parametric bootstrap"]))` of the 10 periods, most of all in periods 1, 5 and 8. In period 1 it includes zero, and the parametric interval, just above zero, does not.
+```{r gsc-conformal-widths, include = FALSE}
+post <- function(m) m[as.numeric(rownames(m)) >= 1, , drop = FALSE]
+w.pb <- with(as.data.frame(post(out.fwd$est.att90)), CI.upper - CI.lower)
+w.cf <- with(as.data.frame(post(out.cf$est.att)), CI.upper - CI.lower)
+pre.cf <- out.cf$est.att[as.numeric(rownames(out.cf$est.att)) %in% -9:0, , drop = FALSE]
+```
 
-Before treatment, the two show different things. The parametric points are the fit's in-sample residuals, averaged over the treated units. The conformal points are out-of-sample prediction errors: each period's outcome is predicted from earlier periods and the controls, as if treatment had started then. Both should be near zero. The conformal interval excludes zero in `r with(subset(ci, t <= 0 & type != "Parametric bootstrap"), sum(lo > 0 | hi < 0))` of the 10 pretreatment periods, about what chance gives at `alpha = 0.1`; a run of such periods would say the treated units were harder to predict than the controls.
+With nine blocks, each conformal interval is set by the most extreme of the nine blocks' errors at that date, so its width changes more from period to period than the parametric interval's. After treatment, it is wider in `r sum(w.cf > w.pb)` of the 10 periods, most of all in periods 1, 5 and 8. In period 1 it includes zero, and the parametric interval, just above zero, does not.
+
+Before treatment, the two show different things. The parametric points are the fit's in-sample residuals, averaged over the treated units. The conformal points are out-of-sample prediction errors: each period's outcome is predicted from earlier periods and the controls, as if treatment had started then. Both should be near zero. The conformal interval excludes zero in `r sum(pre.cf[, "CI.lower"] > 0 | pre.cf[, "CI.upper"] < 0)` of the 10 pretreatment periods, about what chance gives at `alpha = 0.1`; a run of such periods would say the treated units were harder to predict than the controls.
 
 Three of the five checks bear on the conformal guarantee.
 

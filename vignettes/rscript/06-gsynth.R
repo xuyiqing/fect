@@ -404,31 +404,22 @@ out.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
 print(out.cf)
 
 
-## ----gsc-conformal-plot, fig.width = 7, fig.height = 4.2----------------------
-library(ggplot2)
-post <- function(m) m[as.numeric(rownames(m)) >= -9, , drop = FALSE]
-pb <- post(out.fwd$est.att)
-cf <- post(out.cf$est.att)
-z <- qnorm(0.95)
-ci <- rbind(
-  data.frame(t = as.numeric(rownames(pb)), att = pb[, "ATT"],
-             lo = pb[, "ATT"] - z * pb[, "S.E."], hi = pb[, "ATT"] + z * pb[, "S.E."],
-             type = "Parametric bootstrap"),
-  data.frame(t = as.numeric(rownames(cf)), att = cf[, "ATT"],
-             lo = cf[, "CI.lower"], hi = cf[, "CI.upper"],
-             type = "Conformal (block Jackknife+)"))
-ci$type <- factor(ci$type, levels = c("Parametric bootstrap", "Conformal (block Jackknife+)"))
-ggplot(ci, aes(x = t, y = att, ymin = lo, ymax = hi, colour = type)) +
-  geom_hline(yintercept = 0, colour = "grey60") +
-  geom_vline(xintercept = 0.5, linetype = "dashed", colour = "grey50") +
-  geom_pointrange(position = position_dodge(width = 0.5), shape = 21,
-                  fill = "white", size = 0.3, linewidth = 0.6) +
-  scale_colour_manual(values = c("grey50", "#004a8c"), name = NULL) +
-  scale_x_continuous(breaks = seq(-9, 10, by = 1)) +
-  labs(x = "Periods since treatment", y = "Effect on Y (90% intervals)") +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom", panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_blank())
+## ----gsc-conformal-plot, fig.width = 9, fig.height = 4, message = FALSE-------
+library(gridExtra)
+p.pb <- plot(out.fwd, type = "gap", plot.ci = "0.9", xlim = c(-9, 10),
+             ylim = c(-3, 11.5), main = "Parametric bootstrap")
+p.cf <- plot(out.cf, type = "gap", xlim = c(-9, 10), ylim = c(-3, 11.5),
+             main = "Conformal (block Jackknife+)")
+## drop the plot's note on the blocks and the pre-treatment intervals,
+## so that the two panels have the same height
+grid.arrange(p.pb, p.cf + ggplot2::labs(caption = NULL), ncol = 2)
+
+
+## ----gsc-conformal-widths, include = FALSE------------------------------------
+post <- function(m) m[as.numeric(rownames(m)) >= 1, , drop = FALSE]
+w.pb <- with(as.data.frame(post(out.fwd$est.att90)), CI.upper - CI.lower)
+w.cf <- with(as.data.frame(post(out.cf$est.att)), CI.upper - CI.lower)
+pre.cf <- out.cf$est.att[as.numeric(rownames(out.cf$est.att)) %in% -9:0, , drop = FALSE]
 
 
 ## ----gsc-conformal-ranks, cache = TRUE, message = FALSE-----------------------
