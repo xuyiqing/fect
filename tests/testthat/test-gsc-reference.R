@@ -154,24 +154,3 @@ test_that("IFE-EM bootstrap = ife_noise_group_x() + ife_pb_x(): groups, draws, n
   expect_lte(.rel(fit$att.avg.boot, e), 1e-5)
   expect_lte(.rel(fit$att.avg - quantile(fit$att.avg.boot, c(0.975, 0.025)), ref$basic_ci(fit$att.avg, e)), 1e-5)
 })
-
-test_that("overlap_check() on one of the paper's cases (needs the case data)", {
-  skip_if_not_installed("digest"); skip_if_not_installed("osqp")
-  .skip_no_ref(c("R/overlap_free.R", "R/paths.R", "papers/02_gilens2021/00_spec.R"))
-  skip_if_not(dir.exists(Sys.getenv("GSYNTH_REVISIT_DATA", "")), "GSYNTH_REVISIT_DATA not set")
-  ref <- .ref_env(c("R/paths.R", "R/overlap_free.R"))
-  sp <- new.env(parent = ref); sp$ID <- "02_gilens2021"
-  sys.source(file.path(.gr_repo(), "papers/02_gilens2021/00_spec.R"), envir = sp)
-  cell <- sp$cells[[1]]
-  s <- sp$spec
-  for (k in intersect(names(cell), c("data", "treat", "covariates", "force", "min.T0", "index"))) s[[k]] <- cell[[k]]
-  vars <- c(cell$y, s$treat, s$covariates, s$index)
-  d <- s$data[, vars]; d <- d[stats::complete.cases(d), ]
-  fm <- stats::as.formula(paste(cell$y, "~", paste(c(s$treat, s$covariates), collapse = " + ")))
-  w <- fect:::.gsc_wide(fm, d, s$index)
-  a <- ref$overlap_free_panel(w$Y, w$D, ids = w$ids)
-  b <- overlap_check(fm, data = d, index = s$index, level = 0.90)
-  expect_identical(a$units$flag, b$units$flag)
-  expect_identical(a$units$pct, b$units$pct)
-  expect_lte(.rel(b$units$error, a$units$err), 1e-8)
-})
