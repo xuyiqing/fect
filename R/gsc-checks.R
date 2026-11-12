@@ -396,7 +396,8 @@ plot.fect_overlap <- function(x, ...) {
         geom_point(aes(size = .data$weight, colour = .data$Flag)) +
         scale_colour_manual(values = c(flagged = "#a8003b", `not flagged` = "#004a8c"),
                             name = NULL) +
-        scale_size_continuous(name = "Weight", range = c(1, 4)) +
+        scale_size_continuous(name = "Weight", range = c(1, 4),
+                              guide = if (length(unique(u$weight)) > 1) "legend" else "none") +
         scale_x_continuous(limits = c(0, 1)) +
         labs(x = "Percentile among the donors' errors", y = NULL,
              title = "Overlap check without a rank",
@@ -771,7 +772,7 @@ plot.fect_loading <- function(x, ...) {
     }
     p + labs(title = sprintf("Loadings at r = %d", x$r),
              subtitle = paste0("Grey: controls (loadings from their first ", x$window,
-                               " periods). Flagged: outside the hull by more than the noise allows",
+                               " periods).\nFlagged: outside the hull by more than the noise allows",
                                if (ncol(co) > 2) "; first two factors shown" else "")) +
         theme_bw()
 }
