@@ -1,5 +1,5 @@
-## fect 2.5.0: the gsynth-revisit steps (R/gsc-checks.R, R/gsc-rank.R,
-## R/ife-boot.R). Fast unit tests on simulated data shipped with fect.
+## fect 2.5.0: the gsynth-revisit steps (R/gsc-checks.R, R/gsc-rank.R).
+## Fast unit tests on simulated data shipped with fect.
 
 data(simgsynth, package = "fect")
 
@@ -205,77 +205,4 @@ test_that("loading_check(trim = TRUE) drops the flagged unit, chooses the rank a
   ## data given explicitly
   lc2 <- loading_check(fit, trim = TRUE, data = d)
   expect_identical(lc2$trim$est, lc$trim$est)
-})
-
-test_that("IFE-EM bootstrap: runs, records its settings, and is reproducible", {
-  skip_on_cran()
-  run <- function(...) suppressWarnings(suppressMessages(
-    fect(Y ~ D + X1, data = simgsynth, index = c("id", "time"), method = "ife", r = 2, CV = FALSE,
-         se = TRUE, vartype = "parametric", nboots = 20, seed = 7, keep.sims = TRUE, ...)))
-  f1 <- run(parallel = FALSE)
-  ib <- f1$ife.boot
-  expect_identical(ib$r, 2L)
-  expect_identical(ib$r.noise, 1L)                         # 45 controls: one factor fewer
-  expect_identical(ib$G, 30L)
-  expect_identical(length(ib$groups), 45L)
-  expect_identical(sort(unique(ib$groups)), 1:30)
-  expect_identical(dim(ib$noise), c(30L, 45L))
-  expect_identical(dim(ib$draws), c(20L, 50L))
-  expect_true(all(is.finite(f1$att.avg.boot)))
-  expect_true(is.finite(f1$est.avg[1, "S.E."]))
-  expect_identical(f1$vartype, "parametric")
-  ## the draws center on zero (no effect in the bootstrap panel), not on the estimate
-  expect_lt(abs(mean(f1$att.avg.boot)), abs(f1$att.avg))
-  f2 <- run(parallel = FALSE)
-  expect_identical(f2$att.avg.boot, f1$att.avg.boot)
-  f3 <- run(parallel = TRUE, cores = 2)
-  expect_identical(f3$ife.boot$draws, f1$ife.boot$draws)
-  expect_equal(f3$att.avg.boot, f1$att.avg.boot, tolerance = 1e-10)
-})
-
-test_that("IFE-EM bootstrap: noise vectors are leave-group-out residuals", {
-  skip_on_cran()
-  set.seed(1)
-  T <- 12; N <- 14; r <- 1
-  F <- matrix(rnorm(T), T, 1); L <- matrix(rnorm(N), N, 1)
-  Y <- F %*% t(L) + outer(rnorm(T), rep(1, N)) + outer(rep(1, T), rnorm(N)) + matrix(rnorm(T * N), T, N)
-  D <- matrix(0, T, N); D[9:T, 1:2] <- 1
-  I <- matrix(1, T, N); II <- (D == 0) * 1
-  T.on <- matrix(NA, T, N)
-  co <- 3:N
-  set.seed(5)
-  out <- fect:::.ife_noise_group(Y, NULL, D, I, II, T.on, co, r.noise = 0L, G = 30L, force = 3,
-                                 tol = 1e-10, max.iteration = 5000)
-  expect_identical(out$groups, seq_along(co))              # 12 controls: one per group
-  ## r.noise = 0: control j's noise is its outcome net of the refit's time
-  ## effects (fitted without j), demeaned, times sqrt(T / (T - 1))
-  j <- 1
-  keep <- setdiff(1:N, co[j])
-  f <- fect:::fect_fe(Y = Y[, keep], X = NULL, D = D[, keep], W = NULL, I = I[, keep], II = II[, keep],
-                      T.on = T.on[, keep], r.cv = 0, force = 3, hasRevs = 0, tol = 1e-10,
-                      max.iteration = 5000, boot = TRUE)
-  R <- Y[, co[j]] - as.numeric(f$mu) - as.vector(f$xi)
-  e <- (R - mean(R)) * sqrt(T / (T - 1))
-  expect_equal(out$E[, j], e, tolerance = 1e-8)
-})
-
-test_that("IFE-EM bootstrap: one factor with 30 or more controls takes noise at rank 0", {
-  skip_on_cran()
-  f <- suppressWarnings(suppressMessages(
-    fect(Y ~ D, data = simgsynth, index = c("id", "time"), method = "ife", r = 1, CV = FALSE, se = TRUE,
-         vartype = "parametric", nboots = 5, seed = 1, parallel = FALSE)))
-  expect_identical(f$ife.boot$r.noise, 0L)
-  expect_true(all(is.finite(f$att.avg.boot)))
-  expect_false(anyNA(f$ife.boot$noise))
-})
-
-test_that("IFE-EM bootstrap: settings it does not take", {
-  skip_on_cran()
-  base <- list(formula = Y ~ D, data = simgsynth, index = c("id", "time"), method = "ife", r = 1,
-               se = TRUE, vartype = "parametric", nboots = 5, parallel = FALSE)
-  expect_error(do.call(fect, c(base, list(force = "time"))), "unit")
-  expect_error(do.call(fect, c(base, list(placeboTest = TRUE, placebo.period = c(-2, 0)))), "placebo")
-  ## method = "fe" keeps the old gate
-  expect_error(fect(Y ~ D, data = simgsynth, index = c("id", "time"), method = "fe", se = TRUE,
-                    vartype = "parametric", nboots = 5, parallel = FALSE), "nevertreated")
 })

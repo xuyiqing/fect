@@ -71,7 +71,7 @@ Some combinations of options are changed by `fect()` before it fits, and some st
 | **Setting** | **What fect does** | **Notice** |
 |:------------|:-------------------|:--------------|
 | `se = FALSE` (the default) | Ignores `nboots`, `vartype`, `cl`, `ci.method` and `keep.sims`. | nothing |
-| `vartype = "parametric"` | Needs `time.component.from = "nevertreated"` (as with `"gsynth"`), no treatment reversal, a method other than `"mc"` or `"both"`, and at least two never-treated units. Otherwise stops. Ignores `cl`. The exception (v2.5.0): `method = "ife"` with `"notyettreated"` runs the experimental IFE-EM bootstrap, which needs `force = "unit"` or `"two-way"` and stops with weights, `cm`, placebo or carryover tests. | error; warning for `cl`; message for IFE-EM |
+| `vartype = "parametric"` | Needs `time.component.from = "nevertreated"` (as with `"gsynth"`), no treatment reversal, a method other than `"mc"` or `"both"`, and at least two never-treated units. Otherwise stops. Ignores `cl`. | error; warning for `cl` |
 | `cv.method = "forward"` | GSC only (`"gsynth"`, or `"ife"` with `"nevertreated"`), and needs `CV = TRUE` or a range in `r`. Chooses the rank with `fect_rank()`'s forward rule, then fits at it. Otherwise stops. | error; message with the pick |
 | `vartype = "conformal"` | Needs `method` `"fe"` (full conformal sets; no covariates, `force` not `"none"`, no `conformal.block` or `conformal.relabel`), `"gsynth"`, `"ife"` or `"mc"`, an absorbing treatment, at least two never-treated units, and `0 < alpha < 1`. Stops with weights, `group`, `balance.period`, placebo, carryover, `loo`, permutation tests, `cm`, extra fixed effects, binary outcomes or `loading.bound`. Ignores `cl`. `S.E.` is `NA`. | error; warning for `cl` |
 | `para.error` with `vartype` other than `"parametric"` | Ignored. | nothing |
@@ -107,7 +107,7 @@ Some combinations of options are changed by `fect()` before it fits, and some st
 | `test.out` | The F test and equivalence tests of the pre-treatment estimates (`f.p`, `f.equiv.p`, `tost.equiv.p`), or the placebo or carryover test (`placebo.p`, `placebo.equiv.p`; `carryover.p`, `carryover.equiv.p`). |
 | `est.placebo`, `est.carryover` | The placebo or carryover ATT with its S.E., interval, p-value and 90% interval. |
 | `r.cv`, `lambda.cv`, `CV.out` | The chosen number of factors or `lambda`, and the cross-validation scores of each candidate. |
-| `rank.forward`, `ife.boot` | (v2.5.0) With `cv.method = "forward"`, the forward rule's table; with the IFE-EM bootstrap, its settings and noise vectors. |
+| `rank.forward` | (v2.5.0) With `cv.method = "forward"`, the forward rule's table. |
 | `beta`, `est.beta` | Covariate coefficients, and with `se = TRUE` their inference. |
 | `remove.id`, `obs.missing` | Units removed before fitting, and a T by N code of each cell (1 treated, 2 untreated, 3 missing, 4 removed unit, 5 held out for a test, 6 removed by `carryover.rm`). |
 

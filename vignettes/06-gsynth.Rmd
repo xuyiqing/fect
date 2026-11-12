@@ -182,20 +182,7 @@ plot(lc)
 
 With few treated units, use the parametric bootstrap (`vartype = "parametric"`, Algorithm 2 of @Xu2017, as in `out.fwd` above). It simulates each treated unit's prediction error with the prediction errors of controls left out of the factor fit. Use it with caution when the controls are few relative to the treated units or to the rank. The interval at the chosen rank does not account for the choice of the rank. Conformal intervals are a second option, with a finite-sample guarantee under their own conditions ([Section @sec-gsynth-conformal]).
 
-For IFE-EM (`method = "ife"`, factors from all untreated cells), Algorithm 2 does not apply, because the factors depend on the treated units' own pretreatment errors. Since version 2.5.0, `vartype = "parametric"` with `method = "ife"` runs the experimental bootstrap of @iwasakixu2026overlap instead. It regenerates the whole panel from the fitted model plus noise vectors taken from controls left out of the fit, and refits IFE-EM in every draw. It has not been proved valid. In the paper's simulations with one treated unit and 30 or more controls, its 95% intervals cover 95% to 99% of the time at the true rank with noise vectors from full-rank fits, and 94% to 95% with fect's default noise vectors (two panels). With one factor too many, they cover 92% to 97%. With 7 or 10 controls and one factor too many, they cover less than 93%. Each draw refits IFE-EM, so it costs 20 to 30 times as much as Algorithm 2. See "IFE-EM bootstrap" in `?fect`.
-
-```{r gsc-check-ifeboot, cache = TRUE, message = FALSE}
-out.ife <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
-                method = "ife", force = "two-way", r = 2, se = TRUE,
-                vartype = "parametric", nboots = 200, seed = 1234,
-                parallel = TRUE, cores = 16)
-out.ife$est.avg
-out.ife$ife.boot[c("r", "r.noise", "G")]
-```
-
-The interval printed here is fect's default normal interval. The coverage figures above are for the paper's basic interval on the draws as they are, `out.ife$att.avg - quantile(out.ife$att.avg.boot, c(0.975, 0.025))`; `ci.method = "basic"` recenters the draws at the estimate first, so it differs from the paper's by the mean of the draws.
-
-With 30 or more controls (here 45), fect takes the noise vectors from fits with one factor fewer (`r.noise = 1`), because a rank above the true one absorbs part of the noise and makes the vectors too small. Do not rely on a rank at which IFE-EM has not converged; `out.ife$convergence$converged` reports whether the fit met `tol` before `max.iteration` rounds.
+For IFE-EM (`method = "ife"`, factors from all untreated cells), Algorithm 2 does not apply, because the factors depend on the treated units' own pretreatment errors, and `vartype = "parametric"` stops with an error. With few treated units, use GSC with Algorithm 2, or conformal intervals, which also work with IFE-EM ([Section @sec-gsynth-conformal]). The unit bootstrap and the jackknife rely on variation across treated units and do not solve the problem when there are few.
 
 ### Step 5: report
 
@@ -805,8 +792,6 @@ V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X,
 $$
 
 It uses prediction errors from controls left out of the factor fit. Its limitations, including few controls and uncertainty from rank selection, are described in Step 4 of [Section @sec-gsynth-checks].
-
-For IFE-EM, version 2.5.0 adds a different experimental bootstrap under `vartype = "parametric"`. It regenerates the whole panel using noise from controls left out of refits, then refits IFE-EM. It has not been proved valid. See Step 4 for its simulation evidence and cost.
 
 For the GSC parametric bootstrap, `para.error`, introduced in v2.4.2, selects the error resampling path. `"auto"` uses `"empirical"` on fully observed panels and `"ar"` when outcomes are missing. The other options are `"ar"`, the v2.4.1 behavior, `"empirical"`, and `"wild"`. See [Chapter @sec-inference] for the interaction of `vartype`, `ci.method`, and `para.error`, bootstrap mechanics, and the coverage study.
 

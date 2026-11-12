@@ -29,36 +29,23 @@ make_gate_fixture <- function(seed = 42) {
   invisible(TRUE)
 }
 
-## 2.5.0: method = "ife" with time.component.from = "notyettreated" and
-## vartype = "parametric" runs the IFE-EM bootstrap (it stopped before 2.5.0).
-.run_ife_em_boot <- function(expr) {
-  msgs <- character()
-  out <- withCallingHandlers(suppressWarnings(expr), message = function(m) {
-    msgs <<- c(msgs, conditionMessage(m)); invokeRestart("muffleMessage")
-  })
-  list(out = out, msgs = msgs)
-}
-.expect_ife_em_boot <- function(res) {
-  expect_s3_class(res$out, "fect")
-  expect_true(any(grepl("IFE-EM", res$msgs)))
-  expect_false(is.null(res$out$ife.boot))
-  expect_true(is.finite(res$out$att.avg))
-  expect_true(all(is.finite(res$out$est.avg)))
-}
-
 ## ============================================================
 ## POSITIVE-FIRE TESTS: gate fires for invalid combinations
 ## ============================================================
 
-test_that("NGP-1: ife + vartype='parametric' + default factors.from runs the IFE-EM bootstrap (2.5.0)", {
+test_that("NGP-1: ife + vartype='parametric' + default factors.from errors", {
   skip_on_cran()
   d <- make_gate_fixture()
-  .expect_ife_em_boot(.run_ife_em_boot(fect(
+  expect_error(
+    fect(
       Y ~ D, data = d, index = c("id", "time"),
       method = "ife", r = 1, se = TRUE,
       vartype = "parametric", nboots = 10,
       CV = FALSE, parallel = FALSE
-  )))
+    ),
+    regexp = "parametric",
+    ignore.case = TRUE
+  )
 })
 
 test_that("NGP-2: cfe + vartype='parametric' + default factors.from errors", {
@@ -76,25 +63,28 @@ test_that("NGP-2: cfe + vartype='parametric' + default factors.from errors", {
   )
 })
 
-test_that("NGP-3: ife + vartype='parametric' + explicit factors.from='notyettreated' runs the IFE-EM bootstrap (2.5.0)", {
+test_that("NGP-3: ife + vartype='parametric' + explicit factors.from='notyettreated' errors", {
   skip_on_cran()
   d <- make_gate_fixture()
-  .expect_ife_em_boot(.run_ife_em_boot(fect(
+  expect_error(
+    fect(
       Y ~ D, data = d, index = c("id", "time"),
       method = "ife", time.component.from = "notyettreated",
       r = 1, se = TRUE, vartype = "parametric", nboots = 10,
       CV = FALSE, parallel = FALSE
-  )))
+    ),
+    regexp = "parametric",
+    ignore.case = TRUE
+  )
 })
 
 test_that("NGP-4: error message mentions both an alternative (nevertreated or bootstrap or jackknife)", {
   skip_on_cran()
   d <- make_gate_fixture()
-  ## 2.5.0: method = "cfe" runs the IFE-EM bootstrap here; "cfe" still stops
   expect_error(
     fect(
       Y ~ D, data = d, index = c("id", "time"),
-      method = "cfe", r = 1, se = TRUE,
+      method = "ife", r = 1, se = TRUE,
       vartype = "parametric", nboots = 10,
       CV = FALSE, parallel = FALSE
     ),

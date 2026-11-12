@@ -2899,29 +2899,7 @@ fect.default <- function(
     ## actionable reversal message first. Uses method_arg (saved before the
     ## silent fe -> ife coercion) so the message names the user's literal
     ## method argument.
-    ## 2.5.0: method = "ife" with time.component.from = "notyettreated" (IFE-EM)
-    ## runs the experimental IFE-EM parametric bootstrap (R/ife-boot.R).
-    ife.em.boot <- se == 1 && vartype == "parametric" &&
-        time.component.from == "notyettreated" && identical(method_arg, "ife") &&
-        identical(method, "ife") && binary == 0
-    if (ife.em.boot) {
-        if (!force %in% c(1, 3)) {
-            stop("The IFE-EM bootstrap (vartype = \"parametric\" with method = \"ife\") ",
-                 "needs force = \"unit\" or \"two-way\".", call. = FALSE)
-        }
-        if (!is.null(W)) {
-            stop("The IFE-EM bootstrap does not take weights.", call. = FALSE)
-        }
-        if (isTRUE(placeboTest) || isTRUE(carryoverTest)) {
-            stop("The IFE-EM bootstrap does not run placebo or carryover tests; ",
-                 "use vartype = \"bootstrap\" or \"jackknife\" for them.", call. = FALSE)
-        }
-        if (isTRUE(cm)) {
-            stop("The IFE-EM bootstrap does not take cm = TRUE.", call. = FALSE)
-        }
-    }
-    if (se == 1 && vartype == "parametric" && time.component.from != "nevertreated" &&
-        !ife.em.boot) {
+    if (se == 1 && vartype == "parametric" && time.component.from != "nevertreated") {
         stop(sprintf(
             paste0(
                 "vartype = \"parametric\" requires time.component.from = \"nevertreated\".\n",
@@ -2929,7 +2907,10 @@ fect.default <- function(
                 "The parametric pseudo-treated bootstrap requires a control pool ",
                 "isolated from treated-unit pre-treatment cells. Pass ",
                 "time.component.from = \"nevertreated\" (if never-treated controls ",
-                "exist) or use vartype = \"bootstrap\" or \"jackknife\"."
+                "exist) or use vartype = \"bootstrap\" or \"jackknife\". ",
+                "With few treated units and a treatment that does not switch off, ",
+                "use vartype = \"conformal\" (Jackknife+; method = \"gsynth\", ",
+                "\"ife\" or \"mc\"); see ?fect, \"Conformal intervals\"."
             ),
             method_arg, time.component.from
         ), call. = FALSE)
@@ -3666,8 +3647,7 @@ fect.default <- function(
             ## inside fect_boot (no separate resampler, no retained sims).
             dloo               = dloo,
             dloo.adjust        = dloo.adjust,
-            dloo.group.map     = if (!is.null(group)) rawgroup else NULL,
-            seed               = seed
+            dloo.group.map     = if (!is.null(group)) rawgroup else NULL
         )
 
     }

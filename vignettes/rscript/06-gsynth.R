@@ -73,15 +73,6 @@ lc
 plot(lc)
 
 
-## ----gsc-check-ifeboot, cache = TRUE, message = FALSE-------------------------
-out.ife <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
-                method = "ife", force = "two-way", r = 2, se = TRUE,
-                vartype = "parametric", nboots = 200, seed = 1234,
-                parallel = TRUE, cores = 16)
-out.ife$est.avg
-out.ife$ife.boot[c("r", "r.noise", "G")]
-
-
 ## ----rcv_dispatcher_gsc, eval = FALSE-----------------------------------------
 # fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
 #             method = "gsynth", force = "two-way",

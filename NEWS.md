@@ -37,14 +37,6 @@ code" below).
   observed outcome range. `trim = TRUE` drops the flagged units, chooses the
   rank again and refits; the trimmed estimate is reported beside the full
   one.
-* `vartype = "parametric"` with `method = "ife"` and
-  `time.component.from = "notyettreated"` (IFE-EM), which used to stop, now
-  runs the paper's experimental parametric bootstrap for IFE-EM: the whole
-  panel is regenerated from the fitted untreated outcome plus noise vectors
-  from leave-group-out refits (one factor fewer with 30 or more controls),
-  and IFE-EM is refitted in each draw. Covariates and missing cells are
-  supported. With `seed`, the draws equal the replication code's. Not proved
-  valid; see "IFE-EM bootstrap" in `?fect`. Settings in `fit$ife.boot`.
 
 ## Differences from the replication code
 
@@ -62,6 +54,12 @@ code" below).
 ## Other changes
 
 * quadprog moves from Suggests to Imports.
+* `vartype = "parametric"` with IFE-EM (`method = "ife"`,
+  `time.component.from = "notyettreated"`) still stops: the parametric
+  bootstrap needs factors estimated without the treated units' outcomes. The
+  paper's experimental bootstrap for IFE-EM is not included. The error
+  message now also points to conformal intervals (`vartype = "conformal"`),
+  which support IFE-EM.
 * Existing results are unchanged.
 
 # fect 2.4.9
