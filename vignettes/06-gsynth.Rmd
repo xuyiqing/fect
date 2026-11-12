@@ -810,23 +810,23 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
 
 Conformal intervals (`vartype = "conformal"`) are a second way to handle few treated units. The parametric bootstrap simulates each treated unit's prediction error from a model of the errors. Conformal inference instead treats each never-treated control in turn as if it had been treated at the same date, predicts it in the same way, and compares the treated units' prediction errors with the controls' (the Jackknife+ of @liuxu2026conformal). Under the conditions in [Section @sec-conformal-assumptions], each interval covers its effect with probability at least $1 -$ `alpha` in finite samples, with no model of the errors. [Chapter @sec-conformal] explains the method. This section shows how it fits the five checks.
 
-The call below uses the rank the forward rule chose in Step 3, held fixed with `CV = FALSE`. With five treated units, `conformal.block = TRUE` gives the average effect an interval with a guarantee: it compares the five treated units, taken together, with nine blocks of five controls ([Section @sec-conformal-block]). The blocks are drawn at random, so set `seed`. The level is 90%: a 95% block interval needs at least 19 blocks, or 95 controls here, and with 45 controls it would be the whole real line.
+The call below uses the rank the forward rule chose in Step 3, held fixed with `CV = FALSE`. With five treated units, `conformal.block = TRUE` gives the average effect an interval with a guarantee: it compares the five treated units, taken together, with nine blocks of five controls ([Section @sec-conformal-block]). The blocks are drawn at random, so set `seed`. `conformal.diag = 10` adds intervals for the last ten periods before treatment, computed as if each treated unit had adopted at that period ([Section @sec-conformal-checks]). The level is 90%: a 95% block interval needs at least 19 blocks, or 95 controls here, and with 45 controls it would be the whole real line.
 
 ```{r gsc-conformal, cache = TRUE, message = FALSE}
 out.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
                method = "gsynth", force = "two-way", r = 2, CV = FALSE,
                se = TRUE, vartype = "conformal", alpha = 0.1,
-               conformal.block = TRUE, seed = 1234)
+               conformal.block = TRUE, conformal.diag = 10, seed = 1234)
 print(out.cf)
 ```
 
 The block interval for the average effect runs from `r round(out.cf$est.avg[1, "CI.lower"], 2)` to `r round(out.cf$est.avg[1, "CI.upper"], 2)`. The 90% normal interval from the parametric bootstrap in Step 3 runs from `r round(out.fwd$est.avg[1, "ATT.avg"] - qnorm(0.95) * out.fwd$est.avg[1, "S.E."], 2)` to `r round(out.fwd$est.avg[1, "ATT.avg"] + qnorm(0.95) * out.fwd$est.avg[1, "S.E."], 2)`. The p-value, `r round(out.cf$est.avg[1, "p.value"], 2)`, is the smallest possible with nine blocks ($1/N$ with $N = 10$). There are no standard errors. When both intervals are reported and they disagree, the parametric one depends on the model of the errors, and the conformal one on the comparison with the controls.
 
-The plot compares the two 90% intervals in each period after treatment.
+The plot compares the two 90% intervals in each period, from ten periods before treatment to ten after.
 
 ```{r gsc-conformal-plot, fig.width = 7, fig.height = 4.2}
 library(ggplot2)
-post <- function(m) m[as.numeric(rownames(m)) >= 1, , drop = FALSE]
+post <- function(m) m[as.numeric(rownames(m)) >= -9, , drop = FALSE]
 pb <- post(out.fwd$est.att)
 cf <- post(out.cf$est.att)
 z <- qnorm(0.95)
@@ -839,23 +839,26 @@ ci <- rbind(
              type = "Conformal (block Jackknife+)"))
 ci$type <- factor(ci$type, levels = c("Parametric bootstrap", "Conformal (block Jackknife+)"))
 ggplot(ci, aes(x = t, y = att, ymin = lo, ymax = hi, colour = type)) +
-  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_hline(yintercept = 0, colour = "grey60") +
+  geom_vline(xintercept = 0.5, linetype = "dashed", colour = "grey50") +
   geom_pointrange(position = position_dodge(width = 0.5), shape = 21,
                   fill = "white", size = 0.3, linewidth = 0.6) +
   scale_colour_manual(values = c("grey50", "#004a8c"), name = NULL) +
-  scale_x_continuous(breaks = 1:10) +
+  scale_x_continuous(breaks = seq(-9, 10, by = 1)) +
   labs(x = "Periods since treatment", y = "Effect on Y (90% intervals)") +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom", panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank())
 ```
 
-With nine blocks, each conformal interval is set by the most extreme of the nine blocks' errors at that date, so its width changes more from period to period than the parametric interval's. It is wider in `r with(ci, sum((hi - lo)[type != "Parametric bootstrap"] > (hi - lo)[type == "Parametric bootstrap"]))` of the 10 periods, most of all in periods 1, 5 and 8. In period 1 it includes zero, and the parametric interval, just above zero, does not.
+With nine blocks, each conformal interval is set by the most extreme of the nine blocks' errors at that date, so its width changes more from period to period than the parametric interval's. After treatment, it is wider in `r with(subset(ci, t >= 1), sum((hi - lo)[type != "Parametric bootstrap"] > (hi - lo)[type == "Parametric bootstrap"]))` of the 10 periods, most of all in periods 1, 5 and 8. In period 1 it includes zero, and the parametric interval, just above zero, does not.
+
+Before treatment, the two show different things. The parametric points are the fit's in-sample residuals, averaged over the treated units. The conformal points are out-of-sample prediction errors: each period's outcome is predicted from earlier periods and the controls, as if treatment had started then. Both should be near zero. The conformal interval excludes zero in `r with(subset(ci, t <= 0 & type != "Parametric bootstrap"), sum(lo > 0 | hi < 0))` of the 10 pretreatment periods, about what chance gives at `alpha = 0.1`; a run of such periods would say the treated units were harder to predict than the controls.
 
 Three of the five checks bear on the conformal guarantee.
 
 - **Count the data (Step 1).** A finite interval at `alpha = 0.1` needs at least nine never-treated controls, and the block interval needs at least nine per treated unit.
-- **Check overlap (Steps 2 and 3).** The guarantee needs the treated units to be no harder to predict than the controls. A treated unit that the donors cannot follow, or whose loadings lie far outside the controls', is the usual way this fails. The overlap checks give evidence on this condition, and `conformal.diag` adds pre-treatment intervals ([Section @sec-conformal-checks]).
+- **Check overlap (Steps 2 and 3).** The guarantee needs the treated units to be no harder to predict than the controls. A treated unit that the donors cannot follow, or whose loadings lie far outside the controls', is the usual way this fails. The overlap checks give evidence on this condition, and so do the pretreatment intervals in the plot.
 - **Choose the rank (Step 3).** The guarantee assumes a rank fixed in advance. The forward rule chooses the rank from the treated units' pretreatment outcomes, and @liuxu2026conformal warn that tuning on the treated units' fit can break the guarantee. Passing the chosen rank with `CV = FALSE` does not change this. Report the intervals at nearby ranks as well:
 
 ```{r gsc-conformal-ranks, cache = TRUE, message = FALSE}

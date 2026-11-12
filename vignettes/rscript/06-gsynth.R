@@ -400,13 +400,13 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
 out.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
                method = "gsynth", force = "two-way", r = 2, CV = FALSE,
                se = TRUE, vartype = "conformal", alpha = 0.1,
-               conformal.block = TRUE, seed = 1234)
+               conformal.block = TRUE, conformal.diag = 10, seed = 1234)
 print(out.cf)
 
 
 ## ----gsc-conformal-plot, fig.width = 7, fig.height = 4.2----------------------
 library(ggplot2)
-post <- function(m) m[as.numeric(rownames(m)) >= 1, , drop = FALSE]
+post <- function(m) m[as.numeric(rownames(m)) >= -9, , drop = FALSE]
 pb <- post(out.fwd$est.att)
 cf <- post(out.cf$est.att)
 z <- qnorm(0.95)
@@ -419,11 +419,12 @@ ci <- rbind(
              type = "Conformal (block Jackknife+)"))
 ci$type <- factor(ci$type, levels = c("Parametric bootstrap", "Conformal (block Jackknife+)"))
 ggplot(ci, aes(x = t, y = att, ymin = lo, ymax = hi, colour = type)) +
-  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_hline(yintercept = 0, colour = "grey60") +
+  geom_vline(xintercept = 0.5, linetype = "dashed", colour = "grey50") +
   geom_pointrange(position = position_dodge(width = 0.5), shape = 21,
                   fill = "white", size = 0.3, linewidth = 0.6) +
   scale_colour_manual(values = c("grey50", "#004a8c"), name = NULL) +
-  scale_x_continuous(breaks = 1:10) +
+  scale_x_continuous(breaks = seq(-9, 10, by = 1)) +
   labs(x = "Periods since treatment", y = "Effect on Y (90% intervals)") +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom", panel.grid.minor = element_blank(),
