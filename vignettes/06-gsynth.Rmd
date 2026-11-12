@@ -180,9 +180,9 @@ plot(lc)
 
 ### Step 4: use out-of-sample inference
 
-With few treated units, use the parametric bootstrap (`vartype = "parametric"`, Algorithm 2 of @Xu2017, as in `out.fwd` above). It simulates each treated unit's prediction error with the prediction errors of controls left out of the factor fit. Use it with caution when the controls are few relative to the treated units or to the rank. The interval at the chosen rank does not account for the choice of the rank.
+With few treated units, use the parametric bootstrap (`vartype = "parametric"`, Algorithm 2 of @Xu2017, as in `out.fwd` above). It simulates each treated unit's prediction error with the prediction errors of controls left out of the factor fit. Use it with caution when the controls are few relative to the treated units or to the rank. The interval at the chosen rank does not account for the choice of the rank. Conformal intervals are a second option, with a finite-sample guarantee under their own conditions ([Section @sec-gsynth-conformal]).
 
-For IFE-EM (`method = "ife"`, factors from all untreated cells), Algorithm 2 does not apply, because the factors depend on the treated units' own pretreatment errors. Since version 2.5.0, `vartype = "parametric"` with `method = "ife"` runs the experimental bootstrap of @iwasakixu2026overlap instead. It regenerates the whole panel from the fitted model plus noise vectors taken from controls left out of the fit, and refits IFE-EM in every draw. It has not been proved valid. In the paper's simulations with one treated unit and 30 or more controls, its 95% intervals cover 94% to 99% of the time at the true rank and 92% to 97% with one factor too many, and less than 93% with 7 or 10 controls and one factor too many. Each draw refits IFE-EM, so it costs 20 to 30 times as much as Algorithm 2. See "IFE-EM bootstrap" in `?fect`.
+For IFE-EM (`method = "ife"`, factors from all untreated cells), Algorithm 2 does not apply, because the factors depend on the treated units' own pretreatment errors. Since version 2.5.0, `vartype = "parametric"` with `method = "ife"` runs the experimental bootstrap of @iwasakixu2026overlap instead. It regenerates the whole panel from the fitted model plus noise vectors taken from controls left out of the fit, and refits IFE-EM in every draw. It has not been proved valid. In the paper's simulations with one treated unit and 30 or more controls, its 95% intervals cover 95% to 99% of the time at the true rank with noise vectors from full-rank fits, and 94% to 95% with fect's default noise vectors (two panels). With one factor too many, they cover 92% to 97%. With 7 or 10 controls and one factor too many, they cover less than 93%. Each draw refits IFE-EM, so it costs 20 to 30 times as much as Algorithm 2. See "IFE-EM bootstrap" in `?fect`.
 
 ```{r gsc-check-ifeboot, cache = TRUE, message = FALSE}
 out.ife <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
@@ -820,6 +820,42 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
                parallel = TRUE, cores = 16)
 
 ```
+
+### Conformal intervals {#sec-gsynth-conformal}
+
+Conformal intervals (`vartype = "conformal"`) are a second way to handle few treated units. The parametric bootstrap simulates each treated unit's prediction error from a model of the errors. Conformal inference instead treats each never-treated control in turn as if it had been treated at the same date, predicts it in the same way, and compares the treated units' prediction errors with the controls' (the Jackknife+ of @liuxu2026conformal). Under the conditions in [Section @sec-conformal-assumptions], each interval covers its effect with probability at least $1 -$ `alpha` in finite samples, with no model of the errors. [Chapter @sec-conformal] explains the method. This section shows how it fits the five checks.
+
+The call below uses the rank the forward rule chose in Step 3, held fixed with `CV = FALSE`. With five treated units, `conformal.block = TRUE` gives the average effect an interval with a guarantee: it compares the five treated units, taken together, with nine blocks of five controls ([Section @sec-conformal-block]). The blocks are drawn at random, so set `seed`. The level is 90%: a 95% block interval needs at least 19 blocks, or 95 controls here, and with 45 controls it would be the whole real line.
+
+```{r gsc-conformal, cache = TRUE, message = FALSE}
+out.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+               method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+               se = TRUE, vartype = "conformal", alpha = 0.1,
+               conformal.block = TRUE, seed = 1234)
+print(out.cf)
+```
+
+The block interval for the average effect runs from `r round(out.cf$est.avg[1, "CI.lower"], 2)` to `r round(out.cf$est.avg[1, "CI.upper"], 2)`. The 90% normal interval from the parametric bootstrap in Step 3 runs from `r round(out.fwd$est.avg[1, "ATT.avg"] - qnorm(0.95) * out.fwd$est.avg[1, "S.E."], 2)` to `r round(out.fwd$est.avg[1, "ATT.avg"] + qnorm(0.95) * out.fwd$est.avg[1, "S.E."], 2)`. The p-value, `r round(out.cf$est.avg[1, "p.value"], 2)`, is the smallest possible with nine blocks ($1/N$ with $N = 10$). There are no standard errors. When both intervals are reported and they disagree, the parametric one depends on the model of the errors, and the conformal one on the comparison with the controls.
+
+Three of the five checks bear on the conformal guarantee.
+
+- **Count the data (Step 1).** A finite interval at `alpha = 0.1` needs at least nine never-treated controls, and the block interval needs at least nine per treated unit.
+- **Check overlap (Steps 2 and 3).** The guarantee needs the treated units to be no harder to predict than the controls. A treated unit that the donors cannot follow, or whose loadings lie far outside the controls', is the usual way this fails. The overlap checks give evidence on this condition, and `conformal.diag` adds pre-treatment intervals ([Section @sec-conformal-checks]).
+- **Choose the rank (Step 3).** The guarantee assumes a rank fixed in advance. The forward rule chooses the rank from the treated units' pretreatment outcomes, and @liuxu2026conformal warn that tuning on the treated units' fit can break the guarantee. Passing the chosen rank with `CV = FALSE` does not change this. Report the intervals at nearby ranks as well:
+
+```{r gsc-conformal-ranks, cache = TRUE, message = FALSE}
+cf.near <- sapply(c(1, 3), function(r) {
+  fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+              method = "gsynth", force = "two-way", r = r, CV = FALSE,
+              se = TRUE, vartype = "conformal", alpha = 0.1,
+              conformal.block = TRUE, seed = 1234)
+  fit$est.avg[1, c("ATT.avg", "CI.lower", "CI.upper")]
+})
+colnames(cf.near) <- c("r = 1", "r = 3")
+round(cf.near, 2)
+```
+
+At one and three factors, the intervals are wider than at two, and all three exclude zero. Conformal intervals are also available for IFE-EM (`method = "ife"`) and matrix completion (`method = "mc"`), with the same conditions.
 
 ## Additional notes
 

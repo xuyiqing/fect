@@ -404,3 +404,23 @@ out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
                parallel = TRUE, cores = 16)
 
 
+
+## ----gsc-conformal, cache = TRUE, message = FALSE-----------------------------
+out.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+               method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+               se = TRUE, vartype = "conformal", alpha = 0.1,
+               conformal.block = TRUE, seed = 1234)
+print(out.cf)
+
+
+## ----gsc-conformal-ranks, cache = TRUE, message = FALSE-----------------------
+cf.near <- sapply(c(1, 3), function(r) {
+  fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+              method = "gsynth", force = "two-way", r = r, CV = FALSE,
+              se = TRUE, vartype = "conformal", alpha = 0.1,
+              conformal.block = TRUE, seed = 1234)
+  fit$est.avg[1, c("ATT.avg", "CI.lower", "CI.upper")]
+})
+colnames(cf.near) <- c("r = 1", "r = 3")
+round(cf.near, 2)
+
