@@ -584,8 +584,8 @@ test_that("DEAD-1: Branch B parametric block is absent from boot.R source", {
     ## Installed package uses compiled .rdb — read source directly
     src_path <- file.path(find.package("fect"), "..", "..", "..", "fect", "R", "boot.R")
     if (!file.exists(src_path)) {
-      ## Try the known source repo path
-      src_path <- "/Users/xyq/GitHub/statsclaw/.repos/fect/R/boot.R"
+      ## the source tree, when the tests run from it (devtools::test())
+      src_path <- test_path("..", "..", "R", "boot.R")
     }
     if (!file.exists(src_path)) {
       skip("Could not locate boot.R source")
