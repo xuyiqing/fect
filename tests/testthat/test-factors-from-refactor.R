@@ -286,21 +286,25 @@ test_that("Phase 2c: gsynth with parametric bootstrap still works", {
 ## PHASE 3: parametric bootstrap unlocked for ife/cfe
 ## ========================================================
 
-test_that("Phase 3a: vartype='parametric' + ife + default factors.from errors (notyettreated gate)", {
+test_that("Phase 3a: vartype='parametric' + ife + default factors.from runs the IFE-EM bootstrap (2.5.0)", {
 
   skip_on_cran()
   df <- make_staggered_data(N = 40, Ntr = 15)
 
-  expect_error(
-    fect::fect(
+  ## 2.5.0: this call stopped before; it now runs the IFE-EM bootstrap
+  msgs <- character()
+  out <- withCallingHandlers(suppressWarnings(fect::fect(
       Y ~ D, data = df, index = c("id", "time"),
       method = "ife", r = 2, CV = FALSE,
       se = TRUE, vartype = "parametric", nboots = 30,
       parallel = FALSE
-    ),
-    regexp = "parametric",
-    ignore.case = TRUE
-  )
+    )), message = function(m) {
+      msgs <<- c(msgs, conditionMessage(m)); invokeRestart("muffleMessage")
+    })
+  expect_s3_class(out, "fect")
+  expect_true(any(grepl("IFE-EM", msgs)))
+  expect_false(is.null(out$ife.boot))
+  expect_true(is.finite(out$att.avg))
 })
 
 test_that("Phase 3b: vartype='parametric' + fe (->ife) + default factors.from errors (notyettreated gate)", {

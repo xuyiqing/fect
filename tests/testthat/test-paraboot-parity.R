@@ -37,6 +37,23 @@ make_fixture_data <- function(seed = 42) {
 
 ## ---- PAR-1: gsynth+parametric parity ----------------------------------------
 
+## 2.5.0: method = "ife" with time.component.from = "notyettreated" and
+## vartype = "parametric" runs the IFE-EM bootstrap (it stopped before 2.5.0).
+.run_ife_em_boot <- function(expr) {
+  msgs <- character()
+  out <- withCallingHandlers(suppressWarnings(expr), message = function(m) {
+    msgs <<- c(msgs, conditionMessage(m)); invokeRestart("muffleMessage")
+  })
+  list(out = out, msgs = msgs)
+}
+.expect_ife_em_boot <- function(res) {
+  expect_s3_class(res$out, "fect")
+  expect_true(any(grepl("IFE-EM", res$msgs)))
+  expect_false(is.null(res$out$ife.boot))
+  expect_true(is.finite(res$out$att.avg))
+  expect_true(all(is.finite(res$out$est.avg)))
+}
+
 test_that("PAR-1: gsynth+parametric parity (byte-identical pre/post refactor)", {
   skip_on_cran()
   baseline <- load_baseline()
@@ -197,19 +214,15 @@ test_that("PAR-7: jackknife parity — gsynth", {
 
 ## ---- BUG-1a: ife+notyettreated+parametric est.att changed from pre-fix ------
 
-test_that("BUG-1a: ife+notyettreated+parametric now errors via notyettreated gate", {
+test_that("BUG-1a: ife+notyettreated+parametric runs the IFE-EM bootstrap (2.5.0)", {
   skip_on_cran()
   d <- make_fixture_data()
-  expect_error(
-    suppressWarnings(suppressMessages(fect(
+  .expect_ife_em_boot(.run_ife_em_boot(fect(
       Y ~ D, data = d, index = c("id", "time"),
       method = "ife", r = 1, se = TRUE,
       vartype = "parametric", nboots = 50,
       CV = FALSE, parallel = FALSE
-    ))),
-    regexp = "parametric",
-    ignore.case = TRUE
-  )
+  )))
 })
 
 ## ---- BUG-2a: cfe+nevertreated+parametric est.att changed from pre-fix -------
@@ -287,7 +300,7 @@ test_that("BUG-2b: cfe+nevertreated+parametric no longer byte-identical to gsynt
 
 ## ---- BUG-1c: ife+notyettreated att.avg stability ----------------------------
 
-test_that("BUG-1c: ife+notyettreated+parametric (se=TRUE) now errors via notyettreated gate", {
+test_that("BUG-1c: ife+notyettreated+parametric (se=TRUE) runs the IFE-EM bootstrap (2.5.0)", {
   skip_on_cran()
   d <- make_fixture_data()
   ## se=FALSE still works
@@ -296,17 +309,13 @@ test_that("BUG-1c: ife+notyettreated+parametric (se=TRUE) now errors via notyett
     method = "ife", r = 1, se = FALSE, CV = FALSE, parallel = FALSE
   )))
   expect_s3_class(out_no_se, "fect")
-  ## se=TRUE, vartype="parametric" + default factors.from now errors
-  expect_error(
-    suppressWarnings(suppressMessages(fect(
+  ## se=TRUE, vartype="parametric" + default factors.from: IFE-EM bootstrap
+  .expect_ife_em_boot(.run_ife_em_boot(fect(
       Y ~ D, data = d, index = c("id", "time"),
       method = "ife", r = 1, se = TRUE,
       vartype = "parametric", nboots = 50,
       CV = FALSE, parallel = FALSE
-    ))),
-    regexp = "parametric",
-    ignore.case = TRUE
-  )
+  )))
 })
 
 ## ---- BUG-2c: cfe+nevertreated att.avg stability -----------------------------
@@ -361,19 +370,15 @@ test_that("BUG-3c: cfe+notyettreated+parametric (se=TRUE) now errors via notyett
 
 ## ---- BUG-4: ife+notyettreated+parametric SE smoke test -----------------------
 
-test_that("BUG-4: ife+notyettreated+parametric now errors via notyettreated gate", {
+test_that("BUG-4: ife+notyettreated+parametric runs the IFE-EM bootstrap (2.5.0)", {
   skip_on_cran()
   d <- make_fixture_data()
-  expect_error(
-    suppressWarnings(suppressMessages(fect(
+  .expect_ife_em_boot(.run_ife_em_boot(fect(
       Y ~ D, data = d, index = c("id", "time"),
       method = "ife", r = 1, se = TRUE,
       vartype = "parametric", nboots = 50,
       CV = FALSE, parallel = FALSE
-    ))),
-    regexp = "parametric",
-    ignore.case = TRUE
-  )
+  )))
 })
 
 ## ---- BUG-5: cfe+nevertreated+parametric SE smoke test -----------------------
