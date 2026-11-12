@@ -790,9 +790,9 @@ mspe.comp <- fect_mspe(list(gsynth_r2 = out.gsynth.comp,
 print(mspe.comp$summary[, c("Model", "MSPE", "RMSE", "MAD")])
 ```
 
-`sim_gsynth` follows an IFE data generating process with two factors. Models 1 and 2 fit that model using never-treated controls. Their MSPEs are 2.36 and 2.31, and their MADs are 0.563 and 0.564. Different iterative algorithms stop at slightly different solutions. On the full data, their ATTs agree to four decimals (5.5433).
+`sim_gsynth` follows an IFE data generating process with two factors. Models 1 and 2 fit that model using never-treated controls. Their MSPEs are 1.94 and 1.91, and their MADs are 0.538 and 0.541. Different iterative algorithms stop at slightly different solutions. On the full data, their ATTs agree to four decimals (5.5433).
 
-Model 3 adds unit-specific linear trends absent from the data generating process. Its MSPE is 8.87, almost four times that of Model 2. Rolling CV fits each held-out unit's trend using earlier periods and extrapolates it. Here the extra parameters increase prediction error.
+Model 3 adds unit-specific linear trends absent from the data generating process. Its MSPE is 3.27, about 1.7 times that of Model 2. Rolling CV fits each held-out unit's trend using earlier periods and extrapolates it. Here the extra parameters increase prediction error.
 
 `fect_mspe()` scores the full prediction: the intercept, unit and time effects, covariates, factors, and additional CFE terms. Before version 2.4.7, it scored these never-treated fits using only the factor component for GSC or 0 for CFE. Both CFE models then scored 110.33 regardless of specification.
 
