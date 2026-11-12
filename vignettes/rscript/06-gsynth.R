@@ -25,7 +25,7 @@ panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), pre.post = TRUE)
 panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), type = "outcome") 
 
 
-## ----sim2_onecore, cache = TRUE-----------------------------------------------
+## ----sim2, cache = TRUE-------------------------------------------------------
 system.time(
 out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), 
             method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), 
@@ -40,19 +40,37 @@ out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
 # out$beta
 
 
-## ----sim2, cache = TRUE, warning = FALSE--------------------------------------
-system.time(
-out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 1000, vartype = 'parametric', parallel = TRUE, cores = 16)
-)
+## ----gsc-check-overlap--------------------------------------------------------
+oc <- overlap_check(Y ~ D, data = sim_gsynth, index = c("id", "time"), level = 0.90)
+oc
 
 
-## ----simJack, cache = TRUE, message = FALSE-----------------------------------
-out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
-               method = "gsynth", force = "two-way",
-               CV = TRUE, r = c(0, 5), se = TRUE,
-               vartype = "jackknife",
-               parallel = TRUE, cores = 16)
+## ----gsc-check-overlap-plot, fig.width = 8, fig.height = 5--------------------
+plot(oc)
 
+
+## ----gsc-check-rank, cache = TRUE---------------------------------------------
+rk <- fect_rank(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+                force = "two-way", r = 0:5)
+rk
+
+
+## ----gsc-check-forward, cache = TRUE------------------------------------------
+out.fwd <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+                method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+                cv.method = "forward", se = TRUE, vartype = "parametric",
+                nboots = 500, seed = 1234, parallel = TRUE, cores = 16)
+out.fwd$r.cv
+out.fwd$est.avg
+
+
+## ----gsc-check-loading, cache = TRUE------------------------------------------
+lc <- loading_check(out.fwd, trim = TRUE)
+lc
+
+
+## ----gsc-check-loading-plot, fig.width = 6, fig.height = 4.5------------------
+plot(lc)
 
 
 ## ----rcv_dispatcher_gsc, eval = FALSE-----------------------------------------
@@ -123,18 +141,6 @@ plot(out, type = "box", xlab = "time",
 plot(out,type = "calendar")
 
 
-## ----sim-equiv, cache = FALSE, fig.height=5, fig.width=7----------------------
-plot(out, type = "equiv", ylim = c(-5, 5))
-
-
-## ----sim-equiv-no-stats, cache = FALSE, fig.height=5, fig.width=7-------------
-plot(out, type = "equiv", show.stats =  FALSE)
-
-
-## ----sim-equiv-reposition, cache = FALSE, fig.height=5, fig.width=7-----------
-plot(out, type = "equiv", stats.pos = c(-19, 4.5), ylim = c(-5, 5))
-
-
 ## ----turnout-panelview-status, cache = FALSE, warning=FALSE, fig.height=10, fig.width=7----
 panelview(turnout ~ policy_edr, data = turnout, 
           index = c("abb","year"), pre.post = TRUE, 
@@ -169,7 +175,7 @@ out_turnout <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
 
 ## ----turnout-implied-weights--------------------------------------------------
 dim(out_turnout$wgt.implied)
-sort(out_turnout$wgt.implied[,8])
+sort(out_turnout$wgt.implied[, "WI"])
 
 
 ## ----turnout_gap, fig.height=5, fig.width=7-----------------------------------
@@ -284,14 +290,14 @@ plot(out_ub_param, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
 out.unbounded <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
                       method = "gsynth", r = 2,
                       se = TRUE, vartype = "parametric", nboots = 100,
-                      CV = FALSE, parallel = FALSE)
+                      CV = FALSE, parallel = FALSE, seed = 1234)
 
 # Bounded gsynth (new in v2.3.0 --- simplex projection)
 out.bounded   <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
                       method = "gsynth", r = 2,
                       loading.bound = "simplex",
                       se = TRUE, vartype = "parametric", nboots = 100,
-                      CV = FALSE, parallel = FALSE)
+                      CV = FALSE, parallel = FALSE, seed = 1234)
 
 
 ## ----bounded-vs-unbounded-att-------------------------------------------------
@@ -358,19 +364,20 @@ cat("CFE + nevertreated: r.cv =", out.cfe.nt$r.cv,
 # Model 1: gsynth (pure IFE, r = 2)
 out.gsynth.comp <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "gsynth", force = "two-way",
-                        r = 2, se = FALSE, CV = FALSE)
+                        r = 2, se = FALSE, CV = FALSE, max.iteration = 20000)
 
 # Model 2: CFE + nevertreated with r = 2 only (equivalent to gsynth)
 out.cfe.nt.comp <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                         method = "cfe", force = "two-way",
                         time.component.from = "nevertreated",
-                        r = 2, se = FALSE, CV = FALSE)
+                        r = 2, se = FALSE, CV = FALSE, max.iteration = 20000)
 
 # Model 3: CFE + nevertreated with r = 2 and linear trend (overspecified)
 out.cfe.nt.lin <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
                        method = "cfe", force = "two-way",
                        time.component.from = "nevertreated",
-                       Q.type = "linear", r = 2, se = FALSE, CV = FALSE)
+                       Q.type = "linear", r = 2, se = FALSE, CV = FALSE,
+                       max.iteration = 20000)
 
 
 ## ----cfe_nt_mspe, eval=TRUE, cache=TRUE---------------------------------------
@@ -378,4 +385,51 @@ mspe.comp <- fect_mspe(list(gsynth_r2 = out.gsynth.comp,
                             CFE_r2 = out.cfe.nt.comp,
                             CFE_linear_r2 = out.cfe.nt.lin), seed = 1234)
 print(mspe.comp$summary[, c("Model", "MSPE", "RMSE", "MAD")])
+
+
+## ----simJack, cache = TRUE, message = FALSE-----------------------------------
+out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
+               method = "gsynth", force = "two-way",
+               CV = TRUE, r = c(0, 5), se = TRUE,
+               vartype = "jackknife",
+               parallel = TRUE, cores = 16)
+
+
+
+## ----gsc-conformal, cache = TRUE, message = FALSE-----------------------------
+out.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+               method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+               se = TRUE, vartype = "conformal", alpha = 0.1,
+               conformal.block = TRUE, conformal.diag = 10, seed = 1234)
+print(out.cf)
+
+
+## ----gsc-conformal-plot, fig.width = 9, fig.height = 4, message = FALSE-------
+library(gridExtra)
+p.pb <- plot(out.fwd, type = "gap", plot.ci = "0.9", xlim = c(-9, 10),
+             ylim = c(-6.5, 11.5), main = "Parametric bootstrap")
+p.cf <- plot(out.cf, type = "gap", xlim = c(-9, 10), ylim = c(-6.5, 11.5),
+             main = "Conformal (block Jackknife+)")
+## drop the plot's note on the blocks and the pre-treatment intervals,
+## so that the two panels have the same height
+grid.arrange(p.pb, p.cf + ggplot2::labs(caption = NULL), ncol = 2)
+
+
+## ----gsc-conformal-widths, include = FALSE------------------------------------
+post <- function(m) m[as.numeric(rownames(m)) >= 1, , drop = FALSE]
+w.pb <- with(as.data.frame(post(out.fwd$est.att90)), CI.upper - CI.lower)
+w.cf <- with(as.data.frame(post(out.cf$est.att)), CI.upper - CI.lower)
+pre.cf <- out.cf$est.att[as.numeric(rownames(out.cf$est.att)) %in% -9:0, , drop = FALSE]
+
+
+## ----gsc-conformal-ranks, cache = TRUE, message = FALSE-----------------------
+cf.near <- sapply(c(1, 3), function(r) {
+  fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+              method = "gsynth", force = "two-way", r = r, CV = FALSE,
+              se = TRUE, vartype = "conformal", alpha = 0.1,
+              conformal.block = TRUE, seed = 1234)
+  fit$est.avg[1, c("ATT.avg", "CI.lower", "CI.upper")]
+})
+colnames(cf.near) <- c("r = 1", "r = 3")
+round(cf.near, 2)
 

@@ -1,4 +1,67 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.5.0
+
+Development version. 2.4.9 remains the CRAN candidate; everything in 2.4.9
+below is part of this version.
+
+## New features
+
+The steps recommended by Iwasaki and Xu (2026), "Overlap, Overfitting, and
+Overconfidence: A Cautionary Note on Low-Rank Panel Methods", for GSC and
+IFE-EM analyses. Each reproduces the paper's replication code on the
+paper's cases (the exceptions are under "Differences from the replication
+code" below).
+
+* `overlap_check()`: the overlap check that needs no rank. Before any fit,
+  each treated unit's demeaned pretreatment path is rebuilt from the
+  never-treated units with non-negative weights that sum to one, and its
+  error is compared with the never-treated units' errors when each is
+  rebuilt from the others. Unit and adoption-cohort tables (error,
+  percentile, flag, weight in the average effect, reasons a unit is not
+  assessable); `print()` and `plot()` methods. The paper uses
+  `level = 0.90`.
+* `fect_rank()`: GSC at every candidate rank, scored by how well each rank
+  predicts the treated units' own pretreatment outcomes, with the forward
+  window and the leave-one-out window (Xu 2017, Algorithm 1), weighting each
+  unit by its share of the treated post-treatment cells. Returns both picks,
+  whether the forward window is long enough (8 forward predictions at the
+  largest rank for units carrying 80% of the weight), and the estimate and
+  the extrapolation share at every rank (`se = TRUE` adds intervals).
+* `cv.method = "forward"` in `fect()` (GSC only): chooses the rank with the
+  forward rule and fits at it; the rule's table is in `fit$rank.forward`.
+* `loading_check()`: the loading check at the chosen rank. A treated unit is
+  flagged when its loadings lie outside the controls' convex hull by more
+  than the noise in its own loading estimate allows (squared distance in
+  the metric of its sampling variance against a chi-square cutoff). Also
+  reports the share of treated post-treatment counterfactuals outside the
+  observed outcome range. `trim = TRUE` drops the flagged units, chooses the
+  rank again and refits; the trimmed estimate is reported beside the full
+  one.
+
+## Differences from the replication code
+
+* `overlap_check()` solves its least-squares problems on the simplex exactly
+  at any number of donors (quadprog on an active set). The replication code
+  switches to an iterative solver (osqp) above 200 donors, which can stop
+  short of the minimum. On the paper's cases the two agree to 1e-8 except in
+  six cases with 236 to 1,040 donors; in four of them the replication code
+  counts units as assessable, and flags some, whose donors rebuild one
+  another almost exactly, a yardstick fect reports as collapsed.
+* `loading_check()` measures the distance to the hull exactly; above 400
+  controls the replication code takes 3,000 Frank-Wolfe steps, which differ
+  by up to 6e-6 (no flag changes on the paper's cases).
+
+## Other changes
+
+* quadprog moves from Suggests to Imports.
+* `vartype = "parametric"` with IFE-EM (`method = "ife"`,
+  `time.component.from = "notyettreated"`) still stops: the parametric
+  bootstrap needs factors estimated without the treated units' outcomes. The
+  paper's experimental bootstrap for IFE-EM is not included. The error
+  message now also points to conformal intervals (`vartype = "conformal"`),
+  which support IFE-EM.
+* Existing results are unchanged.
+
 # fect 2.4.9
 
 Development version.

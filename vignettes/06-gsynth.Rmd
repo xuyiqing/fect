@@ -1,55 +1,45 @@
-# Gsynth Program {#sec-gsynth}
+# Generalized synthetic control {#sec-gsynth}
 
 ```{r .common, include = FALSE}
 source("_common.R")
 ```
 
-This chapter demonstrates the generalized synthetic control method, or Gsynth, proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\]. R script used in this chapter can be downloaded [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/06-gsynth.R).
+::: {.callout-tip appearance="simple"}
+The standalone **gsynth** package is a wrapper of **fect**. Use its [old syntax](https://yiqingxu.org/packages/gsynth/) if needed.
+:::
 
 ::: {.callout-tip appearance="simple"}
-The **gsynth** package as a standalone package still exists, but algorithmically is a wrapper of the **fect** package. Click [here](https://yiqingxu.org/packages/gsynth/) if you want to use the old syntax.
+### TL;DR
+
+- GSC estimates factors from never-treated controls, then uses each treated unit's pretreatment outcomes to estimate its loadings. In **fect**, set `method = "gsynth"`.
+- Use GSC for block or staggered adoption without treatment reversal, including panels with few treated units.
+- Follow the five checks in [Section @sec-gsynth-checks]: count the data; check overlap; choose the rank forward from treated units; use out-of-sample inference; report the choices.
+- Rolling CV remains the default of `CV = TRUE`, but for GSC it scores control cells and can miss a factor on which treated and control units differ. Choose the rank with the forward rule (Step 3).
+- Bounded factor loadings (`loading.bound = "simplex"`) are optional and do not replace the overlap checks.
+- Basic estimation comes first. Cross-validation options, plots, staggered adoption, unbalanced panels, bounded loadings, and inference follow the five checks.
 :::
 
-::: {.callout-tip}
+GSC is the generalized synthetic control method proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\]. Download the R script for this chapter [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/06-gsynth.R).
 
-### Recommended changes in v2.3.0 for Gsynth users
+GSC differs from the other estimators in **fect** in its treatment setting, factor estimation, and inference:
 
-Two new defaults are strongly recommended for the Synth setting:
-
-**1. Use rolling-window CV for rank selection.** This is now the default. Gsynth applications often use macro panels, where residual shocks are persistent over time. Before v2.3.0, block CV could leak information across the train/test boundary and over-select `r`, often choosing `r.max`. Rolling CV (`cv.method = "rolling"`) prevents this future-side leakage by design.
-
-**2. Bound treated loadings with `loading.bound = "simplex"`.** This restricts each treated unit's factor loading to a non-negative weighted average of the control loadings. In other words, the imputed counterfactual is kept inside the support of the donor pool, matching the usual synthetic-control intuition. The default, `loading.bound = "none"`, preserves the original Xu (2017) behavior: an unconstrained least-squares projection. The simplex bound is opt-in, but it is generally preferable, especially when the donor pool is small or overlap with the donor pool is uncertain. See the **Bounded factor loadings** section below and the companion `loading.overlap` diagnostic.
-
-:::
-
-Gsynth was originally implemented in the **gsynth** package but has now been fully integrated into the **fect** package. Gsynth (`method = "gsynth"`) and FEct/IFEct/MC (`method = "fe"/"ife"/"mc"`) are different in the following ways:
-
--   Gsynth is designed to handle block and staggered DID settings **without** treatment reversal, whereas other methods allow for treatment reversal under the assumption of limited carryover effects.
--   Gsynth is particularly suited for the Synth setting, where the number of treated units is small, including scenarios with only one treated unit. By setting `vartype = "parametric"`, we can use a two-stage parametric bootstrapping procedure to produce uncertainty estimates. In contrast, other methods rely on large samples, particularly a large number of treated units, to obtain reliable standard errors and confidence intervals using `"bootstrap"` or `"jackknife"`.
--   Compared with IFEct (`method = "ife"`), Gsynth *does not* rely on pre-treatment data from the treated units to estimate time components (e.g., factors). Hence, `time.component.from = "nevertreated"`. This approach speeds up computation, improves stability, and is more suitable for predictive inference based on row exchangeability.
-
-Therefore, we recommend setting `method = "gsynth"` in **fect** for the synthetic control setting, where the treatment does not reverse (or is coded accordingly) and the number of treated units is small. 
+- GSC handles block and staggered DID without treatment reversal. FEct, IFEct, and MC also allow reversals under assumptions about carryover effects.
+- GSC can be used with few treated units. Its parametric bootstrap uses prediction errors from controls left out of the factor fit.
+- GSC estimates time components from never-treated controls. IFE-EM uses all untreated cells, including treated units' pretreatment observations.
 
 ::: {.callout-important appearance="simple"}
-
-### Key Equivalence
+### Equivalent specifications
 
 `fect(..., method = "gsynth")` is equivalent to `fect(..., method = "ife", time.component.from = "nevertreated")`.
 
-Gsynth is a procedure based on an IFE model estimated using only never-treated controls. The gsynth package was developed in the synthetic control setting, where a small number of treated units are compared with never-treated controls to learn latent time effects.
-
+Both fit an interactive fixed effects (IFE) model with factors estimated from never-treated controls. Each treated unit's loadings are then estimated from its own pretreatment outcomes.
 :::
 
-Use `method = "gsynth"` (or equivalently `time.component.from = "nevertreated"`) when:
+Use `method = "gsynth"` when treatment does not reverse and never-treated controls are available. This includes settings with $N_{tr} = 1$. Set `vartype = "parametric"` explicitly to use the parametric bootstrap.
 
--   The treatment does *not* reverse (block or staggered adoption only).
--   The number of treated units is *small*, including $N_{tr} = 1$.
--   You want *parametric bootstrap* (`vartype = "parametric"`) for uncertainty estimation — this is particularly useful with few treated units.
--   You do *not* want pre-treatment data from treated units to influence time component (i.e., factor) estimation.
+The default IFE-EM regime, `time.component.from = "notyettreated"`, uses EM to estimate time components from all untreated cells. It accommodates treatment reversal ([Chapter @sec-fect]).
 
-In contrast, the default regime (`time.component.from = "notyettreated"`, used in [Chapter @sec-fect]) accommodates treatment reversal and uses EM to estimate time components (time fixed effects, latent factors, and temporal dynamics) from all not-yet-treated observations.
-
-We will use two datasets, `sim_gsynth` and `turnout`, to perform analyses in block and staggered DID settings. First, we load the two datasets: `sim_gsynth` and `turnout`:
+The examples use `sim_gsynth` for block adoption and `turnout` for staggered adoption.
 
 ```{r setup-seed, echo = FALSE}
 set.seed(1234)
@@ -61,26 +51,26 @@ data(turnout)
 ls()
 ```
 
-## Basic Usage 
+## Basic usage
 
-### Simulated Data
+The simulated example shows the data structure, estimation arguments, and returned estimates.
 
-We start with the first example, `sim_gsynth`, a simulated dataset described in @Xu2017.
+### Simulated data
 
-There are 5 treated units, 45 control units, and 30 time periods. The treatment kicks at Period 21 for all treated units, hence a block DID setup.
+`sim_gsynth` is the simulated dataset described in @Xu2017. It has 5 treated units, 45 control units, and 30 time periods. Treatment starts in Period 21 for every treated unit, giving a block DID design.
 
 ```{r head-sim_gsynth}
 head(sim_gsynth)
 ```
 
-Before we conduct any statistical analysis, it is helpful to visualize the data structure and spot missing values (if there are any). We can easily do so with the help of the **panelView** package. The figure below shows that: (1) there are 5 treated units and 45 control units; (2) the treated units start to be treated in period 21; and (3) there are no missing values, which is a rare case.
+Use **panelView** to inspect treatment timing and missing observations. The plot shows that (1) there are 5 treated units and 45 controls; (2) treatment starts in period 21; and (3) there are no missing values.
 
 ```{r sim-panelview-status, cache = FALSE, fig.height=7, fig.width=7, warning=FALSE}
 library(panelView)
 panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), pre.post = TRUE) 
 ```
 
-The code chunk below visualizes the trends of outcome variable over the full panel across groups; different colors correspond to unique treatment statuses.
+The outcome plot colors each path by treatment status.
 
 ```{r sim-panelview-outcome, cache = FALSE,fig.height=5, fig.width=7}
 panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), type = "outcome") 
@@ -88,11 +78,11 @@ panelview(Y ~ D, data = sim_gsynth,  index = c("id","time"), type = "outcome")
 
 ### Estimation
 
-We estimate the model using only the outcome variable ($Y$), treatment indicator ($D$), covariates ($X_1$) and ($X_2$), and group indicators ($id$) and ($time$).
+The outcome is $Y$, the treatment indicator is $D$, and the covariates are $X_1$ and $X_2$. The unit and time identifiers are $id$ and $time$.
 
-To implement the Gsynth algorithm proposed in Xu (2017), set `method = "gsynth"`.
+Set `method = "gsynth"` to fit GSC. This first call illustrates the default CV interface. For the recommended rank choice, use the forward rule in [Section @sec-gsynth-checks].
 
-```{r sim2_onecore, cache = TRUE}
+```{r sim2, cache = TRUE}
 system.time(
 out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), 
             method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), 
@@ -100,19 +90,21 @@ out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
             parallel = TRUE, cores = 16))
 ```
 
-The first variable on the right-hand side is the binary treatment indicator, with remaining variables as controls. The `index` option designates unit and time indicators for fixed effects analysis.
+The first variable on the right-hand side is the binary treatment indicator. The remaining variables are covariates. `index` identifies the unit and time columns.
 
-The `force` option (`"none"`, `"unit"`, `"time"`, and `"two-way"`) specifies the additive component(s) of the fixed effects included in the model. The default option is `"two-way"` (including additive unit fixed effects). A cross-validation procedure is provided (when `CV = TRUE`) to select the number of unobserved factors within the interval of `r=c(0,5)`. When cross-validation is switched off, the first element in r will be set as the number of factors. Alternatively, for example, when `CV = FALSE`, r can take in a numeric value ($r = 0$).
+`force` selects the additive fixed effects: `"none"`, `"unit"`, `"time"`, or `"two-way"`. The default, `"two-way"`, includes unit and time effects.
 
-Setting `se = TRUE`, the algorithm can produce uncertainty measurements. When the number of treated units is small, a parametric bootstrap procedure is preferred (`vartype = "parametric"`). Conformal intervals (`vartype = "conformal"`) are an alternative with a finite-sample guarantee; see [Chapter @sec-conformal]. The default number of parametric bootstrap runs is set to 200. The number of bootstrap runs can be set by `nboots`.
+With `CV = TRUE`, `r=c(0,5)` sets the candidate rank range. With `CV = FALSE`, the first element of `r` fixes the rank. A scalar also works, such as $r = 0$.
 
-The algorithm prints out the results automatically. `sigma2` stands for the estimated variance of the error term; `IC` represents the Bayesian Information Criterion; and `MPSE` is the Mean Squared Prediction Error. The cross-validation procedure selects an `r*` that minimizes the MSPE.
+Set `se = TRUE` to estimate uncertainty. With few treated units, use `vartype = "parametric"` subject to the cautions in the five checks. Conformal intervals (`vartype = "conformal"`) offer a finite-sample guarantee under their exchangeability and tuning conditions; see [Chapter @sec-conformal]. The default number of parametric bootstrap runs is 200. Change it with `nboots`.
 
-Users can also use the `print` function to directly retrieve specific results. Here, we show three examples for the commonly requested estimates.
+The printed output includes `sigma2`, the estimated error variance; `IC`, an information criterion; and `MSPE`, the mean squared prediction error. By default (`cv.rule = "min"`), CV selects the rank with the smallest MSPE. `cv.rule = "1se"` selects the smallest rank within one standard error of it.
 
--   `est.att` reports the average treatment effect on the treated (ATT) by period
--   `est.avg` shows the ATT averaged over all periods
--   `beta` represents the coefficients of the time-varying covariates
+The following fields report three commonly requested results:
+
+- `est.att`: average treatment effect on the treated (ATT) by event time.
+- `est.avg`: ATT averaged over treated post-treatment observations.
+- `beta`: coefficients of the time-varying covariates.
 
 ```{r print-results, eval = FALSE}
 print(out)
@@ -121,44 +113,104 @@ out$est.avg
 out$beta
 ```
 
-Treatment effect estimates from each bootstrap run are stored in `att.boot`, a matrix with one row per event time and one column per bootstrap run. With `keep.sims = TRUE`, the cell-level draws are also kept, in `eff.boot` (time periods \* units \* bootstrap runs).
+`att.boot` stores the bootstrap ATT estimates, with one row per event time and one column per run. With `keep.sims = TRUE`, `eff.boot` also stores cell-level draws (time periods \* units \* bootstrap runs).
 
 ::: {.callout-note appearance="simple"}
-**Parallel computing** will speed up both cross-validation and uncertainty estimation significantly. We recommend that users manually set the number of cores using the `cores` option. If this is not supplied or is `NULL`, we will automatically select the smaller of `8` and the number of usable system cores minus `2`, to prevent excessive use of system resources.
+Use `cores` to set the number of parallel workers for CV and uncertainty estimation. If `cores` is omitted or `NULL`, **fect** selects the smaller of `8` and the number of usable system cores minus `2`.
 :::
 
-```{r sim2, cache = TRUE, warning = FALSE}
-system.time(
-out <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"), method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5), se = TRUE, nboots = 1000, vartype = 'parametric', parallel = TRUE, cores = 16)
-)
+## Five checks for a GSC analysis {#sec-gsynth-checks}
+
+@iwasakixu2026overlap reanalyze published applications of GSC and IFE-EM and recommend five steps, in order: count the data, check overlap before choosing the rank, choose the rank forward from the treated units, use out-of-sample inference, and report what was done. Version 2.5.0 of **fect** runs each step. This section walks through them on `sim_gsynth`.
+
+### Step 1: count the data
+
+GSC predicts a treated unit's untreated outcome from the factors of the never-treated units and the unit's own pretreatment periods, so count both. `sim_gsynth` has 45 never-treated units and 5 treated units, each with 20 pretreatment periods. The rank rule of Step 3 needs about 15 pretreatment periods when the candidate ranks go up to 5. With fewer, report the ranks that both rules of Step 3 pick (forward and leave one out), and treat a finding that holds at some ranks and not at others as fragile. `fect_rank()` reports whether the window is long enough (see Step 3).
+
+### Step 2: check overlap before choosing the rank
+
+A factor model can only predict a treated unit well if the controls can represent it. `overlap_check()` asks this of the raw data, before any model is fitted. For each treated unit, it takes the unit's pretreatment periods, subtracts from the treated unit's path and from each never-treated unit's path its mean over those periods, rebuilds the treated unit's path as a weighted average of the never-treated units' paths (weights that are non-negative and sum to one), and records the root mean squared error. The yardstick is the same error for each never-treated unit rebuilt from the others. A treated unit is flagged when its error is larger than the donors' 90th percentile.
+
+```{r gsc-check-overlap}
+oc <- overlap_check(Y ~ D, data = sim_gsynth, index = c("id", "time"), level = 0.90)
+oc
 ```
 
-Gsynth in **fect** also incorporates jackknife method for uncertainty estimates.
+One of the five treated units, unit 105, is rebuilt worse than 93% of the donors and is flagged. The table `oc$units` gives each unit's error, its percentile (`pct`) and its weight in the average effect. The check needs no rank and no factor model, so the choice of the rank cannot change it. It is a screen rather than a test. A treated unit is rebuilt from all the donors, while each donor is rebuilt from the others, so the treated unit's error tends to be smaller, and a unit slightly outside what the donors can reproduce may pass. Like every pretreatment check, it cannot detect a factor that does not vary before treatment starts. `plot(oc)` draws each treated unit's gap, its demeaned pretreatment outcome minus its rebuild, in each period before adoption.
 
-```{r simJack, cache = TRUE, message = FALSE}
-out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
-               method = "gsynth", force = "two-way",
-               CV = TRUE, r = c(0, 5), se = TRUE,
-               vartype = "jackknife",
-               parallel = TRUE, cores = 16)
-
+```{r gsc-check-overlap-plot, fig.width = 8, fig.height = 5}
+plot(oc)
 ```
 
-### Cross-validation
+The grey lines are the donors' gaps, each donor rebuilt from the others, and the shaded region holds 90% of them in each period. A unit the donors can follow has a gap that stays mostly inside the region and crosses zero at random. A gap that leaves the region often, or that trends or stays on one side of zero near adoption, belongs to a unit the donors cannot follow. Unit 105's gap leaves the region in 6 of its 20 periods, against 1 to 3 for the other units, and its region is pink because it is flagged. `plot(oc, type = "percentile")` draws one row per unit, which suits panels with many treated units.
 
-`cv.method = "rolling"` is the new default across all CV entry points (DID/TWFE, Gsynth, and `fect_mspe`). `cv.method = "block"` is also available; `"loo"` is exclusive to Gsynth (`time.component.from = "nevertreated"`) because it requires factor estimation to be independent of the held-out treated observations.
+### Step 3: choose the rank forward from the treated units
 
-| | `fect_cv` (DID/TWFE) | CV in Gsynth | `fect_mspe` (post-hoc) |
+`fect_rank()` fits GSC at every candidate rank and scores each rank by how well it predicts the treated units' own pretreatment outcomes. The forward rule refits each treated unit's loadings on its first pretreatment periods and predicts the next one, moving the cutoff forward one period at a time, so every prediction uses only earlier periods, as the post-treatment prediction does. The leave-one-out rule of @Xu2017 also trains on later periods, which under serially correlated errors carry information about the held-out one, so it leans toward more factors. The chosen rank is the smallest minimizer of the forward score. The table also gives the estimate at every rank and the share of the treated units' predicted post-treatment outcomes that lie outside the range of all observed outcomes in the panel (`extrapolation`).
+
+```{r gsc-check-rank, cache = TRUE}
+rk <- fect_rank(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+                force = "two-way", r = 0:5)
+rk
+```
+
+The forward rule picks 2 factors, the number in the simulation, and so does the leave-one-out rule. Report the estimate at every candidate rank and mark the one the rule chose. Here it moves between 5.54 and 5.81 from r = 1 on, a range of about one standard error (0.26 in the output below). To fit at the forward rule's rank in one call, set `cv.method = "forward"`:
+
+```{r gsc-check-forward, cache = TRUE}
+out.fwd <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+                method = "gsynth", force = "two-way", CV = TRUE, r = c(0, 5),
+                cv.method = "forward", se = TRUE, vartype = "parametric",
+                nboots = 500, seed = 1234, parallel = TRUE, cores = 16)
+out.fwd$r.cv
+out.fwd$est.avg
+```
+
+At the chosen rank, `loading_check()` checks overlap in the factor model itself. It asks whether each treated unit's estimated loading lies inside the region the controls' loadings enclose (their convex hull). For a unit outside the hull, it measures the distance to the hull relative to the sampling variance of the unit's own loading estimate, and flags the unit when that distance exceeds the 95th percentile of a chi-square distribution with r degrees of freedom. With `trim = TRUE` it drops the flagged units, chooses the rank again on the units kept and refits. Report the trimmed estimate beside the full one. It is the effect for the treated units the controls can represent, a different estimand.
+
+```{r gsc-check-loading, cache = TRUE}
+lc <- loading_check(out.fwd, trim = TRUE)
+lc
+```
+
+Three of the five treated units, unit 105 among them, lie outside the hull, but each by less than the noise in its loadings allows (`lc$table`). None is flagged, so there is nothing to trim. Step 2 flags unit 105 and this check does not, because the two checks ask different questions, and each can flag a unit the other passes. `plot(lc)` draws the loadings.
+
+```{r gsc-check-loading-plot, fig.width = 6, fig.height = 4.5}
+plot(lc)
+```
+
+### Step 4: use out-of-sample inference
+
+With few treated units, use the parametric bootstrap (`vartype = "parametric"`, Algorithm 2 of @Xu2017, as in `out.fwd` above). It simulates each treated unit's prediction error with the prediction errors of controls left out of the factor fit. Use it with caution when the controls are few relative to the treated units or to the rank. The interval at the chosen rank does not account for the choice of the rank. Conformal intervals are a second option, with a finite-sample guarantee under their own conditions ([Section @sec-gsynth-conformal]).
+
+For IFE-EM (`method = "ife"`, factors from all untreated cells), Algorithm 2 does not apply, because the factors depend on the treated units' own pretreatment errors, and `vartype = "parametric"` stops with an error. With few treated units, use GSC with Algorithm 2, or conformal intervals, which also work with IFE-EM ([Section @sec-gsynth-conformal]). The unit bootstrap and the jackknife rely on variation across treated units and do not solve the problem when there are few.
+
+### Step 5: report
+
+Report the rank and how it was chosen (here, the forward rule over ranks 0 to 5), whether a printed estimate is an average or a single period, the version of **fect**, the stopping rule (`tol`, `max.iteration`) and the seed, and post the data and code.
+
+## Cross-validation
+
+`cv.method = "rolling"` is the default for DID/TWFE CV, GSC CV, and `fect_mspe()`. `"block"` is also available. For GSC rank selection, the five checks recommend `"forward"` instead.
+
+| | `fect_cv` (DID/TWFE) | CV in GSC | `fect_mspe` (post-hoc) |
 |:--|:--|:--|:--|
 | `"rolling"` | **Default** | **Default** | **Default** |
 | `"block"` | Available | Available | Available |
 | `"loo"` | --- | Available | --- |
+| `"forward"` | --- | Available (v2.5.0) | --- |
 
-The legacy values `"all_units"` (now `"block"`) and `"treated_units"` (block masking restricted to treated pre-treatment cells) are still accepted and print a note; use `"block"` in place of `"all_units"`. See the [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv).
+The methods differ in what they predict and which periods they use:
 
-### Rolling-window CV 
+- `"rolling"` holds out blocks and drops later eligible periods from each sampled unit's training data.
+- `"block"` holds out blocks while retaining eligible periods on both sides.
+- `"loo"` predicts each treated unit's pretreatment outcomes from its other pretreatment periods.
+- `"forward"` predicts each treated unit's pretreatment outcomes from earlier periods only. It does not mask cells in the control factor fit.
 
-Set `cv.method = "rolling"` in the main `fect()` CV dispatcher to use rolling-window CV (the recommended default for serially correlated panels --- see the recommended-changes callout at the top of this chapter for the empirical motivation, and [Chapter @sec-ife-mc] for the design and the side-by-side figure).
+`"loo"` and `"forward"` require `time.component.from = "nevertreated"`. Their factor estimates must exclude the held-out treated observations. For GSC, rolling and block CV score control cells. A factor that matters more for treated units can receive little weight in those scores. Changing the window does not resolve that problem [@iwasakixu2026overlap]. Use `fect_rank()` and the forward rule in [Section @sec-gsynth-checks].
+
+The legacy values `"all_units"` (now `"block"`) and `"treated_units"` (block masking restricted to treated pretreatment cells) remain accepted and print a note. Use `"block"` in place of `"all_units"`. See the [cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv).
+
+The following call shows the rolling-window option. Its selected rank is an alternative to compare with the treated-unit rules. See [Chapter @sec-ife-mc] for the rolling design and the side-by-side figure.
 
 ```{r rcv_dispatcher_gsc, eval = FALSE}
 fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
@@ -171,77 +223,81 @@ fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
 fit$r.cv     # selected r --- use this for downstream inference
 ```
 
-CV behavior is identical across `method = "ife"` (IFE-EM, internal `time.component.from = "notyettreated"`) and `method = "gsynth"` (GSC, internal `time.component.from = "nevertreated"`); both score each held-out cell with the model's full prediction there (the intercept, the unit and time effects, the covariates times their coefficients and the factors). The full parameter reference for all CV methods lives in the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv).
+Rolling and block CV score the model's full prediction for both `method = "ife"` and `method = "gsynth"`. That prediction includes the intercept, unit and time effects, covariates, and factors. The estimators differ in which observations supply their time components. See the [Cross-Validation section of the cheatsheet](aa-cheatsheet.html#sec-cheatsheet-cv) for the parameter reference.
 
-### Visualizing Results
+## Plot reference
 
-By default, `plot()` produces a *gap* plot, equivalent to using `plot(out, type = "gap")`, and visualizes the estimated Average Treatment Effect on the Treated (ATT) by period. For reference, the true effects in `gsynth` range from 1 to 10 (with some added white noise) and take effect during periods 21 to 30.
+The plots below use `out`, the initial fit with default rolling CV. They illustrate plot options. The five-check analysis uses `out.fwd`.
 
-Note that the plot() generates a **ggplot2** object, which users can save by simply calling `print` with the object's name.
+### Gap plots
+
+`plot(out)` reports ATT by event time. The true effects in `sim_gsynth` range from 1 to 10, with added white noise, during periods 21 to 30.
+
+`plot()` returns a **ggplot2** object. `print()` displays it, and `ggsave()` saves it.
 
 ```{r sim_gap1, fig.height=5, fig.width=7}
 a <- plot(out) # by default, type = "gap"
 print(a)
 ```
 
-By switching on `connected`, the confidence interval of the ATT estimates will be represented by a shaded area.
+`connected = TRUE` draws the confidence interval as a shaded area.
 
 ```{r sim-gap-connected, fig.height=5, fig.width=7}
 plot(out, connected = TRUE)
 ```
 
-Moreover, by switching off `show.points`, ATT estimates can be displayed as a line plot.
+`show.points = FALSE` removes the points.
 
 ```{r sim-gap-line, fig.height=5, fig.width=7}
 plot(out, connected = TRUE, show.points = FALSE)
 ```
 
-Aesthetic options for ggplot2 objects are compatible for all **fect** plots.
-
-For demonstration, we use `main`, `xlim`, and `ylim` to set the plot title and axis labels.
+Use `main` for the title, `xlab` and `ylab` for axis labels, and `xlim` and `ylim` for axis limits. Standard **ggplot2** styling also applies.
 
 ```{r sim_gap2, fig.height=5, fig.width=7}
 plot(out, type = "gap", ylim = c(-6,12), xlab = "Period", 
      main = "Estimated ATT (Gsynth)")
 ```
 
-**fect** objects can generate eight types of plots for diverse demonstration purposes. The `type` option includes the following:
+### Plot types
 
--   `"gap"`: Reports ATT by period (default).
--   `"counterfactual"`: Generates the observed treated outcome alongside the imputed counterfactual averages. Set `raw = "all"` to add the observed outcome of every treated and control unit as thin lines, or `raw = "band"` to add the range of these observed outcomes as shaded bands.
--   `"factors"` and `"loadings"`: Plot the estimated factors and loadings, respectively.
--   `"status"`: Plots treatment status of all observations, similar to `panelview()`. The `axis.lab` option chooses which labels are shown (`"both"` by default); with 200 or more units, unit labels are dropped automatically.
--   `"box"`: Displays the estimated individual treatment effects with box plot.
--   `"calendar"`: Shows how the treatment effect evolves over time.
--   `"equiv"`: Exhibits the average pre-treatment residuals with equivalence confidence intervals.
+The eight plot types used here are:
 
-To visualize the estimated counterfactual outcomes, we use `type = "counterfactual"`. If no argument is assigned to `raw`, the plot will display the average of the *treated* and of the *estimated counterfactual* outcomes. When `method = "gsynth"` and `vartype = "parametric"`, the 95% confidence intervals around the counterfactual outcomes will be the same as for the event-study ATT (though flipped in shape).
+- `"gap"`: ATT by event time (the default).
+- `"counterfactual"`: average observed treated outcomes and estimated untreated outcomes.
+- `"factors"`: estimated factors.
+- `"loadings"`: estimated factor loadings.
+- `"status"`: treatment and observation status. `axis.lab` selects labels. With 200 or more units, unit labels are dropped.
+- `"box"`: distributions of estimated unit-level gaps.
+- `"calendar"`: ATT by calendar time.
+- `"equiv"`: average pretreatment residuals with equivalence confidence intervals.
+
+For `method = "gsynth"` with `vartype = "parametric"`, the counterfactual plot's 95% intervals have the same widths as the ATT intervals, reflected around the observed outcomes.
 
 ```{r sim-counterfactual, cache = FALSE, fig.height=5, fig.width=7}
 plot(out, type = "counterfactual")
 ```
 
-**fect** offers two options for showing the raw data: `raw = "all"` draws each treated and control unit's observed outcome as a line, and `raw = "band"` draws shaded bands.
+`raw = "all"` adds each treated and control unit's observed outcome path.
 
 ```{r sim-counterfactual-all, cache = FALSE,fig.height=5, fig.width=7}
 plot(out, type = "counterfactual", raw = "all")
 ```
 
-Note that in the plot below, the shaded areas span the 5th to 95th percentiles of the treated units' and of the control units' observed outcomes in each period. They describe the raw data and are not uncertainty estimates.
+`raw = "band"` adds the 5th to 95th percentiles of observed treated and control outcomes in each period. The bands describe the raw outcomes. They are not confidence intervals.
 
 ```{r sim-counterfactual-band, cache = FALSE,fig.height=5, fig.width=7}
 plot(out, type = "counterfactual", raw = "band")
 ```
 
-
-The figure below illustrates the treatment status of all observations. Users can specify the exact values shown on the x- and y-axes using the `xticklabels` and `yticklabels` parameters (i.e., `xticklabels=c("1","5","10", "15","20", "25", "30")`). Setting a nonexistent value to the option removes all numeric labels for that axis (i.e., `yticklabels="0"`). The `status` plot has now been incorporated into a standalone package, **panelView**.
+`"status"` shows treatment status. Use `xticklabels` and `yticklabels` to select labels, such as `xticklabels=c("1","5","10", "15","20", "25", "30")`. A nonexistent value, such as `yticklabels="0"`, removes numeric labels on that axis. **panelView** provides a standalone version.
 
 ```{r sim_status, cache = FALSE,fig.height=7, fig.width=7}
 plot(out, type = "status", yticklabels="0", 
      xticklabels=c("5", "10", "15","20", "25", "30") )
 ```
 
-The next two figures plot the estimated factors and factor loadings, respectively.
+`"loadings"` and `"factors"` display the fitted factor model.
 
 ```{r sim_L, cache = TRUE, message = FALSE, results='hide', fig.height=7, fig.width=7}
 plot(out, type = "loadings")
@@ -251,41 +307,33 @@ plot(out, type = "loadings")
 plot(out, type = "factors", xlab = "Time")
 ```
 
-
-The box plot visualizes the estimated individual treatment effects for the treated units. While these effects are not identified at the individual level, their dispersion provides insight into heterogeneous treatment effects across different time periods and informs model performance. By default, the number of total treated units is labeled on the graph. Note, if the number of treated units is small, the box plot will reduce to a scatter plot, as shown below.
-
-We also provide the `xangle` and `yangle` options to allow users to tilt the labels for better display. We will demonstrate the functionality in later examples.
+`"box"` shows the dispersion of estimated unit-level gaps. These gaps include prediction error and do not by themselves identify individual treatment effects. With few treated units, the display becomes a scatter plot. The graph labels the number of treated units; `xangle` and `yangle` tilt axis labels.
 
 ```{r sim_box, cache = FALSE,fig.height=5, fig.width=8}
 plot(out, type = "box", xlab = "time",
      xticklabels=c("-19", "-15", "-10", "-5","0","5","10") )
 ```
 
-If we want to focus on specific periods within the full panel, the `xlim` option is useful. Here, we narrow the time frame to fifteen periods before and ten periods after the treatment.
+`xlim` restricts the display, here to fifteen periods before treatment and ten after.
 
 ```{r sim_box2, eval = FALSE, fig.height=7, fig.width=7}
 plot(out, type = "box", xlim = c(-15, 10), 
      xticklabels=c( "-15", "-10", "-5","0","5","10"))
 ```
 
-To explore how the treatment effect evolves over time, we can set `type = "calendar"`.
-
-In the plot below, the points represent the ATTs by calendar time. The blue curve shows a lowess fit of these estimates, with the shaded band indicating the 95% confidence interval. The red horizontal dashed line marks the overall average ATT across all time periods.
+`"calendar"` shows ATT by calendar time. The blue lowess curve has a shaded 95% confidence band, and the red dashed line marks the overall average ATT.
 
 ```{r calendar, cache = FALSE,fig.height=5, fig.width=7}
 plot(out,type = "calendar")
 ```
 
-
-------------------------------------------------------------------------
-
 ## Staggered DID
 
-The second example examines the impact of Election-Day Registration (EDR) reforms on voter turnout in the United States, with the treatment taking effect at varying times across states. Further details about the `turnout` dataset can be found in @Xu2017 Section 5.
+The `turnout` example examines Election-Day Registration (EDR) reforms in the United States. Treatment starts in different periods across states. See @Xu2017 Section 5 for the dataset.
 
 ### Data structure
 
-First, we use **panelView** to visualize the data structure. The following figure shows that (1) we have a balanced panel with 9 treated units and (2) the treatment starts at different time periods.
+The **panelView** plot shows that (1) the panel is balanced with 9 treated units and (2) treatment starts in different periods.
 
 ```{r turnout-panelview-status, cache = FALSE, warning=FALSE, fig.height=10, fig.width=7}
 panelview(turnout ~ policy_edr, data = turnout, 
@@ -293,7 +341,7 @@ panelview(turnout ~ policy_edr, data = turnout,
           by.timing = TRUE) 
 ```
 
-**panelView** can visualize the outcome variable using colored lines to represent changes in treatment status.
+The outcome plot colors paths by treatment status.
 
 ```{r turnout-panelview-outcome, cache = FALSE, warning =FALSE, fig.height=5, fig.width=7}
 panelview(turnout ~ policy_edr, data = turnout,
@@ -301,9 +349,9 @@ panelview(turnout ~ policy_edr, data = turnout,
           main = "EDR Reform and Turnout")
 ```
 
-### Estimation w/o factors
+### Estimation without factors
 
-When no factor is assumed, the ATT estimates are close to what we obtain from difference-in-differences.
+Without factors, the ATT estimates are close to the difference-in-differences estimates.
 
 ```{r turnout_did, cache = TRUE}
 out0 <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor, 
@@ -317,9 +365,11 @@ out0 <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
 plot(out0, type = "gap", xlim = c(-15, 5), ylim=c(-15, 10))
 ```
 
-### Estimation w/ factors
+### Estimation with factors
 
-We now allow the algorithm to determine the optimal number of factors that best predict the pre-treatment data with cross-validation. The `keep.sims` option must be set to `TRUE` if the user wishes to visualize subsets of the treated units in the "counterfactual" plot.
+This call retains the default CV specification for comparison. For a GSC analysis, use `fect_rank()` to compare ranks and choose forward from the treated units, as in [Section @sec-gsynth-checks].
+
+Set `keep.sims = TRUE` to retain the draws needed for counterfactual intervals for subsets of treated units.
 
 ```{r turnout_est, cache = TRUE}
 out_turnout <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor, 
@@ -331,22 +381,29 @@ out_turnout <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
 
 ### Implied weights
 
-`out$wgt.implied` stores the implied weights of all control units for each treated unit: an $N_{co}\times N_{tr}$ matrix with one row per control unit and one column per treated unit, labeled by unit ID. Column $i$ holds the weights $w_i$ that rebuild the factor part of treated unit $i$'s counterfactual from the control units' factor parts, $\Lambda_{co}^\top w_i = \lambda_i$, with $w_i = \Lambda_{co}(\Lambda_{co}^\top\Lambda_{co})^{-1}\lambda_i$ [@Xu2017]. Different from the synthetic control method, the weights can take both positive and negative values; with time fixed effects in the model, each column sums to zero. Below we show the control unit weights for Wisconsin.
+`wgt.implied` stores an $N_{co}\times N_{tr}$ matrix, with one row per control unit and one column per treated unit. Unit IDs label the rows and columns. Column $i$ holds weights that rebuild the factor part of treated unit $i$'s counterfactual:
+
+$$
+\Lambda_{co}^\top w_i = \lambda_i,\qquad
+w_i = \Lambda_{co}(\Lambda_{co}^\top\Lambda_{co})^{-1}\lambda_i.
+$$
+
+These weights can be positive or negative [@Xu2017]. With time fixed effects, each column sums to zero. They represent the factor component, rather than synthetic-control weights for the full outcome. The following output shows Wisconsin's weights.
 
 ```{r turnout-implied-weights}
 dim(out_turnout$wgt.implied)
 sort(out_turnout$wgt.implied[, "WI"])
 ```
 
-### Visualizing results
+### Plot reference
 
-Like we have demonstrated with the multiperiod DID analysis, we also use the gap (default) plot to visualize the ATT.
+The gap plot reports ATT by event time.
 
 ```{r turnout_gap, fig.height=5, fig.width=7}
 plot(out_turnout, xlim = c(-10, 5), ylim=c(-10, 10))
 ```
 
-For staggered DID, a status plot can be generated after estimation. Here, we use `xlab`, `ylab`, and `main` to modify the axis labels and the graph title, respectively. Additionally, `xangle` and `yangle` can tilt the numeric labels to improve readability. Note that the values provided for these options specify the degree of tilt.
+The status plot shows staggered adoption. `xlab`, `ylab`, and `main` set labels, and `xangle` and `yangle` set their tilt in degrees.
 
 ```{r turnout-status-plot, fig.height=12, fig.width=7}
 plot(out_turnout, type = "status",xlab = "Year", ylab = "State", main = "Treatment Status", 
@@ -354,32 +411,32 @@ plot(out_turnout, type = "status",xlab = "Year", ylab = "State", main = "Treatme
                    1968, 1976, 1984, 1992, 2000, 2008), xangle=10)
 ```
 
-We can also visualize this using the "counterfactual" plot.
+The counterfactual plot compares observed and estimated untreated outcomes.
 
 ```{r turnout_counterfactual, fig.height=5, fig.width=7}
 plot(out_turnout, type = "counterfactual")
 ```
 
-If we want to zoom in to examine the treatment effect on a specific state, such as Wisconsin, we can do so by setting the `id` option accordingly. The `id` option can also accept a vector if one wishes to plot multiple treated units. This plot will only display confidence intervals for the counterfactual estimates if `keep.sims = TRUE` is set in the estimation step and `vartype = "parametric"`.
+`id` selects a state or a vector of states. Subset counterfactual intervals require `keep.sims = TRUE` and `vartype = "parametric"` in this example.
 
 ```{r turnout_gap2, fig.height=5, fig.width=7}
 plot(out_turnout, type = "counterfactual", id = "WI", main = "Wisconsin")
 ```
 
-As we have seen in the last example, due to the small number of treated units, the box plot reduces to a scatter plot.
+With few treated units, the box plot becomes a scatter plot.
 
 ```{r turnout_box, fig.height=5, fig.width=7}
 plot(out_turnout, type = "box", 
      xticklabels=c("-20", "-15", "-10", "-5","0","5","10"))
 ```
 
-Here, we visualize the estimated average treatment effects by calendar time.
+The calendar plot reports ATT by calendar time.
 
 ```{r turnout_calendar, fig.height=5, fig.width=7}
 plot(out_turnout, type = "calendar", ylim = c(-15,15))
 ```
 
-Estimated factors and factor loadings are plotted below.
+The factor and loading plots describe the fitted factor model.
 
 ```{r turnout_F, message = FALSE, results = 'hide', fig.height=5, fig.width=7, warning=FALSE}
 plot(out_turnout, type = "factors", xlab = "Year")
@@ -389,9 +446,9 @@ plot(out_turnout, type = "factors", xlab = "Year")
 plot(out_turnout, type = "loadings")
 ```
 
-### Cumulative Effects
+### Cumulative effects
 
-For staggered adoption without treatment reversals, the cumulative ATT summarizes how the total treatment dose accumulates over relative time. It is useful for outcomes where each additional treated period adds to a running total (e.g., cumulative voter mobilization). The cumulative ATT at event time $k$ is the running sum of the per-period ATTs from event time 1 to $k$. Because `out_turnout` was estimated with `keep.sims = TRUE` and `vartype = "parametric"`, the per-cell replicate surface needed for `estimand()` is available.
+For staggered adoption without reversals, cumulative ATT sums the per-period ATTs from event time 1 to $k$. Use it when the sum answers the substantive question, such as accumulated voter mobilization. `out_turnout` retains the cell-level replicates needed by `estimand()` because it uses `keep.sims = TRUE` and `vartype = "parametric"`.
 
 ```{r turnout-cumulative, fig.height=5, fig.width=7}
 cumu.turnout <- estimand(out_turnout, "att.cumu", "event.time")
@@ -402,13 +459,11 @@ esplot(cumu.turnout, Period = "event.time",
        ylab = "Cumulative ATT")
 ```
 
-See [Chapter @sec-estimands] (Alternative Estimands) for the full `estimand()` API including parametric variance, log-scale ATT, and APTT.
-
-------------------------------------------------------------------------
+See [Chapter @sec-estimands] (Alternative Estimands) for `estimand()`, including parametric variance, log-scale ATT, and APTT.
 
 ## Unbalanced panels
 
-Gsynth in **fect** can accommodate unbalanced panels. To illustrate how it works, we randomly remove 50 observations as well as the first 15 observations of Wyoming from the turnout dataset and then re-estimate the model.
+GSC in **fect** accommodates unbalanced panels. This example removes 50 observations at random and the first 15 observations of Wyoming, then refits the model.
 
 ```{r create-unbalanced-data}
 set.seed(123456)
@@ -416,7 +471,7 @@ turnout.ub <- turnout[-c(which(turnout$abb=="WY")[1:15],
                          sample(1:nrow(turnout),50,replace=FALSE)),]
 ```
 
-Again, before running any regressions, we first plot the data structure and visualize missing values. In the following plot, white cells represent missing values.
+White cells in the **panelView** plot mark missing observations.
 
 ```{r turnout_ub_panelview_miss, cache = FALSE,fig.height=7, fig.width=7}
 panelview(turnout ~ policy_edr + policy_mail_in + policy_motor, 
@@ -425,6 +480,8 @@ panelview(turnout ~ policy_edr + policy_mail_in + policy_motor,
 ```
 
 ### Estimation
+
+The first fit uses the default unit bootstrap. It is retained to compare with the explicit parametric-bootstrap fit below. Both calls use default CV. In an analysis, apply the five checks before choosing a rank.
 
 ```{r turnout_ub_est, cache = TRUE, message = FALSE}
 out_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
@@ -437,11 +494,11 @@ out_ub <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
 
 ### Parametric bootstrap on an unbalanced panel
 
-When the number of treated units is small, the parametric bootstrap (`vartype = "parametric"`) is the recommended uncertainty procedure for gsynth. It is available on unbalanced panels too, with a small technical adjustment.
+With few treated units, the five checks recommend the GSC parametric bootstrap, subject to the cautions in Step 4. Set `vartype = "parametric"` explicitly. It is also available when outcomes are missing.
 
-On a balanced panel, the parametric bootstrap resamples whole-$T$ residual vectors from the controls and adds them to the estimated counterfactual. On an unbalanced panel, individual residual vectors may have missing cells, so direct vector resampling is not always feasible. `fect` therefore replaces the empirical resample with a Gaussian approximation: it estimates the pairwise-complete empirical covariance matrix of the residuals, $\hat\Sigma \in \mathbb{R}^{T \times T}$, and draws each bootstrap perturbation from a multivariate Gaussian $\mathcal{N}(0, \hat\Sigma)$. The off-diagonal entries of $\hat\Sigma$ encode within-unit serial correlation, so the Gaussian draws inherit the same temporal-dependence structure as the data.
+On a balanced panel, the default parametric-bootstrap path resamples whole-$T$ error vectors. With missing outcomes (`para.error = "ar"`, the default there), **fect** uses Gaussian draws based on pairwise-available residual second moments. It retains off-diagonal terms to represent within-unit serial dependence. These are estimated second moments; the draws need not reproduce the full error distribution.
 
-The two procedures also condition on different objects. The parametric bootstrap is **conditional on the realized factors $\hat F$, loadings $\hat\Lambda$, covariates $X$, and treatment indicators $D$** --- it perturbs only the idiosyncratic error $\varepsilon$. The nonparametric `vartype = "bootstrap"` is **unconditional**: by resampling units with replacement, each draw redraws $(F_i, \Lambda_i, X_i, D_i)$ together, so its variance also reflects between-unit heterogeneity in those structural components. The two SEs answer different inferential questions and need not coincide even when both are correctly calibrated.
+The parametric bootstrap targets uncertainty conditional on the factors, loadings, covariates, and treatment indicators, $(\Lambda, F, X, D)$. The unit bootstrap resamples unit identities and reflects variation in sample composition. Their standard errors need not coincide. See [Chapter @sec-inference] for its mechanics.
 
 ```{r turnout_ub_param, cache = TRUE, message = FALSE}
 out_ub_param <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
@@ -452,7 +509,7 @@ out_ub_param <- fect(turnout ~ policy_edr + policy_mail_in + policy_motor,
                      nboots = 1000, seed = 02139)
 ```
 
-Compare the average CI width of the period-by-period ATT under the two SE procedures on the same unbalanced panel:
+Compare the average widths of the period-specific ATT intervals. Similar widths would not establish that either procedure has correct coverage.
 
 ```{r turnout_ub_ci_compare}
 ci_width <- function(out) mean(out$est.att[, "CI.upper"] -
@@ -463,13 +520,11 @@ data.frame(
 )
 ```
 
-Both should be of the same order of magnitude when both correctly capture the panel's clustering and serial-correlation structure.
+### Plot reference
 
-### Visualizing results
+The fitted status plot marks Wyoming in gray because it has too few pretreatment observations and is excluded.
 
-The status plot visualizes the regression data and differs from the **panelView** plot. Wyoming's data is shown in gray, as its observations are excluded due to an insufficient number of pre-treatment periods.
-
-The missing data matrix can also be accessed via `out_ub$obs.missing`, where 1 marks observations under treatment, 2 observations not under treatment (control units and the pre-treatment periods of treated units), 3 missing observations, and 4 units removed from the sample. Fits with a placebo or carryover test also use 5 for the masked placebo or carryover observations, and 6 for observations removed by `carryover.rm`.
+`out_ub$obs.missing` records observation status: 1 for treated observations, 2 for untreated observations, 3 for missing observations, and 4 for excluded units. Fits with placebo or carryover tests also use 5 for masked test observations and 6 for observations removed by `carryover.rm`.
 
 ```{r, turnout_ub_panelview_miss2, fig.height=12, fig.width=7}
 plot(out_ub, type = "status",
@@ -478,7 +533,7 @@ plot(out_ub, type = "status",
      xangle=10)
 ```
 
-Like in **panelView**, we can plot specific observations by setting `id` and adjust labels on x-axis as needed.
+Use `id` to select units and the axis options to adjust the display.
 
 ```{r turnout_ub_obs_2, fig.height=7, fig.width=7}
 plot(out_ub, type = "status", xlab = "Year", ylab = "State",
@@ -489,24 +544,23 @@ plot(out_ub, type = "status", xlab = "Year", ylab = "State",
 
 ```
 
-We re-produce the gap plot with the unbalanced panel, here, we set the range of y in between $(-10,15)$.
+The unit-bootstrap gap plot uses a y-axis range of $(-10,15)$.
 
 ```{r turnout_ub_gap, fig.height=5, fig.width=7}
 plot(out_ub, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
 ```
 
-The same gap plot under the parametric bootstrap on the same unbalanced panel:
+The next plot uses the parametric bootstrap on the same unbalanced panel.
 
 ```{r turnout_ub_gap_param, fig.height=5, fig.width=7}
 plot(out_ub_param, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
 ```
 
-
-------------------------------------------------------------------------
-
 ## Bounded factor loadings
 
-In the standard Gsynth setup, the treated-unit factor loading $\hat\lambda_i$ is obtained from an unconstrained least-squares projection of the pre-treatment residual onto the control-derived factor matrix. When few treated units lie inside the convex hull of control loadings, this projection can extrapolate aggressively, producing implied counterfactual paths that no individual control (or weighted average of them) could plausibly trace. Bounded factor loadings address this by constraining each treated loading to be a non-negative convex combination of control loadings, recovering the synthetic-control intuition that the imputed counterfactual should sit inside the support of the donor pool.
+`loading.bound = "simplex"` constrains each treated loading to a non-negative weighted average of control loadings. The default, `"none"`, estimates treated loadings by unconstrained least squares.
+
+The bound changes the estimator. It does not establish that the controls can represent a treated unit. Follow the five checks first. `overlap_check()` screens the raw pretreatment paths, and `loading_check()` assesses estimated loadings at the chosen rank. If units are flagged, report the trimmed estimate beside the full estimate.
 
 ### The simplex projection
 
@@ -518,38 +572,40 @@ $$
 
 where:
 
-- $w_i$ is the $N_{co}$-vector of simplex weights for treated unit $i$, with $w_{ij} \geq 0$ and $\sum_j w_{ij} = 1$;
-- $\tilde{w} = (1/N_{co}, \ldots, 1/N_{co})$ is the uniform reference and $\mathrm{KL}(w \,\|\, \tilde{w}) = \sum_j w_j \log(N_{co}\, w_j)$ is the entropy regularizer;
-- $\gamma > 0$ controls regularization strength: as $\gamma \to \infty$ the KL term vanishes and the solution approaches a pure simplex-constrained least-squares projection; as $\gamma \to 0$ weights are forced toward uniform;
-- $u_i^{\mathrm{pre}}$ is the pre-treatment residual of unit $i$ after the grand mean, the covariates and, in a model with time effects, the time effects. It still contains unit $i$'s own level;
-- $F^{\mathrm{pre}}$ is the $T_0 \times r$ matrix of estimated factors restricted to the pre-treatment window;
+- $w_i$ is the $N_{co}$-vector of weights, with $w_{ij} \geq 0$ and $\sum_j w_{ij} = 1$;
+- $\tilde{w} = (1/N_{co}, \ldots, 1/N_{co})$ is the uniform reference, and $\mathrm{KL}(w \,\|\, \tilde{w}) = \sum_j w_j \log(N_{co}\, w_j)$ penalizes departures from it;
+- $\gamma > 0$ controls regularization: as $\gamma \to \infty$, the penalty vanishes; as $\gamma \to 0$, the weights approach uniform;
+- $u_i^{\mathrm{pre}}$ is the pretreatment outcome after removing the grand mean, covariate contribution, and any time effects. It still contains the unit's own level;
+- $F^{\mathrm{pre}}$ is the $T_0 \times r$ matrix of estimated pretreatment factors;
 - $\Lambda_{co}$ is the $N_{co} \times r$ matrix of estimated control loadings.
 
-The implied treated loading is $\hat\lambda_i = \Lambda_{co}^\top w_i$. Because $w_i$ lies in $\Delta^{N_{co}}$ and $\hat\lambda_i$ is therefore a convex combination of rows of $\Lambda_{co}$, the imputed counterfactual
+The fitted loading is $\hat\lambda_i = \Lambda_{co}^\top w_i$. Its factor component,
 
-$$\hat Y_i(0) \;=\; F \, \hat\lambda_i$$
+$$
+F\,\hat\lambda_i = F\Lambda_{co}^\top w_i,
+$$
 
-lies pointwise in the convex hull of factor-implied control outcomes at every period.
+lies pointwise in the convex hull of the control factor components. The full counterfactual also includes the additive effects and covariate contribution. The bound therefore does not put the full counterfactual inside the range of observed control outcomes.
 
-The objective is the standard quadratic-residual fit on the pre-period plus a KL penalty toward uniform. The KL term plays two roles: it stabilizes the optimization (the unconstrained simplex projection is degenerate when $N_{co}$ exceeds the number of pre-period observations) and it shrinks toward an "equal-weight donor pool" prior, which is sensible when controls are exchangeable. Without a unit effect, the solver uses a softmax reparameterization with `optim(method = "L-BFGS-B")` and an analytic gradient, with a mirror-descent fallback for ill-conditioned inputs. With a unit effect, the centered problem is solved by Newton's method on its dual, which converges to the exact minimizer, so the result does not depend on where an iterative solver stops; if Newton's method fails, the L-BFGS-B route is used.
+The objective combines pretreatment squared error with a penalty toward uniform weights. Without a unit effect, the solver uses a softmax parameterization and `optim(method = "L-BFGS-B")`, with an analytic gradient. A mirror-descent fallback handles ill-conditioned inputs. With a unit effect, the centered problem uses Newton's method on the dual, with L-BFGS-B as the fallback.
 
 #### The unit intercept
 
-With a unit effect in the model (`force = "unit"` or `"two-way"`, the default), unit $i$ also has a free intercept $\alpha_i$, its unit fixed effect. Since version 2.4.8, $\alpha_i$ is fitted jointly with $w_i$:
+With `force = "unit"` or `"two-way"`, each treated unit has a free intercept $\alpha_i$. Since version 2.4.8, the estimator fits it jointly with the weights:
 
 $$
 \min_{\alpha_i \in \mathbb{R},\; w_i \in \Delta^{N_{co}}} \;\; \frac{1}{\gamma} \, \mathrm{KL}(w_i \,\|\, \tilde{w}) \; + \; \big\| u_i^{\mathrm{pre}} - \alpha_i \mathbf{1} - F^{\mathrm{pre}} \Lambda_{co}^\top w_i \big\|_2^2 .
 $$
 
-For a given $w_i$, the best intercept is the mean of $u_i^{\mathrm{pre}} - F^{\mathrm{pre}} \Lambda_{co}^\top w_i$ over the pre-treatment periods. Minimizing over $\alpha_i$ first therefore gives the problem above, with $u_i^{\mathrm{pre}}$ and each column of $F^{\mathrm{pre}}$ centered over unit $i$'s own pre-treatment periods. The penalty and $\gamma$ do not change. The code centers the data, solves for $w_i$, and then sets $\alpha_i$ to the mean of $u_i^{\mathrm{pre}} - F^{\mathrm{pre}} \hat\lambda_i$. The intercept is not bounded. The cross-validation of $\gamma$ centers within each training fold and predicts the held-out periods with the training fold's intercept.
+For given weights, the best intercept is the pretreatment mean of $u_i^{\mathrm{pre}} - F^{\mathrm{pre}}\Lambda_{co}^\top w_i$. The solver therefore centers the outcome and factors over each treated unit's pretreatment periods, fits the weights, then recovers the intercept. The intercept is not bounded. CV for $\gamma$ centers within each training fold and predicts with that fold's intercept.
 
-When a constant is added to a treated unit's outcome, only that unit's $\alpha_i$ changes; its weights, its loadings and the ATT do not. Without a unit effect (`force = "none"` or `"time"`), there is no intercept, nothing is centered, and the first problem is solved as written.
+Adding a constant to a treated unit's outcome changes only its intercept. Its weights, loadings, and ATT stay the same. With `force = "none"` or `"time"`, there is no unit intercept, and the solver uses the uncentered objective.
 
-### Bounded vs. unbounded: a worked comparison
+### Bounded and unbounded fits
 
-The new argument `loading.bound = "simplex"` (default `"none"`) activates the constraint. Regularization strength $\gamma$ is selected by 5-fold cross-validation over a log-grid by default; supply `gamma.loading` directly to skip CV, or pass a custom grid via `gamma.loading.grid`. Bounded loadings is supported for `method = "gsynth"` (or equivalently `method = "ife", time.component.from = "nevertreated"`).
+Set `loading.bound = "simplex"` to activate the bound. By default, 5-fold CV over a log-grid selects $\gamma$. Set `gamma.loading` to fix it, or use `gamma.loading.grid` to supply the grid. This tuning selects the penalty strength, separately from the rank.
 
-We fit two specifications on `sim_gsynth` --- one unbounded (`loading.bound = "none"`, the default) and one bounded (`loading.bound = "simplex"`) --- everything else equal:
+The bound is available for `method = "gsynth"`, equivalently `method = "ife", time.component.from = "nevertreated"`. The following fits hold the rank and other settings fixed.
 
 ```{r bounded-vs-unbounded-fit, eval = TRUE, cache = TRUE, message = FALSE, results = "hide"}
 # Unbounded gsynth (default v2.2.x behavior --- standard Xu 2017 estimator)
@@ -566,7 +622,7 @@ out.bounded   <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
                       CV = FALSE, parallel = FALSE, seed = 1234)
 ```
 
-ATT comparison:
+The output compares ATT estimates and reports the selected penalty and pretreatment projection residuals.
 
 ```{r bounded-vs-unbounded-att}
 cat("Unbounded ATT =", round(out.unbounded$att.avg, 3), "\n")
@@ -576,9 +632,11 @@ cat("\nPer-treated projection residuals (loading.proj.resid):\n")
 print(round(out.bounded$loading.proj.resid, 3))
 ```
 
-Large entries in `loading.proj.resid` (substantially above the control-fit RMSE) flag treated units near or outside the convex hull of control loadings --- the simplex constraint is binding for those units, and reported intervals may under-cover (the Andrews 1999, 2001 non-standard-limit regime for constrained estimators).
+Large `loading.proj.resid` values relative to the control-fit RMSE indicate poor pretreatment fit under the bound. They are not the noise-adjusted distances reported by `loading_check()`. When the constraint binds, percentile-bootstrap intervals may under-cover.
 
-#### Side-by-side gap plots
+#### Gap plots
+
+The gap plots compare the estimated effects under the two specifications.
 
 ```{r bounded-vs-unbounded-gap, fig.width = 9, fig.height = 4, message = FALSE}
 library(gridExtra)
@@ -587,9 +645,11 @@ gap.bd  <- plot(out.bounded,   type = "gap", main = "Bounded gsynth (simplex)")
 grid.arrange(gap.un, gap.bd, ncol = 2)
 ```
 
-#### Side-by-side `loading.overlap` plots
+#### Loading overlap plots
 
-The companion plot type `loading.overlap` displays factor 1 versus factor 2, with the convex hull of control loadings shaded and treated units overlaid as red triangles. The unbounded fit shows treated loadings *as estimated* (which can lie outside the hull); the bounded fit shows treated loadings *as projected* onto the simplex (always inside the hull or on its boundary).
+`loading.overlap` plots factor 1 against factor 2. The shaded hull contains the control loadings, and red triangles mark treated loadings. The unbounded plot shows the estimated treated loadings. The bounded plot shows loadings constrained to lie inside or on the hull.
+
+Use `loading_check()` on the unbounded fit to assess whether distances outside the hull exceed each treated loading's estimated noise, as in Step 3. The plot shows where the loadings lie. The check also accounts for their estimation noise. A bounded plot cannot establish overlap because the constraint puts the loadings inside the hull.
 
 ```{r bounded-vs-unbounded-overlap, fig.width = 9, fig.height = 4}
 ov.un <- plot(out.unbounded, type = "loading.overlap",
@@ -599,11 +659,19 @@ ov.bd <- plot(out.bounded,   type = "loading.overlap",
 grid.arrange(ov.un, ov.bd, ncol = 2)
 ```
 
-For one-factor models ($r = 1$), the same `loading.overlap` diagnostic renders as a mirror histogram --- treated counts above the axis, control counts below, with a vertical band marking the range of control loadings. The 1D analog of "outside the hull" is "outside the band."
+For a one-factor model ($r = 1$), the plot uses a mirror histogram. Treated counts appear above the axis and control counts below. A band marks the control range, the 1D counterpart of the hull.
 
-#### Implicit donor weights: bounded vs. unbounded
+#### Implicit donor weights
 
-Each treated counterfactual $\hat Y_i(0) = F\,\hat\lambda_i$ is a linear combination of control-implied outcomes. The coefficients on the controls --- stored in `wgt.implied`, an $N_{co} \times N_{tr}$ matrix with one column per treated unit --- are the *implicit donor weights*. Under `loading.bound = "none"`, they come from the Moore-Penrose pseudo-inverse, $w_i = \Lambda_{co}(\Lambda_{co}^\top\Lambda_{co})^{-1}\lambda_i$, and can be negative; with time fixed effects in the model, each column sums to zero. Under `loading.bound = "simplex"`, each column is non-negative and sums to one (a proper synthetic-control weighting). Both matrices have the same layout, so the scatter below pairs the two weights of every (treated unit, control unit) pair: x-axis is the unbounded weight, y-axis is the bounded weight.
+The weights in `wgt.implied` represent each treated unit's factor component as a linear combination of control factor components. The matrix has dimensions $N_{co} \times N_{tr}$, with one column per treated unit.
+
+Without the bound, the weights use the Moore-Penrose pseudo-inverse,
+
+$$
+w_i = \Lambda_{co}(\Lambda_{co}^\top\Lambda_{co})^{-1}\lambda_i.
+$$
+
+They can be negative and, with time fixed effects, sum to zero. With the simplex bound, each column is non-negative and sums to one. The scatter pairs the unbounded and bounded weights for each treated-control pair.
 
 ```{r bounded-vs-unbounded-weights, fig.width = 6.5, fig.height = 5, message = FALSE}
 library(ggplot2)
@@ -628,33 +696,37 @@ ggplot(df.w, aes(x = unbounded, y = bounded)) +
   theme(panel.grid.minor = element_blank())
 ```
 
-Three patterns are worth checking:
+The plot shows these patterns:
 
-1. **Many weights near $y = 0$.** Bounded weights are sparse: nearly half of the (treated, control) pairs (48%) receive a weight below 0.001, and four of the five treated units put a weight above 0.01 on 16 or fewer of the 45 controls (the five units have 41, 16, 11, 8 and 2 such donors). This sparsity comes from the *simplex constraint*, not from the regularizer. Non-negative least squares on a probability simplex has an active-set property: at the optimum, many constraints $w_j = 0$ are active, and only a few donors have positive weight. The entropy regularizer pushes weights toward uniform $(1/N_{co})$, so it works against sparsity. With moderate $\gamma$, the constraint dominates; as $\gamma \to 0$, weights converge to uniform. Unbounded weights, by contrast, spread non-zero mass across the donor pool because the pseudo-inverse has no non-negativity constraint and no preference for sparsity.
+- **Many bounded weights are near $y = 0$.** Of the treated-control pairs, 48% have bounded weights below 0.001. Four of the five treated units put weights above 0.01 on 16 or fewer of the 45 controls. The five counts are 41, 16, 11, 8 and 2. The simplex permits concentration on a few donors; the entropy penalty pushes toward uniform weights $(1/N_{co})$. As $\gamma \to 0$, weights approach uniform.
+- **Donors with negative unbounded weights often receive small bounded weights.** Among the 118 negative unbounded weights, the largest bounded counterpart is 0.020, and 83% are below 0.01. The bound excludes negative weights, but it refits all weights jointly rather than truncating them.
+- **The largest bounded weights go to donors with positive unbounded weights.** The 11 points above $y = 0.1$ are among the four largest unbounded weights for their treated unit. For the fourth and fifth treated units, the three largest bounded weights sum to 0.81 and 1.00. For the first unit, the largest is 0.055, compared with the uniform weight of 1/45 = 0.022.
 
-2. **Negative unbounded weights become zero.** Points with $x < 0$ sit at $y = 0$, or close to it: of the 118 negative unbounded weights, the largest bounded counterpart is 0.020, and 83% are below 0.01. The simplex projection cannot use negative weights, so it removes those donors from the counterfactual. This matches the synthetic-control intuition: a counterfactual should not be a negative combination of donors.
-
-3. **Large bounded weights go to donors the pseudo-inverse already favors.** The 11 points above $y = 0.1$ all have positive unbounded weights, among the four largest of their treated unit. For the fourth and fifth treated units, the simplex puts almost all the weight on a few of these donors (their three largest weights sum to 0.81 and 1.00), and no bounded weight can exceed one. For the first unit, the weights stay close to uniform (the largest is 0.055, against 1/45 = 0.022). The unbounded weights, which sum to zero, stay small and are spread over the whole donor pool.
-
-The result is a different counterfactual representation. The pseudo-inverse is dense and can extrapolate. The simplex is sparse, uses interpolation only, and gives each weight a synthetic-control interpretation.
+The representations differ: unbounded weights can extrapolate in factor space, while bounded weights interpolate there. The intercept and covariate components remain outside this restriction.
 
 #### Reading the comparison
 
-`sim_gsynth` follows an IFE data generating process. In the unbounded fit, four of the five treated units have loadings inside the convex hull of the control loadings, and one lies outside it. The two fits give ATTs of 4.64 (unbounded) and 4.33 (bounded); the true ATT in `sim_gsynth`, the mean of its `eff` column over the treated cells, is 5.46. The bounded estimate is 0.31 lower than the unbounded one, which is 0.4 and 0.3 times the standard errors of the unbounded and bounded fits (0.78 and 1.02 in this run). Both are below the truth, by 0.82 and 1.14, which is about 1.1 standard errors each. In this simulation, the constraint does not bring the estimate closer to the truth. The *weight* representations differ much more than the estimates, which is informative on its own: the bounded weights are non-negative, and for four of the five treated units they put a weight above 0.01 on 16 or fewer donors. Real datasets with sparse donor pools (few treated units alongside controls with disparate factor loadings) typically show larger ATT gaps; in those settings, the simplex bound corrects the extrapolation that pure least-squares performs and provides a more honest synthetic-control counterfactual.
+`sim_gsynth` follows an IFE data generating process. In the unbounded fit, four of the five treated loadings lie inside the control hull and one lies outside.
+
+The ATTs are 4.64 without the bound and 4.33 with it. The true ATT, the mean of `eff` over treated cells, is 5.46. The bounded estimate is 0.31 lower. That difference is 0.4 and 0.3 times the respective standard errors, 0.78 and 1.02 in this run.
+
+Both estimates are below the truth, by 0.82 and 1.14, about 1.1 standard errors each. The bound does not bring the estimate closer to the truth in this simulation. The weights differ more than the ATTs: for four of the five treated units, bounded weights exceed 0.01 on 16 or fewer donors.
 
 ### Caveats
 
-- Currently restricted to `method = "ife"` or `"gsynth"` (equivalently, `time.component.from = "nevertreated"`).
-- Percentile-bootstrap intervals may under-cover when the simplex constraint binds (true treated loading on the boundary of $\mathrm{conv}(\Lambda_{co})$). Detect via `loading.proj.resid`. Boundary-corrected inference is deferred to a later release.
-- The unit fixed-effect scalar $\alpha_i$ is *not* bounded. Since version 2.4.8, under `force %in% c("unit", "two-way")` it is fitted jointly with the loadings (see "The unit intercept").
-- Before version 2.4.7 the bound was dropped without a message in cross-validation (`CV = TRUE`), in `method = "gsynth"` fits without standard errors, in the parametric bootstrap replicates and in the `loo = TRUE` refits. The estimates, standard errors and selected `r` of such fits can differ from those of earlier versions.
-- Before version 2.4.8 the loadings were fitted without an intercept and the intercept was then set to the mean of the residual. With `force = "unit"` or `"two-way"` the estimated loadings, and so the ATT, then depended on the level of each treated unit (and the cross-validated `gamma.loading` could differ); estimates from earlier versions can therefore differ from those of 2.4.8, sometimes substantially. On `sim_gsynth`, the bounded ATT of the comparison above was 5.10 before version 2.4.8 and is 4.33 now. Fits with `force = "none"` or `"time"` are unchanged.
+- The bound requires `time.component.from = "nevertreated"`, through `method = "gsynth"` or the equivalent IFE specification.
+- Percentile-bootstrap intervals may under-cover when the true treated loading lies on the boundary of $\mathrm{conv}(\Lambda_{co})$. Inspect `loading.proj.resid` for poor constrained fit. It does not establish whether the true loading is on the boundary. Boundary-corrected inference is not implemented.
+- The unit intercept $\alpha_i$ is not bounded. Since version 2.4.8, it is fitted jointly with the loadings when `force` is `"unit"` or `"two-way"`.
+- Before version 2.4.7, the bound was dropped without a message in CV, fits without standard errors, parametric-bootstrap replicates, and `loo = TRUE` refits. Estimates, standard errors, and selected ranks can differ from earlier versions.
+- Before version 2.4.8, the loadings were fitted without an intercept, which was then set to the residual mean. Under `"unit"` or `"two-way"`, the treated outcome level could change the loadings, ATT, and selected `gamma.loading`. On `sim_gsynth`, the bounded ATT above was 5.10 before version 2.4.8 and is 4.33 now. Fits with `"none"` or `"time"` are unchanged.
 
-## CFE with GSynth
+## CFE with never-treated controls
 
-Gsynth is not limited to the IFE method. The complex fixed effects (CFE) estimator can also be used with `time.component.from = "nevertreated"`. This is useful when the data generating process involves not only latent interactive fixed effects but also additional additive fixed effects (e.g., region, industry), unit-specific time trends (via `Q.type`), or time-invariant covariates with time-varying coefficients (`Z`/`gamma`). See [Chapter @sec-cfe] for the full CFE tutorial.
+The complex fixed effects (CFE) estimator also supports `time.component.from = "nevertreated"`. It can add fixed effects, unit-specific trends through `Q.type`, or time-invariant covariates with time-varying coefficients through `Z` and `gamma`. See [Chapter @sec-cfe] for the CFE tutorial.
 
-### Example: CFE + nevertreated
+### Estimation
+
+Set `method = "cfe"` and `time.component.from = "nevertreated"`. This example also includes unit-specific linear trends.
 
 ```{r cfe_nt_demo, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 out.cfe.nt <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id","time"),
@@ -671,12 +743,12 @@ cat("CFE + nevertreated: r.cv =", out.cfe.nt$r.cv,
 ```
 
 ::: {.callout-note appearance="simple"}
-Under `time.component.from = "nevertreated"`, the CFE estimator uses only never-treated controls for factor estimation — the same principle as gsynth. The additional CFE components (extra FE, time trends, Z/gamma) are estimated on the control panel and projected onto treated units alongside the interactive factors. See [Chapter @sec-cfe] for the full CFE tutorial.
+With `time.component.from = "nevertreated"`, CFE estimates factors from never-treated controls, as GSC does. It fits the additional CFE components on the control panel and projects them onto treated units. See [Chapter @sec-cfe].
 :::
 
-### Comparing gsynth and CFE + nevertreated
+### Comparing GSC and CFE
 
-Both approaches share the same estimation regime (never-treated controls only), but CFE can add structural components on top. Whether the extra flexibility helps depends on the data generating process. We compare three specifications using `fect_mspe()`:
+The following comparison holds the estimation regime fixed and varies the model components. `fect_mspe()` reports prediction scores. It does not replace the treated-unit rank rule of Step 3.
 
 ```{r cfe_nt_vs_gsynth, eval=TRUE, cache=TRUE, message=FALSE, results='hide'}
 # Model 1: gsynth (pure IFE, r = 2)
@@ -705,26 +777,106 @@ mspe.comp <- fect_mspe(list(gsynth_r2 = out.gsynth.comp,
 print(mspe.comp$summary[, c("Model", "MSPE", "RMSE", "MAD")])
 ```
 
-`sim_gsynth` follows a pure IFE data generating process with two factors. Models 1 and 2 fit that model on the never-treated units, and their scores are close: an MSPE of 2.36 and 2.31, and almost the same MAD (0.563 and 0.564). They differ slightly because the two estimators fit the model with different iterative algorithms, which stop at slightly different solutions; on the full data their ATTs agree to four decimals (5.5433). Model 3, which adds unit-specific linear trends that the data do not have, scores clearly worse: an MSPE of 8.87, almost four times that of Model 2. In the rolling design, the trend of each held-out unit is fitted to that unit's periods before the held-out block and then extrapolated, so the extra parameters add prediction error. `fect_mspe()` scores the model's full prediction at each held-out cell: the intercept, the unit and time effects, the covariates times their coefficients, the factors and the other CFE terms. Before version 2.4.7 it scored these never-treated fits with only the factor part of the prediction (gsynth) or with 0 (CFE), so the two CFE models both scored 110.33, whatever their specification.
+`sim_gsynth` follows an IFE data generating process with two factors. Models 1 and 2 fit that model using never-treated controls. Their MSPEs are 1.94 and 1.91, and their MADs are 0.538 and 0.541. Different iterative algorithms stop at slightly different solutions. On the full data, their ATTs agree to four decimals (5.5433).
 
+Model 3 adds unit-specific linear trends absent from the data generating process. Its MSPE is 3.27, about 1.7 times that of Model 2. Rolling CV fits each held-out unit's trend using earlier periods and extrapolates it. Here the extra parameters increase prediction error.
+
+`fect_mspe()` scores the full prediction: the intercept, unit and time effects, covariates, factors, and additional CFE terms. Before version 2.4.7, it scored these never-treated fits using only the factor component for GSC or 0 for CFE. Both CFE models then scored 110.33 regardless of specification.
 
 ## Inference
 
-The default `vartype` is `"bootstrap"` for every method, including `method = "gsynth"`. In the gsynth-style regime, `vartype = "parametric"` must be set explicitly. It is a two-stage pseudo-treated bootstrap that targets the conditional variance $V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D)$ on small-$N_{\text{tr}}$ panels where the standard nonparametric bootstrap is unreliable. The `para.error` argument (introduced in v2.4.2) chooses how the residual error process is resampled: `"auto"` (default, resolves to `"empirical"` on a fully-observed panel and `"ar"` on a missing-data panel), `"ar"` (the v2.4.1 behavior), `"empirical"`, or `"wild"`. The (`vartype` × `ci.method` × `para.error`) interaction, parametric-bootstrap mechanics, and an empirical coverage study live in [Chapter @sec-inference], which is the natural next read after this chapter.
+The default `vartype` is `"bootstrap"` for every method, including `method = "gsynth"`. Set `vartype = "parametric"` explicitly for GSC with few treated units. Its two-stage procedure targets the conditional prediction-error variance
 
+$$
+V_t = \mathrm{Var}(\widehat{\mathrm{ATT}}_t - \mathrm{ATT}_t \mid \Lambda, F, X, D).
+$$
 
-## Additional Notes
+It uses prediction errors from controls left out of the factor fit. Its limitations, including few controls and uncertainty from rank selection, are described in Step 4 of [Section @sec-gsynth-checks].
 
-1.  **Unbalanced Panels**: Running Gsynth within **fect** on unbalanced panels will take significantly more time compared to balanced panels, often by a factor of 100:1 or more. This is because the EM algorithm, which fills in missing values (implemented in C++), requires many more iterations to converge. To reduce run-time, users can remove units or time periods with extensive missing values. Understanding the data structure before running any regressions is always helpful. Note that this approach differs from setting `method = "ife"`, as no pre-treatment data from the treated units is used to impute $\hat{Y}(0)$.
+For the GSC parametric bootstrap, `para.error`, introduced in v2.4.2, selects the error resampling path. `"auto"` uses `"empirical"` on fully observed panels and `"ar"` when outcomes are missing. The other options are `"ar"`, the v2.4.1 behavior, `"empirical"`, and `"wild"`. See [Chapter @sec-inference] for the interaction of `vartype`, `ci.method`, and `para.error`, bootstrap mechanics, and the coverage study.
 
-2.  **Adding Covariates**: Including covariates in the model will significantly slow down the algorithm, as the IFE/MC model requires more time to converge. Users should be aware of this trade-off when incorporating covariates.
+The jackknife is also available. Like the unit bootstrap, it relies on variation across units and does not solve the inference problem with few treated units.
 
-3.  **Setting `min.T0`**: Setting `min.T0` to a positive value helps. The algorithm will automatically exclude treated units with too few pre-treatment periods. A larger $T_0$ reduces bias in causal estimates and minimizes the risk of severe extrapolation. When running cross-validation to select the number of factors, `min.T0` must be equal to or greater than (`r.max` + 2). Errors frequently occur when there are too few pre-treatment periods, so ensuring adequate $T_0$ (e.g. setting `min.T0 = 5`) is crucial.
+```{r simJack, cache = TRUE, message = FALSE}
+out2 <- fect(Y ~ D + X1 + X2, data = sim_gsynth,  index = c("id","time"),
+               method = "gsynth", force = "two-way",
+               CV = TRUE, r = c(0, 5), se = TRUE,
+               vartype = "jackknife",
+               parallel = TRUE, cores = 16)
 
+```
 
-## How to Cite
+### Conformal intervals {#sec-gsynth-conformal}
 
-If you find this method helpful, you can cite @Xu2017.
+Conformal intervals (`vartype = "conformal"`) are a second way to handle few treated units. The parametric bootstrap simulates each treated unit's prediction error from a model of the errors. Conformal inference instead treats each never-treated control in turn as if it had been treated at the same date, predicts it in the same way, and compares the treated units' prediction errors with the controls' (the Jackknife+ of @liuxu2026conformal). Under the conditions in [Section @sec-conformal-assumptions], each interval covers its effect with probability at least $1 -$ `alpha` in finite samples, with no model of the errors. [Chapter @sec-conformal] explains the method. This section shows how it fits the five checks.
+
+The call below uses the rank the forward rule chose in Step 3, held fixed with `CV = FALSE`. With five treated units, `conformal.block = TRUE` gives the average effect an interval with a guarantee: it compares the five treated units, taken together, with nine blocks of five controls ([Section @sec-conformal-block]). The blocks are drawn at random, so set `seed`. `conformal.diag = 10` adds intervals for the last ten periods before treatment, computed as if each treated unit had adopted at that period ([Section @sec-conformal-checks]). The level is 90%: a 95% block interval needs at least 19 blocks, or 95 controls here, and with 45 controls it would be the whole real line.
+
+```{r gsc-conformal, cache = TRUE, message = FALSE}
+out.cf <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+               method = "gsynth", force = "two-way", r = 2, CV = FALSE,
+               se = TRUE, vartype = "conformal", alpha = 0.1,
+               conformal.block = TRUE, conformal.diag = 10, seed = 1234)
+print(out.cf)
+```
+
+The block interval for the average effect runs from `r round(out.cf$est.avg[1, "CI.lower"], 2)` to `r round(out.cf$est.avg[1, "CI.upper"], 2)`. The 90% normal interval from the parametric bootstrap in Step 3 runs from `r round(out.fwd$est.avg[1, "ATT.avg"] - qnorm(0.95) * out.fwd$est.avg[1, "S.E."], 2)` to `r round(out.fwd$est.avg[1, "ATT.avg"] + qnorm(0.95) * out.fwd$est.avg[1, "S.E."], 2)`. The p-value, `r round(out.cf$est.avg[1, "p.value"], 2)`, is the smallest possible with nine blocks ($1/N$ with $N = 10$). There are no standard errors. When both intervals are reported and they disagree, the parametric one depends on the model of the errors, and the conformal one on the comparison with the controls.
+
+The two gap plots show the same estimates with 90% intervals, from ten periods before treatment to ten after: the parametric bootstrap on the left and the conformal intervals on the right.
+
+```{r gsc-conformal-plot, fig.width = 9, fig.height = 4, message = FALSE}
+library(gridExtra)
+p.pb <- plot(out.fwd, type = "gap", plot.ci = "0.9", xlim = c(-9, 10),
+             ylim = c(-6.5, 11.5), main = "Parametric bootstrap")
+p.cf <- plot(out.cf, type = "gap", xlim = c(-9, 10), ylim = c(-6.5, 11.5),
+             main = "Conformal (block Jackknife+)")
+## drop the plot's note on the blocks and the pre-treatment intervals,
+## so that the two panels have the same height
+grid.arrange(p.pb, p.cf + ggplot2::labs(caption = NULL), ncol = 2)
+```
+
+```{r gsc-conformal-widths, include = FALSE}
+post <- function(m) m[as.numeric(rownames(m)) >= 1, , drop = FALSE]
+w.pb <- with(as.data.frame(post(out.fwd$est.att90)), CI.upper - CI.lower)
+w.cf <- with(as.data.frame(post(out.cf$est.att)), CI.upper - CI.lower)
+pre.cf <- out.cf$est.att[as.numeric(rownames(out.cf$est.att)) %in% -9:0, , drop = FALSE]
+```
+
+With nine blocks, each conformal interval is set by the most extreme of the nine blocks' errors at that date, so its width changes more from period to period than the parametric interval's. After treatment, it is wider in `r sum(w.cf > w.pb)` of the 10 periods, most of all in periods 1, 5 and 8. In period 1 it includes zero, and the parametric interval, just above zero, does not.
+
+Before treatment, the two show different things. The parametric points are the fit's in-sample residuals, averaged over the treated units. The conformal points are out-of-sample prediction errors: each period's outcome is predicted from earlier periods and the controls, as if treatment had started then. Both should be near zero. The conformal interval excludes zero in `r sum(pre.cf[, "CI.lower"] > 0 | pre.cf[, "CI.upper"] < 0)` of the 10 pretreatment periods, about what chance gives at `alpha = 0.1`; a run of such periods would say the treated units were harder to predict than the controls.
+
+Three of the five checks bear on the conformal guarantee.
+
+- **Count the data (Step 1).** A finite interval at `alpha = 0.1` needs at least nine never-treated controls, and the block interval needs at least nine per treated unit.
+- **Check overlap (Steps 2 and 3).** The guarantee needs the treated units to be no harder to predict than the controls. A treated unit that the donors cannot follow, or whose loadings lie far outside the controls', is the usual way this fails. The overlap checks give evidence on this condition, and so do the pretreatment intervals in the plot.
+- **Choose the rank (Step 3).** The guarantee assumes a rank fixed in advance. The forward rule chooses the rank from the treated units' pretreatment outcomes, and @liuxu2026conformal warn that tuning on the treated units' fit can break the guarantee. Passing the chosen rank with `CV = FALSE` does not change this. Report the intervals at nearby ranks as well:
+
+```{r gsc-conformal-ranks, cache = TRUE, message = FALSE}
+cf.near <- sapply(c(1, 3), function(r) {
+  fit <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+              method = "gsynth", force = "two-way", r = r, CV = FALSE,
+              se = TRUE, vartype = "conformal", alpha = 0.1,
+              conformal.block = TRUE, seed = 1234)
+  fit$est.avg[1, c("ATT.avg", "CI.lower", "CI.upper")]
+})
+colnames(cf.near) <- c("r = 1", "r = 3")
+round(cf.near, 2)
+```
+
+At one and three factors, the intervals are wider than at two, and all three exclude zero. Conformal intervals are also available for IFE-EM (`method = "ife"`) and matrix completion (`method = "mc"`), with the same conditions.
+
+## Additional notes
+
+Missing data, covariates, and the pretreatment window affect computation and the information available for estimation.
+
+- **Unbalanced panels.** Missing control outcomes require iterative imputation and can increase computation time. Inspect the missing-data pattern before fitting. Removing units or periods changes the analysis sample and should be reported. GSC still estimates factors from never-treated controls and uses treated units' pretreatment outcomes to estimate their loadings.
+- **Covariates.** Covariates add parameters and can increase the work needed for convergence. Choose them for the outcome model and inspect convergence.
+- **`min.T0`.** This argument excludes treated units with too few pretreatment observations. For CV, it must be at least `r.max` + 2. A unit that meets it, for example with `min.T0 = 5`, can still have too few periods for the rank rule: Step 1 asks for about 15 when the candidate ranks go up to 5, and `fect_rank()` reports whether the window is long enough.
+
+## How to cite
+
+Cite @Xu2017 for GSC.
 
 ```bibtex
 @article{Xu2017,

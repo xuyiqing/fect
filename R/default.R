@@ -768,6 +768,17 @@ fect.default <- function(
     ## -------------------------------##
     ## Checking Parameters
     ## -------------------------------##
+    ## cv.method = "forward" (2.5.0): the rank of GSC from the forward rule
+    ## (R/gsc-rank.R), then the fit at that rank
+    if (identical(cv.method, "forward")) {
+        if (isFALSE(CV) || (is.null(CV) && !is.null(r) && length(r) == 1L)) {
+            stop("cv.method = \"forward\" chooses the rank: set CV = TRUE, or give ",
+                 "a range of ranks in r.", call. = FALSE)
+        }
+        return(.fect_forward_cv(match.call(), parent.frame(),
+                                list(method = method, time.component.from = time.component.from,
+                                     r = r, lambda = lambda, binary = binary)))
+    }
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     placeboEquiv <- loo
     permu.dimension <- "time"
@@ -2896,7 +2907,10 @@ fect.default <- function(
                 "The parametric pseudo-treated bootstrap requires a control pool ",
                 "isolated from treated-unit pre-treatment cells. Pass ",
                 "time.component.from = \"nevertreated\" (if never-treated controls ",
-                "exist) or use vartype = \"bootstrap\" or \"jackknife\"."
+                "exist) or use vartype = \"bootstrap\" or \"jackknife\". ",
+                "With few treated units and a treatment that does not switch off, ",
+                "use vartype = \"conformal\" (Jackknife+; method = \"gsynth\", ",
+                "\"ife\" or \"mc\"); see ?fect, \"Conformal intervals\"."
             ),
             method_arg, time.component.from
         ), call. = FALSE)

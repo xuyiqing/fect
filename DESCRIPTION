@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactual Estimators
-Version: 2.4.9
-Date: 2026-11-05
+Version: 2.5.0
+Date: 2026-11-11
 Authors@R: 
     c(person("Yiqing", "Xu", , "yiqingxu@stanford.edu", role = c("aut", "cre")),
       person("Licheng", "Liu", , "lichengl@stanford.edu", role = c("aut")), 
@@ -40,7 +40,8 @@ Imports:
     reshape2,
     rlang,
     scales,
-    splines
+    splines,
+    quadprog
 Suggests:
     panelView,
     testthat (>= 3.0.0),
@@ -48,7 +49,6 @@ Suggests:
     DIDmultiplegtDYN,
     ggrepel,
     HonestDiDFEct,
-    quadprog,
     withr
 Depends: R (>= 4.1.0)
 LinkingTo: Rcpp, RcppArmadillo
