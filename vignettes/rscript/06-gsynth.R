@@ -407,8 +407,8 @@ print(out.cf)
 ## ----gsc-conformal-plot, fig.width = 9, fig.height = 4, message = FALSE-------
 library(gridExtra)
 p.pb <- plot(out.fwd, type = "gap", plot.ci = "0.9", xlim = c(-9, 10),
-             ylim = c(-3, 11.5), main = "Parametric bootstrap")
-p.cf <- plot(out.cf, type = "gap", xlim = c(-9, 10), ylim = c(-3, 11.5),
+             ylim = c(-6.5, 11.5), main = "Parametric bootstrap")
+p.cf <- plot(out.cf, type = "gap", xlim = c(-9, 10), ylim = c(-6.5, 11.5),
              main = "Conformal (block Jackknife+)")
 ## drop the plot's note on the blocks and the pre-treatment intervals,
 ## so that the two panels have the same height
