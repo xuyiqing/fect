@@ -440,7 +440,7 @@ Ignored when \code{CV = FALSE}.}
 
   Liu, Z. and Xu, Y. (2026).
   Unit-Level Conformal Inference for Panel Counterfactuals.
-  Working paper.
+  arXiv:2611.19209. \doi{10.48550/arXiv.2611.19209}
 
   Xu, Y. (2017).
   Generalized Synthetic Control Method: Causal Inference with Interactive Fixed Effects Models.
