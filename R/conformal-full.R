@@ -803,8 +803,9 @@
 #'     have no pre-treatment or post-treatment outcome.}
 #'   \item{procedure, rule, alpha, call}{The settings.}
 #'
-#' @references Liu, Licheng and Yiqing Xu. 2026. "Conformal Inference for
-#'   Panel Counterfactual Estimators." Working paper.
+#' @references Liu, Ziyi and Yiqing Xu. 2026. "Unit-Level Conformal Inference
+#'   for Panel Counterfactuals." arXiv:2611.19209.
+#'   \doi{10.48550/arXiv.2611.19209}
 #'
 #' @seealso \code{\link{fect}} with \code{method = "fe"} and
 #'   \code{vartype = "conformal"}, which uses \code{rule = "did"}.

@@ -167,8 +167,9 @@ out.my <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"),
 }
 }
 \references{
-Liu, Licheng and Yiqing Xu. 2026. "Conformal Inference for
-  Panel Counterfactual Estimators." Working paper.
+Liu, Ziyi and Yiqing Xu. 2026. "Unit-Level Conformal Inference
+  for Panel Counterfactuals." arXiv:2611.19209.
+  \doi{10.48550/arXiv.2611.19209}
 }
 \seealso{
 \code{\link{fect}} with \code{method = "fe"} and

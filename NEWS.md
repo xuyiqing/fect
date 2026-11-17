@@ -71,7 +71,8 @@ Development version.
 * New `vartype = "conformal"`: date-specific conformal intervals, one for
   each treated unit and post-treatment date (in `fit$conformal$unit`), by the
   Jackknife+ for full-path estimators of Liu and Xu (2026), "Unit-Level
-  Conformal Inference for Panel Counterfactuals". For `method = "gsynth"`,
+  Conformal Inference for Panel Counterfactuals"
+  (<https://arxiv.org/abs/2611.19209>). For `method = "gsynth"`,
   `"ife"` and `"mc"` with an absorbing treatment. It supersedes the June
   design (#143), which was never released. The paper's full conformal
   inference, for target-date estimators, is not implemented.
