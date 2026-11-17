@@ -285,65 +285,13 @@ plot(out_ub, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
 plot(out_ub_param, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
 
 
-## ----bounded-vs-unbounded-fit, eval = TRUE, cache = TRUE, message = FALSE, results = "hide"----
-# Unbounded gsynth (default v2.2.x behavior --- standard Xu 2017 estimator)
-out.unbounded <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
-                      method = "gsynth", r = 2,
-                      se = TRUE, vartype = "parametric", nboots = 100,
-                      CV = FALSE, parallel = FALSE, seed = 1234)
-
-# Bounded gsynth (new in v2.3.0 --- simplex projection)
-out.bounded   <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
-                      method = "gsynth", r = 2,
-                      loading.bound = "simplex",
-                      se = TRUE, vartype = "parametric", nboots = 100,
-                      CV = FALSE, parallel = FALSE, seed = 1234)
-
-
-## ----bounded-vs-unbounded-att-------------------------------------------------
-cat("Unbounded ATT =", round(out.unbounded$att.avg, 3), "\n")
-cat("Bounded   ATT =", round(out.bounded$att.avg,   3), "\n")
-cat("\ngamma.loading (CV-selected) =", round(out.bounded$gamma.loading, 4), "\n")
-cat("\nPer-treated projection residuals (loading.proj.resid):\n")
-print(round(out.bounded$loading.proj.resid, 3))
-
-
-## ----bounded-vs-unbounded-gap, fig.width = 9, fig.height = 4, message = FALSE----
-library(gridExtra)
-gap.un  <- plot(out.unbounded, type = "gap", main = "Unbounded gsynth")
-gap.bd  <- plot(out.bounded,   type = "gap", main = "Bounded gsynth (simplex)")
-grid.arrange(gap.un, gap.bd, ncol = 2)
-
-
-## ----bounded-vs-unbounded-overlap, fig.width = 9, fig.height = 4--------------
-ov.un <- plot(out.unbounded, type = "loading.overlap",
-              main = "Unbounded loadings")
-ov.bd <- plot(out.bounded,   type = "loading.overlap",
-              main = "Bounded loadings (projected)")
-grid.arrange(ov.un, ov.bd, ncol = 2)
-
-
-## ----bounded-vs-unbounded-weights, fig.width = 6.5, fig.height = 5, message = FALSE----
-library(ggplot2)
-W.un <- as.matrix(out.unbounded$wgt.implied)
-W.bd <- as.matrix(out.bounded$wgt.implied)
-df.w <- data.frame(
-  unbounded = as.numeric(W.un),
-  bounded   = as.numeric(W.bd)
-)
-
-ggplot(df.w, aes(x = unbounded, y = bounded)) +
-  geom_hline(yintercept = 0, color = "grey80", linewidth = 0.4) +
-  geom_vline(xintercept = 0, color = "grey80", linewidth = 0.4) +
-  geom_abline(slope = 1, intercept = 0,
-              color = "grey60", linetype = "dashed", linewidth = 0.4) +
-  geom_point(alpha = 0.4, size = 1.4, color = "#3F6A99") +
-  labs(x = "Unbounded weight (Moore-Penrose pseudo-inverse)",
-       y = "Bounded weight (simplex-projected)",
-       title = "Implicit donor weights: bounded vs unbounded",
-       subtitle = "One point per (treated, control) pair; dashed line is y = x") +
-  theme_bw(base_size = 11) +
-  theme(panel.grid.minor = element_blank())
+## ----bounded-fit, eval = FALSE------------------------------------------------
+# out.bounded <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
+#                     method = "gsynth", r = 2, loading.bound = "simplex",
+#                     se = TRUE, vartype = "parametric")
+# out.bounded$gamma.loading       # penalty chosen by cross-validation
+# out.bounded$loading.proj.resid  # pretreatment fit under the bound
+# out.bounded$wgt.implied         # implied donor weights, one column per treated unit
 
 
 ## ----cfe_nt_demo, eval=TRUE, cache=TRUE, message=FALSE, results='hide'--------

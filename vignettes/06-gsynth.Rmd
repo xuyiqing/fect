@@ -15,7 +15,7 @@ The standalone **gsynth** package is a wrapper of **fect**. Use its [old syntax]
 - Use GSC for block or staggered adoption without treatment reversal, including panels with few treated units.
 - Follow the five checks in [Section @sec-gsynth-checks]: count the data; check overlap; choose the rank forward from treated units; use out-of-sample inference; report the choices.
 - Rolling CV remains the default of `CV = TRUE`, but for GSC it scores control cells and can miss a factor on which treated and control units differ. Choose the rank with the forward rule (Step 3).
-- Bounded factor loadings (`loading.bound = "simplex"`) are optional and do not replace the overlap checks.
+- Bounded factor loadings (`loading.bound = "simplex"`) are experimental and not recommended for reported results. They do not replace the overlap checks.
 - Basic estimation comes first. Cross-validation options, plots, staggered adoption, unbalanced panels, bounded loadings, and inference follow the five checks.
 :::
 
@@ -556,169 +556,38 @@ The next plot uses the parametric bootstrap on the same unbalanced panel.
 plot(out_ub_param, type = "gap", xlim = c(-10, 5), ylim = c(-10, 15))
 ```
 
-## Bounded factor loadings
+## Bounded factor loadings (experimental)
 
-`loading.bound = "simplex"` constrains each treated loading to a non-negative weighted average of control loadings. The default, `"none"`, estimates treated loadings by unconstrained least squares.
+::: {.callout-warning appearance="simple"}
 
-The bound changes the estimator. It does not establish that the controls can represent a treated unit. Follow the five checks first. `overlap_check()` screens the raw pretreatment paths, and `loading_check()` assesses estimated loadings at the chosen rank. If units are flagged, report the trimmed estimate beside the full estimate.
+### Not recommended
 
-### The simplex projection
+`loading.bound = "simplex"` is experimental, and we do not recommend it for reported results. Keep the default, `loading.bound = "none"`. In simulations with a decision rule fixed in advance, the bound did better than unbounded GSC in none of the seven designs tested. The per-unit bound may be deprecated in a later release.
 
-For each treated unit $i$, the bounded estimator solves
+:::
 
-$$
-\min_{w_i \in \Delta^{N_{co}}} \;\; \frac{1}{\gamma} \, \mathrm{KL}(w_i \,\|\, \tilde{w}) \; + \; \big\| u_i^{\mathrm{pre}} - F^{\mathrm{pre}} \Lambda_{co}^\top w_i \big\|_2^2
-$$
+`loading.bound = "simplex"` restricts each treated unit's factor loading to a non-negative weighted average of the controls' loadings. An entropy penalty pulls the weights toward equal weights, and cross-validation sets its strength (`gamma.loading`, or a grid in `gamma.loading.grid`). The bound changes the estimator but does not create overlap. When a treated unit's loading lies outside the controls', the bound replaces the extrapolation with a counterfactual from inside their range, and if the factor model holds outside that range, the bounded estimate is biased.
 
-where:
+The simulations used four panels with 500 replications each and a true effect of zero, at the true rank. With overlap, the bound's false-positive rate was 13%, against 5% for unbounded GSC. Without overlap, including designs in which the untreated outcome bends outside the controls' range, it was 78% to 94%, against 4% to 7%. Its RMSE was lower only with 5 pretreatment periods (0.95 against 1.08), and there its false-positive rate was 13% against 5%. To find out whether the controls can represent the treated units, use the overlap checks in [Section @sec-gsynth-checks].
 
-- $w_i$ is the $N_{co}$-vector of weights, with $w_{ij} \geq 0$ and $\sum_j w_{ij} = 1$;
-- $\tilde{w} = (1/N_{co}, \ldots, 1/N_{co})$ is the uniform reference, and $\mathrm{KL}(w \,\|\, \tilde{w}) = \sum_j w_j \log(N_{co}\, w_j)$ penalizes departures from it;
-- $\gamma > 0$ controls regularization: as $\gamma \to \infty$, the penalty vanishes; as $\gamma \to 0$, the weights approach uniform;
-- $u_i^{\mathrm{pre}}$ is the pretreatment outcome after removing the grand mean, covariate contribution, and any time effects. It still contains the unit's own level;
-- $F^{\mathrm{pre}}$ is the $T_0 \times r$ matrix of estimated pretreatment factors;
-- $\Lambda_{co}$ is the $N_{co} \times r$ matrix of estimated control loadings.
+The call is shown for completeness and is not run here.
 
-The fitted loading is $\hat\lambda_i = \Lambda_{co}^\top w_i$. Its factor component,
-
-$$
-F\,\hat\lambda_i = F\Lambda_{co}^\top w_i,
-$$
-
-lies pointwise in the convex hull of the control factor components. The full counterfactual also includes the additive effects and covariate contribution. The bound therefore does not put the full counterfactual inside the range of observed control outcomes.
-
-The objective combines pretreatment squared error with a penalty toward uniform weights. Without a unit effect, the solver uses a softmax parameterization and `optim(method = "L-BFGS-B")`, with an analytic gradient. A mirror-descent fallback handles ill-conditioned inputs. With a unit effect, the centered problem uses Newton's method on the dual, with L-BFGS-B as the fallback.
-
-#### The unit intercept
-
-With `force = "unit"` or `"two-way"`, each treated unit has a free intercept $\alpha_i$. Since version 2.4.8, the estimator fits it jointly with the weights:
-
-$$
-\min_{\alpha_i \in \mathbb{R},\; w_i \in \Delta^{N_{co}}} \;\; \frac{1}{\gamma} \, \mathrm{KL}(w_i \,\|\, \tilde{w}) \; + \; \big\| u_i^{\mathrm{pre}} - \alpha_i \mathbf{1} - F^{\mathrm{pre}} \Lambda_{co}^\top w_i \big\|_2^2 .
-$$
-
-For given weights, the best intercept is the pretreatment mean of $u_i^{\mathrm{pre}} - F^{\mathrm{pre}}\Lambda_{co}^\top w_i$. The solver therefore centers the outcome and factors over each treated unit's pretreatment periods, fits the weights, then recovers the intercept. The intercept is not bounded. CV for $\gamma$ centers within each training fold and predicts with that fold's intercept.
-
-Adding a constant to a treated unit's outcome changes only its intercept. Its weights, loadings, and ATT stay the same. With `force = "none"` or `"time"`, there is no unit intercept, and the solver uses the uncentered objective.
-
-### Bounded and unbounded fits
-
-Set `loading.bound = "simplex"` to activate the bound. By default, 5-fold CV over a log-grid selects $\gamma$. Set `gamma.loading` to fix it, or use `gamma.loading.grid` to supply the grid. This tuning selects the penalty strength, separately from the rank.
-
-The bound is available for `method = "gsynth"`, equivalently `method = "ife", time.component.from = "nevertreated"`. The following fits hold the rank and other settings fixed.
-
-```{r bounded-vs-unbounded-fit, eval = TRUE, cache = TRUE, message = FALSE, results = "hide"}
-# Unbounded gsynth (default v2.2.x behavior --- standard Xu 2017 estimator)
-out.unbounded <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
-                      method = "gsynth", r = 2,
-                      se = TRUE, vartype = "parametric", nboots = 100,
-                      CV = FALSE, parallel = FALSE, seed = 1234)
-
-# Bounded gsynth (new in v2.3.0 --- simplex projection)
-out.bounded   <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
-                      method = "gsynth", r = 2,
-                      loading.bound = "simplex",
-                      se = TRUE, vartype = "parametric", nboots = 100,
-                      CV = FALSE, parallel = FALSE, seed = 1234)
+```{r bounded-fit, eval = FALSE}
+out.bounded <- fect(Y ~ D, data = sim_gsynth, index = c("id", "time"),
+                    method = "gsynth", r = 2, loading.bound = "simplex",
+                    se = TRUE, vartype = "parametric")
+out.bounded$gamma.loading       # penalty chosen by cross-validation
+out.bounded$loading.proj.resid  # pretreatment fit under the bound
+out.bounded$wgt.implied         # implied donor weights, one column per treated unit
 ```
 
-The output compares ATT estimates and reports the selected penalty and pretreatment projection residuals.
+### Notes
 
-```{r bounded-vs-unbounded-att}
-cat("Unbounded ATT =", round(out.unbounded$att.avg, 3), "\n")
-cat("Bounded   ATT =", round(out.bounded$att.avg,   3), "\n")
-cat("\ngamma.loading (CV-selected) =", round(out.bounded$gamma.loading, 4), "\n")
-cat("\nPer-treated projection residuals (loading.proj.resid):\n")
-print(round(out.bounded$loading.proj.resid, 3))
-```
-
-Large `loading.proj.resid` values relative to the control-fit RMSE indicate poor pretreatment fit under the bound. They are not the noise-adjusted distances reported by `loading_check()`. When the constraint binds, percentile-bootstrap intervals may under-cover.
-
-#### Gap plots
-
-The gap plots compare the estimated effects under the two specifications.
-
-```{r bounded-vs-unbounded-gap, fig.width = 9, fig.height = 4, message = FALSE}
-library(gridExtra)
-gap.un  <- plot(out.unbounded, type = "gap", main = "Unbounded gsynth")
-gap.bd  <- plot(out.bounded,   type = "gap", main = "Bounded gsynth (simplex)")
-grid.arrange(gap.un, gap.bd, ncol = 2)
-```
-
-#### Loading overlap plots
-
-`loading.overlap` plots factor 1 against factor 2. The shaded hull contains the control loadings, and red triangles mark treated loadings. The unbounded plot shows the estimated treated loadings. The bounded plot shows loadings constrained to lie inside or on the hull.
-
-Use `loading_check()` on the unbounded fit to assess whether distances outside the hull exceed each treated loading's estimated noise, as in Step 3. The plot shows where the loadings lie. The check also accounts for their estimation noise. A bounded plot cannot establish overlap because the constraint puts the loadings inside the hull.
-
-```{r bounded-vs-unbounded-overlap, fig.width = 9, fig.height = 4}
-ov.un <- plot(out.unbounded, type = "loading.overlap",
-              main = "Unbounded loadings")
-ov.bd <- plot(out.bounded,   type = "loading.overlap",
-              main = "Bounded loadings (projected)")
-grid.arrange(ov.un, ov.bd, ncol = 2)
-```
-
-For a one-factor model ($r = 1$), the plot uses a mirror histogram. Treated counts appear above the axis and control counts below. A band marks the control range, the 1D counterpart of the hull.
-
-#### Implicit donor weights
-
-The weights in `wgt.implied` represent each treated unit's factor component as a linear combination of control factor components. The matrix has dimensions $N_{co} \times N_{tr}$, with one column per treated unit.
-
-Without the bound, the weights use the Moore-Penrose pseudo-inverse,
-
-$$
-w_i = \Lambda_{co}(\Lambda_{co}^\top\Lambda_{co})^{-1}\lambda_i.
-$$
-
-They can be negative and, with time fixed effects, sum to zero. With the simplex bound, each column is non-negative and sums to one. The scatter pairs the unbounded and bounded weights for each treated-control pair.
-
-```{r bounded-vs-unbounded-weights, fig.width = 6.5, fig.height = 5, message = FALSE}
-library(ggplot2)
-W.un <- as.matrix(out.unbounded$wgt.implied)
-W.bd <- as.matrix(out.bounded$wgt.implied)
-df.w <- data.frame(
-  unbounded = as.numeric(W.un),
-  bounded   = as.numeric(W.bd)
-)
-
-ggplot(df.w, aes(x = unbounded, y = bounded)) +
-  geom_hline(yintercept = 0, color = "grey80", linewidth = 0.4) +
-  geom_vline(xintercept = 0, color = "grey80", linewidth = 0.4) +
-  geom_abline(slope = 1, intercept = 0,
-              color = "grey60", linetype = "dashed", linewidth = 0.4) +
-  geom_point(alpha = 0.4, size = 1.4, color = "#3F6A99") +
-  labs(x = "Unbounded weight (Moore-Penrose pseudo-inverse)",
-       y = "Bounded weight (simplex-projected)",
-       title = "Implicit donor weights: bounded vs unbounded",
-       subtitle = "One point per (treated, control) pair; dashed line is y = x") +
-  theme_bw(base_size = 11) +
-  theme(panel.grid.minor = element_blank())
-```
-
-The plot shows these patterns:
-
-- **Many bounded weights are near $y = 0$.** Of the treated-control pairs, 48% have bounded weights below 0.001. Four of the five treated units put weights above 0.01 on 16 or fewer of the 45 controls. The five counts are 41, 16, 11, 8 and 2. The simplex permits concentration on a few donors; the entropy penalty pushes toward uniform weights $(1/N_{co})$. As $\gamma \to 0$, weights approach uniform.
-- **Donors with negative unbounded weights often receive small bounded weights.** Among the 118 negative unbounded weights, the largest bounded counterpart is 0.020, and 83% are below 0.01. The bound excludes negative weights, but it refits all weights jointly rather than truncating them.
-- **The largest bounded weights go to donors with positive unbounded weights.** The 11 points above $y = 0.1$ are among the four largest unbounded weights for their treated unit. For the fourth and fifth treated units, the three largest bounded weights sum to 0.81 and 1.00. For the first unit, the largest is 0.055, compared with the uniform weight of 1/45 = 0.022.
-
-The representations differ: unbounded weights can extrapolate in factor space, while bounded weights interpolate there. The intercept and covariate components remain outside this restriction.
-
-#### Reading the comparison
-
-`sim_gsynth` follows an IFE data generating process. In the unbounded fit, four of the five treated loadings lie inside the control hull and one lies outside.
-
-The ATTs are 4.64 without the bound and 4.33 with it. The true ATT, the mean of `eff` over treated cells, is 5.46. The bounded estimate is 0.31 lower. That difference is 0.4 and 0.3 times the respective standard errors, 0.78 and 1.02 in this run.
-
-Both estimates are below the truth, by 0.82 and 1.14, about 1.1 standard errors each. The bound does not bring the estimate closer to the truth in this simulation. The weights differ more than the ATTs: for four of the five treated units, bounded weights exceed 0.01 on 16 or fewer donors.
-
-### Caveats
-
-- The bound requires `time.component.from = "nevertreated"`, through `method = "gsynth"` or the equivalent IFE specification.
-- Percentile-bootstrap intervals may under-cover when the true treated loading lies on the boundary of $\mathrm{conv}(\Lambda_{co})$. Inspect `loading.proj.resid` for poor constrained fit. It does not establish whether the true loading is on the boundary. Boundary-corrected inference is not implemented.
-- The unit intercept $\alpha_i$ is not bounded. Since version 2.4.8, it is fitted jointly with the loadings when `force` is `"unit"` or `"two-way"`.
-- Before version 2.4.7, the bound was dropped without a message in CV, fits without standard errors, parametric-bootstrap replicates, and `loo = TRUE` refits. Estimates, standard errors, and selected ranks can differ from earlier versions.
-- Before version 2.4.8, the loadings were fitted without an intercept, which was then set to the residual mean. Under `"unit"` or `"two-way"`, the treated outcome level could change the loadings, ATT, and selected `gamma.loading`. On `sim_gsynth`, the bounded ATT above was 5.10 before version 2.4.8 and is 4.33 now. Fits with `"none"` or `"time"` are unchanged.
+- The bound is available for `method = "gsynth"`, or equivalently `method = "ife"` with `time.component.from = "nevertreated"`.
+- The unit intercept is not bounded. Since version 2.4.8, with `force = "unit"` or `"two-way"`, it is fitted jointly with the weights.
+- Percentile-bootstrap intervals may under-cover when the bound binds. Boundary-corrected inference is not implemented.
+- Before version 2.4.7, the bound was dropped without a message in CV, fits without standard errors, parametric-bootstrap replicates and `loo = TRUE` refits.
+- Before version 2.4.8, the loadings were fitted without an intercept, which was then set to the residual mean, so under `"unit"` or `"two-way"` the treated outcome's level could change the loadings, the ATT and the selected `gamma.loading`. On `sim_gsynth` with two factors, the bounded ATT was 5.10 before version 2.4.8 and is 4.33 now.
 
 ## CFE with never-treated controls
 
