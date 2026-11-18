@@ -251,7 +251,7 @@ plot(out, legacy.style = TRUE)
 Use this for byte-identical regeneration of submitted-version figures, not for new work --- the modern recipe (the v2.3.1 default) is recommended for any figure you are rendering for the first time.
 
 ::: {.callout-note appearance="simple"}
-`theme.bw = FALSE` (the pre-2.3.1 gray-panel look without `legacy.style`) is soft-deprecated and will be removed in v2.5.0. If you need that aesthetic, use `legacy.style = TRUE` + `theme.bw = FALSE`, which is preserved indefinitely.
+`theme.bw = FALSE` (the pre-2.3.1 gray-panel look without `legacy.style`) is soft-deprecated and will be removed in a future version. If you need that aesthetic, use `legacy.style = TRUE` + `theme.bw = FALSE`, which is preserved indefinitely.
 :::
 
 ### Reference lines

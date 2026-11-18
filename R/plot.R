@@ -195,12 +195,12 @@ plot.fect <- function(
   use_modern_recipe <- isTRUE(theme.bw) && !isTRUE(legacy.style)
 
   ## Soft-deprecate theme.bw = FALSE: emit once per session. The gray-panel
-  ## look is preserved for now but slated for removal in v2.5.0.
+  ## look is preserved for now but slated for removal in a future version.
   if (!isTRUE(theme.bw) && !isTRUE(.fect_state$theme.bw.deprecation.notified)) {
     message("Note: `theme.bw = FALSE` is soft-deprecated. The modern style ",
             "is now the default; pass `legacy.style = TRUE` for byte-",
             "identical pre-2.3.1 reproduction. `theme.bw` is slated for ",
-            "removal in v2.5.0.")
+            "removal in a future version.")
     .fect_state$theme.bw.deprecation.notified <- TRUE
   }
   if (is.null(preset)) {
@@ -373,7 +373,7 @@ plot.fect <- function(
   if (!is.null(weight)) {
     warning(
       "The `weight` argument to plot.fect() is deprecated as of fect 2.3.1 ",
-      "and will be removed in v2.5.0. When the fit was constructed with ",
+      "and will be removed in a future version. When the fit was constructed with ",
       "non-NULL `W`, all reported quantities (per-period ATT, aggregate ATT, ",
       "CIs, p-values) are now sample-weighted (W-weighted) by default. ",
       "Refit with `W = NULL` if you want the unweighted view.",

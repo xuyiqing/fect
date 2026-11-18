@@ -1,8 +1,8 @@
 <!-- markdownlint-disable MD025 -->
 # fect 2.5.0
 
-Development version. 2.4.9 remains the CRAN candidate; everything in 2.4.9
-below is part of this version.
+Development version and the next CRAN release. Versions 2.4.6 to 2.4.9 were
+not released on CRAN; their changes, listed below, are part of this version.
 
 ## New features
 
