@@ -8,7 +8,7 @@
 ## lowered to what the data allow (never below min.T0) with a message. The
 ## fold standard errors the rule used come back as CV.out.se, and the
 ## default cv.rule is "min" (the anchor study in
-## Research_Hub/Packages/fect/triage/2026-09-29-cv-anchor-study/).
+## Research_Hub/_system/packages/fect/triage/2026-09-29-cv-anchor-study/).
 
 skip_on_cran()
 
