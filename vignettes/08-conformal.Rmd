@@ -103,17 +103,11 @@ ggplot(cu, aes(x = event.time, y = eff)) +
   theme_bw()
 ```
 
-### Averages: the default has no guarantee
-
-`est.att`, `est.avg` and the gap plot show intervals for averages over the treated units. By default, `fect` averages the treated units' predictions and a control's errors over the same cells in each fold, and uses the absolute average error as the control's score. With several treated units these intervals have no guarantee. An average of five treated units' errors is usually less noisy than one control's error, so the two need not be comparable. In a constructed example in `?fect`, the interval for an average effect covers it with probability 0.42 at a nominal 0.90. `print()` and the caption of the gap plot say so.
-
-```{r conformal-gap, fig.width = 6, fig.height = 4.5}
-plot(out.cf, main = "Average effect, pooled intervals (no guarantee)")
-```
-
 ### Block Jackknife+ for the average effect {#sec-conformal-block}
 
-The block Jackknife+ of @liuxu2026conformal fixes this by comparing like with like: the five treated units, taken together, against blocks of five controls. `conformal.block = TRUE` does the following.
+For the average effect over the treated units, use the block Jackknife+ of @liuxu2026conformal. Without `conformal.block = TRUE`, the fit above also reports intervals for averages in `est.att`, `est.avg` and the gap plot, but these intervals have no guarantee, and we do not recommend reporting them. They compare an average of five treated units' errors with one control's error, and the average is usually less noisy. In a constructed example in `?fect`, such an interval covers the average effect with probability 0.42 at a nominal 0.90. `print()` and the caption of the gap plot say so.
+
+The block Jackknife+ compares like with like: the five treated units, taken together, against blocks of five controls. `conformal.block = TRUE` does the following.
 
 1. It splits the 45 controls at random into nine blocks of five.
 2. Within each block, each control is matched with one treated unit and takes that unit's pre-treatment window and adoption date.
@@ -135,7 +129,7 @@ out.cfb <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
 print(out.cfb)
 ```
 
-The partition is in `out.cfb$conformal$block$partition`. In the gap plot, the intervals after treatment are now block Jackknife+ intervals, and the four dates before treatment show the diagnostics.
+The partition is in `out.cfb$conformal$block$partition`. In the gap plot, the intervals after treatment are block Jackknife+ intervals, and the four dates before treatment show the diagnostics.
 
 ```{r conformal-block-gap, fig.width = 6, fig.height = 4.5}
 plot(out.cfb, main = "Average effect, block Jackknife+ intervals")
@@ -309,3 +303,18 @@ A typical analysis with few treated units:
 4. Add `conformal.relabel = 999` to test whether there is any effect.
 5. With a target-date estimator, such as the fixed-effects model with one treated unit or synthetic control, use full conformal inference: `method = "fe"` in `fect()`, or `conformal_sc()`.
 6. Report the intervals for each unit and date, the block interval for the average, the guarantee level (`print()` shows it), and the diagnostics.
+
+## How to cite
+
+Cite @liuxu2026conformal for conformal inference in **fect**.
+
+```bibtex
+@misc{liuxu2026conformal,
+  title = {Unit-Level Conformal Inference for Panel Counterfactuals},
+  author = {Liu, Ziyi and Xu, Yiqing},
+  year = {2026},
+  eprint = {2611.19209},
+  archivePrefix = {arXiv},
+  url = {https://arxiv.org/abs/2611.19209}
+}
+```

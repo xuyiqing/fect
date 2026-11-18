@@ -5,10 +5,6 @@ source("_common.R")
 ```
 
 ::: {.callout-tip appearance="simple"}
-The standalone **gsynth** package is a wrapper of **fect**. Use its [old syntax](https://yiqingxu.org/packages/gsynth/) if needed.
-:::
-
-::: {.callout-tip appearance="simple"}
 ### TL;DR
 
 - GSC estimates factors from never-treated controls, then uses each treated unit's pretreatment outcomes to estimate its loadings. In **fect**, set `method = "gsynth"`.
@@ -17,6 +13,8 @@ The standalone **gsynth** package is a wrapper of **fect**. Use its [old syntax]
 - Rolling CV remains the default of `CV = TRUE`, but for GSC it scores control cells and can miss a factor on which treated and control units differ. Choose the rank with the forward rule (Step 3).
 - Bounded factor loadings (`loading.bound = "simplex"`) are experimental and not recommended for reported results. They do not replace the overlap checks.
 - Basic estimation comes first. Cross-validation options, plots, staggered adoption, unbalanced panels, bounded loadings, and inference follow the five checks.
+
+The standalone **gsynth** package is a wrapper of **fect**. Use its [old syntax](https://yiqingxu.org/packages/gsynth/) if needed.
 :::
 
 GSC is the generalized synthetic control method proposed in @Xu2017 \[<a href="https://www.cambridge.org/core/journals/political-analysis/article/generalized-synthetic-control-method-causal-inference-with-interactive-fixed-effects-models/B63A8BD7C239DD4141C67DA10CD0E4F3" target="_blank">Paper</a>\]. Download the R script for this chapter [here](https://raw.githubusercontent.com/xuyiqing/fect/dev/vignettes/rscript/06-gsynth.R).
