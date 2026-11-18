@@ -1,4 +1,67 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.5.0
+
+Development version and the next CRAN release. Versions 2.4.6 to 2.4.9 were
+not released on CRAN; their changes, listed below, are part of this version.
+
+## New features
+
+The steps recommended by Iwasaki and Xu (2026), "Overlap, Overfitting, and
+Overconfidence: A Cautionary Note on Low-Rank Panel Methods", for GSC and
+IFE-EM analyses. Each reproduces the paper's replication code on the
+paper's cases (the exceptions are under "Differences from the replication
+code" below).
+
+* `overlap_check()`: the overlap check that needs no rank. Before any fit,
+  each treated unit's demeaned pretreatment path is rebuilt from the
+  never-treated units with non-negative weights that sum to one, and its
+  error is compared with the never-treated units' errors when each is
+  rebuilt from the others. Unit and adoption-cohort tables (error,
+  percentile, flag, weight in the average effect, reasons a unit is not
+  assessable); `print()` and `plot()` methods. The paper uses
+  `level = 0.90`.
+* `fect_rank()`: GSC at every candidate rank, scored by how well each rank
+  predicts the treated units' own pretreatment outcomes, with the forward
+  window and the leave-one-out window (Xu 2017, Algorithm 1), weighting each
+  unit by its share of the treated post-treatment cells. Returns both picks,
+  whether the forward window is long enough (8 forward predictions at the
+  largest rank for units carrying 80% of the weight), and the estimate and
+  the extrapolation share at every rank (`se = TRUE` adds intervals).
+* `cv.method = "forward"` in `fect()` (GSC only): chooses the rank with the
+  forward rule and fits at it; the rule's table is in `fit$rank.forward`.
+* `loading_check()`: the loading check at the chosen rank. A treated unit is
+  flagged when its loadings lie outside the controls' convex hull by more
+  than the noise in its own loading estimate allows (squared distance in
+  the metric of its sampling variance against a chi-square cutoff). Also
+  reports the share of treated post-treatment counterfactuals outside the
+  observed outcome range. `trim = TRUE` drops the flagged units, chooses the
+  rank again and refits; the trimmed estimate is reported beside the full
+  one.
+
+## Differences from the replication code
+
+* `overlap_check()` solves its least-squares problems on the simplex exactly
+  at any number of donors (quadprog on an active set). The replication code
+  switches to an iterative solver (osqp) above 200 donors, which can stop
+  short of the minimum. On the paper's cases the two agree to 1e-8 except in
+  six cases with 236 to 1,040 donors; in four of them the replication code
+  counts units as assessable, and flags some, whose donors rebuild one
+  another almost exactly, a yardstick fect reports as collapsed.
+* `loading_check()` measures the distance to the hull exactly; above 400
+  controls the replication code takes 3,000 Frank-Wolfe steps, which differ
+  by up to 6e-6 (no flag changes on the paper's cases).
+
+## Other changes
+
+* quadprog moves from Suggests to Imports.
+* `vartype = "parametric"` with IFE-EM (`method = "ife"`,
+  `time.component.from = "notyettreated"`) still stops: the parametric
+  bootstrap needs factors estimated without the treated units' outcomes. The
+  paper's experimental bootstrap for IFE-EM is not included. The error
+  message now also points to conformal intervals (`vartype = "conformal"`),
+  which support IFE-EM.
+* Existing results are unchanged.
+
 # fect 2.4.9
 
 Development version.
@@ -8,7 +71,8 @@ Development version.
 * New `vartype = "conformal"`: date-specific conformal intervals, one for
   each treated unit and post-treatment date (in `fit$conformal$unit`), by the
   Jackknife+ for full-path estimators of Liu and Xu (2026), "Unit-Level
-  Conformal Inference for Panel Counterfactuals". For `method = "gsynth"`,
+  Conformal Inference for Panel Counterfactuals"
+  (<https://arxiv.org/abs/2611.19209>). For `method = "gsynth"`,
   `"ife"` and `"mc"` with an absorbing treatment. It supersedes the June
   design (#143), which was never released. The paper's full conformal
   inference, for target-date estimators, is not implemented.
@@ -62,6 +126,34 @@ Development version.
 * A coverage study is in `tests/coverage-study/conformal_v2_coverage.R`
   (gsynth, one treated unit; results in
   `tests/coverage-study/results/conformal_v2_coverage.md`).
+* Full conformal inference for target-date estimators (Liu and Xu 2026,
+  Sec. 2.3). `fect(method = "fe", vartype = "conformal")`, which stopped
+  before, now gives a full conformal set for each treated unit and date,
+  using the target-date form of the fixed-effects imputation (the treated
+  unit's pre-treatment mean plus the controls' change to the date; the unit
+  or time mean with `force = "unit"` or `"time"`). The scores are affine in
+  the candidate effect, so the sets are computed exactly, and each is a
+  single interval (every control's weight on the treated unit lies in
+  [0, 1]). With one treated unit and a control missing an outcome, the
+  target-date estimate can differ from fect's; `fect` says so, and
+  `est.att` and `est.avg` then hold the target-date estimate.
+  With one treated unit, `est.att`, the calendar-time ATT and `est.avg`
+  (the effect averaged over the post-treatment dates) carry its sets; with
+  several, the sets are by unit and date. `conformal.diag` works; covariates,
+  `force = "none"`, `conformal.block` and `conformal.relabel` stop.
+* New `conformal_sc()`: full conformal inference or the Jackknife+
+  (`procedure = "full"`, the default, or `"jackknife+"`) for synthetic
+  control and other target-date estimators, given as `rule = "sc"` (the
+  default: ridge-simplex synthetic control, `eta = 1e-5`, needs quadprog),
+  `"did"` or a function of the
+  held-out unit's pre-treatment outcomes and the training units'
+  pre-treatment and target-date outcomes. Affine rules get exact sets
+  (a user rule's affinity is checked numerically and at the ends of its
+  set), others a grid with flags when the set reaches its ends. It also gives the set for each treated unit's effect
+  averaged over its post-treatment dates and pre-treatment placebo dates
+  (`diag`). On Proposition 99 and German reunification it reproduces the
+  paper's DID and synthetic control results, full conformal and Jackknife+,
+  to 1e-8. quadprog is added to Suggests.
 
 ## Documentation
 

@@ -73,7 +73,10 @@ A typical sequence:
 1. Fit `"fe"` with `se = TRUE`. Look at the pre-treatment estimates in the gap plot and the tests in `fit$test.out`.
 2. If the pre-treatment estimates move away from zero, fit `"ife"` and `"mc"`, and repeat the checks.
    `fect_mspe()` compares the prediction errors of fitted models.
-3. With few treated units and no reversal, use `"gsynth"` with `vartype = "parametric"` or `vartype = "conformal"`.
+3. With few treated units and no reversal, use `"gsynth"`. Run the checks of the manual's Gsynth chapter (2.5.0 or
+   later): `overlap_check()` before any fit, `fect_rank()` to choose the number of factors forward from the treated
+   units' own pretreatment outcomes, and `loading_check()` at the chosen rank. Then use `vartype = "parametric"`
+   or `vartype = "conformal"`.
 
 ## Choosing the uncertainty estimate
 
@@ -86,8 +89,9 @@ Set `se = TRUE` to get standard errors, intervals and p-values. `vartype` choose
   least two never-treated units.
 - `"conformal"` (new in 2.4.9; check `packageVersion("fect")`) compares each treated unit with the never-treated units, each held out as if it
   were treated, and gives an interval for each treated unit and date with a guarantee that holds in finite
-  samples. It works with `"gsynth"`, `"ife"` and `"mc"` and a treatment that never switches off. It gives no
-  standard errors.
+  samples. It works with `"gsynth"`, `"ife"` and `"mc"` and a treatment that never switches off. With `"fe"` it
+  gives full conformal sets for each treated unit and date, and `conformal_sc()` does the same for synthetic
+  control. It gives no standard errors.
 
 With one or very few treated units, do not report bootstrap or jackknife intervals as if they were reliable:
 they resample the treated units, and there are too few to resample. Use `vartype = "parametric"` (with
@@ -127,10 +131,15 @@ fit$test.out             # F test and equivalence tests of the pre-treatment est
 Few treated units:
 
 ```r
+oc <- overlap_check(Y ~ D, data = sim_gsynth, index = c("id", "time"))  # can the controls rebuild each treated unit?
+rk <- fect_rank(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
+                force = "two-way", r = 0:5)  # estimate at every rank; the forward rule's choice
 fit.gs <- fect(Y ~ D + X1 + X2, data = sim_gsynth, index = c("id", "time"),
-               method = "gsynth", r = c(0, 5), CV = TRUE, se = TRUE,
-               vartype = "parametric", nboots = 500, parallel = FALSE)
-fit.gs$r.cv                      # number of factors chosen by cross-validation
+               method = "gsynth", force = "two-way", r = c(0, 5), CV = TRUE,
+               cv.method = "forward", se = TRUE, vartype = "parametric",
+               nboots = 500, parallel = FALSE)
+fit.gs$r.cv                      # number of factors chosen by the forward rule
+loading_check(fit.gs)            # treated loadings outside the controls' hull
 plot(fit.gs, type = "counterfactual")  # observed and predicted Y(0) for the treated
 plot(fit.gs, type = "loading.overlap") # treated loadings against the controls'
 
@@ -183,7 +192,8 @@ The manual's Alternative Estimands chapter (<https://yiqingxu.org/packages/fect/
 - `method = "gsynth"` stops when treatment switches off. `vartype = "parametric"` stops with
   `time.component.from = "notyettreated"`. `placeboTest` stops with cross-validation, so give a single `r`.
 - For `"ife"` and `"gsynth"`, fect cross-validates when `r` is not given or is a range such as `c(0, 5)`. A
-  single `r` fixes it. `"mc"` works the same way with `lambda`.
+  single `r` fixes it. For `"gsynth"`, the default rolling CV scores control cells and can miss a factor on which
+  treated and control units differ; use `cv.method = "forward"` or `fect_rank()`. `"mc"` works the same way with `lambda`.
 - `alpha = 0.05` gives 95% intervals in `est.att` and `est.avg`, and `est.att90` holds the 90% intervals used by the
   equivalence plot.
 - `vartype = "conformal"` stops with weights, placebo and carryover tests, `loo`, `cm`, binary outcomes,

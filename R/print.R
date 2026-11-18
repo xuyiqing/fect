@@ -52,9 +52,16 @@ print.fect <- function(x,
     }
     if (identical(x$vartype, "conformal") && !is.null(x$conformal)) {
         cf <- x$conformal
-        cat("Inference:     conformal, Jackknife+ for full-path estimators ",
-            "(", round(100 * cf$level, 1), "% level; ", cf$n.controls,
-            " never-treated controls; no S.E.)\n", sep = "")
+        if (identical(cf$procedure.type, "full")) {
+            cat("Inference:     conformal, full conformal for target-date ",
+                "estimators (", cf$rule, " rule; ", round(100 * cf$level, 1),
+                "% level or higher; ", cf$n.controls,
+                " never-treated controls; no S.E.)\n", sep = "")
+        } else {
+            cat("Inference:     conformal, Jackknife+ for full-path estimators ",
+                "(", round(100 * cf$level, 1), "% level; ", cf$n.controls,
+                " never-treated controls; no S.E.)\n", sep = "")
+        }
         if (!identical(cf$status, "ok")) {
             cat("Conformal:     ", cf$status, "\n", sep = "")
         }
@@ -65,6 +72,10 @@ print.fect <- function(x,
             cat("Aggregates:    block Jackknife+, ", cf$block$G,
                 " control blocks of ", cf$block$K, " (N = ", cf$block$N,
                 ", q = ", cf$block$q, ")\n", sep = "")
+        } else if (n.tr.cf > 1L && identical(cf$procedure.type, "full")) {
+            cat("Aggregates:    no sets for averages over ", n.tr.cf,
+                " treated units; sets by unit and date in fit$conformal$unit\n",
+                sep = "")
         } else if (n.tr.cf > 1L) {
             cat("Aggregates:    intervals for averages over ", n.tr.cf,
                 " treated units have no coverage guarantee (?fect)\n", sep = "")

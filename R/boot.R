@@ -434,6 +434,7 @@ fect_boot <- function(
   conformal.diag = 0,
   conformal.block = FALSE,
   conformal.relabel = 0,
+  conformal.full = FALSE,
   time.component.from = "notyettreated",
   loading.bound = "none",
   gamma.loading = NULL,
@@ -887,6 +888,14 @@ fect_boot <- function(
               "tuning selected from the controls alone or from the treated ",
               "units' fit can break it (Liu and Xu 2026). To fix the tuning ",
               "in advance, refit with ", tun.txt, " and CV = FALSE.")
+    }
+    ## method = "fe": full conformal inference with the target-date
+    ## (difference-in-differences) rule (R/conformal-full.R)
+    if (isTRUE(conformal.full)) {
+      cf <- conformal_full_fe(Y = Y, D = D, I = I, T.on = T.on, out = out,
+                              force = force, alpha = alpha,
+                              norm.para = norm.para, diag = conformal.diag)
+      return(c(out, cf))
     }
     cf <- conformal_jplus(
       Y = Y, X = X, D = D, I = I, II = II, T.on = T.on, out = out,

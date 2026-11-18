@@ -768,6 +768,17 @@ fect.default <- function(
     ## -------------------------------##
     ## Checking Parameters
     ## -------------------------------##
+    ## cv.method = "forward" (2.5.0): the rank of GSC from the forward rule
+    ## (R/gsc-rank.R), then the fit at that rank
+    if (identical(cv.method, "forward")) {
+        if (isFALSE(CV) || (is.null(CV) && !is.null(r) && length(r) == 1L)) {
+            stop("cv.method = \"forward\" chooses the rank: set CV = TRUE, or give ",
+                 "a range of ranks in r.", call. = FALSE)
+        }
+        return(.fect_forward_cv(match.call(), parent.frame(),
+                                list(method = method, time.component.from = time.component.from,
+                                     r = r, lambda = lambda, binary = binary)))
+    }
     cv.rule <- .fect_validate_cv_rule(cv.rule)
     placeboEquiv <- loo
     permu.dimension <- "time"
@@ -1113,13 +1124,33 @@ fect.default <- function(
                      ". Use vartype = \"bootstrap\", \"jackknife\" or ",
                      "\"parametric\" for that.", call. = FALSE)
             }
-            if (!method_arg %in% c("gsynth", "ife", "mc")) {
+            if (!method_arg %in% c("gsynth", "ife", "mc", "fe")) {
                 stop("vartype = \"conformal\" is available for method = ",
-                     "\"gsynth\", \"ife\" or \"mc\" only; got method = \"",
-                     method_arg, "\".",
-                     if (identical(method_arg, "fe"))
-                         " For the two-way fixed-effects model use method = \"ife\" with r = 0.",
-                     call. = FALSE)
+                     "\"fe\", \"gsynth\", \"ife\" or \"mc\" only; got ",
+                     "method = \"", method_arg, "\".", call. = FALSE)
+            }
+            ## method = "fe": full conformal inference for the target-date
+            ## (difference-in-differences) form of the fixed-effects
+            ## imputation (R/conformal-full.R). It has no covariates, no
+            ## blocks and no relabeling test.
+            if (identical(method_arg, "fe")) {
+                if (!is.null(X) && length(X) > 0) {
+                    stop("vartype = \"conformal\" with method = \"fe\" ",
+                         "(full conformal inference) does not support ",
+                         "covariates. Drop them, or use method = \"ife\" ",
+                         "with r = 0 for the Jackknife+.", call. = FALSE)
+                }
+                if (identical(force, "none") || identical(force, 0)) {
+                    stop("vartype = \"conformal\" with method = \"fe\" ",
+                         "needs force = \"unit\", \"time\" or ",
+                         "\"two-way\".", call. = FALSE)
+                }
+                if (isTRUE(conformal.block) || isTRUE(conformal.relabel != 0)) {
+                    stop("conformal.block and conformal.relabel are not ",
+                         "available with method = \"fe\" (full conformal ",
+                         "inference). Use method = \"ife\" with r = 0 for ",
+                         "them.", call. = FALSE)
+                }
             }
             if (isTRUE(binary)) .cf_stop("binary (probit) models")
             if (!is.null(W) || !is.null(W.est) || !is.null(W.agg)) .cf_stop("weights")
@@ -2876,7 +2907,10 @@ fect.default <- function(
                 "The parametric pseudo-treated bootstrap requires a control pool ",
                 "isolated from treated-unit pre-treatment cells. Pass ",
                 "time.component.from = \"nevertreated\" (if never-treated controls ",
-                "exist) or use vartype = \"bootstrap\" or \"jackknife\"."
+                "exist) or use vartype = \"bootstrap\" or \"jackknife\". ",
+                "With few treated units and a treatment that does not switch off, ",
+                "use vartype = \"conformal\" (Jackknife+; method = \"gsynth\", ",
+                "\"ife\" or \"mc\"); see ?fect, \"Conformal intervals\"."
             ),
             method_arg, time.component.from
         ), call. = FALSE)
@@ -3604,6 +3638,7 @@ fect.default <- function(
             conformal.diag = conformal.diag,
             conformal.block = conformal.block,
             conformal.relabel = conformal.relabel,
+            conformal.full = identical(method_arg, "fe"),
             time.component.from = time.component.from,
             loading.bound      = loading.bound,
             gamma.loading      = gamma.loading,

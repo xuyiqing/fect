@@ -846,6 +846,10 @@
     out <- c(out, paste0("Block Jackknife+ intervals: ", cf$block$G,
                          " control blocks of ", cf$block$K, ", N = ",
                          cf$block$N, "."))
+  } else if (K > 1L && identical(cf$procedure.type, "full")) {
+    out <- c(out, paste0("No full conformal sets for averages over ", K,
+                         " treated units;\nsets by unit and date are in ",
+                         "fit$conformal$unit."))
   } else if (K > 1L) {
     out <- c(out, paste0("Intervals for averages over ", K, " treated units ",
                          "have no coverage guarantee;\nconformal.block = TRUE ",
