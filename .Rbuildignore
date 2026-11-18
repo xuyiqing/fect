@@ -22,3 +22,4 @@
 ^tests/coverage-study$
 ^Rplots\.pdf$
 ^\.git$
+^AGENT_GUIDE\.md$
