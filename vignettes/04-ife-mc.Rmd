@@ -77,9 +77,9 @@ The treated loadings extend well beyond the controls' convex hull, which is expe
 
 ::: {.callout-note appearance="simple"}
 
-### Bounded factor loadings (Synth setting only)
+### Bounded factor loadings (experimental, Synth setting only)
 
-When the diagnostic above shows treated units outside the hull *and* you are in the Synth setting (few treated, many controls, no reversal), the new argument `loading.bound = "simplex"` (introduced in v2.3.0) constrains each treated-unit loading to lie inside the convex hull of control loadings via an entropy-regularized simplex projection, recovering the synthetic-control intuition that the imputed counterfactual should sit inside the donor pool's support. The bound is currently restricted to the Synth setting (`time.component.from = "nevertreated"`) and is highly recommended for the `gsynth` method; see [Chapter @sec-gsynth] for the objective and a worked ON/OFF comparison.
+In the Synth setting (few treated, many controls, no reversal, `time.component.from = "nevertreated"`), the argument `loading.bound = "simplex"` (introduced in v2.3.0) constrains each treated-unit loading to lie inside the convex hull of control loadings via an entropy-regularized simplex projection. It is experimental: it has not appeared in a published paper, it trades bias for variance, and it does not fix a lack of overlap, so we do not recommend it for reported results. See [Chapter @sec-gsynth] for the objective, its limits and a worked comparison.
 
 :::
 
