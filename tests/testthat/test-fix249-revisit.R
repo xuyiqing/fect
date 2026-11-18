@@ -90,14 +90,11 @@ test_that("case bootstrap gets boot.diag too; jackknife and se = FALSE do not", 
   expect_null(n$boot.diag)
 })
 
-## The real case. Its data are not shipped with fect; the test runs where the
-## gsynth-revisit triage folder exists (FECT_TRIAGE_DIR, or Yiqing's Dropbox).
+## The real case: Gilens, Patterson and Haines (2021), tort reform, as the
+## gsynth-revisit reanalysis fitted it (fixtures/gilens-tort.rds: the panel
+## and the fect() arguments).
 test_that("Gilens tort (r = 2): the breakdown warning fires and the S.E. stays 158,668", {
-  dir <- Sys.getenv("FECT_TRIAGE_DIR",
-    "~/Dropbox/Research_Hub/Packages/fect/triage/2026-10-14-gsynth-revisit-bugs")
-  f <- file.path(path.expand(dir), "cases.rds")
-  skip_if_not(file.exists(f), "gsynth-revisit triage cases not available")
-  x <- readRDS(f)$explode_tort
+  x <- readRDS(test_path("fixtures", "gilens-tort.rds"))
   w <- character(0)
   out <- withCallingHandlers(
     suppressMessages(do.call(fect, c(list(data = x$data), x$args))),

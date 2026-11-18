@@ -207,7 +207,9 @@ test_that("DESCRIPTION, NEWS and ?fect describe conformal as 2.4.9", {
                 file.exists(file.path(root, "man", "fect.Rd")),
               "source tree not available")
   desc <- readLines(file.path(root, "DESCRIPTION"))
-  expect_true("Version: 2.4.9" %in% desc)
+  ## the conformal features are 2.4.9; later versions keep the 2.4.9 section
+  v <- sub("^Version: ", "", grep("^Version: ", desc, value = TRUE))
+  expect_true(package_version(v) >= "2.4.9")
   news <- readLines(file.path(root, "NEWS.md"))
   expect_false(any(news == "# fect 2.4.7.9000"))
   h9 <- which(news == "# fect 2.4.9"); h8 <- which(news == "# fect 2.4.8")
