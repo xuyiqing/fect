@@ -105,6 +105,16 @@ they resample the treated units, and there are too few to resample. Use `vartype
   guarantee. With several treated units, the default intervals for averages (`est.att`, `est.avg`) have no
   guarantee; add `conformal.block = TRUE` for the average effect. Add `conformal.diag = 4` for pre-treatment
   checks and `conformal.relabel = 999` for a test of no effect.
+- The score of the full conformal sets can be the absolute prediction error (the default) or the studentized
+  error, which divides it by the unit's pre-treatment root mean squared residual:
+  `conformal_sc(..., score = "studentized")`, or `fect(method = "fe", vartype = "conformal",
+  conformal.score = "studentized")` (`"fe"` only; `"gsynth"`, `"ife"` and `"mc"` stop). Choose the score before
+  seeing post-treatment outcomes, not by which gives the narrower set. A studentized set can be a union of
+  intervals, the average over dates has no set, and an exact pre-treatment fit stops the call (use
+  `score = "absolute"`). `diag` and `conformal.diag` work, each placebo date using the dates before it (an
+  extension of the paper). `plot(x, y.axis = "t")` draws the sets in units of the treated unit's pre-treatment
+  residual (not a t-statistic, no critical value); `plot(fc, jp)` draws a full conformal and a Jackknife+
+  `conformal_sc` fit together. `plot.fect` draws one fit.
 
 `nboots` is 200 by default. Use 1000 or more for intervals built from bootstrap quantiles (`ci.method = "basic"`,
 `"percentile"`, `"bc"`, `"bca"` in `estimand()`). The manual's chapter on the
