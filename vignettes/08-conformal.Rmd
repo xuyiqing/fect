@@ -575,17 +575,70 @@ The studentized full conformal sets exclude zero in `r sum(ex.sf)` of the `r nro
 
 The change comes from West Germany's pre-treatment residuals. Their root mean squared value is `r fmt(sg.wg, 4)`, the `r rk.txt` of the `r nrow(sg)` units. Dividing by it enlarges West Germany's score relative to the controls'.
 
-```{r conformal-stud-fig, fig.width = 6.5, fig.height = 4.2, fig.cap = "Studentized full conformal sets and Jackknife+ intervals, West Germany"}
+```{r conformal-stud-fig, fig.width = 6.5, fig.height = 4.2, fig.cap = "Studentized sets and intervals, West Germany"}
 plot(fs.g, js.g, ylab = "Effect on GDP per capita (thousand USD)")
 ```
 
-The axis again counts periods since treatment, and period 1 is `r min(fs.g$unit$time)`. Adding `y.axis = "t"` to the call divides the estimate and the ends of each set by the treated unit's pre-treatment residual size, which puts treated units with different scales on one axis; it is not a t-statistic.
+The axis again counts periods since treatment, and period 1 is `r min(fs.g$unit$time)`.
 
-```{r conformal-stud-t, eval = FALSE}
+The same two calls on the Proposition 99 panel use the same `diag = 4` and `alpha`.
+
+```{r conformal-stud-fit-ca, cache = TRUE}
+fs.c <- conformal_sc(Y ~ D, data = p99, index = c("id", "time"), alpha = 0.1,
+                     diag = 4, score = "studentized")
+js.c <- conformal_sc(Y ~ D, data = p99, index = c("id", "time"), alpha = 0.1,
+                     diag = 4, score = "studentized", procedure = "jackknife+")
+```
+
+```{r conformal-stud-numbers-ca, include = FALSE}
+sg.c <- fs.c$sigma[fs.c$sigma$time == min(fs.c$unit$time), ]
+sg.ca <- sg.c$sigma[sg.c$unit == "California"]
+rk.c <- rank(sg.c$sigma)[sg.c$unit == "California"]
+ex.cf <- excl(fs.c$unit)
+ex.cj <- excl(js.c$unit)
+ex.cd <- excl(fs.c$diag)
+cut.of <- function(N, a) c(floor(a * N), max(which((2 * seq_len(N) - 1) / N <= a)))
+ord <- function(k) c("most extreme", "second most extreme", "third most extreme")[k]
+cut.c <- cut.of(fs.c$unit$N[1], fs.c$alpha)
+cut.g <- cut.of(fs.g$unit$N[1], fs.g$alpha)
+wide.c <- max((js.c$unit$CI.upper - js.c$unit$CI.lower) / (fs.c$unit$CI.upper - fs.c$unit$CI.lower))
+```
+
+The studentized full conformal sets exclude zero in `r sum(ex.cf)` of the `r nrow(fs.c$unit)` years and the Jackknife+ intervals in `r sum(ex.cj)`. With the absolute score the counts are `r sum(ex.fc)` and `r sum(ex.jp)`. The studentized score adds `r sum(ex.cf) - sum(ex.fc)` years for full conformal inference, against `r sum(ex.sf) - sum(ex.g)` for West Germany. California's pre-treatment residuals have root mean squared value `r fmt(sg.ca, 2)` packs, the `r rk.c`th smallest of the `r nrow(sg.c)` units. The method fits California more closely than `r sum(sg.c$sigma > sg.ca)` of its `r nrow(sg.c) - 1` controls.
+
+The placebo dates do not all agree with zero. With full conformal inference, `r sum(ex.cd)` of the `r nrow(fs.c$diag)` dates reject zero (`r paste(fs.c$diag$time[ex.cd], collapse = ", ")`), and with the Jackknife+ `r sum(excl(js.c$diag))` do. The absolute score had `r sum(ex.dg)` rejections. With `alpha` set to `r fs.c$alpha`, `r fmt(fs.c$alpha * nrow(fs.c$diag), 1)` rejections are expected by chance in `r nrow(fs.c$diag)` dates. This is not strong evidence against the assumption that California is no harder to predict than the controls ([Section @sec-conformal-checks]). It is a reason to read California's studentized sets with more care.
+
+```{r conformal-stud-fig-ca, fig.width = 6.5, fig.height = 4.2, fig.cap = "Studentized sets and intervals, California"}
+plot(fs.c, js.c, ylab = "Effect on sales (packs per capita)")
+```
+
+Period 1 is `r min(fs.c$unit$time)`.
+
+Both procedures guarantee the same level, `r fmt(fs.c$unit$level[1], 3)`, but they cut at different places in the ordered control errors: with `r fs.c$unit$N[1]` units, full conformal inference cuts at the `r ord(cut.c[1])` of the `r fs.c$n.controls` controls and the Jackknife+ at the `r ord(cut.c[2])`. In years when a few control states are predicted badly these two errors are far apart, so the Jackknife+ interval is up to `r fmt(wide.c, 1)` times as wide, while with West Germany's `r fs.g$unit$N[1]` units both procedures cut at the `r ord(cut.g[1])` control and the two nearly agree.
+
+Adding `y.axis = "t"` to the call divides the estimate and the ends of each set by the treated unit's pre-treatment residual size in that date's fit. Then West Germany, in thousand dollars, and California, in packs, can be read on one scale. The values are not t-statistics, and no critical value such as 1.96 applies. The sets, and whether they contain zero, are those of the outcome plots.
+
+```{r conformal-stud-t-numbers, include = FALSE}
+t.max <- function(f) {
+  s <- f$sigma.treated$sigma[match(f$unit$time, f$sigma.treated$time)]
+  i <- which.max(abs(f$unit$eff / s))
+  c(t = unname(f$unit$eff[i] / s[i]), year = unname(f$unit$time[i]))
+}
+tg <- t.max(fs.g)
+tc <- t.max(fs.c)
+```
+
+```{r conformal-stud-t-g, fig.width = 6.5, fig.height = 4.6, fig.cap = "Studentized sets on the t scale, West Germany"}
 plot(fs.g, js.g, y.axis = "t")
 ```
 
-Choose the score before looking at the post-treatment results. If the choice depends on which score excludes zero, the guarantee no longer holds. The pre-treatment residual sizes do not depend on the post-treatment outcomes, so they can inform the choice. Here the largest unit's size is `r fmt(max(sg$sigma) / min(sg$sigma), 0)` times the smallest. The paper defines the studentized score for the post-treatment dates. Applying it at the pre-treatment dates, with each date's weights taken from the dates before it, is an extension in `fect`.
+```{r conformal-stud-t-c, fig.width = 6.5, fig.height = 4.6, fig.cap = "Studentized sets on the t scale, California"}
+plot(fs.c, js.c, y.axis = "t")
+```
+
+The largest estimate in absolute value is `r fmt(abs(tg["t"]), 1)` residual sizes for West Germany (`r as.integer(tg["year"])`) and `r fmt(abs(tc["t"]), 1)` for California (`r as.integer(tc["year"])`). On this scale `r if (abs(tc["t"]) > abs(tg["t"])) "California" else "West Germany"` has the larger estimate.
+
+Choose the score before looking at the post-treatment results. If the choice depends on which score excludes zero, the guarantee no longer holds. The pre-treatment residual sizes do not depend on the post-treatment outcomes, so they can inform the choice. The largest unit's size is `r fmt(max(sg$sigma) / min(sg$sigma), 0)` times the smallest in the West Germany panel and `r fmt(max(sg.c$sigma) / min(sg.c$sigma), 0)` times in the Proposition 99 panel. The paper defines the studentized score for the post-treatment dates. Applying it at the pre-treatment dates, with each date's weights taken from the dates before it, is an extension in `fect`.
 
 `fect(method = "fe", vartype = "conformal", conformal.score = "studentized")` takes the same option. It is not available for `"gsynth"`, `"ife"` or `"mc"`.
 
