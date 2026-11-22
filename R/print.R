@@ -62,6 +62,9 @@ print.fect <- function(x,
                 "(", round(100 * cf$level, 1), "% level; ", cf$n.controls,
                 " never-treated controls; no S.E.)\n", sep = "")
         }
+        if (identical(cf$score, "studentized")) {
+            cat("Score:         studentized\n")
+        }
         if (!identical(cf$status, "ok")) {
             cat("Conformal:     ", cf$status, "\n", sep = "")
         }

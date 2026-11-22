@@ -120,6 +120,7 @@
     num.pretreatment = 3,
     cm = FALSE,
     legacy.style = FALSE,
+    y.axis = "outcome",
     ...
 )
 }
@@ -249,6 +250,7 @@
   \item{num.pretreatment}{Integer; number of pre-treatment periods to include when \code{pretreatment = TRUE}. Default is \code{3}.}
   \item{cm}{Logical; if \code{TRUE}, plots causal moderation estimates instead of effect modification estimates for HTE plots. Requires the \code{fect} object to have been estimated with \code{cm = TRUE}. Default is \code{FALSE}.}
   \item{legacy.style}{Logical; if \code{TRUE}, reproduces the pre-2.3.1 visual defaults (bold centered title, larger axis text, solid treatment-onset line, blue placebo triangles, no peach highlight rectangle) regardless of the value of \code{theme.bw}. If \code{FALSE} (the default) and \code{theme.bw = TRUE}, the modern v2.3.1 visual recipe is used. Pass \code{legacy.style = TRUE} for byte-identical reproduction of figures rendered under earlier fect versions.}
+  \item{y.axis}{\code{"outcome"} (the default) or \code{"t"}. \code{"t"} is for a fit with \code{method = "fe"}, \code{vartype = "conformal"} and \code{conformal.score = "studentized"}, and \code{type = "gap"} (or the default \code{type = NULL}, which is the gap plot for a conformal fit). It draws, for each treated unit, the estimate and the full conformal set at each post-treatment date (and at each diagnostic date, if \code{conformal.diag} is above 0), with the estimate and the set ends divided by the unit's pre-treatment root mean squared residual in that date's fit, the value stored in \code{fit$conformal$sigma.treated}. A diagnostic date is divided by its own residual, computed from the dates before it. The values are in units of that residual. They are not t-statistics in the usual sense and no critical value such as 1.96 applies; the sets, and whether they contain zero, are those of the outcome plot. The count bars and the in-sample pre-treatment points of the usual gap plot are not drawn. Only \code{main}, \code{xlab}, \code{ylab}, \code{xlim}, \code{ylim} and \code{return.data} are used then; any other argument is named in a warning. \code{return.data = TRUE} returns the plotted data frame (columns \code{unit}, \code{time}, \code{event.time}, \code{eff}, \code{CI.lower}, \code{CI.upper} in plotted units, and \code{sigma}, the divisor). It stops with the absolute score (\code{conformal.score = "studentized"} is needed), with a fit that is not a conformal fit with \code{method = "fe"}, or with another \code{type}.}
   \item{loess.fit}{Logical; if \code{TRUE} (default), overlays a LOESS smoothing curve on HTE scatter plots.}
   \item{...}{Not used. Arguments that \code{plot.fect} does not know are ignored without a message, so check the spelling of argument names.}
 }
@@ -262,6 +264,8 @@
   The \code{preset} argument allows for quick customization of plot aesthetics using predefined color schemes.
   Many individual color and style parameters can be set to further customize the appearance, and these will override any settings from a \code{preset} or the base style.
   The function heavily relies on \code{ggplot2} for plotting and \code{esplot} for event-study style visualizations.
+
+  \code{plot.fect} draws one fit. Passing a second \code{fect} or \code{conformal_sc} fit in the place of \code{type}, as in \code{plot(fit1, fit2)}, stops with an error. A full conformal fit and a Jackknife+ fit can be drawn together for \code{conformal_sc} objects, \code{plot(fc, jp)} (see \code{\link{conformal_sc}}); \code{fect(method = "fe")} gives full conformal inference only.
 }
 \value{
   By default, a \code{ggplot2} object representing the plot.

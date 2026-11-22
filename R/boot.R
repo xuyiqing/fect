@@ -432,6 +432,8 @@ fect_boot <- function(
   dis = 0,
   keep.sims = FALSE,
   conformal.diag = 0,
+  conformal.score = "absolute",
+  conformal.time = NULL,   # vartype = "conformal": the user's time labels (messages only)
   conformal.block = FALSE,
   conformal.relabel = 0,
   conformal.full = FALSE,
@@ -894,7 +896,9 @@ fect_boot <- function(
     if (isTRUE(conformal.full)) {
       cf <- conformal_full_fe(Y = Y, D = D, I = I, T.on = T.on, out = out,
                               force = force, alpha = alpha,
-                              norm.para = norm.para, diag = conformal.diag)
+                              norm.para = norm.para, diag = conformal.diag,
+                              score = conformal.score,
+                              time.lab = conformal.time)
       return(c(out, cf))
     }
     cf <- conformal_jplus(

@@ -154,6 +154,8 @@ Development version.
   (`diag`). On Proposition 99 and German reunification it reproduces the
   paper's DID and synthetic control results, full conformal and Jackknife+,
   to 1e-8. quadprog is added to Suggests.
+* `conformal_sc(score = "studentized")` and `fect(method = "fe", conformal.score = "studentized")` divide each unit's absolute prediction error by its pre-treatment root mean squared residual; the default stays `"absolute"`.
+* `plot(x, y.axis = "t")` draws studentized conformal fits in units of the treated unit's pre-treatment residual, and `plot(fc, jp)` draws a full conformal and a Jackknife+ fit together.
 
 ## Documentation
 

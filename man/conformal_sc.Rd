@@ -2,6 +2,7 @@
 % Please edit documentation in R/conformal-full.R
 \name{conformal_sc}
 \alias{conformal_sc}
+\alias{plot.conformal_sc}
 \title{Conformal inference for synthetic control and other target-date estimators}
 \usage{
 conformal_sc(
@@ -13,7 +14,18 @@ conformal_sc(
   alpha = 0.1,
   diag = 0,
   grid = NULL,
-  sc.eta = 1e-05
+  sc.eta = 1e-05,
+  score = c("absolute", "studentized")
+)
+
+\method{plot}{conformal_sc}(
+  x,
+  y = NULL,
+  y.axis = c("outcome", "t"),
+  xlab = NULL,
+  ylab = NULL,
+  main = NULL,
+  ...
 )
 }
 \arguments{
@@ -62,6 +74,32 @@ times the largest control error on each side. Ignored for affine rules,
 whose sets are computed exactly.}
 
 \item{sc.eta}{Ridge term of \code{rule = "sc"}.}
+
+\item{score}{The score that ranks the units. \code{"absolute"} (the default) is the
+absolute prediction error. \code{"studentized"} is the absolute prediction
+error divided by the unit's pre-treatment root mean squared residual, taken
+from the fit that holds that unit out (see Details). The studentized score
+gives no set for the effect averaged over the dates: \code{avg} holds
+\code{NA} with a note. With \code{diag} above 0, the weights at a placebo
+date come from the dates before it. Choose the score before looking at the
+post-treatment outcomes, not by which gives the narrower set.}
+
+\item{x, y}{For \code{plot}: \code{x} is a fit of class \code{"conformal_sc"}.
+\code{y} is an optional second fit of that class. \code{plot(fc, jp)} draws a
+full conformal fit and a Jackknife+ fit together, in either order; the two
+must differ in the procedure alone, and the call stops otherwise.}
+
+\item{y.axis}{For \code{plot}: \code{"outcome"} (the default) draws the estimate and
+the set ends in the outcome's units. \code{"t"} divides them by the treated
+unit's pre-treatment root mean squared residual and needs
+\code{score = "studentized"}. It is not a t-statistic; see "The t axis" in
+Details.}
+
+\item{xlab, ylab, main}{For \code{plot}: axis labels and title.}
+
+\item{...}{For \code{plot}: not used by the default plot. With
+\code{y.axis = "t"} or a second fit, any argument given here is named in a
+warning.}
 }
 \value{
 An object of class \code{"conformal_sc"}, a list with
@@ -73,14 +111,26 @@ An object of class \code{"conformal_sc"}, a list with
     \code{lower.truncated} and \code{upper.truncated} (a grid-based set
     that reaches the end of the grid).}
   \item{avg}{For \code{procedure = "full"}: one row per treated unit with
-    the set for the effect averaged over its post-treatment dates.}
+    the set for the effect averaged over its post-treatment dates. With
+    \code{score = "studentized"} the set is not computed: the row holds
+    \code{NA} and a \code{note}, "not defined for the studentized score".}
   \item{diag}{The pre-treatment placebo rows, if \code{diag > 0}.}
   \item{components}{A list with the components of each set in
     \code{unit}, in the same order.}
   \item{n.treated, n.controls, skipped}{The treated units analysed, the
     never-treated controls, and the treated units left out because they
     have no pre-treatment or post-treatment outcome.}
-  \item{procedure, rule, alpha, call}{The settings.}
+  \item{procedure, rule, alpha, score, call}{The settings.}
+  \item{sigma, sigma.treated}{With \code{score = "studentized"}: \code{sigma.treated} has
+    one row per treated unit and date of \code{unit} and \code{diag} (columns
+    \code{treated}, \code{time}, \code{sigma}), the treated unit's
+    pre-treatment root mean squared residual that \code{plot(y.axis = "t")}
+    divides by. \code{sigma} (full conformal only; columns \code{treated},
+    \code{time}, \code{unit}, \code{sigma}) has the residual of every unit in
+    each date's fit, the post-treatment dates first and then the placebo dates.
+    Use \code{x[["sigma"]]}, not \code{x$sigma}: on a Jackknife+ fit,
+    \code{x$sigma} matches \code{sigma.treated}, because \code{$} accepts a
+    unique prefix.}
 }
 \description{
 Full conformal confidence sets or Jackknife+ intervals, as the user
@@ -101,8 +151,10 @@ unit and at the target date; \eqn{N} is the pool size plus one.
 treated unit's untreated outcome at the target date is set to its observed
 outcome minus \eqn{c}. Each unit is held out in turn and predicted by the
 rule from all the other units, the treated unit included with its
-completed outcome. A unit's score is its absolute prediction error; the
-treated unit's score is \eqn{|\hat\tau - c|}. The p-value of \eqn{c} is the
+completed outcome. With the default score, a unit's score is its absolute
+prediction error and the treated unit's score is \eqn{|\hat\tau - c|}; the
+studentized score divides each of these by the unit's own residual size
+(see below). The p-value of \eqn{c} is the
 share of units whose score is at least the treated unit's, and the set
 keeps the candidates with p-value above \code{alpha}. It covers the effect
 with probability at least \eqn{1 - \lfloor \alpha N \rfloor / N} if the
@@ -110,10 +162,16 @@ scores are exchangeable across units at the true effect: the treated unit
 is no harder to predict than a control, and the rule and its tuning are
 the same for every unit and fixed in advance. When the rule's prediction
 is affine in the completed outcome, as for \code{"did"} and \code{"sc"},
-the set is computed exactly. For \code{"did"} and \code{"sc"} it is a
-single interval, because every control's weight on the treated unit lies
-between 0 and 1; a user rule with a larger weight can give a union of
-intervals (\code{disconnected = TRUE}, the parts in \code{components}). A
+the set is computed exactly. With the absolute score, the set for
+\code{"did"} and \code{"sc"} is a single interval, because every control's
+weight on the treated unit lies between 0 and 1. A user rule with a larger
+weight can give a union of intervals (\code{disconnected = TRUE}, the parts
+in \code{components}). With the studentized score, a set for \code{"did"} or
+\code{"sc"} can also be a union of intervals, some of them unbounded, for
+example when a control's pre-treatment residual is much smaller than the
+treated unit's, so that the control's weight is large; \code{CI.lower} and
+\code{CI.upper} then give the hull of the set, \code{disconnected} is
+\code{TRUE}, and \code{conformal_sc} gives a message. A
 user rule is treated as affine only if its predictions lie on a line at
 five candidates far on both sides of zero and refits just inside and just
 outside the ends of the set agree with it; otherwise the set is evaluated
@@ -127,7 +185,8 @@ It is computed when the rule is affine with the same slope at every date
 (true for \code{"did"} and \code{"sc"}), with the controls observed at
 every date the unit uses. Its guarantee needs the units' absolute
 prediction errors averaged over the dates, rather than the errors at each
-date, to be exchangeable.
+date, to be exchangeable. It is not computed with the studentized score,
+which is defined for each date but not for an average of errors.
 
 \strong{Jackknife+.} The treated unit is held out together with each
 control, and both are predicted from the other controls. The interval
@@ -136,6 +195,101 @@ covers the effect with probability at least \eqn{1 - (2q - 1)/N}, where
 
 The p-value reported for each date is for the null of no effect at that
 date.
+
+\strong{The studentized score.} With \code{score = "studentized"}, unit
+\eqn{i}'s score is its absolute prediction error divided by
+\eqn{\hat\sigma_i}, the root mean squared residual of its own fit to the
+pre-treatment dates. To find it, the rule is applied to unit \eqn{i} at each
+of its pre-treatment dates, with the other units in the fit as the training
+units and their outcomes at that date in the place of the target date's.
+\eqn{\hat\sigma_i} is the square root of the mean of the squared differences
+between unit \eqn{i}'s outcomes and these predictions (the divisor is the
+number of dates; there is no correction for degrees of freedom). The treated
+unit's score at the candidate \eqn{c} is \eqn{|\hat\tau - c|/\hat\sigma_0}.
+The weight \eqn{1/\hat\sigma_i} uses no outcome at the target date and does
+not depend on \eqn{c}, so for an affine rule the set is still computed
+exactly. In the Jackknife+, fold \eqn{j} predicts the treated unit and
+control \eqn{j} from the other controls and gives each its own
+\eqn{\hat\sigma} from that fold's fit. Control \eqn{j}'s score is its
+absolute error divided by its \eqn{\hat\sigma_j}, so in the treated unit's
+units the fold's radius is that error times the treated unit's
+\eqn{\hat\sigma} divided by \eqn{\hat\sigma_j}. The interval is then formed
+from the folds as usual. For a user rule, \eqn{\hat\sigma_i} comes from
+calling the rule at each pre-treatment date with that date's training
+outcomes as \code{background.target}. This is the unit's in-sample fit only
+if the rule predicts from \code{background.target} in the same way at every
+date, which is what the target-date interface asks. A call that returns a
+value that is not finite makes the fit fail: full conformal inference then
+gives no set for that date (\code{method} is \code{"failed"}), and a failed
+Jackknife+ fold widens the interval.
+
+\strong{What the guarantee needs.} Both scores carry the same guarantee,
+\eqn{1 - \lfloor \alpha N \rfloor / N} for full conformal inference and
+\eqn{1 - (2q - 1)/N} for the Jackknife+, when the units' scores are
+exchangeable. With the studentized score, the condition concerns each unit's
+pre-treatment fit together with its post-treatment error: for full
+conformal inference, the studentized scores of all \eqn{N} units at the true
+effect must be exchangeable, and for the Jackknife+, the table of
+studentized scores over all pairs of held-out units must be. Exchangeable
+complete units with one common rule, fixed in advance, imply it, because
+the same rule computes each unit's weight from its own fit. Liu and Xu
+(2026) state this for their bands over several dates, of which a single date
+is the case here. Choose the score before the post-treatment outcomes are
+seen. The absolute score suits panels where prediction errors have similar
+variances across units; when the units' pre-treatment residuals differ
+widely, the paper recommends the studentized score. The residuals depend on
+the pre-treatment outcomes only, and the \code{sigma} element of a
+studentized full conformal fit reports them, so their spread can be looked
+at before any set. Choosing the score after seeing which one gives the
+narrower set, or which one excludes zero, voids the guarantee.
+
+\strong{Placebo dates.} With \code{diag} above 0, each placebo date runs the
+same procedure on the dates before it, and with the studentized score each
+unit's \eqn{\hat\sigma} is computed from those dates only. The paper states
+its pre-treatment diagnostics for the absolute score. Applying them to the
+studentized score is an extension in this package, not a result stated in the
+paper: it uses the same argument, with each unit's \eqn{\hat\sigma}
+computed from the history before the placebo date.
+
+\strong{Errors.} The studentized score needs a positive \eqn{\hat\sigma}
+for every unit in the fit. If a unit's fit reproduces its pre-treatment
+outcomes exactly (\eqn{\hat\sigma} is zero, or below \eqn{10^{-8}} times the
+root mean square of that unit's own pre-treatment outcomes), the function
+stops and names the units, and at a placebo date the date. An exact fit
+gives an infinite weight, and leaving the unit out because of its fit would
+make the pool depend on the data, which the guarantee does not allow. Use
+\code{score = "absolute"}, a smaller \code{diag}, or remove the unit from the
+data before the call, a choice made before the results are seen. For
+example, \code{rule = "did"} with one pre-treatment date fits that date
+exactly. The \code{plot} method stops for \code{y.axis = "t"} on a fit with
+the absolute score, and for a pair of fits that differ in more than the
+procedure; the message names what differs (the rule, \code{alpha}, the
+score, the diagnostic dates or the data).
+
+\strong{The plot.} \code{plot(out)} draws, for each treated unit, the
+estimate and the set at each post-treatment date, and at each placebo date
+if \code{diag} is above 0 (to the left of the vertical line). A set that is a
+union of intervals is drawn by its hull. \code{plot(fc, jp)} draws a full
+conformal fit and a Jackknife+ fit at each date, the full conformal one in
+the darker colour. \code{plot(fc, jp, y.axis = "t")} does the same on the
+scale below.
+
+\strong{The t axis.} \code{y.axis = "t"} divides the estimate and the set
+ends at each date by the treated unit's pre-treatment root mean squared
+residual, so a value of 3 is three times that residual. For a full conformal
+fit the divisor is the treated unit's \eqn{\hat\sigma} in that date's fit.
+For a Jackknife+ fit it is the residual when the treated unit is predicted
+from all the controls, a choice made for the figure, since each fold uses
+its own; in a pair, both procedures are divided by this same number. A
+placebo date is divided by its own residual, computed from the dates before
+it. The division is done after the set is found, so the sets, and whether
+they contain zero, do not change. The axis is not a standard error. Its
+values are not t-statistics in the usual sense, and no critical value such
+as 1.96 applies. Dates with no positive divisor are not drawn, and a
+message names them. The default y label is \dQuote{Effect / pre-treatment
+residual size}. The ggplot's \code{$data} holds the plotted values, and
+with \code{y.axis = "t"} the divisor in \code{sigma}; a pair adds a
+\code{procedure} column. For a \code{fect} fit, see \code{\link{plot.fect}}.
 }
 \examples{
 data(sim_gsynth)
@@ -145,6 +299,18 @@ out <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"),
                     rule = "did", alpha = 0.1)
 out
 head(out$unit)
+
+## studentized score, both procedures, and the two together on the t axis,
+## with two placebo dates (the weights at a placebo date use the dates
+## before it)
+fc <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"), rule = "did",
+                   alpha = 0.1, diag = 2, score = "studentized")
+jp <- conformal_sc(Y ~ D, data = d1, index = c("id", "time"), rule = "did",
+                   procedure = "jackknife+", alpha = 0.1, diag = 2,
+                   score = "studentized")
+range(fc[["sigma"]]$sigma)    ## spread of the pre-treatment residuals
+head(fc$sigma.treated)        ## what y.axis = "t" divides by
+plot(fc, jp, y.axis = "t")
 
 \donttest{
 if (requireNamespace("quadprog", quietly = TRUE)) {

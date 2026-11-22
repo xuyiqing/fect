@@ -101,6 +101,7 @@ fect <- function(
     normalize = FALSE, # accelerate option
     keep.sims = FALSE, # keep individual bootstrap/jackknife simulations
     conformal.diag = 0, # vartype = "conformal": number of pre-treatment diagnostic dates
+    conformal.score = "absolute", # vartype = "conformal", method = "fe": score of the units
     conformal.block = FALSE, # vartype = "conformal": block Jackknife+ for averages
     conformal.relabel = 0, # vartype = "conformal": relabeling-test draws
     cm = FALSE, # causal moderation
@@ -526,6 +527,7 @@ fect.formula <- function(
     normalize = FALSE,
     keep.sims = FALSE,
     conformal.diag = 0, # vartype = "conformal": number of pre-treatment diagnostic dates
+    conformal.score = "absolute", # vartype = "conformal", method = "fe": score of the units
     conformal.block = FALSE, # vartype = "conformal": block Jackknife+ for averages
     conformal.relabel = 0, # vartype = "conformal": relabeling-test draws
     cm = FALSE,
@@ -661,6 +663,7 @@ fect.formula <- function(
         normalize = normalize,
         keep.sims = keep.sims,
         conformal.diag = conformal.diag,
+        conformal.score = conformal.score,
         conformal.block = conformal.block,
         conformal.relabel = conformal.relabel,
         cm = cm,
@@ -757,6 +760,7 @@ fect.default <- function(
     normalize = FALSE,
     keep.sims = FALSE,
     conformal.diag = 0, # vartype = "conformal": number of pre-treatment diagnostic dates
+    conformal.score = "absolute", # vartype = "conformal", method = "fe": score of the units
     conformal.block = FALSE, # vartype = "conformal": block Jackknife+ for averages
     conformal.relabel = 0, # vartype = "conformal": relabeling-test draws
     cm=FALSE,
@@ -1099,10 +1103,14 @@ fect.default <- function(
     ## further down so error messages name the user's actual method = "fe".
     method_arg <- method
 
+    conformal.score <- match.arg(conformal.score,
+                                 c("absolute", "studentized"))
     if (!(isTRUE(se == 1) && identical(vartype, "conformal")) &&
         (isTRUE(conformal.diag != 0) || isTRUE(conformal.block) ||
-         isTRUE(conformal.relabel != 0))) {
-        warning("conformal.diag, conformal.block and conformal.relabel apply ",
+         isTRUE(conformal.relabel != 0) ||
+         !identical(conformal.score, "absolute"))) {
+        warning("conformal.diag, conformal.block, conformal.relabel and ",
+                "conformal.score apply ",
                 "only with se = TRUE and vartype = \"conformal\"; they are ",
                 "ignored.", call. = FALSE)
     }
@@ -1182,6 +1190,15 @@ fect.default <- function(
                 as.integer(v)
             }
             conformal.diag <- .cf_count(conformal.diag, "conformal.diag")
+            if (identical(conformal.score, "studentized")) {
+                if (!identical(method_arg, "fe")) {
+                    stop("conformal.score = \"studentized\" is available ",
+                         "with method = \"fe\" only (full conformal ",
+                         "inference); got method = \"", method_arg,
+                         "\". Use conformal.score = \"absolute\" for the ",
+                         "Jackknife+.", call. = FALSE)
+                }
+            }
             conformal.relabel <- .cf_count(conformal.relabel, "conformal.relabel")
             if (!(is.logical(conformal.block) && length(conformal.block) == 1L &&
                   !is.na(conformal.block))) {
@@ -3636,6 +3653,8 @@ fect.default <- function(
             group = G,
             keep.sims = keep.sims,
             conformal.diag = conformal.diag,
+            conformal.score = conformal.score,
+            conformal.time = if (!is.null(time.labels)) time.labels[time.uni] else time.uni,
             conformal.block = conformal.block,
             conformal.relabel = conformal.relabel,
             conformal.full = identical(method_arg, "fe"),
@@ -4182,6 +4201,12 @@ fect.default <- function(
         cu$unit <- iname[cu$unit]
         cu$time <- tname[cu$time]
         out$conformal$unit <- cu
+        if (!is.null(out$conformal$sigma.treated)) {
+            sg0 <- out$conformal$sigma.treated
+            sg0$treated <- iname[sg0$treated]
+            sg0$time <- tname[sg0$time]
+            out$conformal$sigma.treated <- sg0
+        }
         if (!is.null(out$conformal$folds)) {
             cf.cell <- out$conformal$folds$cell
             cf.cell$unit <- iname[cf.cell$unit]

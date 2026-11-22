@@ -127,7 +127,19 @@ plot.fect <- function(
     ## theme.bw = FALSE for the pre-2.3.1 gray-panel look. Use this for
     ## byte-identical reproduction of figures rendered with fect <= 2.3.0;
     ## remove once you have re-rendered with the modern defaults.
+    y.axis = "outcome", ## "outcome" (default) or "t": a conformal fit with the studentized score, estimate and sets divided by the treated unit's pre-treatment residual
     ...) {
+
+  ## a second fit is not drawn here (plot(fc, jp) is for conformal_sc fits)
+  if (inherits(type, c("fect", "conformal_sc"))) {
+    stop("Plotting two fits together is available for conformal_sc objects: ",
+         "plot(fc, jp).", call. = FALSE)
+  }
+  y.axis <- match.arg(y.axis, c("outcome", "t"))
+  if (identical(y.axis, "t")) {
+    return(.fc_plot_fect_t(x, type, match.call(), main, xlab, ylab, xlim, ylim,
+                           return.data))
+  }
 
   rbind_fill_fect_plot <- function(...) {
     dfs <- list(...)
