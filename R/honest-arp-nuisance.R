@@ -209,11 +209,24 @@
 # right-hand side. .delta_lp_template() does once the part of the set-up that does not depend on
 # it, and .delta_lp_build() then builds the program for one right-hand side.
 #
-# A new lpSolveAPI program is still built for every right-hand side, with the same sequence of
-# calls into the solver as before, so the solver returns what it returned before, bit for bit.
-# The program object is not reused: a program that has been solved once does not return exactly
-# the numbers a new program returns (the last digits can differ), and reusing it would change
-# the simulated values behind the least favorable critical value.
+# One program then serves all the right-hand sides of a theta grid, or of a critical value:
+# .delta_lp_reusable() builds it, and for each right-hand side the caller sets it, resets the
+# basis and solves again.
+#
+# This is not bit-identical to building a new program for every right-hand side, which is what
+# the engine did before. A program that has been solved once returns numbers that can differ in
+# their last digits from those of a new program (about 1e-15 in relative terms; the largest
+# difference seen in a simulated value is 2.6e-9). Bounds and test decisions were unchanged on
+# every recorded case. Three things keep the result well defined:
+#   * .delta_lp_reusable() solves the program once before it is used. The first solve of a
+#     program is the one that differs; after it, the answer for a right-hand side does not
+#     depend on which right-hand sides were solved before.
+#   * If the reused program fails for a right-hand side (a status other than 0), that
+#     right-hand side is solved again with a new program, built as before. So reuse never
+#     makes a program fail that a new one would have solved.
+#   * The program object lives only inside the function call that created it (a local
+#     variable, or the environment .ARP_computeCI creates), never in an object that is passed
+#     to a parallel worker.
 .delta_lp_template <- function(X_T, sigma) {
   dimDelta = base::dim(X_T)[2] # dimension of delta
   sdVec = base::sqrt(base::diag(sigma)) # standard deviation of y_T elements
@@ -253,7 +266,44 @@
   base::return(linprog)
 }
 
-.test_delta_lp_fn <- function(y_T, X_T, sigma, lp_template = NULL) {
+.delta_lp_control <- function(linprog, timeout = NULL) {
+  # Solver settings of the eta program: dual simplex, Dantzig pricing.
+  if (base::is.null(timeout)) {
+    lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral")
+  } else {
+    lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral", timeout=timeout)
+  }
+  base::invisible(NULL)
+}
+
+.delta_lp_reusable <- function(lp_template, timeout = NULL) {
+  # A program to be used for many right-hand sides: built with a right-hand side of zero and
+  # solved once (see the note above .delta_lp_template).
+  linprog = .delta_lp_build(lp_template, base::rep(0, lp_template$nConstraints))
+  .delta_lp_control(linprog, timeout)
+  lpSolveAPI::solve.lpExtPtr(linprog)
+  base::return(linprog)
+}
+
+.delta_lp_solve <- function(lp_template, b, linprog = NULL, timeout = NULL) {
+  # Solves  min f'x  s.t.  C x <= b. With a reusable program: new right-hand side, basis reset,
+  # solve; if that fails, or without a reusable program, a new program as before.
+  # Returns the solved program and the solver's status.
+  error_flag = 1L
+  if (!base::is.null(linprog)) {
+    lpSolveAPI::set.rhs(linprog, b)
+    lpSolveAPI::set.basis(linprog, default = TRUE)
+    error_flag = lpSolveAPI::solve.lpExtPtr(linprog)
+  }
+  if (error_flag != 0) {
+    linprog = .delta_lp_build(lp_template, b)
+    .delta_lp_control(linprog, timeout)
+    error_flag = lpSolveAPI::solve.lpExtPtr(linprog)
+  }
+  base::list(linprog = linprog, error_flag = error_flag)
+}
+
+.test_delta_lp_fn <- function(y_T, X_T, sigma, lp_template = NULL, linprog = NULL) {
   # Returns the value of eta that solves
   #   min_{eta, delta} eta
   #     s.t. y_T - x_T delta <= eta * diag(sigma)
@@ -263,6 +313,8 @@
   #   X_T = matrix
   #   sigma = covariance matrix of y_T
   #   lp_template = output of .delta_lp_template(X_T, sigma), if the caller has it already
+  #   linprog = output of .delta_lp_reusable(lp_template), if the caller has one for this
+  #             X_T and sigma; without it a new program is built
   # Outputs: list with elements
   #   etaStar   = minimum of linear program
   #   deltaStar = minimizer of linear program
@@ -283,12 +335,10 @@
   dimDelta = lp_template$dimDelta # dimension of delta
   b = -y_T
 
-  # Define linear program using lpSolveAPI
-  linprog = .delta_lp_build(lp_template, b)
-
-  # Solve linear program using dual simplex
-  lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral")
-  error_flag = lpSolveAPI::solve.lpExtPtr(linprog)
+  # Solve linear program using dual simplex (lpSolveAPI)
+  solved = .delta_lp_solve(lp_template, b, linprog = linprog)
+  linprog = solved$linprog
+  error_flag = solved$error_flag
   eta = lpSolveAPI::get.objective(linprog)
   primalSoln = lpSolveAPI::get.primal.solution(linprog)
   delta = primalSoln[(base::length(primalSoln)-dimDelta+1):base::length(primalSoln)]
@@ -416,14 +466,11 @@
     sigma <- sigma[rowsForARP, rowsForARP]
   }
 
-  .compute_eta <- function(b, lp_template) {
-    # Define linear program using lpSolveAPI
-    linprog = .delta_lp_build(lp_template, b)
-    # Solve linear program using dual simplex
-    lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral", timeout=10)
-    error_flag = lpSolveAPI::solve.lpExtPtr(linprog)
+  .compute_eta <- function(b, lp_template, linprog) {
+    # Solve linear program using dual simplex (lpSolveAPI), on the reusable program
+    solved = .delta_lp_solve(lp_template, b, linprog = linprog, timeout = 10)
     # Return value of eta
-    base::return(if (error_flag) NA else lpSolveAPI::get.objective(linprog))
+    base::return(if (solved$error_flag) NA else lpSolveAPI::get.objective(solved$linprog))
   }
 
   base::set.seed(seed)
@@ -438,7 +485,8 @@
     xi.draws = mvtnorm::rmvnorm(n=sims, sigma=sigma)
 
     # Compute eta for each simulation
-    eta_vec = base::apply(-xi.draws, 1, .compute_eta, lp_template)
+    eta_vec = base::apply(-xi.draws, 1, .compute_eta, lp_template,
+                          .delta_lp_reusable(lp_template, timeout = 10))
 
     # We compute the 1-kappa quantile of eta_vec and return this value
     base::return(stats::quantile(eta_vec, probs=1-hybrid_kappa, names=FALSE, na.rm=TRUE))
@@ -515,17 +563,22 @@
   k = base::dim(X_T_ARP)[2]
 
   # Compute eta, and the argmin delta. X_T_ARP and sigma_ARP do not change over the theta grid,
-  # so the part of the linear program that depends only on them is set up at the first grid
-  # point and kept in hybrid_list$lp_cache, an environment that .ARP_computeCI creates.
+  # so the linear program is set up at the first grid point and kept, with its template, in
+  # hybrid_list$lp_cache, an environment that .ARP_computeCI creates. Later grid points only
+  # change its right-hand side.
   lp_template = NULL
+  linprog = NULL
   lp_cache = hybrid_list$lp_cache
   if (base::is.environment(lp_cache)) {
     if (base::is.null(lp_cache$template)) {
       lp_cache$template = .delta_lp_template(X_T_ARP, sigma_ARP)
+      lp_cache$linprog = .delta_lp_reusable(lp_cache$template)
     }
     lp_template = lp_cache$template
+    linprog = lp_cache$linprog
   }
-  linSoln = .test_delta_lp_fn(y_T = y_T_ARP, X_T = X_T_ARP, sigma = sigma_ARP, lp_template = lp_template)
+  linSoln = .test_delta_lp_fn(y_T = y_T_ARP, X_T = X_T_ARP, sigma = sigma_ARP, lp_template = lp_template,
+                              linprog = linprog)
 
   # Check to see if valid solution to LP obtained
   if (linSoln$error_flag > 0) {
