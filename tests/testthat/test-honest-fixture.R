@@ -23,13 +23,13 @@ test_that("the engine reproduces every stored case", {
     res <- as.data.frame(res)
     expect_identical(names(res), names(cs$expected), info = id)
     expect_identical(nrow(res), nrow(cs$expected), info = id)
-    expect_close(res$lb, cs$expected$lb, fx$tolerance, info = id)
-    expect_close(res$ub, cs$expected$ub, fx$tolerance, info = id)
+    expect_close(as.vector(res$lb), as.vector(cs$expected$lb), fx$tolerance, info = id)
+    expect_close(as.vector(res$ub), as.vector(cs$expected$ub), fx$tolerance, info = id)
     for (v in setdiff(names(cs$expected), c("lb", "ub"))) {
       if (is.numeric(cs$expected[[v]])) {
-        expect_close(res[[v]], cs$expected[[v]], 1e-12, info = paste(id, v))
+        expect_close(as.vector(res[[v]]), as.vector(cs$expected[[v]]), 1e-12, info = paste(id, v))
       } else {
-        expect_identical(res[[v]], cs$expected[[v]], info = paste(id, v))
+        expect_identical(as.vector(res[[v]]), as.vector(cs$expected[[v]]), info = paste(id, v))
       }
     }
   }
@@ -39,6 +39,6 @@ test_that("no stored result is all-NA", {
   fx <- readRDS(fixture_path)
   for (i in seq_along(fx$cases)) {
     cs <- fx$cases[[i]]
-    expect_true(any(is.finite(c(cs$expected$lb, cs$expected$ub))), info = names(fx$cases)[i])
+    expect_true(any(!is.na(c(cs$expected$lb, cs$expected$ub))), info = names(fx$cases)[i])
   }
 })

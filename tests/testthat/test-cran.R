@@ -38,9 +38,11 @@ test_that("fect_sens engine reproduces the stored bounds", {
     expect_identical(names(res), names(cs$expected), info = nm)
     expect_identical(nrow(res), nrow(cs$expected), info = nm)
     for (v in c("lb", "ub")) {
-      d <- abs(res[[v]] - cs$expected[[v]])
-      fin <- is.finite(res[[v]]) & is.finite(cs$expected[[v]])
-      expect_identical(is.finite(res[[v]]), is.finite(cs$expected[[v]]), info = paste(nm, v))
+      got <- as.vector(res[[v]])
+      ref <- as.vector(cs$expected[[v]])
+      d <- abs(got - ref)
+      fin <- is.finite(got) & is.finite(ref)
+      expect_identical(is.finite(got), is.finite(ref), info = paste(nm, v))
       expect_true(all(d[fin] <= fx$tolerance), info = paste(nm, v))
       if (any(fin)) worst <- max(worst, d[fin])
     }

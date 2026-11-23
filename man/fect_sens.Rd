@@ -51,7 +51,9 @@ Rivka Lipkovitz
 }
 \examples{
 \donttest{
-if (all(vapply(c("Rglpk", "lpSolveAPI", "TruncatedNormal", "matrixStats", "Matrix", "pracma", "purrr", "tibble", "ECOSolveR"), requireNamespace, logical(1), quietly = TRUE))) {
+solvers <- c("Rglpk", "lpSolveAPI", "TruncatedNormal", "matrixStats",
+             "Matrix", "pracma", "purrr", "tibble", "ECOSolveR")
+if (all(vapply(solvers, requireNamespace, logical(1), quietly = TRUE))) {
   library(fect)
   data(simdata)
   ## The sensitivity analysis uses pre-treatment placebo estimates, so fit
