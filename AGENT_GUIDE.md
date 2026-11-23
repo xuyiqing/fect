@@ -177,7 +177,7 @@ head(fit.cf$conformal$diag$unit) # pre-treatment checks; intervals should cover 
 - **Factor models.** `plot(fit, type = "factors")`, `type = "loadings"`, and `type = "loading.overlap"`. A treated
   unit whose loadings fall outside the controls' range is a warning sign, because its counterfactual is an extrapolation.
 - **Sensitivity.** `fect_sens()` on a fit with a placebo test, then `plot(..., type = "sens")`, gives a Rambachan
-  and Roth (2023) sensitivity analysis for violations of parallel trends. It needs the **HonestDiDFEct** package.
+  and Roth (2023) sensitivity analysis for violations of parallel trends. Its code is adapted from **HonestDiD**; some Suggested solver packages are needed and the error message lists the missing ones.
   The manual's Sensitivity Analysis chapter (<https://yiqingxu.org/packages/fect/10-sens>) shows the setup.
 
 ## Where the results are

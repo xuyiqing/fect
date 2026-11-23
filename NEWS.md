@@ -1,4 +1,11 @@
 <!-- markdownlint-disable MD025 -->
+# fect 2.5.1
+
+* `fect_sens()` no longer needs the HonestDiDFEct package: its code, adapted from HonestDiD 0.2.8 (Rambachan and Roth, 2023), is now part of fect. Same arguments, same numbers.
+* The solver packages it uses are now in Suggests; if one is missing, `fect_sens()` stops and prints one `install.packages()` line.
+* The engine is internal and fect exports nothing new, so the fork's other functions (FLCI, other restrictions) are not available through fect.
+* Ashesh Rambachan and Jonathan Roth are listed as contributors in `DESCRIPTION`.
+
 # fect 2.5.0
 
 Development version and the next CRAN release. Versions 2.4.6 to 2.4.9 were

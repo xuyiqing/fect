@@ -78,6 +78,11 @@ jobs:
           # Use CRAN on macOS to ensure binaries are available.
           use-public-rspm: ${{ matrix.config.use_public_rspm }}
 
+      - name: Install GLPK (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y libglpk-dev
+
       - name: Setup R dependencies (attempt 1)
         id: deps1
         uses: r-lib/actions/setup-r-dependencies@v2
@@ -89,7 +94,16 @@ jobs:
           extra-packages: |
             any::rcmdcheck
             any::devtools
-            lzy318/HonestDiDFEct
+            any::CVXR
+            any::Rglpk
+            any::lpSolveAPI
+            any::TruncatedNormal
+            any::matrixStats
+            any::Matrix
+            any::pracma
+            any::purrr
+            any::tibble
+            any::ECOSolveR
           needs: check
 
       - name: Clear pak lockfile/cache (for retry)
@@ -107,15 +121,18 @@ jobs:
           extra-packages: |
             any::rcmdcheck
             any::devtools
-            lzy318/HonestDiDFEct
+            any::CVXR
+            any::Rglpk
+            any::lpSolveAPI
+            any::TruncatedNormal
+            any::matrixStats
+            any::Matrix
+            any::pracma
+            any::purrr
+            any::tibble
+            any::ECOSolveR
           needs: check
 
-
-      - name: Install HonestDiDFEct via devtools
-        shell: Rscript {0}
-        run: |
-          if (!requireNamespace('remotes', quietly=TRUE)) install.packages('remotes', repos='https://cloud.r-project.org')
-          if (!requireNamespace('HonestDiDFEct', quietly=TRUE)) remotes::install_github('lzy318/HonestDiDFEct', upgrade='never')
 
       - name: Ensure rcmdcheck is installed
         shell: Rscript {0}
