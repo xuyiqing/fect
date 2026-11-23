@@ -461,6 +461,11 @@
   base::return(base::list(vlo = vlo, vup = vup))
 }
 
+# The state of the random-number generator (NULL if it has not been used yet). Read only.
+.current_random_seed <- function() {
+  base::get0(".Random.seed", envir = base::globalenv(), inherits = FALSE)
+}
+
 # ARP FUNCTIONS -------------------------------------------------------
 .lp_conditional_test_fn <- function(theta, y_T, X_T, sigma, alpha,
                                     hybrid_flag, hybrid_list, rowsForARP = 1:base::length(y_T)) {
@@ -794,10 +799,30 @@
 
   # HYBRID: Check if hybrid is least favorable, then compute least-favorable CV and add it to hybrid list
   if (hybrid_flag == "LF") {
-    hybrid_list$lf_cv = .compute_least_favorable_cv(X_T = AGammaInv_minusOne,
-                                                    sigma = sigmaY,
-                                                    hybrid_kappa = hybrid_list$hybrid_kappa,
-                                                    rowsForARP = rowsForARP)
+    # The least-favorable CV is a function of AGammaInv_minusOne, sigmaY, hybrid_kappa and
+    # rowsForARP (.compute_least_favorable_cv sets its own seed), not of d or betahat. A caller
+    # that runs this function for several d with the same A, as createSensitivityResults() does
+    # over Mvec, can pass an environment in hybrid_list$lf_cv_cache. The CV is then computed in
+    # the first call and looked up in the later ones. A look-up needs the four inputs to be
+    # identical bit for bit, and the random-number state to be the one the computation left
+    # behind, so that skipping the computation changes neither the CV nor the state.
+    lf_cv_cache = hybrid_list$lf_cv_cache
+    lf_cv_inputs = base::list(AGammaInv_minusOne, sigmaY, hybrid_list$hybrid_kappa, rowsForARP)
+    if (base::is.environment(lf_cv_cache) &&
+        base::identical(lf_cv_cache$inputs, lf_cv_inputs, num.eq = FALSE, single.NA = FALSE) &&
+        base::identical(lf_cv_cache$seed_after, .current_random_seed())) {
+      hybrid_list$lf_cv = lf_cv_cache$value
+    } else {
+      hybrid_list$lf_cv = .compute_least_favorable_cv(X_T = AGammaInv_minusOne,
+                                                      sigma = sigmaY,
+                                                      hybrid_kappa = hybrid_list$hybrid_kappa,
+                                                      rowsForARP = rowsForARP)
+      if (base::is.environment(lf_cv_cache)) {
+        lf_cv_cache$inputs = lf_cv_inputs
+        lf_cv_cache$value = hybrid_list$lf_cv
+        lf_cv_cache$seed_after = .current_random_seed()
+      }
+    }
   }
 
   # A place for .lp_conditional_test_fn to keep what it sets up once for the whole theta grid.

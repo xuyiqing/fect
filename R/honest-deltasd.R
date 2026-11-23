@@ -137,7 +137,8 @@ computeConditionalCS_DeltaSD <- function(betahat, sigma, numPrePeriods, numPostP
                                          M = 0, alpha = 0.05, hybrid_flag = "FLCI", 
                                          hybrid_kappa = alpha/10, returnLength = FALSE,
                                          postPeriodMomentsOnly = TRUE,
-                                         gridPoints =10^3, grid.ub = NA, grid.lb = NA, seed = 0) {
+                                         gridPoints =10^3, grid.ub = NA, grid.lb = NA, seed = 0,
+                                         lf_cv_cache = NULL) {
   # This function computes the ARP CI that includes nuisance parameters
   # for Delta^{SD}(M). This functions uses ARP_computeCI for all
   # of its computations.
@@ -155,6 +156,9 @@ computeConditionalCS_DeltaSD <- function(betahat, sigma, numPrePeriods, numPostP
   #   returnLength        = returns length of CI only. Otherwise, returns matrix with grid in col 1 and test result in col 2.
   #   numGridPoints       = number of gridpoints to test over, default = 1000
   #   postPeriodMomentsOnly = exclude moments for delta^SD that only include pre-period coefs
+  #   lf_cv_cache         = NULL, or an environment shared by calls that differ only in M. With
+  #                         hybrid_flag = "LF" and more than one post-period, the least-favorable CV
+  #                         does not depend on M and is then computed once (see .ARP_computeCI).
   #
   #  Outputs:
   #   data_frame containing upper and lower bounds of CI.
@@ -283,6 +287,9 @@ computeConditionalCS_DeltaSD <- function(betahat, sigma, numPrePeriods, numPostP
         grid.lb = IDset$id.lb - 20*sdTheta
       }
     }
+
+    # Share the least-favorable CV between calls that differ only in M (see .ARP_computeCI)
+    hybrid_list$lf_cv_cache = lf_cv_cache
 
     # Compute ARP CI for l'beta using Delta^SD
     CI = .ARP_computeCI(betahat = betahat, sigma = sigma, numPrePeriods = numPrePeriods,

@@ -121,13 +121,17 @@ createSensitivityResults <- function(betahat, sigma,
         }
       }
     } else if (method == "C-LF") {
+      # The least-favorable critical value does not depend on M: compute it once for all of Mvec.
+      # (With a parallel backend each worker gets its own copy and computes it for itself.)
+      lf_cv_cache = base::new.env()
       if (parallel == FALSE) {
         Results = foreach::foreach(m = 1:base::length(Mvec), .combine = 'rbind') %do% {
           temp = computeConditionalCS_DeltaSD(betahat = betahat, sigma = sigma,
                                               numPrePeriods = numPrePeriods,
                                               numPostPeriods = numPostPeriods,
                                               l_vec = l_vec, alpha = alpha, M = Mvec[m],
-                                              hybrid_flag = "LF", seed = seed)
+                                              hybrid_flag = "LF", seed = seed,
+                                              lf_cv_cache = lf_cv_cache)
           tibble::tibble(lb = base::min(temp$grid[temp$accept == 1]),
                          ub = base::max(temp$grid[temp$accept == 1]),
                          method = "C-LF",
@@ -139,7 +143,8 @@ createSensitivityResults <- function(betahat, sigma,
                                               numPrePeriods = numPrePeriods,
                                               numPostPeriods = numPostPeriods,
                                               l_vec = l_vec, alpha = alpha, M = Mvec[m],
-                                              hybrid_flag = "LF", seed = seed)
+                                              hybrid_flag = "LF", seed = seed,
+                                              lf_cv_cache = lf_cv_cache)
           tibble::tibble(lb = base::min(temp$grid[temp$accept == 1]),
                          ub = base::max(temp$grid[temp$accept == 1]),
                          method = "C-LF",
