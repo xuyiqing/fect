@@ -1,0 +1,141 @@
+# Code adapted from the 'HonestDiD' package, version 0.2.8, by Ashesh Rambachan and Jonathan Roth,
+# through 'HonestDiDFEct' 1.0.0 by Ziyi Liu (github.com/lzy318/HonestDiDFEct, commit 29c831d).
+# Original file: R/utilities.R
+# Copyright (c) 2023 HonestDiD authors. MIT licence; the full notice is in inst/COPYRIGHTS.
+# Copied into fect 2.5.1 without change to any numerical line; the edits are listed in the fect repository history.
+#
+# Other helper functions ----
+.selectionMat <- function(selection, size, select = "columns"){
+  if(select == "rows"){
+    m <- base::matrix(0, nrow = base::length(selection), ncol = size)
+
+    m[ 1:base::length(selection), selection] <- base::diag(base::length(selection))
+  }else{
+    m <- base::matrix(0, ncol = base::length(selection), nrow = size)
+
+    m[ selection , 1:base::length(selection)] <- base::diag(base::length(selection))
+  }
+  base::return(m)
+}
+
+.LeeCFN <- function(eta, Sigma){
+  c = Sigma %*% eta / base::as.numeric( base::t(eta) %*% Sigma %*% eta )
+  base::return(c)
+}
+
+.VLoVUpFN <- function(eta, Sigma, A, b, z){
+  c = .LeeCFN(eta,Sigma)
+
+  objective <- (b - A %*% z) / (A %*% c)
+
+  ACNegativeIndex <- base::which( (A %*% c) < 0 )
+  ACPositiveIndex <- base::which( (A %*% c) > 0 )
+
+  if( base::length(ACNegativeIndex) == 0){
+    VLo <- -Inf
+  }else{
+    VLo <- base::max(objective[ACNegativeIndex])
+  }
+
+  if( base::length(ACPositiveIndex) == 0){
+    VUp <- Inf
+  }else{
+    VUp <- base::min(objective[ACPositiveIndex])
+  }
+
+  base::return(base::c(VLo,VUp))
+}
+
+basisVector <- function(index = 1, size = 1){
+  v <- base::matrix(0, nrow = size, ncol = 1)
+  v[index] = 1
+  base::return(v)
+}
+
+.warnIfNotSymmPSD <- function (sigma) {
+  # Check that sigma is PSD
+  if ( !base::isSymmetric(sigma, check.attributes=FALSE) ) {
+    # sigma <- (sigma + t(sigma)) / 2
+    base::warning(base::sprintf("matrix sigma not exactly symmetric (largest asymmetry was %g)",
+                                base::max(base::abs(sigma - t(sigma)))))
+  }
+
+  lambda <- base::eigen(sigma, TRUE, only.values=TRUE)$values
+  if ( base::any(lambda < 0) ) {
+    base::warning(base::sprintf("matrix sigma not numerically positive semi-definite (smallest eigenvalue was %g)",
+                                base::min(lambda)))
+  }
+
+  # return(sigma)
+}
+
+.stopIfNotConformable <- function (betahat, sigma, numPrePeriods, numPostPeriods, l_vec) {
+  betaDim <- c(base::NROW(betahat), base::NCOL(betahat))
+
+  betaL <- base::max(betaDim)
+  beta1 <- base::min(betaDim)
+  if ( beta1 > 1 ) {
+      base::stop(base::sprintf("expected a vector but betahat was %d by %d", betaDim[1], betaDim[2]))
+  }
+
+  sigmaR <- base::NROW(sigma)
+  sigmaC <- base::NCOL(sigma)
+  if ( sigmaR != sigmaC ) {
+      base::stop(base::sprintf("expected a square matrix but sigma was %d by %d", sigmaR, sigmaC))
+  }
+
+  if ( sigmaR != betaL ) {
+      base::stop(base::sprintf("betahat (%d by %d) and sigma (%d by %d) were non-conformable",
+                 betaDim[1], betaDim[2], sigmaR, sigmaC))
+  }
+
+  numPeriods <- numPrePeriods + numPostPeriods
+  if ( numPeriods != betaL ) {
+      base::stop(base::sprintf("betahat (%d by %d) and pre + post periods (%d + %d) were non-conformable",
+                 betaDim[1], betaDim[2], numPrePeriods, numPostPeriods))
+  }
+
+  if ( base::length(l_vec) != numPostPeriods ) {
+      base::stop(base::sprintf("l_vec (length %d) and post periods (%d) were non-conformable",
+                 base::length(l_vec), numPostPeriods))
+  }
+}
+
+# Wrapper around CVXR::psolve to preserve the pre-1.8 return interface.
+# In CVXR >= 1.8, psolve() returns only the optimal objective value, and
+# status / variable values must be queried via CVXR::status() and
+# CVXR::value() on the problem / variable objects respectively. This wrapper
+# re-packages the new API into the old list form ($value, $status, $getValue)
+# so downstream call sites can stay unchanged.
+#
+# Note: $getValue is a deferred closure that reads CVXR::value(variable) at
+# call time. Because CVXR stores variable solutions on the Variable object
+# itself, a subsequent psolve() on any problem that references the same
+# variable will overwrite its value. Callers must therefore invoke $getValue
+# before issuing another psolve() on an overlapping variable.
+.psolve <- function(problem, ...) {
+  value  <- CVXR::psolve(problem, ...)
+  status <- CVXR::status(problem)
+  base::list(
+    value    = value,
+    status   = status,
+    getValue = function(variable) CVXR::value(variable)
+  )
+}
+
+# Custom error messages. Prints a friendly context header, then re-raises the
+# original condition so upstream handlers (and tests) see a real error rather
+# than a silent NULL. Without the rethrow, errors inside the wrapped block are
+# converted to messages and the caller receives NULL, which causes tests to
+# pass on broken code paths (see issue that motivated test_syntax.R).
+.CustomErrorHandling <- function(code, custom) {
+  base::tryCatch({
+    code
+  }, error = function(e) {
+    base::message(custom)
+    base::message("\tcall:  ", base::paste0(rlang::expr_deparse(e$call), collapse='\n\t'))
+    base::message("\terror: ", e$message)
+    base::message("Traceback:"); traceback()
+    base::stop(e)
+  })
+}
