@@ -797,55 +797,115 @@
   Y = base::c(A %*% betahat - d)
   sigmaY = A %*% sigma %*% base::t(A)
 
-  # HYBRID: Check if hybrid is least favorable, then compute least-favorable CV and add it to hybrid list
-  if (hybrid_flag == "LF") {
-    # The least-favorable CV is a function of AGammaInv_minusOne, sigmaY, hybrid_kappa and
-    # rowsForARP (.compute_least_favorable_cv sets its own seed), not of d or betahat. A caller
-    # that runs this function for several d with the same A, as createSensitivityResults() does
-    # over Mvec, can pass an environment in hybrid_list$lf_cv_cache. The CV is then computed in
-    # the first call and looked up in the later ones. A look-up needs the four inputs to be
-    # identical bit for bit, and the random-number state to be the one the computation left
-    # behind, so that skipping the computation changes neither the CV nor the state.
-    lf_cv_cache = hybrid_list$lf_cv_cache
-    lf_cv_inputs = base::list(AGammaInv_minusOne, sigmaY, hybrid_list$hybrid_kappa, rowsForARP)
-    if (base::is.environment(lf_cv_cache) &&
-        base::identical(lf_cv_cache$inputs, lf_cv_inputs, num.eq = FALSE, single.NA = FALSE) &&
-        base::identical(lf_cv_cache$seed_after, .current_random_seed())) {
-      hybrid_list$lf_cv = lf_cv_cache$value
-    } else {
-      hybrid_list$lf_cv = .compute_least_favorable_cv(X_T = AGammaInv_minusOne,
-                                                      sigma = sigmaY,
-                                                      hybrid_kappa = hybrid_list$hybrid_kappa,
-                                                      rowsForARP = rowsForARP)
-      if (base::is.environment(lf_cv_cache)) {
-        lf_cv_cache$inputs = lf_cv_inputs
-        lf_cv_cache$value = hybrid_list$lf_cv
-        lf_cv_cache$seed_after = .current_random_seed()
+  # MEMO: with hybrid_flag = "LF", the test results over the theta grid are a function of the
+  # grid, of the rows of Y, AGammaInv and sigmaY listed in rowsForARP, and of alpha and
+  # hybrid_kappa (.compute_least_favorable_cv sets its own seed). The other rows of A are not
+  # used. A caller that runs this function on several A whose rows in rowsForARP may coincide,
+  # as computeConditionalCS_DeltaRM() does over s and the sign (at Mbar = 0 they all coincide),
+  # can pass an environment in hybrid_list$arp_memo. A call whose inputs are identical, bit for
+  # bit, to those of an earlier call then takes the earlier call's results instead of computing
+  # them again. The warnings of the earlier call are raised again, and the look-up also needs the
+  # random-number state to be the one the earlier call left behind, so the results, the warnings
+  # and the state are what a second computation would give.
+  arp_memo = hybrid_list$arp_memo
+  memo_key = NULL
+  memo_hit = NULL
+  if (base::is.environment(arp_memo) && hybrid_flag == "LF" && !base::is.null(rowsForARP)) {
+    X_memo = AGammaInv_minusOne
+    if (base::is.vector(X_memo)) {
+      X_memo = base::matrix(X_memo, ncol = 1)
+    }
+    memo_key = base::list(thetaGrid, Y[rowsForARP], AGammaInv_one[rowsForARP], X_memo[rowsForARP,],
+                          sigmaY[rowsForARP, rowsForARP], alpha, hybrid_list$hybrid_kappa)
+    for (memo_entry in arp_memo$entries) {
+      if (base::identical(memo_entry$key, memo_key, num.eq = FALSE, single.NA = FALSE) &&
+          base::identical(memo_entry$seed_after, .current_random_seed())) {
+        memo_hit = memo_entry
+        break
       }
     }
   }
 
-  # A place for .lp_conditional_test_fn to keep what it sets up once for the whole theta grid.
-  hybrid_list$lp_cache = base::new.env()
-
-  # Define helper function to loop over theta grid
-  testTheta <- function(theta) {
-    # If FLCI Hybrid, compute dbar
-    if (hybrid_flag == "FLCI") {
-      hybrid_list$dbar = base::c(hybrid_list$flci_halflength - (t(hybrid_list$vbar) %*% d) + (1 - t(hybrid_list$vbar) %*% AGammaInv_one)*theta,
-                                 hybrid_list$flci_halflength + (t(hybrid_list$vbar) %*% d) - (1 - t(hybrid_list$vbar) %*% AGammaInv_one)*theta)
+  if (!base::is.null(memo_hit)) {
+    hybrid_list$lf_cv = memo_hit$lf_cv
+    for (memo_condition in memo_hit$conditions) {
+      if (base::inherits(memo_condition, "warning")) {
+        base::warning(memo_condition)
+      } else {
+        base::message(memo_condition)
+      }
     }
+    testResultsGrid <- memo_hit$testResultsGrid
+  } else {
+    # The handlers only take note of the warnings and messages; they do not stop them.
+    memo_conditions = base::list()
+    base::withCallingHandlers({
+      # HYBRID: Check if hybrid is least favorable, then compute least-favorable CV and add it to hybrid list
+      if (hybrid_flag == "LF") {
+        # The least-favorable CV is a function of AGammaInv_minusOne, sigmaY, hybrid_kappa and
+        # rowsForARP (.compute_least_favorable_cv sets its own seed), not of d or betahat. A caller
+        # that runs this function for several d with the same A, as createSensitivityResults() does
+        # over Mvec, can pass an environment in hybrid_list$lf_cv_cache. The CV is then computed in
+        # the first call and looked up in the later ones. A look-up needs the four inputs to be
+        # identical bit for bit, and the random-number state to be the one the computation left
+        # behind, so that skipping the computation changes neither the CV nor the state.
+        lf_cv_cache = hybrid_list$lf_cv_cache
+        lf_cv_inputs = base::list(AGammaInv_minusOne, sigmaY, hybrid_list$hybrid_kappa, rowsForARP)
+        if (base::is.environment(lf_cv_cache) &&
+            base::identical(lf_cv_cache$inputs, lf_cv_inputs, num.eq = FALSE, single.NA = FALSE) &&
+            base::identical(lf_cv_cache$seed_after, .current_random_seed())) {
+          hybrid_list$lf_cv = lf_cv_cache$value
+        } else {
+          hybrid_list$lf_cv = .compute_least_favorable_cv(X_T = AGammaInv_minusOne,
+                                                          sigma = sigmaY,
+                                                          hybrid_kappa = hybrid_list$hybrid_kappa,
+                                                          rowsForARP = rowsForARP)
+          if (base::is.environment(lf_cv_cache)) {
+            lf_cv_cache$inputs = lf_cv_inputs
+            lf_cv_cache$value = hybrid_list$lf_cv
+            lf_cv_cache$seed_after = .current_random_seed()
+          }
+        }
+      }
 
-    # For the FLCI, we compute the modified FLCI vlo, vup inside this function now.
-    reject = .test_delta_lp_fn_wrapper(theta = theta, y_T = Y-AGammaInv_one*theta, X_T = AGammaInv_minusOne,
-                                       sigma = sigmaY, alpha = alpha,
-                                       hybrid_flag = hybrid_flag, hybrid_list = hybrid_list, rowsForARP = rowsForARP)
-    accept = 1-reject
-    base::return(accept)
+      # A place for .lp_conditional_test_fn to keep what it sets up once for the whole theta grid.
+      hybrid_list$lp_cache = base::new.env()
+
+      # Define helper function to loop over theta grid
+      testTheta <- function(theta) {
+        # If FLCI Hybrid, compute dbar
+        if (hybrid_flag == "FLCI") {
+          hybrid_list$dbar = base::c(hybrid_list$flci_halflength - (t(hybrid_list$vbar) %*% d) + (1 - t(hybrid_list$vbar) %*% AGammaInv_one)*theta,
+                                     hybrid_list$flci_halflength + (t(hybrid_list$vbar) %*% d) - (1 - t(hybrid_list$vbar) %*% AGammaInv_one)*theta)
+        }
+
+        # For the FLCI, we compute the modified FLCI vlo, vup inside this function now.
+        reject = .test_delta_lp_fn_wrapper(theta = theta, y_T = Y-AGammaInv_one*theta, X_T = AGammaInv_minusOne,
+                                           sigma = sigmaY, alpha = alpha,
+                                           hybrid_flag = hybrid_flag, hybrid_list = hybrid_list, rowsForARP = rowsForARP)
+        accept = 1-reject
+        base::return(accept)
+      }
+
+      # Loop over theta grid and store acceptances
+      testResultsGrid <- purrr::map_dbl(.x = thetaGrid, .f = testTheta)
+    }, warning = function(w) {
+      if (!base::is.null(memo_key)) {
+        memo_conditions[[base::length(memo_conditions) + 1L]] <<- w
+      }
+    }, message = function(m) {
+      if (!base::is.null(memo_key)) {
+        memo_conditions[[base::length(memo_conditions) + 1L]] <<- m
+      }
+    })
+    if (!base::is.null(memo_key)) {
+      arp_memo$entries = base::c(arp_memo$entries,
+                                 base::list(base::list(key = memo_key, lf_cv = hybrid_list$lf_cv,
+                                                       conditions = memo_conditions,
+                                                       testResultsGrid = testResultsGrid,
+                                                       seed_after = .current_random_seed())))
+    }
   }
-
-  # Loop over theta grid and store acceptances
-  testResultsGrid <- purrr::map_dbl(.x = thetaGrid, .f = testTheta)
   testValsGrid <- thetaGrid
   resultsGrid <- base::cbind(testValsGrid, testResultsGrid)
   if( (resultsGrid[1, 2] == 1 | resultsGrid[base::NROW(resultsGrid), 2] == 1) & hybrid_flag != "FLCI"){

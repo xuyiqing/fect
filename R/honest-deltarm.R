@@ -190,10 +190,14 @@
 .computeConditionalCS_DeltaRM_fixedS <- function(s, max_positive, Mbar,
                                                  betahat, sigma, numPrePeriods, numPostPeriods, l_vec,
                                                  alpha, hybrid_flag, hybrid_kappa,
-                                                 postPeriodMomentsOnly, gridPoints, grid.ub, grid.lb, seed = 0) {
+                                                 postPeriodMomentsOnly, gridPoints, grid.ub, grid.lb, seed = 0,
+                                                 arp_memo = NULL) {
   # This function computes the ARP CI that includes nuisance parameters
   # for Delta^{RM}(Mbar) for a fixed s and (+),(-). This functions uses ARP_computeCI for all
   # of its computations. It is used as a helper function in computeConditionalCS_DeltaRM below.
+  #
+  # arp_memo = NULL, or an environment shared by the calls for the different s and signs, in
+  # which .ARP_computeCI keeps the results of each distinct problem (see the note there).
 
   # Check that hybrid_flag equals LF or ARP
   if (hybrid_flag != "LF" & hybrid_flag != "ARP") {
@@ -240,6 +244,9 @@
                                 grid.ub = grid.ub, grid.lb = grid.lb,
                                 gridPoints = gridPoints)
   } else { # CASE: NumPostPeriods > 1, use the nuisance parameter functions.
+    # Let .ARP_computeCI answer a problem it has solved already for another s or sign
+    hybrid_list$arp_memo = arp_memo
+
     # Compute ARP CI for l'beta using Delta^RM
     CI = .ARP_computeCI(betahat = betahat, sigma = sigma, numPrePeriods = numPrePeriods,
                         numPostPeriods = numPostPeriods, A = A_RM_s, d = d_RM,
@@ -288,6 +295,10 @@ computeConditionalCS_DeltaRM <- function(betahat, sigma, numPrePeriods, numPostP
   if (base::is.na(grid.ub)) { grid.ub = 20*sdTheta }
   if (base::is.na(grid.lb)) { grid.lb = -20*sdTheta }
 
+  # The problems for different s and signs can coincide on the moments the test uses (at Mbar = 0
+  # all of them do). Each distinct problem is computed once: see the note in .ARP_computeCI.
+  arp_memo = base::new.env()
+
   # Loop over s values for (+), (-), left join the resulting CIs based on the grid
   CIs_RM_plus_allS = base::matrix(0, nrow = gridPoints, ncol = base::length(s_indices))
   CIs_RM_minus_allS = base::matrix(0, nrow = gridPoints, ncol = base::length(s_indices))
@@ -298,7 +309,8 @@ computeConditionalCS_DeltaRM <- function(betahat, sigma, numPrePeriods, numPostP
                                                      numPostPeriods = numPostPeriods, l_vec = l_vec,
                                                      alpha = alpha, hybrid_flag = hybrid_flag, hybrid_kappa = hybrid_kappa,
                                                      postPeriodMomentsOnly = postPeriodMomentsOnly,
-                                                     gridPoints = gridPoints, grid.ub = grid.ub, grid.lb = grid.lb, seed = seed)
+                                                     gridPoints = gridPoints, grid.ub = grid.ub, grid.lb = grid.lb, seed = seed,
+                                                     arp_memo = arp_memo)
     CIs_RM_plus_allS[,s_i] = CI_s_plus$accept
 
     # Compute CI for s, (-) and bind it to all CI's for (-)
@@ -307,7 +319,8 @@ computeConditionalCS_DeltaRM <- function(betahat, sigma, numPrePeriods, numPostP
                                                       numPostPeriods = numPostPeriods, l_vec = l_vec,
                                                       alpha = alpha, hybrid_flag = hybrid_flag, hybrid_kappa = hybrid_kappa,
                                                       postPeriodMomentsOnly = postPeriodMomentsOnly,
-                                                      gridPoints = gridPoints, grid.ub = grid.ub, grid.lb = grid.lb, seed = seed)
+                                                      gridPoints = gridPoints, grid.ub = grid.ub, grid.lb = grid.lb, seed = seed,
+                                                      arp_memo = arp_memo)
     CIs_RM_minus_allS[,s_i] = CI_s_minus$accept
   }
 
