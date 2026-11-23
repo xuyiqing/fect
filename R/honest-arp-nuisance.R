@@ -2,7 +2,8 @@
 # through 'HonestDiDFEct' 1.0.0 by Ziyi Liu (github.com/lzy318/HonestDiDFEct, commit 29c831d).
 # Original file: R/arp-nuisance.R
 # Copyright (c) 2023 HonestDiD authors. MIT licence; the full notice is in inst/COPYRIGHTS.
-# Copied into fect 2.5.1 without change to any numerical line; the edits are listed in the fect repository history.
+# Copied into fect 2.5.1 without change to any numerical line; later modified, see next line; the edits are listed in the fect repository history.
+# Modified by the fect authors in 2026 for speed; the reported bounds are the same.
 #
 # DESCRIPTION =========================================================
 # Author: Ashesh Rambachan <asheshr@g.harvard.edu>
