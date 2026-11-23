@@ -6,12 +6,17 @@
   if (!isTRUE(rm) && !isTRUE(smooth)) {
     return(character(0))
   }
-  needs <- c("tibble", "purrr", "TruncatedNormal", "matrixStats", "Rglpk")
+  needs <- c("tibble", "purrr", "TruncatedNormal")
   if (isTRUE(rm)) {
     needs <- c(needs, "pracma")
   }
+  if (isTRUE(smooth)) {
+    needs <- c(needs, "Rglpk")
+  }
   if (numPostPeriods > 1) {
     needs <- c(needs, "lpSolveAPI", "Matrix", "pracma")
+  } else {
+    needs <- c(needs, "matrixStats")
   }
   sort(unique(needs))
 }
