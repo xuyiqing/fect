@@ -1,8 +1,8 @@
 Package: fect
 Type: Package
 Title: Fixed Effects Counterfactual Estimators
-Version: 2.5.0
-Date: 2026-11-11
+Version: 2.5.1
+Date: 2026-11-22
 Authors@R: 
     c(person("Yiqing", "Xu", , "yiqingxu@stanford.edu", role = c("aut", "cre")),
       person("Licheng", "Liu", , "lichengl@stanford.edu", role = c("aut")), 
@@ -10,10 +10,12 @@ Authors@R:
       person("Ye", "Wang", , "yezhehuzhi@gmail.com", role = c("aut")),       
       person("Tianzhu", "Qin", , "tianzhu@stanford.edu", role = c("aut")),
       person("Shiyun", "Hu", , "hushiyun@pku.edu.cn", role = c("aut")),
-      person("Rivka", "Lipkovitz", , "rivkal@mit.edu", role = c("aut")))
-Author: Yiqing Xu [aut, cre], Licheng Liu [aut], Ziyi Liu [aut], Ye Wang [aut], Tianzhu Qin [aut], Shiyun Hu [aut], Rivka Lipkovitz [aut]
+      person("Rivka", "Lipkovitz", , "rivkal@mit.edu", role = c("aut")),
+      person("Ashesh", "Rambachan", role = c("ctb", "cph"), comment = "author of the 'HonestDiD' code included in fect_sens()"),
+      person("Jonathan", "Roth", role = c("ctb", "cph"), comment = "author of the 'HonestDiD' code included in fect_sens()"))
+Author: Yiqing Xu [aut, cre], Licheng Liu [aut], Ziyi Liu [aut], Ye Wang [aut], Tianzhu Qin [aut], Shiyun Hu [aut], Rivka Lipkovitz [aut], Ashesh Rambachan [ctb, cph] (author of the 'HonestDiD' code included in fect_sens()), Jonathan Roth [ctb, cph] (author of the 'HonestDiD' code included in fect_sens())
 Maintainer: Yiqing Xu <yiqingxu@stanford.edu>
-Description: Provides tools for estimating causal effects in panel data using counterfactual methods, as well as other modern DID estimators. It is designed for causal panel analysis with binary treatments under the parallel trends assumption. The package supports scenarios where treatments can switch on and off and allows for limited carryover effects. It includes several imputation estimators, such as Gsynth (Xu 2017), linear factor models, and the matrix completion method. Detailed methodology is described in Liu, Wang, and Xu (2024) <doi:10.48550/arXiv.2107.00856> and Chiu et al. (2025) <doi:10.48550/arXiv.2309.15983>; conformal inference follows Liu and Xu (2026) <doi:10.48550/arXiv.2611.19209>. Optionally integrates with the "HonestDiDFEct" package for sensitivity analyses compatible with imputation estimators. "HonestDiDFEct" is not on CRAN but can be obtained from <https://github.com/lzy318/HonestDiDFEct>.
+Description: Provides tools for estimating causal effects in panel data using counterfactual methods, as well as other modern DID estimators. It is designed for causal panel analysis with binary treatments under the parallel trends assumption. The package supports scenarios where treatments can switch on and off and allows for limited carryover effects. It includes several imputation estimators, such as Gsynth (Xu 2017), linear factor models, and the matrix completion method. Detailed methodology is described in Liu, Wang, and Xu (2024) <doi:10.48550/arXiv.2107.00856> and Chiu et al. (2025) <doi:10.48550/arXiv.2309.15983>; conformal inference follows Liu and Xu (2026) <doi:10.48550/arXiv.2611.19209>. It includes a sensitivity analysis of post-treatment effects to violations of parallel trends, following Rambachan and Roth (2023) <doi:10.1093/restud/rdad018>, with code adapted from the 'HonestDiD' package. This analysis uses optional solver packages, listed under Suggests.
 URL: https://yiqingxu.org/packages/fect/, https://github.com/xuyiqing/fect
 BugReports: https://github.com/xuyiqing/fect/issues
 NeedsCompilation: yes
@@ -48,8 +50,17 @@ Suggests:
     did (>= 2.5.1),
     DIDmultiplegtDYN,
     ggrepel,
-    HonestDiDFEct,
-    withr
+    withr,
+    CVXR (>= 1.8),
+    ECOSolveR,
+    lpSolveAPI (>= 5.5.2.0-17),
+    Matrix (>= 1.2-17),
+    matrixStats (>= 0.63.0),
+    pracma (>= 2.2.5),
+    purrr (>= 0.3.4),
+    Rglpk (>= 0.6-4),
+    tibble (>= 1.3.4),
+    TruncatedNormal (>= 1.0)
 Depends: R (>= 4.1.0)
 LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 7.3.3

@@ -1,14 +1,32 @@
-.has_honest <- function() {
-  requireNamespace("HonestDiDFEct", quietly = TRUE)
-}
 
-.honest <- function(fun) {
-  if (!.has_honest()) {
-    stop("Optional dependency ``HonestDiDFEct'' not available. Install from https://github.com/lzy318/HonestDiDFEct .", call. = FALSE)
+
+# Suggested packages that the sensitivity engine (R/honest-*.R) calls for the
+# requested analyses. Sorted and unique; character(0) when nothing is computed.
+.fect_sens_needs <- function(rm, smooth, numPostPeriods) {
+  if (!isTRUE(rm) && !isTRUE(smooth)) {
+    return(character(0))
   }
-  getExportedValue("HonestDiDFEct", fun)
+  needs <- c("tibble", "purrr", "TruncatedNormal", "matrixStats", "Rglpk")
+  if (isTRUE(rm)) {
+    needs <- c(needs, "pracma")
+  }
+  if (numPostPeriods > 1) {
+    needs <- c(needs, "lpSolveAPI", "Matrix", "pracma")
+  }
+  sort(unique(needs))
 }
 
+# Stop with one install line when a needed Suggested package is missing.
+.fect_sens_check_packages <- function(needs) {
+  miss <- needs[!vapply(needs, requireNamespace, logical(1), quietly = TRUE)]
+  if (length(miss) > 0) {
+    stop("fect_sens() needs the package(s) ",
+         paste0("'", miss, "'", collapse = ", "), ". Install with:\n",
+         "install.packages(c(", paste0("\"", miss, "\"", collapse = ", "), "))",
+         call. = FALSE)
+  }
+  invisible(NULL)
+}
 
 fect_sens <- function(
     fect.out,
@@ -45,6 +63,12 @@ fect_sens <- function(
       stop("fect_sens: the fit has no post-treatment event times.", call. = FALSE)
     }
   }
+  .fect_sens_check_packages(.fect_sens_needs(
+    rm = !is.null(Mbarvec) && length(Mbarvec) > 0 ||
+      !is.null(periodMbarvec) && length(periodMbarvec) > 0,
+    smooth = !is.null(Mvec) && length(Mvec) > 0 ||
+      !is.null(periodMvec) && length(periodMvec) > 0,
+    numPostPeriods = length(post.periods)))
   all.periods.char <- as.character(c(pre.periods, post.periods))
 
   # Make sure that:
@@ -115,7 +139,7 @@ fect_sens <- function(
   # -------------------------------------------------------------------
   if (!is.null(Mbarvec) && length(Mbarvec) > 0) {
     # 3a) Weighted-average, across the entire post-treatment window
-    rm_sens_results <- suppressWarnings(.honest("createSensitivityResults_relativeMagnitudes")(
+    rm_sens_results <- suppressWarnings(createSensitivityResults_relativeMagnitudes(
       betahat = beta.hat,
       sigma = vcov.hat,
       numPrePeriods = numPrePeriods,
@@ -126,7 +150,7 @@ fect_sens <- function(
     ))
 
 
-    rm_original_cs <- suppressWarnings(.honest("constructOriginalCS")(
+    rm_original_cs <- suppressWarnings(constructOriginalCS(
       betahat        = beta.hat,
       sigma          = vcov.hat,
       numPrePeriods  = numPrePeriods,
@@ -148,7 +172,7 @@ fect_sens <- function(
 
       # For each t_i, we run createSensitivityResults_relativeMagnitudes
       # across all Mbar in Mbarvec
-      honest.dte <- suppressWarnings(.honest("createSensitivityResults_relativeMagnitudes")(
+      honest.dte <- suppressWarnings(createSensitivityResults_relativeMagnitudes(
         betahat        = beta.hat,
         sigma          = vcov.hat,
         numPrePeriods  = numPrePeriods,
@@ -185,7 +209,7 @@ fect_sens <- function(
   if (!is.null(Mvec) && length(Mvec) > 0) {
     # 4a) Weighted-average analysis
 
-    smooth_sens_results <- suppressWarnings(.honest("createSensitivityResults")(
+    smooth_sens_results <- suppressWarnings(createSensitivityResults(
       betahat = beta.hat,
       sigma = vcov.hat,
       numPrePeriods = numPrePeriods,
@@ -196,7 +220,7 @@ fect_sens <- function(
       parallel = parallel
     ))
 
-    sm_original_cs <- suppressWarnings(.honest("constructOriginalCS")(
+    sm_original_cs <- suppressWarnings(constructOriginalCS(
       betahat        = beta.hat,
       sigma          = vcov.hat,
       numPrePeriods  = numPrePeriods,
@@ -213,7 +237,7 @@ fect_sens <- function(
       dte_l <- rep(0, numPostPeriods)
       dte_l[t_i] <- 1
 
-      honest.dte <- suppressWarnings(.honest("createSensitivityResults")(
+      honest.dte <- suppressWarnings(createSensitivityResults(
         betahat = beta.hat,
         sigma = vcov.hat,
         numPrePeriods = numPrePeriods,
