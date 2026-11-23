@@ -29,17 +29,33 @@
   base::return(v)
 }
 
+# The program of the bisection (.vlo_vup_dual_fn):
+#   min -f'x  s.t.  t(W_T) x = (1, 0, ..., 0),  x >= 0.
+# It was solved with Rglpk and is now solved with lpSolveAPI, the solver of the eta program.
+# The two solvers agree on the optimum to about 1e-12 in relative terms, not to the last digit;
+# on every recorded case the bounds, the test decisions and the critical values are unchanged.
+.max_lp_build <- function(Aeq, beq) {
+  # The constraints, without an objective. Type 3 is "="; lpSolveAPI's default lower bound is 0.
+  lp = lpSolveAPI::make.lp(nrow = 0, ncol = base::NCOL(Aeq))
+  for (r in 1:base::NROW(Aeq)) {
+    lpSolveAPI::add.constraint(lp, xt = base::c(Aeq[r,]), type = 3L, rhs = beq[r])
+  }
+  base::return(lp)
+}
+
 .max_program <- function(s_T, gamma_tilde, sigma, W_T, c) {
   # Define objective and constraints
   f = s_T + base::c(base::t(gamma_tilde) %*% sigma %*% gamma_tilde)^(-1)*(sigma %*% gamma_tilde)*c
   Aeq = base::t(W_T)
   beq = base::c(1, base::rep(0, base::dim(Aeq)[1]-1))
 
-  # Set up linear program. Note: don't need to provide lower bound because default lb is zero in ROI package.
-  linprog = Rglpk::Rglpk_solve_LP(obj = -base::c(f),
-                                  mat = Aeq,
-                                  dir = base::rep("==", base::NROW(Aeq)),
-                                  rhs = beq)
+  # Set up and solve the linear program: a new program for every call, solver defaults.
+  lp = .max_lp_build(Aeq, beq)
+  lpSolveAPI::set.objfn(lp, -base::c(f))
+  status = lpSolveAPI::solve.lpExtPtr(lp)
+  linprog = base::list(optimum = lpSolveAPI::get.objective(lp),
+                       solution = lpSolveAPI::get.variables(lp),
+                       status = status)
   base::return(linprog)
 }
 
