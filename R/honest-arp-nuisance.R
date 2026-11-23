@@ -205,7 +205,55 @@
   base::return(base::list(vlo = vlo, vup = vup))
 }
 
-.test_delta_lp_fn <- function(y_T, X_T, sigma) {
+# The linear program for eta is the same from one right-hand side to the next except for that
+# right-hand side. .delta_lp_template() does once the part of the set-up that does not depend on
+# it, and .delta_lp_build() then builds the program for one right-hand side.
+#
+# A new lpSolveAPI program is still built for every right-hand side, with the same sequence of
+# calls into the solver as before, so the solver returns what it returned before, bit for bit.
+# The program object is not reused: a program that has been solved once does not return exactly
+# the numbers a new program returns (the last digits can differ), and reusing it would change
+# the simulated values behind the least favorable critical value.
+.delta_lp_template <- function(X_T, sigma) {
+  dimDelta = base::dim(X_T)[2] # dimension of delta
+  sdVec = base::sqrt(base::diag(sigma)) # standard deviation of y_T elements
+
+  # Define objective function
+  f = base::c(1, base::rep(0, dimDelta))
+
+  # Define linear constraint
+  C = -base::cbind(sdVec, X_T)
+
+  # lpSolveAPI::add.constraint() passes to the solver the coefficients that exceed, in absolute
+  # value, the epsel of the program, which for a new program is the default. Find them once here.
+  epsel = lpSolveAPI::lp.control(lpSolveAPI::make.lp(nrow = 0, ncol = base::length(f)))$epsilon[["epsel"]]
+  nConstraints = base::dim(C)[1]
+  xt = base::vector("list", nConstraints)
+  indices = base::vector("list", nConstraints)
+  for (r in 1:nConstraints) {
+    row = base::c(C[r,])
+    indices[[r]] = base::which(base::abs(row) > epsel)
+    xt[[r]] = row[indices[[r]]]
+  }
+  base::list(f = f, dimDelta = dimDelta, nConstraints = nConstraints, xt = xt, indices = indices,
+             lower = base::rep(-Inf, base::length(f)), columns = 1:base::length(f))
+}
+
+.delta_lp_build <- function(lp_template, b) {
+  # Builds the program  min f'x  s.t.  C x <= b  from a template. The calls into the solver, and
+  # their order, are those of the code this replaces: make.lp, set.objfn, one add.constraint per
+  # row (type 1 is "<="), set.bounds.
+  linprog = lpSolveAPI::make.lp(nrow = 0, ncol = base::length(lp_template$f))
+  lpSolveAPI::set.objfn(linprog, lp_template$f)
+  for (r in 1:lp_template$nConstraints) {
+    lpSolveAPI::add.constraint(linprog, xt = lp_template$xt[[r]], type = 1L, rhs = b[r],
+                               indices = lp_template$indices[[r]])
+  }
+  lpSolveAPI::set.bounds(linprog, lower = lp_template$lower, columns = lp_template$columns)
+  base::return(linprog)
+}
+
+.test_delta_lp_fn <- function(y_T, X_T, sigma, lp_template = NULL) {
   # Returns the value of eta that solves
   #   min_{eta, delta} eta
   #     s.t. y_T - x_T delta <= eta * diag(sigma)
@@ -214,6 +262,7 @@
   #   y_T = vector
   #   X_T = matrix
   #   sigma = covariance matrix of y_T
+  #   lp_template = output of .delta_lp_template(X_T, sigma), if the caller has it already
   # Outputs: list with elements
   #   etaStar   = minimum of linear program
   #   deltaStar = minimizer of linear program
@@ -226,23 +275,16 @@
   #     max f' X
   #     s.t. C X \leq b
 
-  dimDelta = base::dim(X_T)[2] # dimension of delta
-  sdVec = base::sqrt(base::diag(sigma)) # standard deviation of y_T elements
-
-  # Define objective function
-  f = base::c(1, base::rep(0, dimDelta))
-
-  # Define linear constraint
-  C = -base::cbind(sdVec, X_T)
+  # Objective function f = (1, 0, ..., 0) and linear constraint C = -(sdVec, X_T): see
+  # .delta_lp_template()
+  if (base::is.null(lp_template)) {
+    lp_template = .delta_lp_template(X_T, sigma)
+  }
+  dimDelta = lp_template$dimDelta # dimension of delta
   b = -y_T
 
   # Define linear program using lpSolveAPI
-  linprog = lpSolveAPI::make.lp(nrow = 0, ncol = base::length(f))
-  lpSolveAPI::set.objfn(linprog, f)
-  for (r in 1:base::dim(C)[1]) {
-    lpSolveAPI::add.constraint(linprog, xt = base::c(C[r,]), type = "<=", rhs = b[r])
-  }
-  lpSolveAPI::set.bounds(linprog, lower = base::rep(-Inf, base::length(f)), columns = 1:base::length(f))
+  linprog = .delta_lp_build(lp_template, b)
 
   # Solve linear program using dual simplex
   lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral")
@@ -250,7 +292,7 @@
   eta = lpSolveAPI::get.objective(linprog)
   primalSoln = lpSolveAPI::get.primal.solution(linprog)
   delta = primalSoln[(base::length(primalSoln)-dimDelta+1):base::length(primalSoln)]
-  dual = -lpSolveAPI::get.sensitivity.rhs(linprog)$duals[1:base::dim(C)[1]]
+  dual = -lpSolveAPI::get.sensitivity.rhs(linprog)$duals[1:lp_template$nConstraints]
 
   # Construct results  list
   results = base::list(eta_star = eta,
@@ -374,14 +416,9 @@
     sigma <- sigma[rowsForARP, rowsForARP]
   }
 
-  .compute_eta <- function(b, f, C) {
+  .compute_eta <- function(b, lp_template) {
     # Define linear program using lpSolveAPI
-    linprog = lpSolveAPI::make.lp(nrow = 0, ncol = base::length(f))
-    lpSolveAPI::set.objfn(linprog, f)
-    for (r in 1:base::dim(C)[1]) {
-      lpSolveAPI::add.constraint(linprog, xt = base::c(C[r,]), type = "<=", rhs = b[r])
-    }
-    lpSolveAPI::set.bounds(linprog, lower = base::rep(-Inf, base::length(f)), columns = 1:base::length(f))
+    linprog = .delta_lp_build(lp_template, b)
     # Solve linear program using dual simplex
     lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral", timeout=10)
     error_flag = lpSolveAPI::solve.lpExtPtr(linprog)
@@ -395,15 +432,13 @@
     eta_vec = matrixStats::rowMaxs(xi.draws)
     base::return(stats::quantile(eta_vec, probs = 1 - hybrid_kappa, names = FALSE))
   } else { # Nuisance parameter case
-    # Compute elements for LP that will be re-used
-    sdVec = base::sqrt(base::diag(sigma))  # standard deviation of y_T elements
-    dimDelta = base::dim(X_T)[2]     # dimension of delta
-    f = base::c(1, base::rep(0, dimDelta)) # Define objective function
-    C = -base::cbind(sdVec, X_T)     # Define linear constraint
+    # Compute elements for LP that will be re-used: objective function f = (1, 0, ..., 0) and
+    # linear constraint C = -(sdVec, X_T)
+    lp_template = .delta_lp_template(X_T, sigma)
     xi.draws = mvtnorm::rmvnorm(n=sims, sigma=sigma)
 
     # Compute eta for each simulation
-    eta_vec = base::apply(-xi.draws, 1, .compute_eta, f, C)
+    eta_vec = base::apply(-xi.draws, 1, .compute_eta, lp_template)
 
     # We compute the 1-kappa quantile of eta_vec and return this value
     base::return(stats::quantile(eta_vec, probs=1-hybrid_kappa, names=FALSE, na.rm=TRUE))
@@ -474,8 +509,18 @@
   M = base::dim(sigma_ARP)[1]
   k = base::dim(X_T_ARP)[2]
 
-  # Compute eta, and the argmin delta
-  linSoln = .test_delta_lp_fn(y_T = y_T_ARP, X_T = X_T_ARP, sigma = sigma_ARP)
+  # Compute eta, and the argmin delta. X_T_ARP and sigma_ARP do not change over the theta grid,
+  # so the part of the linear program that depends only on them is set up at the first grid
+  # point and kept in hybrid_list$lp_cache, an environment that .ARP_computeCI creates.
+  lp_template = NULL
+  lp_cache = hybrid_list$lp_cache
+  if (base::is.environment(lp_cache)) {
+    if (base::is.null(lp_cache$template)) {
+      lp_cache$template = .delta_lp_template(X_T_ARP, sigma_ARP)
+    }
+    lp_template = lp_cache$template
+  }
+  linSoln = .test_delta_lp_fn(y_T = y_T_ARP, X_T = X_T_ARP, sigma = sigma_ARP, lp_template = lp_template)
 
   # Check to see if valid solution to LP obtained
   if (linSoln$error_flag > 0) {
@@ -754,6 +799,9 @@
                                                     hybrid_kappa = hybrid_list$hybrid_kappa,
                                                     rowsForARP = rowsForARP)
   }
+
+  # A place for .lp_conditional_test_fn to keep what it sets up once for the whole theta grid.
+  hybrid_list$lp_cache = base::new.env()
 
   # Define helper function to loop over theta grid
   testTheta <- function(theta) {
