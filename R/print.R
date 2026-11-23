@@ -196,6 +196,11 @@ print.fect <- function(x,
     if (.boot_diag_flagged(x$boot.diag)) {
         .print_boot_diag(x$boot.diag)
     }
+    ## K4: bootstrap refits that stopped at max.iteration
+    if (isTRUE(x$boot.diag$n.cap > 0)) {
+        cat("\n", x$boot.diag$n.cap, " of ", x$boot.diag$n.used,
+            " bootstrap fits stopped at max.iteration; the standard error rests partly on fits that did not converge.\n", sep = "")
+    }
 }
 
 ## One line on how the IFE-EM main fit stopped (x$convergence, v2.4.8).

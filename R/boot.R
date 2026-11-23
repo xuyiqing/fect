@@ -166,9 +166,21 @@ trim_closure_env <- function(fun) {
 ## the seed, because the explosions are rare draws). `sim` is
 ## .fect_para_sim_check()'s list (parametric bootstrap only).
 .fect_boot_diag <- function(att.avg.boot, nboots, n.failed = 0L, sim = NULL,
-                            para.error = NULL, threshold = 5, min.draws = 20L) {
+                            para.error = NULL, threshold = 5, min.draws = 20L,
+                            niter = NULL, max.iteration = NULL) {
   b.all <- as.numeric(att.avg.boot)
   b <- b.all[is.finite(b.all)]
+  ## K4: usable draws whose refit stopped at the iteration cap, and usable
+  ## draws whose round count was not returned. `niter` is aligned with
+  ## att.avg.boot (NA = not returned). Counting only; no draw is changed.
+  n.cap <- 0L
+  n.cap.unknown <- length(b)
+  if (length(niter) == length(b.all) && length(max.iteration) == 1L &&
+      is.numeric(max.iteration) && is.finite(max.iteration)) {
+    nit.use <- as.numeric(niter)[is.finite(b.all)]
+    n.cap <- as.integer(sum(nit.use >= max.iteration, na.rm = TRUE))
+    n.cap.unknown <- as.integer(sum(is.na(nit.use)))
+  }
   sd.b <- if (length(b) >= 2L) stats::sd(b) else NA_real_
   iqr.sd <- if (length(b) >= 2L) stats::IQR(b) / 1.349 else NA_real_
   ## not defined when the IQR is 0 (the robust spread has no scale)
@@ -198,6 +210,8 @@ trim_closure_env <- function(fun) {
     n.used = length(b),
     n.failed = if (is.numeric(n.failed) && length(n.failed) == 1) as.integer(n.failed) else 0L,
     n.nonfinite = sum(!is.finite(b.all)),
+    n.cap = as.integer(n.cap),
+    n.cap.unknown = as.integer(n.cap.unknown),
     n.extreme = n.extreme,
     n.dropped = n.extreme,
     sd = sd.b,
@@ -2356,6 +2370,7 @@ fect_boot <- function(
   ## as a failed parallel worker is, so that boot.rm drops it and the count
   ## message below reports it. keep.sims arrays go through .fect_store_slice(),
   ## which pads narrower replicates (cluster bootstrap) with NA columns.
+  boot.niter <- rep(NA_real_, nboots) # K4: rounds each refit ran (NA = not returned)
   for (j in 1:nboots) {
     if (inherits(boot.out[[j]], "error")) {
       warning(
@@ -2486,6 +2501,11 @@ fect_boot <- function(
       if (stored) break
       boot.out[[j]] <- make_boot_na()
     }
+    ## K4: read only; exact name match, no change to the stored draw
+    nit.j <- boot.out[[j]][["niter"]]
+    if (is.numeric(nit.j) && length(nit.j) == 1L && is.finite(nit.j)) {
+      boot.niter[j] <- as.numeric(nit.j)
+    }
   }
   ## end of bootstrapping
   ## remove failure bootstrap
@@ -2495,6 +2515,7 @@ fect_boot <- function(
   if (sum(is.na(c(att.avg.boot))) > 0) {
     boot.rm <- which(is.na(c(att.avg.boot)))
     n.fail <- length(boot.rm)
+    boot.niter <- boot.niter[-boot.rm]
     att.avg.boot <- t(as.matrix(att.avg.boot[, -boot.rm]))
     att.avg.unit.boot <- t(as.matrix(att.avg.unit.boot[, -boot.rm]))
     att.boot <- as.matrix(att.boot[, -boot.rm])
@@ -5160,6 +5181,7 @@ fect_boot <- function(
     ## v2.4.8 (B1): replicates dropped as failed, and the Step-1 error pool
     ## check; read by fect.default() to build boot.diag
     n.boot.fail = n.fail,
+    boot.niter = boot.niter, # K4: per kept draw; read by fect.default(), then removed
     para.sim.check = if (vartype == "parametric" && exists("para.sim.check", inherits = FALSE)) para.sim.check else NULL
   )
   if (keep.sims) {
