@@ -457,6 +457,9 @@ did_wrapper <- function(
 
       # ── 6) DIDmultiplegtDYN Dyn ──────────────────────────────────────────────
     } else if (method == "didm") {
+      if (!requireNamespace("DIDmultiplegtDYN", quietly = TRUE)) {
+        stop("method = \"didm\" needs the DIDmultiplegtDYN package: install.packages(\"DIDmultiplegtDYN\").", call. = FALSE)
+      }
       res <- DIDmultiplegtDYN::did_multiplegt_dyn(
         df        = as.data.frame(dd), # DIDmultiplegtDYN prefers data.frame
         outcome   = Y,
