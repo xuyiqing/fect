@@ -16,7 +16,7 @@ rm(list = ls())
 |--------|---------|------|----------|
 | CRAN | 2.4.5 | 2026-05-30 | Default release |
 | GitHub (`master`) | 2.4.5 | 2026-05-30 | Same as CRAN |
-| GitHub (`dev`) | 2.5.0 | in development | Adds conformal intervals (`vartype = "conformal"`, `conformal_sc()`), the checks for GSC (`overlap_check()`, `fect_rank()`, `cv.method = "forward"`, `loading_check()`), `dloo` placebos, cross-validation of the number of factors by default for `method = "ife"`, and the correctness fixes in the changelog |
+| GitHub (`dev`) | 2.5.1 | in development | Adds conformal intervals (`vartype = "conformal"`, `conformal_sc()`), the checks for GSC (`overlap_check()`, `fect_rank()`, `cv.method = "forward"`, `loading_check()`), `dloo` placebos, cross-validation of the number of factors by default for `method = "ife"`, and the correctness fixes in the changelog |
 
 To install **fect** from CRAN:
 
