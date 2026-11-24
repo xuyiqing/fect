@@ -3,7 +3,7 @@
 # Original file: R/arp-nuisance.R
 # Copyright (c) 2023 HonestDiD authors. MIT licence; the full notice is in inst/COPYRIGHTS.
 # Copied into fect 2.5.1 without change to any numerical line; later modified, see next line; the edits are listed in the fect repository history.
-# Modified by the fect authors in 2026 for speed; the reported bounds are the same.
+# Modified by the fect authors in 2026 for speed (the reported bounds are the same) and, in the primal branch of .lp_conditional_test_fn, to treat a left-out row whose rho is zero up to a relative tolerance as zero (see NEWS); bounds differ only for inputs with such rows.
 #
 # DESCRIPTION =========================================================
 # Author: Ashesh Rambachan <asheshr@g.harvard.edu>
@@ -531,6 +531,17 @@
   base::get0(".Random.seed", envir = base::globalenv(), inherits = FALSE)
 }
 
+# Relative tolerance below which rho is treated as 0 (units: the largest standard deviation of the moments).
+.honest_rho_tol_default <- 1e-10
+
+.honest_rho_tol <- function() {
+  tol <- base::getOption("fect.honest_rho_tol", .honest_rho_tol_default)
+  if (!base::is.numeric(tol) || base::length(tol) != 1L || base::is.na(tol) || tol < 0) {
+    base::stop("option 'fect.honest_rho_tol' must be one non-negative number")
+  }
+  tol
+}
+
 # ARP FUNCTIONS -------------------------------------------------------
 .lp_conditional_test_fn <- function(theta, y_T, X_T, sigma, alpha,
                                     hybrid_flag, hybrid_list, rowsForARP = 1:base::length(y_T)) {
@@ -749,6 +760,20 @@
       ))
     }
     rho = Gamma_B %*% sigma_ARP %*% v_B %*% base::solve(sigma2_B)
+    # rho is exactly 0 for a left-out row that carries no information on eta (for example an exact copy of a binding row);
+    # rounding leaves a value near 1e-18 whose quotient below then has an arbitrary sign. Treat it as 0, as for an exact 0.
+    # rho has the units of the data, so the tolerance is relative to the largest standard deviation.
+    rho_scale = base::max(sdVec)
+    rho_rel = base::abs(base::as.vector(rho)) / rho_scale
+    rho_zero = base::which(rho_rel <= .honest_rho_tol())   # rho_scale = 0 gives NaN: no row is guarded
+    if (base::length(rho_zero) > 0) rho[rho_zero] = 0
+    rho_log = base::getOption("fect.honest_rho_log")
+    if (base::is.environment(rho_log)) {
+      rho_log$n_calls   = (if (base::is.null(rho_log$n_calls))   0L else rho_log$n_calls)   + 1L
+      rho_log$n_guarded = (if (base::is.null(rho_log$n_guarded)) 0L else rho_log$n_guarded) + base::length(rho_zero)
+      rho_log$n_calls_guarded = (if (base::is.null(rho_log$n_calls_guarded)) 0L else rho_log$n_calls_guarded) + (base::length(rho_zero) > 0)
+      rho_log$small = base::c(rho_log$small, rho_rel[!base::is.na(rho_rel) & rho_rel < 1e-4])
+    }
     maximand_or_minimand = (-Gamma_B %*% y_T_ARP)/rho + base::c(base::t(v_B) %*% y_T_ARP)
 
     # Compute truncation values
