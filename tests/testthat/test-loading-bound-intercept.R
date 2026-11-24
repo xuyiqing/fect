@@ -341,10 +341,12 @@ test_that("T3: bounded fit equals unbounded fit when the constraint is inactive"
 ## which stops on a relative decrease of the objective (factr), so att.avg is
 ## known only to where it stops: 1e-6 to 1.3e-5 from the exact minimiser on
 ## these six panels (measured 2026-11-24 against the Newton solver). Rounding
-## moves that stopping point: scaling Y by 1 + 1e-13 noise moves att.avg by
-## 1.1e-6 on one machine, and Ubuntu and Windows land 2.6e-6 and 1.2e-6 from
-## the macOS pins. tol_simplex = 5e-5 covers that; changing gamma from 1 to
-## 1.01 moves att.avg by 1.3e-4. The "none" pins are least-squares fits,
+## moves that stopping point: scaling Y by 1 + 1e-15 to 1e-12 noise moves
+## att.avg by up to about 6e-6 on one machine, depending on the draw, and
+## Ubuntu and Windows land 2.6e-6 and 1.2e-6 from the macOS pins. Two
+## L-BFGS-B answers can differ by about twice the solver's error, 2.6e-5;
+## tol_simplex = 5e-5 covers that, while changing gamma from 1 to 1.01 moves
+## att.avg by 1.3e-4 to 1.6e-4. The "none" pins are least-squares fits,
 ## exact to rounding, and keep 1e-8.
 test_that("T4: att.avg matches the pinned fect 2.4.7 values", {
     tol         <- 1e-8
