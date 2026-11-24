@@ -29,6 +29,8 @@ tests/testthat/test-honest-fect.R
 
 Source: HonestDiD 0.2.8 (Rambachan and Roth) through HonestDiDFEct 1.0.0 by Ziyi Liu, commit 29c831d of github.com/lzy318/HonestDiDFEct.
 
+In 2026 the fect authors modified four of these files for speed; the reported bounds are the same: R/honest-arp-nuisance.R, R/honest-deltasd.R, R/honest-deltarm.R and R/honest-sensitivityresults.R.
+
 MIT License
 
 Copyright (c) 2023 HonestDiD authors

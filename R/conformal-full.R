@@ -204,17 +204,35 @@
   0L
 }
 
+## The two linear factors of control j's comparison S_j(c) >= S_0(c), one per
+## row as (intercept, slope): (a_j - a_0) + (b_j - b_0) c and
+## (a_j + a_0) + (b_j + b_0) c. The comparison holds where their product is
+## >= 0, so it can change only at a root of a factor.
+## The slopes b come from a difference quotient (.fc_coefs), so two slopes
+## that are equal, or opposite, in exact arithmetic can differ in their last
+## digits. A synthetic control that puts all its weight on the treated unit
+## has slope 1 against the treated unit's -1; stored as 1 + 2.2e-16, their sum
+## is 2.2e-16 and not 0, and the factor gets a root near 1e14 times the
+## errors. The set then gains a piece beyond that root, and its hull loses a
+## finite end. So a factor's slope that is zero up to rounding, relative to
+## the larger of |b_j| and |b_0|, is set to zero: the factor is then a
+## constant and has no root. The tolerance is the one .fc_avg uses to decide
+## that slopes are equal across dates.
+.fc_factors <- function(a, b, i0, j, tol = 1e-10) {
+  f <- rbind(c(a[j] - a[i0], b[j] - b[i0]), c(a[j] + a[i0], b[j] + b[i0]))
+  f[which(abs(f[, 2]) <= tol * max(abs(b[j]), abs(b[i0]))), 2] <- 0
+  f
+}
+
 ## Roots of the comparison S_i(c) = S_0(c) for every control i: a table of
 ## (root, unit) with one row per root of each linear factor. Controls whose
 ## comparison is an identity (a factor identically 0) give no roots and
 ## compare as TRUE everywhere.
 .fc_root_table <- function(a, b, i0) {
-  a0 <- a[i0]
-  b0 <- b[i0]
   rr <- numeric(0)
   uu <- integer(0)
   for (j in setdiff(seq_along(a), i0)) {
-    f <- rbind(c(a[j] - a0, b[j] - b0), c(a[j] + a0, b[j] + b0))
+    f <- .fc_factors(a, b, i0, j)
     if (any(f[, 1] == 0 & f[, 2] == 0)) next
     for (k in 1:2) {
       if (f[k, 2] != 0) {
@@ -234,12 +252,11 @@
 ## consecutive roots and at every root, by a sweep from -Inf.
 .fc_sweep <- function(a, b, i0, rt = NULL) {
   if (is.null(rt)) rt <- .fc_root_table(a, b, i0)
-  a0 <- a[i0]
-  b0 <- b[i0]
   ctrl <- setdiff(seq_along(a), i0)
   cur <- vapply(ctrl, function(j) {
-    s1 <- .fc_sign_minf(a[j] - a0, b[j] - b0)
-    s2 <- .fc_sign_minf(a[j] + a0, b[j] + b0)
+    f <- .fc_factors(a, b, i0, j)
+    s1 <- .fc_sign_minf(f[1L, 1L], f[1L, 2L])
+    s2 <- .fc_sign_minf(f[2L, 1L], f[2L, 2L])
     s1 == 0L || s2 == 0L || s1 == s2
   }, logical(1))
   names(cur) <- ctrl

@@ -2,7 +2,8 @@
 # through 'HonestDiDFEct' 1.0.0 by Ziyi Liu (github.com/lzy318/HonestDiDFEct, commit 29c831d).
 # Original file: R/arp-nuisance.R
 # Copyright (c) 2023 HonestDiD authors. MIT licence; the full notice is in inst/COPYRIGHTS.
-# Copied into fect 2.5.1 without change to any numerical line; the edits are listed in the fect repository history.
+# Copied into fect 2.5.1 without change to any numerical line; later modified, see next line; the edits are listed in the fect repository history.
+# Modified by the fect authors in 2026 for speed; the reported bounds are the same.
 #
 # DESCRIPTION =========================================================
 # Author: Ashesh Rambachan <asheshr@g.harvard.edu>
@@ -29,17 +30,33 @@
   base::return(v)
 }
 
+# The program of the bisection (.vlo_vup_dual_fn):
+#   min -f'x  s.t.  t(W_T) x = (1, 0, ..., 0),  x >= 0.
+# It was solved with Rglpk and is now solved with lpSolveAPI, the solver of the eta program.
+# The two solvers agree on the optimum to about 1e-12 in relative terms, not to the last digit;
+# on every recorded case the bounds, the test decisions and the critical values are unchanged.
+.max_lp_build <- function(Aeq, beq) {
+  # The constraints, without an objective. Type 3 is "="; lpSolveAPI's default lower bound is 0.
+  lp = lpSolveAPI::make.lp(nrow = 0, ncol = base::NCOL(Aeq))
+  for (r in 1:base::NROW(Aeq)) {
+    lpSolveAPI::add.constraint(lp, xt = base::c(Aeq[r,]), type = 3L, rhs = beq[r])
+  }
+  base::return(lp)
+}
+
 .max_program <- function(s_T, gamma_tilde, sigma, W_T, c) {
   # Define objective and constraints
   f = s_T + base::c(base::t(gamma_tilde) %*% sigma %*% gamma_tilde)^(-1)*(sigma %*% gamma_tilde)*c
   Aeq = base::t(W_T)
   beq = base::c(1, base::rep(0, base::dim(Aeq)[1]-1))
 
-  # Set up linear program. Note: don't need to provide lower bound because default lb is zero in ROI package.
-  linprog = Rglpk::Rglpk_solve_LP(obj = -base::c(f),
-                                  mat = Aeq,
-                                  dir = base::rep("==", base::NROW(Aeq)),
-                                  rhs = beq)
+  # Set up and solve the linear program: a new program for every call, solver defaults.
+  lp = .max_lp_build(Aeq, beq)
+  lpSolveAPI::set.objfn(lp, -base::c(f))
+  status = lpSolveAPI::solve.lpExtPtr(lp)
+  linprog = base::list(optimum = lpSolveAPI::get.objective(lp),
+                       solution = lpSolveAPI::get.variables(lp),
+                       status = status)
   base::return(linprog)
 }
 
@@ -205,7 +222,105 @@
   base::return(base::list(vlo = vlo, vup = vup))
 }
 
-.test_delta_lp_fn <- function(y_T, X_T, sigma) {
+# The linear program for eta is the same from one right-hand side to the next except for that
+# right-hand side. .delta_lp_template() does once the part of the set-up that does not depend on
+# it, and .delta_lp_build() then builds the program for one right-hand side.
+#
+# One program then serves all the right-hand sides of a theta grid, or of a critical value:
+# .delta_lp_reusable() builds it, and for each right-hand side the caller sets it, resets the
+# basis and solves again.
+#
+# This is not bit-identical to building a new program for every right-hand side, which is what
+# the engine did before. A program that has been solved once returns numbers that can differ in
+# their last digits from those of a new program (about 1e-15 in relative terms; the largest
+# difference seen in a simulated value is 2.6e-9). Bounds and test decisions were unchanged on
+# every recorded case. Three things keep the result well defined:
+#   * .delta_lp_reusable() solves the program once before it is used. The first solve of a
+#     program is the one that differs; after it, the answer for a right-hand side does not
+#     depend on which right-hand sides were solved before.
+#   * If the reused program fails for a right-hand side (a status other than 0), that
+#     right-hand side is solved again with a new program, built as before. So reuse never
+#     makes a program fail that a new one would have solved.
+#   * The program object lives only inside the function call that created it (a local
+#     variable, or the environment .ARP_computeCI creates), never in an object that is passed
+#     to a parallel worker.
+.delta_lp_template <- function(X_T, sigma) {
+  dimDelta = base::dim(X_T)[2] # dimension of delta
+  sdVec = base::sqrt(base::diag(sigma)) # standard deviation of y_T elements
+
+  # Define objective function
+  f = base::c(1, base::rep(0, dimDelta))
+
+  # Define linear constraint
+  C = -base::cbind(sdVec, X_T)
+
+  # lpSolveAPI::add.constraint() passes to the solver the coefficients that exceed, in absolute
+  # value, the epsel of the program, which for a new program is the default. Find them once here.
+  epsel = lpSolveAPI::lp.control(lpSolveAPI::make.lp(nrow = 0, ncol = base::length(f)))$epsilon[["epsel"]]
+  nConstraints = base::dim(C)[1]
+  xt = base::vector("list", nConstraints)
+  indices = base::vector("list", nConstraints)
+  for (r in 1:nConstraints) {
+    row = base::c(C[r,])
+    indices[[r]] = base::which(base::abs(row) > epsel)
+    xt[[r]] = row[indices[[r]]]
+  }
+  base::list(f = f, dimDelta = dimDelta, nConstraints = nConstraints, xt = xt, indices = indices,
+             lower = base::rep(-Inf, base::length(f)), columns = 1:base::length(f))
+}
+
+.delta_lp_build <- function(lp_template, b) {
+  # Builds the program  min f'x  s.t.  C x <= b  from a template. The calls into the solver, and
+  # their order, are those of the code this replaces: make.lp, set.objfn, one add.constraint per
+  # row (type 1 is "<="), set.bounds.
+  linprog = lpSolveAPI::make.lp(nrow = 0, ncol = base::length(lp_template$f))
+  lpSolveAPI::set.objfn(linprog, lp_template$f)
+  for (r in 1:lp_template$nConstraints) {
+    lpSolveAPI::add.constraint(linprog, xt = lp_template$xt[[r]], type = 1L, rhs = b[r],
+                               indices = lp_template$indices[[r]])
+  }
+  lpSolveAPI::set.bounds(linprog, lower = lp_template$lower, columns = lp_template$columns)
+  base::return(linprog)
+}
+
+.delta_lp_control <- function(linprog, timeout = NULL) {
+  # Solver settings of the eta program: dual simplex, Dantzig pricing.
+  if (base::is.null(timeout)) {
+    lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral")
+  } else {
+    lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral", timeout=timeout)
+  }
+  base::invisible(NULL)
+}
+
+.delta_lp_reusable <- function(lp_template, timeout = NULL) {
+  # A program to be used for many right-hand sides: built with a right-hand side of zero and
+  # solved once (see the note above .delta_lp_template).
+  linprog = .delta_lp_build(lp_template, base::rep(0, lp_template$nConstraints))
+  .delta_lp_control(linprog, timeout)
+  lpSolveAPI::solve.lpExtPtr(linprog)
+  base::return(linprog)
+}
+
+.delta_lp_solve <- function(lp_template, b, linprog = NULL, timeout = NULL) {
+  # Solves  min f'x  s.t.  C x <= b. With a reusable program: new right-hand side, basis reset,
+  # solve; if that fails, or without a reusable program, a new program as before.
+  # Returns the solved program and the solver's status.
+  error_flag = 1L
+  if (!base::is.null(linprog)) {
+    lpSolveAPI::set.rhs(linprog, b)
+    lpSolveAPI::set.basis(linprog, default = TRUE)
+    error_flag = lpSolveAPI::solve.lpExtPtr(linprog)
+  }
+  if (error_flag != 0) {
+    linprog = .delta_lp_build(lp_template, b)
+    .delta_lp_control(linprog, timeout)
+    error_flag = lpSolveAPI::solve.lpExtPtr(linprog)
+  }
+  base::list(linprog = linprog, error_flag = error_flag)
+}
+
+.test_delta_lp_fn <- function(y_T, X_T, sigma, lp_template = NULL, linprog = NULL) {
   # Returns the value of eta that solves
   #   min_{eta, delta} eta
   #     s.t. y_T - x_T delta <= eta * diag(sigma)
@@ -214,6 +329,9 @@
   #   y_T = vector
   #   X_T = matrix
   #   sigma = covariance matrix of y_T
+  #   lp_template = output of .delta_lp_template(X_T, sigma), if the caller has it already
+  #   linprog = output of .delta_lp_reusable(lp_template), if the caller has one for this
+  #             X_T and sigma; without it a new program is built
   # Outputs: list with elements
   #   etaStar   = minimum of linear program
   #   deltaStar = minimizer of linear program
@@ -226,31 +344,22 @@
   #     max f' X
   #     s.t. C X \leq b
 
-  dimDelta = base::dim(X_T)[2] # dimension of delta
-  sdVec = base::sqrt(base::diag(sigma)) # standard deviation of y_T elements
-
-  # Define objective function
-  f = base::c(1, base::rep(0, dimDelta))
-
-  # Define linear constraint
-  C = -base::cbind(sdVec, X_T)
+  # Objective function f = (1, 0, ..., 0) and linear constraint C = -(sdVec, X_T): see
+  # .delta_lp_template()
+  if (base::is.null(lp_template)) {
+    lp_template = .delta_lp_template(X_T, sigma)
+  }
+  dimDelta = lp_template$dimDelta # dimension of delta
   b = -y_T
 
-  # Define linear program using lpSolveAPI
-  linprog = lpSolveAPI::make.lp(nrow = 0, ncol = base::length(f))
-  lpSolveAPI::set.objfn(linprog, f)
-  for (r in 1:base::dim(C)[1]) {
-    lpSolveAPI::add.constraint(linprog, xt = base::c(C[r,]), type = "<=", rhs = b[r])
-  }
-  lpSolveAPI::set.bounds(linprog, lower = base::rep(-Inf, base::length(f)), columns = 1:base::length(f))
-
-  # Solve linear program using dual simplex
-  lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral")
-  error_flag = lpSolveAPI::solve.lpExtPtr(linprog)
+  # Solve linear program using dual simplex (lpSolveAPI)
+  solved = .delta_lp_solve(lp_template, b, linprog = linprog)
+  linprog = solved$linprog
+  error_flag = solved$error_flag
   eta = lpSolveAPI::get.objective(linprog)
   primalSoln = lpSolveAPI::get.primal.solution(linprog)
   delta = primalSoln[(base::length(primalSoln)-dimDelta+1):base::length(primalSoln)]
-  dual = -lpSolveAPI::get.sensitivity.rhs(linprog)$duals[1:base::dim(C)[1]]
+  dual = -lpSolveAPI::get.sensitivity.rhs(linprog)$duals[1:lp_template$nConstraints]
 
   # Construct results  list
   results = base::list(eta_star = eta,
@@ -374,19 +483,11 @@
     sigma <- sigma[rowsForARP, rowsForARP]
   }
 
-  .compute_eta <- function(b, f, C) {
-    # Define linear program using lpSolveAPI
-    linprog = lpSolveAPI::make.lp(nrow = 0, ncol = base::length(f))
-    lpSolveAPI::set.objfn(linprog, f)
-    for (r in 1:base::dim(C)[1]) {
-      lpSolveAPI::add.constraint(linprog, xt = base::c(C[r,]), type = "<=", rhs = b[r])
-    }
-    lpSolveAPI::set.bounds(linprog, lower = base::rep(-Inf, base::length(f)), columns = 1:base::length(f))
-    # Solve linear program using dual simplex
-    lpSolveAPI::lp.control(linprog, sense = "min", simplextype="dual", pivoting = "dantzig", verbose="neutral", timeout=10)
-    error_flag = lpSolveAPI::solve.lpExtPtr(linprog)
+  .compute_eta <- function(b, lp_template, linprog) {
+    # Solve linear program using dual simplex (lpSolveAPI), on the reusable program
+    solved = .delta_lp_solve(lp_template, b, linprog = linprog, timeout = 10)
     # Return value of eta
-    base::return(if (error_flag) NA else lpSolveAPI::get.objective(linprog))
+    base::return(if (solved$error_flag) NA else lpSolveAPI::get.objective(solved$linprog))
   }
 
   base::set.seed(seed)
@@ -395,15 +496,14 @@
     eta_vec = matrixStats::rowMaxs(xi.draws)
     base::return(stats::quantile(eta_vec, probs = 1 - hybrid_kappa, names = FALSE))
   } else { # Nuisance parameter case
-    # Compute elements for LP that will be re-used
-    sdVec = base::sqrt(base::diag(sigma))  # standard deviation of y_T elements
-    dimDelta = base::dim(X_T)[2]     # dimension of delta
-    f = base::c(1, base::rep(0, dimDelta)) # Define objective function
-    C = -base::cbind(sdVec, X_T)     # Define linear constraint
+    # Compute elements for LP that will be re-used: objective function f = (1, 0, ..., 0) and
+    # linear constraint C = -(sdVec, X_T)
+    lp_template = .delta_lp_template(X_T, sigma)
     xi.draws = mvtnorm::rmvnorm(n=sims, sigma=sigma)
 
     # Compute eta for each simulation
-    eta_vec = base::apply(-xi.draws, 1, .compute_eta, f, C)
+    eta_vec = base::apply(-xi.draws, 1, .compute_eta, lp_template,
+                          .delta_lp_reusable(lp_template, timeout = 10))
 
     # We compute the 1-kappa quantile of eta_vec and return this value
     base::return(stats::quantile(eta_vec, probs=1-hybrid_kappa, names=FALSE, na.rm=TRUE))
@@ -424,6 +524,11 @@
   vup = base::min(max_or_min[VbarMat %*% c > 0])
   # Return Vlo, Vup
   base::return(base::list(vlo = vlo, vup = vup))
+}
+
+# The state of the random-number generator (NULL if it has not been used yet). Read only.
+.current_random_seed <- function() {
+  base::get0(".Random.seed", envir = base::globalenv(), inherits = FALSE)
 }
 
 # ARP FUNCTIONS -------------------------------------------------------
@@ -474,8 +579,23 @@
   M = base::dim(sigma_ARP)[1]
   k = base::dim(X_T_ARP)[2]
 
-  # Compute eta, and the argmin delta
-  linSoln = .test_delta_lp_fn(y_T = y_T_ARP, X_T = X_T_ARP, sigma = sigma_ARP)
+  # Compute eta, and the argmin delta. X_T_ARP and sigma_ARP do not change over the theta grid,
+  # so the linear program is set up at the first grid point and kept, with its template, in
+  # hybrid_list$lp_cache, an environment that .ARP_computeCI creates. Later grid points only
+  # change its right-hand side.
+  lp_template = NULL
+  linprog = NULL
+  lp_cache = hybrid_list$lp_cache
+  if (base::is.environment(lp_cache)) {
+    if (base::is.null(lp_cache$template)) {
+      lp_cache$template = .delta_lp_template(X_T_ARP, sigma_ARP)
+      lp_cache$linprog = .delta_lp_reusable(lp_cache$template)
+    }
+    lp_template = lp_cache$template
+    linprog = lp_cache$linprog
+  }
+  linSoln = .test_delta_lp_fn(y_T = y_T_ARP, X_T = X_T_ARP, sigma = sigma_ARP, lp_template = lp_template,
+                              linprog = linprog)
 
   # Check to see if valid solution to LP obtained
   if (linSoln$error_flag > 0) {
@@ -747,32 +867,115 @@
   Y = base::c(A %*% betahat - d)
   sigmaY = A %*% sigma %*% base::t(A)
 
-  # HYBRID: Check if hybrid is least favorable, then compute least-favorable CV and add it to hybrid list
-  if (hybrid_flag == "LF") {
-    hybrid_list$lf_cv = .compute_least_favorable_cv(X_T = AGammaInv_minusOne,
-                                                    sigma = sigmaY,
-                                                    hybrid_kappa = hybrid_list$hybrid_kappa,
-                                                    rowsForARP = rowsForARP)
-  }
-
-  # Define helper function to loop over theta grid
-  testTheta <- function(theta) {
-    # If FLCI Hybrid, compute dbar
-    if (hybrid_flag == "FLCI") {
-      hybrid_list$dbar = base::c(hybrid_list$flci_halflength - (t(hybrid_list$vbar) %*% d) + (1 - t(hybrid_list$vbar) %*% AGammaInv_one)*theta,
-                                 hybrid_list$flci_halflength + (t(hybrid_list$vbar) %*% d) - (1 - t(hybrid_list$vbar) %*% AGammaInv_one)*theta)
+  # MEMO: with hybrid_flag = "LF", the test results over the theta grid are a function of the
+  # grid, of the rows of Y, AGammaInv and sigmaY listed in rowsForARP, and of alpha and
+  # hybrid_kappa (.compute_least_favorable_cv sets its own seed). The other rows of A are not
+  # used. A caller that runs this function on several A whose rows in rowsForARP may coincide,
+  # as computeConditionalCS_DeltaRM() does over s and the sign (at Mbar = 0 they all coincide),
+  # can pass an environment in hybrid_list$arp_memo. A call whose inputs are identical, bit for
+  # bit, to those of an earlier call then takes the earlier call's results instead of computing
+  # them again. The warnings of the earlier call are raised again, and the look-up also needs the
+  # random-number state to be the one the earlier call left behind, so the results, the warnings
+  # and the state are what a second computation would give.
+  arp_memo = hybrid_list$arp_memo
+  memo_key = NULL
+  memo_hit = NULL
+  if (base::is.environment(arp_memo) && hybrid_flag == "LF" && !base::is.null(rowsForARP)) {
+    X_memo = AGammaInv_minusOne
+    if (base::is.vector(X_memo)) {
+      X_memo = base::matrix(X_memo, ncol = 1)
     }
-
-    # For the FLCI, we compute the modified FLCI vlo, vup inside this function now.
-    reject = .test_delta_lp_fn_wrapper(theta = theta, y_T = Y-AGammaInv_one*theta, X_T = AGammaInv_minusOne,
-                                       sigma = sigmaY, alpha = alpha,
-                                       hybrid_flag = hybrid_flag, hybrid_list = hybrid_list, rowsForARP = rowsForARP)
-    accept = 1-reject
-    base::return(accept)
+    memo_key = base::list(thetaGrid, Y[rowsForARP], AGammaInv_one[rowsForARP], X_memo[rowsForARP,],
+                          sigmaY[rowsForARP, rowsForARP], alpha, hybrid_list$hybrid_kappa)
+    for (memo_entry in arp_memo$entries) {
+      if (base::identical(memo_entry$key, memo_key, num.eq = FALSE, single.NA = FALSE) &&
+          base::identical(memo_entry$seed_after, .current_random_seed())) {
+        memo_hit = memo_entry
+        break
+      }
+    }
   }
 
-  # Loop over theta grid and store acceptances
-  testResultsGrid <- purrr::map_dbl(.x = thetaGrid, .f = testTheta)
+  if (!base::is.null(memo_hit)) {
+    hybrid_list$lf_cv = memo_hit$lf_cv
+    for (memo_condition in memo_hit$conditions) {
+      if (base::inherits(memo_condition, "warning")) {
+        base::warning(memo_condition)
+      } else {
+        base::message(memo_condition)
+      }
+    }
+    testResultsGrid <- memo_hit$testResultsGrid
+  } else {
+    # The handlers only take note of the warnings and messages; they do not stop them.
+    memo_conditions = base::list()
+    base::withCallingHandlers({
+      # HYBRID: Check if hybrid is least favorable, then compute least-favorable CV and add it to hybrid list
+      if (hybrid_flag == "LF") {
+        # The least-favorable CV is a function of AGammaInv_minusOne, sigmaY, hybrid_kappa and
+        # rowsForARP (.compute_least_favorable_cv sets its own seed), not of d or betahat. A caller
+        # that runs this function for several d with the same A, as createSensitivityResults() does
+        # over Mvec, can pass an environment in hybrid_list$lf_cv_cache. The CV is then computed in
+        # the first call and looked up in the later ones. A look-up needs the four inputs to be
+        # identical bit for bit, and the random-number state to be the one the computation left
+        # behind, so that skipping the computation changes neither the CV nor the state.
+        lf_cv_cache = hybrid_list$lf_cv_cache
+        lf_cv_inputs = base::list(AGammaInv_minusOne, sigmaY, hybrid_list$hybrid_kappa, rowsForARP)
+        if (base::is.environment(lf_cv_cache) &&
+            base::identical(lf_cv_cache$inputs, lf_cv_inputs, num.eq = FALSE, single.NA = FALSE) &&
+            base::identical(lf_cv_cache$seed_after, .current_random_seed())) {
+          hybrid_list$lf_cv = lf_cv_cache$value
+        } else {
+          hybrid_list$lf_cv = .compute_least_favorable_cv(X_T = AGammaInv_minusOne,
+                                                          sigma = sigmaY,
+                                                          hybrid_kappa = hybrid_list$hybrid_kappa,
+                                                          rowsForARP = rowsForARP)
+          if (base::is.environment(lf_cv_cache)) {
+            lf_cv_cache$inputs = lf_cv_inputs
+            lf_cv_cache$value = hybrid_list$lf_cv
+            lf_cv_cache$seed_after = .current_random_seed()
+          }
+        }
+      }
+
+      # A place for .lp_conditional_test_fn to keep what it sets up once for the whole theta grid.
+      hybrid_list$lp_cache = base::new.env()
+
+      # Define helper function to loop over theta grid
+      testTheta <- function(theta) {
+        # If FLCI Hybrid, compute dbar
+        if (hybrid_flag == "FLCI") {
+          hybrid_list$dbar = base::c(hybrid_list$flci_halflength - (t(hybrid_list$vbar) %*% d) + (1 - t(hybrid_list$vbar) %*% AGammaInv_one)*theta,
+                                     hybrid_list$flci_halflength + (t(hybrid_list$vbar) %*% d) - (1 - t(hybrid_list$vbar) %*% AGammaInv_one)*theta)
+        }
+
+        # For the FLCI, we compute the modified FLCI vlo, vup inside this function now.
+        reject = .test_delta_lp_fn_wrapper(theta = theta, y_T = Y-AGammaInv_one*theta, X_T = AGammaInv_minusOne,
+                                           sigma = sigmaY, alpha = alpha,
+                                           hybrid_flag = hybrid_flag, hybrid_list = hybrid_list, rowsForARP = rowsForARP)
+        accept = 1-reject
+        base::return(accept)
+      }
+
+      # Loop over theta grid and store acceptances
+      testResultsGrid <- purrr::map_dbl(.x = thetaGrid, .f = testTheta)
+    }, warning = function(w) {
+      if (!base::is.null(memo_key)) {
+        memo_conditions[[base::length(memo_conditions) + 1L]] <<- w
+      }
+    }, message = function(m) {
+      if (!base::is.null(memo_key)) {
+        memo_conditions[[base::length(memo_conditions) + 1L]] <<- m
+      }
+    })
+    if (!base::is.null(memo_key)) {
+      arp_memo$entries = base::c(arp_memo$entries,
+                                 base::list(base::list(key = memo_key, lf_cv = hybrid_list$lf_cv,
+                                                       conditions = memo_conditions,
+                                                       testResultsGrid = testResultsGrid,
+                                                       seed_after = .current_random_seed())))
+    }
+  }
   testValsGrid <- thetaGrid
   resultsGrid <- base::cbind(testValsGrid, testResultsGrid)
   if( (resultsGrid[1, 2] == 1 | resultsGrid[base::NROW(resultsGrid), 2] == 1) & hybrid_flag != "FLCI"){

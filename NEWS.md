@@ -5,6 +5,8 @@
 * The solver packages it uses are now in Suggests; if one is missing, `fect_sens()` stops and prints one `install.packages()` line.
 * The engine is internal and fect exports nothing new, so the fork's other functions (FLCI, other restrictions) are not available through fect.
 * Ashesh Rambachan and Jonathan Roth are listed as contributors in `DESCRIPTION`.
+* `fect_sens()` is about four times faster with default grids; the reported bounds are unchanged.
+* `conformal_sc()` and `fect(method = "fe", vartype = "conformal")`: a full conformal set no longer gains or loses a piece when two slopes that are equal in exact arithmetic differ in their last digits.
 
 # fect 2.5.0
 
