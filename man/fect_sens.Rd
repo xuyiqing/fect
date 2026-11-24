@@ -36,7 +36,10 @@ This function:
   \item Computes robust confidence sets under RM and C-LF assumptions.
   \item Optionally computes robust bounds for each post-treatment period separately.
 }
-Robust sets are computed using functions from the \pkg{HonestDiDFEct} package.
+The robust sets use code from the \pkg{HonestDiD} package of Rambachan and Roth (2023), adapted to the output of \code{fect} and included in \pkg{fect}. The solver packages the analysis calls (\pkg{Rglpk}, \pkg{lpSolveAPI}, \pkg{TruncatedNormal}, \pkg{matrixStats}, \pkg{Matrix}, \pkg{pracma}, \pkg{purrr}, \pkg{tibble} and \pkg{ECOSolveR}) are in Suggests: if one is missing, \code{fect_sens()} stops and prints one \code{install.packages()} line naming the missing ones.
+}
+\references{
+Rambachan, A. and Roth, J. (2023). A more credible approach to parallel trends. \emph{Review of Economic Studies} 90(5), 2555-2591. \doi{10.1093/restud/rdad018}
 }
 \value{
 An updated \code{fect} object including:
@@ -48,8 +51,9 @@ Rivka Lipkovitz
 }
 \examples{
 \donttest{
-## HonestDiDFEct is not on CRAN: remotes::install_github("lzy318/HonestDiDFEct")
-if (requireNamespace("HonestDiDFEct", quietly = TRUE)) {
+solvers <- c("Rglpk", "lpSolveAPI", "TruncatedNormal", "matrixStats",
+             "Matrix", "pracma", "purrr", "tibble", "ECOSolveR")
+if (all(vapply(solvers, requireNamespace, logical(1), quietly = TRUE))) {
   library(fect)
   data(simdata)
   ## The sensitivity analysis uses pre-treatment placebo estimates, so fit

@@ -165,6 +165,7 @@ The following individuals (and AI) have contributed to **gsynth** and **fect**, 
 -   Jinwen Wu (PhD Student at Yale University)
 -   [Rivka Lipkovitz](https://rivka.me/) (Undergraduate at MIT)
 -   [Anton Strezhnev](https://www.antonstrezhnev.com/) (Assistant Professor at the University of Wisconsin--Madison; contributed the double leave-one-out pre-trend placebos, `dloo`)
+-   [Ashesh Rambachan](https://asheshrambachan.github.io/) and [Jonathan Roth](https://www.jonathandroth.com/) (authors of [**HonestDiD**](https://github.com/asheshrambachan/HonestDiD); `fect_sens()` includes code adapted from it)
 -   [StatsClaw](https://statsclaw.ai/) (Agentic System for Statistical Software Development)
 
 ## How to Cite

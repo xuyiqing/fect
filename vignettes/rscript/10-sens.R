@@ -12,17 +12,11 @@ if ("fect" %in% rownames(installed.packages()) == FALSE) {
   devtools:: install_github("xuyiqing/fect")
 }
 
-# install forked "HonestDiD" package compatible with "fect"
-if ("HonestDiDFEct" %in% rownames(installed.packages()) == FALSE) {
-  devtools:: install_github("lzy318/HonestDiDFEct") # This is used by fect_sens
-}
-
 
 ## ----load-libraries, message = FALSE, warning = FALSE-------------------------
 library(dplyr)
 library(panelView)
 library(ggplot2)
-library(HonestDiDFEct) # Required for fect_sens to work
 
 
 ## ----load-hh2019, message = FALSE, warning = FALSE----------------------------

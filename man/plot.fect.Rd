@@ -334,7 +334,7 @@ if (requireNamespace("ggplot2")) {
   # plot(effect(out.sims), main = "Cumulative ATT")
 
   # Sensitivity plots: on the object returned by fect_sens(), which needs a fit
-  # with a placebo test and the HonestDiDFEct package; see ?fect_sens
+  # with a placebo test and the solver packages in Suggests; see ?fect_sens
   # out.p <- fect(Y ~ D, data = simdata, index = c("id","time"), method = "fe",
   #               se = TRUE, placeboTest = TRUE, placebo.period = c(-2, 0),
   #               parallel = FALSE, nboots = 50)

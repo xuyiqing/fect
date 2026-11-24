@@ -14,11 +14,6 @@ if ("fect" %in% rownames(installed.packages()) == FALSE) {
   devtools:: install_github("xuyiqing/fect")
 }
 
-# install forked "HonestDiD" package compatible with "fect"
-if ("HonestDiDFEct" %in% rownames(installed.packages()) == FALSE) {
-  devtools:: install_github("lzy318/HonestDiDFEct")
-}
-
 
 ## ----load-libraries, message = FALSE, warning = FALSE-------------------------
 library(dplyr)
@@ -32,7 +27,6 @@ library(bacondecomp)
 library(didimputation)
 library(doParallel)
 library(HonestDiD)
-library(HonestDiDFEct)
 has_polars <- requireNamespace("polars", quietly = TRUE)
 if (has_polars) {
   library(polars)

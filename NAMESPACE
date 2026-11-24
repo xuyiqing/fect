@@ -4,7 +4,7 @@ importFrom(Rcpp, evalCpp)
 importFrom("stats", "na.omit", "quantile", "sd", "var", "cov", "pchisq", "lm",
 "as.formula", "median", "pnorm", "predict", "qnorm", "reshape",
 "dnorm", "pf", "rbinom", "loess", "aggregate", "pt", "qt", "setNames", "time")
-importFrom("foreach","foreach","%dopar%")
+importFrom("foreach","foreach","%dopar%","%do%")
 importFrom("parallel", "detectCores", "stopCluster", "makeCluster")
 importFrom("doRNG","registerDoRNG")
 importFrom("MASS", "ginv")
