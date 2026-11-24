@@ -767,13 +767,6 @@
     rho_rel = base::abs(base::as.vector(rho)) / rho_scale
     rho_zero = base::which(rho_rel <= .honest_rho_tol())   # rho_scale = 0 gives NaN: no row is guarded
     if (base::length(rho_zero) > 0) rho[rho_zero] = 0
-    rho_log = base::getOption("fect.honest_rho_log")
-    if (base::is.environment(rho_log)) {
-      rho_log$n_calls   = (if (base::is.null(rho_log$n_calls))   0L else rho_log$n_calls)   + 1L
-      rho_log$n_guarded = (if (base::is.null(rho_log$n_guarded)) 0L else rho_log$n_guarded) + base::length(rho_zero)
-      rho_log$n_calls_guarded = (if (base::is.null(rho_log$n_calls_guarded)) 0L else rho_log$n_calls_guarded) + (base::length(rho_zero) > 0)
-      rho_log$small = base::c(rho_log$small, rho_rel[!base::is.na(rho_rel) & rho_rel < 1e-4])
-    }
     maximand_or_minimand = (-Gamma_B %*% y_T_ARP)/rho + base::c(base::t(v_B) %*% y_T_ARP)
 
     # Compute truncation values
