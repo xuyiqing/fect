@@ -4599,7 +4599,9 @@ fect.default <- function(
             nboots = nboots,
             n.failed = output$n.boot.fail,
             sim = output$para.sim.check,
-            para.error = output$para.error
+            para.error = output$para.error,
+            niter = output$boot.niter,
+            max.iteration = max.iteration
         )
         ## warn when the final draws or the first-step pool break down
         if (!identical(output$boot.diag$cause, "none")) {
@@ -4607,7 +4609,16 @@ fect.default <- function(
                                             has.missing = any(I == 0)),
                     call. = FALSE)
         }
+        ## K4: bootstrap refits that stopped at max.iteration
+        if (isTRUE(output$boot.diag$n.cap > 0)) {
+            warning(sprintf(
+                paste("%d of %d bootstrap fits stopped at max.iteration = %d;",
+                      "the standard error rests partly on fits that did not converge"),
+                output$boot.diag$n.cap, output$boot.diag$n.used,
+                as.integer(max.iteration)), call. = FALSE)
+        }
     }
+    output$boot.niter <- NULL
     output$n.boot.fail <- NULL
     output$para.sim.check <- NULL
 

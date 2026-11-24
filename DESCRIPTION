@@ -30,7 +30,6 @@ Imports:
     abind (>= 1.4-0),
     codetools,
     MASS, 
-    gridExtra, 
     grid, 
     fixest (>= 0.14.0), 
     doRNG,
@@ -49,7 +48,6 @@ Suggests:
     testthat (>= 3.0.0),
     did (>= 2.5.1),
     DIDmultiplegtDYN,
-    ggrepel,
     withr,
     CVXR (>= 1.8),
     ECOSolveR,
@@ -64,7 +62,6 @@ Suggests:
 Depends: R (>= 4.1.0)
 LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 7.3.3
-Packaged: 2024-01-26 03:25:56 UTC; ziyil
 Encoding: UTF-8
 Config/testthat/edition: 3
 LazyData: true

@@ -472,7 +472,6 @@ plot.fect <- function(
 
   carryover.period <- x$carryover.period
   binary <- x$binary
-  Ftest <- !is.null(x$pre.test)
 
   if (!is.null(show.group)) {
     if (length(show.group) > 1) {
@@ -1148,10 +1147,10 @@ plot.fect <- function(
     if (!plot.ci %in% c("0.9", "0.95", "none")) {
       stop("\"plot.ci\" must be one of \"0.95\", \"0.9\" or \"none\".")
     }
-    if (plot.ci %in% c("0.90", "0.95") && is.null(x$est.att) && !unit.gap) {
+    if (plot.ci %in% c("0.9", "0.95") && is.null(x$est.att) && !unit.gap) {
       stop("No uncertainty estimates.")
     }
-    if (plot.ci == "0.90" && type %in% c("gap", "exit")) {
+    if (plot.ci == "0.9" && type %in% c("gap", "exit")) {
       warning("90% CI in gap plots or exiting treatment plots.\n")
     }
     if (plot.ci == "0.95" && type == "equiv") {
@@ -1573,7 +1572,7 @@ plot.fect <- function(
     x$att <- x$balance.att
     x$time <- x$balance.time
     x$count <- x$balance.count
-    x$att.avg <- x$balance.att.avg
+    x$att.avg <- x$balance.avg.att
     x$est.att <- x$est.balance.att
     x$att.bound <- x$balance.att.bound
     x$att.boot <- x$balance.att.boot
@@ -1899,7 +1898,7 @@ plot.fect <- function(
         }
       }
       xlab_final <- if (is.null(xlab)) x$index[2] else if (xlab == "") NULL else xlab
-      ylab_final <- if (is.null(ylab)) x$Yname else if (ylab == "") NULL else ylab
+      ylab_final <- if (is.null(ylab)) x$Y else if (ylab == "") NULL else ylab
       plot_single_unit_flag <- FALSE
       unit_to_plot_name <- NULL
       plot_single_unit_flag <- length(id.tr_names) == 1
@@ -2297,7 +2296,7 @@ plot.fect <- function(
 
       maintext <- "Treated vs Estimated Counterfactuals"
       xlab_final <- if (is.null(xlab)) "Time Since the Treatment's Onset" else if (xlab == "") NULL else xlab
-      ylab_final <- if (is.null(ylab)) x$Yname else if (ylab == "") NULL else ylab
+      ylab_final <- if (is.null(ylab)) x$Y else if (ylab == "") NULL else ylab
 
       # Determine indices of event_time_full_series to show, based on provided_xlim (un-padded)
       indices_to_show <- 1:length(event_time_full_series)
