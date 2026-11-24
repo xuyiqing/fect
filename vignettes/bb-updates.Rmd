@@ -4,7 +4,7 @@
 
 [Development version, not yet on CRAN.]{.text-muted}
 
-**Change: fect_sens() no longer needs a separate GitHub package.** Its code, adapted from HonestDiD [@rambachan2023more], is part of fect. Arguments and results do not change. The solver packages it uses are in Suggests; a missing one is named in the error message.
+**Change: fect_sens() no longer needs a separate GitHub package.** Its code, adapted from HonestDiD [@rambachan2023more], is part of fect. Arguments and results do not change. The solver packages it uses are in Suggests; a missing one is named in the error message. `fect_sens()` is also about five times faster with default settings, and the reported bounds do not change.
 
 ## v2.5.0
 
