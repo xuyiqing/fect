@@ -144,6 +144,33 @@ trim_closure_env <- function(fun) {
   x[sample.int(length(x), size, replace = replace)]
 }
 
+## v2.5.1: the bootstrap and the parametric error draw redraw units until every
+## period keeps an untreated observation. On a sparse panel (few untreated
+## observations in some periods) no draw may ever qualify, and the redraw
+## loop never ended (found on a 864-row, 310-period sample). Each loop now
+## calls a counter made here and stops with a clear error after `max.tries`.
+.fect_redraw_guard <- function(max.tries = 10000L) {
+  n <- 0L
+  function() {
+    n <<- n + 1L
+    if (n > max.tries) {
+      stop(structure(
+        class = c("fect_redraw_error", "error", "condition"),
+        list(
+          message = paste0(
+            "Uncertainty estimates: after ", max.tries, " tries, no resample ",
+            "of units left every period with an untreated observation. Some ",
+            "periods have untreated observations in very few units. Drop ",
+            "those periods or units, or use vartype = \"jackknife\"."
+          ),
+          call = NULL
+        )
+      ))
+    }
+    invisible(n)
+  }
+}
+
 ## v2.4.8 (B1): draws "more than k IQRs from the median" -- the extreme-draw
 ## rule of the gsynth-revisit reanalysis. NA when the IQR is 0 (at least half
 ## the draws are equal): the rule has no scale then, and counting every draw
@@ -1248,7 +1275,9 @@ fect_boot <- function(
     valid.co <- valid_controls(out, method, time.component.from, force)
 
     draw.error <- function() {
+      tick <- .fect_redraw_guard()
       repeat {
+        tick()
         fake.tr <- id.co[sample.int(length(id.co), 1L)]
         if (fake.tr %in% valid.co) {
           break
@@ -1256,7 +1285,9 @@ fect_boot <- function(
       }
 
       id.co.rest <- id.co[which(!id.co %in% fake.tr)]
+      tick <- .fect_redraw_guard()
       repeat {
+        tick()
         id.co.pseudo <- .fect_resample(id.co.rest, Nco)
         if (sum(apply(as.matrix(out$I[, id.co.pseudo]), 1, sum) >= 1) == TT) {
           break
@@ -1412,7 +1443,9 @@ fect_boot <- function(
 
     one.nonpara <- function(num = NULL) {
       ## boostrap ID
+      tick <- .fect_redraw_guard()
       repeat {
+        tick()
         fake.co <- .fect_resample(id.co, Nco)
         if (sum(apply(as.matrix(II[, fake.co]), 1, sum) >= 1) == TT) {
           break
@@ -1648,7 +1681,9 @@ fect_boot <- function(
         if (is.null(cl)) {
           if (hasRevs == 0) {
             if (Nco > 0) {
+              tick <- .fect_redraw_guard()
               repeat {
+                tick()
                 fake.co <- .fect_resample(co, Nco)
                 fake.tr <- .fect_resample(tr, Ntr)
                 boot.id <- c(fake.tr, fake.co)
@@ -1657,7 +1692,9 @@ fect_boot <- function(
                 }
               }
             } else {
+              tick <- .fect_redraw_guard()
               repeat {
+                tick()
                 boot.id <- .fect_resample(tr, Ntr)
                 if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                   break
@@ -1667,7 +1704,9 @@ fect_boot <- function(
           } else {
             if (Ntr > 0) {
               if (Nco > 0) {
+                tick <- .fect_redraw_guard()
                 repeat {
+                  tick()
                   fake.co <- .fect_resample(co, Nco)
                   fake.tr <- .fect_resample(tr, Ntr)
                   fake.rev <- .fect_resample(rev, Nrev)
@@ -1677,7 +1716,9 @@ fect_boot <- function(
                   }
                 }
               } else {
+                tick <- .fect_redraw_guard()
                 repeat {
+                  tick()
                   fake.tr <- .fect_resample(tr, Ntr)
                   fake.rev <- .fect_resample(rev, Nrev)
                   boot.id <- c(fake.rev, fake.tr)
@@ -1688,7 +1729,9 @@ fect_boot <- function(
               }
             } else {
               if (Nco > 0) {
+                tick <- .fect_redraw_guard()
                 repeat {
+                  tick()
                   fake.co <- .fect_resample(co, Nco)
                   fake.rev <- .fect_resample(rev, Nrev)
                   boot.id <- c(fake.rev, fake.co)
@@ -1697,7 +1740,9 @@ fect_boot <- function(
                   }
                 }
               } else {
+                tick <- .fect_redraw_guard()
                 repeat {
+                  tick()
                   boot.id <- .fect_resample(rev, Nrev)
                   if (sum(apply(as.matrix(II[, boot.id]), 1, sum) >= 1) == TT) {
                     break

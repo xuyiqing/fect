@@ -8,6 +8,7 @@
 * `fect_sens()` is about five times faster with default grids; the reported bounds are unchanged.
 * The honest-sensitivity engine treats a left-out moment whose weight in the truncation interval is zero up to rounding (relative 1e-10) as zero, so a duplicated moment no longer makes a bound depend on the BLAS/LAPACK library; `fect_sens()` results are not expected to change.
 * `conformal_sc()` and `fect(method = "fe", vartype = "conformal")`: a full conformal set no longer gains or loses a piece when two slopes that are equal in exact arithmetic differ in their last digits.
+* Bootstrap and parametric-bootstrap uncertainty estimates no longer run forever when some periods have untreated observations in very few units: after 10,000 resamples of units that leave a period without an untreated observation, `fect()` stops with an error that suggests dropping those periods or units, or using `vartype = "jackknife"`. Fits that worked before give the same results with the same seed.
 
 # fect 2.5.0
 
