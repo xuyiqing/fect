@@ -6,6 +6,8 @@
 
 **Change: fect_sens() no longer needs a separate GitHub package.** Its code, adapted from HonestDiD [@rambachan2023more], is part of fect. Arguments and results do not change. The solver packages it uses are in Suggests; a missing one is named in the error message. `fect_sens()` is also about five times faster with default settings, and the reported bounds do not change.
 
+**Fix: the bootstrap no longer hangs on sparse panels.** When some periods have untreated observations in very few units, almost no resample of units keeps an untreated observation in every period, and the bootstrap used to run forever. It now stops after 10,000 such resamples with an error that suggests dropping those periods or units, or using `vartype = "jackknife"`. Fits that worked before give the same results with the same seed.
+
 ## v2.5.0
 
 [Development version, not yet on CRAN.]{.text-muted}
