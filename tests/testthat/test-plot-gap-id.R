@@ -23,6 +23,18 @@
   list(p = p, messages = msgs)
 }
 
+## plot.ci = "0.9" on a gap plot warns by design (R/plot.R); check that
+## warning, and only it, and return the plot.
+.gi_w90 <- function(expr) {
+  w <- character(0)
+  p <- withCallingHandlers(expr, warning = function(c) {
+    w <<- c(w, conditionMessage(c))
+    invokeRestart("muffleWarning")
+  })
+  expect_identical(trimws(w), "90% CI in gap plots or exiting treatment plots.")
+  p
+}
+
 .gi_geoms <- function(p) vapply(p$layers, function(l) class(l$geom)[1], "")
 
 ## The estimates the plot draws (default unconnected style): x, y, ymin and
@@ -160,7 +172,9 @@ test_that("G3: with a bootstrap fit, the gap plot for an id draws no interval, s
   expect_true(any(grepl("F test p-value", .gi_text(p0), fixed = TRUE)))
   for (args in list(list(), list(plot.ci = "0.95"), list(plot.ci = "0.9"),
                     list(stats = "F.p"), list(bound = "equiv"))) {
-    r <- .gi_plot(do.call(plot, c(list(fit, type = "gap", id = 102), args)))
+    r <- .gi_plot(if (identical(args$plot.ci, "0.9"))
+      .gi_w90(do.call(plot, c(list(fit, type = "gap", id = 102), args)))
+    else do.call(plot, c(list(fit, type = "gap", id = 102), args)))
     pts <- .gi_points(r$p)
     expect_equal(pts$y, as.numeric(fit$eff[, j]), tolerance = 1e-12)
     expect_true(all(is.na(pts$ymin)) && all(is.na(pts$ymax)))
@@ -390,7 +404,7 @@ test_that("G8: with parametric draws, the gap plot for an id draws a band from t
     expect_false("GeomLine" %in% .gi_geoms(p))
   }
   ## plot.ci = "0.9": the 90% band; "none": no band and no message
-  p90 <- suppressMessages(plot(fit, type = "gap", id = 102, plot.ci = "0.9"))
+  p90 <- suppressMessages(.gi_w90(plot(fit, type = "gap", id = 102, plot.ci = "0.9")))
   expect_equal(.gi_points(p90), .gi_band_by_hand(fit, 102, a = 0.1), tolerance = 1e-10)
   rn <- .gi_plot(plot(fit, type = "gap", id = 102, plot.ci = "none"))
   expect_true(all(is.na(.gi_points(rn$p)$ymin)))
@@ -416,8 +430,8 @@ test_that("G8: with parametric draws, the gap plot for an id draws a band from t
   a10$ci.alpha <- 0.1
   expect_equal(.gi_points(suppressMessages(plot(a10, type = "gap", id = 102))),
                .gi_band_by_hand(fit, 102, a = 0.1), tolerance = 1e-10)
-  expect_equal(.gi_points(suppressMessages(plot(a10, type = "gap", id = 102,
-                                                plot.ci = "0.9"))),
+  expect_equal(.gi_points(suppressMessages(.gi_w90(plot(a10, type = "gap", id = 102,
+                                                       plot.ci = "0.9")))),
                .gi_band_by_hand(fit, 102, a = 0.2), tolerance = 1e-10)
   ## a fit object from before fect 2.4.7, without ci.method and ci.alpha:
   ## the normal 95% band
@@ -446,7 +460,7 @@ test_that("G9: the band follows the fit's ci.method and alpha", {
   pts <- .gi_points(suppressMessages(plot(fit, type = "gap", id = 102)))
   expect_equal(pts, .gi_band_by_hand(fit, 102, a = 0.1, rule = "basic"),
                tolerance = 1e-10)
-  p90 <- .gi_points(suppressMessages(plot(fit, type = "gap", id = 102, plot.ci = "0.9")))
+  p90 <- .gi_points(suppressMessages(.gi_w90(plot(fit, type = "gap", id = 102, plot.ci = "0.9"))))
   expect_equal(p90, .gi_band_by_hand(fit, 102, a = 0.2, rule = "basic"),
                tolerance = 1e-10)
   pall <- suppressMessages(plot(fit, type = "gap", id = fit$id[fit$tr]))
