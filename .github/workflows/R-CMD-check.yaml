@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [master, dev]
   workflow_dispatch:
+    inputs:
+      suite:
+        description: "Tests on macOS: cran (skip_on_cran tests skipped; under an hour) or full (every test; about 2.5 hours)"
+        type: choice
+        options: [cran, full]
+        default: cran
 
 permissions:
   contents: read
@@ -25,6 +31,9 @@ jobs:
       #     (test-paraboot-parity.R PAR-1..7, test-cv-parallel.R P.3-P.6) execute on
       #     the OS where their RDS baselines were captured. Non-Apple BLAS produces
       #     bit-different results, so those tests are gated to macOS only.
+      #     A hand-started run (workflow_dispatch) runs macOS CRAN-style too unless
+      #     its `suite` input is "full"; a push to master always runs the full suite.
+      #     The Check step applies this through CHECK_NOT_CRAN.
       #
       # The matrix carries the per-OS not_cran value which we pass directly to
       # rcmdcheck::rcmdcheck(env = ...) below — see the Check step for why we
@@ -161,6 +170,9 @@ jobs:
 
       - name: Check (CRAN-like)
         shell: Rscript {0}
+        env:
+          # A hand-started run is CRAN-style on every OS unless suite = "full".
+          CHECK_NOT_CRAN: ${{ (github.event_name == 'workflow_dispatch' && inputs.suite != 'full') && 'false' || matrix.config.not_cran }}
         run: |
           # r-lib/actions/setup-r-dependencies@v2 writes NOT_CRAN=true to
           # $GITHUB_ENV unconditionally, so the parent R process always sees
@@ -172,12 +184,14 @@ jobs:
           # testthat's skip_on_cran() gates correctly per matrix entry.
           # Verified: callr::rcmd_safe_env() lists 4 baseline keys (CYGWIN,
           # R_TESTS, R_BROWSER, R_PDFVIEWER); rcmdcheck appends `env` on top.
-          cat("Passing NOT_CRAN='${{ matrix.config.not_cran }}' to rcmdcheck via env=\n")
+          not_cran <- Sys.getenv("CHECK_NOT_CRAN")
+          stopifnot(not_cran %in% c("true", "false"))
+          cat("Passing NOT_CRAN='", not_cran, "' to rcmdcheck via env=\n", sep = "")
           rcmdcheck::rcmdcheck(
             args = c('--no-manual','--as-cran'),
             error_on = 'error',
             check_dir = 'check',
-            env = c(NOT_CRAN = "${{ matrix.config.not_cran }}")
+            env = c(NOT_CRAN = not_cran)
           )
 
       - name: Upload test results (JUnit XML)
